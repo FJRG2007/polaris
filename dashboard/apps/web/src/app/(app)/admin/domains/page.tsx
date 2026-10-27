@@ -1,16 +1,16 @@
 /**
  * Domains admin panel (/admin/domains). The guided setup decides how the box is
  * exposed and under which domain; this page also holds Polaris's own addresses (the
- * app domain and the sharing domain used for share links and drop points), the root
- * certificate for `polaris.local`, and - under Advanced - the manual exposure and
- * DuckDNS controls. Admin-only.
+ * app domain and the sharing domain used for share links and drop points), the DNS
+ * records, and - under Advanced - the manual exposure and DuckDNS controls.
+ * Remote access, ports, certificates and the security inventory are pages of their
+ * own beside it (see `moved-anchors.ts` for where an old anchor goes). Admin-only.
  *
  * The page awaits nothing but the admin check. Everything on it reads through the
  * network to answer - the address list dials the tunnel daemon and probes each
- * hostname, the game ports knock on a router, the guided setup checks DNS - and
- * awaiting those here meant the navigation itself stalled until the slowest of
- * them came back, with the previous page still on screen. The panel fetches after
- * the first paint instead.
+ * hostname, the guided setup checks DNS - and awaiting those here meant the
+ * navigation itself stalled until the slowest of them came back, with the previous
+ * page still on screen. The panel fetches after the first paint instead.
  */
 
 import { PageHeader } from "@polaris/ui";
@@ -18,7 +18,7 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { DomainsView } from "./domains-view";
 import { Messages } from "@/components/i18n/messages";
-import { SecurityInventory } from "@/components/domain-security/security-inventory";
+import { MovedAnchorRedirect } from "./moved-anchor-redirect";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +34,9 @@ export default async function DomainsPage() {
                 title={t("domains.page.title")}
                 description={t("domains.page.description")}
             />
+            <MovedAnchorRedirect />
             <Messages namespaces={["dns", "deploySafety"]}>
                 <DomainsView />
-            </Messages>
-            {/* Every domain Polaris knows, checked for spoofing, DNS, registration
-                and HTTPS problems - read after the first paint like the rest. */}
-            <Messages namespaces={["domainSecurity"]}>
-                <div className="mt-6">
-                    <SecurityInventory />
-                </div>
             </Messages>
         </div>
     );

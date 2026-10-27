@@ -114,6 +114,9 @@ import {
     TrendingUp,
     Stethoscope,
     Package,
+    Waypoints,
+    EthernetPort,
+    FileBadge,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -675,6 +678,14 @@ const DEVELOPERS_GROUP = "Developers";
 const ADMIN_AREAS_GROUP = "Areas";
 
 /**
+ * Platform's Domains heading. Domains grew past one page - the tunnels, the ports
+ * and the certificates each answer a different question, and on one page they
+ * were a long scroll - so its screens sit under a heading of their own in the
+ * Platform rail, at the addresses below /admin/domains.
+ */
+const DOMAINS_GROUP = "Domains";
+
+/**
  * The Management areas, each a rail of its own.
  *
  * Twenty-odd screens under seven headings was still a list to read through, so
@@ -896,8 +907,48 @@ const ADMIN_AREAS: AppSubapp[] = [
                 label: "Domains", // i18n-ignore
                 href: "/admin/domains",
                 adminOnly: true,
+                group: DOMAINS_GROUP,
                 icon: Globe,
-                keywords: ["dns", "tunnels", "certificates"]
+                keywords: ["dns", "dns records", "setup", "app domain", "sharing domain", "duckdns"]
+            },
+            {
+                label: "Remote access", // i18n-ignore
+                href: "/admin/domains/remote-access",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: Waypoints,
+                keywords: [
+                    "tunnels",
+                    "cloudflare tunnel",
+                    "tailscale",
+                    "relay",
+                    "cgnat",
+                    "backup access"
+                ]
+            },
+            {
+                label: "Ports", // i18n-ignore
+                href: "/admin/domains/ports",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: EthernetPort,
+                keywords: ["port forwarding", "router", "game ports", "call ports", "nat"]
+            },
+            {
+                label: "Certificates", // i18n-ignore
+                href: "/admin/domains/certificates",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: FileBadge,
+                keywords: ["https", "tls", "ssl", "root certificate", "polaris.local", "acme"]
+            },
+            {
+                label: "Domain security", // i18n-ignore
+                href: "/admin/domains/security",
+                adminOnly: true,
+                group: DOMAINS_GROUP,
+                icon: ShieldCheck,
+                keywords: ["spoofing", "dmarc", "spf", "dkim", "registration", "expiry"]
             }
         ]
     },

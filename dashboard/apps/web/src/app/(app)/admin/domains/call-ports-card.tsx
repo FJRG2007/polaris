@@ -23,6 +23,7 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { repairCallAddressAction } from "./actions";
 import { useLiveResource } from "@/components/use-live-resource";
+import { PortsReadFailed } from "./ports-read-failed";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CALL_FORWARD_RULES, type CallPortsReading } from "@/lib/chat/call-ports";
 
@@ -32,7 +33,9 @@ const POLL_MS = 15_000;
 
 const PORTS_URL = "/api/admin/domains/call-ports";
 
-export function CallPortsCard() {
+/** `onKnown` hears, once the first read is in, whether the card has anything to
+ *  show - so a page holding only this card can tell loading from empty. */
+export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void } = {}) {
     const t = useTranslations("admin");
     // Off for the first read and on for every one after: knocking on a closed
     // port waits out a timeout, so the card is on screen before it starts.
@@ -49,6 +52,22 @@ export function CallPortsCard() {
     }, [live.loading]);
 
     const reading = live.data;
+    const known = reading !== null || !live.loading;
+    const failed = reading === null && live.error !== null;
+    const shown = failed || Boolean(reading?.shipped);
+    useEffect(() => {
+        if (known) onKnown?.(shown);
+    }, [known, shown, onKnown]);
+    if (failed) {
+        return (
+            <PortsReadFailed
+                id="call-ports"
+                title={t("domainsPorts.call.title")}
+                refreshing={live.refreshing}
+                onRetry={live.refresh}
+            />
+        );
+    }
     // Nothing to say about a call server somebody else runs: it has its own
     // address and its own router, and none of this advice is about it.
     if (!reading || !reading.shipped) return null;
@@ -59,7 +78,6 @@ export function CallPortsCard() {
             title={t("domainsPorts.call.title")}
             description={t("domainsPorts.call.description")}
         >
-
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                     {live.stale ??
@@ -81,9 +99,15 @@ export function CallPortsCard() {
 
             <ul className="flex flex-col divide-y divide-border/60">
                 {reading.ports.map((entry) => (
-                    <li key={`${entry.protocol}-${entry.port}`} className="flex items-center gap-2 py-2">
+                    <li
+                        key={`${entry.protocol}-${entry.port}`}
+                        className="flex items-center gap-2 py-2"
+                    >
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm" title={t(`domainsPorts.callLabel.${entry.protocol}`)}>
+                            <p
+                                className="truncate text-sm"
+                                title={t(`domainsPorts.callLabel.${entry.protocol}`)}
+                            >
                                 {t(`domainsPorts.callLabel.${entry.protocol}`)}
                             </p>
                             <p className="font-mono text-xs text-muted-foreground">
@@ -127,7 +151,9 @@ export function CallPortsCard() {
                                 {t("domainsPorts.reached")}
                             </Badge>
                         ) : (
-                            <Badge className="border-warning-edge text-warning">{t("domainsPorts.notConfirmed")}</Badge>
+                            <Badge className="border-warning-edge text-warning">
+                                {t("domainsPorts.notConfirmed")}
+                            </Badge>
                         )}
                     </li>
                 ))}
@@ -151,12 +177,18 @@ export function CallPortsCard() {
                 </p>
             ) : reading.confirmed ? null : (
                 <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
-                    <p className="font-medium text-foreground">{t("domainsPorts.call.onlyLocal")}</p>
+                    <p className="font-medium text-foreground">
+                        {t("domainsPorts.call.onlyLocal")}
+                    </p>
                     <p className="text-muted-foreground">
                         {reading.cannotProbe ?? t("domainsPorts.call.nothingArrived")}
                     </p>
                     <div className="text-muted-foreground">
-                        <RouterSteps server={null} lanIp={reading.lanIp} rules={CALL_FORWARD_RULES} />
+                        <RouterSteps
+                            server={null}
+                            lanIp={reading.lanIp}
+                            rules={CALL_FORWARD_RULES}
+                        />
                     </div>
                 </div>
             )}
@@ -178,13 +210,7 @@ export function CallPortsCard() {
  * the minutes before it notices, and for the person who wants to rule the whole
  * theory in or out now rather than in ten minutes.
  */
-function AddressRow({
-    reading,
-    onDone
-}: {
-    reading: CallPortsReading;
-    onDone: () => void;
-}) {
+function AddressRow({ reading, onDone }: { reading: CallPortsReading; onDone: () => void }) {
     const t = useTranslations("admin");
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState("");
@@ -193,19 +219,27 @@ function AddressRow({
         <div
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
-                reading.addressStale ? "border-warning-edge bg-warning-soft" : "border-border bg-muted/40"
+                reading.addressStale
+                    ? "border-warning-edge bg-warning-soft"
+                    : "border-border bg-muted/40"
             )}
         >
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium text-foreground">
-                    {reading.addressStale ? t("domainsPorts.call.addressStale") : t("domainsPorts.call.address")}
+                    {reading.addressStale
+                        ? t("domainsPorts.call.addressStale")
+                        : t("domainsPorts.call.address")}
                 </p>
                 {reading.publicIp && (
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{reading.publicIp}</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                        {reading.publicIp}
+                    </code>
                 )}
             </div>
             <p className="text-muted-foreground">
-                {reading.addressStale ? t("domainsPorts.call.addressStaleBody") : t("domainsPorts.call.addressBody")}
+                {reading.addressStale
+                    ? t("domainsPorts.call.addressStaleBody")
+                    : t("domainsPorts.call.addressBody")}
                 {reading.askedAt
                     ? ` ${t("domainsPorts.call.askedAt", { time: new Date(reading.askedAt).toLocaleString() })}`
                     : ""}

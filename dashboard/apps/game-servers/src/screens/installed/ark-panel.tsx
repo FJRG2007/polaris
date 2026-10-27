@@ -664,7 +664,7 @@ function ConnectCard({
                             )}
                             {reach.forward && (
                                 <Link
-                                    href="/admin/domains#game-ports"
+                                    href="/admin/domains/ports#game-ports"
                                     className="w-fit text-primary hover:underline"
                                 >
                                     {t("panel.openTheRouterWalkthrough")}

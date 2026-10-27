@@ -219,7 +219,7 @@ export function CallServerView() {
                                             link: (chunks) => (
                                                 <Link
                                                     key="link"
-                                                    href="/admin/domains"
+                                                    href="/admin/domains/ports#call-ports"
                                                     className="text-primary hover:underline"
                                                 >
                                                     {chunks}

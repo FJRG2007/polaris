@@ -345,7 +345,7 @@ async function tellAdmins(state: CallAddressState): Promise<void> {
                 level: state.healed ? "info" : "warning",
                 audience: "admins",
                 actionRequired: !state.healed,
-                href: "/admin/domains",
+                href: "/admin/domains/ports#call-ports",
                 metadata: { address: state.current, changedAt: state.changedAt }
             })
         )

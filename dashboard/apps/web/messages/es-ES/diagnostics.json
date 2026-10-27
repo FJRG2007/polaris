@@ -81,6 +81,7 @@
         "freeSpace": "Liberar espacio",
         "openSettings": "Abrir ajustes",
         "openDomains": "Abrir dominios",
+        "openCertificates": "Abrir certificados",
         "done": "Hecho. Se volvió a comprobar.",
         "failed": "No funcionó. La comprobación muestra cómo está."
     },

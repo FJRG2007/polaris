@@ -152,13 +152,13 @@ function StatusLine({ status }: { status: FollowStatus | null }) {
                         {
                             ip: status.ip ?? "-",
                             link: (chunks) => (
-                                <a
+                                <Link
                                     key="link"
-                                    href="#backup-access"
+                                    href="/admin/domains/remote-access#backup-access"
                                     className="text-primary hover:underline"
                                 >
                                     {chunks}
-                                </a>
+                                </Link>
                             )
                         }
                     )}

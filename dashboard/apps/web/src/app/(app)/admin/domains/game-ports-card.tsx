@@ -31,6 +31,7 @@ import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
 import { describeBlock } from "@/lib/apps/port-block";
 import { useLiveResource } from "@/components/use-live-resource";
+import { PortsReadFailed } from "./ports-read-failed";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { GamePortsReading } from "@/lib/apps/port-advice";
 
@@ -40,7 +41,9 @@ const POLL_MS = 15_000;
 
 const PORTS_URL = "/api/admin/domains/game-ports";
 
-export function GamePortsCard() {
+/** `onKnown` hears, once the first read is in, whether the card has anything to
+ *  show - so a page holding only this card can tell loading from empty. */
+export function GamePortsCard({ onKnown }: { onKnown?: (shown: boolean) => void } = {}) {
     const t = useTranslations("admin");
     // Off for the first read and on for every one after: knocking on a closed port
     // waits out a timeout, so the card is on screen before it starts.
@@ -59,6 +62,22 @@ export function GamePortsCard() {
     }, [live.loading]);
 
     const reading = live.data;
+    const known = reading !== null || !live.loading;
+    const failed = reading === null && live.error !== null;
+    const shown = failed || Boolean(reading && reading.servers.length > 0);
+    useEffect(() => {
+        if (known) onKnown?.(shown);
+    }, [known, shown, onKnown]);
+    if (failed) {
+        return (
+            <PortsReadFailed
+                id="game-ports"
+                title={t("domainsPorts.game.title")}
+                refreshing={live.refreshing}
+                onRetry={live.refresh}
+            />
+        );
+    }
     // Nothing to say on a deployment that runs no game servers, and a card that
     // explains a situation nobody is in is noise on an admin page.
     if (!reading || reading.servers.length === 0) return null;
