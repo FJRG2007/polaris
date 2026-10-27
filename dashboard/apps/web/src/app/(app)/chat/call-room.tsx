@@ -415,19 +415,16 @@ export function CallRoom({
      * in this call, so opening the conversation again does not undo it - see
      * `stoppedStreams`.
      */
-    const [away, setAway] = useState<readonly string[]>(() =>
-        stillShared(stoppedStreams(meetingId), shared)
-    );
+    const [away, setAway] = useState<readonly string[]>(() => stoppedStreams(meetingId, shared));
     const sharedKeys = shared.map((stage) => stage.key).join("|");
     const [knownKeys, setKnownKeys] = useState(sharedKeys);
     if (knownKeys !== sharedKeys) {
         setKnownKeys(sharedKeys);
         setAway((was) => stillShared(was, shared));
     }
-    const awayKeys = away.join("|");
     useEffect(() => {
-        rememberStopped(meetingId, awayKeys ? awayKeys.split("|") : []);
-    }, [meetingId, awayKeys]);
+        rememberStopped(meetingId, shared.filter((stage) => away.includes(stage.key)));
+    }, [meetingId, away, shared]);
     /** What is left to draw, which is what the rest of the room is built from:
      *  a screen put away is not on the stage, does not hold the panel open and
      *  does not push the faces into a strip. */
@@ -2764,7 +2761,9 @@ function Tile({
         !(event.target as Element | null)?.closest?.(`[${TILE_CONTROLS}]`);
     const zoomProps = zoomable ? look.frameProps : null;
     const frameProps = {
-        onPointerDown: (event: React.PointerEvent<HTMLElement>) => zoomProps?.onPointerDown(event),
+        onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+            if (onPicture(event)) zoomProps?.onPointerDown(event);
+        },
         onPointerMove: (event: React.PointerEvent<HTMLElement>) => {
             zoomProps?.onPointerMove(event);
             controls.frameProps.onPointerMove(event);

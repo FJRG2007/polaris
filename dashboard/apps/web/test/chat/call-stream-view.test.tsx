@@ -55,12 +55,15 @@ const video = {
 };
 
 class FakeStream {
-    constructor(private readonly audio: number) {}
+    constructor(
+        private readonly audio: number,
+        private readonly picture: object = video
+    ) {}
     getAudioTracks() {
         return Array.from({ length: this.audio }, () => ({ kind: "audio" }));
     }
     getVideoTracks() {
-        return [video];
+        return [this.picture];
     }
     getTracks() {
         return [...this.getAudioTracks(), ...this.getVideoTracks()];
@@ -230,6 +233,27 @@ describe("a stream in a direct message", () => {
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
     });
 
+    it("is watched again when the share started over while the call was closed", () => {
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Stop watching Bo - screen" }));
+        expect(watchedStreams()).toEqual([]);
+
+        cleanup();
+        const again = new FakeStream(1, { ...video, id: "second-share" });
+        render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call({ screens: new Map([["seat-bo", again as unknown as MediaStream]]) })}
+                onLeave={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    });
+
     it("takes the call alone when asked, and gives the people back", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
             wrapper: MessagesWrapper
@@ -396,6 +420,30 @@ describe("the buttons over a stream", () => {
         expect(tile.getByRole("button", { name: "Pop out" })).toBeTruthy();
         expect(tile.getByRole("button", { name: "Zoom in" })).toBeTruthy();
         expect(tile.getByRole("button", { name: "Full screen" })).toBeTruthy();
+    });
+
+    it("are pressed, not dragged, on a zoomed picture", () => {
+        const capture = vi.fn();
+        Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+            configurable: true,
+            value: capture
+        });
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        const tile = within(streamTile());
+        fireEvent.click(tile.getByRole("button", { name: "Zoom in" }));
+        fireEvent.pointerDown(tile.getByRole("button", { name: "Full screen" }), {
+            button: 0,
+            pointerId: 1
+        });
+        fireEvent.pointerDown(tile.getByLabelText("How loud Bo - screen is"), {
+            button: 0,
+            pointerId: 1
+        });
+        expect(capture).not.toHaveBeenCalled();
+        fireEvent.pointerDown(document.querySelector("video")!, { button: 0, pointerId: 1 });
+        expect(capture).toHaveBeenCalledTimes(1);
     });
 
     it("goes full screen on a double press", () => {
