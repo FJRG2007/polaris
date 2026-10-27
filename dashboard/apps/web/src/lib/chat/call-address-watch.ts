@@ -207,8 +207,13 @@ export async function syncCallNodeIp(ip: string | null): Promise<boolean> {
     // A server somebody else runs learns its own address.
     if (!endpoint?.shipped) return false;
     try {
-        if (ip) await writeFile(file, `${ip}
-`, { encoding: "utf8", mode: 0o644 });
+        if (ip)
+            await writeFile(
+                file,
+                `${ip}
+`,
+                { encoding: "utf8", mode: 0o644 }
+            );
         else await rm(file, { force: true });
     } catch {
         // No shared volume here (the limited edition): nothing to point.
