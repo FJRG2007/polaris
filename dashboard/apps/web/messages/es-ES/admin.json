@@ -836,6 +836,8 @@
         "lastAnswered": "Respondió desde fuera por última vez el {time}",
         "reached": "Accesible desde fuera",
         "notConfirmed": "Sin confirmar",
+        "readFailed": "No se han podido leer estos puertos ahora mismo.",
+        "retry": "Reintentar",
         "errors": {
             "invalid": "Puertos no válidos",
             "range": "El rango {protocol} tiene que tener la forma 25565-25664, quedar por encima de 1024 y no incluir 80 ni 443."

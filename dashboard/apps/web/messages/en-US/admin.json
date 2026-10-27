@@ -836,6 +836,8 @@
         "lastAnswered": "Last answered from outside on {time}",
         "reached": "Reached from outside",
         "notConfirmed": "Not confirmed",
+        "readFailed": "These ports could not be read just now.",
+        "retry": "Try again",
         "errors": {
             "invalid": "Invalid port settings",
             "range": "The {protocol} range has to read like 25565-25664, stay above 1024, and leave 80 and 443 alone."

@@ -15,6 +15,7 @@
  * where it can, and link straight to the right panel where it cannot.
  */
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
 import { CERTIFICATE_CONTACT_ID } from "./certificate-contact-card";
@@ -1351,12 +1352,12 @@ function RouterAdviceNote({
                     </ol>
                 )}
                 {advice.key === "cert:untrusted" ? (
-                    <a
+                    <Link
                         href={`/admin/domains/certificates#${CERTIFICATE_CONTACT_ID}`}
                         className="w-fit text-primary underline-offset-2 hover:underline"
                     >
                         {t("domainsSetup.certificateContactLink")}
-                    </a>
+                    </Link>
                 ) : null}
                 {advice.forward && (
                     <RouterSteps

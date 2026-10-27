@@ -23,6 +23,7 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { repairCallAddressAction } from "./actions";
 import { useLiveResource } from "@/components/use-live-resource";
+import { PortsReadFailed } from "./ports-read-failed";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CALL_FORWARD_RULES, type CallPortsReading } from "@/lib/chat/call-ports";
 
@@ -52,10 +53,21 @@ export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
 
     const reading = live.data;
     const known = reading !== null || !live.loading;
-    const shown = Boolean(reading?.shipped);
+    const failed = reading === null && live.error !== null;
+    const shown = failed || Boolean(reading?.shipped);
     useEffect(() => {
         if (known) onKnown?.(shown);
     }, [known, shown, onKnown]);
+    if (failed) {
+        return (
+            <PortsReadFailed
+                id="call-ports"
+                title={t("domainsPorts.call.title")}
+                refreshing={live.refreshing}
+                onRetry={live.refresh}
+            />
+        );
+    }
     // Nothing to say about a call server somebody else runs: it has its own
     // address and its own router, and none of this advice is about it.
     if (!reading || !reading.shipped) return null;
