@@ -33,6 +33,9 @@ export type Placeholder = (typeof PLACEHOLDERS)[number];
 
 export const TITLE_MAX = 120;
 export const BODY_MAX = 2000;
+/** The long form behind "See details", and one update added to it later. */
+export const DETAILS_MAX = 20_000;
+export const UPDATE_MAX = 4000;
 export const LINK_LABEL_MAX = 40;
 /** A day ahead unless the administrator says otherwise. */
 export const DEFAULT_LEAD_MINUTES = 24 * 60;
@@ -94,6 +97,8 @@ export const composeSchema = z
         severity: z.enum(SEVERITIES),
         title: z.string().min(1).max(TITLE_MAX),
         body: z.string().max(BODY_MAX),
+        // Optional so a form or a client written before details existed still parses.
+        details: z.string().max(DETAILS_MAX).default(""),
         linkUrl: z.string().max(2000).refine(safeLink, "link").nullable(),
         linkLabel: z.string().max(LINK_LABEL_MAX).nullable(),
         audience: audienceSchema,
@@ -151,8 +156,15 @@ export function normalizeCompose(input: ComposeInput): ComposeInput {
         ...input,
         title: input.title.trim(),
         body: input.body.trim(),
+        // Absent from a form written before details existed.
+        details: (input.details ?? "").trim(),
         linkUrl: optional(input.linkUrl),
         linkLabel: optional(input.linkLabel),
         affected: [...new Set(input.affected.map((one) => one.trim()).filter(Boolean))]
     };
 }
+
+/** An update added to an announcement after it went out. */
+export const addUpdateSchema = z
+    .object({ id: uuid, body: z.string().trim().min(1).max(UPDATE_MAX) })
+    .strict();

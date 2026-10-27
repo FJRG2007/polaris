@@ -18,6 +18,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { findAccountsAsAdmin } from "@/lib/people-search";
 import * as announcements from "@/lib/announcements/service";
 import {
+    addUpdateSchema,
     announcementIdSchema,
     audienceSchema,
     composeSchema,
@@ -151,6 +152,23 @@ export async function retractAnnouncementAction(id: string): Promise<Result> {
         action: "announcement.retract",
         targetType: "announcement",
         targetId: id
+    });
+    return { ok: true };
+}
+
+/** Add an update ("taking longer than planned") to the announcement's details page. */
+export async function addAnnouncementUpdateAction(input: unknown): Promise<Result> {
+    const admin = await requireAdmin();
+    const t = await errorWords();
+    const parsed = addUpdateSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: t("admin.errors.update"), field: "body" };
+    if (!(await announcements.addAnnouncementUpdate(admin.id, parsed.data.id, parsed.data.body)))
+        return { ok: false, error: t("admin.errors.gone") };
+    await recordAudit({
+        actorId: admin.id,
+        action: "announcement.addUpdate",
+        targetType: "announcement",
+        targetId: parsed.data.id
     });
     return { ok: true };
 }

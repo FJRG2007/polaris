@@ -50,7 +50,8 @@
             "upcoming": "Scheduled maintenance",
             "inProgress": "Maintenance in progress",
             "finished": "Maintenance finished"
-        }
+        },
+        "details": "See details"
     },
     "admin": {
         "title": "Announcements",
@@ -101,7 +102,10 @@
             "save": "Save changes",
             "cancel": "Cancel",
             "translated": "Translated for each reader while you leave the text as it is.",
-            "edited": "Edited text is shown as you wrote it, in every language."
+            "edited": "Edited text is shown as you wrote it, in every language.",
+            "detailsLabel": "Details",
+            "detailsHint": "Shown on its own page behind \"See details\". Optional.",
+            "detailsPlaceholder": "What is affected, the timeline, what to expect"
         },
         "severity": {
             "info": "Info",
@@ -131,7 +135,8 @@
             "rateLimited": "Too many sends in the last hour. Try again in {minutes} min.",
             "notEditable": "It has already started, so it can no longer be edited. End it or send a new one.",
             "gone": "That announcement no longer exists.",
-            "failed": "That did not work. Try again."
+            "failed": "That did not work. Try again.",
+            "update": "Write the update (up to 4000 characters)."
         },
         "history": {
             "title": "Sent and scheduled",
@@ -155,7 +160,14 @@
             "cancelled": "Cancelled",
             "sent": "Sent",
             "saved": "Saved",
-            "older": "Show more"
+            "older": "Show more",
+            "addUpdate": "Post an update",
+            "updateTitle": "Post an update",
+            "updateBody": "It is added to the details page and readers' banners show \"See details\".",
+            "updatePlaceholder": "The upgrade is taking longer than planned.",
+            "updateConfirm": "Post update",
+            "updated": "Update posted.",
+            "viewDetails": "Open details page"
         },
         "phase": {
             "scheduled": "Scheduled",
@@ -166,5 +178,14 @@
             "ended": "Ended",
             "retracted": "Retracted"
         }
+    },
+    "details": {
+        "back": "Back",
+        "notFound": "This announcement is not available.",
+        "window": "Window",
+        "affected": "Affected",
+        "updates": "Updates",
+        "noDetails": "No further details.",
+        "posted": "Posted {when}"
     }
 }

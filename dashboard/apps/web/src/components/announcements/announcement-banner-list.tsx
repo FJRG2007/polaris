@@ -153,6 +153,14 @@ export function AnnouncementBannerList({
                             />
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
+                            {banner.detailsUrl && banner.detailsUrl !== banner.linkUrl ? (
+                                <Link
+                                    href={banner.detailsUrl}
+                                    className="max-w-40 truncate rounded-md border border-current/20 px-2 py-1 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10"
+                                >
+                                    {t("banner.details")}
+                                </Link>
+                            ) : null}
                             {banner.linkUrl ? (
                                 banner.linkUrl.startsWith("/") ? (
                                     <Link

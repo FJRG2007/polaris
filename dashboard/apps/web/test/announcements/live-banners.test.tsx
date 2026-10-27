@@ -57,6 +57,7 @@ function banner(over: Partial<BannerView> = {}): BannerView {
         body: "",
         linkUrl: null,
         linkLabel: null,
+        detailsUrl: null,
         dismissible: true,
         countdownTo: null,
         ...over
@@ -198,6 +199,17 @@ describe("the banner stack follows along", () => {
         expect(screen.getByText("Maintenance in progress")).toBeTruthy();
         // Under way: no close button.
         expect(screen.queryByRole("button", { name: /dismiss|close/i })).toBeNull();
+    });
+
+    it("offers See details when the banner has a page", () => {
+        render(
+            <AnnouncementBannerList
+                initial={{ banners: [banner({ detailsUrl: "/announcements/x" })], nextChangeInMs: null }}
+                locale="en-US"
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.getByRole("link", { name: "See details" }).getAttribute("href")).toBe("/announcements/x");
     });
 
     it("keeps what is on screen when a read fails", async () => {

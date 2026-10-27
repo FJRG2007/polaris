@@ -47,6 +47,8 @@ export const NOTICE_EVENT = "instance.announcement";
 export const CRITICAL_EVENT = "instance.announcement.critical";
 const BANNER_LIMIT = 5;
 const BANNER_SCAN = 200;
+/** Updates a details page lists; past this an announcement wants a new one. */
+const UPDATES_SHOWN = 100;
 const HISTORY_MAX = 1000;
 const CLOCK_BATCH = 50;
 const SEND_CONCURRENCY = 20;
@@ -135,6 +137,7 @@ export function columnsFor(input: ComposeInput, now: Date) {
         severity: input.severity,
         title: input.title,
         body: input.body,
+        details: input.details,
         linkUrl: input.linkUrl,
         linkLabel: input.linkUrl ? input.linkLabel : null,
         vars: JSON.stringify({ affected: input.affected }),
@@ -160,6 +163,7 @@ export function composeFrom(row: AnnouncementRow): ComposeInput {
         severity: row.severity as ComposeInput["severity"],
         title: row.title,
         body: row.body,
+        details: row.details,
         linkUrl: row.linkUrl,
         linkLabel: row.linkLabel,
         audience: readAudience(row.audience),
@@ -429,6 +433,8 @@ export interface BannerView {
     body: string;
     linkUrl: string | null;
     linkLabel: string | null;
+    /** Where "See details" goes, when there is more to read than the banner says. */
+    detailsUrl: string | null;
     dismissible: boolean;
     /** The moment a countdown counts to: the window's start while it is upcoming. */
     countdownTo: string | null;
@@ -496,7 +502,8 @@ async function readBanners(
             OR: [{ endsAt: null }, { endsAt: { gt: now } }]
         },
         orderBy: { startsAt: "desc" },
-        take: BANNER_SCAN
+        take: BANNER_SCAN,
+        include: { _count: { select: { updates: true } } }
     });
     if (rows.length === 0) return { banners: [], nextChangeInMs: null };
     let member: Awaited<ReturnType<typeof membershipOf>> | undefined;
@@ -532,6 +539,7 @@ async function readBanners(
                 body: text.body,
                 linkUrl: row.linkUrl,
                 linkLabel: row.linkLabel,
+                detailsUrl: hasDetails(row, row._count?.updates ?? 0) ? detailsPath(row.id) : null,
                 dismissible: bannerDismissible(row.severity, phase),
                 countdownTo:
                     phase === "upcoming" && row.windowStart ? row.windowStart.toISOString() : null
@@ -540,6 +548,108 @@ async function readBanners(
     return { banners, nextChangeInMs: edges.length > 0 ? Math.min(...edges) : null };
 }
 
+/** The page an announcement's details are read on. */
+export function detailsPath(id: string): string {
+    return `/announcements/${id}`;
+}
+
+/**
+ * Whether there is more to read than the banner says: written details, an
+ * update added since, or a maintenance window, whose page lists the window and
+ * what it touches.
+ */
+export function hasDetails(row: Pick<AnnouncementRow, "kind" | "details">, updates: number): boolean {
+    return row.kind === "maintenance" || (row.details ?? "").trim().length > 0 || updates > 0;
+}
+
+export interface AnnouncementDetails {
+    id: string;
+    kind: string;
+    severity: string;
+    phase: Phase;
+    title: string;
+    body: string;
+    details: string;
+    linkUrl: string | null;
+    linkLabel: string | null;
+    windowStart: string | null;
+    windowEnd: string | null;
+    affected: string[];
+    startsAt: string;
+    updates: { id: string; body: string; createdAt: string }[];
+}
+
+/**
+ * One announcement as its details page shows it, or null when this reader may
+ * not read it: not in its audience, taken back, or not started yet. An
+ * administrator reads any of them, so the history can link to the page.
+ */
+export async function detailsFor(
+    userId: string,
+    isAdmin: boolean,
+    id: string,
+    reader: Reader,
+    now = new Date()
+): Promise<AnnouncementDetails | null> {
+    const row = await prisma.announcement.findUnique({
+        where: { id },
+        include: {
+            updates: {
+                orderBy: { createdAt: "asc" },
+                take: UPDATES_SHOWN,
+                select: { id: true, body: true, createdAt: true }
+            }
+        }
+    });
+    if (!row) return null;
+    if (!isAdmin) {
+        if (row.retractedAt || row.startsAt > now) return null;
+        const audience = readAudience(row.audience);
+        if (!audience.everyone && !matchesAudience(await membershipOf(userId), audience)) return null;
+    }
+    const phase = phaseAt(row, now);
+    const text = renderFor(renderInput(row), phase, reader);
+    return {
+        id: row.id,
+        kind: row.kind,
+        severity: row.severity,
+        phase,
+        title: text.title,
+        body: text.body,
+        details: row.details,
+        linkUrl: row.linkUrl,
+        linkLabel: row.linkLabel,
+        windowStart: row.windowStart?.toISOString() ?? null,
+        windowEnd: row.windowEnd?.toISOString() ?? null,
+        affected: readAffected(row.vars),
+        startsAt: row.startsAt.toISOString(),
+        updates: (row.updates ?? []).map((one) => ({
+            id: one.id,
+            body: one.body,
+            createdAt: one.createdAt.toISOString()
+        }))
+    };
+}
+
+/** Add an update to an announcement still standing, and tell its audience's tabs. */
+export async function addAnnouncementUpdate(
+    actorId: string,
+    id: string,
+    body: string,
+    now = new Date()
+): Promise<boolean> {
+    const row = await prisma.announcement.findUnique({
+        where: { id },
+        select: { audience: true, retractedAt: true }
+    });
+    if (!row || row.retractedAt) return false;
+    await prisma.announcementUpdate.create({
+        data: { announcementId: id, body, createdById: actorId, createdAt: now }
+    });
+    // The first update is what gives a banner its "See details".
+    announceBannerChange(readAudience(row.audience));
+    return true;
+}
 /** Close a banner for one reader, for the phase it is in. Refused when it may not be closed. */
 export async function dismissBanner(
     userId: string,
