@@ -518,6 +518,7 @@
         "web/src/app/(app)/admin/domains/certificates/page.tsx",
         "web/src/app/(app)/admin/domains/security/page.tsx",
         "web/src/app/(app)/admin/domains/moved-anchor-redirect.tsx",
+        "web/src/app/(app)/admin/domains/ports-view.tsx",
         "web/src/app/(app)/admin/domains/port-policy-form.tsx",
         "web/src/app/(app)/admin/domains/router-steps.tsx",
         "web/src/app/(app)/admin/domains/setup-actions.ts",

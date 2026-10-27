@@ -15,6 +15,8 @@
 
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
+import { useEffect } from "react";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,6 +38,24 @@ function stub(name: string) {
     return () => <section data-card={name} />;
 }
 
+/** What each port card has found: null while its read is out, then whether it has
+ *  anything to show. */
+const ports = vi.hoisted(() => ({
+    game: true as boolean | null,
+    call: true as boolean | null
+}));
+
+/** A port card stand-in that reports, like the real one, once it knows. */
+function portCard(name: string, which: "game" | "call") {
+    return function PortCard({ onKnown }: { onKnown?: (shown: boolean) => void }) {
+        const found = ports[which];
+        useEffect(() => {
+            if (found !== null) onKnown?.(found);
+        }, [found, onKnown]);
+        return found ? <section data-card={name} /> : null;
+    };
+}
+
 const DOMAINS = "src/app/(app)/admin/domains";
 
 vi.mock("@/app/(app)/admin/domains/domains-view", () => ({
@@ -49,10 +69,10 @@ vi.mock("@/app/(app)/admin/domains/tailscale-card", () => ({
     TailscaleCard: stub("TailscaleCard")
 }));
 vi.mock("@/app/(app)/admin/domains/game-ports-card", () => ({
-    GamePortsCard: stub("GamePortsCard")
+    GamePortsCard: portCard("GamePortsCard", "game")
 }));
 vi.mock("@/app/(app)/admin/domains/call-ports-card", () => ({
-    CallPortsCard: stub("CallPortsCard")
+    CallPortsCard: portCard("CallPortsCard", "call")
 }));
 vi.mock("@/app/(app)/admin/domains/certificate-contact-card", () => ({
     CertificateContactCard: stub("CertificateContactCard")
@@ -117,6 +137,8 @@ const ANCHOR_OWNERS: Record<string, { card: string; file: string }> = {
 };
 
 beforeEach(() => {
+    ports.game = true;
+    ports.call = true;
     session.requireAdmin.mockClear();
     router.replace.mockClear();
 });
@@ -125,7 +147,7 @@ afterEach(cleanup);
 describe("the Domains pages", () => {
     for (const [href, { page, cards }] of Object.entries(PAGES)) {
         it(`${href} draws ${cards.join(", ")} after the admin check`, async () => {
-            const markup = renderToStaticMarkup(await page());
+            const markup = renderToStaticMarkup(withMessages(await page()));
 
             expect(session.requireAdmin).toHaveBeenCalledTimes(1);
             for (const card of cards) expect(markup).toContain(`data-card="${card}"`);
@@ -157,7 +179,7 @@ describe("the Domains pages", () => {
     it("draws each card on exactly one page", async () => {
         const seen: string[] = [];
         for (const { page } of Object.values(PAGES)) {
-            const markup = renderToStaticMarkup(await page());
+            const markup = renderToStaticMarkup(withMessages(await page()));
             seen.push(...[...markup.matchAll(/data-card="([^"]+)"/g)].map((match) => match[1]!));
         }
 
@@ -183,7 +205,7 @@ describe("an old link to /admin/domains#anchor", () => {
             const moved = movedAnchorHref(`#${id}`);
             const href = moved ? moved.split("#")[0]! : "/admin/domains";
             if (moved) expect(moved).toBe(`${href}#${id}`);
-            const markup = renderToStaticMarkup(await PAGES[href]!.page());
+            const markup = renderToStaticMarkup(withMessages(await PAGES[href]!.page()));
 
             expect(markup).toContain(`data-card="${owner.card}"`);
         });
@@ -214,5 +236,46 @@ describe("an old link to /admin/domains#anchor", () => {
         expect(router.replace).toHaveBeenCalledWith(
             "/admin/domains/certificates#certificate-contact"
         );
+    });
+});
+
+describe("the Ports page", () => {
+    const EMPTY = "Nothing on this server needs an open port right now.";
+
+    it("holds a skeleton, not the empty note, while the cards are still reading", async () => {
+        ports.game = null;
+        ports.call = null;
+        const view = render(withMessages(await PortsPage()));
+
+        expect(view.queryAllByTestId("ports-skeleton")).toHaveLength(2);
+        expect(view.container.textContent).not.toContain(EMPTY);
+    });
+
+    it("keeps the note back while one card is still reading", async () => {
+        ports.game = false;
+        ports.call = null;
+        const view = render(withMessages(await PortsPage()));
+
+        expect(view.queryAllByTestId("ports-skeleton")).toHaveLength(1);
+        expect(view.container.textContent).not.toContain(EMPTY);
+    });
+
+    it("says nothing needs a port once both have read and found nothing", async () => {
+        ports.game = false;
+        ports.call = false;
+        const view = render(withMessages(await PortsPage()));
+
+        expect(view.queryAllByTestId("ports-skeleton")).toHaveLength(0);
+        expect(view.container.textContent).toContain(EMPTY);
+    });
+
+    it("shows a card that has something, and no note", async () => {
+        ports.game = true;
+        ports.call = false;
+        const view = render(withMessages(await PortsPage()));
+
+        expect(view.container.querySelector('[data-card="GamePortsCard"]')).not.toBeNull();
+        expect(view.queryAllByTestId("ports-skeleton")).toHaveLength(0);
+        expect(view.container.textContent).not.toContain(EMPTY);
     });
 });

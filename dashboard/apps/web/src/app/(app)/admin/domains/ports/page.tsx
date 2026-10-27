@@ -9,8 +9,7 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { CallPortsCard } from "@/app/(app)/admin/domains/call-ports-card";
-import { GamePortsCard } from "@/app/(app)/admin/domains/game-ports-card";
+import { PortsView } from "@/app/(app)/admin/domains/ports-view";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +23,7 @@ export default async function PortsPage() {
                 title={t("domains.pages.ports.title")}
                 description={t("domains.pages.ports.description")}
             />
-            {/* Each card draws nothing when nothing on this server needs it, so
-                the note below stands in when both are empty. */}
-            <div className="peer flex w-full flex-col gap-6 empty:hidden">
-                <GamePortsCard />
-                <CallPortsCard />
-            </div>
-            <p className="hidden text-sm text-muted-foreground peer-empty:block">
-                {t("domains.pages.ports.empty")}
-            </p>
+            <PortsView />
         </div>
     );
 }

@@ -32,7 +32,9 @@ const POLL_MS = 15_000;
 
 const PORTS_URL = "/api/admin/domains/call-ports";
 
-export function CallPortsCard() {
+/** `onKnown` hears, once the first read is in, whether the card has anything to
+ *  show - so a page holding only this card can tell loading from empty. */
+export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void } = {}) {
     const t = useTranslations("admin");
     // Off for the first read and on for every one after: knocking on a closed
     // port waits out a timeout, so the card is on screen before it starts.
@@ -49,6 +51,11 @@ export function CallPortsCard() {
     }, [live.loading]);
 
     const reading = live.data;
+    const known = reading !== null || !live.loading;
+    const shown = Boolean(reading?.shipped);
+    useEffect(() => {
+        if (known) onKnown?.(shown);
+    }, [known, shown, onKnown]);
     // Nothing to say about a call server somebody else runs: it has its own
     // address and its own router, and none of this advice is about it.
     if (!reading || !reading.shipped) return null;
