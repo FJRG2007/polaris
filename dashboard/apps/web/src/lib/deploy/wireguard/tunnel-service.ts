@@ -20,6 +20,7 @@ import { loadEnv } from "@polaris/config";
 import { serviceName } from "@polaris/deploy";
 import { getPorts } from "@/lib/deploy/runtime";
 import { getPublicIp } from "@/lib/domain-service";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { edgeHostnameTaken } from "@/lib/app-edge";
 import { getHostConnection } from "@/lib/host-service";
 import { containerPortOf } from "@/lib/deploy-service";
@@ -169,7 +170,7 @@ export async function listTunnels(ownerId: string): Promise<TunnelView[]> {
         }
     });
     const localIp = rows.some((row) => row.publicTarget.kind === "local")
-        ? await getPublicIp()
+        ? await homeEndpointHost()
         : null;
     return rows.map((row) => ({
         id: row.id,
@@ -187,6 +188,82 @@ export async function listTunnels(ownerId: string): Promise<TunnelView[]> {
             row.publicTarget.kind === "local" ? localIp : (row.publicTarget.host?.address ?? null),
         createdAt: row.createdAt.toISOString()
     }));
+}
+
+/**
+ * The UDP ports this machine listens on as the public end of a running tunnel.
+ *
+ * A tunnel whose public end is this machine needs its port reachable from
+ * outside; behind a carrier NAT only the backup relay can carry it.
+ */
+export async function homeListenPorts(): Promise<number[]> {
+    const rows = await prisma.wireguardTunnel.findMany({
+        where: { paused: false, publicTarget: { kind: "local" } },
+        select: { listenPort: true },
+        take: 1000
+    });
+    return rows.map((row) => row.listenPort);
+}
+
+/**
+ * Where peers reach the tunnels whose public end is this machine, while the
+ * backup relay carries their listen ports: the relay's public address. Absent
+ * when they dial this machine's own address. `applied` is false until every such
+ * tunnel was brought up again with it.
+ */
+const HOME_RELAY_KEY = "wireguard.homeRelay";
+
+interface HomeRelay {
+    readonly address: string | null;
+    readonly applied: boolean;
+}
+
+async function readHomeRelay(): Promise<HomeRelay> {
+    try {
+        const parsed = JSON.parse((await getSetting(HOME_RELAY_KEY)) ?? "null") as unknown;
+        if (parsed && typeof parsed === "object") {
+            const { address, applied } = parsed as { address?: unknown; applied?: unknown };
+            return {
+                address: typeof address === "string" && address ? address : null,
+                applied: applied === true
+            };
+        }
+    } catch {
+        // Unreadable: treated as never set.
+    }
+    return { address: null, applied: true };
+}
+
+/** The address peers dial for a tunnel whose public end is this machine. */
+async function homeEndpointHost(): Promise<string | null> {
+    return (await readHomeRelay()).address ?? (await getPublicIp());
+}
+
+/**
+ * Point the tunnels whose public end is this machine at `address` (the relay's,
+ * or null for this machine's own) and bring each running one up again, so the
+ * end behind NAT dials where the listen port is reachable. Quiet when nothing
+ * changed; a tunnel that could not be brought up is tried again next call.
+ */
+export async function followHomeRelay(address: string | null): Promise<void> {
+    const stored = await readHomeRelay();
+    if (stored.address === address && stored.applied) return;
+    await setSetting(HOME_RELAY_KEY, JSON.stringify({ address, applied: false }));
+    const rows = await prisma.wireguardTunnel.findMany({
+        where: { paused: false, publicTarget: { kind: "local" } },
+        select: { id: true, ownerId: true },
+        take: 1000
+    });
+    let applied = true;
+    for (const row of rows) {
+        await bringUp(row.ownerId, row.id).catch((caught: unknown) => {
+            applied = false;
+            console.warn(
+                `polaris: tunnel ${row.id} could not follow the relay: ${caught instanceof Error ? caught.message : String(caught)}`
+            );
+        });
+    }
+    if (applied) await setSetting(HOME_RELAY_KEY, JSON.stringify({ address, applied }));
 }
 
 /** Create a tunnel and bring both ends up. */
@@ -523,7 +600,7 @@ async function bringUp(ownerId: string, id: string): Promise<void> {
     const row = await loadTunnel(ownerId, id);
     const host =
         row.publicTarget.kind === "local"
-            ? await getPublicIp()
+            ? await homeEndpointHost()
             : (row.publicTarget.host?.address ?? null);
     if (!host) throw new TunnelRefusal("noAddress");
     const endpoint = `${host.includes(":") ? `[${host}]` : host}:${row.listenPort}`;
@@ -669,9 +746,8 @@ async function publishRoutes(ownerId: string, target: TunnelRow["publicTarget"])
  * serves for a moment), so that is refused with the reason instead.
  */
 async function ensureEdge(hostId: string, ownerId: string, proxyNetwork: string): Promise<void> {
-    const { readServerEdge, prepareServerEdge, withSetupLock } = await import(
-        "@/lib/deploy/server-edge"
-    );
+    const { readServerEdge, prepareServerEdge, withSetupLock } =
+        await import("@/lib/deploy/server-edge");
     const edge = await readServerEdge(hostId, ownerId);
     if (edge.error) throw new TunnelRefusal("unreachable");
     if (!edge.traefik) {

@@ -38,6 +38,7 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
     ArrowLeft,
     Hash,
+    House,
     Image as ImageIcon,
     Link2,
     LogOut,
@@ -126,7 +127,7 @@ export function ChannelHeader({
     const t = useTranslations("chat");
     const router = useRouter();
     const baseUrl = useAppUrl();
-    const { may, callsOff } = useChat();
+    const { may, callsOff, callsOutside } = useChat();
     const mayCall = may.call;
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
@@ -147,6 +148,14 @@ export function ChannelHeader({
     // The two call buttons, which only exist when a call can be started here
     // and none is running.
     const startable = mayCall && !callsOff && !call;
+    // Calls still start when outsiders cannot reach them: the house hears itself.
+    // What changes is the hover, which says who will not be able to join.
+    const outsideNote =
+        !mayCall || callsOff || !callsOutside
+            ? null
+            : callsOutside === "cgnat"
+              ? t("channelHeader.callsOutsideCgnat")
+              : t("channelHeader.callsOutsideBackup");
 
     /**
      * Whether "add people" is offered here, and why it is refused if it is.
@@ -325,7 +334,7 @@ export function ChannelHeader({
                             type="button"
                             onClick={() => onStartCall(false)}
                             aria-label={t("channelHeader.joinTheCall")}
-                            title={t("channelHeader.joinTheCall")}
+                            title={outsideNote ?? t("channelHeader.joinTheCall")}
                             className="flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/25"
                         >
                             <Phone className="size-4" />
@@ -333,14 +342,26 @@ export function ChannelHeader({
                         </button>
                     ) : (
                         <>
+                            {outsideNote && (
+                                <span
+                                    role="img"
+                                    aria-label={outsideNote}
+                                    title={outsideNote}
+                                    className="hidden p-1.5 text-warning sm:block"
+                                >
+                                    <House className="size-4" />
+                                </span>
+                            )}
                             <HeaderButton
                                 label={t("channelHeader.startACall")}
+                                hint={outsideNote}
                                 onClick={() => onStartCall(false)}
                             >
                                 <Phone className="size-4" />
                             </HeaderButton>
                             <HeaderButton
                                 label={t("channelHeader.startAVideoCall")}
+                                hint={outsideNote}
                                 onClick={() => onStartCall(true)}
                             >
                                 <Video className="size-4" />
@@ -547,6 +568,16 @@ export function ChannelHeader({
                                     </DropdownMenuItem>
                                 </>
                             )}
+                            {outsideNote && (
+                                <DropdownMenuItem
+                                    className="whitespace-normal sm:hidden"
+                                    disabled
+                                    title={outsideNote}
+                                >
+                                    <House className="size-3.5 shrink-0" />
+                                    {t("channelHeader.callsHouseOnly")}
+                                </DropdownMenuItem>
+                            )}
                             {mayCall && callsOff && (
                                 <DropdownMenuItem className="sm:hidden" disabled title={callsOff}>
                                     <PhoneOff className="size-3.5" />
@@ -732,12 +763,15 @@ function HeaderButton({
     label,
     onClick,
     reason = null,
+    hint = null,
     pressed,
     children
 }: {
     label: string;
     onClick: () => void;
     reason?: string | null;
+    /** A note for the hover that does not disable the button. */
+    hint?: string | null;
     pressed?: boolean;
     children: React.ReactNode;
 }) {
@@ -748,7 +782,7 @@ function HeaderButton({
             disabled={reason !== null}
             aria-label={label}
             aria-pressed={pressed}
-            title={reason ?? label}
+            title={reason ?? (hint ? `${label} - ${hint}` : label)}
             className={cn(
                 "hidden rounded p-1.5 transition-colors sm:block",
                 reason !== null

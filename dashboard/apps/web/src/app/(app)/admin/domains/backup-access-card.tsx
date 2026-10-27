@@ -400,8 +400,30 @@ function LineReach({ view }: { view: BackupView }) {
                         {t("domains.backup.works.callsLocal")}
                     </p>
                 ) : null}
+                <Ipv6Line view={view} />
             </div>
         </div>
+    );
+}
+
+/** What IPv6 visitors get: published, refused by the router, or not writable here. */
+function Ipv6Line({ view }: { view: BackupView }) {
+    const t = useTranslations("admin");
+    const { address, inbound, published, problem } = view.ipv6;
+    if (!address) return null;
+    const key = published
+        ? "published"
+        : problem === "no-cloudflare"
+          ? "noCloudflare"
+          : problem === "failed"
+            ? "failed"
+            : inbound === false
+              ? "blocked"
+              : "checking";
+    return (
+        <p className="break-words text-xs text-muted-foreground">
+            {t(`domains.backup.ipv6.${key}`, { address: published ?? address })}
+        </p>
     );
 }
 

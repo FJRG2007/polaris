@@ -64,6 +64,8 @@ const FAILING_KEY = "network.dnsFollowFailing";
 /** The open problems this job raises, one notice each, rewritten while they hold. */
 const STALE_CONDITION = "domain.address-stale";
 const UNREACHED_CONDITION = "domain.address-unreached";
+/** Open while the line takes no visitors and no backup path holds the records. */
+const CGNAT_CONDITION = "domain.address-cgnat";
 /** What the last run found, for Admin -> Domains. */
 export const STATUS_KEY = "network.dnsFollowStatus";
 
@@ -260,10 +262,16 @@ const EMPTY_STATUS: FollowStatus = {
  * costs two echo requests and one Cloudflare read per owned name.
  */
 export async function syncZoneAddress(): Promise<ZoneAddressSync> {
-    if (await backupAccessActive())
+    if (await backupAccessActive()) {
+        // A path carries visitors now, so the "no way in" notice has been answered.
+        await notices.resolveCondition(CGNAT_CONDITION);
         return { ...NOTHING, skipped: "Backup access owns the records" };
+    }
     const config = await getDomainZones().catch(() => null);
-    if (!config?.baseDomain) return { ...NOTHING, skipped: "No domain is configured" };
+    if (!config?.baseDomain) {
+        await notices.resolveCondition(CGNAT_CONDITION);
+        return { ...NOTHING, skipped: "No domain is configured" };
+    }
 
     const previous = await readStatus();
     const now = new Date();
@@ -307,9 +315,24 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         backupServing: false
     });
     if (gate.refusal === "cgnat" || gate.refusal === "not-public") {
+        const domain = config.baseDomain;
+        // Keyed on the refusal, not the address: a carrier rotating the shared
+        // address is not news, a line that changed kind is.
+        await notifyAdmins(
+            CGNAT_CONDITION,
+            (t) => ({
+                type: CGNAT_CONDITION,
+                title: t("domainAddress.cgnatTitle", { domain }),
+                body: t("domainAddress.cgnatBody", { domain, current }),
+                level: "warning",
+                actionRequired: true
+            }),
+            gate.refusal
+        );
         await save({ ip: current, problem: gate.refusal, detail: null, reachBy: null });
         return { ...NOTHING, from, to: current, skipped: "The address takes no visitors" };
     }
+    await notices.resolveCondition(CGNAT_CONDITION);
 
     const token = await loadCloudflareToken().catch(() => null);
     if (!token) {

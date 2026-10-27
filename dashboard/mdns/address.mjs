@@ -68,3 +68,116 @@ export function lanAddresses(interfaces, routeTable) {
         .sort((a, b) => rank(a) - rank(b) || a.index - b.index);
     return [...new Set(ordered.map((entry) => entry.address))];
 }
+
+/** Kernel address flags, as /proc/net/if_inet6 prints them (`ifa_flags`, low byte). */
+const IFA_F_TEMPORARY = 0x01;
+const IFA_F_DADFAILED = 0x08;
+const IFA_F_DEPRECATED = 0x20;
+const IFA_F_TENTATIVE = 0x40;
+const UNUSABLE = IFA_F_TEMPORARY | IFA_F_DADFAILED | IFA_F_DEPRECATED | IFA_F_TENTATIVE;
+
+/** 32 hex digits, as procfs prints an IPv6 address, to the usual colon form. */
+function hexToIpv6(hex) {
+    const groups = [];
+    for (let index = 0; index < 32; index += 4)
+        groups.push(Number.parseInt(hex.slice(index, index + 4), 16).toString(16));
+    return groups.join(":");
+}
+
+/**
+ * The interfaces that carry an IPv6 default route, best first, from the text of
+ * /proc/net/ipv6_route. A default route has an all-zero destination and prefix
+ * length 0; the kernel parks unreachable defaults on `lo`, which are not routes
+ * anybody leaves by.
+ */
+export function defaultRouteInterfaces6(routeTable) {
+    const routes = [];
+    for (const line of String(routeTable ?? "").split("\n")) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 10) continue;
+        const [destination, prefix, , , , metric, , , flags, name] = fields;
+        if (!/^0{32}$/.test(destination) || prefix !== "00" || name === "lo") continue;
+        if ((Number.parseInt(flags, 16) & 1) === 0) continue;
+        routes.push({ name, metric: Number.parseInt(metric, 16) || 0 });
+    }
+    return [...new Set(routes.sort((a, b) => a.metric - b.metric).map((route) => route.name))];
+}
+
+/**
+ * The host's stable global IPv6 on the interface that carries the IPv6 default
+ * route, or null.
+ *
+ * Read from /proc/net/if_inet6 rather than os.networkInterfaces() because only
+ * the kernel's table carries the flags: a temporary (privacy) address rotates
+ * every few hours and would make a DNS record that points at it go stale, and a
+ * deprecated or still-tentative one is on its way out or not yet usable. Only
+ * 2000::/3 counts - unique-local (fc00::/7) and link-local addresses reach no
+ * visitor. Without a default IPv6 route nothing outside can answer back, so
+ * nothing is returned.
+ */
+export function globalIpv6(addressTable, routeTable) {
+    const routed = defaultRouteInterfaces6(routeTable);
+    if (routed.length === 0) return null;
+    const found = [];
+    for (const line of String(addressTable ?? "").split("\n")) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 6) continue;
+        const [hex, , , scope, flags, name] = fields;
+        if (!/^[0-9a-f]{32}$/i.test(hex) || VIRTUAL.test(name)) continue;
+        // Scope 00 is global; link-local is 20, host 10.
+        if (scope !== "00") continue;
+        if ((Number.parseInt(flags, 16) & UNUSABLE) !== 0) continue;
+        const first = Number.parseInt(hex.slice(0, 4), 16);
+        if (first < 0x2000 || first > 0x3fff) continue;
+        const rank = routed.indexOf(name);
+        if (rank === -1) continue;
+        found.push({ rank, address: hexToIpv6(hex.toLowerCase()) });
+    }
+    found.sort((a, b) => a.rank - b.rank);
+    return found[0]?.address ?? null;
+}
+
+/**
+ * The IPv4 gateway of the best default route, from the text of /proc/net/route,
+ * or null. The kernel prints it as little-endian hex.
+ */
+export function defaultGateway(routeTable) {
+    let best = null;
+    for (const line of String(routeTable ?? "")
+        .split("\n")
+        .slice(1)) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 8) continue;
+        const [, destination, gateway, flags, , , metric, mask] = fields;
+        if (destination !== "00000000" || mask !== "00000000") continue;
+        // RTF_UP and RTF_GATEWAY.
+        if ((Number.parseInt(flags, 16) & 3) !== 3) continue;
+        const value = Number.parseInt(gateway, 16);
+        if (!Number.isFinite(value) || value === 0) continue;
+        const rank = Number.parseInt(metric, 10) || 0;
+        if (best && best.rank <= rank) continue;
+        best = {
+            rank,
+            address: [value & 255, (value >>> 8) & 255, (value >>> 16) & 255, value >>> 24].join(
+                "."
+            )
+        };
+    }
+    return best?.address ?? null;
+}
+
+/** A NAT-PMP external-address request (RFC 6886): version 0, opcode 0. */
+export const NAT_PMP_REQUEST = Uint8Array.from([0, 0]);
+
+/**
+ * The external address from a NAT-PMP answer, or null: anything but a
+ * successful version-0 reply to opcode 0, or an all-zero address (a router with
+ * no WAN address yet).
+ */
+export function natPmpExternal(message) {
+    const bytes = Uint8Array.from(message ?? []);
+    if (bytes.length < 12 || bytes[0] !== 0 || bytes[1] !== 128) return null;
+    if (bytes[2] !== 0 || bytes[3] !== 0) return null;
+    const address = [...bytes.subarray(8, 12)];
+    return address.every((part) => part === 0) ? null : address.join(".");
+}

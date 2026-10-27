@@ -43,6 +43,7 @@ const CHANNEL = {
 const pushed: string[] = [];
 let groupCalls: unknown[] = [];
 let groups = true;
+let outside: "cgnat" | "backup" | null = null;
 
 vi.mock("@/app/(app)/chat/actions", () => ({
     groupFromDirectAction: async (input: unknown) => {
@@ -70,6 +71,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
         viewerId: "ada",
         may: { call: true, groups, spaces: true, attach: true, meetings: true },
         callsOff: null,
+        callsOutside: outside,
         blocked: new Set<string>(),
         friends: new Set<string>(),
         channels: [CHANNEL],
@@ -123,6 +125,7 @@ beforeEach(() => {
     pushed.length = 0;
     groupCalls = [];
     groups = true;
+    outside = null;
 });
 
 afterEach(cleanup);
@@ -196,5 +199,28 @@ describe("adding people", () => {
         await userEvent.click(screen.getByRole("button", { name: "Create group" }));
         await waitFor(() => expect(pushed).toEqual(["/chat/c/group-9"]));
         expect(groupCalls).toEqual([{ channelId: "d1", userIds: ["alan"] }]);
+    });
+});
+
+describe("calls outsiders cannot reach", () => {
+    it("keeps the call buttons and says only the house can join", () => {
+        outside = "cgnat";
+        header();
+        const note = screen.getByRole("img", { name: /only people in the house can join/ });
+        expect(note).toBeTruthy();
+        const start = screen.getAllByRole("button", { name: "Start a call" })[0];
+        expect(start.hasAttribute("disabled")).toBe(false);
+        expect(start.getAttribute("title")).toMatch(/takes no visitors/);
+    });
+
+    it("names the backup tunnel when that is the reason", () => {
+        outside = "backup";
+        header();
+        expect(screen.getByRole("img", { name: /backup tunnel/ })).toBeTruthy();
+    });
+
+    it("says nothing when outsiders can reach a call", () => {
+        header();
+        expect(screen.queryByRole("img", { name: /house/ })).toBeNull();
     });
 });

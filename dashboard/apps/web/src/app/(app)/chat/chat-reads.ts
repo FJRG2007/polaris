@@ -52,6 +52,13 @@ export const callsUnavailable = (signal?: AbortSignal) =>
         signal
     );
 
+export const callsOutside = (signal?: AbortSignal) =>
+    readPoll<Answer<typeof meetingActionsModule.callsOutsideAction>>(
+        "/api/chat/calls-outside",
+        {},
+        signal
+    );
+
 export const editHistory = (messageId: string, signal?: AbortSignal) =>
     readPoll<Answer<typeof actionsModule.editHistoryAction>>(
         "/api/chat/edit-history",

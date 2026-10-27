@@ -11,11 +11,16 @@
 import { reverse } from "node:dns/promises";
 import { getPublicIp } from "@/lib/domain-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { getRouterWanIp } from "@/lib/host-address";
+import { stunMappedIp } from "@/lib/network/stun";
 import { detectLocalEnvironment } from "@/lib/network-service";
 import { detectCgnat, INBOUND_KEY, readReach, type InboundReach } from "./inbound";
 
 const PTR_KEY = "network.publicIpPtr";
 const PTR_TIMEOUT_MS = 3_000;
+/** How long after the line's address moves the responder may still hold the
+ *  router's former WAN address: it asks every five minutes. */
+const ROUTER_WAN_REFRESH_MS = 330_000;
 
 export async function readInboundReach(): Promise<InboundReach | null> {
     return readReach(await getSetting(INBOUND_KEY));
@@ -63,27 +68,39 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
     const previous = await readInboundReach();
     if (!input.publicIp) return previous;
     const sameIp = previous?.publicIp === input.publicIp;
-    const [ownIp, ptr] = await Promise.all([
+    const now = new Date().toISOString();
+    const uplinkChangedAt = sameIp || !previous ? (previous?.uplinkChangedAt ?? null) : now;
+    const wanNotBefore =
+        uplinkChangedAt && Date.now() - Date.parse(uplinkChangedAt) < ROUTER_WAN_REFRESH_MS
+            ? new Date(uplinkChangedAt)
+            : null;
+    const [ownIp, ptr, routerWanIp, stunIp] = await Promise.all([
         getPublicIp().catch(() => null),
-        reverseNames(input.publicIp)
+        reverseNames(input.publicIp),
+        getRouterWanIp(wanNotBefore).catch(() => null),
+        stunMappedIp().catch(() => null)
     ]);
     const verdict = detectCgnat({
         ownIp,
-        routerWanIp: null,
+        routerWanIp,
         publicIp: input.publicIp,
         ptr,
         outside: input.outside ?? (sameIp && previous?.inboundProven ? "up" : null),
         hairpin: input.hairpin,
-        stunIp: null
+        stunIp
     });
-    const now = new Date().toISOString();
     const reach: InboundReach = {
         checkedAt: now,
         publicIp: input.publicIp,
         ...verdict,
-        ipv6: input.ipv6 ?? previous?.ipv6 ?? null,
-        ipv6Inbound: input.ipv6Inbound ?? (sameIp ? (previous?.ipv6Inbound ?? null) : null),
-        uplinkChangedAt: sameIp || !previous ? (previous?.uplinkChangedAt ?? null) : now
+        // Undefined: this pass did not look. Null: it looked and found none.
+        ipv6: input.ipv6 !== undefined ? input.ipv6 : (previous?.ipv6 ?? null),
+        ipv6Inbound:
+            input.ipv6Inbound ??
+            (sameIp && (input.ipv6 === undefined || input.ipv6 === previous?.ipv6)
+                ? (previous?.ipv6Inbound ?? null)
+                : null),
+        uplinkChangedAt
     };
     await setSetting(INBOUND_KEY, JSON.stringify(reach));
     // The uplink moved (a failover to the other line) or the verdict flipped:

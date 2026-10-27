@@ -24,6 +24,12 @@ describe("outsideScript", () => {
         expect(outsideScript("2001:db8::1")).toContain("'https://[2001:db8::1]:443/'");
     });
 
+    it("first asks whether the server has IPv6 of its own, only for IPv6", () => {
+        expect(outsideScript("2001:db8::1")).toContain("/proc/net/ipv6_route");
+        expect(outsideScript("203.0.113.7")).not.toContain("ipv6_route");
+        expect(readOutside("POLARIS_OUTSIDE no-ipv6")).toBeNull();
+    });
+
     it("refuses anything that is not an IP literal", () => {
         expect(() => outsideScript("example.com")).toThrow();
         expect(() => outsideScript("1.2.3.4'; rm -rf /; '")).toThrow();

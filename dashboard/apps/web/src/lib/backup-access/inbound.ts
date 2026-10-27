@@ -99,8 +99,9 @@ export function detectCgnat(evidence: InboundEvidence): CgnatVerdict {
     if (evidence.routerWanIp && isIpv4(evidence.routerWanIp)) {
         if (isCarrierGradeNat(evidence.routerWanIp)) return found("router-wan", true);
         // The router's own WAN address is not the one the internet sees: a
-        // second NAT sits between them.
+        // second NAT sits between them - unless a check from outside got in.
         if (
+            evidence.outside !== "up" &&
             isPublicIpv4(evidence.routerWanIp) &&
             evidence.publicIp &&
             evidence.publicIp !== evidence.routerWanIp
@@ -208,6 +209,19 @@ export function callReach(input: {
     // A tunnel carries the web only: signalling on 443 gets through, media does not.
     if (input.cgnat || input.serving === "backup") return "local-only";
     return "direct";
+}
+
+export type CallsOutside = "cgnat" | "backup";
+
+/**
+ * Why a caller outside the house cannot reach the call media, or null when they
+ * can. "cgnat": the line takes nothing in and no relay carries the media.
+ * "backup": a tunnel serves the web while the direct line is down, and a tunnel
+ * carries no media. People in the house can still call either way.
+ */
+export function callsOutside(input: Parameters<typeof callReach>[0]): CallsOutside | null {
+    if (callReach(input) !== "local-only") return null;
+    return input.cgnat ? "cgnat" : "backup";
 }
 
 /** The ways in Polaris can offer, the direct line included. */

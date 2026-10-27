@@ -24,6 +24,7 @@ import * as meetingLink from "@/lib/chat/meeting-link-access";
 import { linkDenialMessage } from "@/lib/link-denial";
 import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
+import { callsOutsideNow } from "@/lib/backup-access/service";
 import { mayRing } from "@/lib/privacy-service";
 import { presenceFor } from "@/lib/presence-service";
 import { requirePermission } from "@/lib/session";
@@ -62,6 +63,16 @@ const guard = guardChat;
 export async function callsUnavailableAction(): Promise<string | null> {
     await requirePermission("chat.use");
     return calls.callsUnavailable();
+}
+
+/**
+ * Why somebody outside the house could not be reached by a call started here,
+ * or null when they could. Calls still start: people in the house hear each
+ * other either way, so this is a note beside the buttons, not a refusal.
+ */
+export async function callsOutsideAction(): Promise<"cgnat" | "backup" | null> {
+    await requirePermission("chat.use");
+    return callsOutsideNow().catch(() => null);
 }
 
 /**

@@ -13,7 +13,14 @@ import { readFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import makeMdns from "multicast-dns";
-import { lanAddresses } from "./address.mjs";
+import { createSocket } from "node:dgram";
+import {
+    defaultGateway,
+    globalIpv6,
+    lanAddresses,
+    NAT_PMP_REQUEST,
+    natPmpExternal
+} from "./address.mjs";
 
 const NAME = (process.env.POLARIS_MDNS_HOSTNAME || "polaris").toLowerCase();
 const FQDN = `${NAME}.local`;
@@ -48,6 +55,22 @@ function hostIpv4s() {
     return found.length > 0 ? found : ["127.0.0.1"];
 }
 
+/**
+ * The host's stable global IPv6, or null (`address.mjs` decides which). Like the
+ * IPv4s, only this process can see it: the web container sits on a bridge.
+ */
+function hostIpv6() {
+    try {
+        return globalIpv6(
+            readFileSync("/proc/net/if_inet6", "utf8"),
+            readFileSync("/proc/net/ipv6_route", "utf8")
+        );
+    } catch {
+        // No IPv6 in this kernel, or no procfs.
+        return null;
+    }
+}
+
 /** What the last pass found, so a query is answered without reading the host's
  *  tables again; refreshed by every announcement. */
 let current = hostIpv4s();
@@ -73,7 +96,11 @@ const IP_FILE = process.env.POLARIS_HOST_IP_FILE || "/run/polaris-host/host-ip";
 /** Every LAN address, one per line, the advertised one first: a machine on cable
  *  and WiFi answers on both, and the certificate and "is this us" need both. */
 const IPS_FILE = `${IP_FILE}s`;
+/** The global IPv6, or an empty file when there is none - so a reader can tell
+ *  "this host has no IPv6" from "the responder never wrote one". */
+const IPV6_FILE = `${IP_FILE}v6`;
 let publishedIps = null;
+let publishedIpv6 = null;
 let publishFailure = null;
 
 async function writeAtomic(path, text) {
@@ -113,6 +140,74 @@ async function publishIps(ips) {
     }
 }
 
+async function publishIpv6(address) {
+    const text = address ?? "";
+    if (text === publishedIpv6) return;
+    try {
+        await writeAtomic(
+            IPV6_FILE,
+            text
+                ? `${text}
+`
+                : ""
+        );
+        publishedIpv6 = text;
+    } catch {
+        // Said by publishIps for the same volume; tried again next announcement.
+    }
+}
+
+/**
+ * The router's own WAN address, asked of the gateway over NAT-PMP (RFC 6886) -
+ * one two-byte UDP packet to port 5351. Only this process can ask: the gateway
+ * of every other container is a Docker bridge. A WAN address in the carrier
+ * range, or one that differs from what the internet sees, is a carrier NAT for
+ * certain. Routers without NAT-PMP stay silent, and the file is left empty.
+ */
+const WAN_FILE = `${IP_FILE}wan`;
+let publishedWan = null;
+
+function askRouterWan() {
+    let routes = "";
+    try {
+        routes = readFileSync("/proc/net/route", "utf8");
+    } catch {
+        return Promise.resolve(null);
+    }
+    const gateway = defaultGateway(routes);
+    if (!gateway) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        const socket = createSocket("udp4");
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            socket.close();
+            resolve(value);
+        };
+        const timer = setTimeout(() => finish(null), 1_000);
+        socket.on("error", () => finish(null));
+        socket.on("message", (message, from) => {
+            if (from.address === gateway) finish(natPmpExternal(message));
+        });
+        socket.send(NAT_PMP_REQUEST, 5351, gateway, (error) => {
+            if (error) finish(null);
+        });
+    });
+}
+
+async function publishRouterWan() {
+    const text = (await askRouterWan().catch(() => null)) ?? "";
+    if (text === publishedWan) return;
+    try {
+        await writeAtomic(WAN_FILE, text ? `${text}\n` : "");
+        publishedWan = text;
+    } catch {
+        // Said by publishIps for the same volume; tried again next time.
+    }
+}
+
 const mdns = makeMdns();
 
 /** The records that answer "where is polaris.local" and describe the service. */
@@ -136,6 +231,7 @@ function announce() {
     current = hostIpv4s();
     const r = records();
     void publishIps(current);
+    void publishIpv6(hostIpv6());
     mdns.respond({ answers: [r.a, r.ptr, r.srv, r.txt] });
 }
 
@@ -179,7 +275,13 @@ function check() {
 
 // Checked every 15 s - one interface list and one read of the routing table -
 // and announced every 60 s regardless, keeping caches of the 120 s records warm.
-const timers = [setInterval(check, 15_000), setInterval(announce, 60_000)];
+// The router is asked every five minutes: its WAN address changes with the line.
+void publishRouterWan();
+const timers = [
+    setInterval(check, 15_000),
+    setInterval(announce, 60_000),
+    setInterval(() => void publishRouterWan(), 300_000)
+];
 for (const timer of timers) timer.unref?.();
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

@@ -107,12 +107,18 @@ export async function listZones(token: string): Promise<CfZone[]> {
         .map((entry) => ({ id: entry.id, name: entry.name }));
 }
 
+/** The zone whose name is the longest suffix of a hostname (app.example.com -> example.com), or null. */
+export function zoneForHostname(zones: readonly CfZone[], hostname: string): CfZone | null {
+    return (
+        zones
+            .filter((zone) => hostname === zone.name || hostname.endsWith(`.${zone.name}`))
+            .sort((a, b) => b.name.length - a.name.length)[0] ?? null
+    );
+}
+
 /** Find the zone whose name is the longest suffix of a hostname (app.example.com -> example.com). */
 export async function resolveZoneForHostname(token: string, hostname: string): Promise<CfZone> {
-    const zones = await listZones(token);
-    const match = zones
-        .filter((zone) => hostname === zone.name || hostname.endsWith(`.${zone.name}`))
-        .sort((a, b) => b.name.length - a.name.length)[0];
+    const match = zoneForHostname(await listZones(token), hostname);
     if (!match) {
         throw new CloudflareApiError(
             `${hostname} is not on a domain in this Cloudflare account. Add the domain to Cloudflare first.`

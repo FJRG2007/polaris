@@ -16,6 +16,13 @@ vi.mock("@/lib/setting-store", () => ({
 vi.mock("@/lib/domain-service", () => ({ getPublicIp: async () => "192.168.1.10" }));
 vi.mock("@/lib/network-service", () => ({ detectLocalEnvironment: redetected }));
 vi.mock("node:dns/promises", () => ({ reverse: async (ip: string) => ptr.get(ip) ?? [] }));
+/** The router's WAN address as the responder last wrote it, and when. */
+const wan = { ip: null as string | null, writtenAt: new Date(0) };
+vi.mock("@/lib/host-address", () => ({
+    getRouterWanIp: async (notBefore?: Date | null) =>
+        notBefore && wan.writtenAt < notBefore ? null : wan.ip
+}));
+vi.mock("@/lib/network/stun", () => ({ stunMappedIp: async () => null }));
 
 const { refreshInboundReach } = await import("../../src/lib/backup-access/inbound-service");
 
@@ -25,6 +32,8 @@ beforeEach(() => {
     settings.clear();
     ptr.clear();
     redetected.mockClear();
+    wan.ip = null;
+    wan.writtenAt = new Date(0);
 });
 
 describe("refreshInboundReach", () => {
@@ -71,6 +80,20 @@ describe("refreshInboundReach", () => {
         expect(reach).toMatchObject({ publicIp: STARLINK, cgnat: true, reason: "starlink" });
         expect(reach?.uplinkChangedAt).not.toBeNull();
         expect(redetected).toHaveBeenCalledWith(true);
+    });
+
+    it("does not read the router's WAN from before the line's address moved", async () => {
+        const OTHER = "88.0.0.20";
+        wan.ip = FIBRE;
+        wan.writtenAt = new Date(Date.now() - 60_000);
+        await refreshInboundReach({ publicIp: FIBRE, outside: null, hairpin: false });
+        const moved = await refreshInboundReach({ publicIp: OTHER, outside: null, hairpin: false });
+        expect(moved).toMatchObject({ publicIp: OTHER, cgnat: false });
+
+        wan.ip = "100.64.0.7";
+        wan.writtenAt = new Date(Date.now() + 1_000);
+        const fresh = await refreshInboundReach({ publicIp: OTHER, outside: null, hairpin: false });
+        expect(fresh).toMatchObject({ cgnat: true, certain: true, reason: "router-wan" });
     });
 
     it("keeps the last verdict when no address was measured", async () => {

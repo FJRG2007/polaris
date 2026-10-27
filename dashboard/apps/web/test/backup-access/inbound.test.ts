@@ -53,6 +53,13 @@ describe("detectCgnat", () => {
         expect(verdict).toMatchObject({ cgnat: true, certain: true });
     });
 
+    it("does not call a mismatched router WAN a carrier NAT once outside got in", () => {
+        const verdict = inbound.detectCgnat(
+            evidence({ routerWanIp: RELAY, publicIp: FIBRE, outside: "up" })
+        );
+        expect(verdict).toMatchObject({ cgnat: false, inboundProven: true });
+    });
+
     it("suspects a Starlink reverse name without proof of inbound", () => {
         const verdict = inbound.detectCgnat(
             evidence({ publicIp: STARLINK, ptr: ["customer.mdrdesp1.pop.starlinkisp.net"] })
@@ -265,6 +272,36 @@ describe("call address", () => {
         expect(
             inbound.callReach({ cgnat: true, serving: "direct", path: null, relayAddress: null })
         ).toBe("local-only");
+    });
+
+    it("explains why outsiders cannot reach a call", () => {
+        expect(
+            inbound.callsOutside({ cgnat: true, serving: "direct", path: null, relayAddress: null })
+        ).toBe("cgnat");
+        expect(
+            inbound.callsOutside({
+                cgnat: false,
+                serving: "backup",
+                path: "tunnel",
+                relayAddress: null
+            })
+        ).toBe("backup");
+        expect(
+            inbound.callsOutside({
+                cgnat: true,
+                serving: "backup",
+                path: "relay",
+                relayAddress: RELAY
+            })
+        ).toBeNull();
+        expect(
+            inbound.callsOutside({
+                cgnat: false,
+                serving: "direct",
+                path: null,
+                relayAddress: null
+            })
+        ).toBeNull();
     });
 
     it("never advertises a private relay address", () => {

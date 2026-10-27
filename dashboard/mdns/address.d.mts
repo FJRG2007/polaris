@@ -13,3 +13,18 @@ export function lanAddresses(
         Readonly<Record<string, readonly InterfaceAddress[] | undefined>> | null | undefined,
     routeTable: string | null | undefined
 ): string[];
+
+export function defaultRouteInterfaces6(routeTable: string | null | undefined): string[];
+
+export function globalIpv6(
+    addressTable: string | null | undefined,
+    routeTable: string | null | undefined
+): string | null;
+
+export function defaultGateway(routeTable: string | null | undefined): string | null;
+
+export const NAT_PMP_REQUEST: Uint8Array;
+
+export function natPmpExternal(
+    message: Uint8Array | readonly number[] | null | undefined
+): string | null;

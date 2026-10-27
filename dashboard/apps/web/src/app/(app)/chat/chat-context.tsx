@@ -113,6 +113,12 @@ interface ChatContextValue {
      * work, and what tells them why.
      */
     readonly callsOff: string | null;
+    /**
+     * Why somebody outside the house could not be reached by a call, or null
+     * when they could (or before the first answer). Calls still start: this is
+     * a note, not a refusal.
+     */
+    readonly callsOutside: "cgnat" | "backup" | null;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -121,6 +127,10 @@ const ChatContext = createContext<ChatContextValue | null>(null);
  *  instance asks once and stops, and a restarting one gets its buttons back
  *  within a few seconds of the media server coming up. */
 const CALLS_RECHECK_MS = 8000;
+
+/** How often to ask whether outsiders can reach a call. The line changes on the
+ *  scale of minutes (a relay coming up, a backup flip), never per second. */
+const CALLS_OUTSIDE_RECHECK_MS = 60_000;
 
 /** How long a burst of arrivals is gathered before the conversations are asked
  *  for again. Short enough that a new message moves the list while somebody is
@@ -253,6 +263,29 @@ export function ChatProvider({
         };
     }, [may.call, callsAreOff]);
 
+    const [callsOutside, setCallsOutside] = useState<"cgnat" | "backup" | null>(null);
+
+    useEffect(() => {
+        if (!may.call) return;
+        let stopped = false;
+        const ask = (): void => {
+            void polls
+                .callsOutside()
+                .then((reason) => {
+                    if (!stopped) setCallsOutside(reason);
+                })
+                .catch(() => {
+                    // Left as it was: a failed question is not an answer.
+                });
+        };
+        ask();
+        const timer = setInterval(ask, CALLS_OUTSIDE_RECHECK_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [may.call]);
+
     const rulesFor = useCallback(
         (channel: { spaceId: string | null; kind: string }) =>
             rules?.[core.chatRuleScopeOf(channel)] ?? core.DEFAULT_CHAT_RULES,
@@ -277,7 +310,8 @@ export function ChatProvider({
             refresh,
             refreshChannels,
             rulesFor,
-            callsOff
+            callsOff,
+            callsOutside
         }),
         [
             viewerId,
@@ -295,7 +329,8 @@ export function ChatProvider({
             refresh,
             refreshChannels,
             rulesFor,
-            callsOff
+            callsOff,
+            callsOutside
         ]
     );
 

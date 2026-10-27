@@ -27,6 +27,8 @@ const containers = new Map<string, number>();
 let nextId = 1;
 let lineUp = true;
 let games: { ports: { port: number; protocol: "tcp" | "udp" }[] }[] = [];
+let tunnelPorts: number[] = [];
+const tunnelRelays: (string | null)[] = [];
 /** The last spec each fake runtime was brought up with, by `where/project`. */
 const brought = new Map<string, { services: { name: string; image: string }[] }>();
 
@@ -106,7 +108,9 @@ vi.mock("@/lib/app-extensions/registry", () => ({ forwardedPorts: async () => ga
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     sealKey: (value: string) => value,
-    openKey: (value: string) => value
+    openKey: (value: string) => value,
+    homeListenPorts: async () => tunnelPorts,
+    followHomeRelay: async (ip: string | null) => void tunnelRelays.push(ip)
 }));
 
 const notified: { type: string; body: string }[] = [];
@@ -202,6 +206,7 @@ function serving() {
 }
 
 beforeEach(() => {
+    tunnelPorts = [];
     vi.useFakeTimers({ toFake: ["Date"] });
     settings.clear();
     zone.clear();
@@ -214,6 +219,7 @@ beforeEach(() => {
     lineUp = true;
     reachNow = null;
     callNodeIps.length = 0;
+    tunnelRelays.length = 0;
     callSyncFails = false;
     settings.set("published", HOME);
     for (const name of NAMES) {
@@ -389,6 +395,7 @@ describe("runBackupAccess", () => {
         await pass();
         expect(serving()).toBe("backup");
         expect(callNodeIps.at(-1)).toBe(RELAY);
+        expect(tunnelRelays.at(-1)).toBe(RELAY);
 
         callSyncFails = true;
         await pass();
@@ -441,5 +448,14 @@ describe("runBackupAccess", () => {
         brought.clear();
         await pass();
         expect(brought.size).toBe(0);
+
+        // A WireGuard tunnel whose public end is this machine: its peers dial the
+        // listen port, so the relay carries it too and both ends come up again.
+        tunnelPorts = [51821];
+        await pass();
+        expect(brought.size).toBeGreaterThan(0);
+        expect(JSON.parse(settings.get("backupAccess.relay") ?? "{}").udp).toEqual([
+            7882, 19132, 51821
+        ]);
     });
 });

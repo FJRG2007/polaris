@@ -21,17 +21,30 @@ const CONNECT_SECONDS = 5;
 /**
  * The script: open a TCP connection to the address and say how it went, with
  * curl where the server has it (it also times the connection), else nc, else
- * bash's /dev/tcp. The address is an IP literal, checked, so it cannot carry
- * anything else into the shell.
+ * bash's /dev/tcp. For an IPv6 address it first makes sure the server has an
+ * IPv6 default route, so its own missing IPv6 is never read as the house's. The
+ * address is an IP literal, checked, so it cannot carry anything else into the
+ * shell.
  */
 export function outsideScript(address: string, port = 443): string {
     if (isIP(address) === 0) throw new Error("The address to check is not an IP address");
     if (!Number.isInteger(port) || port < 1 || port > 65535)
         throw new Error("The port to check is not a port");
-    const url = `https://${isIP(address) === 6 ? `[${address}]` : address}:${port}/`;
+    const v6 = isIP(address) === 6;
+    const url = `https://${v6 ? `[${address}]` : address}:${port}/`;
     return [
         `addr='${address}'`,
         `port=${port}`,
+        // A server with no IPv6 route of its own reaches no IPv6 address at all,
+        // which says nothing about the house: answered as "cannot tell".
+        ...(v6
+            ? [
+                  'if [ -r /proc/net/ipv6_route ] && ! awk \'$1 ~ /^0+$/ && $2 == "00" && $10 != "lo" { found = 1 } END { exit !found }\' /proc/net/ipv6_route; then',
+                  `  echo "${MARKER} no-ipv6"`,
+                  "  exit 0",
+                  "fi"
+              ]
+            : []),
         "if command -v curl >/dev/null 2>&1; then",
         `  out=$(curl -sk -o /dev/null --connect-timeout ${CONNECT_SECONDS} --max-time ${CONNECT_SECONDS * 2} -w '%{time_connect}' '${url}' 2>/dev/null)`,
         `  echo "${MARKER} curl $? $out"`,

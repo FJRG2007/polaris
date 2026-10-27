@@ -36,7 +36,12 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
 import { forwardedPorts } from "@/lib/app-extensions/registry";
 import { generateKeyPair } from "@/lib/deploy/wireguard/tunnel-config";
-import { openKey, sealKey } from "@/lib/deploy/wireguard/tunnel-service";
+import {
+    followHomeRelay,
+    homeListenPorts,
+    openKey,
+    sealKey
+} from "@/lib/deploy/wireguard/tunnel-service";
 import {
     loadCloudflareToken,
     requireCloudflareAccount
@@ -81,12 +86,16 @@ import { CALL_PORTS } from "@/lib/chat/call-ports";
 import { getTailscaleHost } from "@/lib/tailscale/tailscale-service";
 import { syncCallNodeIp } from "@/lib/chat/call-address-watch";
 import { refreshInboundReach, readInboundReach } from "./inbound-service";
+import { readAaaa, syncAaaa } from "./aaaa-service";
+import { getHostGlobalIpv6 } from "@/lib/host-address";
 import {
     callNodeIp,
     callReach,
+    callsOutside,
     cgnatVerdict,
     recommendPath,
     type CallReach,
+    type CallsOutside,
     type InboundPath,
     type InboundReach
 } from "./inbound";
@@ -194,6 +203,22 @@ export async function readConfig(): Promise<BackupConfig> {
     return parse(configSchema, await getSetting(BACKUP_CONFIG_KEY)) ?? DEFAULT_CONFIG;
 }
 
+/** Why callers outside the house cannot reach a call now, or null when they can. */
+export async function callsOutsideNow(): Promise<CallsOutside | null> {
+    const [config, state, relay, reach] = await Promise.all([
+        readConfig(),
+        getSetting(BACKUP_STATE_KEY).then(readState),
+        getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
+        readInboundReach().catch(() => null)
+    ]);
+    return callsOutside({
+        cgnat: reach?.cgnat ?? false,
+        serving: state.serving,
+        path: config.path,
+        relayAddress: relay?.address ?? null
+    });
+}
+
 /** What Admin -> Domains shows. */
 export interface BackupView {
     readonly configured: boolean;
@@ -212,10 +237,17 @@ export interface BackupView {
     readonly recommended: InboundPath;
     /** How a caller outside the house reaches the call media now. */
     readonly calls: CallReach;
+    /** This server's IPv6 way in: the address, and what its AAAA records hold. */
+    readonly ipv6: {
+        readonly address: string | null;
+        readonly inbound: boolean | null;
+        readonly published: string | null;
+        readonly problem: "no-cloudflare" | "failed" | null;
+    };
 }
 
 export async function backupView(): Promise<BackupView> {
-    const [zones, config, state, probe, tunnel, relay, token, servers, reach, tailscale] =
+    const [zones, config, state, probe, tunnel, relay, token, servers, reach, tailscale, aaaa] =
         await Promise.all([
             getDomainZones().catch(() => null),
             readConfig(),
@@ -235,7 +267,8 @@ export async function backupView(): Promise<BackupView> {
             readInboundReach().catch(() => null),
             getTailscaleHost()
                 .then(Boolean)
-                .catch(() => false)
+                .catch(() => false),
+            readAaaa().catch(() => null)
         ]);
     const cgnat = reach?.cgnat ?? false;
     return {
@@ -260,7 +293,13 @@ export async function backupView(): Promise<BackupView> {
             serving: state.serving,
             path: config.path,
             relayAddress: relay?.address ?? null
-        })
+        }),
+        ipv6: {
+            address: reach?.ipv6 ?? null,
+            inbound: reach?.ipv6Inbound ?? null,
+            published: aaaa?.published ?? null,
+            problem: aaaa?.problem ?? null
+        }
     };
 }
 
@@ -314,13 +353,21 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         uplink,
         config.relayTargetId
     );
+    // The IPv6 way in: this box's own global address, checked from outside the
+    // same way as the line. Published as AAAA only once that check gets in.
+    const ipv6 = uplink ? await getHostGlobalIpv6().catch(() => null) : null;
+    const v6 = ipv6 ? await checkFromOutside(config.relayTargetId, ipv6) : null;
+    const ipv6Inbound = v6 ? v6.answer.verdict === "up" : null;
     const reach = uplink
         ? await refreshInboundReach({
               publicIp: evidence.ip,
               outside: evidence.outside,
-              hairpin: evidence.hairpin
+              hairpin: evidence.hairpin,
+              ipv6,
+              ipv6Inbound
           }).catch(() => null)
         : null;
+    if (uplink) await syncAaaa({ ipv6, inbound: ipv6Inbound }).catch(() => undefined);
     // A carrier NAT takes no visitors whatever the probes say: a hairpin to the
     // carrier's address can even answer from somebody else's router.
     const cgnat = cgnatVerdict(reach, evidence.ip);
@@ -376,15 +423,22 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             problem = problem ?? "failed";
             detail = detail ?? message(caught);
         }
+        const serving = (await getSetting(BACKUP_STATE_KEY).then(readState)).serving;
+        const relay = parse(relaySchema, await getSetting(RELAY_KEY));
+        const relayIp = callNodeIp({
+            serving,
+            path: config.path,
+            relayAddress: relay?.address ?? null
+        });
         try {
-            const serving = (await getSetting(BACKUP_STATE_KEY).then(readState)).serving;
-            const relay = parse(relaySchema, await getSetting(RELAY_KEY));
-            await syncCallNodeIp(
-                callNodeIp({ serving, path: config.path, relayAddress: relay?.address ?? null })
-            );
+            await syncCallNodeIp(relayIp);
         } catch (caught) {
             console.error("polaris: could not point the call server at the relay:", caught);
         }
+        // The tunnels that end here are dialed through the relay the same way.
+        await followHomeRelay(relayIp).catch((caught: unknown) => {
+            console.error("polaris: could not point the tunnels at the relay:", caught);
+        });
     }
     await setSetting(
         PROBE_KEY,
@@ -640,7 +694,14 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
     const games = await forwardedPorts().catch(() => []);
     // The call media rides the relay too: without it a call through the relay
     // joins and carries no sound.
-    const ports = relayPorts([...games.flatMap((row) => row.ports), ...CALL_PORTS]);
+    // So do the WireGuard tunnels whose public end is this machine: their peers
+    // dial its listen port, which a carrier NAT never lets in.
+    const tunnels = await homeListenPorts().catch(() => []);
+    const ports = relayPorts([
+        ...games.flatMap((row) => row.ports),
+        ...CALL_PORTS,
+        ...tunnels.map((port) => ({ port, protocol: "udp" as const }))
+    ]);
     // Fresh keys start with no ports, so they always bring both ends up again; a
     // relay brought up before UDP was carried stored none, so one with UDP game
     // ports comes up again with them.

@@ -9,8 +9,10 @@
  * port-forwarding instruction sends the operator to configure the wrong machine.
  */
 
-import { readFile } from "node:fs/promises";
+import { isIP } from "node:net";
+import { readFile, stat } from "node:fs/promises";
 import { isLocalAddress } from "@polaris/core";
+import { canonicalIpv6 } from "@/lib/backup-access/aaaa";
 
 const IP_FILE = process.env.POLARIS_HOST_IP_FILE ?? "/run/polaris-host/host-ip";
 const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
@@ -58,4 +60,35 @@ export async function getHostLanIps(): Promise<string[]> {
         .map((line) => line.trim())
         .filter((line) => IPV4.test(line) && isLanAddress(line));
     return [...new Set([...(primary ? [primary] : []), ...listed])];
+}
+
+/**
+ * The router's own WAN address, as it answered NAT-PMP to the responder, or null
+ * when the router does not speak it or nothing was written yet. With `notBefore`,
+ * also null when the responder wrote it before then: it asks only every few
+ * minutes, so right after the line's address moves the file may still hold the
+ * WAN address of the line before.
+ */
+export async function getRouterWanIp(notBefore?: Date | null): Promise<string | null> {
+    const path = `${IP_FILE}wan`;
+    if (notBefore) {
+        const written = await stat(path).catch(() => null);
+        if (!written || written.mtime < notBefore) return null;
+    }
+    const raw = await readFile(path, "utf8").catch(() => null);
+    const value = raw?.trim() ?? "";
+    return IPV4.test(value) ? value : null;
+}
+
+/**
+ * This server's stable global IPv6, or null when it has none or the responder has
+ * not said. The responder picks it (default-route interface, no temporary or
+ * unique-local address); checked again here because it is read from a file.
+ */
+export async function getHostGlobalIpv6(): Promise<string | null> {
+    const raw = await readFile(`${IP_FILE}v6`, "utf8").catch(() => null);
+    const value = raw?.trim().toLowerCase() ?? "";
+    if (isIP(value) !== 6) return null;
+    const first = Number.parseInt(value.split(":")[0] || "0", 16);
+    return first >= 0x2000 && first <= 0x3fff ? canonicalIpv6(value) : null;
 }
