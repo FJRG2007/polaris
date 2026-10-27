@@ -3514,6 +3514,7 @@
             "updateNow": "Update now",
             "ownVulns": "The last scans of Polaris's own images ({images}) found {critical} critical and {high} high vulnerabilities.",
             "ownVulnsNone": "The last scans of Polaris's own images ({images}) found nothing critical or high.",
+            "ownVulnsFailed": "{failed, plural, one {The last scan of one of Polaris's own images failed, so it is not counted.} other {The last scans of # of Polaris's own images failed, so they are not counted.}}",
             "ownVulnsUpdate": "Updating installs freshly built images on patched base images.",
             "ownVulnsLink": "See findings"
         },

@@ -61,4 +61,12 @@ describe("newestPerRef", () => {
         expect(newestPerRef(rows).map((r) => r.id)).toEqual(["a", "b"]);
         expect(newestPerRef([])).toEqual([]);
     });
+
+    it("keeps a newer failed scan over an older image's finished one", () => {
+        const rows = [
+            { label: "fixture/hostd:latest", id: "new", state: "failed" },
+            { label: "fixture/hostd:latest", id: "old", state: "done" }
+        ];
+        expect(newestPerRef(rows).map((r) => [r.id, r.state])).toEqual([["new", "failed"]]);
+    });
 });

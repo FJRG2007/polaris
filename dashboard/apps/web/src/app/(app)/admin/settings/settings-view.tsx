@@ -1163,20 +1163,26 @@ function OwnVulnerabilitiesLine({ available }: { available: boolean }) {
     }, []);
     if (!found) return null;
     const serious = found.critical + found.high > 0;
+    // An image whose newest scan failed is named as not scanned, never counted
+    // with what an older image under its name had.
+    const failed = found.failed ?? 0;
     return (
         <div className="flex items-start gap-2 text-sm">
             <ShieldAlert
-                className={`mt-0.5 size-4 shrink-0 ${serious ? "text-danger" : "text-muted-foreground"}`}
+                className={`mt-0.5 size-4 shrink-0 ${serious ? "text-danger" : failed > 0 ? "text-warning" : "text-muted-foreground"}`}
                 aria-hidden
             />
             <p className="min-w-0">
-                {serious
-                    ? t("settings.updates.ownVulns", {
-                          critical: found.critical,
-                          high: found.high,
-                          images: found.images
-                      })
-                    : t("settings.updates.ownVulnsNone", { images: found.images })}{" "}
+                {found.images === 0
+                    ? null
+                    : serious
+                      ? t("settings.updates.ownVulns", {
+                            critical: found.critical,
+                            high: found.high,
+                            images: found.images
+                        }) + " "
+                      : t("settings.updates.ownVulnsNone", { images: found.images }) + " "}
+                {failed > 0 ? t("settings.updates.ownVulnsFailed", { failed }) + " " : null}
                 {serious && available ? t("settings.updates.ownVulnsUpdate") + " " : null}
                 <a className="text-primary hover:underline" href="/admin/images">
                     {t("settings.updates.ownVulnsLink")}
