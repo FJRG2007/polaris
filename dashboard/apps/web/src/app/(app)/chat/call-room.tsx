@@ -75,9 +75,16 @@ import { GameInviteDialog } from "@/components/arcade/game-invite-dialog";
 import { useCallVolume } from "./call-volumes";
 import { MicLevelMeter } from "./mic-level-meter";
 import { GAIN_MAX, GAIN_MIN, useMicGain } from "./mic-gain";
-import { PersonMenu, StreamMenu, type SeatHosting } from "./call-menus";
+import {
+    PersonMenu,
+    PopOutButton,
+    StreamMenu,
+    StreamVolumeControl,
+    type SeatHosting
+} from "./call-menus";
+import { TILE_CONTROLS, useRevealControls } from "./call-tile-controls";
 import { useZoomPan } from "@/components/use-zoom-pan";
-import { setWatchedStreams } from "./call-stream-audio";
+import { rememberStopped, setWatchedStreams, stoppedStreams } from "./call-stream-audio";
 import { useStreamFormat } from "./call-stream-format";
 import { ControlHint, type ControlHintText } from "./control-hint";
 import { useMutedSpeech } from "./muted-speech";
@@ -86,7 +93,6 @@ import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import type { PickedPerson } from "@/components/people-picker";
 import {
-    arrivedKeys,
     canShareScreen,
     LOCAL_SCREEN_KEY,
     putAwayOf,
@@ -137,7 +143,9 @@ import {
     Video,
     VideoOff,
     VolumeX,
-    X
+    X,
+    ZoomIn,
+    ZoomOut
 } from "lucide-react";
 import {
     Button,
@@ -399,30 +407,27 @@ export function CallRoom({
      * whose share has ended are dropped as it ends, so somebody who stops
      * sharing and starts again is watched again - a decision about a share that
      * is over must not quietly hide the next one.
+     *
+     * Every share is watched as it starts, in a direct message as much as in a
+     * room: a screen somebody put up in a call of a few people is the thing the
+     * call is now about, and making everybody press Watch first was a step every
+     * other voice client skips. Started from what this reader stopped watching
+     * in this call, so opening the conversation again does not undo it - see
+     * `stoppedStreams`.
      */
-    const [away, setAway] = useState<readonly string[]>([]);
+    const [away, setAway] = useState<readonly string[]>(() => stoppedStreams(meetingId, shared));
     const sharedKeys = shared.map((stage) => stage.key).join("|");
-    const [knownKeys, setKnownKeys] = useState(place === "direct" ? "" : sharedKeys);
+    const [knownKeys, setKnownKeys] = useState(sharedKeys);
     if (knownKeys !== sharedKeys) {
-        const before = knownKeys.length > 0 ? knownKeys.split("|") : [];
         setKnownKeys(sharedKeys);
-        setAway((was) => {
-            const kept = stillShared(was, shared);
-            // In a direct message a screen is offered rather than taken. The
-            // panel there is a band over the conversation it was started from,
-            // so a screen arriving into it takes the whole thing before anybody
-            // has said they want to watch anything - and the way back was a
-            // control that only exists once it has already happened. Everywhere
-            // else there is room to spare and a share goes straight up.
-            //
-            // Not this browser's own: somebody who just pressed Share knows what
-            // they shared, and offering it back to them as something to open is
-            // a question with one answer.
-            if (place !== "direct") return kept;
-            const offered = arrivedKeys(before, shared).filter((key) => key !== LOCAL_SCREEN_KEY);
-            return [...kept, ...offered.filter((key) => !kept.includes(key))];
-        });
+        setAway((was) => stillShared(was, shared));
     }
+    useEffect(() => {
+        rememberStopped(
+            meetingId,
+            shared.filter((stage) => away.includes(stage.key))
+        );
+    }, [meetingId, away, shared]);
     /** What is left to draw, which is what the rest of the room is built from:
      *  a screen put away is not on the stage, does not hold the panel open and
      *  does not push the faces into a strip. */
@@ -529,23 +534,9 @@ export function CallRoom({
         focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
             ? focused
             : null;
-    /**
-     * The streams drawn as tiles among the people rather than above them.
-     *
-     * In a direct message a watched stream sits beside the person sharing it,
-     * the size of a face, until somebody asks to see it bigger - which is how
-     * every voice client draws a call between a few people, and leaves everybody
-     * on screen while it is watched. Everywhere else a share goes up above the
-     * faces, where a room has the space to give it.
-     */
-    const inlineStreams = place === "direct" && live === null ? stages : [];
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
-    const {
-        showing,
-        staged: shareStaged,
-        enlarged
-    } = stagingOf(inlineStreams.length > 0 ? [] : stages, live);
+    const { showing, staged: shareStaged, enlarged } = stagingOf(stages, live);
     // A game somebody pulled up to the big place takes it the way a screen
     // does: the faces become the strip under it.
     const staged = shareStaged || activity.focused;
@@ -569,20 +560,17 @@ export function CallRoom({
     /** Whether the people in this call are drawn as faces rather than as tiles -
      *  see `call-band`, which owns both of the questions `place` answers and is
      *  where the reasoning lives. */
-    const bareFaces = callBareFaces(place, staged, pictures || inlineStreams.length > 0);
+    const bareFaces = callBareFaces(place, staged, pictures);
     /** How a direct message's call is laid out around what is being watched -
      *  see `directLayout` in `call-band`, which is where the reasoning lives. */
-    const layout = place === "direct" ? directLayout(stages.length > 0, expanded, enlarged) : null;
+    const layout = place === "direct" ? directLayout(stages.length > 0, enlarged) : null;
     /**
      * Whether the people are drawn under whatever is being watched.
      *
-     * Everywhere with room for it, yes - a strip of faces under a shared screen
-     * is how anybody knows who is still there. In a direct message the panel is
-     * a band a few hundred pixels tall, and a screen worth opening plus a strip
-     * of heads under it leaves neither of them a usable size: the screen is the
-     * thing somebody asked to see bigger, so it gets the band, and the faces come
-     * back the moment it is let go of. Expanded, there is room for both, and the
-     * people are a row under the stream.
+     * Yes, as a strip under it - a strip of faces under a shared screen is how
+     * anybody knows who is still there. Asked for by name, the stream has the
+     * panel alone, and pressing it again brings the strip back. In a direct
+     * message a face asked for by name takes the panel alone too.
      */
     const peopleShown = place === "direct" ? !staged || layout === "stream-over-people" : !enlarged;
     /** Offered shares sit among the people, first, rather than in a row above
@@ -593,13 +581,12 @@ export function CallRoom({
     const tileCount =
         1 +
         (admitted ?? []).filter((person) => person.id !== call.participantId).length +
-        (offersInline ? putAway.length : 0) +
-        inlineStreams.length;
+        (offersInline ? putAway.length : 0);
     /** Gap between tiles, in pixels: `gap-2`. */
     const tiles = useTileFit<HTMLDivElement>(tileCount, 8);
-    /** In the band, a stream asked for by name is all there is: pressing it
-     *  again puts it back among the people, which is the way back to say. */
-    const letGo = layout === "stream" && !expanded;
+    /** A stream asked for by name is all there is: pressing it again puts the
+     *  people back under it, which is the way back to say. */
+    const letGo = layout === "stream";
 
     /**
      * The middle size, on the picture itself.
@@ -637,16 +624,13 @@ export function CallRoom({
         if (expanded && expandedWatching.current && before.watching && !watching) onExpand?.(false);
     }, [watching, expanded, onExpand]);
 
-    /** A stream among the people is still a picture worth room: the band grows
-     *  for it as it would for a stream above them. */
-    const streamsAmongPeople = inlineStreams.length > 0;
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
      *  for, and that is this component's own. */
     useEffect(() => {
-        onStage?.(staged || streamsAmongPeople);
+        onStage?.(staged);
         return () => onStage?.(false);
-    }, [onStage, staged, streamsAmongPeople]);
+    }, [onStage, staged]);
 
     // The call ending under somebody - the host closing it, or the last other
     // person leaving a one-to-one - is the case that most needs a sound: the
@@ -1156,20 +1140,6 @@ export function CallRoom({
                                 cn("size-full", (staged || tiles.fit.width === 0) && "min-h-24")
                             )
                         )}
-                    {inlineStreams.map((stage) => (
-                        <Tile
-                            key={stage.key}
-                            stream={stage.stream}
-                            name={stage.name}
-                            personId={null}
-                            screen
-                            onFocus={() => focus(stage.key)}
-                            {...column}
-                            zoomable
-                            volumeKey={undefined}
-                            streamMenu={streamMenu(stage)}
-                        />
-                    ))}
                     <Tile
                         stream={call.localStream}
                         name={ownName}
@@ -2779,13 +2749,57 @@ function Tile({
     const blank = !stream || cameraOff || !hasVideo;
     const format = useStreamFormat(video, screen && !blank);
 
+    /**
+     * The buttons over the picture, which come with the pointer and go when it
+     * rests - see `call-tile-controls`. A double press on a stream is full
+     * screen and back, the way every player does it; the wheel and the buttons
+     * in its corner are the zoom.
+     */
+    const controls = useRevealControls();
+    const onPicture = (event: React.SyntheticEvent) =>
+        !(event.target as Element | null)?.closest?.(`[${TILE_CONTROLS}]`);
+    const zoomProps = zoomable ? look.frameProps : null;
+    const frameProps = {
+        onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+            if (onPicture(event)) zoomProps?.onPointerDown(event);
+        },
+        onPointerMove: (event: React.PointerEvent<HTMLElement>) => {
+            zoomProps?.onPointerMove(event);
+            controls.frameProps.onPointerMove(event);
+        },
+        onPointerUp: (event: React.PointerEvent<HTMLElement>) => {
+            zoomProps?.onPointerUp();
+            controls.frameProps.onPointerUp(event);
+        },
+        onPointerCancel: () => zoomProps?.onPointerCancel(),
+        onPointerLeave: controls.frameProps.onPointerLeave,
+        onDoubleClick: (event: React.MouseEvent<HTMLElement>) => {
+            if (!onPicture(event)) return;
+            if (screen && !blank) toggleFull();
+            else zoomProps?.onDoubleClick(event);
+        }
+    };
+    /** Where a group of buttons sits, drawn or not by `controls`. Hidden ones
+     *  take no presses: a tap where a faded button was is a tap on the picture. */
+    const controlsBox = (corner: string) => ({
+        [TILE_CONTROLS]: "",
+        ...controls.controlsProps,
+        className: cn(
+            "absolute flex max-w-[calc(100%-0.5rem)] flex-wrap items-center justify-end gap-0.5 transition-opacity motion-reduce:transition-none",
+            corner,
+            controls.shown
+                ? "opacity-100"
+                : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100"
+        )
+    });
+
     const tile = (
         <div
             ref={(node) => {
                 frame.current = node;
                 if (zoomable) look.frameRef(node);
             }}
-            {...(zoomable ? look.frameProps : {})}
+            {...frameProps}
             className={cn(
                 "group/tile relative min-h-0 overflow-hidden rounded-lg bg-elevated ring-1 transition-shadow duration-fast",
                 // Two rings rather than a thicker one: a border that appears and
@@ -2955,12 +2969,17 @@ function Tile({
                 want when it is a film. */}
             {screen && !blank && (
                 // What the share is arriving at and that it is live, top right
-                // where every voice client puts it. Out of the way of the three
-                // size buttons, which take the same corner on hover.
+                // where every voice client puts it. Out of the way of the zoom
+                // buttons, which take the same corner while they are up.
                 // Each mark stays on one line; on a tile too narrow for both,
                 // the LIVE mark moves under the format instead of either
                 // breaking or running off the edge.
-                <span className="pointer-events-none absolute right-1 top-1 flex max-w-[calc(100%-0.5rem)] flex-wrap items-center justify-end gap-1 transition-opacity group-focus-within/tile:opacity-0 group-hover/tile:opacity-0">
+                <span
+                    className={cn(
+                        "pointer-events-none absolute right-1 top-1 flex max-w-[calc(100%-0.5rem)] flex-wrap items-center justify-end gap-1 transition-opacity group-focus-within/tile:opacity-0 motion-reduce:transition-none",
+                        controls.shown && "opacity-0"
+                    )}
+                >
                     {format && (
                         <span className="whitespace-nowrap rounded bg-background/80 px-1 text-[0.625rem] font-bold leading-4 tabular-nums">
                             {t("callRoom.streamFormat", { height: format.height, fps: format.fps })}
@@ -2969,8 +2988,64 @@ function Tile({
                     <LiveBadge />
                 </span>
             )}
+            {/* Zoom, top right on a stream, beside what the wheel already does:
+                in, out once in, and the scale, which puts it back. */}
+            {!blank && zoomable && (
+                <span {...controlsBox("right-1 top-1")}>
+                    {look.zoomed && (
+                        <button
+                            type="button"
+                            onClick={look.zoomOut}
+                            aria-label={t("callRoom.zoomOut")}
+                            title={t("callRoom.zoomOut")}
+                            className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            <ZoomOut className="size-3.5" />
+                        </button>
+                    )}
+                    {look.zoomed && (
+                        <button
+                            type="button"
+                            onClick={look.reset}
+                            aria-label={t("callRoom.fitThePictureAgain")}
+                            title={t("callRoom.fitThePictureAgain")}
+                            className="rounded bg-background/80 px-1.5 py-1 text-[0.625rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            {look.zoom.scale.toFixed(1)}x
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={look.zoomIn}
+                        aria-label={t("callRoom.zoomIn")}
+                        title={t("callRoom.zoomIn")}
+                        className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        <ZoomIn className="size-3.5" />
+                    </button>
+                </span>
+            )}
+            {/* The rest come and go with the pointer - see `call-tile-controls`.
+                On a stream they sit bottom right with its sound and its window,
+                the way every voice client draws them; on a face, top right,
+                clear of the name. */}
             {!blank && (
-                <span className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/tile:opacity-100">
+                <span {...controlsBox(screen ? "bottom-1 right-1" : "right-1 top-1")}>
+                    {screen && streamMenu && (
+                        <StreamVolumeControl
+                            name={streamMenu.name}
+                            person={streamMenu.person}
+                            hasSound={streamMenu.hasSound}
+                        />
+                    )}
+                    {screen && streamMenu && (
+                        <PopOutButton
+                            streamKey={streamMenu.streamKey}
+                            stream={streamMenu.stream}
+                            watching={streamMenu.watching}
+                            onWatch={streamMenu.onWatch}
+                        />
+                    )}
                     {onFocus && (
                         <button
                             type="button"
@@ -3016,20 +3091,6 @@ function Tile({
                             ) : (
                                 <ChevronsDown className="size-3.5" />
                             )}
-                        </button>
-                    )}
-                    {/* Only where the wheel already does it, and only once it
-                        has been used: a button that says 1.0x is a button that
-                        says nothing. */}
-                    {zoomable && look.zoomed && (
-                        <button
-                            type="button"
-                            onClick={look.reset}
-                            aria-label={t("callRoom.fitThePictureAgain")}
-                            title={t("callRoom.fitThePictureAgain")}
-                            className="rounded bg-background/80 px-1.5 py-1 text-[0.625rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                            {look.zoom.scale.toFixed(1)}x
                         </button>
                     )}
                     <button

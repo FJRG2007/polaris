@@ -3,11 +3,10 @@
  * Watching somebody's stream in a direct message, and what right-clicking it
  * offers.
  *
- * In a direct message a share is offered, not taken, and the offer sits among
- * the people - first, to their left - rather than in a row above them. Once
- * watched, the stream is a tile among the people, the way every voice client
- * draws a call between a few people; asked for by name it has the band to
- * itself, and with the call expanded the people are a row under it. Right-clicking
+ * In a direct message a share is watched as it starts and fills the call, the
+ * people in a row under it; asked for by name it has the call to itself, and
+ * somebody who stops watching it is not made to watch it again in that call.
+ * The buttons over it come with the pointer and go when it rests. Right-clicking
  * the stream mutes it, sets its volume, pops it out and sets how far voices are
  * lowered while it plays; right-clicking a person in a call of two shows
  * combining greyed out.
@@ -17,7 +16,9 @@ import { MessagesWrapper } from "../setup/i18n";
 import type { CallState } from "@/app/(app)/chat/call-state";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { REVEAL_IDLE_MS } from "@/app/(app)/chat/call-tile-controls";
 import {
+    rememberStopped,
     setWatchedStreams,
     streamMuted,
     voiceScale,
@@ -54,12 +55,15 @@ const video = {
 };
 
 class FakeStream {
-    constructor(private readonly audio: number) {}
+    constructor(
+        private readonly audio: number,
+        private readonly picture: object = video
+    ) {}
     getAudioTracks() {
         return Array.from({ length: this.audio }, () => ({ kind: "audio" }));
     }
     getVideoTracks() {
-        return [video];
+        return [this.picture];
     }
     getTracks() {
         return [...this.getAudioTracks(), ...this.getVideoTracks()];
@@ -132,6 +136,8 @@ Object.defineProperty(window, "localStorage", {
 beforeEach(() => {
     window.localStorage.clear();
     setWatchedStreams([]);
+    rememberStopped("m1", []);
+    rememberStopped("m2", []);
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
         configurable: true,
         value: () => Promise.resolve()
@@ -144,89 +150,132 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+/** The tile a stream is drawn in. */
+const streamTile = () =>
+    document.querySelector("video")!.closest("[class*='group/tile']") as HTMLElement;
+
 describe("a stream in a direct message", () => {
-    it("is offered to the left of the people rather than above them", () => {
+    it("is watched as soon as it starts, filling the call with the people under it", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
             wrapper: MessagesWrapper
         });
-        const card = screen.getByTitle("Watch Bo - screen");
-        const row = card.closest("ul")!;
-        const items = within(row).getAllByRole("listitem");
-        expect(items[0]!.contains(card)).toBe(true);
-        expect(within(row).getByText("You")).toBeTruthy();
-        expect(within(row).getByText("Bo")).toBeTruthy();
-        expect(watchedStreams()).toEqual([]);
-    });
-
-    it("sits among the people once watched, and takes the band only when asked", () => {
-        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
-            wrapper: MessagesWrapper
-        });
-        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
-        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
-        const stream = document.querySelector("video")!;
-        const you = screen.getByText("You");
-        // One grid: the stream first, then the people, the size of a face each.
-        expect(stream.closest(".grid")).toBe(you.closest(".grid"));
-        expect(stream.compareDocumentPosition(you) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(screen.getByText("Bo")).toBeTruthy();
-        expect(screen.getAllByText("Bo - screen").length).toBeGreaterThan(0);
-
-        // Asked for by name, the band holds the picture alone.
-        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
-        expect(screen.queryByText("You")).toBeNull();
-
-        // And pressed again it goes back among the people, still watched.
-        fireEvent.click(screen.getByRole("button", { name: "Back to the people" }));
-        expect(screen.getByText("You")).toBeTruthy();
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
         expect(screen.queryByTitle("Watch Bo - screen")).toBeNull();
-    });
-
-    it("lists the people in a row under the stream once the call is expanded", () => {
-        render(
-            <CallRoom
-                meetingId="m1"
-                place="direct"
-                call={call()}
-                expanded
-                onExpand={() => undefined}
-                onLeave={() => undefined}
-            />,
-            { wrapper: MessagesWrapper }
-        );
-        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
-        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
         const stream = document.querySelector("video")!;
         const you = screen.getByText("You");
         // After the stream in the document, which in a column is under it.
         expect(stream.compareDocumentPosition(you) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(stream.closest(".grid")).not.toBe(you.closest(".grid"));
         expect(screen.getByText("Bo")).toBeTruthy();
+    });
 
-        fireEvent.click(screen.getByRole("button", { name: "Back to the grid" }));
-        expect(document.querySelector("video")!.closest(".grid")).toBe(
-            screen.getByText("You").closest(".grid")
+    it("watches a share that starts later as well", () => {
+        const { rerender } = render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call({ screens: new Map() })}
+                onLeave={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
         );
+        expect(watchedStreams()).toEqual([]);
+        rerender(
+            <CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />
+        );
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    });
+
+    it("goes straight up in a voice room, as it always did", () => {
+        render(<CallRoom meetingId="m1" place="room" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    });
+
+    it("stays stopped in this call once somebody stops watching it", () => {
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Stop watching Bo - screen" }));
+        expect(watchedStreams()).toEqual([]);
+        expect(screen.getByTitle("Watch Bo - screen")).toBeTruthy();
+
+        // The conversation closed and opened again: still stopped.
+        cleanup();
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(watchedStreams()).toEqual([]);
+        expect(screen.getByTitle("Watch Bo - screen")).toBeTruthy();
+
+        // Another call is another decision.
+        cleanup();
+        render(<CallRoom meetingId="m2" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    });
+
+    it("is watched again once its share ends and starts over", () => {
+        const { rerender } = render(
+            <CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />,
+            { wrapper: MessagesWrapper }
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Stop watching Bo - screen" }));
+        rerender(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call({ screens: new Map() })}
+                onLeave={() => undefined}
+            />
+        );
+        rerender(
+            <CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />
+        );
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    });
+
+    it("is watched again when the share started over while the call was closed", () => {
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Stop watching Bo - screen" }));
+        expect(watchedStreams()).toEqual([]);
+
+        cleanup();
+        const again = new FakeStream(1, { ...video, id: "second-share" });
+        render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call({ screens: new Map([["seat-bo", again as unknown as MediaStream]]) })}
+                onLeave={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+    });
+
+    it("takes the call alone when asked, and gives the people back", () => {
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
+        expect(screen.queryByText("You")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Back to the people" }));
+        expect(screen.getByText("You")).toBeTruthy();
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
     });
 
     it("leaves the speaking ring room in the strip of faces under a stream", () => {
         // The report: with a screen shared, a talking person's green ring was cut
         // off top and bottom - the strip scrolls sideways, which clips the other
         // way too, and the ring is drawn outside the tile.
-        render(
-            <CallRoom
-                meetingId="m1"
-                place="direct"
-                call={call()}
-                expanded
-                onExpand={vi.fn()}
-                onLeave={vi.fn()}
-            />,
-            { wrapper: MessagesWrapper }
-        );
-        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
-        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={vi.fn()} />, {
+            wrapper: MessagesWrapper
+        });
         const strip = screen.getByText("You").closest(".grid") as HTMLElement;
         expect(strip.className).toContain("overflow-x-auto");
         // As much room inside its edges as the ring is wide (ring-2: 2px).
@@ -237,11 +286,7 @@ describe("a stream in a direct message", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
             wrapper: MessagesWrapper
         });
-        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
-        const tile = document
-            .querySelector("video")!
-            .closest("[class*='group/tile']") as HTMLElement;
-        expect(within(tile).getAllByText("Live").length).toBeGreaterThan(0);
+        expect(within(streamTile()).getAllByText("Live").length).toBeGreaterThan(0);
     });
 
     it("offers expanding the call, and says which way it goes", () => {
@@ -276,7 +321,8 @@ describe("a stream in a direct message", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
             wrapper: MessagesWrapper
         });
-        expect(screen.getAllByRole("img", { name: "Sharing a screen" })).toHaveLength(1);
+        const bo = screen.getByText("Bo").closest("[class*='group/tile']") as HTMLElement;
+        expect(within(bo).getAllByRole("img", { name: "Sharing a screen" })).toHaveLength(1);
     });
 
     it("offers mute, volume, pop-out and attenuation on right-click", () => {
@@ -291,9 +337,10 @@ describe("a stream in a direct message", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
             wrapper: MessagesWrapper
         });
-        fireEvent.contextMenu(screen.getByTitle("Watch Bo - screen"));
-        expect(screen.getByRole("menuitem", { name: /Pop out/ })).toBeTruthy();
-        expect(screen.getByLabelText("How loud Bo - screen is")).toBeTruthy();
+        fireEvent.contextMenu(streamTile());
+        const menu = screen.getByRole("menu");
+        expect(within(menu).getByRole("menuitem", { name: /Pop out/ })).toBeTruthy();
+        expect(within(menu).getByLabelText("How loud Bo - screen is")).toBeTruthy();
         const attenuation = screen.getByLabelText(
             "How far other voices are lowered while a stream plays"
         ) as HTMLInputElement;
@@ -320,8 +367,105 @@ describe("a stream in a direct message", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        fireEvent.contextMenu(screen.getByTitle("Watch Bo - screen"));
-        expect(screen.getByText("This stream has no sound.")).toBeTruthy();
+        fireEvent.contextMenu(streamTile());
+        expect(
+            within(screen.getByRole("menu")).getByText("This stream has no sound.")
+        ).toBeTruthy();
+    });
+});
+
+describe("the buttons over a stream", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("come with the pointer and go again once it rests", () => {
+        vi.useFakeTimers();
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        const full = within(streamTile()).getByRole("button", { name: "Full screen" });
+        const box = full.closest("[data-tile-controls]") as HTMLElement;
+        expect(box.className).toContain("opacity-0");
+        fireEvent.pointerMove(streamTile());
+        expect(box.className).toContain("opacity-100");
+        act(() => vi.advanceTimersByTime(REVEAL_IDLE_MS + 10));
+        expect(box.className).toContain("opacity-0");
+        expect(box.className).toContain("pointer-events-none");
+    });
+
+    it("stay up while a key is on one of them", () => {
+        vi.useFakeTimers();
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        const full = within(streamTile()).getByRole("button", { name: "Full screen" });
+        const box = full.closest("[data-tile-controls]") as HTMLElement;
+        act(() => full.focus());
+        act(() => vi.advanceTimersByTime(REVEAL_IDLE_MS * 2));
+        expect(box.className).toContain("opacity-100");
+    });
+
+    it("carry the stream's volume, its window, zoom and full screen", () => {
+        Object.defineProperty(document, "pictureInPictureEnabled", {
+            configurable: true,
+            value: true
+        });
+        Object.defineProperty(HTMLVideoElement.prototype, "requestPictureInPicture", {
+            configurable: true,
+            value: () => Promise.resolve({})
+        });
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        const tile = within(streamTile());
+        const slider = tile.getByLabelText("How loud Bo - screen is") as HTMLInputElement;
+        fireEvent.change(slider, { target: { value: "0.5" } });
+        expect(slider.value).toBe("0.5");
+        act(() => fireEvent.click(tile.getByRole("button", { name: "Mute stream" })));
+        expect(streamMuted("bo")).toBe(true);
+        expect(tile.getByRole("button", { name: "Unmute stream" })).toBeTruthy();
+        expect(tile.getByRole("button", { name: "Pop out" })).toBeTruthy();
+        expect(tile.getByRole("button", { name: "Zoom in" })).toBeTruthy();
+        expect(tile.getByRole("button", { name: "Full screen" })).toBeTruthy();
+    });
+
+    it("are pressed, not dragged, on a zoomed picture", () => {
+        const capture = vi.fn();
+        Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+            configurable: true,
+            value: capture
+        });
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        const tile = within(streamTile());
+        fireEvent.click(tile.getByRole("button", { name: "Zoom in" }));
+        fireEvent.pointerDown(tile.getByRole("button", { name: "Full screen" }), {
+            button: 0,
+            pointerId: 1
+        });
+        fireEvent.pointerDown(tile.getByLabelText("How loud Bo - screen is"), {
+            button: 0,
+            pointerId: 1
+        });
+        expect(capture).not.toHaveBeenCalled();
+        fireEvent.pointerDown(document.querySelector("video")!, { button: 0, pointerId: 1 });
+        expect(capture).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes full screen on a double press", () => {
+        const requestFullscreen = vi.fn(() => Promise.resolve());
+        Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+            configurable: true,
+            value: requestFullscreen
+        });
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.doubleClick(document.querySelector("video")!);
+        expect(requestFullscreen).toHaveBeenCalledTimes(1);
+        // Not from a button, which is a button being pressed twice.
+        fireEvent.doubleClick(within(streamTile()).getByRole("button", { name: "Zoom in" }));
+        expect(requestFullscreen).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -343,7 +487,6 @@ describe("the three sizes a watched stream has", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
         expect(screen.getByRole("button", { name: "Full screen" })).toBeTruthy();
 
         fireEvent.click(screen.getByRole("button", { name: "Fill the column" }));

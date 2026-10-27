@@ -1,10 +1,9 @@
 /**
  * How a call in a direct message is laid out around a stream.
  *
- * A watched stream is a tile among the people, the size of a face, the way
- * every voice client draws a call between a few people - not the whole band,
- * which left nobody on screen but the picture. Asking for it by name gives it
- * the band; expanded, the people are a row under it.
+ * A watched stream fills the call with the people in a row under it, from the
+ * moment it starts; asked for by name it has the call alone. Whether the call
+ * has been expanded changes how much of the column that is, not the shape.
  */
 
 import { describe, expect, it } from "vitest";
@@ -12,21 +11,16 @@ import { callBandHeight, directLayout } from "@/app/(app)/chat/call-band";
 
 describe("a stream in a direct message's call", () => {
     it("leaves the people where they are while nothing is watched", () => {
-        expect(directLayout(false, false, false)).toBe("people");
-        expect(directLayout(false, true, false)).toBe("people");
+        expect(directLayout(false, false)).toBe("people");
+        expect(directLayout(false, true)).toBe("people");
     });
 
-    it("is a tile among the people while it is watched", () => {
-        expect(directLayout(true, false, false)).toBe("people");
-        expect(directLayout(true, true, false)).toBe("people");
+    it("fills the call with the people under it while it is watched", () => {
+        expect(directLayout(true, false)).toBe("stream-over-people");
     });
 
-    it("takes the band alone when asked for by name", () => {
-        expect(directLayout(true, false, true)).toBe("stream");
-    });
-
-    it("has the people in a row under it once the call is expanded", () => {
-        expect(directLayout(true, true, true)).toBe("stream-over-people");
+    it("takes the call alone when asked for by name", () => {
+        expect(directLayout(true, true)).toBe("stream");
     });
 });
 

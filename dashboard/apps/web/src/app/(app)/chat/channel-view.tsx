@@ -78,7 +78,7 @@ import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
-import { callBandHeight, callBandLimit, type CallPlace } from "./call-band";
+import { callBandHeight, callBandLimit, callBandSize, type CallPlace } from "./call-band";
 import {
     forgetPaneSize,
     onLayoutReset,
@@ -1967,10 +1967,7 @@ export function ChannelView({
     /** What the divider says it is at, which has to be the height on screen: the
      *  drawn one until somebody has decided, and never past the ceiling - a stored
      *  height from a taller window is not the height this one is showing. */
-    const bandSize = Math.min(
-        Math.max(bandHeight ?? bandDrawn?.height ?? BAND.fallback, BAND.min),
-        bandLimit
-    );
+    const bandSize = callBandSize(bandHeight, bandDrawn?.height ?? null, bandLimit, BAND);
 
     // Waiting rather than refused while the list has not arrived: a first page
     // that lands before it is the ordinary way in from a link, and saying the

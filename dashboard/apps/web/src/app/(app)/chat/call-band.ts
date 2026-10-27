@@ -64,37 +64,30 @@ export function callBareFaces(place: CallPlace, staged: boolean, pictures: boole
 /**
  * How a direct message's call is laid out around a stream somebody is watching.
  *
- * Three shapes, the three a voice client draws a call of a few people in:
+ * One model, the one every voice client draws a call of a few people in: a
+ * watched stream fills the call and the people are a strip under it, and how
+ * much of the column that is is the divider under the call, dragged to taste.
  *
- * - `people`: the band is the people, and a stream being watched is one more
- *   tile among them - the size of a face, beside the person sharing it, the way
- *   every voice client draws a call between a few people. A share that has not
- *   been opened yet is offered there too.
- * - `stream`: a stream somebody asked to see bigger, alone. In the band's
- *   ordinary size there is room for a picture or for a row of heads, not both -
- *   the stream is the thing somebody pressed, so it gets the band, and pressing
- *   it again puts it back among the people.
- * - `stream-over-people`: the same, once the call is expanded to the whole
- *   column, where there is room for both - the stream on top and the people in
- *   a row under it.
+ * - `people`: nothing is being watched, so the call is the people.
+ * - `stream-over-people`: the stream fills the call, the people in a row under
+ *   it. What watching looks like, from the moment a share starts.
+ * - `stream`: a stream somebody asked to see bigger, alone - the strip is the
+ *   last room there is to give it. Pressing it again brings the strip back.
  *
- * Full screen is not one of these: it is the stream's own tile taken to the
- * whole display, and a tile holds nothing but its picture.
+ * This used to have a fourth step, the stream drawn the size of a face among the
+ * people until somebody asked for more, and which of the three a press led to
+ * depended on whether the call had been expanded. It is gone: the height is the
+ * divider's, and full screen is the stream's own tile taken to the display.
  */
 export type DirectLayout = "people" | "stream" | "stream-over-people";
 
 /**
  * @param watching Whether any stream is being watched here.
- * @param expanded Whether the call has been expanded to take the column.
  * @param enlarged Whether a stream was asked for by name ("make this bigger").
  */
-export function directLayout(
-    watching: boolean,
-    expanded: boolean,
-    enlarged: boolean
-): DirectLayout {
-    if (!watching || !enlarged) return "people";
-    return expanded ? "stream-over-people" : "stream";
+export function directLayout(watching: boolean, enlarged: boolean): DirectLayout {
+    if (!watching) return "people";
+    return enlarged ? "stream" : "stream-over-people";
 }
 
 /**
@@ -172,3 +165,20 @@ const BAND_CLASS = {
     channel: "max-h-[60%]",
     staged: "max-h-[78%]"
 } as const;
+
+/**
+ * The height the divider says the call is at, which has to be the height on
+ * screen: what somebody dragged it to, else what it is drawn at, else the
+ * fallback - never under the floor, and never past the ceiling, since a height
+ * stored from a taller window is not the height this one is showing.
+ */
+export function callBandSize(
+    stored: number | null,
+    drawn: number | null,
+    limit: number,
+    bounds: { readonly min: number; readonly fallback: number }
+): number {
+    const wanted = stored ?? drawn ?? bounds.fallback;
+    const size = Number.isFinite(wanted) ? wanted : bounds.fallback;
+    return Math.min(Math.max(size, bounds.min), Math.max(limit, bounds.min));
+}

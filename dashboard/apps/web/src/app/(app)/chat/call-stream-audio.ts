@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import type { CallStage } from "./call-media";
 
 /** Where a stream's volume is remembered, beside the voices in `call-volumes`. */
 export function streamVolumeKey(person: string): string {
@@ -67,6 +68,48 @@ function currentWatched(): readonly string[] {
 
 export function useWatchedStreams(): readonly string[] {
     return useSyncExternalStore(subscribe, currentWatched, () => EMPTY);
+}
+
+// ---------------------------------------------------------------------------
+// What somebody stopped watching
+// ---------------------------------------------------------------------------
+
+/** How many calls' decisions are kept at once - only the recent ones matter. */
+const STOPPED_CALLS = 16;
+const stoppedByCall = new Map<string, readonly string[]>();
+
+/** Which share a screen is: its key names the sharer, and a share started
+ *  again by the same person is a new picture track under that key. */
+function shareOf(stage: CallStage): string {
+    return `${stage.key}#${stage.stream.getVideoTracks()[0]?.id ?? stage.stream.id}`;
+}
+
+/**
+ * The streams this reader stopped watching in a call, among those shared now.
+ *
+ * Held outside the room because the room is drawn by whatever conversation is
+ * open: walking to another one and back mounts it again, and a share somebody
+ * turned off must not come back on just because they read a message elsewhere.
+ * Remembered per share rather than per sharer, so a share that ended and started
+ * again while no room was drawn is watched like any other new one.
+ */
+export function stoppedStreams(meetingId: string, stages: readonly CallStage[]): readonly string[] {
+    const held = stoppedByCall.get(meetingId);
+    if (!held) return EMPTY;
+    return stages.filter((stage) => held.includes(shareOf(stage))).map((stage) => stage.key);
+}
+
+/** Said by the room whenever the screens it has stopped watching change. */
+export function rememberStopped(meetingId: string, stopped: readonly CallStage[]): void {
+    stoppedByCall.delete(meetingId);
+    if (stopped.length === 0) return;
+    stoppedByCall.set(meetingId, stopped.map(shareOf));
+    // Oldest first, so the call held longest without a change goes first.
+    while (stoppedByCall.size > STOPPED_CALLS) {
+        const oldest = stoppedByCall.keys().next().value;
+        if (oldest === undefined) break;
+        stoppedByCall.delete(oldest);
+    }
 }
 
 // ---------------------------------------------------------------------------
