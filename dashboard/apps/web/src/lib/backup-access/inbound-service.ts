@@ -81,8 +81,13 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
         checkedAt: now,
         publicIp: input.publicIp,
         ...verdict,
-        ipv6: input.ipv6 ?? previous?.ipv6 ?? null,
-        ipv6Inbound: input.ipv6Inbound ?? (sameIp ? (previous?.ipv6Inbound ?? null) : null),
+        // Undefined: this pass did not look. Null: it looked and found none.
+        ipv6: input.ipv6 !== undefined ? input.ipv6 : (previous?.ipv6 ?? null),
+        ipv6Inbound:
+            input.ipv6Inbound ??
+            (sameIp && (input.ipv6 === undefined || input.ipv6 === previous?.ipv6)
+                ? (previous?.ipv6Inbound ?? null)
+                : null),
         uplinkChangedAt: sameIp || !previous ? (previous?.uplinkChangedAt ?? null) : now
     };
     await setSetting(INBOUND_KEY, JSON.stringify(reach));

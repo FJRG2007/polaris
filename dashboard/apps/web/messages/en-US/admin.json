@@ -752,6 +752,13 @@
                 "tailscaleSetUp": "Set up Tailscale",
                 "ipv6": "Free. Reaches only visitors whose own connection has IPv6.",
                 "direct": "Your own line, when it takes visitors: everything works."
+            },
+            "ipv6": {
+                "published": "IPv6 visitors reach this server directly at {address}.",
+                "checking": "This server has the IPv6 address {address}. It is published once a check from outside gets in.",
+                "blocked": "This server has the IPv6 address {address}, but a check from outside could not get in, so it is not published. The router may block incoming IPv6.",
+                "noCloudflare": "This server has the IPv6 address {address}. Polaris publishes it only for domains managed in Cloudflare; connect Cloudflare under Integrations.",
+                "failed": "Cloudflare refused the IPv6 records for {address}. Polaris tries again on the next check."
             }
         },
         "tailscale": {

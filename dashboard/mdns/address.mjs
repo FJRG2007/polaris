@@ -68,3 +68,71 @@ export function lanAddresses(interfaces, routeTable) {
         .sort((a, b) => rank(a) - rank(b) || a.index - b.index);
     return [...new Set(ordered.map((entry) => entry.address))];
 }
+
+/** Kernel address flags, as /proc/net/if_inet6 prints them (`ifa_flags`, low byte). */
+const IFA_F_TEMPORARY = 0x01;
+const IFA_F_DADFAILED = 0x08;
+const IFA_F_DEPRECATED = 0x20;
+const IFA_F_TENTATIVE = 0x40;
+const UNUSABLE = IFA_F_TEMPORARY | IFA_F_DADFAILED | IFA_F_DEPRECATED | IFA_F_TENTATIVE;
+
+/** 32 hex digits, as procfs prints an IPv6 address, to the usual colon form. */
+function hexToIpv6(hex) {
+    const groups = [];
+    for (let index = 0; index < 32; index += 4)
+        groups.push(Number.parseInt(hex.slice(index, index + 4), 16).toString(16));
+    return groups.join(":");
+}
+
+/**
+ * The interfaces that carry an IPv6 default route, best first, from the text of
+ * /proc/net/ipv6_route. A default route has an all-zero destination and prefix
+ * length 0; the kernel parks unreachable defaults on `lo`, which are not routes
+ * anybody leaves by.
+ */
+export function defaultRouteInterfaces6(routeTable) {
+    const routes = [];
+    for (const line of String(routeTable ?? "").split("\n")) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 10) continue;
+        const [destination, prefix, , , , metric, , , flags, name] = fields;
+        if (!/^0{32}$/.test(destination) || prefix !== "00" || name === "lo") continue;
+        if ((Number.parseInt(flags, 16) & 1) === 0) continue;
+        routes.push({ name, metric: Number.parseInt(metric, 16) || 0 });
+    }
+    return [...new Set(routes.sort((a, b) => a.metric - b.metric).map((route) => route.name))];
+}
+
+/**
+ * The host's stable global IPv6 on the interface that carries the IPv6 default
+ * route, or null.
+ *
+ * Read from /proc/net/if_inet6 rather than os.networkInterfaces() because only
+ * the kernel's table carries the flags: a temporary (privacy) address rotates
+ * every few hours and would make a DNS record that points at it go stale, and a
+ * deprecated or still-tentative one is on its way out or not yet usable. Only
+ * 2000::/3 counts - unique-local (fc00::/7) and link-local addresses reach no
+ * visitor. Without a default IPv6 route nothing outside can answer back, so
+ * nothing is returned.
+ */
+export function globalIpv6(addressTable, routeTable) {
+    const routed = defaultRouteInterfaces6(routeTable);
+    if (routed.length === 0) return null;
+    const found = [];
+    for (const line of String(addressTable ?? "").split("\n")) {
+        const fields = line.trim().split(/\s+/);
+        if (fields.length < 6) continue;
+        const [hex, , , scope, flags, name] = fields;
+        if (!/^[0-9a-f]{32}$/i.test(hex) || VIRTUAL.test(name)) continue;
+        // Scope 00 is global; link-local is 20, host 10.
+        if (scope !== "00") continue;
+        if ((Number.parseInt(flags, 16) & UNUSABLE) !== 0) continue;
+        const first = Number.parseInt(hex.slice(0, 4), 16);
+        if (first < 0x2000 || first > 0x3fff) continue;
+        const rank = routed.indexOf(name);
+        if (rank === -1) continue;
+        found.push({ rank, address: hexToIpv6(hex.toLowerCase()) });
+    }
+    found.sort((a, b) => a.rank - b.rank);
+    return found[0]?.address ?? null;
+}

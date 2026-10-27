@@ -81,6 +81,8 @@ import { CALL_PORTS } from "@/lib/chat/call-ports";
 import { getTailscaleHost } from "@/lib/tailscale/tailscale-service";
 import { syncCallNodeIp } from "@/lib/chat/call-address-watch";
 import { refreshInboundReach, readInboundReach } from "./inbound-service";
+import { readAaaa, syncAaaa } from "./aaaa-service";
+import { getHostGlobalIpv6 } from "@/lib/host-address";
 import {
     callNodeIp,
     callReach,
@@ -230,10 +232,17 @@ export interface BackupView {
     readonly recommended: InboundPath;
     /** How a caller outside the house reaches the call media now. */
     readonly calls: CallReach;
+    /** This server's IPv6 way in: the address, and what its AAAA records hold. */
+    readonly ipv6: {
+        readonly address: string | null;
+        readonly inbound: boolean | null;
+        readonly published: string | null;
+        readonly problem: "no-cloudflare" | "failed" | null;
+    };
 }
 
 export async function backupView(): Promise<BackupView> {
-    const [zones, config, state, probe, tunnel, relay, token, servers, reach, tailscale] =
+    const [zones, config, state, probe, tunnel, relay, token, servers, reach, tailscale, aaaa] =
         await Promise.all([
             getDomainZones().catch(() => null),
             readConfig(),
@@ -253,7 +262,8 @@ export async function backupView(): Promise<BackupView> {
             readInboundReach().catch(() => null),
             getTailscaleHost()
                 .then(Boolean)
-                .catch(() => false)
+                .catch(() => false),
+            readAaaa().catch(() => null)
         ]);
     const cgnat = reach?.cgnat ?? false;
     return {
@@ -278,7 +288,13 @@ export async function backupView(): Promise<BackupView> {
             serving: state.serving,
             path: config.path,
             relayAddress: relay?.address ?? null
-        })
+        }),
+        ipv6: {
+            address: reach?.ipv6 ?? null,
+            inbound: reach?.ipv6Inbound ?? null,
+            published: aaaa?.published ?? null,
+            problem: aaaa?.problem ?? null
+        }
     };
 }
 
@@ -332,13 +348,21 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         uplink,
         config.relayTargetId
     );
+    // The IPv6 way in: this box's own global address, checked from outside the
+    // same way as the line. Published as AAAA only once that check gets in.
+    const ipv6 = uplink ? await getHostGlobalIpv6().catch(() => null) : null;
+    const v6 = ipv6 ? await checkFromOutside(config.relayTargetId, ipv6) : null;
+    const ipv6Inbound = v6 ? v6.answer.verdict === "up" : null;
     const reach = uplink
         ? await refreshInboundReach({
               publicIp: evidence.ip,
               outside: evidence.outside,
-              hairpin: evidence.hairpin
+              hairpin: evidence.hairpin,
+              ipv6,
+              ipv6Inbound
           }).catch(() => null)
         : null;
+    if (uplink) await syncAaaa({ ipv6, inbound: ipv6Inbound }).catch(() => undefined);
     // A carrier NAT takes no visitors whatever the probes say: a hairpin to the
     // carrier's address can even answer from somebody else's router.
     const cgnat = cgnatVerdict(reach, evidence.ip);

@@ -30,3 +30,11 @@ install with no `mdns` container running - the limited edition, or host
 networking unavailable - simply has no neighbour table to read, and a storage
 is then identified by its SMB answer alone, and a device by MAC only where its
 own driver can scan for it.
+
+## The host's IPv6
+
+For the same reason it writes the host's stable global IPv6 beside the LAN
+addresses (`host-ipv6`, empty when there is none): the address on the interface
+that carries the IPv6 default route, never a temporary (privacy), deprecated,
+unique-local or link-local one. The dashboard checks it from outside and, when
+it gets in, publishes it as AAAA records in a Cloudflare-managed zone.

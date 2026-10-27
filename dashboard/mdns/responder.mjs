@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import makeMdns from "multicast-dns";
-import { lanAddresses } from "./address.mjs";
+import { globalIpv6, lanAddresses } from "./address.mjs";
 
 const NAME = (process.env.POLARIS_MDNS_HOSTNAME || "polaris").toLowerCase();
 const FQDN = `${NAME}.local`;
@@ -48,6 +48,22 @@ function hostIpv4s() {
     return found.length > 0 ? found : ["127.0.0.1"];
 }
 
+/**
+ * The host's stable global IPv6, or null (`address.mjs` decides which). Like the
+ * IPv4s, only this process can see it: the web container sits on a bridge.
+ */
+function hostIpv6() {
+    try {
+        return globalIpv6(
+            readFileSync("/proc/net/if_inet6", "utf8"),
+            readFileSync("/proc/net/ipv6_route", "utf8")
+        );
+    } catch {
+        // No IPv6 in this kernel, or no procfs.
+        return null;
+    }
+}
+
 /** What the last pass found, so a query is answered without reading the host's
  *  tables again; refreshed by every announcement. */
 let current = hostIpv4s();
@@ -73,7 +89,11 @@ const IP_FILE = process.env.POLARIS_HOST_IP_FILE || "/run/polaris-host/host-ip";
 /** Every LAN address, one per line, the advertised one first: a machine on cable
  *  and WiFi answers on both, and the certificate and "is this us" need both. */
 const IPS_FILE = `${IP_FILE}s`;
+/** The global IPv6, or an empty file when there is none - so a reader can tell
+ *  "this host has no IPv6" from "the responder never wrote one". */
+const IPV6_FILE = `${IP_FILE}v6`;
 let publishedIps = null;
+let publishedIpv6 = null;
 let publishFailure = null;
 
 async function writeAtomic(path, text) {
@@ -113,6 +133,18 @@ async function publishIps(ips) {
     }
 }
 
+async function publishIpv6(address) {
+    const text = address ?? "";
+    if (text === publishedIpv6) return;
+    try {
+        await writeAtomic(IPV6_FILE, text ? `${text}
+` : "");
+        publishedIpv6 = text;
+    } catch {
+        // Said by publishIps for the same volume; tried again next announcement.
+    }
+}
+
 const mdns = makeMdns();
 
 /** The records that answer "where is polaris.local" and describe the service. */
@@ -136,6 +168,7 @@ function announce() {
     current = hostIpv4s();
     const r = records();
     void publishIps(current);
+    void publishIpv6(hostIpv6());
     mdns.respond({ answers: [r.a, r.ptr, r.srv, r.txt] });
 }
 

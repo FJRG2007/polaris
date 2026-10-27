@@ -7,7 +7,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { defaultRouteInterfaces, lanAddresses } from "../../../../mdns/address.mjs";
+import {
+    defaultRouteInterfaces,
+    defaultRouteInterfaces6,
+    globalIpv6,
+    lanAddresses
+} from "../../../../mdns/address.mjs";
 
 const HEADER =
     "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT";
@@ -97,5 +102,50 @@ describe("the LAN addresses", () => {
     it("never advertises a self-assigned address", () => {
         const unleased = { eth1: [v4("169.254.10.4")], br0: [v4("192.168.1.142")] };
         expect(lanAddresses(unleased, "")).toEqual(["192.168.1.142"]);
+    });
+});
+
+// Fixture tables in the kernel's own format. 2001:db8::/32 is the documentation
+// range; the rule under test is the 2000::/3 one, which it falls inside.
+const ZERO = "0".repeat(32);
+const route6 = (name: string, metric = "00000400", flags = "00450003", prefix = "00") =>
+    `${ZERO} ${prefix} ${ZERO} 00 fe800000000000000000000000000001 ${metric} 00000001 00000000 ${flags} ${name}`;
+const addr6 = (hex: string, name: string, scope = "00", flags = "00") =>
+    `${hex} 00000002 40 ${scope} ${flags} ${name}`;
+const STABLE = "20010db8000000010000000000000010";
+const PRIVACY = "20010db80000000155aa66bb77cc88dd";
+
+describe("the global IPv6", () => {
+    it("is the stable address on the default-route interface", () => {
+        const table = [
+            addr6("fe800000000000000000000000000010", "eth0", "20", "80"),
+            addr6(PRIVACY, "eth0", "00", "01"),
+            addr6(STABLE, "eth0", "00", "00")
+        ].join("\n");
+        expect(globalIpv6(table, route6("eth0"))).toBe("2001:db8:0:1:0:0:0:10");
+    });
+
+    it("skips temporary, deprecated and tentative addresses", () => {
+        for (const flags of ["01", "20", "40"])
+            expect(globalIpv6(addr6(STABLE, "eth0", "00", flags), route6("eth0"))).toBeNull();
+    });
+
+    it("skips unique-local and link-local addresses", () => {
+        const table = [
+            addr6("fd000000000000000000000000000001", "eth0"),
+            addr6("fe800000000000000000000000000001", "eth0", "20")
+        ].join("\n");
+        expect(globalIpv6(table, route6("eth0"))).toBeNull();
+    });
+
+    it("is none without an IPv6 default route, or one parked on lo", () => {
+        expect(globalIpv6(addr6(STABLE, "eth0"), "")).toBeNull();
+        expect(globalIpv6(addr6(STABLE, "eth0"), route6("lo"))).toBeNull();
+        expect(defaultRouteInterfaces6(route6("eth0", "00000400", "00450003", "40"))).toEqual([]);
+    });
+
+    it("ignores an address on another interface or a container bridge", () => {
+        const table = [addr6(STABLE, "wlan0"), addr6(STABLE, "docker0")].join("\n");
+        expect(globalIpv6(table, route6("eth0"))).toBeNull();
     });
 });
