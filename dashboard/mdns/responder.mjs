@@ -144,8 +144,13 @@ async function publishIpv6(address) {
     const text = address ?? "";
     if (text === publishedIpv6) return;
     try {
-        await writeAtomic(IPV6_FILE, text ? `${text}
-` : "");
+        await writeAtomic(
+            IPV6_FILE,
+            text
+                ? `${text}
+`
+                : ""
+        );
         publishedIpv6 = text;
     } catch {
         // Said by publishIps for the same volume; tried again next announcement.

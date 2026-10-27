@@ -158,7 +158,9 @@ export function defaultGateway(routeTable) {
         if (best && best.rank <= rank) continue;
         best = {
             rank,
-            address: [value & 255, (value >>> 8) & 255, (value >>> 16) & 255, value >>> 24].join(".")
+            address: [value & 255, (value >>> 8) & 255, (value >>> 16) & 255, value >>> 24].join(
+                "."
+            )
         };
     }
     return best?.address ?? null;
