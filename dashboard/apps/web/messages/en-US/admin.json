@@ -2485,6 +2485,10 @@
             "sso": {
                 "title": "Single sign-on",
                 "description": "SAML identity providers and the email domains that sign in through them."
+            },
+            "images": {
+                "title": "Polaris images",
+                "description": "Vulnerabilities in Polaris's own images."
             }
         }
     },
@@ -3767,5 +3771,11 @@
             "invalid": "Check the highlighted fields.",
             "failed": "That did not go through. Try again in a moment."
         }
+    },
+    "images": {
+        "title": "Polaris images",
+        "description": "Known vulnerabilities in the images Polaris runs on this machine.",
+        "emptyTitle": "Not scanned yet",
+        "emptyBody": "Polaris scans its own images on its own within a few hours of starting or updating."
     }
 }

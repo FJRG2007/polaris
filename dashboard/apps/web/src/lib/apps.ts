@@ -113,6 +113,7 @@ import {
     Music,
     TrendingUp,
     Stethoscope,
+    Package,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -1031,7 +1032,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         label: "Usage & health", // i18n-ignore
         icon: Gauge,
         base: "/admin/consumption",
-        match: ["/admin/billing", "/admin/diagnostics"],
+        match: ["/admin/billing", "/admin/diagnostics", "/admin/images"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -1081,6 +1082,13 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Stethoscope,
                 keywords: ["health", "doctor", "speed test", "support bundle", "troubleshoot"]
+            },
+            {
+                label: "Polaris images", // i18n-ignore
+                href: "/admin/images",
+                adminOnly: true,
+                icon: Package,
+                keywords: ["vulnerabilities", "cve", "security scans", "image scans", "own images"]
             }
         ]
     }

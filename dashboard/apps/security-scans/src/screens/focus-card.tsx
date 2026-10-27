@@ -237,6 +237,11 @@ export function FocusCard({
                             <a href={focus.appHref}>{t("focus.openApp")}</a>
                         </Button>
                     ) : null}
+                    {focus.ownHref ? (
+                        <Button asChild size="sm">
+                            <a href={focus.ownHref}>{t("focus.openOwn")}</a>
+                        </Button>
+                    ) : null}
                     {rescan ? (
                         <Button
                             size="sm"

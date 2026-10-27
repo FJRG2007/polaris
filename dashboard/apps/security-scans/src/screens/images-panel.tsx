@@ -213,6 +213,20 @@ export function ImagesPanel({
                                                   )}
                                               </td>
                                               <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                                                  {image.home ? (
+                                                      <Button asChild size="xs" variant="ghost">
+                                                          <a
+                                                              href={image.home}
+                                                              title={
+                                                                  image.source === "polaris"
+                                                                      ? t("images.openOwn")
+                                                                      : t("images.openDeploy")
+                                                              }
+                                                          >
+                                                              {t("images.open")}
+                                                          </a>
+                                                      </Button>
+                                                  ) : null}
                                                   {scan?.state === "done" ? (
                                                       <Button
                                                           size="xs"

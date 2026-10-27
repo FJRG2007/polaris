@@ -54,7 +54,9 @@ export function currentApp(
         return { name, href: manifest?.opensAt ?? `/apps/installed/${row.installed.id}` };
     return {
         name,
-        href: row.projectId ? `/apps/deploy/${row.projectId}?service=${row.id}` : null
+        href: row.projectId
+            ? `/apps/deploy/${row.projectId}?service=${row.id}&tab=vulnerabilities`
+            : null
     };
 }
 

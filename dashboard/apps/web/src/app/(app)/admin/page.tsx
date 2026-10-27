@@ -17,6 +17,7 @@ import {
     Mail,
     MessageSquare,
     MessagesSquare,
+    Package,
     Scale,
     Settings,
     ShieldCheck,
@@ -54,6 +55,7 @@ const SECTIONS = [
     { key: "display", href: "/admin/display", icon: SlidersHorizontal },
     { key: "agents", href: "/admin/agents", icon: Bot },
     { key: "uploads", href: "/admin/uploads", icon: HardDrive },
+    { key: "images", href: "/admin/images", icon: Package },
     { key: "integrations", href: "/admin/integrations", icon: Blocks },
     { key: "integrationsModels", href: "/admin/integrations/models", icon: Sparkles },
     { key: "settings", href: "/admin/settings", icon: Settings }

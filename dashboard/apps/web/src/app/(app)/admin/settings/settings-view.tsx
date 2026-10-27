@@ -1178,7 +1178,7 @@ function OwnVulnerabilitiesLine({ available }: { available: boolean }) {
                       })
                     : t("settings.updates.ownVulnsNone", { images: found.images })}{" "}
                 {serious && available ? t("settings.updates.ownVulnsUpdate") + " " : null}
-                <a className="text-primary hover:underline" href="/apps/servers/security">
+                <a className="text-primary hover:underline" href="/admin/images">
                     {t("settings.updates.ownVulnsLink")}
                 </a>
             </p>
