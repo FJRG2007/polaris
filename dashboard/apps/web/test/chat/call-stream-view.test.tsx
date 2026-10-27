@@ -180,7 +180,9 @@ describe("a stream in a direct message", () => {
             { wrapper: MessagesWrapper }
         );
         expect(watchedStreams()).toEqual([]);
-        rerender(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />);
+        rerender(
+            <CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />
+        );
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
     });
 
@@ -229,7 +231,9 @@ describe("a stream in a direct message", () => {
                 onLeave={() => undefined}
             />
         );
-        rerender(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />);
+        rerender(
+            <CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />
+        );
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
     });
 
@@ -364,7 +368,9 @@ describe("a stream in a direct message", () => {
             { wrapper: MessagesWrapper }
         );
         fireEvent.contextMenu(streamTile());
-        expect(within(screen.getByRole("menu")).getByText("This stream has no sound.")).toBeTruthy();
+        expect(
+            within(screen.getByRole("menu")).getByText("This stream has no sound.")
+        ).toBeTruthy();
     });
 });
 

@@ -423,7 +423,10 @@ export function CallRoom({
         setAway((was) => stillShared(was, shared));
     }
     useEffect(() => {
-        rememberStopped(meetingId, shared.filter((stage) => away.includes(stage.key)));
+        rememberStopped(
+            meetingId,
+            shared.filter((stage) => away.includes(stage.key))
+        );
     }, [meetingId, away, shared]);
     /** What is left to draw, which is what the rest of the room is built from:
      *  a screen put away is not on the stage, does not hold the panel open and
@@ -533,11 +536,7 @@ export function CallRoom({
             : null;
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
-    const {
-        showing,
-        staged: shareStaged,
-        enlarged
-    } = stagingOf(stages, live);
+    const { showing, staged: shareStaged, enlarged } = stagingOf(stages, live);
     // A game somebody pulled up to the big place takes it the way a screen
     // does: the faces become the strip under it.
     const staged = shareStaged || activity.focused;

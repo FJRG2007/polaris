@@ -476,10 +476,7 @@ export function PopOutButton({
     stream,
     watching,
     onWatch
-}: Pick<
-    React.ComponentProps<typeof StreamMenu>,
-    "streamKey" | "stream" | "watching" | "onWatch"
->) {
+}: Pick<React.ComponentProps<typeof StreamMenu>, "streamKey" | "stream" | "watching" | "onWatch">) {
     const t = useTranslations("chat");
     const popped = usePoppedStream() === streamKey;
     if (!canPopOut()) return null;
