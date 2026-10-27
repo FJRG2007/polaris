@@ -19,6 +19,7 @@
  */
 
 import { POLARIS_CA } from "./evaluate";
+import { ruaAddress } from "./dmarc-advice";
 import { txtText } from "@/lib/dns/record-schema";
 import type { FindingCode, SecurityReport } from "./types";
 import {
@@ -220,15 +221,14 @@ export function planChanges(input: PlanInput): PlannedChange[] {
             }
             // Reports reach Polaris's own mailbox, alongside any address already
             // named, so it can tell by itself when tightening is safe.
-            if (parsed.ok && input.reportAddress) {
-                const withPolaris = withRua(next, `mailto:${input.reportAddress}`);
-                if (withPolaris !== next) {
-                    next = withPolaris;
-                    code ??=
-                        parsed.record.rua.length === 0
-                            ? "dmarcRuaMissing"
-                            : "dmarcReportsElsewhere";
-                }
+            if (
+                parsed.ok &&
+                input.reportAddress &&
+                !parsed.record.rua.map(ruaAddress).includes(input.reportAddress.toLowerCase())
+            ) {
+                next = withRua(next, `mailto:${input.reportAddress}`);
+                code ??=
+                    parsed.record.rua.length === 0 ? "dmarcRuaMissing" : "dmarcReportsElsewhere";
             }
             if (code && next !== current) {
                 push({

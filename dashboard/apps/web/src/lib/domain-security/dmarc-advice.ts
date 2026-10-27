@@ -28,6 +28,9 @@ export const READY_DAYS = 14;
 /** Failing senders listed as findings, worst first; the senders list has the rest. */
 export const MAX_SENDER_FINDINGS = 5;
 
+/** The longest stretch without a report that still counts as continuous coverage. */
+const GAP_SLACK = 2 * DAY;
+
 export type DmarcReadiness =
     /** Every real sender passed for READY_DAYS: the next step is safe. */
     | { readonly kind: "ready" }
@@ -61,10 +64,8 @@ export function dmarcReadiness(input: {
     const { reportAddress, reports, now } = input;
     if (!reportAddress) return { kind: "unread" };
     const reaches = input.rua.map(ruaAddress).includes(reportAddress.toLowerCase());
-    if (reports.length === 0)
-        return reaches
-            ? { kind: "collecting", days: 0 }
-            : { kind: "noReports", address: reportAddress };
+    if (!reaches) return { kind: "noReports", address: reportAddress };
+    if (reports.length === 0) return { kind: "collecting", days: 0 };
     const windowStart = now.getTime() - READY_DAYS * DAY;
     const recent = reports.filter((report) => report.end.getTime() >= windowStart);
     // Spoofing is exactly what a stricter policy refuses; only a real sender
@@ -72,13 +73,24 @@ export function dmarcReadiness(input: {
     const failing = sendingSources(recent).filter((source) => source.verdict === "misconfigured");
     if (failing.length > 0) return { kind: "failing", senders: failing };
     const seen = recent.some((report) => report.rows.some((row) => row.count > 0));
-    if (!seen)
-        return reaches
-            ? { kind: "collecting", days: 0 }
-            : { kind: "noReports", address: reportAddress };
-    const earliest = Math.min(...reports.map((report) => report.begin.getTime()));
-    const days = Math.max(0, Math.floor((now.getTime() - earliest) / DAY));
+    if (!seen) return { kind: "collecting", days: 0 };
+    const days = coveredDays(reports, now);
     return days >= READY_DAYS ? { kind: "ready" } : { kind: "collecting", days };
+}
+
+/**
+ * Days back from now that reports cover without a gap: the run stops at the
+ * first stretch longer than GAP_SLACK with no report, and is none at all when
+ * the newest report is older than that.
+ */
+function coveredDays(reports: readonly core.DmarcReport[], now: Date): number {
+    const byEnd = [...reports].sort((a, b) => b.end.getTime() - a.end.getTime());
+    let cursor = now.getTime();
+    for (const report of byEnd) {
+        if (report.end.getTime() < cursor - GAP_SLACK) break;
+        cursor = Math.min(cursor, report.begin.getTime());
+    }
+    return Math.max(0, Math.floor((now.getTime() - cursor) / DAY));
 }
 
 /**

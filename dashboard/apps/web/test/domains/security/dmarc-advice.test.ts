@@ -121,6 +121,27 @@ describe("dmarcReadiness", () => {
         const reports = [...daily(READY_DAYS, [row("pass")]), report(20, [row("misconfigured")])];
         expect(readiness(reports)).toEqual({ kind: "ready" });
     });
+
+    it("does not decide from old reports once the record stops sending them here", () => {
+        const reports = Array.from({ length: 20 }, (_, index) => report(index + 10, [row("pass")]));
+        expect(readiness(reports, ["mailto:dmarc@reports.example.net"])).toEqual({
+            kind: "noReports",
+            address: POLARIS
+        });
+    });
+
+    it("is not ready when recent reports stopped arriving", () => {
+        const reports = Array.from({ length: 20 }, (_, index) => report(index + 10, [row("pass")]));
+        expect(readiness(reports)).toEqual({ kind: "collecting", days: 0 });
+    });
+
+    it("counts only the days since the last gap in reports", () => {
+        const reports = [
+            ...daily(4, [row("pass")]),
+            ...Array.from({ length: 10 }, (_, index) => report(index + 10, [row("pass")]))
+        ];
+        expect(readiness(reports)).toEqual({ kind: "collecting", days: 4 });
+    });
 });
 
 describe("withReadiness", () => {

@@ -31,7 +31,12 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { knownDomain, knownDomains, type KnownDomain } from "./inventory";
 import { storedReport } from "@/lib/mail-server/dmarc-report";
 import { sendingSources, type SendingSource } from "./dmarc-sources";
-import { dmarcReadiness, withReadiness, type DmarcReadiness } from "./dmarc-advice";
+import {
+    dmarcReadiness,
+    withReadiness,
+    MAX_SENDER_FINDINGS,
+    type DmarcReadiness
+} from "./dmarc-advice";
 import { resolveCondition } from "@/lib/notification-service";
 import { regressions, severityRank, type Finding, type Grade, type SecurityReport } from "./types";
 import { emptyDraft, type DnsRecordDraft } from "@/lib/dns/record-schema";
@@ -343,7 +348,10 @@ async function readinessFor(
         now: new Date()
     });
     if (readiness.kind !== "failing") return readiness;
-    return { kind: "failing", senders: await namedSources(readiness.senders.slice(0, 5)) };
+    return {
+        kind: "failing",
+        senders: await namedSources(readiness.senders.slice(0, MAX_SENDER_FINDINGS))
+    };
 }
 
 async function viewOf(access: Access): Promise<DomainSecurityView> {
