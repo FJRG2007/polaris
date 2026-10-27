@@ -302,6 +302,21 @@ modded content never sets back, kicks or freezes a player.
   heartbeat (`chat/call-seat.ts`) is the model, and a 410 from it re-seats the
   tab instead of giving up.
 
+## One address for this server
+
+A server can hold two addresses on the same LAN at once - cable and Wi-Fi is
+the ordinary case, and the production one does. Both are valid, one is worse,
+and anything that offers every address will wander onto the worse one: a call
+whose media server offered both flapped its path every two seconds, and each
+switch reset the picture to its lowest quality.
+
+- **Whatever hands out "this server's address"** - the media server's
+  candidates, mDNS, a DNS bind, a link, a device callback, a port forward -
+  offers only the address of the default-route interface (the lowest-metric
+  default route), and follows it when it changes (`lan-address-follow`).
+- Test the two-interfaces-on-one-subnet case. A degraded call is checked for
+  "switched pair" in the media server's log before anything else.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started
