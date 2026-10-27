@@ -236,6 +236,19 @@ export function ChannelHeader({
                         className="text-sm font-semibold"
                     />
                 </span>
+                {/* A call running in a one-to-one or a group, said beside who
+                    it is with. Only to somebody who may take calls - the same
+                    rule as the call button. */}
+                {call && mayCall && !named ? (
+                    <span
+                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-success"
+                        title={t("channelHeader.inACall")}
+                    >
+                        <Phone className="size-3.5" aria-hidden />
+                        <span className="hidden sm:inline">{t("channelHeader.inACall")}</span>
+                        <span className="sr-only sm:hidden">{t("channelHeader.inACall")}</span>
+                    </span>
+                ) : null}
                 {/* And what they are actually called, when the name above is
                     this reader's own for them. A conversation headed by a
                     nickname is one where nothing on screen says whose account it
