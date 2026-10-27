@@ -15970,6 +15970,9 @@ model Announcement {
     severity     String    @default("info")
     title        String
     body         String    @default("")
+    // The long form behind "See details": what is affected, the timeline, the
+    // impact. Markdown, drawn by the same renderer as every other written text.
+    details      String    @default("")
     linkUrl      String?
     linkLabel    String?
     // Stringified JSON: { affected: string[] } and anything else a template reads.
@@ -15999,6 +16002,7 @@ model Announcement {
     retractedAt  DateTime?
 
     dismissals AnnouncementDismissal[]
+    updates    AnnouncementUpdate[]
 
     // The shell asks "what is showing now" on every page load.
     @@index([showBanner, retractedAt, startsAt, endsAt])
@@ -16009,6 +16013,20 @@ model Announcement {
 
 // Somebody closed a banner. Per phase, so closing a maintenance countdown does
 // not also hide "finished" when it comes.
+// A note added to an announcement after it went out ("the upgrade is taking
+// longer"), shown in order on its details page.
+model AnnouncementUpdate {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    announcementId String   @db.Uuid
+    body           String
+    createdById    String?  @db.Uuid
+    createdAt      DateTime @default(now())
+
+    announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+    @@index([announcementId, createdAt])
+}
+
 model AnnouncementDismissal {
     announcementId String   @db.Uuid
     userId         String   @db.Uuid
