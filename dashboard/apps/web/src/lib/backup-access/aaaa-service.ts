@@ -13,8 +13,9 @@ import {
     createAddressRecord,
     deleteDnsRecord,
     findAddressRecords,
+    listZones,
     repointRecord,
-    resolveZoneForHostname
+    zoneForHostname
 } from "@/lib/integrations/cloudflare-api";
 import { AAAA_KEY, nextAaaa, planAaaaRecords, readAaaaState, type AaaaState } from "./aaaa";
 
@@ -32,7 +33,7 @@ export async function syncAaaa(input: {
 }): Promise<AaaaState> {
     const previous = await readAaaa();
     const next = nextAaaa(previous, input);
-    // Nothing ever written and nothing to write: no call to Cloudflare at all.
+    // No record of ours left and nothing to write: no call to Cloudflare at all.
     if (!next.published && next.written.length === 0) {
         if (JSON.stringify(next) !== JSON.stringify(previous))
             await setSetting(AAAA_KEY, JSON.stringify(next));
@@ -50,7 +51,13 @@ export async function syncAaaa(input: {
         return blocked;
     }
     try {
-        const zoneId = (await resolveZoneForHostname(token, config.baseDomain)).id;
+        const zone = zoneForHostname(await listZones(token), config.baseDomain);
+        if (!zone) {
+            const elsewhere: AaaaState = { ...next, published: null, problem: "no-cloudflare" };
+            await setSetting(AAAA_KEY, JSON.stringify(elsewhere));
+            return elsewhere;
+        }
+        const zoneId = zone.id;
         const names = zoneRecords(config).flatMap((record) => [record.host, record.wildcard]);
         // Sequential: Cloudflare rate-limits per account.
         for (const name of names) {
@@ -78,7 +85,9 @@ export async function syncAaaa(input: {
         await setSetting(AAAA_KEY, JSON.stringify(failed));
         return failed;
     }
-    const done: AaaaState = { ...next, problem: null };
+    // Nothing published and every record of ours now gone: forget them, so the
+    // next pass makes no call to Cloudflare at all.
+    const done: AaaaState = { ...next, written: next.published ? next.written : [], problem: null };
     await setSetting(AAAA_KEY, JSON.stringify(done));
     return done;
 }

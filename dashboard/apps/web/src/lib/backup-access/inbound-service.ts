@@ -18,6 +18,9 @@ import { detectCgnat, INBOUND_KEY, readReach, type InboundReach } from "./inboun
 
 const PTR_KEY = "network.publicIpPtr";
 const PTR_TIMEOUT_MS = 3_000;
+/** How long after the line's address moves the responder may still hold the
+ *  router's former WAN address: it asks every five minutes. */
+const ROUTER_WAN_REFRESH_MS = 330_000;
 
 export async function readInboundReach(): Promise<InboundReach | null> {
     return readReach(await getSetting(INBOUND_KEY));
@@ -65,10 +68,16 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
     const previous = await readInboundReach();
     if (!input.publicIp) return previous;
     const sameIp = previous?.publicIp === input.publicIp;
+    const now = new Date().toISOString();
+    const uplinkChangedAt = sameIp || !previous ? (previous?.uplinkChangedAt ?? null) : now;
+    const wanNotBefore =
+        uplinkChangedAt && Date.now() - Date.parse(uplinkChangedAt) < ROUTER_WAN_REFRESH_MS
+            ? new Date(uplinkChangedAt)
+            : null;
     const [ownIp, ptr, routerWanIp, stunIp] = await Promise.all([
         getPublicIp().catch(() => null),
         reverseNames(input.publicIp),
-        getRouterWanIp().catch(() => null),
+        getRouterWanIp(wanNotBefore).catch(() => null),
         stunMappedIp().catch(() => null)
     ]);
     const verdict = detectCgnat({
@@ -80,7 +89,6 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
         hairpin: input.hairpin,
         stunIp
     });
-    const now = new Date().toISOString();
     const reach: InboundReach = {
         checkedAt: now,
         publicIp: input.publicIp,
@@ -92,7 +100,7 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
             (sameIp && (input.ipv6 === undefined || input.ipv6 === previous?.ipv6)
                 ? (previous?.ipv6Inbound ?? null)
                 : null),
-        uplinkChangedAt: sameIp || !previous ? (previous?.uplinkChangedAt ?? null) : now
+        uplinkChangedAt
     };
     await setSetting(INBOUND_KEY, JSON.stringify(reach));
     // The uplink moved (a failover to the other line) or the verdict flipped:

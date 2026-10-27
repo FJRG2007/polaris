@@ -268,7 +268,10 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         return { ...NOTHING, skipped: "Backup access owns the records" };
     }
     const config = await getDomainZones().catch(() => null);
-    if (!config?.baseDomain) return { ...NOTHING, skipped: "No domain is configured" };
+    if (!config?.baseDomain) {
+        await notices.resolveCondition(CGNAT_CONDITION);
+        return { ...NOTHING, skipped: "No domain is configured" };
+    }
 
     const previous = await readStatus();
     const now = new Date();

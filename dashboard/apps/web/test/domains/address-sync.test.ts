@@ -63,8 +63,9 @@ vi.mock("@/lib/network-service", () => ({
     publicIpHistory: () => history(),
     rememberPublicIp: async () => undefined
 }));
+let baseDomain: string | null = "example.com";
 vi.mock("@/lib/domain-zones", () => ({
-    getDomainZones: async () => ({ baseDomain: "example.com", zones: [] }),
+    getDomainZones: async () => ({ baseDomain, zones: [] }),
     polarisZoneHost: async () => "polaris.example.com"
 }));
 vi.mock("@/lib/domain-dns", () => ({
@@ -478,6 +479,21 @@ describe("a line that takes no visitors", () => {
         settings.delete("network.inboundReach");
         await syncZoneAddress();
         expect(repoint).toHaveBeenCalled();
+        const rows = ofType("domain.address-cgnat");
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.conditionKey).toBeNull();
+    });
+
+    it("closes the notice when the domain is taken away", async () => {
+        settings.set(PUBLISHED_KEY, OLD);
+        settings.set("network.inboundReach", cgnatReach(NEW));
+        await syncZoneAddress();
+        baseDomain = null;
+        try {
+            await syncZoneAddress();
+        } finally {
+            baseDomain = "example.com";
+        }
         const rows = ofType("domain.address-cgnat");
         expect(rows).toHaveLength(1);
         expect(rows[0]!.conditionKey).toBeNull();

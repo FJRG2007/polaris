@@ -99,8 +99,9 @@ export function detectCgnat(evidence: InboundEvidence): CgnatVerdict {
     if (evidence.routerWanIp && isIpv4(evidence.routerWanIp)) {
         if (isCarrierGradeNat(evidence.routerWanIp)) return found("router-wan", true);
         // The router's own WAN address is not the one the internet sees: a
-        // second NAT sits between them.
+        // second NAT sits between them - unless a check from outside got in.
         if (
+            evidence.outside !== "up" &&
             isPublicIpv4(evidence.routerWanIp) &&
             evidence.publicIp &&
             evidence.publicIp !== evidence.routerWanIp

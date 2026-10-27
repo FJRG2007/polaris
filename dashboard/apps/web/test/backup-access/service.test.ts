@@ -28,6 +28,7 @@ let nextId = 1;
 let lineUp = true;
 let games: { ports: { port: number; protocol: "tcp" | "udp" }[] }[] = [];
 let tunnelPorts: number[] = [];
+const tunnelRelays: (string | null)[] = [];
 /** The last spec each fake runtime was brought up with, by `where/project`. */
 const brought = new Map<string, { services: { name: string; image: string }[] }>();
 
@@ -108,7 +109,8 @@ vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key:
 vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     sealKey: (value: string) => value,
     openKey: (value: string) => value,
-    homeListenPorts: async () => tunnelPorts
+    homeListenPorts: async () => tunnelPorts,
+    followHomeRelay: async (ip: string | null) => void tunnelRelays.push(ip)
 }));
 
 const notified: { type: string; body: string }[] = [];
@@ -217,6 +219,7 @@ beforeEach(() => {
     lineUp = true;
     reachNow = null;
     callNodeIps.length = 0;
+    tunnelRelays.length = 0;
     callSyncFails = false;
     settings.set("published", HOME);
     for (const name of NAMES) {
@@ -392,6 +395,7 @@ describe("runBackupAccess", () => {
         await pass();
         expect(serving()).toBe("backup");
         expect(callNodeIps.at(-1)).toBe(RELAY);
+        expect(tunnelRelays.at(-1)).toBe(RELAY);
 
         callSyncFails = true;
         await pass();

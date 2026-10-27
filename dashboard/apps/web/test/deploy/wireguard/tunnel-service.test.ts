@@ -34,6 +34,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: MASTER }) }));
+const settings = vi.hoisted(() => new Map<string, string | null>());
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: vi.fn(async (key: string) => settings.get(key) ?? null),
+    setSetting: vi.fn(async (key: string, value: string | null) => void settings.set(key, value))
+}));
 vi.mock("@/lib/domain-service", () => ({ getPublicIp: vi.fn(async () => "203.0.113.7") }));
 vi.mock("@/lib/deploy-service", () => ({ containerPortOf: () => 3000 }));
 vi.mock("@/lib/traefik-dynamic", () => ({ writeDynamicFile: vi.fn(async () => undefined) }));
@@ -239,6 +244,7 @@ beforeEach(() => {
     state.edge = { traefik: true, pushable: true, error: null };
     state.prepared = 0;
     state.owned = { target: true, app: true };
+    settings.clear();
 });
 
 async function refusalOf(
@@ -353,6 +359,47 @@ describe("resuming a tunnel", () => {
             wg.endNames(ID, "public").project
         );
         expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
+    });
+});
+
+describe("a tunnel whose public end is this machine", () => {
+    const natEndpoint = (): string | undefined => {
+        const calls = state.ports.get(HOME.id)?.composeUp.mock.calls ?? [];
+        const spec = calls.at(-1)?.[0] as
+            { services: { env?: Record<string, string> }[] } | undefined;
+        const config = spec?.services.find((entry) => entry.env?.WG_CONFIG)?.env?.WG_CONFIG;
+        return config
+            ? /Endpoint\s*=\s*(\S+)/.exec(Buffer.from(config, "base64").toString("utf8"))?.[1]
+            : undefined;
+    };
+
+    beforeEach(() => {
+        (state.row as { publicTarget: Record<string, unknown> }).publicTarget = {
+            ...PUBLIC,
+            kind: "local",
+            host: null
+        };
+    });
+
+    it("is dialed through the relay while it carries the port, and at home again after", async () => {
+        await service.followHomeRelay("198.51.100.9");
+        expect(natEndpoint()).toBe("198.51.100.9:51821");
+
+        state.ports.get(HOME.id)?.composeUp.mockClear();
+        await service.followHomeRelay("198.51.100.9");
+        expect(state.ports.get(HOME.id)?.composeUp).not.toHaveBeenCalled();
+
+        await service.followHomeRelay(null);
+        expect(natEndpoint()).toBe("203.0.113.7:51821");
+    });
+
+    it("tries again on the next call when a tunnel could not be brought up", async () => {
+        const quiet = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        state.ports.get(HOME.id)?.composeUp.mockRejectedValueOnce(new Error("daemon said no"));
+        await service.followHomeRelay("198.51.100.9");
+        quiet.mockRestore();
+        await service.followHomeRelay("198.51.100.9");
+        expect(natEndpoint()).toBe("198.51.100.9:51821");
     });
 });
 

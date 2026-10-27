@@ -36,7 +36,12 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
 import { forwardedPorts } from "@/lib/app-extensions/registry";
 import { generateKeyPair } from "@/lib/deploy/wireguard/tunnel-config";
-import { homeListenPorts, openKey, sealKey } from "@/lib/deploy/wireguard/tunnel-service";
+import {
+    followHomeRelay,
+    homeListenPorts,
+    openKey,
+    sealKey
+} from "@/lib/deploy/wireguard/tunnel-service";
 import {
     loadCloudflareToken,
     requireCloudflareAccount
@@ -418,15 +423,22 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             problem = problem ?? "failed";
             detail = detail ?? message(caught);
         }
+        const serving = (await getSetting(BACKUP_STATE_KEY).then(readState)).serving;
+        const relay = parse(relaySchema, await getSetting(RELAY_KEY));
+        const relayIp = callNodeIp({
+            serving,
+            path: config.path,
+            relayAddress: relay?.address ?? null
+        });
         try {
-            const serving = (await getSetting(BACKUP_STATE_KEY).then(readState)).serving;
-            const relay = parse(relaySchema, await getSetting(RELAY_KEY));
-            await syncCallNodeIp(
-                callNodeIp({ serving, path: config.path, relayAddress: relay?.address ?? null })
-            );
+            await syncCallNodeIp(relayIp);
         } catch (caught) {
             console.error("polaris: could not point the call server at the relay:", caught);
         }
+        // The tunnels that end here are dialed through the relay the same way.
+        await followHomeRelay(relayIp).catch((caught: unknown) => {
+            console.error("polaris: could not point the tunnels at the relay:", caught);
+        });
     }
     await setSetting(
         PROBE_KEY,
