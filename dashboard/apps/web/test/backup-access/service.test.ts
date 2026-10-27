@@ -110,12 +110,6 @@ vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     openKey: (value: string) => value,
     homeListenPorts: async () => tunnelPorts
 }));
-vi.mock("@/lib/chat/call-address-watch", () => ({ syncCallNodeIp: async () => undefined }));
-vi.mock("@/lib/tailscale/tailscale-service", () => ({ getTailscaleHost: async () => null }));
-vi.mock("@/lib/backup-access/inbound-service", () => ({
-    readInboundReach: async () => null,
-    refreshInboundReach: async () => null
-}));
 
 const notified: { type: string; body: string }[] = [];
 vi.mock("@/lib/notification-service", () => ({
