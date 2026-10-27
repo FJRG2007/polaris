@@ -185,6 +185,25 @@ describe("tailscale apps", () => {
         expect((serveWrites()[0]?.[1] as string[])[4]).toBe(serve);
     });
 
+    it("never lets a route write that read an older list land after a newer one", async () => {
+        await connected();
+        let file = "";
+        let slow = true;
+        writeDynamicFile.mockImplementation(async (...args: unknown[]) => {
+            if (slow) {
+                slow = false;
+                await new Promise((done) => setTimeout(done, 20));
+            }
+            file = String(args[1]);
+        });
+        await Promise.all([
+            service.syncTailscaleRoute(),
+            service.syncTailscaleApps(["shop.example.com"])
+        ]);
+        writeDynamicFile.mockImplementation(async (..._args: unknown[]) => undefined);
+        expect(file).toContain("PathPrefix(`/.polaris-ts/10001/`)");
+    });
+
     it("keeps the ports and the route file when the component is off", async () => {
         await service.syncTailscaleApps(["shop.example.com"]);
         expect(ports.runIn).not.toHaveBeenCalled();

@@ -109,6 +109,6 @@ describe("Tailscale card apps", () => {
     it("says how an app gets an address when none has one", async () => {
         serve({ ...VIEW, apps: [] });
         render(<TailscaleCard />);
-        expect(await screen.findByText(/No app has a domain yet/)).toBeTruthy();
+        expect(await screen.findByText(/No app is on your tailnet yet/)).toBeTruthy();
     });
 });

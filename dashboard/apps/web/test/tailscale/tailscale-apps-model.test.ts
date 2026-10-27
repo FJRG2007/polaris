@@ -9,6 +9,7 @@ import {
     allocateAppPorts,
     APP_PORT_FIRST,
     appUrl,
+    holdsOnTailnet,
     renderServeConfig,
     renderTailscaleRoute,
     setAppPublic,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/tailscale/tailscale-model";
 
 const HOST = "polaris.tail1234.ts.net";
+const COOKIES = "http://polaris-edge-guard:8080/tailnet-cookies";
 
 function app(hostname: string, port: number, extra: Partial<TailnetApp> = {}): TailnetApp {
     return { hostname, port, public: false, live: true, ...extra };
@@ -145,10 +147,12 @@ describe("renderServeConfig with apps", () => {
 });
 
 describe("renderTailscaleRoute with apps", () => {
-    const yaml = renderTailscaleRoute(HOST, "http://dashboard:3000", [
-        app("a.example.com", 10001),
-        app("b.example.com", 8443, { public: true })
-    ]);
+    const yaml = renderTailscaleRoute(
+        HOST,
+        "http://dashboard:3000",
+        [app("a.example.com", 10001), app("b.example.com", 8443, { public: true })],
+        COOKIES
+    );
 
     it("routes each port's path back round the edge under the app's own name", () => {
         expect(yaml).toContain(
@@ -164,8 +168,25 @@ describe("renderTailscaleRoute with apps", () => {
         expect(yaml).toContain('          Host: "a.example.com"');
         expect(yaml).toContain('          X-Forwarded-Prefix: ""');
         expect(yaml).toContain(
-            "      middlewares: [polaris-tailscale-10001-strip, polaris-tailscale-10001-host]"
+            "      middlewares: [polaris-tailscale-10001-cookies, polaris-tailscale-10001-strip, polaris-tailscale-10001-host]"
         );
+    });
+
+    it("hands each app only the cookies the guard leaves it", () => {
+        expect(yaml).toContain(
+            [
+                "    polaris-tailscale-10001-cookies:",
+                "      forwardAuth:",
+                `        address: "${COOKIES}"`,
+                "        authResponseHeaders: [Cookie]"
+            ].join("\n")
+        );
+    });
+
+    it("routes no app without the cookie filter", () => {
+        expect(
+            renderTailscaleRoute(HOST, "http://dashboard:3000", [app("a.example.com", 10001)])
+        ).toBe(renderTailscaleRoute(HOST, "http://dashboard:3000"));
     });
 
     it("gives every router an explicit priority", () => {
@@ -181,8 +202,50 @@ describe("renderTailscaleRoute with apps", () => {
         );
         expect(renderTailscaleRoute(HOST, "http://dashboard:3000")).not.toContain("middlewares");
         expect(
-            renderTailscaleRoute(null, "http://dashboard:3000", [app("a.example.com", 10001)])
+            renderTailscaleRoute(
+                null,
+                "http://dashboard:3000",
+                [app("a.example.com", 10001)],
+                COOKIES
+            )
         ).toBe("http: {}\n");
+    });
+});
+
+describe("holdsOnTailnet", () => {
+    const ipRule = (enabled: boolean) => ({
+        enabled,
+        conditions: [
+            {
+                match: "any" as const,
+                conditions: [
+                    { field: "ip" as const, operator: "equals" as const, values: ["1.2.3.4"] }
+                ]
+            }
+        ]
+    });
+
+    it("keeps a route whose rules decide by neither address nor sign-in", () => {
+        expect(holdsOnTailnet({})).toBe(true);
+        expect(holdsOnTailnet({ allowLists: [[]], deny: [] })).toBe(true);
+        expect(holdsOnTailnet({ rules: [ipRule(false)] })).toBe(true);
+        expect(
+            holdsOnTailnet({
+                rules: [
+                    {
+                        enabled: true,
+                        conditions: [{ field: "path", operator: "contains", values: ["/admin"] }]
+                    }
+                ]
+            })
+        ).toBe(true);
+    });
+
+    it("leaves off a route that asks for sign-in or reads the visitor's address", () => {
+        expect(holdsOnTailnet({ requireLogin: true })).toBe(false);
+        expect(holdsOnTailnet({ allowLists: [["10.0.0.0/8"]] })).toBe(false);
+        expect(holdsOnTailnet({ deny: ["1.2.3.4"] })).toBe(false);
+        expect(holdsOnTailnet({ rules: [ipRule(true)] })).toBe(false);
     });
 });
 

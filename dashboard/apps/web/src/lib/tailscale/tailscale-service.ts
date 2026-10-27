@@ -15,7 +15,9 @@
 
 import { getCapabilities } from "@polaris/config";
 import type { ComposeSpec } from "@polaris/deploy";
+import { guardUrl } from "@/lib/deploy/router";
 import { dashboardOrigin } from "@/lib/domain-edge";
+import { TAILNET_COOKIES_PATH } from "@polaris/core/waf";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { TAILSCALE_PROJECT } from "@/lib/polaris-parts";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
@@ -116,13 +118,22 @@ async function saveApps(apps: readonly TailnetApp[]): Promise<void> {
     await setSetting(APPS_KEY, JSON.stringify(apps));
 }
 
-/** Changes to the app list run one at a time, so two route syncs at once cannot
- *  hand the same port to two names. */
+/** Changes to the app list and every write of the route or the serve config run one
+ *  at a time, so two route syncs at once cannot hand the same port to two names, and
+ *  a write that read the list before a change cannot land after it. */
 let appsQueue: Promise<unknown> = Promise.resolve();
 function serialized<T>(work: () => Promise<T>): Promise<T> {
     const run = appsQueue.then(work, work);
     appsQueue = run.catch(() => undefined);
     return run;
+}
+
+/** Publish the edge route for a name and an app list. Only inside `serialized`. */
+async function writeRoute(host: string | null, apps: readonly TailnetApp[]): Promise<void> {
+    await writeDynamicFile(
+        ROUTE_FILE,
+        renderTailscaleRoute(host, dashboardOrigin(), apps, `${guardUrl()}${TAILNET_COOKIES_PATH}`)
+    );
 }
 
 async function saveConfig(config: TailscaleConfig): Promise<void> {
@@ -210,11 +221,11 @@ async function readStatus(ports: HostdPorts): Promise<TailscaleStatus> {
 async function syncHost(host: string | null): Promise<void> {
     const name = tailnetHost(host);
     if (name === (await getTailscaleHost())) return;
-    await writeDynamicFile(
-        ROUTE_FILE,
-        renderTailscaleRoute(name, dashboardOrigin(), await getTailnetApps())
-    );
-    await setSetting(HOST_KEY, name);
+    await serialized(async () => {
+        if (name === (await getTailscaleHost())) return;
+        await writeRoute(name, await getTailnetApps());
+        await setSetting(HOST_KEY, name);
+    });
 }
 
 /**
@@ -246,8 +257,10 @@ async function refreshTailscaleHost(): Promise<void> {
         const status = await readStatus(ports);
         if (status.state === "connected") {
             await syncHost(status.host);
-            const config = await getTailscaleConfig();
-            await pushServeConfig(ports, renderServeConfig(config, await getTailnetApps()));
+            await serialized(async () => {
+                const config = await getTailscaleConfig();
+                await pushServeConfig(ports, renderServeConfig(config, await getTailnetApps()));
+            });
         }
     } finally {
         await ports.dispose();
@@ -258,10 +271,7 @@ async function refreshTailscaleHost(): Promise<void> {
  *  background, so a slow daemon never holds up the routes published beside it.
  *  Called with the dashboard's own route, startup included. */
 export async function syncTailscaleRoute(): Promise<void> {
-    await writeDynamicFile(
-        ROUTE_FILE,
-        renderTailscaleRoute(await getTailscaleHost(), dashboardOrigin(), await getTailnetApps())
-    );
+    await serialized(async () => writeRoute(await getTailscaleHost(), await getTailnetApps()));
     void refreshTailscaleHost().catch((error) =>
         console.error("polaris: reading the Tailscale name failed:", error)
     );
@@ -308,10 +318,7 @@ export async function syncTailscaleApps(hostnames: readonly string[]): Promise<v
 }
 
 async function publishApps(apps: readonly TailnetApp[]): Promise<void> {
-    await writeDynamicFile(
-        ROUTE_FILE,
-        renderTailscaleRoute(await getTailscaleHost(), dashboardOrigin(), apps)
-    );
+    await writeRoute(await getTailscaleHost(), apps);
     const config = await getTailscaleConfig();
     if (edition() === "limited" || !config.enabled) return;
     const ports = new HostdPorts();
@@ -465,7 +472,9 @@ export async function disconnectTailscale(): Promise<void> {
     }
     await saveConfig({ ...(await getTailscaleConfig()), enabled: false });
     await setSetting(AUTH_KEY, null);
-    await writeDynamicFile(ROUTE_FILE, renderTailscaleRoute(null, dashboardOrigin()));
-    await setSetting(HOST_KEY, null);
+    await serialized(async () => {
+        await writeRoute(null, []);
+        await setSetting(HOST_KEY, null);
+    });
     // The ports stay: connecting again gives every app the address it had.
 }

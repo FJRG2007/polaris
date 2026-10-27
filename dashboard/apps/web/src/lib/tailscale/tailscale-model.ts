@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import type { WafCondition, WafCustomRule } from "@polaris/core";
 
 /** What the operator chose. Serve on and Funnel off are the defaults. */
 export const tailscaleConfigSchema = z.object({
@@ -207,14 +208,19 @@ export const EDGE_LOOPBACK = "https://traefik:443";
  *
  * An app's router never reaches the app: it strips the port's path, restores the
  * app's hostname, and sends the request round the edge again, so the app's own
- * router - guard, firewall, sign-in and all - is what answers. An app that is not
+ * router - guard, headers and all - is what answers. An app that is not
  * public refuses what Funnel brought in, so the dashboard's name being open to the
  * internet never opens an app's path on it too.
+ *
+ * The app shares the dashboard's name, and with it every cookie the browser holds for
+ * it, so `cookies` - the guard's filter - hands it only its own. Without one, no app
+ * is routed.
  */
 export function renderTailscaleRoute(
     host: string | null,
     origin: string,
-    apps: readonly TailnetApp[] = []
+    apps: readonly TailnetApp[] = [],
+    cookies = ""
 ): string {
     const name = tailnetHost(host);
     if (!name) return "http: {}\n";
@@ -234,7 +240,7 @@ export function renderTailscaleRoute(
     ];
     const transports: string[] = [];
     const middlewares: string[] = [];
-    for (const app of [...liveApps(apps)].sort((a, b) => a.port - b.port)) {
+    for (const app of cookies ? [...liveApps(apps)].sort((a, b) => a.port - b.port) : []) {
         const id = `${ROUTER}-${app.port}`;
         const path = appPath(app.port);
         const funnel = app.public && FUNNEL_APP_PORTS.includes(app.port);
@@ -247,7 +253,7 @@ export function renderTailscaleRoute(
             "      entryPoints: [websecure]",
             `      priority: ${TAILSCALE_APP_PRIORITY}`,
             `      service: ${id}`,
-            `      middlewares: [${id}-strip, ${id}-host]`,
+            `      middlewares: [${id}-cookies, ${id}-strip, ${id}-host]`,
             "      tls: {}"
         );
         services.push(
@@ -266,6 +272,12 @@ export function renderTailscaleRoute(
             "      insecureSkipVerify: true"
         );
         middlewares.push(
+            // The guard answers with the Cookie header the app may see, which replaces
+            // the request's own; an answer without one removes it.
+            `    ${id}-cookies:`,
+            "      forwardAuth:",
+            `        address: "${cookies}"`,
+            "        authResponseHeaders: [Cookie]",
             `    ${id}-strip:`,
             "      stripPrefix:",
             `        prefixes: ["${path}"]`,
@@ -302,9 +314,10 @@ export function renderTailscaleRoute(
  * a host - so Serve tells it: each port's proxy target carries a path naming the
  * port, which Tailscale joins in front of the request's own path. The edge router
  * for that path strips it, puts the app's own hostname back in `Host`, and hands the
- * request to the edge again, where the app's own router answers it with every guard,
- * firewall rule and sign-in requirement that router already carries. Nothing on
- * this path reaches a container directly.
+ * request to the edge again, where the app's own router answers it with every guard
+ * and header that router already carries. Nothing on this path reaches a container
+ * directly, and a name whose rules could not hold there gets no port routed at all
+ * (see `holdsOnTailnet`).
  */
 
 /** Funnel listens only on 443, 8443 and 10000, and 443 is the dashboard's. */
@@ -418,6 +431,35 @@ export function appPath(port: number): string {
 export function appUrl(host: string | null, port: number): string | null {
     const name = tailnetHost(host);
     return name ? `https://${name}:${port}` : null;
+}
+
+/** The parts of an app route's rules that decide who gets in. */
+export interface TailnetRouteRules {
+    readonly requireLogin?: boolean;
+    readonly allowLists?: readonly (readonly string[])[];
+    readonly deny?: readonly string[];
+    readonly rules?: readonly Pick<WafCustomRule, "enabled" | "conditions">[];
+}
+
+function readsAddress(condition: WafCondition): boolean {
+    if ("match" in condition) return condition.conditions.some(readsAddress);
+    return "field" in condition && condition.field === "ip";
+}
+
+/**
+ * Whether a route's rules still hold when it is reached on the tailnet. Rules that
+ * decide by address or by sign-in do not: every request there comes round from the
+ * edge itself, so an address rule sees this machine instead of the visitor, and a
+ * sign-in leaves its cookie on the app's own hostname instead of the tailnet one.
+ * Such a name gets no tailnet address, rather than one that admits everybody or nobody.
+ */
+export function holdsOnTailnet(route: TailnetRouteRules): boolean {
+    if (route.requireLogin) return false;
+    if ((route.allowLists ?? []).some((list) => list.length > 0)) return false;
+    if ((route.deny?.length ?? 0) > 0) return false;
+    return !(route.rules ?? []).some(
+        (rule) => rule.enabled !== false && rule.conditions.some(readsAddress)
+    );
 }
 
 /** The entries that are routed now, each with a usable name. */

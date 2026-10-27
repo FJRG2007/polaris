@@ -11,6 +11,7 @@ import { sendBlocked } from "./block-page.js";
 import { sendSignInUnavailable } from "./signin-unavailable.js";
 import { sendChallenge } from "./challenge-page.js";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
+import { TAILNET_COOKIES_PATH, tailnetAppCookies } from "@polaris/core/waf";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 
 /** The header `/health` names this guard's optional abilities in, comma-separated. */
@@ -40,6 +41,14 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 [GUARD_FEATURES_HEADER]: GUARD_FEATURES
             });
             res.end("ok");
+            return;
+        }
+        if (url === TAILNET_COOKIES_PATH) {
+            // Read back by Traefik as the request's Cookie header, so an answer
+            // without one strips them all.
+            const cookie = tailnetAppCookies(header(req, "cookie"));
+            res.writeHead(200, cookie ? { cookie } : {});
+            res.end();
             return;
         }
         const decision = evaluate(
