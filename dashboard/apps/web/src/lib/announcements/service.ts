@@ -558,7 +558,10 @@ export function detailsPath(id: string): string {
  * update added since, or a maintenance window, whose page lists the window and
  * what it touches.
  */
-export function hasDetails(row: Pick<AnnouncementRow, "kind" | "details">, updates: number): boolean {
+export function hasDetails(
+    row: Pick<AnnouncementRow, "kind" | "details">,
+    updates: number
+): boolean {
     return row.kind === "maintenance" || (row.details ?? "").trim().length > 0 || updates > 0;
 }
 
@@ -605,7 +608,8 @@ export async function detailsFor(
     if (!isAdmin) {
         if (row.retractedAt || row.startsAt > now) return null;
         const audience = readAudience(row.audience);
-        if (!audience.everyone && !matchesAudience(await membershipOf(userId), audience)) return null;
+        if (!audience.everyone && !matchesAudience(await membershipOf(userId), audience))
+            return null;
     }
     const phase = phaseAt(row, now);
     const text = renderFor(renderInput(row), phase, reader);

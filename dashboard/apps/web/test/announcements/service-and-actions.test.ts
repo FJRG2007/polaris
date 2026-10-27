@@ -347,13 +347,27 @@ describe("telling the open tabs", () => {
         stop = subscribeNotices((change) => heard.push(change));
     });
     const audiences = () =>
-        heard.map((change) => (typeof change.reach === "object" ? change.reach.audiences : change.reach));
-    const ana = { everyone: false, roleIds: [], groupIds: [], orgIds: [], userIds: ["0190f3c6-0000-7000-8000-0000000000b1"] };
+        heard.map((change) =>
+            typeof change.reach === "object" ? change.reach.audiences : change.reach
+        );
+    const ana = {
+        everyone: false,
+        roleIds: [],
+        groupIds: [],
+        orgIds: [],
+        userIds: ["0190f3c6-0000-7000-8000-0000000000b1"]
+    };
     const group = { everyone: false, roleIds: [], groupIds: [MY_GROUP], orgIds: [], userIds: [] };
 
     it("a published one goes to its audience", async () => {
-        db.announcement.create.mockResolvedValue(row({ audience: JSON.stringify(group), sendNotice: false }));
-        await service.createAnnouncement("admin", { ...service.composeFrom(row({ audience: JSON.stringify(group) })) }, now);
+        db.announcement.create.mockResolvedValue(
+            row({ audience: JSON.stringify(group), sendNotice: false })
+        );
+        await service.createAnnouncement(
+            "admin",
+            { ...service.composeFrom(row({ audience: JSON.stringify(group) })) },
+            now
+        );
         stop();
         expect(heard.every((change) => change.topic === "announcements")).toBe(true);
         expect(audiences()[0]).toEqual([group]);
@@ -361,8 +375,12 @@ describe("telling the open tabs", () => {
 
     it("an edit goes to the audience it had and the one it has", async () => {
         const later = { startsAt: new Date(now.getTime() + 3_600_000) };
-        db.announcement.findUnique.mockResolvedValue(row({ ...later, audience: JSON.stringify(ana) }));
-        db.announcement.update.mockResolvedValue(row({ ...later, audience: JSON.stringify(group), sendNotice: false }));
+        db.announcement.findUnique.mockResolvedValue(
+            row({ ...later, audience: JSON.stringify(ana) })
+        );
+        db.announcement.update.mockResolvedValue(
+            row({ ...later, audience: JSON.stringify(group), sendNotice: false })
+        );
         const input = service.composeFrom(row({ ...later, audience: JSON.stringify(group) }));
         expect(await service.updateAnnouncement(ID, input, now)).not.toBeNull();
         stop();
@@ -402,7 +420,9 @@ describe("telling the open tabs", () => {
                 windowEnd: new Date(windowStart.getTime() + 3_600_000)
             })
         ]);
-        db.announcement.findFirst.mockResolvedValue({ startsAt: new Date(now.getTime() + 600_000) });
+        db.announcement.findFirst.mockResolvedValue({
+            startsAt: new Date(now.getTime() + 600_000)
+        });
         const reader = { locale: "en-US" as const, timeZone: "UTC" };
         const state = await service.bannerStateFor("u1", reader, now);
         stop();
@@ -415,7 +435,13 @@ describe("telling the open tabs", () => {
 
 describe("details behind a banner", () => {
     const reader = { locale: "en-US" as const, timeZone: "UTC" };
-    const group = { everyone: false, roleIds: [], groupIds: [OTHER_GROUP], orgIds: [], userIds: [] };
+    const group = {
+        everyone: false,
+        roleIds: [],
+        groupIds: [OTHER_GROUP],
+        orgIds: [],
+        userIds: []
+    };
 
     it("offers See details only when there is more to read", async () => {
         db.announcement.findMany.mockResolvedValue([
@@ -425,7 +451,11 @@ describe("details behind a banner", () => {
         ]);
         const banners = await service.bannersFor("u1", reader, now);
         const url = Object.fromEntries(banners.map((one) => [one.title, one.detailsUrl]));
-        expect(url).toEqual({ Hello: null, Written: "/announcements/b", Updated: "/announcements/c" });
+        expect(url).toEqual({
+            Hello: null,
+            Written: "/announcements/b",
+            Updated: "/announcements/c"
+        });
     });
 
     it("always has a page for maintenance, which lists the window", () => {
@@ -446,7 +476,9 @@ describe("details behind a banner", () => {
     });
 
     it("refuses one not meant for the reader, retracted, or not started - except to an administrator", async () => {
-        db.announcement.findUnique.mockResolvedValue(row({ audience: JSON.stringify(group), updates: [] }));
+        db.announcement.findUnique.mockResolvedValue(
+            row({ audience: JSON.stringify(group), updates: [] })
+        );
         expect(await service.detailsFor("u1", false, ID, reader, now)).toBeNull();
         expect(await service.detailsFor("u1", true, ID, reader, now)).not.toBeNull();
         db.announcement.findUnique.mockResolvedValue(row({ retractedAt: now, updates: [] }));
@@ -460,9 +492,15 @@ describe("details behind a banner", () => {
     it("adds an update and tells the audience's tabs; not on one taken back", async () => {
         const heard: NoticeChange[] = [];
         const stop = subscribeNotices((change) => heard.push(change));
-        db.announcement.findUnique.mockResolvedValueOnce({ audience: JSON.stringify(group), retractedAt: null });
+        db.announcement.findUnique.mockResolvedValueOnce({
+            audience: JSON.stringify(group),
+            retractedAt: null
+        });
         expect(await service.addAnnouncementUpdate("admin", ID, "Taking longer", now)).toBe(true);
-        db.announcement.findUnique.mockResolvedValueOnce({ audience: JSON.stringify(group), retractedAt: now });
+        db.announcement.findUnique.mockResolvedValueOnce({
+            audience: JSON.stringify(group),
+            retractedAt: now
+        });
         expect(await service.addAnnouncementUpdate("admin", ID, "Again", now)).toBe(false);
         stop();
         expect(db.announcementUpdate.create).toHaveBeenCalledTimes(1);
@@ -473,13 +511,22 @@ describe("details behind a banner", () => {
     it("the action refuses an empty or oversized update and audits one added", async () => {
         requireAdmin.mockResolvedValue({ id: "admin" });
         expect((await actions.addAnnouncementUpdateAction({ id: ID, body: "  " })).ok).toBe(false);
-        expect((await actions.addAnnouncementUpdateAction({ id: ID, body: "x".repeat(4001) })).ok).toBe(false);
-        db.announcement.findUnique.mockResolvedValueOnce({ audience: JSON.stringify(group), retractedAt: null });
-        expect((await actions.addAnnouncementUpdateAction({ id: ID, body: " Taking longer " })).ok).toBe(true);
+        expect(
+            (await actions.addAnnouncementUpdateAction({ id: ID, body: "x".repeat(4001) })).ok
+        ).toBe(false);
+        db.announcement.findUnique.mockResolvedValueOnce({
+            audience: JSON.stringify(group),
+            retractedAt: null
+        });
+        expect(
+            (await actions.addAnnouncementUpdateAction({ id: ID, body: " Taking longer " })).ok
+        ).toBe(true);
         expect(db.announcementUpdate.create).toHaveBeenCalledWith({
             data: expect.objectContaining({ body: "Taking longer", announcementId: ID })
         });
-        expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "announcement.addUpdate" }));
+        expect(recordAudit).toHaveBeenCalledWith(
+            expect.objectContaining({ action: "announcement.addUpdate" })
+        );
     });
 
     it("keeps the written details through compose and back", () => {

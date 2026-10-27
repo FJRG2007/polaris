@@ -23,9 +23,7 @@ export type NoticeTopic = "announcements" | "disk" | "lan";
 
 /** Who a change is for: every account, whoever holds a capability, or any of these audiences. */
 export type NoticeReach =
-    | "everyone"
-    | { permission: Permission }
-    | { audiences: readonly AudienceSpec[] };
+    "everyone" | { permission: Permission } | { audiences: readonly AudienceSpec[] };
 
 export interface NoticeChange {
     readonly topic: NoticeTopic;
@@ -92,7 +90,8 @@ export async function noticeReaches(
     lookups: NoticeLookups
 ): Promise<boolean> {
     if (change.reach === "everyone") return true;
-    if ("permission" in change.reach) return reader.isAdmin || (await lookups.can(change.reach.permission));
+    if ("permission" in change.reach)
+        return reader.isAdmin || (await lookups.can(change.reach.permission));
     const audiences = change.reach.audiences;
     if (audiences.some((one) => one.everyone || one.userIds.includes(reader.id))) return true;
     const grouped = audiences.filter(

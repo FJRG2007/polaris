@@ -946,9 +946,7 @@ export function AnnouncementsView({
                             setUpdateError(null);
                         }}
                     />
-                    {updateError ? (
-                        <p className="text-xs text-destructive">{updateError}</p>
-                    ) : null}
+                    {updateError ? <p className="text-xs text-destructive">{updateError}</p> : null}
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setUpdating(null)}>
                             {t("admin.compose.cancel")}

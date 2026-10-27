@@ -37,10 +37,13 @@ export function useNoticeFrames(topic: NoticeTopic, onChange: () => void, enable
         let timer: ReturnType<typeof setTimeout> | null = null;
         const stop = subscribeSharedStream(STREAM_PATH, scope, ({ data }) => {
             if (!isNoticeFrame(data, topic) || timer) return;
-            timer = setTimeout(() => {
-                timer = null;
-                latest.current();
-            }, SETTLE_MS + Math.random() * NOTICE_SPREAD_MS);
+            timer = setTimeout(
+                () => {
+                    timer = null;
+                    latest.current();
+                },
+                SETTLE_MS + Math.random() * NOTICE_SPREAD_MS
+            );
         });
         return () => {
             if (timer) clearTimeout(timer);

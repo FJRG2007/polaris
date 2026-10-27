@@ -49,7 +49,11 @@ export async function GET(request: Request): Promise<Response> {
     const session = await resolveSession();
     // A non-200 makes EventSource give up rather than reconnect every few
     // seconds against a session that is gone.
-    if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+    if (!session)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
 
     // Held rather than read off `session` inside the closures: the narrowing
     // above does not survive into a callback.
@@ -114,7 +118,9 @@ export async function GET(request: Request): Promise<Response> {
             unsubscribeLocale = subscribeLocale((change) => {
                 if (closed || change.userId !== readerId) return;
                 sequence += 1;
-                write(`data: ${JSON.stringify({ kind: "locale", locale: change.locale, seq: sequence })}\n\n`);
+                write(
+                    `data: ${JSON.stringify({ kind: "locale", locale: change.locale, seq: sequence })}\n\n`
+                );
             });
 
             unsubscribeNotices = subscribeNotices((change) => {
@@ -123,7 +129,9 @@ export async function GET(request: Request): Promise<Response> {
                     .then((reaches) => {
                         if (!reaches || closed) return;
                         sequence += 1;
-                        write(`data: ${JSON.stringify({ kind: "notices", topic: change.topic, seq: sequence })}\n\n`);
+                        write(
+                            `data: ${JSON.stringify({ kind: "notices", topic: change.topic, seq: sequence })}\n\n`
+                        );
                     })
                     .catch(() => undefined);
             });

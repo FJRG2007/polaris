@@ -66,7 +66,10 @@ function useNow(enabled: boolean): number {
  * The banners as the server last said, read again on a live frame and at the
  * next phase boundary. An answer that arrives after a newer one is dropped.
  */
-export function useLiveBanners(initial: BannerState, read: () => Promise<BannerState>): BannerState {
+export function useLiveBanners(
+    initial: BannerState,
+    read: () => Promise<BannerState>
+): BannerState {
     const [state, setState] = useState(initial);
     const asked = useRef(0);
     const reread = useCallback(() => {

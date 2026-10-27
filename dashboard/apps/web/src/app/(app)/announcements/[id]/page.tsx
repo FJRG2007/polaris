@@ -37,17 +37,27 @@ export default async function AnnouncementDetailsPage({
     ]);
     const timeZone = prefs.timeZone;
     // Somebody viewing as another account reads what that account would.
-    const item = await detailsFor(user.id, user.isAdmin && !user.viewingAs, id, { locale, timeZone });
+    const item = await detailsFor(user.id, user.isAdmin && !user.viewingAs, id, {
+        locale,
+        timeZone
+    });
     if (!item) notFound();
 
-    const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone });
+    const when = new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone
+    });
     const maintenancePhase = ["upcoming", "inProgress", "finished"].includes(item.phase)
         ? (item.phase as "upcoming" | "inProgress" | "finished")
         : null;
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-            <Link href="/" className="self-start text-sm text-muted-foreground hover:text-foreground">
+            <Link
+                href="/"
+                className="self-start text-sm text-muted-foreground hover:text-foreground"
+            >
                 {t("details.back")}
             </Link>
             <PageHeader
@@ -59,7 +69,9 @@ export default async function AnnouncementDetailsPage({
                     ) : undefined
                 }
             />
-            {item.body ? <AnnouncementMarkdown source={item.body} className="min-w-0 text-sm" /> : null}
+            {item.body ? (
+                <AnnouncementMarkdown source={item.body} className="min-w-0 text-sm" />
+            ) : null}
             {item.kind === "maintenance" && item.windowStart && item.windowEnd ? (
                 <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
                     <dt className="text-muted-foreground">{t("details.window")}</dt>
@@ -70,7 +82,9 @@ export default async function AnnouncementDetailsPage({
                         <>
                             <dt className="text-muted-foreground">{t("details.affected")}</dt>
                             <dd className="min-w-0 break-words">
-                                {new Intl.ListFormat(locale, { type: "conjunction" }).format(item.affected)}
+                                {new Intl.ListFormat(locale, { type: "conjunction" }).format(
+                                    item.affected
+                                )}
                             </dd>
                         </>
                     ) : null}
@@ -87,8 +101,13 @@ export default async function AnnouncementDetailsPage({
                     <ol className="flex flex-col gap-4 border-l pl-4">
                         {item.updates.map((update) => (
                             <li key={update.id} className="flex min-w-0 flex-col gap-1">
-                                <time dateTime={update.createdAt} className="text-xs text-muted-foreground">
-                                    {t("details.posted", { when: when.format(new Date(update.createdAt)) })}
+                                <time
+                                    dateTime={update.createdAt}
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    {t("details.posted", {
+                                        when: when.format(new Date(update.createdAt))
+                                    })}
                                 </time>
                                 <RichText value={update.body} className="min-w-0" />
                             </li>
@@ -98,7 +117,10 @@ export default async function AnnouncementDetailsPage({
             ) : null}
             {item.linkUrl ? (
                 item.linkUrl.startsWith("/") ? (
-                    <Link href={item.linkUrl} className="self-start text-sm font-medium underline underline-offset-2">
+                    <Link
+                        href={item.linkUrl}
+                        className="self-start text-sm font-medium underline underline-offset-2"
+                    >
                         {item.linkLabel ?? item.linkUrl}
                     </Link>
                 ) : (

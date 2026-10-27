@@ -12,11 +12,17 @@ import { MessagesWrapper } from "../setup/i18n";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const streams = vi.hoisted(() => ({ listeners: [] as ((frame: { data: string; owner: boolean }) => void)[] }));
+const streams = vi.hoisted(() => ({
+    listeners: [] as ((frame: { data: string; owner: boolean }) => void)[]
+}));
 const read = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/shared-stream", () => ({
-    subscribeSharedStream: (_path: string, _scope: string, listener: (frame: { data: string; owner: boolean }) => void) => {
+    subscribeSharedStream: (
+        _path: string,
+        _scope: string,
+        listener: (frame: { data: string; owner: boolean }) => void
+    ) => {
         streams.listeners.push(listener);
         return () => {
             streams.listeners = streams.listeners.filter((one) => one !== listener);
@@ -37,7 +43,12 @@ import type { BannerState, BannerView } from "@/lib/announcements/service";
 import { rereadDelay, REREAD_MAX_MS, REREAD_SLACK_MS } from "@/lib/announcements/phase";
 import { AnnouncementBannerList } from "@/components/announcements/announcement-banner-list";
 import { NOTICE_SPREAD_MS } from "@/components/use-notice-frames";
-import { noticeReaches, publishNoticeChange, subscribeNotices, type NoticeLookups } from "@/lib/shell-notices-live";
+import {
+    noticeReaches,
+    publishNoticeChange,
+    subscribeNotices,
+    type NoticeLookups
+} from "@/lib/shell-notices-live";
 
 const GROUP = "0190f3c6-0000-7000-8000-0000000000a1";
 const audience = (over: Record<string, unknown> = {}) => ({
@@ -83,22 +94,36 @@ describe("who a change reaches", () => {
 
     it("reaches everyone for an audience of everyone, without reading memberships", async () => {
         const lookups = looking({ membership: vi.fn(async () => null) });
-        const change = { topic: "announcements" as const, reach: { audiences: [audience({ everyone: true })] } };
+        const change = {
+            topic: "announcements" as const,
+            reach: { audiences: [audience({ everyone: true })] }
+        };
         expect(await noticeReaches(change, ana, lookups)).toBe(true);
         expect(lookups.membership).not.toHaveBeenCalled();
     });
 
     it("reaches a person named in it, and nobody else, without reading memberships", async () => {
         const lookups = looking({ membership: vi.fn(async () => null) });
-        const change = { topic: "announcements" as const, reach: { audiences: [audience({ userIds: ["ana"] })] } };
+        const change = {
+            topic: "announcements" as const,
+            reach: { audiences: [audience({ userIds: ["ana"] })] }
+        };
         expect(await noticeReaches(change, ana, lookups)).toBe(true);
         expect(await noticeReaches(change, { id: "ben", isAdmin: false }, lookups)).toBe(false);
         expect(lookups.membership).not.toHaveBeenCalled();
     });
 
     it("reaches a group's members through one read of the reader's memberships", async () => {
-        const change = { topic: "announcements" as const, reach: { audiences: [audience({ groupIds: [GROUP] })] } };
-        const inGroup = vi.fn(async () => ({ id: "ana", roleIds: new Set<string>(), groupIds: new Set([GROUP]), orgIds: new Set<string>() }));
+        const change = {
+            topic: "announcements" as const,
+            reach: { audiences: [audience({ groupIds: [GROUP] })] }
+        };
+        const inGroup = vi.fn(async () => ({
+            id: "ana",
+            roleIds: new Set<string>(),
+            groupIds: new Set([GROUP]),
+            orgIds: new Set<string>()
+        }));
         expect(await noticeReaches(change, ana, looking({ membership: inGroup }))).toBe(true);
         expect(inGroup).toHaveBeenCalledTimes(1);
         expect(await noticeReaches(change, ana, looking())).toBe(false);
@@ -124,14 +149,22 @@ describe("who a change reaches", () => {
     });
 
     it("spares administrators somebody else closing a banner, unless they are viewing as them", async () => {
-        const change = { topic: "announcements" as const, reach: { audiences: [audience({ userIds: ["ana"] })] } };
+        const change = {
+            topic: "announcements" as const,
+            reach: { audiences: [audience({ userIds: ["ana"] })] }
+        };
         expect(await noticeReaches(change, root, looking())).toBe(false);
-        expect(await noticeReaches(change, root, looking({ viewing: async () => "ana" }))).toBe(true);
+        expect(await noticeReaches(change, root, looking({ viewing: async () => "ana" }))).toBe(
+            true
+        );
         expect(await noticeReaches(change, { id: "ana", isAdmin: true }, looking())).toBe(true);
     });
 
     it("still tells administrators about an audience of roles, groups or organizations", async () => {
-        const change = { topic: "announcements" as const, reach: { audiences: [audience({ groupIds: [GROUP] })] } };
+        const change = {
+            topic: "announcements" as const,
+            reach: { audiences: [audience({ groupIds: [GROUP] })] }
+        };
         const lookups = looking();
         expect(await noticeReaches(change, root, lookups)).toBe(true);
         expect(lookups.viewing).not.toHaveBeenCalled();
@@ -175,7 +208,9 @@ describe("the banner stack follows along", () => {
 
     it("shows an announcement published while the tab is open", async () => {
         read.mockResolvedValue({ banners: [banner()], nextChangeInMs: null });
-        render(<AnnouncementBannerList initial={empty} locale="en-US" />, { wrapper: MessagesWrapper });
+        render(<AnnouncementBannerList initial={empty} locale="en-US" />, {
+            wrapper: MessagesWrapper
+        });
         expect(screen.queryByText("Scheduled maintenance")).toBeNull();
         expect(streams.listeners).toHaveLength(1);
 
@@ -191,9 +226,15 @@ describe("the banner stack follows along", () => {
 
     it("takes a withdrawn one down, and ignores other notices' frames", async () => {
         read.mockResolvedValue(empty);
-        render(<AnnouncementBannerList initial={{ banners: [banner()], nextChangeInMs: null }} locale="en-US" />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <AnnouncementBannerList
+                initial={{ banners: [banner()], nextChangeInMs: null }}
+                locale="en-US"
+            />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         await act(async () => {
             frame("disk");
             await vi.advanceTimersByTimeAsync(400 + NOTICE_SPREAD_MS);
@@ -207,11 +248,26 @@ describe("the banner stack follows along", () => {
     });
 
     it("switches phase at the boundary without a frame", async () => {
-        const upcoming = banner({ title: "Database upgrade", phase: "upcoming", countdownTo: new Date(Date.now() + 60_000).toISOString() });
-        read.mockResolvedValue({ banners: [banner({ title: "Database upgrade", phase: "inProgress", dismissible: false })], nextChangeInMs: 3_600_000 });
-        render(<AnnouncementBannerList initial={{ banners: [upcoming], nextChangeInMs: 60_000 }} locale="en-US" />, {
-            wrapper: MessagesWrapper
+        const upcoming = banner({
+            title: "Database upgrade",
+            phase: "upcoming",
+            countdownTo: new Date(Date.now() + 60_000).toISOString()
         });
+        read.mockResolvedValue({
+            banners: [
+                banner({ title: "Database upgrade", phase: "inProgress", dismissible: false })
+            ],
+            nextChangeInMs: 3_600_000
+        });
+        render(
+            <AnnouncementBannerList
+                initial={{ banners: [upcoming], nextChangeInMs: 60_000 }}
+                locale="en-US"
+            />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(screen.getByText(/^Scheduled maintenance/)).toBeTruthy();
         await act(async () => {
             await vi.advanceTimersByTimeAsync(60_000 + REREAD_SLACK_MS - 10);
@@ -229,19 +285,30 @@ describe("the banner stack follows along", () => {
     it("offers See details when the banner has a page", () => {
         render(
             <AnnouncementBannerList
-                initial={{ banners: [banner({ detailsUrl: "/announcements/x" })], nextChangeInMs: null }}
+                initial={{
+                    banners: [banner({ detailsUrl: "/announcements/x" })],
+                    nextChangeInMs: null
+                }}
                 locale="en-US"
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByRole("link", { name: "See details" }).getAttribute("href")).toBe("/announcements/x");
+        expect(screen.getByRole("link", { name: "See details" }).getAttribute("href")).toBe(
+            "/announcements/x"
+        );
     });
 
     it("keeps what is on screen when a read fails", async () => {
         read.mockRejectedValue(new Error("offline"));
-        render(<AnnouncementBannerList initial={{ banners: [banner()], nextChangeInMs: null }} locale="en-US" />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <AnnouncementBannerList
+                initial={{ banners: [banner()], nextChangeInMs: null }}
+                locale="en-US"
+            />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         await act(async () => {
             frame("announcements");
             await vi.advanceTimersByTimeAsync(400 + NOTICE_SPREAD_MS);
