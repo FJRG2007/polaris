@@ -62,6 +62,7 @@ import marketplace from "./marketplace.json";
 import publicPages from "./publicPages.json";
 import tasksDetail from "./tasksDetail.json";
 import diagnostics from "./diagnostics.json";
+import imageScans from "./imageScans.json";
 import deployConfig from "./deployConfig.json";
 import deployRegistries from "./deployRegistries.json";
 import deploySafety from "./deploySafety.json";
@@ -98,6 +99,7 @@ export default {
     databases,
     diagram,
     diagnostics,
+    imageScans,
     deploy,
     deployConfig,
     deployRegistries,

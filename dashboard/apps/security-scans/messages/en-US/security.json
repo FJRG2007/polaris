@@ -99,7 +99,10 @@
             "agent": "Agent",
             "other": "Other"
         },
-        "noApps": "No apps on this server yet."
+        "noApps": "No apps on this server yet.",
+        "open": "Open",
+        "openOwn": "Open in Management",
+        "openDeploy": "Open in Deploy"
     },
     "history": "Recent scans",
     "noScans": "No scans yet.",
@@ -177,7 +180,8 @@
         "serverGone": "That server is no longer in Polaris. Showing another one.",
         "running": "This scan has not finished yet. The page updates when it does.",
         "loadFailed": "Could not open this scan. Try again.",
-        "appGone": "The app this scan was about has been removed since."
+        "appGone": "The app this scan was about has been removed since.",
+        "openOwn": "Open in Management"
     },
     "verdict": {
         "issues": "{count, plural, =0 {No known issues} one {# issue} other {# issues}}",

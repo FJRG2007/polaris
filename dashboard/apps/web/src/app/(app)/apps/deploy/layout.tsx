@@ -17,7 +17,8 @@ export default function DeployLayout({ children }: { children: ReactNode }) {
                 "deployService",
                 "deploySettings",
                 "driveViewer",
-                "firewall"
+                "firewall",
+                "imageScans"
             ]}
         >
             {children}

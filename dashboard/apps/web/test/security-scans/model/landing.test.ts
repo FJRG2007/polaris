@@ -82,3 +82,30 @@ describe("parseLanding", () => {
         ]);
     });
 });
+
+describe("findingsHome", () => {
+    it("sends Polaris's own image scans to Management", () => {
+        expect(landing.findingsHome({ targetId: TARGET, scanId: SCAN, own: true })).toBe(
+            `/admin/images?scan=${SCAN}`
+        );
+    });
+
+    it("sends a Deploy service's scans to its Vulnerabilities tab", () => {
+        const appHref = "/apps/deploy/p9?service=a3&tab=vulnerabilities";
+        expect(landing.findingsHome({ targetId: TARGET, scanId: SCAN, appHref })).toBe(appHref);
+    });
+
+    it("keeps everything else on the scans page", () => {
+        expect(
+            landing.findingsHome({
+                targetId: TARGET,
+                scanId: SCAN,
+                appHref: "/apps/installed/x",
+                ids: ["CVE-2026-1"]
+            })
+        ).toBe(landing.alertHref({ targetId: TARGET, scanId: SCAN, ids: ["CVE-2026-1"] }));
+        expect(landing.findingsHome({ targetId: TARGET, scanId: SCAN })).toBe(
+            landing.alertHref({ targetId: TARGET, scanId: SCAN })
+        );
+    });
+});

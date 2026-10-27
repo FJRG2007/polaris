@@ -65,6 +65,20 @@ describe("server images", () => {
         ]);
     });
 
+    it("names the Deploy apps that run an image, so its findings link to them", () => {
+        const grouped = images.groupImages(
+            listed,
+            new Map([["polaris-0123abcd", "Fixture shop"]]),
+            new Map([["polaris-0123abcd", "fixture-app-id"]])
+        );
+        expect(grouped.map((image) => [image.source, image.applicationIds])).toEqual([
+            ["polaris", []],
+            ["polaris", []],
+            ["app", ["fixture-app-id"]],
+            ["agent", []]
+        ]);
+    });
+
     it("counts an image Polaris also runs as Polaris's own", () => {
         const shared = images.groupImages(
             [

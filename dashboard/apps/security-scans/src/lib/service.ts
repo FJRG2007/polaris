@@ -14,7 +14,7 @@ import * as specs from "../model/specs";
 import * as images from "../model/images";
 import * as history from "../model/history";
 import * as subjects from "../model/subjects";
-import { alertHref } from "../model/landing";
+import { findingsHome, OWN_IMAGES_PATH, ownImagesHref } from "../model/landing";
 import { gunzip, gzip } from "node:zlib";
 import { Readable } from "node:stream";
 import { decodeLockfiles, dependencyContext, shortHash } from "@polaris/deploy";
@@ -340,6 +340,11 @@ export async function focusScan(scanId: string | null) {
         ),
         applicationId: appId,
         appHref: app?.href ?? null,
+        // Polaris's own image on this machine: its home is Management.
+        ownHref:
+            scan.kind === "image" && scan.source === "polaris" && scan.target.kind === "local"
+                ? ownImagesHref(scan.id)
+                : null,
         // Removed apps are not offered again.
         appGone: Boolean(appId) && !app,
         imageId: scan.imageId,
@@ -453,10 +458,16 @@ export async function queueImage(targetId: string, applicationId: string, userId
     return enqueue(targetId, "image", app.name, { applicationId, image }, userId);
 }
 
-/** The app names a server's containers are listed under, by compose project. */
-async function appNamesOf(targetId: string): Promise<Map<string, string>> {
+/** The app names and ids a server's containers are listed under, by compose project. */
+async function appProjectsOf(
+    targetId: string
+): Promise<{ names: Map<string, string>; ids: Map<string, string> }> {
     const apps = await appsOf(targetId);
-    return new Map(apps.map((app) => [`polaris-${shortHash(app.id, 8)}`, app.name]));
+    const project = (id: string) => `polaris-${shortHash(id, 8)}`;
+    return {
+        names: new Map(apps.map((app) => [project(app.id), app.name])),
+        ids: new Map(apps.map((app) => [project(app.id), app.id]))
+    };
 }
 
 /** Every image a server runs right now, one per image id; null when it cannot be asked. */
@@ -466,7 +477,8 @@ async function imagesOn(target: ScanTarget): Promise<images.ServerImage[] | null
         return null;
     });
     if (!containers) return null;
-    return images.groupImages(containers, await appNamesOf(target.id));
+    const projects = await appProjectsOf(target.id);
+    return images.groupImages(containers, projects.names, projects.ids);
 }
 
 /**
@@ -496,11 +508,27 @@ export async function serverImages(targetId: string) {
     for (const scan of scans) {
         if (scan.imageId && !latest.has(scan.imageId)) latest.set(scan.imageId, scan);
     }
+    const apps = await currentApps(found.flatMap((image) => image.applicationIds.slice(0, 1)));
     return {
         available: true as const,
         images: found.map((image) => {
             const scan = latest.get(image.imageId);
-            return { ...image, scan: scan ? { ...scan, summary: safeJson(scan.summary) } : null };
+            const app = image.applicationIds[0] ? apps.get(image.applicationIds[0]) : undefined;
+            // Where this image's findings are read now: the service's tab in
+            // Deploy, or Management for Polaris's own on this machine.
+            const home =
+                image.source === "polaris" && target.kind === "local"
+                    ? scan
+                        ? ownImagesHref(scan.id)
+                        : OWN_IMAGES_PATH
+                    : app?.href?.startsWith("/apps/deploy/")
+                      ? app.href
+                      : null;
+            return {
+                ...image,
+                home,
+                scan: scan ? { ...scan, summary: safeJson(scan.summary) } : null
+            };
         })
     };
 }
@@ -525,7 +553,12 @@ export async function queueServerImage(
         targetId,
         "image",
         image.ref,
-        { imageId: image.imageId, ref: image.ref, users: image.users },
+        {
+            imageId: image.imageId,
+            ref: image.ref,
+            users: image.users,
+            applicationIds: image.applicationIds
+        },
         userId,
         { imageId: image.imageId, source: image.source }
     );
@@ -720,7 +753,30 @@ async function alertNew(
     if (claimed.count === 0) return;
     const requester = await prisma.securityScan.findUnique({
         where: { id: scanId },
-        select: { requestedById: true }
+        select: {
+            requestedById: true,
+            kind: true,
+            input: true,
+            source: true,
+            target: { select: { kind: true } }
+        }
+    });
+    const input = requester ? safeJson(requester.input) : {};
+    // A scan the server's listing queued names its apps rather than one app.
+    const listed = Array.isArray(input.applicationIds) ? input.applicationIds : [];
+    const appId =
+        subjects.applicationIdOf(input) ??
+        (typeof listed[0] === "string" && listed[0].length > 0 ? listed[0] : null);
+    const appHref = appId ? ((await currentApps([appId])).get(appId)?.href ?? null) : null;
+    const href = findingsHome({
+        targetId: target.id,
+        scanId,
+        ids: fresh.slice(0, 20).map((i) => i.id),
+        appHref,
+        own:
+            requester?.kind === "image" &&
+            requester.source === "polaris" &&
+            requester.target.kind === "local"
     });
     const recipients = [
         ...new Set([target.ownerId, requester?.requestedById].filter((id): id is string => !!id))
@@ -742,11 +798,7 @@ async function alertNew(
                         ? t("images.fixedIn", { version: worst.fixedIn })
                         : t("images.noFix")
                 }),
-                href: alertHref({
-                    targetId: target.id,
-                    scanId,
-                    ids: fresh.slice(0, 20).map((i) => i.id)
-                }),
+                href,
                 metadata: { scanId, targetId: target.id, ids: fresh.slice(0, 20).map((i) => i.id) }
             });
         })

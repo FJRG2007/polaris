@@ -2485,6 +2485,10 @@
             "sso": {
                 "title": "Acceso único",
                 "description": "Proveedores de identidad SAML y los dominios de correo que entran con ellos."
+            },
+            "images": {
+                "title": "Imágenes",
+                "description": "Vulnerabilidades en las imágenes de Polaris."
             }
         }
     },
@@ -3767,5 +3771,11 @@
             "invalid": "Revisa los campos marcados.",
             "failed": "No se ha podido completar. Inténtalo de nuevo en un momento."
         }
+    },
+    "images": {
+        "title": "Imágenes",
+        "description": "Vulnerabilidades conocidas en las imágenes que Polaris ejecuta en esta máquina.",
+        "emptyTitle": "Aún sin analizar",
+        "emptyBody": "Polaris analiza sus propias imágenes por su cuenta en unas horas tras arrancar o actualizarse."
     }
 }

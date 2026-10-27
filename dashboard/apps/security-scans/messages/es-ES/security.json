@@ -99,7 +99,10 @@
             "agent": "Agente",
             "other": "Otra"
         },
-        "noApps": "Aún no hay apps en este servidor."
+        "noApps": "Aún no hay apps en este servidor.",
+        "open": "Abrir",
+        "openOwn": "Abrir en Gestión",
+        "openDeploy": "Abrir en Deploy"
     },
     "history": "Recientes",
     "noScans": "Aún no hay análisis.",
@@ -177,7 +180,8 @@
         "serverGone": "Ese servidor ya no está en Polaris. Se muestra otro.",
         "running": "Este análisis aún no ha terminado. La página se actualiza cuando acabe.",
         "loadFailed": "No se pudo abrir este análisis. Inténtalo de nuevo.",
-        "appGone": "La app de este análisis se ha eliminado desde entonces."
+        "appGone": "La app de este análisis se ha eliminado desde entonces.",
+        "openOwn": "Abrir en Gestión"
     },
     "verdict": {
         "issues": "{count, plural, =0 {Sin problemas conocidos} one {# problema} other {# problemas}}",

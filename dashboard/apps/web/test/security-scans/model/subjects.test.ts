@@ -48,7 +48,7 @@ describe("currentApp", () => {
     it("links a plain Deploy app to its service in the project", () => {
         expect(
             subjects.currentApp({ id: "a3", name: "api", projectId: "p9", installed: null }, find)
-        ).toEqual({ name: "api", href: "/apps/deploy/p9?service=a3" });
+        ).toEqual({ name: "api", href: "/apps/deploy/p9?service=a3&tab=vulnerabilities" });
     });
 
     it("has no link when the app has nowhere to open", () => {

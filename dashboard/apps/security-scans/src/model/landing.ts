@@ -11,6 +11,9 @@ import { z } from "zod";
 /** The page an image's findings are on. */
 export const SECURITY_PATH = "/apps/servers/security";
 
+/** Where Polaris's own images' findings live: Management > Polaris images. */
+export const OWN_IMAGES_PATH = "/admin/images";
+
 /** Advisories carried in a link; an alert never names more. */
 export const MAX_LINK_IDS = 20;
 
@@ -39,6 +42,30 @@ export function alertHref(to: {
     const ids = cleanIds(to.ids ?? []);
     if (ids.length > 0) params.set("ids", ids.join(","));
     return `${SECURITY_PATH}?${params.toString()}`;
+}
+
+/** One of Polaris's own image scans, opened in Management. */
+export function ownImagesHref(scanId: string): string {
+    return `${OWN_IMAGES_PATH}?${new URLSearchParams({ scan: scanId }).toString()}`;
+}
+
+/**
+ * Where a scan's findings are read and acted on: a Deploy service's
+ * Vulnerabilities tab, Management for Polaris's own images on this machine,
+ * and this page for everything else (an agent's image, an installed app).
+ */
+export function findingsHome(to: {
+    readonly targetId: string;
+    readonly scanId: string;
+    readonly ids?: readonly string[];
+    /** The app's page, from `subjects.currentApp`. */
+    readonly appHref?: string | null;
+    /** A scan of Polaris's own image on the machine it runs on. */
+    readonly own?: boolean;
+}): string {
+    if (to.own) return ownImagesHref(to.scanId);
+    if (to.appHref?.startsWith("/apps/deploy/")) return to.appHref;
+    return alertHref(to);
 }
 
 function first(value: string | readonly string[] | undefined): string | undefined {

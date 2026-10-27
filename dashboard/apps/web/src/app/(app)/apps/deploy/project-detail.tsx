@@ -108,6 +108,8 @@ export function ProjectDetail({
         const url = new URL(window.location.href);
         if (app) url.searchParams.set("service", app.id);
         else url.searchParams.delete("service");
+        // A linked tab (`?tab=vulnerabilities`) is for the service it opened.
+        url.searchParams.delete("tab");
         window.history.replaceState(null, "", url);
     }
 

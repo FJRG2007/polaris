@@ -28,6 +28,8 @@ export interface ServerImage {
     readonly source: ImageSource;
     /** Who uses it, as the screen names them: an app, a Polaris part, a container. */
     readonly users: readonly string[];
+    /** The Deploy apps among them, by id: where the findings are read. */
+    readonly applicationIds: readonly string[];
 }
 
 export const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
@@ -111,15 +113,20 @@ export function sourceOf(container: ListedContainer): ImageSource {
 
 /**
  * Group containers by the image they run. `appNames` maps an app's project
- * (`polaris-<hash>`) to its name. An image used by Polaris and by an app counts
- * as Polaris's: that is the one an update replaces.
+ * (`polaris-<hash>`) to its name, and `appIds` the same project to its id. An
+ * image used by Polaris and by an app counts as Polaris's: that is the one an
+ * update replaces.
  */
 export function groupImages(
     containers: readonly ListedContainer[],
-    appNames: ReadonlyMap<string, string>
+    appNames: ReadonlyMap<string, string>,
+    appIds: ReadonlyMap<string, string> = new Map()
 ): ServerImage[] {
     const rank: Record<ImageSource, number> = { polaris: 0, app: 1, agent: 2, other: 3 };
-    const byId = new Map<string, { ref: string; source: ImageSource; users: Set<string> }>();
+    const byId = new Map<
+        string,
+        { ref: string; source: ImageSource; users: Set<string>; apps: Set<string> }
+    >();
     for (const container of containers) {
         if (container.name.startsWith(SCANNER_PREFIX)) continue;
         const source = sourceOf(container);
@@ -130,11 +137,18 @@ export function groupImages(
                 : source === "polaris"
                   ? (container.labels["com.docker.compose.service"] ?? container.name)
                   : container.name;
+        const appId = source === "app" && project ? appIds.get(project) : undefined;
         const entry = byId.get(container.imageId);
         if (!entry) {
-            byId.set(container.imageId, { ref: container.ref, source, users: new Set([user]) });
+            byId.set(container.imageId, {
+                ref: container.ref,
+                source,
+                users: new Set([user]),
+                apps: new Set(appId ? [appId] : [])
+            });
             continue;
         }
+        if (appId && entry.apps.size < MAX_USERS) entry.apps.add(appId);
         if (rank[source] < rank[entry.source]) entry.source = source;
         // A ref someone typed reads better than the bare id a container may show.
         if (entry.ref.startsWith("sha256:") && !container.ref.startsWith("sha256:"))
@@ -146,7 +160,8 @@ export function groupImages(
             imageId,
             ref: entry.ref,
             source: entry.source,
-            users: [...entry.users].filter(Boolean).sort()
+            users: [...entry.users].filter(Boolean).sort(),
+            applicationIds: [...entry.apps].sort()
         }))
         .sort((a, b) => rank[a.source] - rank[b.source] || a.ref.localeCompare(b.ref));
 }
