@@ -272,9 +272,12 @@ services:
     # internet - the default route with the lowest metric, the same choice the
     # local-name responder makes - plus the public one STUN finds from it. The
     # kernel answers that question (`ip route get`, the image's busybox; nothing
-    # is sent), so it is right on cable, on WiFi, and after a move. When the
-    # route goes through a container bridge or a VPN tunnel, or there is no route
-    # yet, nothing is narrowed and the exclusions below are what applies.
+    # is sent), so it is right on cable, on WiFi, and after a move. The IPv6
+    # default route's source goes in beside it when there is one: an include
+    # list drops every address not on it, and a line reached over IPv6 would
+    # otherwise lose the address it is reached on. When the IPv4 route goes
+    # through a container bridge or a VPN tunnel, or there is no route yet,
+    # nothing is narrowed and the exclusions below are what applies.
     #
     # It is worked out here rather than written into .env or the configuration
     # by the dashboard, so it needs nothing an existing install does not have and
@@ -285,16 +288,21 @@ services:
       - /bin/sh
       - -c
       - |
-        route=$$(ip -4 route get 1.1.1.1 2>/dev/null)
-        dev=$$(printf '%s\n' "$$route" | sed -n 's/.* dev \([^ ]*\).*/\1/p')
-        src=$$(printf '%s\n' "$$route" | sed -n 's/.* src \([0-9][0-9.]*\).*/\1/p')
-        case "$$dev" in
-          ""|docker*|br-*|veth*|virbr*|cni*|flannel*|kube*|tailscale*|zt*|wg*|tun*) src="" ;;
-        esac
+        source_of() {
+          route=$$(ip "$$1" route get "$$2" 2>/dev/null)
+          dev=$$(printf '%s\n' "$$route" | sed -n 's/.* dev \([^ ]*\).*/\1/p')
+          case "$$dev" in
+            ""|docker*|br-*|veth*|virbr*|cni*|flannel*|kube*|tailscale*|zt*|wg*|tun*) return ;;
+          esac
+          printf '%s\n' "$$route" | sed -n 's/.* src \([0-9a-fA-F][0-9a-fA-F.:]*\).*/\1/p'
+        }
+        src=$$(source_of -4 1.1.1.1)
+        src6=$$(source_of -6 2606:4700:4700::1111)
         if [ -n "$$src" ]; then
-          LIVEKIT_CONFIG=$$(printf '%s\n' "$$LIVEKIT_CONFIG" | sed "s|^\( *\)# includes: default-route address$$|\1includes: [$$src/32]|")
+          list="\"$$src/32\"$${src6:+, \"$$src6/128\"}"
+          LIVEKIT_CONFIG=$$(printf '%s\n' "$$LIVEKIT_CONFIG" | sed "s|^\( *\)# includes: default-route address$$|\1includes: [$$list]|")
           export LIVEKIT_CONFIG
-          echo "polaris: offering calls on $$src ($$dev) and the public address" >&2
+          echo "polaris: offering calls on $$src$${src6:+ and $$src6} and the public address" >&2
         else
           echo "polaris: no default route to narrow to; offering every local address" >&2
         fi

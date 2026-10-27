@@ -24,6 +24,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
 
 const COMPOSE = readFileSync(
     new URL("../../../../docker/docker-compose.yml", import.meta.url),
@@ -112,7 +113,8 @@ describe("the one local address a call is offered", () => {
     const MARKER = "# includes: default-route address";
 
     it("asks the kernel for the default route's address and starts the server itself", () => {
-        expect(script).toContain("ip -4 route get");
+        expect(script).toContain('ip "$$1" route get');
+        expect(script).toContain("source_of -4 1.1.1.1");
         expect(script).toContain("exec /livekit-server");
     });
 
@@ -137,4 +139,71 @@ describe("the one local address a call is offered", () => {
         expect(indent(lines[ips]!)).toBeLessThan(indent(lines[at]!));
         expect(lines.slice(ips + 1, at).every((line) => line.trim().startsWith("#"))).toBe(true);
     });
+
+    /** The script as the shell receives it, run with `ip` answering `routes`. */
+    function start(routes: { v4: string; v6: string }): { config: string; log: string } {
+        const body = script
+            .split(/\r?\n/)
+            .slice(script.split(/\r?\n/).findIndex((line) => line.trim() === "- |") + 1)
+            .map((line) => line.replace(/^ {8}/, ""))
+            .join("\n")
+            .replace(/\$\$/g, "$")
+            .replace("exec /livekit-server", "printf '%s\\n' \"$LIVEKIT_CONFIG\"");
+        const ip = 'ip() { if [ "$1" = -4 ]; then printf \'%s\\n\' "$FAKE_V4"; else printf \'%s\\n\' "$FAKE_V6"; fi; }';
+        const config = COMPOSE.slice(COMPOSE.indexOf("      LIVEKIT_CONFIG: |"))
+            .split(/\r?\n/)
+            .slice(1)
+            .filter((line, index, all) => all.slice(0, index + 1).every((seen) => seen === "" || seen.startsWith("        ")))
+            .map((line) => line.slice(8))
+            .join("\n");
+        const run = spawnSync("sh", ["-c", `${ip}\n${body}`], {
+            encoding: "utf8",
+            env: { ...process.env, LIVEKIT_CONFIG: config, FAKE_V4: routes.v4, FAKE_V6: routes.v6 }
+        });
+        expect(run.status).toBe(0);
+        return { config: run.stdout, log: run.stderr };
+    }
+
+    const HAS_SH = spawnSync("sh", ["-c", "true"]).status === 0;
+    const includesLine = (config: string) =>
+        config.split("\n").find((line) => line.trim().startsWith("includes:")) ?? null;
+    const markerIndent = (config: string) =>
+        config.split("\n").find((line) => line.trim() === "excludes:")!.match(/^ */)![0];
+
+    it.skipIf(!HAS_SH)(
+        "writes the default route's IPv4 and IPv6 sources into rtc.ips.includes",
+        () => {
+            const { config } = start({
+                v4: "1.1.1.1 via 192.168.1.1 dev br0 src 192.168.1.20 uid 0\n    cache",
+                v6: "2606:4700:4700::1111 from :: via fe80::1 dev br0 proto ra src 2001:db8::20 metric 1024 pref medium"
+            });
+            expect(config).not.toContain(MARKER);
+            expect(includesLine(config)).toBe(
+                `${markerIndent(config)}includes: ["192.168.1.20/32", "2001:db8::20/128"]`
+            );
+        }
+    );
+
+    it.skipIf(!HAS_SH)(
+        "narrows to the IPv4 address alone when there is no IPv6 route",
+        () => {
+            const { config } = start({
+                v4: "1.1.1.1 via 10.0.0.1 dev wlan0 src 10.0.0.7 uid 0",
+                v6: ""
+            });
+            expect(includesLine(config)).toBe(`${markerIndent(config)}includes: ["10.0.0.7/32"]`);
+        }
+    );
+
+    it.skipIf(!HAS_SH)(
+        "narrows nothing when the route goes through a tunnel or there is none",
+        () => {
+            for (const v4 of ["1.1.1.1 dev wg0 src 10.8.0.2 uid 0", ""]) {
+                const { config, log } = start({ v4, v6: "" });
+                expect(config).toContain(MARKER);
+                expect(includesLine(config)).toBeNull();
+                expect(log).toContain("no default route to narrow to");
+            }
+        }
+    );
 });
