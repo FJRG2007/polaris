@@ -735,7 +735,8 @@
         "channelSettings": "Channel settings",
         "searchIn": "Search {name}",
         "groupsNotAllowed": "Your account cannot start groups",
-        "cannotReachThem": "You cannot add people to this conversation"
+        "cannotReachThem": "You cannot add people to this conversation",
+        "inACall": "In a call"
     },
     "meetingNotice": {
         "invitedTitle": "{name} invited you to {meeting}",
@@ -1497,6 +1498,13 @@
         "join": "Join",
         "withVideo": "With video",
         "show": "Show"
+    },
+    "callStage": {
+        "calling": "{name} is calling",
+        "incomingCall": "Incoming call",
+        "joinWithVideo": "Join with video",
+        "decline": "Decline",
+        "silence": "Silence the ring"
     },
     "saved": {
         "backToConversations": "Back to conversations",

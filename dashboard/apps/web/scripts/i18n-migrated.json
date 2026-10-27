@@ -828,6 +828,7 @@
         "web/src/app/(app)/chat/call-room.tsx",
         "web/src/app/(app)/chat/call-roster.tsx",
         "web/src/app/(app)/chat/call-session.tsx",
+        "web/src/app/(app)/chat/call-stage.tsx",
         "web/src/app/(app)/chat/camera-background.ts",
         "web/src/app/(app)/chat/camera-compositor.ts",
         "web/src/app/(app)/chat/camera-device.ts",

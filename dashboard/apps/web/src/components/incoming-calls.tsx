@@ -43,7 +43,7 @@ import { useDoNotDisturb } from "./do-not-disturb";
 import { claimForDevice } from "@/lib/device-once";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import {
     answersMissedCall,
@@ -60,6 +60,7 @@ import {
     type NoticeStanding
 } from "@/lib/desktop-notify";
 import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
+import { publishCardRings, shownStages, stageShown, subscribeStages } from "@/lib/chat/call-stage";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging, willBeHeard } from "@/lib/call-sounds";
@@ -600,7 +601,33 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         return () => clearInterval(timer);
     }, [ringing.length, missedOut]);
 
-    if (showing.length === 0 && missed.length === 0) return null;
+    /**
+     * The calls whose conversation is on screen with its call stage up.
+     *
+     * The stage is the same prompt, drawn where the call is, so the card steps
+     * aside for it there - and only there. Everything else about the ringing
+     * stays: the sound, the notice, and the card the moment the stage goes.
+     */
+    useSyncExternalStore(subscribeStages, shownStages, () => "");
+
+    // And what is ringing, for the stage of a conversation opened after the
+    // ring arrived. Cleared when this goes, so nothing rings on from it.
+    useEffect(() => {
+        publishCardRings(
+            showing.map((entry) => ({
+                meetingId: entry.meetingId,
+                channelId: entry.channelId,
+                callerId: entry.userId,
+                name: entry.name,
+                at: entry.at,
+                silenced: silenced.includes(entry.meetingId)
+            }))
+        );
+    });
+    useEffect(() => () => publishCardRings([]), []);
+    const cards = showing.filter((entry) => !stageShown(entry.meetingId));
+
+    if (cards.length === 0 && missed.length === 0) return null;
 
     return (
         <div className="flex flex-col gap-2">
@@ -683,7 +710,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                     </span>
                 </div>
             ))}
-            {showing.map((entry) => (
+            {cards.map((entry) => (
                 <div
                     key={entry.meetingId}
                     role="alert"

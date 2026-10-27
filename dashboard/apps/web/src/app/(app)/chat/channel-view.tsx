@@ -70,6 +70,9 @@ import { sendFile, type Sent } from "@/components/transfers/move-file";
 import type { SendOutcome, SendProgress } from "./outgoing";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
+import { CallStage } from "./call-stage";
+import { useRingingHere } from "./use-ringing-here";
+import { stageMode } from "@/lib/chat/call-stage";
 import type { RosterModeration } from "./call-moderation-menu";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
@@ -296,6 +299,9 @@ export function ChannelView({
     // their camera opened for them.
     const { call, session, enter, leave: leaveCall, withVideo } = useCallHold();
     const inCall = session?.channelId === channelId ? session.meetingId : null;
+    // Whether the call here is ringing at this reader, for the stage over the
+    // messages - see `call-stage`.
+    const ringingHere = useRingingHere(channelId, viewerId, inCall);
     // Joining a room while already in a call replaces the call, which is the one
     // thing here nobody can undo. Whether to ask first is this browser's own
     // setting - see `voice-settings`.
@@ -2421,6 +2427,17 @@ export function ChannelView({
         <PanelSearch channelName={channel.name} onSearch={searchFor} />
     ) : undefined;
 
+    const stage = stageMode({
+        kind: channel.kind,
+        mayCall: may.call,
+        inCall: inCall !== null,
+        ring: ringingHere.ring,
+        live
+    });
+    // The stage takes the place of the preview. Put away, it is the folded
+    // line, ringing or not - and the corner card rings again.
+    const stageOwns = stage !== "none" && live !== null && !hidden;
+
     const view = (
         <div
             className={cn(
@@ -2471,8 +2488,37 @@ export function ChannelView({
                     who is in it and who is muted, the way a voice room lists
                     them, with the way in beside it. Nothing of the call itself
                     reaches this browser until it joins. */}
+                {/* A one-to-one or a group draws the call as a stage over the
+                    messages: the faces, the caller ringing, and the ways in.
+                    Hidden, it is the same line as anywhere else. */}
+                {stageOwns && live ? (
+                    <CallStage
+                        meetingId={live.meetingId}
+                        people={live.people}
+                        count={live.count}
+                        caller={
+                            stage === "ringing" && ringingHere.ring
+                                ? { id: ringingHere.ring.callerId, name: ringingHere.ring.name }
+                                : null
+                        }
+                        canJoin={!callsOff}
+                        busy={joining}
+                        onJoin={(video) => void startCall(video)}
+                        onDecline={() => {
+                            ringingHere.decline();
+                            // The call goes on without this reader: it folds
+                            // into the line, still one press from joining.
+                            setHidden(true);
+                        }}
+                        silenced={ringingHere.silenced}
+                        onSilence={ringingHere.silence}
+                        onHide={() => setHidden(true)}
+                        moderation={rosterModeration}
+                    />
+                ) : null}
                 {may.call &&
                     channel.kind !== "voice" &&
+                    !stageOwns &&
                     !inCall &&
                     live &&
                     live.people.length > 0 &&
