@@ -449,7 +449,11 @@ export async function reconcileWorldBuilds(
             await host.appsInstallConfig.patchInstallConfig(server.installedAppId, (current) => ({
                 [plan.SITE_SEARCH_KEY]: searchesOf(current, season)
             }));
-        if (!decoration) return;
+        // Nor onto a map: its world is somebody's build, and a pumpkin patch
+        // pasted into a parkour course is a jump nobody can make. `mapId` is
+        // `MAP_KEY` in `games-create.ts`, which this module cannot import.
+        const onMap = typeof config.mapId === "string" && config.mapId.length > 0;
+        if (!decoration || onMap) return;
         // Read once a pass, however many of the season's builds look for a site.
         let homes: Promise<{ x: number; z: number }[]> | null = null;
         const homesOnce = () => (homes ??= homesOf(server));
