@@ -590,6 +590,7 @@ async function createMinecraftServer(
         },
         new Map(base.env.map((entry) => [entry.key, entry.value]))
     );
+    const shaped = new Set(env.keys());
     // On this disk before the container asks for it, if it is not already.
     const map = findMap(input.mapId);
     if (map) warmMap(map);
@@ -616,7 +617,12 @@ async function createMinecraftServer(
     // the template for the same reason as the access above: a login is not a
     // preference a saved server passes on, and the template may carry the project
     // guard this replaces.
-    const seed = await anticheatSeed(env, await loginSeed(env));
+    const seed = withShapedEnv(
+        manifest,
+        env,
+        shaped,
+        await anticheatSeed(env, await loginSeed(env))
+    );
 
     // Crossplay is Geyser listening on the Bedrock port inside the same container,
     // so that port has to be published as well - one service, two doors. Geyser's
@@ -670,6 +676,37 @@ async function createMinecraftServer(
         srv: input.edition === "java"
     });
     return { installedAppId: install.installedAppId, hostname };
+}
+
+/**
+ * The seed carrying what the shape decided that the app's form does not declare.
+ *
+ * `installApp` keeps only the keys its manifest declares, which is right for a
+ * form and wrong for this: the map's download (`WORLD`), the level it lands in
+ * (`LEVEL`) and the generator (`LEVEL_TYPE`, `GENERATOR_SETTINGS`) are worked out
+ * here and are not fields anybody fills in. Dropped there, a server built on a map
+ * booted into an ordinary generated world and spawned its first player inside the
+ * rock under the map's spawn point. A saved template's keys are not shaped and are
+ * still filtered as before.
+ */
+function withShapedEnv(
+    manifest: { readonly template?: { readonly env?: readonly { readonly key: string }[] } },
+    env: ReadonlyMap<string, string>,
+    shaped: ReadonlySet<string>,
+    seed: InstallSeed | undefined
+): InstallSeed | undefined {
+    const declared = new Set((manifest.template?.env ?? []).map((field) => field.key));
+    const carried = new Set((seed?.env ?? []).map((entry) => entry.key));
+    const extra = [...shaped]
+        .filter((key) => !declared.has(key) && !carried.has(key))
+        .map((key) => ({ key, value: env.get(key) ?? "", isSecret: false }))
+        // A blank is what a new server already has without it.
+        .filter((entry) => entry.value.length > 0);
+    if (extra.length === 0) return seed;
+    return {
+        installedAppId: seed?.installedAppId ?? randomUUID(),
+        env: [...(seed?.env ?? []), ...extra]
+    };
 }
 
 /**

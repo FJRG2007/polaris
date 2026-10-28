@@ -74,6 +74,11 @@ function created() {
     return { env, seed };
 }
 
+/** The login and anti-cheat settings a seed carries, beside the world's. */
+function polarisKeys(seed: Seed | undefined): string[] {
+    return (seed?.env ?? []).map((entry) => entry.key).filter((key) => key.startsWith("POLARIS_"));
+}
+
 beforeEach(() => {
     installApp.mockClear();
     publicAppUrl.mockClear();
@@ -102,7 +107,7 @@ describe("a new server's login", () => {
         publicAppUrl.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
         const { env, seed } = created();
-        expect(seed).toBeUndefined();
+        expect(polarisKeys(seed)).toEqual([]);
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
         expect(env.has("POLARIS_LOGIN")).toBe(false);
     });
@@ -110,7 +115,7 @@ describe("a new server's login", () => {
     it("is the Modrinth guard where there is none", async () => {
         await createGameServer("owner", "actor", server("NEOFORGE", "1.21.1"));
         const { env, seed } = created();
-        expect(seed).toBeUndefined();
+        expect(polarisKeys(seed)).toEqual([]);
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
     });
 
@@ -149,5 +154,32 @@ describe("a new server's login", () => {
         const token = (seed: Seed) =>
             seed.env.find((entry) => entry.key === "POLARIS_SERVER_TOKEN")?.value;
         expect(token(seeds[0]!)).not.toBe(token(seeds[1]!));
+    });
+});
+
+describe("a new server built on a map", () => {
+    it("is given the map's world and level, which its form does not declare", async () => {
+        await createGameServer(
+            "owner",
+            "actor",
+            createGameServerSchema.parse({
+                game: "minecraft",
+                name: "Parkour",
+                serverId: "local",
+                ownerPlayer: "Steve",
+                ownerAddress: "203.0.113.9",
+                edition: "java",
+                software: "PAPER",
+                version: "LATEST",
+                blueprintId: "parkour",
+                mapId: "parkour-spiral"
+            })
+        );
+        const { seed } = created();
+        const written = new Map((seed?.env ?? []).map((entry) => [entry.key, entry.value]));
+        expect(written.get("LEVEL")).toBe("parkour-spiral");
+        expect(written.get("WORLD")).toBe(
+            "https://polaris.example/api/minecraft/world/key/parkour-spiral.zip"
+        );
     });
 });

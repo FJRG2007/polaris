@@ -660,6 +660,15 @@ describe("the season's builds in the world", () => {
         ).toBe(true);
     });
 
+    it("puts nothing up on a server built on a map", async () => {
+        config = { mapId: "parkour-spiral" };
+        const { server, said, sent } = fakeServer();
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(plan.readPlaced(config)).toEqual([]);
+        expect(said).toEqual([]);
+        expect(sent).toEqual([]);
+    });
+
     it("does nothing at all on the next pass: nothing is pasted twice", async () => {
         const first = fakeServer();
         await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
