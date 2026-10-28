@@ -72,7 +72,8 @@ export async function register(): Promise<void> {
     const repairEdgeFiles = () =>
         repairEmptySections()
             .then((names) => {
-                if (names.length > 0) console.info(`polaris: rewrote empty edge files: ${names.join(", ")}`);
+                if (names.length > 0)
+                    console.info(`polaris: rewrote empty edge files: ${names.join(", ")}`);
             })
             .catch((error) => console.error("polaris: could not repair empty edge files:", error));
     await repairEdgeFiles();

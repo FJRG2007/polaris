@@ -38,7 +38,8 @@ describe("refusedEmptyFile", () => {
 
 describe("repairEmptySections", () => {
     it("rewrites the refused files and leaves the rest as they were", async () => {
-        const routed = "http:\n  routers:\n    a:\n      rule: Host(`a.test`)\n      service: s\n      tls: {}\n";
+        const routed =
+            "http:\n  routers:\n    a:\n      rule: Host(`a.test`)\n      service: s\n      tls: {}\n";
         await writeFile(join(dynamic, "polaris-tailscale.yml"), "http: {}\n");
         await writeFile(join(dynamic, "polaris-app-status-pages.yaml"), "http: {}\n");
         await writeFile(join(dynamic, "polaris-apps.yml"), routed);

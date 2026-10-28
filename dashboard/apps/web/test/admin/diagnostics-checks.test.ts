@@ -16,9 +16,10 @@ const queryRaw = vi.fn(async (): Promise<unknown> => [{ ok: 1 }]);
 const health = vi.fn(async (): Promise<unknown> => ({ version: "1.4.0" }));
 const capabilities = vi.fn(() => ({ edition: "full", hostd: { present: true, version: "1.4.0" } }));
 const localDisk = vi.fn(async (): Promise<unknown> => ({ used: 50 * GB, total: 100 * GB }));
-const getUpdateStatus = vi.fn(
-    async (): Promise<unknown> => ({ upToDate: true, current: "2026.10.1" })
-);
+const getUpdateStatus = vi.fn(async (): Promise<unknown> => ({
+    upToDate: true,
+    current: "2026.10.1"
+}));
 const checkedAddresses = vi.fn(async (): Promise<unknown> => []);
 const polarisZoneHost = vi.fn(async (): Promise<string | null> => null);
 const lookup = vi.fn(async (): Promise<unknown> => ({ address: "203.0.113.7", family: 4 }));

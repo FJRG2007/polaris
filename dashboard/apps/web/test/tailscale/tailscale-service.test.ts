@@ -193,7 +193,10 @@ describe("tailscale service", () => {
     it("asks nothing of a component that is off", async () => {
         await service.syncTailscaleRoute();
         expect(ports.inspect).not.toHaveBeenCalled();
-        expect(writeDynamicFile).toHaveBeenLastCalledWith("polaris-tailscale.yml", "# No routes.\n");
+        expect(writeDynamicFile).toHaveBeenLastCalledWith(
+            "polaris-tailscale.yml",
+            "# No routes.\n"
+        );
     });
 });
 
@@ -274,7 +277,10 @@ describe("tailscale apps", () => {
     it("keeps the ports and the route file when the component is off", async () => {
         await service.syncTailscaleApps(["shop.example.com"]);
         expect(ports.runIn).not.toHaveBeenCalled();
-        expect(writeDynamicFile).toHaveBeenLastCalledWith("polaris-tailscale.yml", "# No routes.\n");
+        expect(writeDynamicFile).toHaveBeenLastCalledWith(
+            "polaris-tailscale.yml",
+            "# No routes.\n"
+        );
         expect((await service.getTailnetApps())[0]?.port).toBe(10001);
     });
 
