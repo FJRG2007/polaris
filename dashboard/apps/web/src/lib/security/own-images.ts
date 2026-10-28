@@ -3,9 +3,9 @@
  * for the Updates card. Only scans that ran are counted - nothing is estimated:
  * no scan of Polaris's own images means no line on the card.
  *
- * The newest scan per image reference decides, so an image an update already
- * replaced (same reference, older id) is never counted for the one running
- * now: when the newest scan of a reference failed, that reference is reported
+ * The newest scan per image (see `ownImageKey`) decides, so an image an update
+ * already replaced (same reference, older id) is never counted for the one
+ * running now: when the newest scan of a reference failed, that reference is reported
  * as not scanned rather than with an older image's numbers. Server-only.
  */
 
@@ -18,6 +18,8 @@ export const OWN_SCANS = 200;
 
 export interface OwnImageScan {
     readonly label: string;
+    /** The scan's stored input, which names the app a part of Polaris runs as. */
+    readonly input?: string;
     /** queued | running | done | failed */
     readonly state: string;
     readonly imageId: string | null;
@@ -45,10 +47,30 @@ function count(summary: string, key: "critical" | "high"): number {
     }
 }
 
-/** Newest scan per image reference (its label); `rows` arrive newest first. Pure. */
-export function newestPerRef<T extends { label: string }>(rows: readonly T[]): T[] {
+/**
+ * What one of Polaris's own images is across its releases. Most are their
+ * reference (`.../polaris-web:latest`), which an update keeps. A part of Polaris
+ * that runs as an app - the camera relay - comes up under a new release tag on
+ * every build, so it is the app its scan names, or each build would leave the
+ * one it replaced behind as an image of its own. Pure.
+ */
+export function ownImageKey(row: { readonly label: string; readonly input?: string }): string {
+    try {
+        const part = (JSON.parse(row.input ?? "{}") as { part?: unknown } | null)?.part;
+        if (typeof part === "string" && part) return `app:${part}`;
+    } catch {
+        // Not JSON: the reference decides.
+    }
+    return row.label;
+}
+
+/** Newest scan per image (see `ownImageKey`); `rows` arrive newest first. Pure. */
+export function newestPerRef<T extends { label: string; input?: string }>(rows: readonly T[]): T[] {
     const seen = new Map<string, T>();
-    for (const row of rows) if (!seen.has(row.label)) seen.set(row.label, row);
+    for (const row of rows) {
+        const key = ownImageKey(row);
+        if (!seen.has(key)) seen.set(key, row);
+    }
     return [...seen.values()];
 }
 
@@ -82,7 +104,10 @@ export function currentScan<T extends Pick<OwnImageScan, "state" | "imageId">>(
 /** Each reference's current scan, summed. `scans` arrive newest first. Pure. */
 export function summarizeOwnScans(scans: readonly OwnImageScan[]): OwnVulnerabilities | null {
     const byRef = new Map<string, OwnImageScan[]>();
-    for (const scan of scans) byRef.set(scan.label, [...(byRef.get(scan.label) ?? []), scan]);
+    for (const scan of scans) {
+        const key = ownImageKey(scan);
+        byRef.set(key, [...(byRef.get(key) ?? []), scan]);
+    }
     let images = 0;
     let failed = 0;
     let critical = 0;
@@ -106,7 +131,14 @@ export async function ownVulnerabilities(now = new Date()): Promise<OwnVulnerabi
         where: ownScansWhere(now),
         orderBy: { createdAt: "desc" },
         take: OWN_SCANS,
-        select: { label: true, state: true, imageId: true, summary: true, finishedAt: true }
+        select: {
+            label: true,
+            input: true,
+            state: true,
+            imageId: true,
+            summary: true,
+            finishedAt: true
+        }
     });
     return summarizeOwnScans(scans);
 }

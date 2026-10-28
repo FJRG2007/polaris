@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
+import { shortHash } from "@polaris/deploy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const FIXTURE = readFileSync(join(__dirname, "..", "fixtures", "grype-node-image.json"), "utf8");
@@ -34,6 +35,8 @@ const db = vi.hoisted(() => ({
         createdAt: Date;
     }[],
     apps: [] as { id: string; targetId: string; name: string }[],
+    installs: [] as { applicationId: string; catalogId: string }[],
+    containers: [] as unknown[],
     queueFails: new Set<string>()
 }));
 
@@ -133,7 +136,15 @@ vi.mock("@polaris/db", () => {
                     )
                     .map((a) => ({ id: a.id, name: a.name, environment: null }))
         },
-        installedApp: { findMany: async () => [] },
+        // The server listing pass is left out: these are the release path's scans.
+        deployTarget: {
+            findUnique: async () => TARGET,
+            findMany: async () => []
+        },
+        installedApp: {
+            findMany: async ({ where }: { where: { applicationId: { in: string[] } } }) =>
+                db.installs.filter((row) => where.applicationId.in.includes(row.applicationId))
+        },
         $transaction: (ops: Promise<unknown>[]) => Promise.all(ops)
     };
     return { prisma };
@@ -141,6 +152,10 @@ vi.mock("@polaris/db", () => {
 
 vi.mock("@polaris/app-host", () => ({
     host: {
+        appsCatalog: {
+            findApp: (id: string) =>
+                id === "camera-hub" ? { id, name: "Camera relay", ownedBy: "home" } : undefined
+        },
         i18nLocaleService: { getUserLocale: async () => "en-US" },
         notificationsDispatch: {
             notify: async (input: { userId: string; title: string }) => {
@@ -153,6 +168,7 @@ vi.mock("@polaris/app-host", () => ({
 vi.mock("@polaris-app/security-scans/src/lib/runner", () => ({
     exportImage: async () => undefined,
     listExports: async () => [],
+    listContainers: async () => db.containers,
     portsFor: async () => ({}),
     removeExport: async () => undefined,
     runHostAction: async () => ({ exitCode: 0, output: "" }),
@@ -196,6 +212,8 @@ describe("new releases are scanned on their own", () => {
         db.alerts.length = 0;
         db.deployments.length = 0;
         db.apps.length = 0;
+        db.installs.length = 0;
+        db.containers.length = 0;
         db.queueFails.clear();
         notified.length = 0;
     });
@@ -210,6 +228,38 @@ describe("new releases are scanned on their own", () => {
         await pass();
         await pass();
         expect(db.scans).toHaveLength(1);
+    });
+
+    it("scans a part of Polaris as one of Polaris's own images", async () => {
+        const relay = "polaris-release/fixture-relay:1.0.0";
+        const imageId = `sha256:${"a".repeat(64)}`;
+        release("relay-1", relay);
+        db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });
+        db.containers.push({
+            name: "fixture-relay",
+            ref: relay,
+            imageId,
+            project: `polaris-${shortHash("relay-1", 8)}`,
+            labels: {}
+        });
+        await pass();
+        await settled();
+        expect(db.scans).toHaveLength(1);
+        expect(db.scans[0]).toMatchObject({ source: "polaris", imageId, label: relay });
+        expect(JSON.parse(db.scans[0]!.input)).toMatchObject({
+            applicationIds: ["relay-1"],
+            part: "relay-1"
+        });
+        await pass();
+        expect(db.scans).toHaveLength(1);
+    });
+
+    it("never files a part of Polaris as an app while its container is not up yet", async () => {
+        release("relay-1", "polaris-release/fixture-relay:1.0.0");
+        db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });
+        await pass();
+        await settled();
+        expect(db.scans).toHaveLength(0);
     });
 
     it("looks for releases at most every ten minutes", async () => {
@@ -253,6 +303,8 @@ describe("serious findings ring the bell once", () => {
         db.alerts.length = 0;
         db.deployments.length = 0;
         db.apps.length = 0;
+        db.installs.length = 0;
+        db.containers.length = 0;
         db.queueFails.clear();
         notified.length = 0;
     });
