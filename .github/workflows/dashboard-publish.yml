@@ -286,6 +286,17 @@ jobs:
       # {"<app>": "<manifest digest>"} for the bundles this image names.
       bundles: ${{ steps.bundles.outputs.list }}
     steps:
+      # The image, the app bundles and the compile-cache export together outgrow
+      # the runner's free disk: a run pushed its image and then died with "No
+      # space left on device" inside the cache export, and a crashed runner fails
+      # the job even under continue-on-error - so `latest` was never moved. The
+      # preinstalled SDKs below are never used by this job and hold over 20 GB.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
+          df -h /
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
         with:
