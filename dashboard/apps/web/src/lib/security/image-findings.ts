@@ -231,14 +231,15 @@ const ownInputSchema = z.object({
     imageId: z.string().regex(IMAGE_ID).nullable().catch(null).default(null),
     ref: z.string().max(512).nullable().catch(null).default(null),
     users: z.array(z.string().max(200)).max(20).catch([]).default([]),
-    applicationIds: z.array(z.string().max(64)).max(20).catch([]).default([])
+    applicationIds: z.array(z.string().max(64)).max(20).catch([]).default([]),
+    part: z.string().min(1).max(64).nullable().catch(null).default(null)
 });
 
 function ownInput(raw: string): z.infer<typeof ownInputSchema> {
     const parsed = ownInputSchema.safeParse(json(raw) ?? {});
     return parsed.success
         ? parsed.data
-        : { imageId: null, ref: null, users: [], applicationIds: [] };
+        : { imageId: null, ref: null, users: [], applicationIds: [], part: null };
 }
 
 /**
@@ -324,7 +325,10 @@ export async function queueOwnImageScan(
                 imageId,
                 ref: input.ref ?? scan.label,
                 users: input.users,
-                ...(input.applicationIds.length > 0 ? { applicationIds: input.applicationIds } : {})
+                ...(input.applicationIds.length > 0
+                    ? { applicationIds: input.applicationIds }
+                    : {}),
+                ...(input.part ? { part: input.part } : {})
             }),
             requestedById: userId,
             imageId,

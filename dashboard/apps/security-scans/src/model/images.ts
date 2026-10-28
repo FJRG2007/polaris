@@ -30,6 +30,8 @@ export interface ServerImage {
     readonly users: readonly string[];
     /** The Deploy apps among them, by id: where the findings are read. */
     readonly applicationIds: readonly string[];
+    /** The app a part of Polaris runs as, when this image is one (see `groupImages`). */
+    readonly part?: string;
 }
 
 export const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
@@ -128,7 +130,13 @@ export function groupImages(
     const rank: Record<ImageSource, number> = { polaris: 0, app: 1, agent: 2, other: 3 };
     const byId = new Map<
         string,
-        { ref: string; source: ImageSource; users: Set<string>; apps: Set<string> }
+        {
+            ref: string;
+            source: ImageSource;
+            users: Set<string>;
+            apps: Set<string>;
+            parts: Set<string>;
+        }
     >();
     for (const container of containers) {
         if (container.name.startsWith(SCANNER_PREFIX)) continue;
@@ -143,17 +151,20 @@ export function groupImages(
                   ? (container.labels["com.docker.compose.service"] ?? container.name)
                   : container.name;
         const appId = listed === "app" && project ? appIds.get(project) : undefined;
+        const partId = part ? appId : undefined;
         const entry = byId.get(container.imageId);
         if (!entry) {
             byId.set(container.imageId, {
                 ref: container.ref,
                 source,
                 users: new Set([user]),
-                apps: new Set(appId ? [appId] : [])
+                apps: new Set(appId ? [appId] : []),
+                parts: new Set(partId ? [partId] : [])
             });
             continue;
         }
         if (appId && entry.apps.size < MAX_USERS) entry.apps.add(appId);
+        if (partId && entry.parts.size < MAX_USERS) entry.parts.add(partId);
         if (rank[source] < rank[entry.source]) entry.source = source;
         // A ref someone typed reads better than the bare id a container may show.
         if (entry.ref.startsWith("sha256:") && !container.ref.startsWith("sha256:"))
@@ -166,7 +177,8 @@ export function groupImages(
             ref: entry.ref,
             source: entry.source,
             users: [...entry.users].filter(Boolean).sort(),
-            applicationIds: [...entry.apps].sort()
+            applicationIds: [...entry.apps].sort(),
+            ...(entry.parts.size > 0 ? { part: [...entry.parts].sort()[0] } : {})
         }))
         .sort((a, b) => rank[a.source] - rank[b.source] || a.ref.localeCompare(b.ref));
 }

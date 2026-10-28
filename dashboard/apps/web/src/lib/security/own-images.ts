@@ -56,8 +56,8 @@ function count(summary: string, key: "critical" | "high"): number {
  */
 export function ownImageKey(row: { readonly label: string; readonly input?: string }): string {
     try {
-        const ids = (JSON.parse(row.input ?? "{}") as { applicationIds?: unknown }).applicationIds;
-        if (Array.isArray(ids) && typeof ids[0] === "string" && ids[0]) return `app:${ids[0]}`;
+        const part = (JSON.parse(row.input ?? "{}") as { part?: unknown } | null)?.part;
+        if (typeof part === "string" && part) return `app:${part}`;
     } catch {
         // Not JSON: the reference decides.
     }

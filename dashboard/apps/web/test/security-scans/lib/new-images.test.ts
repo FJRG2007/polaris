@@ -246,9 +246,20 @@ describe("new releases are scanned on their own", () => {
         await settled();
         expect(db.scans).toHaveLength(1);
         expect(db.scans[0]).toMatchObject({ source: "polaris", imageId, label: relay });
-        expect(JSON.parse(db.scans[0]!.input).applicationIds).toEqual(["relay-1"]);
+        expect(JSON.parse(db.scans[0]!.input)).toMatchObject({
+            applicationIds: ["relay-1"],
+            part: "relay-1"
+        });
         await pass();
         expect(db.scans).toHaveLength(1);
+    });
+
+    it("never files a part of Polaris as an app while its container is not up yet", async () => {
+        release("relay-1", "polaris-release/fixture-relay:1.0.0");
+        db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });
+        await pass();
+        await settled();
+        expect(db.scans).toHaveLength(0);
     });
 
     it("looks for releases at most every ten minutes", async () => {

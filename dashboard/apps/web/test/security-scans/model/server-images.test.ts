@@ -90,8 +90,12 @@ describe("server images", () => {
         expect(relay).toMatchObject({
             source: "polaris",
             users: ["Camera relay"],
-            applicationIds: ["fixture-app-id"]
+            applicationIds: ["fixture-app-id"],
+            part: "fixture-app-id"
         });
+        expect(images.groupImages(listed, new Map(), new Map()).some((i) => "part" in i)).toBe(
+            false
+        );
     });
 
     it("counts an image Polaris also runs as Polaris's own", () => {

@@ -43,7 +43,7 @@ describe("own image vulnerabilities", () => {
     });
 
     it("counts a part of Polaris once across the release tags of its builds", () => {
-        const relay = '{"applicationIds":["fixture-relay"]}';
+        const relay = '{"applicationIds":["fixture-relay"],"part":"fixture-relay"}';
         const summary = summarizeOwnScans([
             {
                 ...row("fixture/relay:build-2", "done", ID_NEW, '{"critical":0,"high":1}', at(9)),

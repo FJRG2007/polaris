@@ -457,9 +457,10 @@ export async function queueImage(targetId: string, applicationId: string, userId
     // step it names is updating Polaris rather than an app nobody installed.
     if ((await polarisParts([applicationId])).has(applicationId)) {
         const own = (await imagesOn(await targetRow(targetId)))?.find(
-            (image) => image.source === "polaris" && image.applicationIds.includes(applicationId)
+            (image) => image.part === applicationId
         );
-        if (own) return queueServerImage(targetId, own.imageId, userId, own);
+        if (!own) throw new ScanFailure("imageMissing");
+        return queueServerImage(targetId, own.imageId, userId, own);
     }
     // The image is recorded so a new release's image is told apart from one
     // already scanned (see `planNewImages`).
@@ -590,7 +591,8 @@ export async function queueServerImage(
             imageId: image.imageId,
             ref: image.ref,
             users: image.users,
-            applicationIds: image.applicationIds
+            applicationIds: image.applicationIds,
+            ...(image.part ? { part: image.part } : {})
         },
         userId,
         { imageId: image.imageId, source: image.source }
@@ -1209,7 +1211,9 @@ async function planSchedules(now: Date): Promise<void> {
         }
         await enqueue(setting.targetId, "audit", "host", {}, null);
         for (const app of await appsOf(setting.targetId)) {
-            if (await imageOf(app.id)) await queueImage(setting.targetId, app.id, null);
+            if (await imageOf(app.id)) {
+                await queueImage(setting.targetId, app.id, null).catch(() => undefined);
+            }
         }
     }
 }
