@@ -193,6 +193,9 @@ const nextConfig = {
             destination: "/admin/integrations/:path*",
             permanent: false
         },
+        // Polaris's own image scans moved under Management > Security; alerts
+        // already in a bell link the old address with `?scan=`, which carries over.
+        { source: "/admin/images", destination: "/admin/security/scans", permanent: false },
         { source: "/settings", destination: "/admin/settings", permanent: false },
         { source: "/settings/:path*", destination: "/admin/settings/:path*", permanent: false },
         { source: "/inbox", destination: "/admin/inbox", permanent: false },

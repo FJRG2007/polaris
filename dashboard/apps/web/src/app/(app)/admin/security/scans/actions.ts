@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Management > Polaris images. Administrators only, checked on every call as
+ * Management > Security scans. Administrators only, checked on every call as
  * the page checks it; errors come back as a key of the `imageScans` catalog.
  */
 

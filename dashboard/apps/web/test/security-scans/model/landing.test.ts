@@ -86,7 +86,7 @@ describe("parseLanding", () => {
 describe("findingsHome", () => {
     it("sends Polaris's own image scans to Management", () => {
         expect(landing.findingsHome({ targetId: TARGET, scanId: SCAN, own: true })).toBe(
-            `/admin/images?scan=${SCAN}`
+            `/admin/security/scans?scan=${SCAN}`
         );
     });
 

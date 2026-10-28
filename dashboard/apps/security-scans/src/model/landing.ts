@@ -11,8 +11,8 @@ import { z } from "zod";
 /** The page an image's findings are on. */
 export const SECURITY_PATH = "/apps/servers/security";
 
-/** Where Polaris's own images' findings live: Management > Polaris images. */
-export const OWN_IMAGES_PATH = "/admin/images";
+/** Where Polaris's own images' findings live: Management > Security scans. */
+export const OWN_IMAGES_PATH = "/admin/security/scans";
 
 /** Advisories carried in a link; an alert never names more. */
 export const MAX_LINK_IDS = 20;
