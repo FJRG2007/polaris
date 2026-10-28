@@ -3,9 +3,10 @@
  * for the Updates card. Only scans that ran are counted - nothing is estimated:
  * no scan of Polaris's own images means no line on the card.
  *
- * The newest finished scan per image reference counts, so an image an update
- * already replaced (same reference, older id) is not added on top of the one
- * running now. Server-only.
+ * The newest scan per image reference decides, so an image an update already
+ * replaced (same reference, older id) is never counted for the one running
+ * now: when the newest scan of a reference failed, that reference is reported
+ * as not scanned rather than with an older image's numbers. Server-only.
  */
 
 import { prisma } from "@polaris/db";
@@ -17,14 +18,20 @@ export const OWN_SCANS = 200;
 
 export interface OwnImageScan {
     readonly label: string;
+    /** queued | running | done | failed */
+    readonly state: string;
+    readonly imageId: string | null;
     readonly summary: string;
     readonly finishedAt: Date | null;
 }
 
 export interface OwnVulnerabilities {
+    /** Images whose newest scan counted. */
     readonly images: number;
     readonly critical: number;
     readonly high: number;
+    /** Images whose newest scan failed: nothing is known about what they run. */
+    readonly failed: number;
     /** When the oldest of the counted scans finished (ISO 8601). */
     readonly scannedAt: string | null;
 }
@@ -55,27 +62,51 @@ export function ownScansWhere(now: Date) {
     } as const;
 }
 
-/** Newest scan per reference, summed. `scans` arrive newest first. Pure. */
+/**
+ * The scan that speaks for a reference now. Its newest one when that finished;
+ * while a newer one waits or runs, the newest finished scan of that same image
+ * id - never one of an image the reference no longer runs. Null when there is
+ * none, or when the newest one failed. `rows` are one reference's, newest
+ * first. Pure.
+ */
+export function currentScan<T extends Pick<OwnImageScan, "state" | "imageId">>(
+    rows: readonly T[]
+): T | null {
+    const newest = rows[0];
+    if (!newest) return null;
+    if (newest.state === "done") return newest;
+    if (newest.state === "failed" || newest.imageId === null) return null;
+    return rows.find((row) => row.state === "done" && row.imageId === newest.imageId) ?? null;
+}
+
+/** Each reference's current scan, summed. `scans` arrive newest first. Pure. */
 export function summarizeOwnScans(scans: readonly OwnImageScan[]): OwnVulnerabilities | null {
-    const newest = newestPerRef(scans);
-    if (newest.length === 0) return null;
+    const byRef = new Map<string, OwnImageScan[]>();
+    for (const scan of scans) byRef.set(scan.label, [...(byRef.get(scan.label) ?? []), scan]);
+    let images = 0;
+    let failed = 0;
     let critical = 0;
     let high = 0;
     let oldest: Date | null = null;
-    for (const scan of newest) {
+    for (const rows of byRef.values()) {
+        if (rows[0]?.state === "failed") failed += 1;
+        const scan = currentScan(rows);
+        if (!scan) continue;
+        images += 1;
         critical += count(scan.summary, "critical");
         high += count(scan.summary, "high");
         if (scan.finishedAt && (!oldest || scan.finishedAt < oldest)) oldest = scan.finishedAt;
     }
-    return { images: newest.length, critical, high, scannedAt: oldest?.toISOString() ?? null };
+    if (images === 0 && failed === 0) return null;
+    return { images, critical, high, failed, scannedAt: oldest?.toISOString() ?? null };
 }
 
 export async function ownVulnerabilities(now = new Date()): Promise<OwnVulnerabilities | null> {
     const scans = await prisma.securityScan.findMany({
-        where: { ...ownScansWhere(now), state: "done" },
+        where: ownScansWhere(now),
         orderBy: { createdAt: "desc" },
         take: OWN_SCANS,
-        select: { label: true, summary: true, finishedAt: true }
+        select: { label: true, state: true, imageId: true, summary: true, finishedAt: true }
     });
     return summarizeOwnScans(scans);
 }

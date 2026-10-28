@@ -133,7 +133,9 @@
         "quarantineFailed": "The file could not be moved. Try again.",
         "updatesFailed": "Could not read or change automatic updates on this server.",
         "imageMissing": "The image this app runs is no longer on the server. Redeploy the app, then scan again.",
-        "noRoom": "Not enough free disk on the server to check this image. Free some space, then try again."
+        "noRoom": "Not enough free disk on the server to check this image. Free some space, then try again.",
+        "scannerFailed": "The vulnerability scanner stopped with an error. Try again.",
+        "reportUnreadable": "The scanner's report could not be read. Update Polaris from Settings, then scan again."
     },
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",

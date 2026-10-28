@@ -6,6 +6,36 @@
 import { scanMount } from "./specs";
 
 /* -------------------------------------------------------------------------- */
+/* Container output                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** The stamp `logs --timestamps` puts before every message: RFC 3339 to the
+ *  nanosecond, in UTC or with the engine's offset, then one space. */
+const LOG_STAMP = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})) /;
+
+/**
+ * A one-off container's output as it printed it, without the engine's stamps.
+ *
+ * Its logs are read with `--timestamps`, which stamps every message - and the
+ * engine stores a line longer than 16 KiB as several partial messages, each
+ * printed with the stamp of the line's first piece and no newline between
+ * them. A scanner's report is one JSON line of hundreds of KiB, so the stamp
+ * lands inside it every 16 KiB. Every piece of one line carries the same
+ * stamp, so it is cut wherever it repeats. Pure.
+ */
+export function unstampLog(text: string): string {
+    return text
+        .split("\n")
+        .map((raw) => {
+            const line = raw.replace(/\r$/, "");
+            const stamp = LOG_STAMP.exec(line);
+            if (!stamp) return line;
+            return line.slice(stamp[0].length).split(stamp[0]).join("");
+        })
+        .join("\n");
+}
+
+/* -------------------------------------------------------------------------- */
 /* Malware                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -279,15 +309,44 @@ export interface VulnReport {
 }
 
 /** The JSON a container printed, from its first brace to its last. */
+function parsed(text: string): unknown {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The JSON document a tool printed. Its diagnostics share the stream, so when
+ * everything from the first brace to the last is not one document, the longest
+ * line that is one wins - the report is a single line. Pure.
+ */
 export function jsonOf(text: string): unknown {
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     if (start < 0 || end <= start) return null;
-    try {
-        return JSON.parse(text.slice(start, end + 1));
-    } catch {
-        return null;
+    const whole = parsed(text.slice(start, end + 1));
+    if (whole !== null) return whole;
+    const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith("{") && line.endsWith("}"))
+        .sort((a, b) => b.length - a.length);
+    for (const line of lines) {
+        const value = parsed(line);
+        if (value !== null) return value;
     }
+    return null;
+}
+
+/** The start of output that could not be read, for the server's own log only:
+ *  control characters dropped, one line. Pure. */
+export function outputHead(text: string, max = 300): string {
+    return text
+        .slice(0, max)
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .trim();
 }
 
 function severityOf(value: unknown): Severity {

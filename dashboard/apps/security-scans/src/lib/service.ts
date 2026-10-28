@@ -693,8 +693,9 @@ async function execute(scanId: string): Promise<void> {
         }
     } catch (caught) {
         const code = caught instanceof ScanFailure ? caught.code : "failed";
-        if (!(caught instanceof ScanFailure))
-            console.error(`polaris: security scan ${scanId}:`, caught);
+        if (caught instanceof ScanFailure)
+            console.warn(`polaris: security scan ${scanId} failed: ${code}`);
+        else console.error(`polaris: security scan ${scanId}:`, caught);
         await prisma.securityScan.update({
             where: { id: scanId },
             // A deps scan's stored lockfiles go with it either way.
@@ -915,6 +916,23 @@ async function runAudit(target: ScanTarget): Promise<ScanResult> {
     };
 }
 
+/** Say on the server's own log why a tool's output was not used: its exit code,
+ *  how much it printed and how that began. The scan row keeps a message key. */
+function unreadable(scanId: string, tool: string, run: { exitCode: number; log: string }): void {
+    console.error(
+        `polaris: security scan ${scanId}: ${tool} exited ${run.exitCode}, ${run.log.length} chars unreadable: ${parse.outputHead(run.log)}`
+    );
+}
+
+/** The matcher's report, or the failure that says why there is none: the
+ *  matcher stopping on an error, or a report that could not be read. */
+function vulnReport(scanId: string, run: { exitCode: number; log: string }): parse.VulnReport {
+    const report = parse.parseVulnJson(parse.jsonOf(run.log));
+    if (report) return report;
+    unreadable(scanId, "matcher", run);
+    throw new ScanFailure(run.exitCode === 0 ? "reportUnreadable" : "scannerFailed");
+}
+
 async function runImage(
     target: ScanTarget,
     input: Record<string, unknown>,
@@ -929,8 +947,8 @@ async function runImage(
     if (!parse.isImageRef(image)) throw new ScanFailure("imageMissing");
     const volume = specs.exportVolumeName(scanId);
     const ports = await portsFor(target);
-    let vuln: { log: string };
-    let sbom: { log: string };
+    let vuln: { exitCode: number; log: string };
+    let sbom: { exitCode: number; log: string };
     try {
         const deadline = Date.now() + TIMEOUT_MS;
         await exportImage(target, image, volume);
@@ -941,10 +959,10 @@ async function runImage(
             console.error(`polaris: security scan ${scanId} left its export volume:`, caught)
         );
     }
-    const report = parse.parseVulnJson(parse.jsonOf(vuln.log));
-    if (!report) throw new ScanFailure("scanError");
+    const report = vulnReport(scanId, vuln);
     const sbomJson = parse.jsonOf(sbom.log);
     const inventory = parse.summarizeSbom(sbomJson);
+    if (!inventory) unreadable(scanId, "inventory", sbom);
     const payload = inventory ? await zip(JSON.stringify(sbomJson)) : undefined;
     return {
         findings: report.items.map((item) => ({
@@ -989,8 +1007,7 @@ async function runDeps(target: ScanTarget, scanId: string): Promise<ScanResult> 
         builder: "docker"
     });
     const vuln = await runOneShot(ports, specs.depsSpec());
-    const report = parse.parseVulnJson(parse.jsonOf(vuln.log));
-    if (!report) throw new ScanFailure("scanError");
+    const report = vulnReport(scanId, vuln);
     return {
         findings: report.items.map((item) => ({
             severity: item.severity,
