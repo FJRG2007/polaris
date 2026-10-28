@@ -29,7 +29,7 @@ export const PRIVATE_DOMAIN_SUFFIX = "polaris.internal";
  * its 1.8.1.3 release so a moved tag can never change what runs beside a service.
  */
 export const FORWARDER_IMAGE =
-    "alpine/socat:1.8.1.3@sha256:5ffbd6ae916cbad86a58fabe0d6d5a6fd5c2b47ddf031e82996baac9300e732f";
+    "alpine/socat:1.8.1.3@sha256:603174b77eebaba25ba8f8ebb15e1234d6600409554e95d6fb203fd106150287";
 
 /** The port the forwarder answers on. */
 export const PORTLESS_PORT = 80;

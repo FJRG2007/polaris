@@ -307,7 +307,7 @@ ROLLING_SERVICES="edge-guard"
 # interruption however it is done, so an update replaces it only when the release
 # changed its definition - which cannot be put off, because the dashboard of the
 # same release may depend on that change - and never merely because the moving tag
-# it was created from (`traefik:v3.6`, `postgres:16-alpine`) was patched upstream.
+# it was created from (`traefik:v3.7`, `postgres:16-alpine3.24`) was patched upstream.
 # Such a patch is pulled, named in the update log, and goes in with the next
 # release that changes that service. A restart does not apply it: a container
 # keeps the image it was created from.
@@ -359,7 +359,7 @@ replace_service() {
 #     release had added.
 #   - Its IMAGE, as the reference the running container was created from resolves
 #     to right now, after the pull above. `livekit/livekit-server:v1.13` and
-#     `traefik:v3.6` are moving tags: upstream rewrites them with patches. When
+#     `traefik:v3.7` are moving tags: upstream rewrites them with patches. When
 #     one has genuinely moved, a service that can roll over or is in no request
 #     path is replaced; one of SINGLE_INSTANCE_SERVICES is left running, because
 #     an update must not interrupt what it carries for a patch nobody asked for.
@@ -411,6 +411,27 @@ roll_service() {
 
     log "$svc: unchanged; leaving it running"
     return 0
+}
+
+# Earlier releases wrote `http: {}` for an edge file with no routes. Traefik refuses
+# that file, and from 3.7 one refused file means it loads none of the directory - so
+# each one is rewritten to a comment, through the dashboard that is still running,
+# before the supporting services (the edge among them) are recreated. The new
+# dashboard does the same at boot; this closes the gap until it is up.
+repair_edge_files() {
+    web=$($compose ps -q web 2>/dev/null | head -n1)
+    [ -n "$web" ] || return 0
+    # shellcheck disable=SC2016 # expanded by the shell inside the container
+    fixed=$(docker exec "$web" sh -c '
+        dir="${POLARIS_TRAEFIK_DYNAMIC_DIR:-/dynamic}"
+        for f in "$dir"/*.yml "$dir"/*.yaml; do
+            [ -f "$f" ] || continue
+            grep -qvE "^[[:space:]]*(#.*)?$|^[[:space:]]*(http|tcp|udp|tls):[[:space:]]*\{[[:space:]]*\}[[:space:]]*$" "$f" && continue
+            grep -qE "^[[:space:]]*(http|tcp|udp|tls):" "$f" || continue
+            t="$f.$$.tmp"
+            printf "# No routes.\n" > "$t" && mv "$t" "$f" && echo "${f##*/}"
+        done' 2>/dev/null) || { err "could not check the edge files for empty sections; continuing"; return 0; }
+    [ -z "$fixed" ] || log "rewrote empty edge files: $(printf '%s' "$fixed" | tr '\n' ' ')"
 }
 
 # The definition compose would create a service from right now, as the same hash it
@@ -694,6 +715,8 @@ main() {
         # silently: this says which container is being replaced and why, which is
         # the difference between an update that can be read afterwards and one
         # that has to be inferred from what broke.
+        repair_edge_files
+
         log "updating the supporting services"
         for service in $others; do
             roll_service "$service"
@@ -729,6 +752,7 @@ main() {
 
     log "rolling the dashboard over to the new build"
     if ! roll_dashboard "$web_image"; then
+        repair_edge_files
         err "the update did not complete; the previous dashboard is still serving"
         exit 1
     fi

@@ -15,7 +15,7 @@ const ORIGIN = "http://web:3000";
 
 describe("renderStatusEdge", () => {
     it("is an empty config with nothing to route", () => {
-        expect(renderStatusEdge([], ORIGIN)).toBe("http: {}\n");
+        expect(renderStatusEdge([], ORIGIN)).toBe("# No routes.\n");
     });
 
     it("routes each hostname to the dashboard at priority 50 and rewrites its root", () => {

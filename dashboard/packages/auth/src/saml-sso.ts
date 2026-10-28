@@ -139,7 +139,7 @@ export async function refuseSessionForEnforcedDomain(userId: string): Promise<vo
  */
 export async function samlSignUpAllowed(
     email: string,
-    context: { path?: string; params?: Record<string, string> } | null
+    context: { path?: string; params?: Record<string, string | undefined> } | null
 ): Promise<boolean> {
     if (!context?.path?.startsWith("/sso/")) return true;
     const providerId = context.params?.providerId;
@@ -168,15 +168,14 @@ export function samlResponseRequestId(encoded: string): string | null {
 
 /**
  * Refuses a SAML response that does not answer a sign-in started here, for this
- * provider, and spends that request so the same response can never be posted
- * twice.
+ * provider, before the response is looked at.
  *
- * The plugin means to do this itself, but the version pinned here reads the
- * request id from a field the response parser never fills, so with IdP-initiated
- * sign-in off it refuses every sign-in, and with it on it checks nothing. Polaris
- * therefore turns the plugin's check off and does it here, before the response is
- * looked at. The test suite signs in end to end, so a plugin upgrade that changes
- * this fails there rather than in production.
+ * The request is only read here, not spent: the plugin spends it right after
+ * (atomically, so the same response can never be posted twice) and needs the
+ * record it stored to finish the sign-in. The plugin runs with IdP-initiated
+ * sign-in allowed, so this is what refuses an unsolicited response. The test
+ * suite signs in end to end, so a plugin upgrade that changes this fails there
+ * rather than in production.
  */
 async function requireAnsweredRequest(ctx: {
     body?: unknown;
@@ -185,7 +184,7 @@ async function requireAnsweredRequest(ctx: {
         baseURL: string;
         logger: { warn: (message: string, ...args: unknown[]) => void };
         internalAdapter: {
-            consumeVerificationValue: (identifier: string) => Promise<{ value: string } | null>;
+            findVerificationValue: (identifier: string) => Promise<{ value: string } | null>;
         };
     };
     redirect: (url: string) => unknown;
@@ -200,18 +199,18 @@ async function requireAnsweredRequest(ctx: {
     if (typeof encoded !== "string") return refuse("no response");
     const requestId = samlResponseRequestId(encoded);
     if (!requestId) return refuse("it answers no sign-in request");
-    const consumed = await ctx.context.internalAdapter.consumeVerificationValue(
+    const stored = await ctx.context.internalAdapter.findVerificationValue(
         `${AUTHN_REQUEST_PREFIX}${requestId}`
     );
     let providerId: unknown = null;
     try {
-        providerId = consumed
-            ? (JSON.parse(consumed.value) as { providerId?: unknown }).providerId
+        providerId = stored
+            ? (JSON.parse(stored.value) as { providerId?: unknown }).providerId
             : null;
     } catch {
         providerId = null;
     }
-    if (!consumed) return refuse("unknown, expired or already answered request");
+    if (!stored) return refuse("unknown, expired or already answered request");
     if (providerId !== ctx.params?.providerId) return refuse("request was for another provider");
 }
 
@@ -226,8 +225,8 @@ export function samlSsoPlugin(): BetterAuthPlugin {
         disableImplicitSignUp: false,
         providersLimit: 0,
         saml: {
-            // The plugin still records each sign-in request it issues; whether a
-            // response answers one is checked by `requireAnsweredRequest`, which
+            // The plugin records each sign-in request it issues and spends it when
+            // the response arrives; `requireAnsweredRequest` checks it first and
             // also refuses every unsolicited (IdP-initiated) response.
             enableInResponseToValidation: true,
             allowIdpInitiated: true,

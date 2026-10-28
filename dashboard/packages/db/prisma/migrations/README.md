@@ -58,3 +58,12 @@ written from `20260930110001` onwards for exactly this reason: everything before
 it is already applied on real deployments and is left alone.
 
 Correct a shipped migration by writing a new one after it.
+
+The one exception is a migration that fails on a fresh database, which no later
+migration can reach because the history stops at it. `20260901100000_session_account`
+is one: it alters `AgentSession` before `20260929090000_agent_sessions` creates it.
+It was guarded so it skips when the table is absent, and
+`20261231161000_agent_session_account` adds the column afterwards. `prisma migrate
+deploy` only applies pending migrations, so the changed checksum on installs that
+already ran it does not stop them updating; `migrate status` and `migrate dev` will
+report it as modified, and that is expected.

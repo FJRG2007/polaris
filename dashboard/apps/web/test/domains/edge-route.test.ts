@@ -17,9 +17,8 @@ vi.mock("@polaris/db", () => ({
     prisma: { setting: { findUnique, upsert: vi.fn(), deleteMany: vi.fn() } }
 }));
 
-const { dashboardHosts, publicHostname, renderDashboardConfig } = await import(
-    "../../src/lib/domain-edge"
-);
+const { dashboardHosts, publicHostname, renderDashboardConfig } =
+    await import("../../src/lib/domain-edge");
 
 /** The Setting rows an install would hold, so the reads follow the real path. */
 function stored(values: Record<string, string>): void {
@@ -105,7 +104,7 @@ describe("what the edge is told to serve", () => {
     });
 
     it("writes an empty config when no domain is configured", () => {
-        expect(renderDashboardConfig([])).toBe("http: {}\n");
+        expect(renderDashboardConfig([])).toBe("# No routes.\n");
     });
 });
 

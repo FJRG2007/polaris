@@ -423,7 +423,7 @@ describe("the edge route a world is fetched through without a public address", (
     });
 
     it("publishes nothing for a name or an origin that is not plainly one", () => {
-        expect(renderWorldEdge("traefik`) || Host(`x", "http://web:3000")).toBe("http: {}\n");
-        expect(renderWorldEdge("traefik", 'http://web:3000"\n  evil: 1')).toBe("http: {}\n");
+        expect(renderWorldEdge("traefik`) || Host(`x", "http://web:3000")).toBe("# No routes.\n");
+        expect(renderWorldEdge("traefik", 'http://web:3000"\n  evil: 1')).toBe("# No routes.\n");
     });
 });

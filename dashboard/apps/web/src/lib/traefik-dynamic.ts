@@ -27,8 +27,9 @@
 
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import { setTimeout as pause } from "node:timers/promises";
-import { chmod, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { chmod, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 
 /**
  * How many times a rename that was refused is tried again, and how long it waits
@@ -92,6 +93,39 @@ export async function writeDynamicFile(
         await unlink(temp).catch(() => undefined);
         throw error;
     }
+}
+
+/** A top-level section with nothing in it, which Traefik refuses as "a standalone element". */
+const EMPTY_SECTION = /^(http|tcp|udp|tls):\s*\{\s*\}$/;
+
+/** Whether a file holds nothing but empty sections (and comments), the shape
+ *  earlier releases wrote for "no routes" and Traefik refuses. */
+export function refusedEmptyFile(content: string): boolean {
+    const lines = content
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "" && !line.startsWith("#"));
+    return lines.length > 0 && lines.every((line) => EMPTY_SECTION.test(line));
+}
+
+/**
+ * Rewrite every routing file an earlier release left as `http: {}` to
+ * `NO_ROUTES_FILE`. Traefik refuses that file, and one refused file stops the
+ * edge applying any change in the directory - on 3.7 it loads none of it - so a
+ * file nothing will render again (an uninstalled app's) cannot wait for its
+ * writer. Returns the names it rewrote.
+ */
+export async function repairEmptySections(): Promise<string[]> {
+    const names = await readdir(dynamicDir()).catch(() => [] as string[]);
+    const repaired: string[] = [];
+    for (const name of names) {
+        if (!/\.ya?ml$/.test(name)) continue;
+        const content = await readFile(dynamicPath(name), "utf8").catch(() => null);
+        if (content === null || !refusedEmptyFile(content)) continue;
+        await writeDynamicFile(name, NO_ROUTES_FILE);
+        repaired.push(name);
+    }
+    return repaired;
 }
 
 /** Rename over the target, waiting out a filesystem that refuses one racing

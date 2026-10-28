@@ -23,7 +23,7 @@ WORKDIR /cache
 FROM node:22-bookworm-slim AS builder
 
 # openssl lets Prisma detect the right engine (debian-openssl-3.0.x) at generate
-# time so the client matches the runner, which also has openssl 3.x on bookworm.
+# time so the client matches the runner, which also has openssl 3.x on trixie.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -254,7 +254,9 @@ COPY --from=builder /build/apps/web/.next/cache /cache/
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS runner
+# Debian 13. Its 12 still ships util-linux, glibc, curl and libxml2 with
+# vulnerabilities it has no fix for, and the image scans flag every one.
+FROM node:22-trixie-slim AS runner
 
 ENV NODE_ENV=production \
     # Next standalone server binds these; 0.0.0.0 so the proxy can reach it.
@@ -276,12 +278,15 @@ ENV NODE_ENV=production \
 # git + tar let the Deploy app build applications from a public git repository
 # (clone + tar the context, then build it on the target).
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends openssl ca-certificates smbclient git tar \
     && rm -rf /var/lib/apt/lists/*
 
 # Prisma CLI, pinned to the version used by @polaris/db, so `migrate deploy`
 # in the entrypoint matches the generated client and committed migrations.
-RUN npm install -g prisma@6.2.1
+# npm itself is moved off the copy Node 22 bundles, whose own dependencies
+# (brace-expansion, picomatch, sigstore) carry known vulnerabilities.
+RUN npm install -g npm@11.21.1 prisma@6.2.1 && npm cache clean --force
 
 # Commit this image was built from, passed by CI. Surfaced by the update checker
 # so the dashboard can report how far behind the release branch it is.

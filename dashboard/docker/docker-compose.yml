@@ -12,7 +12,7 @@ name: polaris
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine3.24
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-polaris}
@@ -542,7 +542,7 @@ services:
   # older Traefik discovers no services; the pinned DOCKER_API_VERSION is a
   # belt-and-suspenders floor the daemon accepts.
   traefik:
-    image: traefik:v3.6
+    image: traefik:v3.7
     restart: unless-stopped
     environment:
       DOCKER_API_VERSION: "1.44"

@@ -65,6 +65,20 @@ export async function register(): Promise<void> {
     const { startUpsWatch } = await import("./lib/ups/ups-service");
     void afterPredecessor().then(startUpsWatch);
 
+    // Earlier releases wrote `http: {}` for a file with no routes, which Traefik
+    // refuses - and one refused file freezes the whole directory. Rewritten before
+    // anything else publishes, including files no writer will render again.
+    const { repairEmptySections } = await import("./lib/traefik-dynamic");
+    const repairEdgeFiles = () =>
+        repairEmptySections()
+            .then((names) => {
+                if (names.length > 0)
+                    console.info(`polaris: rewrote empty edge files: ${names.join(", ")}`);
+            })
+            .catch((error) => console.error("polaris: could not repair empty edge files:", error));
+    await repairEdgeFiles();
+    void afterPredecessor().then(repairEdgeFiles);
+
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
     const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } =

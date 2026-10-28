@@ -5,18 +5,19 @@
  * The app renders the file (a pure function it tests); this module only writes
  * it, always through `writeDynamicFile`, and empties it when the app is
  * uninstalled, so a route never outlives the code that answers it. Emptied
- * rather than deleted: `http: {}` is a valid file, and the write is the same
- * atomic rename every other edge file goes through.
+ * rather than deleted, to `NO_ROUTES_FILE`, through the same atomic rename
+ * every other edge file goes through.
  */
 
 import { prisma } from "@polaris/db";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { dashboardHosts, dashboardOrigin } from "@/lib/domain-edge";
 
 const APP_ID = /^[a-z][a-z0-9-]{0,40}$/;
 
 /** What an app's edge file holds when it routes nothing. */
-export const EMPTY_EDGE = "http: {}\n";
+export const EMPTY_EDGE = NO_ROUTES_FILE;
 
 /** The file an app's routes live in. */
 export function appEdgeFile(appId: string): string {

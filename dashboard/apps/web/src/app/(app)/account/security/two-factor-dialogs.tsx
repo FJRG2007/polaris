@@ -87,9 +87,12 @@ export function EnableTwoFactorDialog({
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
         setError(null);
-        const { data, error: enableError } = await authClient.twoFactor.enable({ password });
+        const { data, error: enableError } = await authClient.twoFactor.enable({
+            password,
+            method: "totp"
+        });
         setBusy(false);
-        if (enableError || !data) {
+        if (enableError || data?.method !== "totp") {
             setError(enableError?.message ?? t("authenticator.startFailed"));
             return;
         }

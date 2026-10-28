@@ -24,6 +24,7 @@
 
 import { modToken } from "./mod-token";
 import { host } from "@polaris/app-host";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import { WORLD_PATH, type MapAddresses } from "./maps";
 
 const APP_ID = "game-servers";
@@ -48,7 +49,7 @@ const ORIGIN = /^https?:\/\/[A-Za-z0-9.:[\]-]+\/?$/;
  *  an origin that is not plainly one publishes nothing, so a configured value
  *  cannot reach the YAML unchecked. */
 export function renderWorldEdge(edgeHost: string, origin: string): string {
-    if (!HOSTNAME.test(edgeHost) || !ORIGIN.test(origin)) return "http: {}\n";
+    if (!HOSTNAME.test(edgeHost) || !ORIGIN.test(origin)) return NO_ROUTES_FILE;
     return [
         "http:",
         "  routers:",
