@@ -314,9 +314,12 @@ function AuthenticatorFactor({
     async function start(given: string): Promise<void> {
         setBusy(true);
         setError(null);
-        const { data, error: enableError } = await authClient.twoFactor.enable({ password: given });
+        const { data, error: enableError } = await authClient.twoFactor.enable({
+            password: given,
+            method: "totp"
+        });
         setBusy(false);
-        if (enableError || !data) {
+        if (enableError || data?.method !== "totp") {
             setError(enableError?.message ?? t("enroll.authenticator.startFailed"));
             return;
         }

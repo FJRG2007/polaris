@@ -39,12 +39,15 @@ export async function provisionUser(auth: Auth, input: ProvisionInput): Promise<
 
     const ctx = await auth.$context;
     const hash = await ctx.password.hash(input.password);
-    const user = await ctx.internalAdapter.createUser({
-        email,
-        name: input.name.trim(),
-        username,
-        emailVerified: false
-    });
+    const user = await ctx.internalAdapter.createUser(
+        {
+            email,
+            name: input.name.trim(),
+            username,
+            emailVerified: false
+        },
+        { method: "email-password" }
+    );
     await ctx.internalAdapter.linkAccount({
         userId: user.id,
         providerId: "credential",

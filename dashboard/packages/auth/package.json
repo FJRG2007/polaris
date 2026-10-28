@@ -18,14 +18,14 @@
         "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
-        "@better-auth/core": "1.6.25",
-        "@better-auth/passkey": "1.6.25",
-        "@better-auth/sso": "1.6.25",
-        "@better-auth/utils": "0.4.2",
+        "@better-auth/core": "1.7.14",
+        "@better-auth/passkey": "1.7.14",
+        "@better-auth/sso": "1.7.14",
+        "@better-auth/utils": "0.5.1",
         "@polaris/config": "0.1.0",
         "@polaris/core": "0.1.0",
         "@polaris/db": "0.1.0",
-        "better-auth": "1.6.25",
+        "better-auth": "1.7.14",
         "samlify": "2.13.1",
         "zod": "3.25.76"
     },
