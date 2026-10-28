@@ -239,7 +239,7 @@ function StageButton({
             disabled={disabled}
             onClick={onClick}
             className={cn(
-                "h-12 w-16 rounded-lg px-0",
+                "h-10 w-12 rounded-lg px-0 [&_svg]:size-5",
                 tone === "join" &&
                     "border-0 bg-success text-white hover:bg-success/90 active:bg-success/80"
             )}
