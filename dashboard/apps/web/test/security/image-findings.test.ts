@@ -62,6 +62,15 @@ describe("newestPerRef", () => {
         expect(newestPerRef([])).toEqual([]);
     });
 
+    it("keeps one scan of a part of Polaris whatever tag each build gave it", () => {
+        const input = '{"applicationIds":["fixture-relay"]}';
+        const rows = [
+            { label: "fixture/relay:build-2", input, id: "new" },
+            { label: "fixture/relay:build-1", input, id: "old" }
+        ];
+        expect(newestPerRef(rows).map((r) => r.id)).toEqual(["new"]);
+    });
+
     it("keeps a newer failed scan over an older image's finished one", () => {
         const rows = [
             { label: "fixture/hostd:latest", id: "new", state: "failed" },

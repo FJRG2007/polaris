@@ -230,12 +230,15 @@ export interface OwnImage {
 const ownInputSchema = z.object({
     imageId: z.string().regex(IMAGE_ID).nullable().catch(null).default(null),
     ref: z.string().max(512).nullable().catch(null).default(null),
-    users: z.array(z.string().max(200)).max(20).catch([]).default([])
+    users: z.array(z.string().max(200)).max(20).catch([]).default([]),
+    applicationIds: z.array(z.string().max(64)).max(20).catch([]).default([])
 });
 
 function ownInput(raw: string): z.infer<typeof ownInputSchema> {
     const parsed = ownInputSchema.safeParse(json(raw) ?? {});
-    return parsed.success ? parsed.data : { imageId: null, ref: null, users: [] };
+    return parsed.success
+        ? parsed.data
+        : { imageId: null, ref: null, users: [], applicationIds: [] };
 }
 
 /**
@@ -315,7 +318,14 @@ export async function queueOwnImageScan(
             targetId: scan.targetId,
             kind: "image",
             label: scan.label,
-            input: JSON.stringify({ imageId, ref: input.ref ?? scan.label, users: input.users }),
+            // The app a part of Polaris runs as is kept, so the rescan stays the
+            // same image as the scan it repeats (see `ownImageKey`).
+            input: JSON.stringify({
+                imageId,
+                ref: input.ref ?? scan.label,
+                users: input.users,
+                ...(input.applicationIds.length > 0 ? { applicationIds: input.applicationIds } : {})
+            }),
             requestedById: userId,
             imageId,
             source: "polaris"

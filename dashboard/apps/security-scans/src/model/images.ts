@@ -115,12 +115,15 @@ export function sourceOf(container: ListedContainer): ImageSource {
  * Group containers by the image they run. `appNames` maps an app's project
  * (`polaris-<hash>`) to its name, and `appIds` the same project to its id. An
  * image used by Polaris and by an app counts as Polaris's: that is the one an
- * update replaces.
+ * update replaces. `ownApps` are the app projects that are parts of Polaris
+ * rather than somebody's app - the camera relay, say - whose image is Polaris's
+ * too, under the app's name.
  */
 export function groupImages(
     containers: readonly ListedContainer[],
     appNames: ReadonlyMap<string, string>,
-    appIds: ReadonlyMap<string, string> = new Map()
+    appIds: ReadonlyMap<string, string> = new Map(),
+    ownApps: ReadonlySet<string> = new Set()
 ): ServerImage[] {
     const rank: Record<ImageSource, number> = { polaris: 0, app: 1, agent: 2, other: 3 };
     const byId = new Map<
@@ -129,15 +132,17 @@ export function groupImages(
     >();
     for (const container of containers) {
         if (container.name.startsWith(SCANNER_PREFIX)) continue;
-        const source = sourceOf(container);
+        const listed = sourceOf(container);
         const project = container.project?.match(APP_PROJECT)?.[1];
+        const part = listed === "app" && project !== undefined && ownApps.has(project);
+        const source: ImageSource = part ? "polaris" : listed;
         const user =
-            source === "app" && project
+            listed === "app" && project
                 ? (appNames.get(project) ?? container.name)
                 : source === "polaris"
                   ? (container.labels["com.docker.compose.service"] ?? container.name)
                   : container.name;
-        const appId = source === "app" && project ? appIds.get(project) : undefined;
+        const appId = listed === "app" && project ? appIds.get(project) : undefined;
         const entry = byId.get(container.imageId);
         if (!entry) {
             byId.set(container.imageId, {

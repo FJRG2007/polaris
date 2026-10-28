@@ -79,6 +79,21 @@ describe("server images", () => {
         ]);
     });
 
+    it("counts a part of Polaris run as an app as Polaris's own, under the app's name", () => {
+        const grouped = images.groupImages(
+            listed,
+            new Map([["polaris-0123abcd", "Camera relay"]]),
+            new Map([["polaris-0123abcd", "fixture-app-id"]]),
+            new Set(["polaris-0123abcd"])
+        );
+        const relay = grouped.find((image) => image.ref === "polaris-0123abcd:fixture-release");
+        expect(relay).toMatchObject({
+            source: "polaris",
+            users: ["Camera relay"],
+            applicationIds: ["fixture-app-id"]
+        });
+    });
+
     it("counts an image Polaris also runs as Polaris's own", () => {
         const shared = images.groupImages(
             [

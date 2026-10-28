@@ -452,21 +452,54 @@ export async function queueImage(targetId: string, applicationId: string, userId
         select: { name: true }
     });
     if (!app) throw new ScanFailure("noApp");
+    // A part of Polaris is scanned as one of Polaris's images, by the image it
+    // runs, so its findings land with the others in Management and the next
+    // step it names is updating Polaris rather than an app nobody installed.
+    if ((await polarisParts([applicationId])).has(applicationId)) {
+        const own = (await imagesOn(await targetRow(targetId)))?.find(
+            (image) => image.source === "polaris" && image.applicationIds.includes(applicationId)
+        );
+        if (own) return queueServerImage(targetId, own.imageId, userId, own);
+    }
     // The image is recorded so a new release's image is told apart from one
     // already scanned (see `planNewImages`).
     const image = await imageOf(applicationId);
     return enqueue(targetId, "image", app.name, { applicationId, image }, userId);
 }
 
-/** The app names and ids a server's containers are listed under, by compose project. */
+/**
+ * Which of these apps are parts of Polaris: Places' own containers (the camera
+ * relay, the vision worker, the recognizer, the lock broker). Polaris builds
+ * them and brings each to every new build of itself (`ownedBy: "home"`, see
+ * Places' side upgrade), so their image is Polaris's to update - nobody
+ * installed them on purpose, and nobody can update them as an app.
+ */
+async function polarisParts(applicationIds: readonly string[]): Promise<Set<string>> {
+    if (applicationIds.length === 0) return new Set();
+    const rows = await prisma.installedApp.findMany({
+        where: { applicationId: { in: [...applicationIds] }, status: { not: "removed" } },
+        select: { applicationId: true, catalogId: true },
+        take: 500
+    });
+    return new Set(
+        rows
+            .filter((row) => host.appsCatalog.findApp(row.catalogId)?.ownedBy === "home")
+            .map((row) => row.applicationId!)
+    );
+}
+
+/** The app names and ids a server's containers are listed under, by compose
+ *  project, and the projects that are parts of Polaris. */
 async function appProjectsOf(
     targetId: string
-): Promise<{ names: Map<string, string>; ids: Map<string, string> }> {
+): Promise<{ names: Map<string, string>; ids: Map<string, string>; own: Set<string> }> {
     const apps = await appsOf(targetId);
     const project = (id: string) => `polaris-${shortHash(id, 8)}`;
+    const parts = await polarisParts(apps.map((app) => app.id));
     return {
         names: new Map(apps.map((app) => [project(app.id), app.name])),
-        ids: new Map(apps.map((app) => [project(app.id), app.id]))
+        ids: new Map(apps.map((app) => [project(app.id), app.id])),
+        own: new Set(apps.filter((app) => parts.has(app.id)).map((app) => project(app.id)))
     };
 }
 
@@ -478,7 +511,7 @@ async function imagesOn(target: ScanTarget): Promise<images.ServerImage[] | null
     });
     if (!containers) return null;
     const projects = await appProjectsOf(target.id);
-    return images.groupImages(containers, projects.names, projects.ids);
+    return images.groupImages(containers, projects.names, projects.ids, projects.own);
 }
 
 /**

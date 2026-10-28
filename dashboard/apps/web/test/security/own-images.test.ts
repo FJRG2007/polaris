@@ -42,6 +42,21 @@ describe("own image vulnerabilities", () => {
         });
     });
 
+    it("counts a part of Polaris once across the release tags of its builds", () => {
+        const relay = '{"applicationIds":["fixture-relay"]}';
+        const summary = summarizeOwnScans([
+            {
+                ...row("fixture/relay:build-2", "done", ID_NEW, '{"critical":0,"high":1}', at(9)),
+                input: relay
+            },
+            {
+                ...row("fixture/relay:build-1", "done", ID_OLD, '{"critical":5,"high":5}', at(2)),
+                input: relay
+            }
+        ]);
+        expect(summary).toMatchObject({ images: 1, critical: 0, high: 1 });
+    });
+
     it("never counts a replaced image when the scans of the new one failed", () => {
         const summary = summarizeOwnScans([
             row("fixture/polaris-hostd:latest", "failed", ID_NEW, "{}", at(9)),
