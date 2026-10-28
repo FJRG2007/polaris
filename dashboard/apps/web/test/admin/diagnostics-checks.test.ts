@@ -222,7 +222,7 @@ describe("each check against its source", () => {
     });
 
     it("edge: an empty file in the real dynamic directory fails it", async () => {
-        await writeFile(join(dynamic, "polaris-apps.yml"), "http: {}\n");
+        await writeFile(join(dynamic, "polaris-apps.yml"), "# No routes.\n");
         expect(await runCheck("edge")).toMatchObject({ status: "pass", facts: { count: 1 } });
         await writeFile(join(dynamic, "polaris-apps.yml"), "");
         expect(await runCheck("edge")).toMatchObject({

@@ -22,6 +22,7 @@
 
 import { dashboardHosts } from "@/lib/domain-edge";
 import { resolvePolarisWaf } from "@/lib/waf-service";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { CALL_PATH, callServer } from "@/lib/chat/call-server";
 
@@ -77,7 +78,7 @@ export interface CallRouteGuard {
  *  route. Pure, so what the edge is asked to serve can be asserted without a
  *  filesystem. */
 export function renderCallServerRoute(serve: boolean, guard?: CallRouteGuard): string {
-    if (!serve) return "http: {}\n";
+    if (!serve) return NO_ROUTES_FILE;
     const hosts = guard?.hosts ?? [];
     const allow = guard?.allow ?? [];
     const guarded = hosts.length > 0 && allow.length > 0;

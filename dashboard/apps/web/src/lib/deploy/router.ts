@@ -20,6 +20,7 @@
 import { STICKY_COOKIE } from "@polaris/deploy";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import type { AppEdgeConfig, WafCustomRule, WafPrincipalGrant } from "@polaris/core";
 import {
     declaresFraming,
@@ -823,7 +824,7 @@ export function renderDynamicConfig(
     }
     // Last, so it loses the length-ranked tie to every app router above it.
     if (zones.length > 0) routers.push(...vacantRouters(zones, defs));
-    if (routers.length === 0) return "http: {}\n";
+    if (routers.length === 0) return NO_ROUTES_FILE;
     const middlewares = [...defs.values()].join("\n");
     return `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n${middlewares}\n`;
 }

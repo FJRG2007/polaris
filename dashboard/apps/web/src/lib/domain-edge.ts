@@ -16,6 +16,7 @@
 import { getSetting } from "./setting-store";
 import { polarisZoneHost } from "./domain-zones";
 import { resolvePolarisWaf } from "./waf-service";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import type { WafCustomRule } from "@polaris/core";
 import { encodeGuardRule } from "@polaris/core/waf";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
@@ -93,7 +94,7 @@ function guardUrl(): string {
  * would be a redirect loop, not a second factor.
  */
 export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardWaf): string {
-    if (hosts.length === 0) return "http: {}\n";
+    if (hosts.length === 0) return NO_ROUTES_FILE;
     const rule = hosts.map((host) => `Host(\`${host}\`)`).join(" || ");
     const allow = waf?.allow ?? [];
     const deny = waf?.deny ?? [];

@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import type { WafCondition, WafCustomRule } from "@polaris/core";
 
 /** What the operator chose. Serve on and Funnel off are the defaults. */
@@ -223,7 +224,7 @@ export function renderTailscaleRoute(
     cookies = ""
 ): string {
     const name = tailnetHost(host);
-    if (!name) return "http: {}\n";
+    if (!name) return NO_ROUTES_FILE;
     const routers = [
         `    ${ROUTER}:`,
         `      rule: "Host(\`${name}\`)"`,

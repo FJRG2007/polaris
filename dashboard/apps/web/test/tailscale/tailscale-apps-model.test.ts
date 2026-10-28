@@ -208,7 +208,7 @@ describe("renderTailscaleRoute with apps", () => {
                 [app("a.example.com", 10001)],
                 COOKIES
             )
-        ).toBe("http: {}\n");
+        ).toBe("# No routes.\n");
     });
 });
 

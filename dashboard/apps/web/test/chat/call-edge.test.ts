@@ -67,7 +67,7 @@ describe("the call server's route", () => {
     it("publishes nothing when calls run somewhere else", () => {
         // An instance pointed at a call server somebody else operates has no use
         // for this path, and one left behind reaches nothing.
-        expect(renderCallServerRoute(false)).toBe("http: {}\n");
+        expect(renderCallServerRoute(false)).toBe("# No routes.\n");
     });
 
     it("carries the firewall's allowlist onto the hostnames it covers", () => {
@@ -116,7 +116,7 @@ describe("publishing it", () => {
         // as unwritten, so every call fails at the WebSocket on a deployment that
         // was one retry from working.
         expect(await syncCallServerRoute()).toBe(false);
-        expect((await readFile(routeFile(), "utf8")).trim()).toBe("http: {}");
+        expect((await readFile(routeFile(), "utf8")).trim()).toBe("# No routes.");
     });
 
     it("is settled when calls deliberately run somewhere else", async () => {

@@ -18,6 +18,7 @@
 
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
+import { NO_ROUTES_FILE } from "@polaris/core";
 import { SLUG_PATTERN, isCustomHostname } from "../model/schemas";
 
 const APP_ID = "status-pages";
@@ -39,7 +40,7 @@ export function renderStatusEdge(routes: readonly StatusEdgeRoute[], origin: str
     const unique = valid.filter(
         (route, index) => valid.findIndex((other) => other.hostname === route.hostname) === index
     );
-    if (unique.length === 0) return "http: {}\n";
+    if (unique.length === 0) return NO_ROUTES_FILE;
 
     const routers: string[] = [];
     const middlewares: string[] = [

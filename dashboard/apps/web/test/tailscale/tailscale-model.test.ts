@@ -134,8 +134,8 @@ describe("renderTailscaleRoute", () => {
     });
 
     it("renders an empty config with no name or a name that is not a tailnet's", () => {
-        expect(renderTailscaleRoute(null, "http://web:3000")).toBe("http: {}\n");
-        expect(renderTailscaleRoute("example.com", "http://web:3000")).toBe("http: {}\n");
+        expect(renderTailscaleRoute(null, "http://web:3000")).toBe("# No routes.\n");
+        expect(renderTailscaleRoute("example.com", "http://web:3000")).toBe("# No routes.\n");
     });
 });
 

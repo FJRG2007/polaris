@@ -105,7 +105,7 @@ describe("what the edge is told to serve", () => {
     });
 
     it("writes an empty config when no domain is configured", () => {
-        expect(renderDashboardConfig([])).toBe("http: {}\n");
+        expect(renderDashboardConfig([])).toBe("# No routes.\n");
     });
 });
 

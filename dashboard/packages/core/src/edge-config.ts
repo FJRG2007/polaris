@@ -325,6 +325,17 @@ export const appEdgeConfigSchema = z.object({
 });
 export type AppEdgeConfig = z.infer<typeof appEdgeConfigSchema>;
 
+/**
+ * What a file in Traefik's dynamic directory holds when it routes nothing.
+ *
+ * A comment, not `http: {}`: Traefik refuses an empty section ("http cannot be
+ * a standalone element"), and one refused file stops the file provider from
+ * applying any change in the directory - on 3.7 it loads none of it at all.
+ * A comment-only file parses as nothing, on every version, and is not the
+ * zero-byte file the edge diagnostics treat as a truncated write.
+ */
+export const NO_ROUTES_FILE = "# No routes.\n";
+
 /** What a service asks of the edge when it has asked for nothing. */
 export const EMPTY_EDGE_CONFIG: AppEdgeConfig = appEdgeConfigSchema.parse({});
 
