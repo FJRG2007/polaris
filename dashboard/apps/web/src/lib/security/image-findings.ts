@@ -12,7 +12,13 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import { newestPerRef, ofRunningImages, OWN_SCANS, ownScansWhere, runningImageIds } from "./own-images";
+import {
+    newestPerRef,
+    ofRunningImages,
+    OWN_SCANS,
+    ownScansWhere,
+    runningImageIds
+} from "./own-images";
 
 /** One scan's stored findings are capped at this by the scans themselves. */
 const MAX_FINDINGS = 500;
