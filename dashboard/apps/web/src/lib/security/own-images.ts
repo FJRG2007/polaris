@@ -52,17 +52,29 @@ function count(summary: string, key: "critical" | "high"): number {
  * What one of Polaris's own images is across its releases. Most are their
  * reference (`.../polaris-web:latest`), which an update keeps. A part of Polaris
  * that runs as an app - the camera relay - comes up under a new release tag on
- * every build, so it is the app its scan names, or each build would leave the
- * one it replaced behind as an image of its own. Pure.
+ * every build, so it is the app its scan names together with the repository,
+ * tag left off, or each build would leave the one it replaced behind as an image
+ * of its own. The repository stays in the key because one app runs more than
+ * one image: the relay and the forwarder beside it are both the camera relay,
+ * and keyed by the app alone the forwarder's scan hid the relay's. Pure.
  */
 export function ownImageKey(row: { readonly label: string; readonly input?: string }): string {
     try {
         const part = (JSON.parse(row.input ?? "{}") as { part?: unknown } | null)?.part;
-        if (typeof part === "string" && part) return `app:${part}`;
+        if (typeof part === "string" && part) return `app:${part}:${repositoryOf(row.label)}`;
     } catch {
         // Not JSON: the reference decides.
     }
     return row.label;
+}
+
+/** A reference without its tag or digest: `alpine/socat:1.8@sha256:...` is
+ *  `alpine/socat`, and a registry's port is kept. Pure. */
+function repositoryOf(ref: string): string {
+    const name = ref.split("@")[0] ?? ref;
+    const slash = name.lastIndexOf("/");
+    const colon = name.lastIndexOf(":");
+    return colon > slash ? name.slice(0, colon) : name;
 }
 
 /** Newest scan per image (see `ownImageKey`); `rows` arrive newest first. Pure. */
