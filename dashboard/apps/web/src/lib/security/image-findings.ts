@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import { newestPerRef, OWN_SCANS, ownScansWhere } from "./own-images";
+import { newestPerRef, ofRunningImages, OWN_SCANS, ownScansWhere, runningImageIds } from "./own-images";
 
 /** One scan's stored findings are capped at this by the scans themselves. */
 const MAX_FINDINGS = 500;
@@ -254,8 +254,14 @@ export async function ownImages(now = new Date()): Promise<OwnImage[]> {
         take: OWN_SCANS,
         select: { ...SCAN_SELECT, label: true, input: true, imageId: true }
     });
+    const running = await runningImageIds();
+    const current = ofRunningImages(
+        rows,
+        (row) => row.imageId ?? ownInput(row.input).imageId,
+        running
+    );
     const out: OwnImage[] = [];
-    for (const row of newestPerRef(rows)) {
+    for (const row of newestPerRef(current)) {
         const scan = scanView(row);
         if (!scan) continue;
         const input = ownInput(row.input);

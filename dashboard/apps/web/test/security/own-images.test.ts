@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
-import { currentScan, summarizeOwnScans } from "@/lib/security/own-images";
+import { currentScan, ofRunningImages, summarizeOwnScans } from "@/lib/security/own-images";
 
 const at = (day: number) => new Date(Date.UTC(2026, 0, day));
 
@@ -91,5 +91,25 @@ describe("own image vulnerabilities", () => {
         ];
         expect(currentScan(rows)).toBeNull();
         expect(summarizeOwnScans(rows)).toBeNull();
+    });
+});
+
+describe("ofRunningImages", () => {
+    const RUNNING = `sha256:${"3".repeat(64)}`;
+    const REPLACED = `sha256:${"4".repeat(64)}`;
+    const rows = [
+        { label: "traefik:v3.7", imageId: RUNNING },
+        { label: "traefik:v3.6", imageId: REPLACED },
+        { label: "queued", imageId: null }
+    ];
+
+    it("drops the scans of an image an update replaced under another reference", () => {
+        expect(
+            ofRunningImages(rows, (row) => row.imageId, new Set([RUNNING])).map((row) => row.label)
+        ).toEqual(["traefik:v3.7"]);
+    });
+
+    it("keeps every scan when what the machine runs is not known", () => {
+        expect(ofRunningImages(rows, (row) => row.imageId, null)).toHaveLength(3);
     });
 });
