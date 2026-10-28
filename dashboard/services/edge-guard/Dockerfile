@@ -37,7 +37,10 @@ COPY . .
 # @polaris/core must be built first (the guard bundles from its dist), then bundle.
 RUN npm run build -w @polaris/core && npm run build -w @polaris/edge-guard
 
-FROM node:22-bookworm-slim AS runner
+# Debian 13, patched at build, and without npm, yarn or corepack: the guard
+# runs one bundled file, and those tools are where most of the image's
+# reported vulnerabilities lived.
+FROM node:22-trixie-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # Name lookups share libuv's four-thread pool by default; a dead internet line
@@ -49,7 +52,11 @@ COPY --from=builder /build/services/edge-guard/dist/index.js ./index.js
 # container mounts it first: if that is this one and the mountpoint is root-owned,
 # the control plane can never write the list this guard reads. Created node-owned
 # in both images so the order stops mattering.
-RUN mkdir -p /edge-intel && chown -R node:node /edge-intel
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && mkdir -p /edge-intel && chown -R node:node /edge-intel
 USER node
 # 8080 answers Traefik's forwardAuth question; 8081 IS the upstream for a route whose
 # response gets rewritten. Both are declared so `docker ps` shows what the container

@@ -81,15 +81,21 @@ RUN npm ci --omit=dev --workspace @polaris/vision --include-workspace-root=false
     rm -rf node_modules/@polaris && \
     npm cache clean --force
 
-FROM node:22-bookworm-slim AS runner
+# Debian 13: its ffmpeg 7 and system libraries have fixes 12's lack. npm, yarn
+# and corepack are removed - the worker runs one file and spawns ffmpeg.
+FROM node:22-trixie-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
 # ffmpeg is what decodes video here, and ffprobe - from the same package - is
 # what says how big a camera's picture is, which every box the detector reports
 # is divided by.
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 # Everything the worker uses beyond that addon, including the pure Polaris logic
 # it shares with the dashboard, is in the one built file.

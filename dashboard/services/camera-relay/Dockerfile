@@ -11,7 +11,10 @@
 # Pinned rather than tracking latest: this is a media server on somebody's own
 # network, and an image that moves under a running house is how a camera stops
 # working on a Tuesday for no reason anybody can trace.
-FROM alexxit/go2rtc:1.9.14
+FROM alexxit/go2rtc:1.9.15
+
+# The base's Alpine packages (OpenSSL, curl, expat) are patched at build.
+RUN apk upgrade --no-cache
 
 COPY services/camera-relay/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
