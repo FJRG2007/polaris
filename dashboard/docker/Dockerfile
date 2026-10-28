@@ -23,7 +23,7 @@ WORKDIR /cache
 FROM node:22-bookworm-slim AS builder
 
 # openssl lets Prisma detect the right engine (debian-openssl-3.0.x) at generate
-# time so the client matches the runner, which also has openssl 3.x on bookworm.
+# time so the client matches the runner, which also has openssl 3.x on trixie.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*

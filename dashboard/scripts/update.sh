@@ -752,6 +752,7 @@ main() {
 
     log "rolling the dashboard over to the new build"
     if ! roll_dashboard "$web_image"; then
+        repair_edge_files
         err "the update did not complete; the previous dashboard is still serving"
         exit 1
     fi
