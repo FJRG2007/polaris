@@ -2,7 +2,8 @@
 
 /**
  * Remote access through Tailscale. Off until the operator connects; then the card
- * shows the login link the component prints (or takes a pasted auth key), and once
+ * shows the login link the component prints (or signs in with the auth key kept in
+ * Management > Integrations), and once
  * signed in the machine's ts.net address, the tailnet, and who it answers: the
  * tailnet (Serve) or the internet too (Funnel). Refreshed in the background, faster
  * while it is starting or waiting on a sign-in.
@@ -12,11 +13,11 @@ import { useId, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { PageSection } from "@/components/page-section";
 import Link from "next/link";
-import { authKeySchema, FUNNEL_APP_PORTS } from "@/lib/tailscale/tailscale-model";
+import { FUNNEL_APP_PORTS } from "@/lib/tailscale/tailscale-model";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TailnetAppView, TailscaleView } from "@/lib/tailscale/tailscale-service";
-import { Button, ConfirmDeleteDialog, CopyButton, Input, Skeleton, Switch } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, CopyButton, Skeleton, Switch } from "@polaris/ui";
 import {
     connectTailscaleAction,
     disconnectTailscaleAction,
@@ -26,6 +27,10 @@ import {
 } from "./tailscale-actions";
 
 const STATUS_URL = "/api/admin/domains/tailscale";
+/** Where the auth key is kept: the Tailscale entry in Integrations, opened. */
+const KEY_URL = "/admin/integrations?configure=tailscale";
+/** The connect button, which other cards on the page bring into view. */
+export const TAILSCALE_CONNECT_ID = "tailscale-connect";
 const POLL_MS = 5_000;
 const SETTLED_POLL_MS = 30_000;
 
@@ -33,9 +38,7 @@ export function TailscaleCard() {
     const t = useTranslations("admin");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const [key, setKey] = useState("");
     const [confirm, setConfirm] = useState(false);
-    const keyHint = useId();
     const [settled, setSettled] = useState(false);
     const live = useLiveResource<TailscaleView>({
         url: STATUS_URL,
@@ -48,8 +51,6 @@ export function TailscaleCard() {
         ? !view.config.enabled || view.edition === "limited" || view.status.state === "connected"
         : false;
     if (nowSettled !== settled) setSettled(nowSettled);
-    const trimmed = key.trim();
-    const keyValid = trimmed === "" || authKeySchema.safeParse(trimmed).success;
 
     async function run(call: () => Promise<TailscaleResult>, optimistic?: TailscaleView) {
         const before = view;
@@ -65,9 +66,7 @@ export function TailscaleCard() {
     }
 
     async function connect() {
-        if (!keyValid) return;
-        const result = await run(() => connectTailscaleAction({ authKey: trimmed }));
-        if (result?.view) setKey("");
+        await run(() => connectTailscaleAction({}));
     }
 
     async function toggle(serve: boolean, funnel: boolean) {
@@ -113,39 +112,21 @@ export function TailscaleCard() {
                                     {t("domains.tailscale.limited")}
                                 </p>
                             ) : null}
-                            <label className="flex min-w-0 flex-col gap-1.5">
-                                <span className="text-xs text-muted-foreground">
-                                    {t("domains.tailscale.keyLabel")}
-                                </span>
-                                <Input
-                                    type="password"
-                                    autoComplete="off"
-                                    spellCheck={false}
-                                    value={key}
-                                    disabled={busy || limited}
-                                    aria-invalid={!keyValid}
-                                    aria-describedby={keyHint}
-                                    placeholder="tskey-auth-..."
-                                    onChange={(event) => setKey(event.target.value)}
-                                    className="max-w-md"
-                                />
-                                <span
-                                    id={keyHint}
-                                    className={
-                                        keyValid
-                                            ? "text-xs text-muted-foreground"
-                                            : "text-xs text-danger"
-                                    }
-                                >
-                                    {keyValid
-                                        ? t("domains.tailscale.keyHint")
-                                        : t("domains.tailscale.badKey")}
-                                </span>
-                            </label>
+                            <p className="text-xs text-muted-foreground">
+                                {view.hasAuthKey
+                                    ? t("domains.tailscale.withKey")
+                                    : t("domains.tailscale.withLink")}{" "}
+                                <Link href={KEY_URL} className="text-primary hover:underline">
+                                    {view.hasAuthKey
+                                        ? t("domains.tailscale.keyChange")
+                                        : t("domains.tailscale.keyAdd")}
+                                </Link>
+                            </p>
                             <div>
                                 <Button
+                                    id={TAILSCALE_CONNECT_ID}
                                     size="sm"
-                                    disabled={busy || limited || !keyValid}
+                                    disabled={busy || limited}
                                     title={limited ? t("domains.tailscale.limited") : undefined}
                                     onClick={() => void connect()}
                                 >

@@ -164,9 +164,9 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "steam") return SteamDialog;
     // Both GIF services are a key and a switch, so they share the dialog and
     // the action; which one the picker asks is decided where the search is made.
-    // Last.fm is the same shape: a key, and a switch for what it turns on.
-    if (card.slug === "tenor" || card.slug === "giphy" || card.slug === "lastfm")
-        return TenorDialog;
+    // Last.fm and Tailscale are the same shape: a key, and a switch for what it
+    // turns on.
+    if (["tenor", "giphy", "lastfm", "tailscale"].includes(card.slug)) return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     return null;
@@ -1289,8 +1289,8 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
     const [loaded] = useState(() => values);
     const unchanged = !isDirty(loaded, values);
     const [saving, startSave] = useTransition();
-    const switchLabel =
-        card.slug === "lastfm" ? t("integrations.lastfm.switch") : t("integrations.tenor.search");
+    const words = card.slug === "lastfm" || card.slug === "tailscale" ? card.slug : null;
+    const switchLabel = words ? t(`integrations.${words}.switch`) : t("integrations.tenor.search");
 
     function onSave() {
         setError(null);
@@ -1343,8 +1343,8 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                         <span>
                             <span className="font-medium">{switchLabel}</span>
                             <span className="block text-xs text-muted-foreground">
-                                {card.slug === "lastfm"
-                                    ? t("integrations.lastfm.hint")
+                                {words
+                                    ? t(`integrations.${words}.hint`)
                                     : t("integrations.tenor.hint")}
                             </span>
                         </span>

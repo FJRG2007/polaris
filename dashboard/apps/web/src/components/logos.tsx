@@ -127,6 +127,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     lastfm: brand.LastfmMark,
     cloudflare: brand.CloudflareMark,
     ngrok: brand.NgrokMark,
+    tailscale: brand.TailscaleMark,
     giphy: brand.GiphyMark,
     krisp: brand.KrispMark,
     dymo: DymoMark,

@@ -1,13 +1,15 @@
 /**
  * The Tailscale service against a stubbed host daemon: the component's compose spec,
- * a connect or a disconnect that fails leaving the saved state as it was, and the
- * route kept in step with the component when nobody has the card open.
+ * a connect or a disconnect that fails leaving the saved state as it was, the auth
+ * key read from Integrations, and the route kept in step with the component when
+ * nobody has the card open.
  */
 
 import { forCompose } from "@polaris/deploy";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const settings = new Map<string, string | null>();
+const integrations = new Map<string, { enabled: boolean; secret: string | null }>();
 const writeDynamicFile = vi.fn(async (..._args: unknown[]) => undefined);
 const ports = {
     composeUp: vi.fn(async (..._args: unknown[]) => undefined),
@@ -34,6 +36,23 @@ vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
     setSetting: async (key: string, value: string | null) => void settings.set(key, value)
 }));
+vi.mock("@/lib/integration-service", () => ({
+    getIntegrationState: async (provider: string) => {
+        const row = integrations.get(provider);
+        return row ? { provider, enabled: row.enabled, hasSecret: row.secret !== null } : null;
+    },
+    getIntegrationSecret: async (provider: string) => integrations.get(provider)?.secret ?? null,
+    upsertIntegration: async (
+        provider: string,
+        input: { enabled?: boolean; secret?: string | null }
+    ) => {
+        const row = integrations.get(provider) ?? { enabled: false, secret: null };
+        integrations.set(provider, {
+            enabled: input.enabled ?? row.enabled,
+            secret: input.secret === undefined ? row.secret : input.secret || null
+        });
+    }
+}));
 vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     sealKey: (key: string) => `sealed:${key}`,
     openKey: (sealed: string) => sealed.replace(/^sealed:/, "")
@@ -47,6 +66,14 @@ const CONNECTED = JSON.stringify({
     Self: { DNSName: "polaris.tail1234.ts.net." }
 });
 
+/** The environment of the component the last compose-up started. */
+function composedEnv(): Record<string, string> {
+    const spec = ports.composeUp.mock.calls.at(-1)?.[0] as {
+        services: { env: Record<string, string> }[];
+    };
+    return spec.services[0]!.env;
+}
+
 function savedConfig() {
     return JSON.parse(settings.get("tailscale.config") ?? JSON.stringify(DEFAULT_CONFIG));
 }
@@ -54,6 +81,7 @@ function savedConfig() {
 beforeEach(() => {
     vi.clearAllMocks();
     settings.clear();
+    integrations.clear();
     ports.inspect.mockImplementation(async () => ({ State: { Running: true } }));
     ports.runIn.mockImplementation(async () => ({ code: 0, output: "" }));
 });
@@ -108,7 +136,46 @@ describe("tailscale service", () => {
         ports.composeDown.mockRejectedValueOnce(new Error("hostd timeout"));
         await expect(service.disconnectTailscale()).rejects.toThrow("hostd timeout");
         expect(savedConfig().enabled).toBe(true);
-        expect(settings.get("tailscale.authKey")).toBe("sealed:tskey-auth-abc12345");
+        expect(integrations.get("tailscale")?.secret).toBe("tskey-auth-abc12345");
+    });
+
+    it("signs in with the key saved in Integrations while it is switched on", async () => {
+        integrations.set("tailscale", { enabled: true, secret: "tskey-auth-abc12345" });
+        await service.connectTailscale(null, "limited");
+        expect(composedEnv()).toHaveProperty("TS_AUTHKEY", "tskey-auth-abc12345");
+        expect((await service.tailscaleView()).hasAuthKey).toBe(true);
+
+        integrations.set("tailscale", { enabled: false, secret: "tskey-auth-abc12345" });
+        await service.setTailscaleToggles({ serve: false, funnel: false }, "limited");
+        expect(composedEnv()).not.toHaveProperty("TS_AUTHKEY");
+        expect((await service.tailscaleView()).hasAuthKey).toBe(false);
+    });
+
+    it("moves a key an older Polaris sealed into Integrations, switched on", async () => {
+        settings.set("tailscale.authKey", "sealed:tskey-auth-old12345");
+        await service.connectTailscale(null, "limited");
+        expect(integrations.get("tailscale")).toEqual({
+            enabled: true,
+            secret: "tskey-auth-old12345"
+        });
+        expect(settings.get("tailscale.authKey")).toBeNull();
+        expect(composedEnv()).toHaveProperty("TS_AUTHKEY", "tskey-auth-old12345");
+    });
+
+    it("keeps a key already in Integrations over an older sealed one", async () => {
+        integrations.set("tailscale", { enabled: true, secret: "tskey-auth-new12345" });
+        settings.set("tailscale.authKey", "sealed:tskey-auth-old12345");
+        await service.connectTailscale(null, "limited");
+        expect(integrations.get("tailscale")?.secret).toBe("tskey-auth-new12345");
+        expect(settings.get("tailscale.authKey")).toBeNull();
+    });
+
+    it("leaves the key in Integrations on a disconnect", async () => {
+        integrations.set("tailscale", { enabled: true, secret: "tskey-auth-abc12345" });
+        await service.connectTailscale(null, "limited");
+        await service.disconnectTailscale();
+        expect(savedConfig().enabled).toBe(false);
+        expect(integrations.get("tailscale")?.secret).toBe("tskey-auth-abc12345");
     });
 
     it("publishes the name a connected node reports without the card", async () => {

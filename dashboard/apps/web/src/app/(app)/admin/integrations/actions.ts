@@ -24,6 +24,7 @@ import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken } from "@/lib/integrations/tunnel-token";
+import { authKeySchema } from "@/lib/tailscale/tailscale-model";
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
@@ -377,14 +378,21 @@ export async function saveLicensedFilterAction(input: {
 export async function saveTenorAction(input: {
     enabled: boolean;
     apiKey?: string;
-    /** `tenor`, `giphy` or `lastfm`. Anything else is refused rather than written: this
-     *  writes an integration row, and the slug is the row. */
+    /** `tenor`, `giphy`, `lastfm` or `tailscale`. Anything else is refused rather than
+     *  written: this writes an integration row, and the slug is the row. */
     slug?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
-    const slug = input.slug === "giphy" || input.slug === "lastfm" ? input.slug : "tenor";
+    const slug =
+        input.slug === "giphy" || input.slug === "lastfm" || input.slug === "tailscale"
+            ? input.slug
+            : "tenor";
     const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
+    // A Tailscale key goes into the component's environment as-is, so a value
+    // that is not one is refused here rather than by the daemon.
+    if (slug === "tailscale" && apiKey && !authKeySchema.safeParse(apiKey).success)
+        return { error: t("domains.tailscale.badKey") };
     try {
         const existing = await getIntegrationState(slug);
         if (input.enabled && !apiKey && !existing?.hasSecret) {

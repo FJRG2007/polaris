@@ -786,8 +786,10 @@
             "limited": "Remote access needs the full edition of Polaris, which can start extra components on this machine.",
             "failed": "Tailscale could not be started. Try again in a minute.",
             "badKey": "That is not a Tailscale auth key. Keys start with tskey-.",
-            "keyLabel": "Auth key (optional)",
-            "keyHint": "Leave it empty to sign in with a link instead. A key is saved encrypted and never shown again.",
+            "withLink": "Polaris signs in with a link you open here.",
+            "keyAdd": "Use an auth key instead",
+            "withKey": "Polaris signs in with the auth key saved in Integrations.",
+            "keyChange": "Change it",
             "connect": "Connect with Tailscale",
             "connecting": "Connecting...",
             "now": "Status",
@@ -816,7 +818,7 @@
             "funnelNotAllowed": "Your tailnet policy does not allow Funnel for this machine yet. Add the funnel attribute in the Access controls page of the Tailscale admin console.",
             "disconnect": "Disconnect",
             "disconnectTitle": "Disconnect Tailscale?",
-            "disconnectBody": "Polaris leaves your tailnet and its ts.net address stops working. The saved auth key is deleted.",
+            "disconnectBody": "Polaris leaves your tailnet and its ts.net address stops working. The auth key stays in Integrations.",
             "appsTitle": "Apps on your tailnet",
             "appsHint": "Each app with a domain also answers on its own port here, behind its guard. Apps that need sign-in or filter by IP stay off the tailnet: here every visitor appears to come from this machine.",
             "appsEmpty": "No app is on your tailnet yet. Apps with a domain show up here, unless they need sign-in or filter by IP.",
@@ -1925,6 +1927,10 @@
             "switch": "Show what people scrobble",
             "hint": "Lets everybody type their Last.fm username under Connected accounts and shows their song beside their name."
         },
+        "tailscale": {
+            "switch": "Sign in with this key",
+            "hint": "Off, remote access signs in with a link you open instead."
+        },
         "oauth": {
             "idLabel": {
                 "clientId": "Client ID",
@@ -2359,6 +2365,17 @@
                 "links": {
                     "0": {
                         "label": "Get your authtoken"
+                    }
+                }
+            },
+            "tailscale": {
+                "summary": "Sign Polaris in to your tailnet with an auth key instead of a link.",
+                "description": "Remote access through Tailscale signs in with a link you open. Save an auth key here and Polaris signs in with it instead, with nothing to open.",
+                "apiKeyLabel": "Auth key",
+                "apiKeyHelp": "Starts with tskey-auth-. A reusable key keeps working if Polaris has to sign in again.",
+                "links": {
+                    "0": {
+                        "label": "Generate an auth key"
                     }
                 }
             },
