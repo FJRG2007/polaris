@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HostdClient } from "@polaris/hostd-client";
 
 /** How old the newest scan may be and still be shown. */
 const WINDOW_MS = 30 * 24 * 60 * 60_000;
@@ -72,6 +73,47 @@ export function newestPerRef<T extends { label: string; input?: string }>(rows: 
         if (!seen.has(key)) seen.set(key, row);
     }
     return [...seen.values()];
+}
+
+/**
+ * The image ids the containers on this machine run, stopped ones included, or
+ * null when the daemon does not answer.
+ *
+ * An update replaces an image under a new reference as often as under the same
+ * one - `traefik:v3.6` became `traefik:v3.7` - and the scan of the one it
+ * replaced is still the newest of its reference. Without this it stayed on the
+ * screen, and in the summary, for the whole window, counting vulnerabilities in
+ * an image nothing runs any more.
+ */
+export async function runningImageIds(): Promise<ReadonlySet<string> | null> {
+    const reply = await new HostdClient()
+        .dockerRequest("GET", "/containers/json?all=1")
+        .catch(() => null);
+    if (!reply || reply.status !== 200) return null;
+    try {
+        const listing: unknown = JSON.parse(reply.body);
+        if (!Array.isArray(listing)) return null;
+        const ids = listing
+            .map((row) => (row as { ImageID?: unknown } | null)?.ImageID)
+            .filter((id): id is string => typeof id === "string" && id.length > 0);
+        return new Set(ids);
+    } catch {
+        return null;
+    }
+}
+
+/** The scans of an image this machine still runs; all of them when what it runs
+ *  is not known, since hiding every image would say there is nothing to fix. Pure. */
+export function ofRunningImages<T>(
+    rows: readonly T[],
+    imageIdOf: (row: T) => string | null,
+    running: ReadonlySet<string> | null
+): T[] {
+    if (!running) return [...rows];
+    return rows.filter((row) => {
+        const id = imageIdOf(row);
+        return id !== null && running.has(id);
+    });
 }
 
 /** Scans of Polaris's own images on this machine recent enough to be shown. */
@@ -140,5 +182,6 @@ export async function ownVulnerabilities(now = new Date()): Promise<OwnVulnerabi
             finishedAt: true
         }
     });
-    return summarizeOwnScans(scans);
+    const running = await runningImageIds();
+    return summarizeOwnScans(ofRunningImages(scans, (scan) => scan.imageId, running));
 }

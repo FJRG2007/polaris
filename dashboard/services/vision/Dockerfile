@@ -81,21 +81,29 @@ RUN npm ci --omit=dev --workspace @polaris/vision --include-workspace-root=false
     rm -rf node_modules/@polaris && \
     npm cache clean --force
 
-# Debian 13: its ffmpeg 7 and system libraries have fixes 12's lack. npm, yarn
-# and corepack are removed - the worker runs one file and spawns ffmpeg.
+# Debian 13, because the onnxruntime addon needs glibc. npm, yarn and corepack
+# are removed - the worker runs one file and spawns ffmpeg.
 FROM node:22-trixie-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# ffmpeg is what decodes video here, and ffprobe - from the same package - is
-# what says how big a camera's picture is, which every box the detector reports
-# is divided by.
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
+    apt-get install -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
         /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
         /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
+# ffmpeg is what decodes video here, and ffprobe is what says how big a
+# camera's picture is, which every box the detector reports is divided by.
+#
+# A static build of a current release rather than Debian's: Debian's ffmpeg 7
+# carried a critical and dozens of high vulnerabilities with no fix released,
+# and its dependencies (X11, libtiff, libxml2, libsndfile) most of the rest.
+# Two self-contained binaries need none of them. Pinned by digest, so a
+# rebuild of this commit gets the same ones.
+COPY --from=mwader/static-ffmpeg:9.0.2-1@sha256:f5d100184884eb3e82b0eb14bb5ebf98da99826ac824989720297fb9ef21c822 \
+    /ffmpeg /ffprobe /usr/local/bin/
 
 # Everything the worker uses beyond that addon, including the pure Polaris logic
 # it shares with the dashboard, is in the one built file.

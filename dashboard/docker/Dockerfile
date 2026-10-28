@@ -284,9 +284,13 @@ RUN apt-get update \
 
 # Prisma CLI, pinned to the version used by @polaris/db, so `migrate deploy`
 # in the entrypoint matches the generated client and committed migrations.
-# npm itself is moved off the copy Node 22 bundles, whose own dependencies
-# (brace-expansion, picomatch, sigstore) carry known vulnerabilities.
-RUN npm install -g npm@11.21.1 prisma@6.2.1 && npm cache clean --force
+# Then npm, yarn and corepack go: nothing at runtime calls them (the CLI is run
+# by node directly), and they are where the image's fixable vulnerabilities
+# were - npm's own bundled undici among them.
+RUN npm install -g prisma@6.2.1 && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 # Commit this image was built from, passed by CI. Surfaced by the update checker
 # so the dashboard can report how far behind the release branch it is.
