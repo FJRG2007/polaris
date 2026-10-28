@@ -1685,6 +1685,7 @@
         "none": "No apps are installed.",
         "notHere": "Not downloaded yet",
         "installed": "Installed {version}",
+        "builtIn": "Built in {version}",
         "available": "{version} available",
         "needsPolaris": "{version} needs a newer Polaris",
         "checkFailed": "Could not check for updates",
