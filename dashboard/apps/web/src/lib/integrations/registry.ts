@@ -714,6 +714,28 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyLabel: "Authtoken"
     },
     {
+        slug: "tailscale",
+        name: "Tailscale",
+        category: "Networking",
+        summary: "Sign Polaris in to your tailnet with an auth key instead of a link.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Remote access through Tailscale signs in with a link you open. Save an auth key here and Polaris signs in with it instead, with nothing to open.",
+        docsUrl: "https://tailscale.com/kb/1085/auth-keys",
+        setupLinks: [
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Generate an auth key",
+                url: "https://login.tailscale.com/admin/settings/keys"
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Auth key",
+        apiKeyHelp:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Starts with tskey-auth-. A reusable key keeps working if Polaris has to sign in again."
+    },
+    {
         slug: "duckdns",
         name: "DuckDNS",
         category: "Networking",

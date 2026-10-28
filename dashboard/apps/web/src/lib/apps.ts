@@ -113,7 +113,6 @@ import {
     Music,
     TrendingUp,
     Stethoscope,
-    Package,
     Waypoints,
     EthernetPort,
     FileBadge,
@@ -787,6 +786,20 @@ const ADMIN_AREAS: AppSubapp[] = [
                 ]
             },
             {
+                label: "Security scans", // i18n-ignore
+                href: "/admin/security/scans",
+                adminOnly: true,
+                icon: ScanSearch,
+                keywords: [
+                    "vulnerabilities",
+                    "cve",
+                    "image scans",
+                    "polaris images",
+                    "own images",
+                    "containers"
+                ]
+            },
+            {
                 label: "Single sign-on", // i18n-ignore
                 href: "/admin/sso",
                 adminOnly: true,
@@ -1083,7 +1096,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         label: "Usage & health", // i18n-ignore
         icon: Gauge,
         base: "/admin/consumption",
-        match: ["/admin/billing", "/admin/diagnostics", "/admin/images"],
+        match: ["/admin/billing", "/admin/diagnostics"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -1133,13 +1146,6 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Stethoscope,
                 keywords: ["health", "doctor", "speed test", "support bundle", "troubleshoot"]
-            },
-            {
-                label: "Polaris images", // i18n-ignore
-                href: "/admin/images",
-                adminOnly: true,
-                icon: Package,
-                keywords: ["vulnerabilities", "cve", "security scans", "image scans", "own images"]
             }
         ]
     }

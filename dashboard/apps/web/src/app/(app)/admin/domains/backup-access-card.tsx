@@ -12,6 +12,7 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Skeleton, Checkbox } from "@polaris/ui";
 import { saveBackupAccessAction } from "./actions";
+import { TAILSCALE_CONNECT_ID } from "./tailscale-card";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -429,6 +430,20 @@ function Ipv6Line({ view }: { view: BackupView }) {
 
 const COMPARED: readonly InboundPath[] = ["relay", "tunnel", "tailscale"];
 
+/**
+ * Bring the Tailscale section into view and put the focus on its connect button.
+ * A bare `#tailscale` did nothing anyone could see: the section sits right under
+ * this card, so following the anchor barely moved the page.
+ */
+function goToTailscale(event: React.MouseEvent<HTMLAnchorElement>) {
+    const section = document.getElementById("tailscale");
+    if (!section) return;
+    event.preventDefault();
+    section.scrollIntoView({ block: "start", behavior: "smooth" });
+    document.getElementById(TAILSCALE_CONNECT_ID)?.focus({ preventScroll: true });
+    window.history.replaceState(null, "", "#tailscale");
+}
+
 /** The ways in side by side, the recommended one marked, each with its catch. */
 function PathsCompared({ view }: { view: BackupView }) {
     const t = useTranslations("admin");
@@ -451,7 +466,11 @@ function PathsCompared({ view }: { view: BackupView }) {
                             {t(`domains.backup.compare.${path}`)}
                         </span>
                         {path === "tailscale" ? (
-                            <a href="#tailscale" className="text-primary hover:underline">
+                            <a
+                                href="#tailscale"
+                                onClick={goToTailscale}
+                                className="text-primary hover:underline"
+                            >
                                 {view.tailscale
                                     ? t("domains.backup.compare.tailscaleOpen")
                                     : t("domains.backup.compare.tailscaleSetUp")}

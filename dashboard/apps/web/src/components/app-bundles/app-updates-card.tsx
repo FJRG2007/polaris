@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpCircle, RotateCcw, RotateCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -162,6 +163,8 @@ function AppRow({
             ? Math.min(100, Math.round((progress.received / progress.total) * 100))
             : null;
 
+    // A native app is part of every Polaris: it runs a build, nobody installed it.
+    const running = isNativeApp(row.id) ? "appUpdates.builtIn" : "appUpdates.installed";
     let status: string;
     if (!row.installed) status = t("appUpdates.notHere");
     else if (newer && !newer.runs)
@@ -178,9 +181,7 @@ function AppRow({
                         {row.name}
                     </p>
                     <p className="break-words text-xs text-muted-foreground">
-                        {row.installed
-                            ? t("appUpdates.installed", { version: buildLabel(row.installed) })
-                            : null}
+                        {row.installed ? t(running, { version: buildLabel(row.installed) }) : null}
                         {row.installed ? " - " : null}
                         {status}
                     </p>

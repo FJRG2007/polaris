@@ -1,6 +1,6 @@
 /**
  * Image vulnerability findings where they are acted on: a Deploy service's
- * Vulnerabilities tab (the image it runs now) and Management > Polaris images
+ * Vulnerabilities tab (the image it runs now) and Management > Security scans
  * (the images Polaris itself runs on this machine). Read straight from the
  * scans' tables, as `dependency-findings.ts` does - the dashboard never imports
  * the security scans app. A scan asked for here is a queued row; the scans'

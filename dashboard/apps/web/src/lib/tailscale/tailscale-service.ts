@@ -8,8 +8,8 @@
  * named volume so a restart, a reboot or a Polaris update keeps it signed in.
  *
  * Signing in is either the login link the component prints - read back from its
- * status, never asked of the operator as a command - or an auth key pasted once and
- * kept sealed. Serve publishes this machine to the tailnet on its MagicDNS name;
+ * status, never asked of the operator as a command - or the auth key saved in
+ * Management > Integrations, the Tailscale entry, while it is switched on. Serve publishes this machine to the tailnet on its MagicDNS name;
  * Funnel opens the same name to the internet.
  */
 
@@ -22,7 +22,12 @@ import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { TAILSCALE_PROJECT } from "@/lib/polaris-parts";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { openKey, sealKey } from "@/lib/deploy/wireguard/tunnel-service";
+import { openKey } from "@/lib/deploy/wireguard/tunnel-service";
+import {
+    getIntegrationSecret,
+    getIntegrationState,
+    upsertIntegration
+} from "@/lib/integration-service";
 import { prisma } from "@polaris/db";
 import {
     allocateAppPorts,
@@ -52,7 +57,11 @@ const ROUTE_FILE = "polaris-tailscale.yml";
 const NETWORK = process.env.POLARIS_TUNNEL_NETWORK ?? "polaris_default";
 
 const CONFIG_KEY = "tailscale.config";
-const AUTH_KEY = "tailscale.authKey";
+/** The integration that holds the auth key. */
+const INTEGRATION = "tailscale";
+/** Where the key was sealed before it moved to Integrations; read once, moved, and
+ *  cleared, so an install that saved one keeps signing in with it. */
+const LEGACY_AUTH_KEY = "tailscale.authKey";
 /** The machine's tailnet name once seen connected, so the sign-in path can trust it
  *  without asking the daemon on every request. */
 const HOST_KEY = "tailscale.host";
@@ -378,10 +387,39 @@ async function appViews(host: string | null): Promise<TailnetAppView[]> {
     });
 }
 
+/**
+ * Whether the Tailscale integration is switched on with a key in it. A key sealed
+ * by an older Polaris is moved into the integration first, switched on, unless
+ * the integration already holds one; one that no longer opens is dropped, as it
+ * could not have signed anything in.
+ */
+async function authKeyReady(): Promise<boolean> {
+    const sealed = await getSetting(LEGACY_AUTH_KEY);
+    if (sealed) {
+        let key: string | null = null;
+        try {
+            key = openKey(sealed);
+        } catch {
+            key = null;
+        }
+        const existing = await getIntegrationState(INTEGRATION);
+        if (key && !existing?.hasSecret)
+            await upsertIntegration(INTEGRATION, { enabled: true, secret: key });
+        await setSetting(LEGACY_AUTH_KEY, null);
+    }
+    const state = await getIntegrationState(INTEGRATION);
+    return Boolean(state?.enabled && state.hasSecret);
+}
+
+/** The key the component signs in with, or null for the login link. */
+async function storedAuthKey(): Promise<string | null> {
+    return (await authKeyReady()) ? getIntegrationSecret(INTEGRATION) : null;
+}
+
 /** Everything the card shows. Reads the component live; never starts it. */
 export async function tailscaleView(): Promise<TailscaleView> {
-    const [config, sealed] = await Promise.all([getTailscaleConfig(), getSetting(AUTH_KEY)]);
-    const base = { edition: edition(), config, hasAuthKey: Boolean(sealed) };
+    const [config, hasAuthKey] = await Promise.all([getTailscaleConfig(), authKeyReady()]);
+    const base = { edition: edition(), config, hasAuthKey };
     if (base.edition === "limited" || !config.enabled) return { ...base, status: OFF, apps: [] };
     const ports = new HostdPorts();
     try {
@@ -414,8 +452,7 @@ export async function setTailnetAppPublic(
 }
 
 async function bringUp(config: TailscaleConfig): Promise<void> {
-    const sealed = await getSetting(AUTH_KEY);
-    const authKey = sealed ? openKey(sealed) : null;
+    const authKey = await storedAuthKey();
     const ports = new HostdPorts();
     try {
         await ports.composeUp(tailscaleSpec(config, authKey, await getTailnetApps()));
@@ -429,15 +466,16 @@ function requireFull(message: string): void {
 }
 
 /**
- * Turn remote access on. A key, when given, is sealed before anything else and
- * never read back to a screen; without one the component prints a login link.
+ * Turn remote access on. With the integration's key the component signs itself
+ * in; without one it prints a login link. A key handed in directly - from a page
+ * opened before the key moved to Integrations - is saved there first.
  */
 export async function connectTailscale(
     authKey: string | null,
     limitedMessage: string
 ): Promise<void> {
     requireFull(limitedMessage);
-    if (authKey) await setSetting(AUTH_KEY, sealKey(authKey));
+    if (authKey) await upsertIntegration(INTEGRATION, { enabled: true, secret: authKey });
     const config = { ...(await getTailscaleConfig()), enabled: true };
     await bringUp(config);
     await saveConfig(config);
@@ -459,8 +497,8 @@ export async function setTailscaleToggles(
 
 /**
  * Sign the machine out of the tailnet, stop the component and withdraw the route.
- * The stored key is forgotten too: disconnecting is the operator taking access
- * away, and a key left behind would quietly let it back in on the next connect.
+ * The key in Integrations stays where the operator put it: nothing reconnects on
+ * its own, and connecting again is a button somebody presses.
  */
 export async function disconnectTailscale(): Promise<void> {
     const ports = new HostdPorts();
@@ -471,7 +509,7 @@ export async function disconnectTailscale(): Promise<void> {
         await ports.dispose();
     }
     await saveConfig({ ...(await getTailscaleConfig()), enabled: false });
-    await setSetting(AUTH_KEY, null);
+    await setSetting(LEGACY_AUTH_KEY, null);
     await serialized(async () => {
         await writeRoute(null, []);
         await setSetting(HOST_KEY, null);

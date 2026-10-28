@@ -1,5 +1,5 @@
 /**
- * Management > Polaris images: what the vulnerability scans found in the
+ * Management > Security scans: what the vulnerability scans found in the
  * images Polaris itself runs on this machine - the dashboard, the host
  * service, the updater - each with its findings and a way to scan it again.
  * The list is read in the browser, so the page paints at once.

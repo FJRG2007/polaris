@@ -786,8 +786,10 @@
             "limited": "El acceso remoto necesita la edición completa de Polaris, que puede iniciar componentes adicionales en esta máquina.",
             "failed": "No se pudo iniciar Tailscale. Inténtalo de nuevo en un minuto.",
             "badKey": "Eso no es una clave de autenticación de Tailscale. Las claves empiezan por tskey-.",
-            "keyLabel": "Clave (opcional)",
-            "keyHint": "Déjala vacía para iniciar sesión con un enlace. La clave se guarda cifrada y no se vuelve a mostrar.",
+            "withLink": "Polaris entra con un enlace que abres aquí.",
+            "keyAdd": "Usar una clave de acceso",
+            "withKey": "Polaris entra con la clave de acceso guardada en Integraciones.",
+            "keyChange": "Cambiarla",
             "connect": "Conectar con Tailscale",
             "connecting": "Conectando...",
             "now": "Estado",
@@ -816,7 +818,7 @@
             "funnelNotAllowed": "La política de tu tailnet aún no permite Funnel en esta máquina. Añade el atributo funnel en la página Access controls de la consola de Tailscale.",
             "disconnect": "Desconectar",
             "disconnectTitle": "¿Desconectar Tailscale?",
-            "disconnectBody": "Polaris sale de tu tailnet y su dirección ts.net deja de funcionar. Se borra la clave guardada.",
+            "disconnectBody": "Polaris sale de tu tailnet y su dirección ts.net deja de funcionar. La clave sigue en Integraciones.",
             "appsTitle": "Apps en tu tailnet",
             "appsHint": "Cada app con dominio responde también aquí, en un puerto propio y tras su protección. Las que piden iniciar sesión o filtran por IP no se publican: aquí todas las visitas parecen venir de esta máquina.",
             "appsEmpty": "Aún no hay apps en tu tailnet. Las apps con dominio aparecen aquí, salvo las que piden iniciar sesión o filtran por IP.",
@@ -1925,6 +1927,10 @@
             "switch": "Mostrar lo que registra la gente",
             "hint": "Permite que cada persona escriba su usuario de Last.fm en Cuentas conectadas y muestra su canción junto a su nombre."
         },
+        "tailscale": {
+            "switch": "Entrar con esta clave",
+            "hint": "Si está apagado, el acceso remoto entra con un enlace que abres tú."
+        },
         "oauth": {
             "idLabel": {
                 "clientId": "ID cliente",
@@ -2362,6 +2368,17 @@
                     }
                 }
             },
+            "tailscale": {
+                "summary": "Conecta Polaris a tu tailnet con una clave de autenticación, sin enlace.",
+                "description": "El acceso remoto con Tailscale se conecta con un enlace que abres tú. Guarda aquí una clave de autenticación y Polaris la usará en su lugar, sin nada que abrir.",
+                "apiKeyLabel": "Clave",
+                "apiKeyHelp": "Empieza por tskey-auth-. Una clave reutilizable sigue sirviendo si Polaris tiene que volver a entrar.",
+                "links": {
+                    "0": {
+                        "label": "Generar una clave"
+                    }
+                }
+            },
             "duckdns": {
                 "summary": "DNS dinámico gratuito: mantén un subdominio apuntando a tu IP cambiante.",
                 "description": "Apunta un subdominio gratuito '<nombre>'.duckdns.org a la IP pública de este servidor y lo mantiene al día cuando cambia la dirección de tu proveedor, para que una máquina en casa siga siendo accesible. DuckDNS también resuelve *.'<nombre>'.duckdns.org, así que sirve como base comodín para los subdominios de las apps.",
@@ -2563,7 +2580,7 @@
                 "description": "Proveedores de identidad SAML y los dominios de correo que entran con ellos."
             },
             "images": {
-                "title": "Imágenes",
+                "title": "Vulnerabilidades",
                 "description": "Vulnerabilidades en las imágenes de Polaris."
             }
         }
@@ -3850,7 +3867,7 @@
         }
     },
     "images": {
-        "title": "Imágenes",
+        "title": "Vulnerabilidades",
         "description": "Vulnerabilidades conocidas en las imágenes que Polaris ejecuta en esta máquina.",
         "emptyTitle": "Aún sin analizar",
         "emptyBody": "Polaris analiza sus propias imágenes por su cuenta en unas horas tras arrancar o actualizarse."

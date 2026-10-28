@@ -2,7 +2,7 @@
 
 /**
  * One image scan as every dashboard screen draws it - a Deploy service's
- * Vulnerabilities tab and Management > Polaris images: the severity counts,
+ * Vulnerabilities tab and Management > Security scans: the severity counts,
  * when it ran, and its findings in the shared vulnerability table, or the
  * sentence for a scan that has not finished. Words from the `imageScans`
  * namespace, which the page around it hands down.
