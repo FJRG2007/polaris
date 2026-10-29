@@ -325,7 +325,7 @@ export async function banUser(
     // Immediate, rather than only on their next sign-in.
     await dropSessions(userId);
     // And their devices off the VPN, which a session ending does not reach.
-    await (await import("@/lib/vpn/service")).refreshVpnAccess();
+    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
     await recordAudit({
         actorId,
         action: until ? "user.suspend" : "user.ban",
@@ -392,7 +392,7 @@ export async function setAdminAccess(
     }
     await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
     // Administrators reach every device on the VPN; its policy names them.
-    await (await import("@/lib/vpn/service")).refreshVpnAccess();
+    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
     await recordAudit({
         actorId,
         action: isAdmin ? "user.promote" : "user.demote",
@@ -622,7 +622,7 @@ export async function deleteUser(actorId: string, userId: string): Promise<{ err
     if (driveLeft) leftBehind.push(driveLeft);
     await (await import("@/lib/cloud-servers-host")).handOverOrgCloudAccounts(userId);
     await prisma.user.delete({ where: { id: userId } });
-    await (await import("@/lib/vpn/service")).refreshVpnAccess();
+    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
     await recordAudit({
         actorId,
         action: "user.delete",

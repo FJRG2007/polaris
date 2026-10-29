@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
     app: null as { id: string; config: string | null } | null,
     engine: null as { id: string; ownerId: string; applicationId: string | null; status: string } | null,
-    accounts: [] as { id: string; bannedAt: Date | null }[],
+    accounts: [] as { id: string; bannedAt: Date | null; disabledAt: Date | null }[],
     admins: [] as { id: string; name: string; email: string }[]
 }));
 
@@ -34,6 +34,7 @@ import { headscaleUserName, accountIdOf } from "@/lib/vpn/settings";
 const KEPT = "0190f1c2-0000-7000-8000-000000000001";
 const GONE = "0190f1c2-0000-7000-8000-000000000002";
 const BANNED = "0190f1c2-0000-7000-8000-000000000003";
+const DISABLED = "0190f1c2-0000-7000-8000-000000000004";
 
 function user(id: string, accountId: string) {
     return { id, name: headscaleUserName(accountId), displayName: "", email: "" };
@@ -42,13 +43,21 @@ function user(id: string, accountId: string) {
 /** A Headscale that answers what the sync asks, and records every call. */
 function headscale() {
     const calls: string[] = [];
-    const users = [user("1", KEPT), user("2", GONE), user("3", BANNED), { ...user("4", KEPT), name: "someone-else" }];
+    const users = [
+        user("1", KEPT),
+        user("2", GONE),
+        user("3", BANNED),
+        { ...user("4", KEPT), name: "someone-else" },
+        user("5", DISABLED)
+    ];
     const nodes: Record<string, { id: string; name: string; expiry: string | null }[]> = {
         [headscaleUserName(GONE)]: [{ id: "20", name: "phone", expiry: null }],
         [headscaleUserName(BANNED)]: [
             { id: "30", name: "laptop", expiry: null },
-            { id: "31", name: "old", expiry: "2020-01-01T00:00:00Z" }
-        ]
+            { id: "31", name: "old", expiry: "2020-01-01T00:00:00Z" },
+            { id: "32", name: "tv", expiry: "0001-01-01T00:00:00Z" }
+        ],
+        [headscaleUserName(DISABLED)]: [{ id: "50", name: "tablet", expiry: null }]
     };
     const fetcher = vi.fn(async (input: string, init?: RequestInit) => {
         const url = new URL(input);
@@ -68,8 +77,9 @@ beforeEach(() => {
     db.app = { id: "app", config: JSON.stringify({ vpn: { enabled: true, apiKey: "key", hostname: "vpn.example.test" } }) };
     db.engine = { id: "engine", ownerId: "owner", applicationId: "application", status: "running" };
     db.accounts = [
-        { id: KEPT, bannedAt: null },
-        { id: BANNED, bannedAt: new Date("2026-10-29T10:00:00Z") }
+        { id: KEPT, bannedAt: null, disabledAt: null },
+        { id: BANNED, bannedAt: new Date("2026-10-29T10:00:00Z"), disabledAt: null },
+        { id: DISABLED, bannedAt: null, disabledAt: new Date("2026-10-29T10:00:00Z") }
     ];
     db.admins = [];
 });
@@ -90,6 +100,11 @@ describe("bringing the VPN in line with the accounts", () => {
         expect(calls).toContain("POST /api/v1/node/30/expire");
         // Already expired: nothing to sign out.
         expect(calls).not.toContain("POST /api/v1/node/31/expire");
+        // Headscale's zero time is "never expires", so it is signed out too.
+        expect(calls).toContain("POST /api/v1/node/32/expire");
+        // A switched-off account is signed out like a banned one, and kept.
+        expect(calls).toContain("POST /api/v1/node/50/expire");
+        expect(calls).not.toContain("DELETE /api/v1/user/5");
         expect(calls.filter((call) => call.includes("/user/1") || call.includes("/user/4"))).toEqual([]);
         expect(calls).not.toContain(`GET /api/v1/node?user=${headscaleUserName(KEPT)}`);
         // A device is deleted before its user, which Headscale refuses otherwise.

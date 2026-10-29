@@ -166,6 +166,7 @@
     "register": {
         "title": "¿Añadir este dispositivo a la VPN?",
         "body": "Un dispositivo ha pedido unirse. Se añade a los dispositivos de {account} y solo llega a ellos. Añádelo solo si acabas de iniciarlo tú.",
+        "adminBody": "Un dispositivo ha pedido unirse. Se añade a los dispositivos de {account} y, como {account} tiene permisos de administración, llega a todos los dispositivos de la VPN. Añádelo solo si acabas de iniciarlo tú.",
         "add": "Añadir este equipo",
         "addedTitle": "Se añadió {name}",
         "addedBody": "El dispositivo está conectado. Puedes cerrar esta página.",

@@ -230,6 +230,9 @@ async function client(): Promise<HeadscaleClient> {
     return engineClient(engine, settings);
 }
 
+/** Before this, an expiry is Headscale's zero time for "never", not a date. */
+const EXPIRY_FLOOR = Date.UTC(2000, 0, 1);
+
 /** How many administrators the policy names at most. */
 const POLICY_ADMINS = 200;
 
@@ -260,10 +263,10 @@ async function applyPolicy(api: HeadscaleClient): Promise<void> {
 /**
  * Bring the tailnet in line with the accounts: the policy re-written for the
  * administrators there are now, a deleted account's devices and user deleted,
- * and a banned account's devices signed out, so they need a sign-in - which a
- * banned account cannot do - before they reconnect. Run on Turn on, which
- * catches whatever changed while the server was off, and after each of those
- * changes (`refreshVpnAccess`).
+ * and a banned or switched-off account's devices signed out, so they need a
+ * sign-in before they reconnect. Run on Turn on, which catches whatever
+ * changed while the server was off, and after each of those changes
+ * (`refreshVpnAccess`).
  */
 async function syncAccess(api: HeadscaleClient): Promise<void> {
     await applyPolicy(api);
@@ -274,9 +277,11 @@ async function syncAccess(api: HeadscaleClient): Promise<void> {
     if (users.length === 0) return;
     const accounts = await prisma.user.findMany({
         where: { id: { in: users.map((user) => user.accountId) } },
-        select: { id: true, bannedAt: true }
+        select: { id: true, bannedAt: true, disabledAt: true }
     });
-    const standing = new Map(accounts.map((account) => [account.id, account.bannedAt !== null]));
+    const standing = new Map(
+        accounts.map((account) => [account.id, account.bannedAt !== null || account.disabledAt !== null])
+    );
     for (const user of users) {
         const banned = standing.get(user.accountId);
         if (banned === false) continue;
@@ -288,7 +293,8 @@ async function syncAccess(api: HeadscaleClient): Promise<void> {
         }
         const now = Date.now();
         for (const node of nodes) {
-            if (node.expiry && Date.parse(node.expiry) <= now) continue;
+            const expiry = node.expiry ? Date.parse(node.expiry) : Number.NaN;
+            if (expiry > EXPIRY_FLOOR && expiry <= now) continue;
             await api.expireNode(node.id);
         }
     }

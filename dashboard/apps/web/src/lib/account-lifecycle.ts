@@ -154,6 +154,7 @@ export async function closeAccount(userId: string, closure: core.AccountClosure)
     await revokeExtensionSessions(userId);
     await revokeCliSessions(userId);
     await revokeStepUpGrants(userId);
+    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
     await recordAudit({
         actorId: userId,
         action: closure === "deleting" ? "account.deletion.requested" : "account.disabled"

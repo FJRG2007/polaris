@@ -166,6 +166,7 @@
     "register": {
         "title": "Add this device to the VPN?",
         "body": "A device asked to join. It is added to {account}'s devices and reaches only them. Add it only if you just signed it in yourself.",
+        "adminBody": "A device asked to join. It is added to {account}'s devices and, because {account} is an administrator, reaches every device on the VPN. Add it only if you just signed it in yourself.",
         "add": "Add this device",
         "addedTitle": "{name} was added",
         "addedBody": "The device is connected. You can close this page.",

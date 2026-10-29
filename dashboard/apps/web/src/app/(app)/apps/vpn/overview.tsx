@@ -37,7 +37,9 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
     const [confirmOff, setConfirmOff] = useState(false);
     const [confirmRemove, setConfirmRemove] = useState(false);
     const [choice, setChoice] = useState({ zoneLabel: "", subdomain: "vpn" });
+    const [check, setCheck] = useState<HostnameCheck | null>(null);
     const status = read.data?.status ?? null;
+    const picking = isAdmin && status?.state === "off" && !status.hostname;
 
     // A server still starting is asked again until it answers.
     useEffect(() => {
@@ -98,11 +100,13 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                     </div>
                                 </div>
                             ) : null}
-                            {isAdmin && status.state === "off" && !status.hostname ? (
+                            {picking ? (
                                 <HostnamePicker
                                     zones={read.data?.zones ?? []}
                                     choice={choice}
                                     onChoice={setChoice}
+                                    check={check}
+                                    onCheck={setCheck}
                                 />
                             ) : null}
                             {isAdmin && status.state === "off" && status.kept ? (
@@ -112,7 +116,7 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                 {isAdmin && (status.state === "off" || status.state === "failed") ? (
                                     <ui.Button
                                         size="sm"
-                                        disabled={pending}
+                                        disabled={pending || (picking && !check?.ok)}
                                         onClick={() => run(() => actions.turnOnVpnAction(choice))}
                                     >
                                         {pending ? <Loader2 className="animate-spin" /> : null}
@@ -222,6 +226,8 @@ function ErrorLine({ text, onRetry }: { text: string; onRetry: () => void }) {
     );
 }
 
+type HostnameCheck = { text: string; ok: boolean };
+
 /**
  * The hostname the control server will answer on: a zone and a subdomain in
  * it, checked as it is typed the way Deploy's domain field checks one. Chosen
@@ -230,17 +236,22 @@ function ErrorLine({ text, onRetry }: { text: string; onRetry: () => void }) {
 function HostnamePicker({
     zones,
     choice,
-    onChoice
+    onChoice,
+    check,
+    onCheck: setCheck
 }: {
     zones: Overview["zones"];
     choice: { zoneLabel: string; subdomain: string };
     onChoice: (next: { zoneLabel: string; subdomain: string }) => void;
+    check: HostnameCheck | null;
+    onCheck: (next: HostnameCheck | null) => void;
 }) {
     const t = useTranslations("vpn");
-    const [check, setCheck] = useState<{ text: string; ok: boolean } | null>(null);
     const zoneLabel = choice.zoneLabel || zones.find((zone) => zone.primary)?.label || zones[0]?.label || "";
 
     useEffect(() => {
+        setCheck(null);
+        if (!zoneLabel) return;
         let live = true;
         const timer = window.setTimeout(async () => {
             const result = await actions
@@ -257,7 +268,7 @@ function HostnamePicker({
             live = false;
             window.clearTimeout(timer);
         };
-    }, [zoneLabel, choice.subdomain, t]);
+    }, [zoneLabel, choice.subdomain, t, setCheck]);
 
     if (zones.length === 0) {
         return (

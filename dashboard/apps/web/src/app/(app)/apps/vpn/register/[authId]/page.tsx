@@ -19,6 +19,7 @@ export default async function VpnRegisterPage({ params }: { params: Promise<{ au
         <RegisterDevice
             authId={parsed.success ? parsed.data : null}
             account={user.name || user.email}
+            isAdmin={user.isAdmin}
         />
     );
 }

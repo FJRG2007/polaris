@@ -13,7 +13,15 @@ import { useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CheckCircle2, Loader2, MonitorSmartphone } from "lucide-react";
 
-export function RegisterDevice({ authId, account }: { authId: string | null; account: string }) {
+export function RegisterDevice({
+    authId,
+    account,
+    isAdmin
+}: {
+    authId: string | null;
+    account: string;
+    isAdmin: boolean;
+}) {
     const t = useTranslations("vpn");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -54,7 +62,7 @@ export function RegisterDevice({ authId, account }: { authId: string | null; acc
             <ui.EmptyState
                 icon={<MonitorSmartphone />}
                 title={t("register.title")}
-                description={t("register.body", { account })}
+                description={t(isAdmin ? "register.adminBody" : "register.body", { account })}
                 action={
                     <>
                         <ui.Button size="sm" autoFocus onClick={add} disabled={pending}>
