@@ -15,6 +15,8 @@
  * sentence anybody should be shown.
  */
 
+import type { ServerRow } from "./servers";
+
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
 export interface NoticeInput {
@@ -117,9 +119,14 @@ export type PushEvent =
 
 export interface PolarisLocal {
     readonly connect: {
-        /** The address in use and why it could not be opened, if it could not. */
-        state(): Promise<{ readonly address: string | null; readonly error: string | null; }>;
+        /** The address in use, why it could not be opened if it could not, and
+         *  every server kept. */
+        state(): Promise<{ readonly address: string | null; readonly error: string | null; readonly servers: readonly ServerRow[]; }>;
         submit(address: string): Promise<Outcome>;
+        /** Open a server from the list. */
+        switchTo(origin: string): Promise<Outcome>;
+        rename(origin: string, name: string): Promise<Outcome>;
+        remove(origin: string): Promise<Outcome>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -170,6 +177,9 @@ export const CHANNELS = {
     gamePrograms: "desktop:game-programs",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
+    connectSwitch: "local:connect-switch",
+    connectRename: "local:connect-rename",
+    connectRemove: "local:connect-remove",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

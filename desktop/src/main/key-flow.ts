@@ -66,10 +66,10 @@ export function apiKeyFor(server: string, parent?: BrowserWindow, signal?: Abort
     });
 }
 
-/** Forget the key everywhere, after the instance refused it. */
-export function dropApiKey(): void {
-    remembered = null;
-    forgetApiKey();
+/** Forget the key for this Polaris, after it refused it or somebody asked. */
+export function dropApiKey(server: string): void {
+    if (remembered?.server === server) remembered = null;
+    forgetApiKey(server);
 }
 
 export function keyFormState(): { server: string; canKeep: boolean; } {

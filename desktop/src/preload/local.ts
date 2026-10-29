@@ -12,7 +12,10 @@ import { CHANNELS, type PolarisLocal, type PushEvent } from "@/shared/bridge";
 const bridge: PolarisLocal = {
     connect: {
         state: () => ipcRenderer.invoke(CHANNELS.connectState),
-        submit: (address) => ipcRenderer.invoke(CHANNELS.connectSubmit, address)
+        submit: (address) => ipcRenderer.invoke(CHANNELS.connectSubmit, address),
+        switchTo: (origin) => ipcRenderer.invoke(CHANNELS.connectSwitch, origin),
+        rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
+        remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin)
     },
     apiKey: {
         state: () => ipcRenderer.invoke(CHANNELS.keyState),

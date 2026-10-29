@@ -25,7 +25,10 @@ nothing to download.
 
 The first run asks for the address you open Polaris at: https://, or http:// for
 an address only your own network reaches (a private IP, a name with no dot, or
-one ending in `.local`, `.lan`, `.home.arpa` or `.internal`). Pushing asks once
+one ending in `.local`, `.lan`, `.home.arpa` or `.internal`). Every address
+opened is kept under File > Servers, where each one can be named, opened or
+removed, and File > Switch to goes straight to another; each server keeps its
+own sign-in and its own saved API key. Pushing asks once
 for an API key with the Deploy scope (Account > API keys); the key is encrypted
 by the operating system's password store (Keychain, Windows DPAPI, or the
 desktop's secret service on Linux) and never written in plain text. On a Linux

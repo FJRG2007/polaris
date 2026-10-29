@@ -226,7 +226,7 @@ class Push {
                     : this.finish(false, "Canceled.", "cancelled");
             }
             if (caught instanceof ApiFailure) {
-                if (caught.status === 401) dropApiKey();
+                if (caught.status === 401) dropApiKey(server);
                 return this.finish(false, caught.message);
             }
             console.error("[push]", caught);

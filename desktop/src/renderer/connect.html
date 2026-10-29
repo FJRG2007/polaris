@@ -13,8 +13,13 @@
         <img class="mark" src="mark.svg" alt="" />
         <h1>Open your Polaris</h1>
         <p class="lead">The address you open Polaris at in the browser. This app opens it in a window of its own.</p>
+        <p id="failure" class="banner bad" role="alert" hidden></p>
+        <section id="saved" class="servers" aria-labelledby="saved-title" hidden>
+            <h2 id="saved-title">Your servers</h2>
+            <ul id="server-list" class="server-list"></ul>
+        </section>
         <form id="form" novalidate>
-            <p id="failure" class="banner bad" role="alert" hidden></p>
+            <h2 id="add-title" hidden>Add another</h2>
             <label>
                 Address *
                 <input

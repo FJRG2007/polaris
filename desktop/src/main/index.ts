@@ -10,7 +10,8 @@
  * The first run asks for the address. It is probed at `/api/health` before it is
  * kept, so the form says "that is not Polaris" instead of opening a window onto
  * somebody else's page, and a window that later fails to load comes back to the
- * same form with the reason in words.
+ * same form with the reason in words. Every address opened is kept in a list
+ * (File > Servers), so going to another Polaris and back is a press, not typing.
  */
 
 import { registerIpc } from "./ipc";
@@ -23,9 +24,10 @@ import { CHANNELS, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
 import { handledSquirrelEvent } from "./squirrel";
 import { installScreenShare } from "./screen-share";
-import { installMenu, type MenuActions } from "./menu";
-import { serverAddress, setServerAddress } from "./settings";
+import { installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
+import { listServers, normalizeServerName, renameServer, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
+import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, session, shell } from "electron";
@@ -139,17 +141,61 @@ async function connectSubmit(raw: unknown): Promise<Outcome> {
 
     const changed = origin !== current;
     setServerAddress(origin);
+    if (changed) leaveServer();
     current = origin;
     loadError = null;
-    if (changed) {
-        // Every window on the old instance goes: none of them may stay open on an
-        // origin the navigation rules no longer allow.
-        for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
-        main = null;
-    }
+    refreshMenu();
     showPolaris();
     connect?.close();
     return { ok: true };
+}
+
+/** Every window on the instance in use goes: none of them may stay open on an
+ *  origin the navigation rules no longer allow. */
+function leaveServer(): void {
+    for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
+    main = null;
+}
+
+function servers() {
+    return listServers(savedServers(), current);
+}
+
+/** Open a server from the list. The same door as typing its address, so it is
+ *  probed first and an unreachable one says why instead of opening a blank window. */
+function switchServer(origin: string): Promise<Outcome> {
+    if (!savedServers().some((server) => server.origin === origin)) {
+        return Promise.resolve({ ok: false, error: "That server is not in the list any more." });
+    }
+    return connectSubmit(origin);
+}
+
+function nameServer(origin: string, typed: string): Outcome {
+    const name = normalizeServerName(typed);
+    if (name && name.length > SERVER_NAME_MAX) return { ok: false, error: `Use at most ${SERVER_NAME_MAX} characters.` };
+    setSavedServers(renameServer(savedServers(), origin, name));
+    refreshMenu();
+    return { ok: true };
+}
+
+/** Take a server off the list. Removing the one in use closes its windows and
+ *  leaves the list open to pick another; its sign-in is not touched. */
+function removeServer(origin: string): Outcome {
+    if (origin === current) {
+        setServerAddress(null);
+        current = null;
+        leaveServer();
+    }
+    setSavedServers(withoutServer(savedServers(), origin));
+    refreshMenu();
+    return { ok: true };
+}
+
+let menuUpdate: MenuUpdate | undefined;
+let menuActions: MenuActions | null = null;
+
+function refreshMenu(): void {
+    if (menuActions) installMenu(menuActions, menuUpdate, servers());
 }
 
 function start(): void {
@@ -175,8 +221,11 @@ function start(): void {
             runningGame: () => games.running(),
             isReporter: (sender) => Boolean(main && !main.isDestroyed() && main.webContents === sender),
             setCustomGames: (list) => games.setCustomGames(list),
-            connectState: () => ({ address: current, error: loadError }),
-            connectSubmit
+            connectState: () => ({ address: current, error: loadError, servers: servers() }),
+            connectSubmit,
+            switchServer,
+            nameServer,
+            removeServer
         });
 
         installScreenShare(server);
@@ -184,10 +233,18 @@ function start(): void {
 
         const menu: MenuActions = {
             changeServer: openConnect,
+            switchServer: (origin) => {
+                void switchServer(origin).then((outcome) => {
+                    if (!outcome.ok) {
+                        loadError = outcome.error;
+                        openConnect();
+                    }
+                });
+            },
             back: goBack,
             reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
             forgetApiKey: () => {
-                dropApiKey();
+                if (current) dropApiKey(current);
                 void dialog.showMessageBox({
                     type: "info",
                     message: "The saved API key was removed from this computer.",
@@ -199,10 +256,12 @@ function start(): void {
                 if (current) void shell.openExternal(current);
             }
         };
-        installMenu(menu);
+        menuActions = menu;
+        refreshMenu();
         watchForUpdates((update) => {
             const open = () => void shell.openExternal(update.page);
-            installMenu(menu, { version: update.version, open });
+            menuUpdate = { version: update.version, open };
+            refreshMenu();
             showNotice({
                 title: `Polaris ${update.version} is available`,
                 body: "Open its download page from here or from the Help menu.",
