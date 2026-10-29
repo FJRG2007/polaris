@@ -13,7 +13,8 @@
  * network; finding the release is covered in `updates/app-releases`.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
     DesktopDownloadOffer,
@@ -68,37 +69,54 @@ describe("the desktop app's files", () => {
         { name: "Polaris-0.2.0-x64.AppImage", url: "https://example.test/polaris.AppImage" }
     ];
 
-    it("gives every platform its own file", () => {
-        const html = renderToStaticMarkup(withMessages(
+    const AGENTS = {
+        windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        macos: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)",
+        linux: "Mozilla/5.0 (X11; Linux x86_64)"
+    } as const;
+
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+    });
+
+    /** The offer as a reader on `system` sees it: one system at a time, the
+     *  reader's own first. */
+    function filesOn(system: keyof typeof AGENTS, released: typeof files) {
+        vi.spyOn(navigator, "userAgent", "get").mockReturnValue(AGENTS[system]);
+        const { container } = render(withMessages(
             <DesktopFilesOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
                     version: "0.2.0",
-                    files
+                    files: released
                 }}
             />
         ));
-        expect(html).toContain("0.2.0");
-        expect(html).toContain('href="https://example.test/Polaris-Setup.exe"');
-        expect(html).toContain('href="https://example.test/arm64.dmg"');
-        expect(html).toContain('href="https://example.test/x64.dmg"');
-        expect(html).toContain('href="https://example.test/polaris.deb"');
-        expect(html).toContain('href="https://example.test/polaris.AppImage"');
-        expect(html).not.toContain("Not in this release");
+        return container.innerHTML;
+    }
+
+    it("gives every platform its own file", () => {
+        const windows = filesOn("windows", files);
+        expect(windows).toContain("0.2.0");
+        expect(windows).toContain('href="https://example.test/Polaris-Setup.exe"');
+        expect(windows).not.toContain("Not in this release");
+        cleanup();
+        const mac = filesOn("macos", files);
+        expect(mac).toContain('href="https://example.test/arm64.dmg"');
+        expect(mac).toContain('href="https://example.test/x64.dmg"');
+        expect(mac).not.toContain("Polaris-Setup.exe");
+        cleanup();
+        const linux = filesOn("linux", files);
+        expect(linux).toContain('href="https://example.test/polaris.deb"');
+        expect(linux).toContain('href="https://example.test/polaris.AppImage"');
+        expect(linux).not.toContain("Not in this release");
     });
 
     it("keeps the two Mac images apart", () => {
         // One `.dmg` match for both architectures would hand an Intel Mac the
         // Apple-silicon image, which opens and then refuses to run.
-        const html = renderToStaticMarkup(withMessages(
-            <DesktopFilesOffer
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
-                    version: "0.2.0",
-                    files: [files[1]!, files[2]!]
-                }}
-            />
-        ));
+        const html = filesOn("macos", [files[1]!, files[2]!]);
         const silicon = html.indexOf("Apple silicon");
         const intel = html.indexOf("macOS, Intel");
         expect(silicon).toBeGreaterThan(-1);
@@ -108,17 +126,11 @@ describe("the desktop app's files", () => {
     });
 
     it("says which platform is missing from a release that has the others", () => {
-        const html = renderToStaticMarkup(withMessages(
-            <DesktopFilesOffer
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
-                    version: "0.2.0",
-                    files: [files[0]!]
-                }}
-            />
-        ));
-        expect(html).toContain('href="https://example.test/Polaris-Setup.exe"');
-        expect(html).toContain("Not in this release");
+        expect(filesOn("windows", [files[0]!])).toContain(
+            'href="https://example.test/Polaris-Setup.exe"'
+        );
+        cleanup();
+        expect(filesOn("macos", [files[0]!])).toContain("Not in this release");
     });
 
     it("offers nothing to press when nothing has been released", () => {
