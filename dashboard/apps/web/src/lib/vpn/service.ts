@@ -237,7 +237,8 @@ const POLICY_ADMINS = 200;
  * Write the access policy (`rules.vpnPolicy`): everybody kept to their own
  * devices, administrators reaching all of them. Every administrator gets a
  * Headscale user first, so the group the policy names never refers to a user
- * that does not exist. Applied on every Turn on and whenever a user is created.
+ * that does not exist. Applied whenever a user is created, and as part of
+ * `syncAccess`.
  */
 async function applyPolicy(api: HeadscaleClient): Promise<void> {
     const admins = await prisma.user.findMany({
@@ -254,6 +255,60 @@ async function applyPolicy(api: HeadscaleClient): Promise<void> {
         known.add(name);
     }
     await api.setPolicy(rules.vpnPolicy(admins.map((admin) => rules.headscaleUserName(admin.id))));
+}
+
+/**
+ * Bring the tailnet in line with the accounts: the policy re-written for the
+ * administrators there are now, a deleted account's devices and user deleted,
+ * and a banned account's devices signed out, so they need a sign-in - which a
+ * banned account cannot do - before they reconnect. Run on Turn on, which
+ * catches whatever changed while the server was off, and after each of those
+ * changes (`refreshVpnAccess`).
+ */
+async function syncAccess(api: HeadscaleClient): Promise<void> {
+    await applyPolicy(api);
+    const users = (await api.listUsers()).flatMap((user) => {
+        const accountId = rules.accountIdOf(user.name);
+        return accountId ? [{ ...user, accountId }] : [];
+    });
+    if (users.length === 0) return;
+    const accounts = await prisma.user.findMany({
+        where: { id: { in: users.map((user) => user.accountId) } },
+        select: { id: true, bannedAt: true }
+    });
+    const standing = new Map(accounts.map((account) => [account.id, account.bannedAt !== null]));
+    for (const user of users) {
+        const banned = standing.get(user.accountId);
+        if (banned === false) continue;
+        const nodes = await api.listNodes(user.name);
+        if (banned === undefined) {
+            for (const node of nodes) await api.deleteNode(node.id);
+            await api.deleteUser(user.id);
+            continue;
+        }
+        const now = Date.now();
+        for (const node of nodes) {
+            if (node.expiry && Date.parse(node.expiry) <= now) continue;
+            await api.expireNode(node.id);
+        }
+    }
+}
+
+/**
+ * Carry a change to who somebody is - promoted, demoted, banned, deleted - to
+ * the tailnet. Nothing when the VPN is not running; Turn on catches up then.
+ * Never throws: the change itself has already been made and must stand.
+ */
+export async function refreshVpnAccess(): Promise<void> {
+    try {
+        const { settings } = await requireApp();
+        const engine = await engineRow();
+        if (!engine || !settings.enabled) return;
+        await syncAccess(await engineClient(engine, settings));
+    } catch (error) {
+        if (error instanceof VpnRefusal) return;
+        console.error("polaris: the VPN's access was not brought up to date:", error);
+    }
 }
 
 async function publishEdge(hostname: string | null): Promise<void> {
@@ -334,7 +389,7 @@ export async function turnOn(
     }
     settings = { ...settings, enabled: true };
     await saveSettings(app.id, settings);
-    await applyPolicy(await engineClient(engine, settings)).catch((error: unknown) => {
+    await syncAccess(await engineClient(engine, settings)).catch((error: unknown) => {
         console.error("polaris: the VPN's access policy was not applied:", error);
         throw new VpnRefusal("notApplied");
     });

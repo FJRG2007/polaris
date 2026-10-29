@@ -96,6 +96,10 @@ export interface HeadscaleClient {
     listNodes(user?: string): Promise<HeadscaleNode[]>;
     renameNode(nodeId: string, name: string): Promise<HeadscaleNode>;
     deleteNode(nodeId: string): Promise<void>;
+    /** Sign a device out now: it has to sign in again before it reconnects. */
+    expireNode(nodeId: string): Promise<void>;
+    /** Delete a user, which Headscale refuses while it still has devices. */
+    deleteUser(userId: string): Promise<void>;
     approveRoutes(nodeId: string, routes: readonly string[]): Promise<HeadscaleNode>;
     createPreAuthKey(input: {
         userId: string;
@@ -160,6 +164,12 @@ export function headscaleClient(
         },
         async deleteNode(nodeId) {
             await call("DELETE", `/node/${segment(nodeId)}`, z.unknown());
+        },
+        async expireNode(nodeId) {
+            await call("POST", `/node/${segment(nodeId)}/expire`, z.unknown());
+        },
+        async deleteUser(userId) {
+            await call("DELETE", `/user/${segment(userId)}`, z.unknown());
         },
         async approveRoutes(nodeId, routes) {
             return (

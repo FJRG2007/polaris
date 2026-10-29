@@ -76,6 +76,15 @@ export function headscaleUserName(userId: string): string {
     return `polaris-${userId.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`;
 }
 
+/** The account a Headscale user stands for, or null for a user Polaris did not
+ *  make. Account ids are lowercase UUIDs, so `headscaleUserName` keeps them
+ *  whole and this reads them back. */
+const POLARIS_USER = /^polaris-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+export function accountIdOf(userName: string): string | null {
+    return POLARIS_USER.exec(userName)?.[1] ?? null;
+}
+
 /** Who a device list is for: an administrator sees every device, anybody else
  *  their own. */
 export interface VpnViewer {
