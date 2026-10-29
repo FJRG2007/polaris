@@ -23,7 +23,7 @@ function stampOf(at: Date): string {
 }
 
 function extensionOf(file: File, generic: RegExpExecArray | null): string {
-    if (generic) return generic[1].toLowerCase();
+    if (generic?.[1]) return generic[1].toLowerCase();
     const subtype = file.type.split("/")[1]?.toLowerCase() ?? "";
     return EXTENSIONS[subtype] ?? (/^[a-z0-9]+$/.test(subtype) ? subtype : "bin");
 }

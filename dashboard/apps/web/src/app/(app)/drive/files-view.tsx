@@ -101,6 +101,7 @@ import {
     shortcutPressed,
     shellScroller,
     useShortcutHint,
+    useToast,
     DateInput
 } from "@polaris/ui";
 import {
@@ -700,9 +701,14 @@ export function FilesView({
      */
     function holdInClipboard(items: DriveEntry[], mode: "copy" | "cut") {
         setClipboard({ entries: items, mode });
-        void navigator.clipboard
-            ?.writeText(items.map((item) => item.name).join("\n"))
-            .catch(() => undefined);
+        explorerIsNewest.current = true;
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(items.map((item) => item.name).join("\n")).then(
+            () => {
+                explorerIsNewest.current = false;
+            },
+            () => undefined
+        );
     }
 
     /**
@@ -742,6 +748,17 @@ export function FilesView({
     // Set when the paste shortcut is the browser's own paste: the paste event that
     // follows decides between the system clipboard's files and the explorer's.
     const pasteFromKeys = useRef(false);
+    // Set while the explorer's copy is newer than whatever the system clipboard
+    // holds - its write was refused or is not offered here - so files found on the
+    // system clipboard are older than it. Leaving the page may change that.
+    const explorerIsNewest = useRef(false);
+    useEffect(() => {
+        function onBlur() {
+            explorerIsNewest.current = false;
+        }
+        window.addEventListener("blur", onBlur);
+        return () => window.removeEventListener("blur", onBlur);
+    }, []);
 
     function openViewer(entry: DriveEntry) {
         // The preview takes over the listing area and the details panel beside it
@@ -859,6 +876,11 @@ export function FilesView({
             // Not prevented: that would cancel the paste event, and with it any
             // files on the system clipboard.
             pasteFromKeys.current = true;
+            window.setTimeout(() => {
+                if (!pasteFromKeys.current) return;
+                pasteFromKeys.current = false;
+                if (clipboard) paste();
+            }, 0);
         } else if (pressed("drive.paste") && clipboard) {
             event.preventDefault();
             paste();
@@ -995,7 +1017,7 @@ export function FilesView({
             if (renaming || viewerTarget || pendingFolder) return;
             if (keyboardIsBusy(event)) return;
             const files = Array.from(event.clipboardData?.files ?? []);
-            if (files.length === 0) {
+            if (files.length === 0 || (fromKeys && clipboard && explorerIsNewest.current)) {
                 if (fromKeys && clipboard) {
                     event.preventDefault();
                     paste();

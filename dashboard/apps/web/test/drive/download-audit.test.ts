@@ -57,14 +57,23 @@ describe("reading a drive file", () => {
         expect(recorded()).toEqual([expect.objectContaining({ action: "drive.view" })]);
     });
 
-    it("records a video's first range once and not its seeks", async () => {
+    it("records a video's first range as the view and its seeks apart", async () => {
         await read("&disposition=inline", "bytes=0-");
         await read("&disposition=inline", "bytes=50-");
-        expect(recorded()).toHaveLength(1);
+        expect(recorded()).toEqual([
+            expect.objectContaining({ action: "drive.view" }),
+            expect.objectContaining({ action: "drive.range", metadata: expect.objectContaining({ from: "50" }) })
+        ]);
     });
 
-    it("records nothing for a tile's thumbnail frame", async () => {
+    it("records a tile's thumbnail frame apart from a view", async () => {
         await read("&disposition=inline&purpose=thumbnail", "bytes=0-");
-        expect(recorded()).toEqual([]);
+        expect(recorded()).toEqual([expect.objectContaining({ action: "drive.thumbnail" })]);
+    });
+
+    it("cannot be asked to leave no record", async () => {
+        await read("&purpose=thumbnail", "bytes=1-");
+        await read("&disposition=inline&purpose=thumbnail");
+        expect(recorded()).toHaveLength(2);
     });
 });

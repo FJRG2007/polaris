@@ -24,6 +24,8 @@ export const dynamic = "force-dynamic";
 const SCAN_WINDOW = 400;
 /** Events returned for the panel. */
 const MAX_RESULTS = 25;
+/** Reads of a file that only looked at it, kept out of the panel. */
+const LOOKS_ONLY = ["drive.view", "drive.range", "drive.thumbnail"];
 
 /** The source an audit row was about, for the rows whose id is not a uuid and so
  *  lives in the metadata rather than in the column - see `recordAudit`. */
@@ -82,11 +84,12 @@ export async function GET(request: Request): Promise<Response> {
     // are narrowed to drive events and matched here.
     const keyed = isUuid(connectionId);
     const rows = await prisma.auditLog.findMany({
-        // Views are left out: they are for Recent, and a feed that lists every
-        // time somebody looked at a picture buries what was done to it.
+        // Reads that only looked are left out: views are for Recent, and a feed
+        // that lists every time somebody looked at a picture, a tile or a seek
+        // of a video buries what was done to it.
         where: keyed
-            ? { targetId: connectionId, action: { startsWith: "drive.", not: "drive.view" } }
-            : { targetType: "connection", action: { startsWith: "drive.", not: "drive.view" } },
+            ? { targetId: connectionId, action: { startsWith: "drive.", notIn: LOOKS_ONLY } }
+            : { targetType: "connection", action: { startsWith: "drive.", notIn: LOOKS_ONLY } },
         orderBy: { at: "desc" },
         take: SCAN_WINDOW,
         select: { id: true, action: true, actorId: true, metadata: true, at: true }
