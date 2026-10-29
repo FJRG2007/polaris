@@ -41,7 +41,7 @@ export async function PublicChrome({
             {/* Deliberately the signed-in header's own measurements. A public
                 page an inch shorter in the bar is the kind of difference nobody
                 can name and everybody notices. */}
-            <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
+            <header className="app-titlebar sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <Link
                     href={PUBLIC_PATHS.home}
                     aria-label="Polaris" // i18n-ignore the product's name
@@ -49,7 +49,9 @@ export async function PublicChrome({
                 >
                     <PolarisMark />
                 </Link>
-                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                {/* app-titlebar-end: room for the desktop app's window buttons,
+                    nothing in a browser. */}
+                <div className="app-titlebar-end flex shrink-0 items-center gap-1.5 sm:gap-2">
                     <Button asChild size="sm" variant="ghost">
                         <Link href="/oauth/accept-invite">
                             <Ticket className="size-4" />

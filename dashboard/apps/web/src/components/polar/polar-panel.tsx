@@ -505,7 +505,7 @@ function PolarAsideOpen() {
             data-state={presence.state}
             onAnimationEnd={presence.onAnimationEnd}
             style={{ ["--polar-width" as string]: `${width}px` }}
-            className="polar-aside fixed inset-0 z-50 flex flex-col overflow-hidden bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:static xl:z-auto xl:h-auto xl:shrink-0 xl:shadow-none"
+            className="polar-aside fixed inset-0 top-[var(--window-controls-height)] z-50 flex flex-col overflow-hidden bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:static xl:z-auto xl:h-auto xl:shrink-0 xl:shadow-none"
         >
             <div
                 role="separator"

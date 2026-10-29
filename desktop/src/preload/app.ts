@@ -8,6 +8,7 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
+import { followTitleBarColors } from "@/shared/title-bar";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
@@ -59,3 +60,5 @@ const bridge: PolarisDesktop = {
 };
 
 contextBridge.exposeInMainWorld("polarisDesktop", bridge);
+
+followTitleBarColors((colors) => void ipcRenderer.invoke(CHANNELS.titleBarColors, colors));

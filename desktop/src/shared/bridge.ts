@@ -222,6 +222,7 @@ export const CHANNELS = {
     drawOnShare: "desktop:draw-on-share",
     canDrawOnShare: "desktop:can-draw-on-share",
     stopDrawing: "desktop:stop-drawing",
+    titleBarColors: "desktop:title-bar-colors",
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",

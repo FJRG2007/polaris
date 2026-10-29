@@ -118,6 +118,11 @@
        gap under one aside and not the other. */
     --header-height: 3rem;
 
+    /* The band the desktop app's window buttons are drawn in, across the top of
+       the page; 0px in a browser. Anything fixed to the top right starts below
+       it, or the buttons cover it. */
+    --window-controls-height: env(titlebar-area-height, 0px);
+
     /* What the shell's notices above a page take, published by the page-notices
        strip while one is up (see PAGE_NOTICES), plus the connection strip above
        the whole shell. Screens that fill the window subtract it. */
@@ -530,4 +535,60 @@ html:has(.page-bleed) {
     to {
         width: 100%;
     }
+}
+
+/* The desktop app's window has no title bar: the system's minimize, maximize and
+   close buttons are drawn over the top right of the page (Window Controls
+   Overlay), and the header is what the window is dragged by. The titlebar-area
+   values only exist there, so in a browser the strip and the reserved space
+   are zero wide and app-region is ignored. */
+.app-titlebar {
+    app-region: drag;
+}
+
+.app-titlebar
+    :is(
+        a,
+        button,
+        input,
+        select,
+        textarea,
+        label,
+        [role="button"],
+        [role="link"],
+        [role="combobox"],
+        [role="searchbox"],
+        [role="textbox"],
+        [role="menuitem"],
+        [role="option"],
+        [role="tab"],
+        [role="switch"],
+        [role="checkbox"],
+        [role="radio"],
+        [role="slider"],
+        [tabindex]:not([tabindex="-1"])
+    ) {
+    app-region: no-drag;
+}
+
+/* Whatever opens over the header - a dialog, the dimmed page behind it, a menu -
+   takes its own clicks instead of moving the window. */
+:is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], .app-no-drag) {
+    app-region: no-drag;
+}
+
+/* On the header's last group, so it ends where the window buttons begin. */
+.app-titlebar-end {
+    padding-inline-end: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+}
+
+/* A page with no header still has to be movable: a strip under the buttons'
+   height across the top, below any header that draws its own. */
+.app-drag-strip {
+    position: fixed;
+    inset: 0 auto auto 0;
+    z-index: 30;
+    width: env(titlebar-area-width, 0px);
+    height: env(titlebar-area-height, 0px);
+    app-region: drag;
 }

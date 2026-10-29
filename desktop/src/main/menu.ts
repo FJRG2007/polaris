@@ -3,13 +3,18 @@
  * Edit, View, Window and Help - which also offers a newer version once one is
  * out.
  *
- * Installed on every platform. macOS draws it in the menu bar; Windows and Linux
- * draw it in the window. Electron's roles bring the right labels, shortcuts and
- * translations - Edit in particular is what makes Cmd+C and Cmd+V reach a text
- * field on macOS at all.
+ * Installed on every platform, and drawn only on macOS, in the menu bar. On
+ * Windows and Linux the windows hide it (`hideMenuBar`): a File / Edit / View
+ * strip across a chat app is not what anybody expects there, and the menu stays
+ * installed so its shortcuts - reload, zoom, back - keep working. What it holds
+ * that is the app's own goes in the tray icon too (`appItems`). On Linux, where
+ * a desktop such as stock GNOME shows no tray icon at all, Alt still brings the
+ * menu up, so none of it is left without a way in.
+ * Electron's roles bring the right labels, shortcuts and translations - Edit in
+ * particular is what makes Cmd+C and Cmd+V reach a text field on macOS at all.
  */
 
-import { app, Menu, type MenuItemConstructorOptions } from "electron";
+import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
 import { describeServer, type ServerRow } from "@/shared/servers";
 
 export interface MenuActions {
@@ -32,10 +37,10 @@ export interface MenuUpdate {
     readonly restart?: () => void;
 }
 
-export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: readonly ServerRow[] = []): void {
-    // One line per server, the one in use ticked. Only worth a submenu once
-    // there is somewhere else to go.
-    const switchTo: MenuItemConstructorOptions[] =
+/** One line per server, the one in use ticked. Only worth a submenu once there
+ *  is somewhere else to go. */
+function switchTo(actions: MenuActions, servers: readonly ServerRow[]): MenuItemConstructorOptions[] {
+    return (
         servers.length > 1
             ? [
                   {
@@ -51,7 +56,49 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: 
                       }))
                   }
               ]
-            : [];
+            : []
+    );
+}
+
+/** The newer version on offer, as a line to act on. */
+function updateItems(update?: MenuUpdate): MenuItemConstructorOptions[] {
+    if (!update) return [];
+    return [
+        update.restart
+            ? { label: `Restart to update to Polaris ${update.version}`, click: update.restart }
+            : { label: `Download Polaris ${update.version}...`, click: update.open },
+        { type: "separator" }
+    ];
+}
+
+/**
+ * What the app itself offers, for the tray icon where the window draws no menu:
+ * the servers, the saved API key, an update waiting, and the browser.
+ */
+export function appItems(
+    actions: MenuActions,
+    update?: MenuUpdate,
+    servers: readonly ServerRow[] = []
+): MenuItemConstructorOptions[] {
+    return [
+        ...updateItems(update),
+        { label: "Servers...", click: actions.changeServer },
+        ...switchTo(actions, servers),
+        { type: "separator" },
+        { label: "API keys", click: actions.openApiKeys },
+        { label: "Forget the saved API key", click: actions.forgetApiKey },
+        { label: "Open this Polaris in the browser", click: actions.openInBrowser }
+    ];
+}
+
+/** Take the menu bar off a window on Windows and Linux; see the file comment. */
+export function hideMenuBar(window: BrowserWindow): void {
+    if (isMac) return;
+    if (process.platform === "linux") window.setAutoHideMenuBar(true);
+    window.setMenuBarVisibility(false);
+}
+
+export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: readonly ServerRow[] = []): void {
     const template: MenuItemConstructorOptions[] = [
         ...(isMac
             ? ([
@@ -75,7 +122,7 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: 
             label: "File",
             submenu: [
                 { label: "Servers...", click: actions.changeServer },
-                ...switchTo,
+                ...switchTo(actions, servers),
                 { label: "Back", accelerator: isMac ? "Cmd+[" : "Alt+Left", click: actions.back },
                 { label: "Reload", accelerator: "CmdOrCtrl+R", click: actions.reload },
                 { type: "separator" },
@@ -125,14 +172,7 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: 
         {
             role: "help",
             submenu: [
-                ...(update
-                    ? ([
-                          update.restart
-                              ? { label: `Restart to update to Polaris ${update.version}`, click: update.restart }
-                              : { label: `Download Polaris ${update.version}...`, click: update.open },
-                          { type: "separator" }
-                      ] satisfies MenuItemConstructorOptions[])
-                    : []),
+                ...updateItems(update),
                 { label: "Open this Polaris in the browser", click: actions.openInBrowser },
                 ...(isMac ? [] : ([{ type: "separator" }, { role: "about" }] satisfies MenuItemConstructorOptions[]))
             ]

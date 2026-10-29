@@ -51,5 +51,7 @@ mkdirSync(join(DIST, "renderer"), { recursive: true });
 for (const file of ["connect.html", "api-key.html", "push.html", "overlay.html", "styles.css", "mark.svg"]) {
     copyFileSync(join(ROOT, "src/renderer", file), join(DIST, "renderer", file));
 }
-// The window icon on Linux; Windows and macOS take theirs from the executable.
+// The window icon on Linux - Windows and macOS take theirs from the executable -
+// and the tray icon on Windows and Linux.
 copyFileSync(join(ROOT, "assets/icon.png"), join(DIST, "icon.png"));
+copyFileSync(join(ROOT, "assets/icon.ico"), join(DIST, "icon.ico"));

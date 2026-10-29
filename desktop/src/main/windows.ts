@@ -18,6 +18,7 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { VERSION_ARGUMENT } from "@/shared/bridge";
+import { defaultTitleBarColors, foreignPageCss, overlayHeight, TITLE_BAR_HEIGHT } from "@/shared/title-bar";
 import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
     app,
@@ -55,6 +56,24 @@ function preferences(preload: string, extra: WebPreferences = {}): WebPreference
         navigateOnDragDrop: false,
         safeDialogs: true,
         ...extra
+    };
+}
+
+/**
+ * No title bar on a Polaris window on Windows and Linux: the page runs to the top
+ * edge, and the system's own minimize, maximize and close buttons are drawn over
+ * its header (the Window Controls Overlay), the way Discord and Teams look. The
+ * page leaves room for them and is dragged by its header - see `app-titlebar`
+ * in the dashboard - and the preload paints them in the header's colours
+ * (`titleBarColors`). The system's buttons rather than drawn ones, because they
+ * keep Windows' snap layouts on hover. macOS keeps its own title bar.
+ */
+function titleBar(): BrowserWindowConstructorOptions {
+    if (process.platform === "darwin") return {};
+    const colors = defaultTitleBarColors(nativeTheme.shouldUseDarkColors);
+    return {
+        titleBarStyle: "hidden",
+        titleBarOverlay: { color: colors.background, symbolColor: colors.symbol, height: TITLE_BAR_HEIGHT }
     };
 }
 
@@ -100,6 +119,19 @@ function contain(contents: WebContents, server: () => string | null): void {
     };
     contents.on("will-navigate", guard);
     contents.on("will-redirect", guard);
+    // A provider's page has no header to sit the window buttons in or to drag
+    // the window by, and no preload that may report its colours.
+    contents.on("dom-ready", () => {
+        const origin = server();
+        if (process.platform === "darwin" || !origin || isServerUrl(contents.getURL(), origin)) return;
+        const colors = defaultTitleBarColors(nativeTheme.shouldUseDarkColors);
+        BrowserWindow.fromWebContents(contents)?.setTitleBarOverlay({
+            color: colors.background,
+            symbolColor: colors.symbol,
+            height: overlayHeight(contents.getZoomFactor())
+        });
+        void contents.insertCSS(foreignPageCss(colors.background));
+    });
     contents.on("did-navigate", (_event, url) => {
         const origin = server();
         if (!trip || !origin || !isServerUrl(url, origin)) return;
@@ -113,6 +145,7 @@ function contain(contents: WebContents, server: () => string | null): void {
             return {
                 action: "allow",
                 overrideBrowserWindowOptions: windowOptions({
+                    ...titleBar(),
                     width: 1100,
                     height: 760,
                     show: true,
@@ -137,6 +170,7 @@ export function openPolarisWindow(
 ): BrowserWindow {
     const window = new BrowserWindow(
         windowOptions({
+            ...titleBar(),
             title: options.title ?? "Polaris",
             width: options.width ?? 1280,
             height: options.height ?? 820,
