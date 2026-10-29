@@ -33,27 +33,3 @@ export function describeNetError(code: string | null, host: string): string {
     }
     return `Could not reach ${host} (${code}).`;
 }
-
-/** What the health probe at `/api/health` said about an address. */
-export type ProbeVerdict =
-    | { readonly ok: true; }
-    | { readonly ok: false; readonly reason: "not-ready" | "not-polaris"; };
-
-/**
- * Whether a response to `GET /api/health` came from a Polaris. It answers
- * `{"status":"ok"}` when it is serving and `{"status":"error"}` with a 503 when
- * it is up but its database is not; anything else is some other server.
- */
-export function classifyHealth(status: number, body: unknown): ProbeVerdict {
-    const said = body && typeof body === "object" ? (body as { status?: unknown; }).status : undefined;
-    if (status === 200 && said === "ok") return { ok: true };
-    if (status === 503 && said === "error") return { ok: false, reason: "not-ready" };
-    return { ok: false, reason: "not-polaris" };
-}
-
-export function describeProbe(verdict: ProbeVerdict, host: string): string | null {
-    if (verdict.ok) return null;
-    return verdict.reason === "not-ready"
-        ? `Polaris at ${host} is starting, or cannot reach its database yet. Try again in a minute.`
-        : `Something answered at ${host}, but it is not Polaris.`;
-}

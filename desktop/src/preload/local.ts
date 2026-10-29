@@ -14,6 +14,7 @@ const bridge: PolarisLocal = {
     connect: {
         state: () => ipcRenderer.invoke(CHANNELS.connectState),
         submit: (address) => ipcRenderer.invoke(CHANNELS.connectSubmit, address),
+        check: (address) => ipcRenderer.invoke(CHANNELS.connectCheck, address),
         switchTo: (origin) => ipcRenderer.invoke(CHANNELS.connectSwitch, origin),
         rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
         remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin)

@@ -7,7 +7,8 @@
  * another. The address is checked as it is typed against the same schema the
  * main process keeps it with. An empty field is incomplete rather than wrong,
  * so it only disables the button; the reason something is not an address
- * appears once there is text.
+ * appears once there is text. A well-formed address is then asked whether it
+ * is a Polaris, 400 ms after typing pauses, and Open stays off until it is.
  */
 
 import { available, byId, say } from "./dom";
@@ -26,15 +27,55 @@ const hint = note.textContent ?? "";
 
 let busy = false;
 
+/** How long the field waits after the last keystroke before it asks. */
+const ASK_AFTER_MS = 400;
+/** The address the live check last found to be a Polaris. */
+let confirmed: string | null = null;
+/** Which question an answer belongs to, so a slow one never lands on a newer address. */
+let asked = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+/** The address when it can be opened: well-formed, and found to be a Polaris. */
 function check(): string | null {
     const text = input.value;
     const parsed = serverAddressSchema.safeParse(text);
-    const problem = text.trim() && !parsed.success ? (parsed.error.issues[0]?.message ?? null) : null;
-    input.setAttribute("aria-invalid", String(Boolean(problem)));
-    note.textContent = problem ?? (parsed.success ? `Opens ${parsed.data}` : hint);
-    note.className = problem ? "error" : "hint";
-    available(submit, parsed.success && !busy);
-    return parsed.success ? parsed.data : null;
+    if (!parsed.success) {
+        const problem = text.trim() ? (parsed.error.issues[0]?.message ?? null) : null;
+        input.setAttribute("aria-invalid", String(Boolean(problem)));
+        note.textContent = problem ?? hint;
+        note.className = problem ? "error" : "hint";
+        available(submit, false);
+        return null;
+    }
+    const found = confirmed === parsed.data;
+    available(submit, found && !busy);
+    return found ? parsed.data : null;
+}
+
+/** Ask the main process whether the address in the field is a Polaris. */
+function ask(): void {
+    clearTimeout(timer);
+    const ticket = (asked += 1);
+    const parsed = serverAddressSchema.safeParse(input.value);
+    if (!parsed.success || confirmed === parsed.data) return;
+    const origin = parsed.data;
+    confirmed = null;
+    input.setAttribute("aria-invalid", "false");
+    note.textContent = `Checking ${new URL(origin).host}...`;
+    note.className = "hint";
+    timer = setTimeout(() => {
+        void window.polarisLocal.connect
+            .check(origin)
+            .catch(() => null)
+            .then((answer) => {
+                if (ticket !== asked || !answer || answer.message === null) return;
+                if (answer.ok) confirmed = origin;
+                input.setAttribute("aria-invalid", String(!answer.ok));
+                note.textContent = answer.message;
+                note.className = answer.ok ? "found" : "error";
+                check();
+            });
+    }, ASK_AFTER_MS);
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -175,6 +216,7 @@ async function refresh(): Promise<void> {
 input.addEventListener("input", () => {
     say(failure, null);
     check();
+    ask();
 });
 
 form.addEventListener("submit", (event) => {
@@ -207,4 +249,5 @@ void window.polarisLocal.connect.state().then((state) => {
     say(failure, state?.error ?? null);
     draw(servers);
     check();
+    ask();
 });

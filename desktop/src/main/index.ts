@@ -7,8 +7,8 @@
  * a folder zipped from the disk for "Upload a folder", and pushing a build made
  * with this computer's Docker.
  *
- * The first run asks for the address. It is probed at `/api/health` before it is
- * kept, so the form says "that is not Polaris" instead of opening a window onto
+ * The first run asks for the address. It is asked whether it is a Polaris
+ * (`shared/server-identity`) as it is typed and again before it is kept, so the form says "that is not Polaris" instead of opening a window onto
  * somebody else's page, and a window that later fails to load comes back to the
  * same form with the reason in words. Every address opened is kept in a list
  * (File > Servers), so going to another Polaris and back is a press, not typing.
@@ -20,7 +20,7 @@ import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
 import { watchForUpdates } from "./updates";
-import { CHANNELS, type Outcome } from "@/shared/bridge";
+import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
 import { handledSquirrelEvent } from "./squirrel";
 import { installScreenShare } from "./screen-share";
@@ -31,7 +31,8 @@ import { savedServers, serverAddress, setSavedServers, setServerAddress } from "
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, session, shell } from "electron";
-import { classifyHealth, describeNetError, describeProbe, netErrorCode } from "./reachability";
+import { describeNetError, netErrorCode } from "./reachability";
+import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
 
 /** Where the dashboard opens, the same as the installable app's start page. */
 const START = "/home";
@@ -99,25 +100,38 @@ function openConnect(): void {
     });
 }
 
+/** Every answer about an address, kept briefly so typing it again asks nothing. */
+const serverCheck = createServerCheck((input, init) => net.fetch(input, init));
+/** The one live check in flight; a newer address cancels it. */
+let checking: AbortController | null = null;
+
+/** What the servers window says about an address: the verdict, in words. */
+function verdictWords(verdict: ServerVerdict, origin: string): string {
+    const host = new URL(origin).host;
+    if (verdict.kind === "unreachable") return describeNetError(netErrorCode(verdict.cause ?? ""), host);
+    return describeVerdict(verdict, host);
+}
+
 /** Whether an address is a Polaris that can be opened now, and if not, why. */
 async function probe(origin: string): Promise<string | null> {
-    const host = new URL(origin).host;
+    const verdict = await serverCheck.check(origin);
+    return verdict.kind === "polaris" ? null : verdictWords(verdict, origin);
+}
+
+/** The servers window asking about the address in its field while it is typed. */
+async function connectCheck(raw: unknown): Promise<AddressCheck> {
+    const parsed = serverAddressSchema.safeParse(typeof raw === "string" ? raw : "");
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "That is not an address." };
+    checking?.abort();
+    const controller = new AbortController();
+    checking = controller;
     try {
-        const response = await net.fetch(`${origin}/api/health`, {
-            credentials: "omit",
-            cache: "no-store",
-            signal: AbortSignal.timeout(10_000)
-        });
-        // An http address that redirects to https, or an old name that moved: the
-        // window may only ever be on the address kept, so the one it lands on is
-        // the one to type.
-        const landed = new URL(response.url || origin).origin;
-        if (landed !== origin) return `${host} sends visitors on to ${landed}. Use that address instead.`;
-        const body = await response.json().catch(() => null);
-        return describeProbe(classifyHealth(response.status, body), host);
-    } catch (caught) {
-        if ((caught as Error).name === "TimeoutError") return describeNetError("ERR_TIMED_OUT", host);
-        return describeNetError(netErrorCode(String(caught)), host);
+        const verdict = await serverCheck.check(parsed.data, controller.signal);
+        return { ok: verdict.kind === "polaris", message: verdictWords(verdict, parsed.data) };
+    } catch {
+        return { ok: false, message: null };
+    } finally {
+        if (checking === controller) checking = null;
     }
 }
 
@@ -223,6 +237,7 @@ function start(): void {
             setCustomGames: (list) => games.setCustomGames(list),
             connectState: () => ({ address: current, error: loadError, servers: servers() }),
             connectSubmit,
+            connectCheck,
             switchServer,
             nameServer,
             removeServer

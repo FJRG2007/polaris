@@ -20,6 +20,11 @@ import type { ServerRow } from "./servers";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
+/** What the live check found about a typed address: whether it is a Polaris
+ *  that can be opened, and the line to show. Null when it was cancelled by a
+ *  newer address. */
+export type AddressCheck = { readonly ok: boolean; readonly message: string | null; };
+
 export interface NoticeInput {
     readonly title: string;
     readonly body?: string;
@@ -155,6 +160,8 @@ export interface PolarisLocal {
          *  every server kept. */
         state(): Promise<{ readonly address: string | null; readonly error: string | null; readonly servers: readonly ServerRow[]; }>;
         submit(address: string): Promise<Outcome>;
+        /** Whether a typed address is a Polaris, asked while it is typed. */
+        check(address: string): Promise<AddressCheck>;
         /** Open a server from the list. */
         switchTo(origin: string): Promise<Outcome>;
         rename(origin: string, name: string): Promise<Outcome>;
@@ -221,6 +228,7 @@ export const CHANNELS = {
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
     connectRemove: "local:connect-remove",
+    connectCheck: "local:connect-check",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

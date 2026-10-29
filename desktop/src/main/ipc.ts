@@ -19,6 +19,7 @@ import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
 import {
+    type AddressCheck,
     CHANNELS,
     type CustomGameInput,
     type GameActivity,
@@ -39,6 +40,7 @@ export interface IpcHost extends PushHost {
     /** The address form's state: the address in use and why it failed to open. */
     readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
     readonly connectSubmit: (raw: unknown) => Promise<Outcome>;
+    readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
     readonly removeServer: (origin: string) => Outcome;
@@ -271,6 +273,9 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));
     ipcMain.handle(CHANNELS.connectSubmit, (event, raw: unknown) =>
         from(event, "connect") ? host.connectSubmit(raw) : REFUSED
+    );
+    ipcMain.handle(CHANNELS.connectCheck, (event, raw: unknown) =>
+        from(event, "connect") ? host.connectCheck(raw) : { ok: false, message: null }
     );
     ipcMain.handle(CHANNELS.connectSwitch, (event, raw: unknown) => {
         const origin = listedSchema.safeParse(raw);

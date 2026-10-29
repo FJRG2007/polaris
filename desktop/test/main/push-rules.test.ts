@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { apiKeySchema } from "@/shared/api-key";
 import { buildArgs, dockerEnv } from "@/main/docker";
 import { deployOutcome, firstLine } from "@/main/deploy-outcome";
-import { classifyHealth, describeNetError, describeProbe, netErrorCode } from "@/main/reachability";
+import { describeNetError, netErrorCode } from "@/main/reachability";
 
 describe("apiKeySchema", () => {
     it("takes a whole key, trimmed", () => {
@@ -90,16 +90,5 @@ describe("reachability", () => {
             "Could not reach polaris.example.com (ERR_SOMETHING_NEW)."
         );
         expect(describeNetError(null, "polaris.example.com")).toBe("Could not reach polaris.example.com.");
-    });
-
-    it("recognises Polaris by its health probe", () => {
-        expect(classifyHealth(200, { status: "ok" })).toEqual({ ok: true });
-        expect(classifyHealth(503, { status: "error", database: false })).toEqual({ ok: false, reason: "not-ready" });
-        expect(classifyHealth(200, "<html>")).toEqual({ ok: false, reason: "not-polaris" });
-        expect(classifyHealth(404, { error: "Not found" })).toEqual({ ok: false, reason: "not-polaris" });
-        expect(describeProbe({ ok: false, reason: "not-polaris" }, "example.com")).toBe(
-            "Something answered at example.com, but it is not Polaris."
-        );
-        expect(describeProbe({ ok: true }, "example.com")).toBeNull();
     });
 });
