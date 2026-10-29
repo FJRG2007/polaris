@@ -18,6 +18,7 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { VERSION_ARGUMENT } from "@/shared/bridge";
+import { defaultTitleBarColors, foreignPageCss, overlayHeight, TITLE_BAR_HEIGHT } from "@/shared/title-bar";
 import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
     app,
@@ -58,9 +59,6 @@ function preferences(preload: string, extra: WebPreferences = {}): WebPreference
     };
 }
 
-/** How tall the window buttons are: the dashboard's header, which they sit in. */
-const TITLE_BAR_HEIGHT = 48;
-
 /**
  * No title bar on a Polaris window on Windows and Linux: the page runs to the top
  * edge, and the system's own minimize, maximize and close buttons are drawn over
@@ -72,14 +70,10 @@ const TITLE_BAR_HEIGHT = 48;
  */
 function titleBar(): BrowserWindowConstructorOptions {
     if (process.platform === "darwin") return {};
-    const dark = nativeTheme.shouldUseDarkColors;
+    const colors = defaultTitleBarColors(nativeTheme.shouldUseDarkColors);
     return {
         titleBarStyle: "hidden",
-        titleBarOverlay: {
-            color: dark ? "#101114" : "#ffffff",
-            symbolColor: dark ? "#e6e7ea" : "#1c1d21",
-            height: TITLE_BAR_HEIGHT
-        }
+        titleBarOverlay: { color: colors.background, symbolColor: colors.symbol, height: TITLE_BAR_HEIGHT }
     };
 }
 
@@ -125,6 +119,19 @@ function contain(contents: WebContents, server: () => string | null): void {
     };
     contents.on("will-navigate", guard);
     contents.on("will-redirect", guard);
+    // A provider's page has no header to sit the window buttons in or to drag
+    // the window by, and no preload that may report its colours.
+    contents.on("dom-ready", () => {
+        const origin = server();
+        if (process.platform === "darwin" || !origin || isServerUrl(contents.getURL(), origin)) return;
+        const colors = defaultTitleBarColors(nativeTheme.shouldUseDarkColors);
+        BrowserWindow.fromWebContents(contents)?.setTitleBarOverlay({
+            color: colors.background,
+            symbolColor: colors.symbol,
+            height: overlayHeight(contents.getZoomFactor())
+        });
+        void contents.insertCSS(foreignPageCss(colors.background));
+    });
     contents.on("did-navigate", (_event, url) => {
         const origin = server();
         if (!trip || !origin || !isServerUrl(url, origin)) return;

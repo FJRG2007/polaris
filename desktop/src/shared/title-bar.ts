@@ -20,6 +20,37 @@ export const titleBarColorsSchema = z.object({
 
 export type TitleBarColors = z.infer<typeof titleBarColorsSchema>;
 
+/** How tall the window buttons are at 100%: the dashboard's header, which they
+ *  sit in. */
+export const TITLE_BAR_HEIGHT = 48;
+
+/** The buttons' height at a page zoom, so they keep lining up with the header
+ *  the zoom scaled. */
+export function overlayHeight(zoom: number): number {
+    const factor = Number.isFinite(zoom) && zoom > 0 ? Math.min(Math.max(zoom, 0.25), 5) : 1;
+    return Math.round(TITLE_BAR_HEIGHT * factor);
+}
+
+/** The buttons' colours before a page has said what is under them, following
+ *  the system's theme. */
+export function defaultTitleBarColors(dark: boolean): TitleBarColors {
+    return dark ? { background: "#101114", symbol: "#e6e7ea" } : { background: "#ffffff", symbol: "#1c1d21" };
+}
+
+/**
+ * What a page that is not Polaris - a provider's sign-in during a round trip -
+ * is given in the window: it is moved down below the buttons, and the band they
+ * sit in is filled and drags the window, since that page has no header of ours.
+ */
+export function foreignPageCss(background: string): string {
+    if (!HEX.test(background)) throw new Error("not a hex colour");
+    return [
+        "html { padding-top: env(titlebar-area-height, 0px) !important; }",
+        "html::before { content: \"\"; position: fixed; inset: 0 0 auto 0; z-index: 2147483647;",
+        `  height: env(titlebar-area-height, 0px); background: ${background}; app-region: drag; }`
+    ].join("\n");
+}
+
 /** `rgb(16, 17, 20)` / `rgba(...)` as `#101114`, or null when it is see-through
  *  or not a colour at all. */
 export function hexOf(css: string): string | null {
@@ -53,6 +84,8 @@ function backgroundAt(x: number, y: number): string | null {
  * change, so a page that redraws often does not send a message per frame.
  */
 export function followTitleBarColors(report: (colors: TitleBarColors) => void): void {
+    // The zoom is part of it: the main process sizes the buttons by it, and a
+    // zoom changes the device pixel ratio and fires a resize.
     let last = "";
     let queued = false;
     const read = () => {
@@ -63,8 +96,9 @@ export function followTitleBarColors(report: (colors: TitleBarColors) => void): 
         const area = overlay?.getTitlebarAreaRect();
         const x = area && area.width > 0 ? Math.max(0, area.x + area.width - 2) : window.innerWidth - 160;
         const background = backgroundAt(x, 8);
-        if (!background || background === last) return;
-        last = background;
+        const key = background ? `${background}@${window.devicePixelRatio}` : "";
+        if (!background || key === last) return;
+        last = key;
         report({ background, symbol: symbolFor(background) });
     };
     const soon = () => {
@@ -83,4 +117,5 @@ export function followTitleBarColors(report: (colors: TitleBarColors) => void): 
         new MutationObserver(soon).observe(document.body, { childList: true });
     });
     window.addEventListener("load", soon);
+    window.addEventListener("resize", soon);
 }

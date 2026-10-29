@@ -235,7 +235,7 @@ function ToastStack({
     if (!mounted || shown.length === 0 || typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+        <div className="pointer-events-none fixed right-4 top-[calc(1rem+var(--window-controls-height))] z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
             {shown.map((toast) =>
                 toast.conversation ? (
                     <ConversationNote

@@ -118,6 +118,11 @@
        gap under one aside and not the other. */
     --header-height: 3rem;
 
+    /* The band the desktop app's window buttons are drawn in, across the top of
+       the page; 0px in a browser. Anything fixed to the top right starts below
+       it, or the buttons cover it. */
+    --window-controls-height: env(titlebar-area-height, 0px);
+
     /* What the shell's notices above a page take, published by the page-notices
        strip while one is up (see PAGE_NOTICES), plus the connection strip above
        the whole shell. Screens that fill the window subtract it. */
@@ -541,7 +546,34 @@ html:has(.page-bleed) {
     app-region: drag;
 }
 
-.app-titlebar :is(a, button, input, select, textarea, label, [role], [tabindex]) {
+.app-titlebar
+    :is(
+        a,
+        button,
+        input,
+        select,
+        textarea,
+        label,
+        [role="button"],
+        [role="link"],
+        [role="combobox"],
+        [role="searchbox"],
+        [role="textbox"],
+        [role="menuitem"],
+        [role="option"],
+        [role="tab"],
+        [role="switch"],
+        [role="checkbox"],
+        [role="radio"],
+        [role="slider"],
+        [tabindex]:not([tabindex="-1"])
+    ) {
+    app-region: no-drag;
+}
+
+/* Whatever opens over the header - a dialog, the dimmed page behind it, a menu -
+   takes its own clicks instead of moving the window. */
+:is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], .app-no-drag) {
     app-region: no-drag;
 }
 

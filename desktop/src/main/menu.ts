@@ -4,10 +4,12 @@
  * out.
  *
  * Installed on every platform, and drawn only on macOS, in the menu bar. On
- * Windows and Linux the windows hide it (`hideMenuBars`): a File / Edit / View
+ * Windows and Linux the windows hide it (`hideMenuBar`): a File / Edit / View
  * strip across a chat app is not what anybody expects there, and the menu stays
- * installed only so its shortcuts - reload, zoom, back - keep working. What it
- * holds that is the app's own goes in the tray icon instead (`appItems`).
+ * installed so its shortcuts - reload, zoom, back - keep working. What it holds
+ * that is the app's own goes in the tray icon too (`appItems`). On Linux, where
+ * a desktop such as stock GNOME shows no tray icon at all, Alt still brings the
+ * menu up, so none of it is left without a way in.
  * Electron's roles bring the right labels, shortcuts and translations - Edit in
  * particular is what makes Cmd+C and Cmd+V reach a text field on macOS at all.
  */
@@ -91,7 +93,9 @@ export function appItems(
 
 /** Take the menu bar off a window on Windows and Linux; see the file comment. */
 export function hideMenuBar(window: BrowserWindow): void {
-    if (!isMac) window.setMenuBarVisibility(false);
+    if (isMac) return;
+    if (process.platform === "linux") window.setAutoHideMenuBar(true);
+    window.setMenuBarVisibility(false);
 }
 
 export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: readonly ServerRow[] = []): void {

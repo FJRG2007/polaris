@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { titleBarColorsSchema } from "@/shared/title-bar";
+import { overlayHeight, titleBarColorsSchema } from "@/shared/title-bar";
 import { runningPrograms } from "./game-detect";
 import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-share";
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
@@ -275,7 +275,11 @@ export function registerIpc(host: IpcHost): void {
         const colors = titleBarColorsSchema.safeParse(raw);
         const window = BrowserWindow.fromWebContents(event.sender);
         if (!colors.success || !window) return;
-        window.setTitleBarOverlay({ color: colors.data.background, symbolColor: colors.data.symbol });
+        window.setTitleBarOverlay({
+            color: colors.data.background,
+            symbolColor: colors.data.symbol,
+            height: overlayHeight(event.sender.getZoomFactor())
+        });
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));

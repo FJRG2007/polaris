@@ -279,9 +279,11 @@ function start(): void {
                     : {
                           title: `Polaris ${update.version} is available`,
                           body:
-                              process.platform === "darwin"
-                                  ? "Open its download page from here or from the Help menu."
-                                  : "Open its download page from here or from the Polaris icon in the taskbar.",
+                              process.platform === "win32"
+                                  ? "Open its download page from here or from the Polaris icon in the taskbar."
+                                  : process.platform === "linux"
+                                    ? "Open its download page from here or from the Help menu, which Alt opens."
+                                    : "Open its download page from here or from the Help menu.",
                           tag: "desktop-update",
                           onClick: open
                       }
