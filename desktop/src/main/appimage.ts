@@ -49,7 +49,11 @@ export async function replaceAppImage(
                 throw new Error("The download is larger than the release says");
             }
             hash.update(value);
-            await file.write(value);
+            // A write may take less than it was given; the checksum is of what
+            // was downloaded, so what reaches the file has to be all of it.
+            for (let at = 0; at < value.byteLength; ) {
+                at += (await file.write(value, at, value.byteLength - at)).bytesWritten;
+            }
         }
         if (size !== expected.size) throw new Error("The download is smaller than the release says");
         if (hash.digest("hex") !== expected.sha256) throw new Error("The download does not match its checksum");
