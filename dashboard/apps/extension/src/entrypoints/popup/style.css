@@ -207,6 +207,25 @@ h2 {
     font-size: 12px;
 }
 
+/* What the address field's live check says: waiting, a Polaris, or not one. */
+.check {
+    margin: 8px 16px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.check.wait {
+    color: hsl(var(--muted-foreground));
+}
+
+.check.good {
+    color: hsl(var(--success));
+}
+
+.check.bad {
+    color: hsl(var(--danger-ink));
+}
+
 /* A build newer than this one: the only thing the popup says on its own. Above
    whichever screen is showing, including the locked one - being out of date is
    worth knowing before the master password, not after it. */
@@ -1212,7 +1231,8 @@ button.copied {
     overflow-wrap: anywhere;
 }
 
-.problem.inline {
+.problem.inline,
+.add-server .check {
     margin: 0;
 }
 

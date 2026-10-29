@@ -2,6 +2,7 @@ import { POLAR_BROWSER_ALARM, PolarBrowser, type BrowserApi } from "@/lib/polar-
 import { storage } from "#imports";
 import * as link from "@/lib/link";
 import { onShelf } from "@/lib/shelf";
+import { createServerCheck } from "@/lib/server-identity";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import * as accounts from "@/lib/accounts";
@@ -131,6 +132,24 @@ let open: OpenVault | null = null;
  *  can change between two answers, when the account's does. */
 async function say(key: WordKey, params?: Record<string, string | number>): Promise<string> {
     return (await words())(key, params);
+}
+
+const serverCheck = createServerCheck();
+
+/**
+ * Null when `origin` answers as a Polaris, otherwise why not, in words. The
+ * popup asks the same question while the address is typed; this is the answer
+ * that decides, asked with the host permission already held, so the older
+ * signals an install that predates the identity route serves can be read too.
+ */
+async function notPolaris(origin: string): Promise<string | null> {
+    const verdict = await serverCheck.check(origin);
+    if (verdict.kind === "polaris") return null;
+    const host = new URL(origin).host;
+    if (verdict.kind === "not-polaris") return say("servers.check.notPolaris", { host });
+    if (verdict.kind === "redirects") return say("servers.check.redirects", { host });
+    if (verdict.kind === "starting") return say("servers.check.starting", { host });
+    return say("servers.check.unreachable", { host });
 }
 
 const CIPHERS = storage.defineItem<protocol.SyncResponse | null>("session:vault.ciphers", {
@@ -3103,6 +3122,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                         error: await say("errors.noPermission")
                     };
                 }
+                const refusal = await notPolaris(origin);
+                if (refusal) return { ok: false, error: refusal };
                 // Through the same door as switching servers, so an address
                 // somebody has been signed in on before brings that account back
                 // rather than a second, empty session beside it.
@@ -3384,6 +3405,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!(await holdsOrigin(origin))) {
                     return { ok: false, error: await say("errors.noPermission") };
                 }
+                const refusal = await notPolaris(origin);
+                if (refusal) return { ok: false, error: refusal };
                 await inTurn(() => bringServer(origin));
                 return { ok: true, status: await status() };
             }

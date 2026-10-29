@@ -6,13 +6,14 @@ import { EVERY_SITE } from "@/lib/injection";
 import { PAGE_FILLING_KEY } from "@/lib/page-filling";
 import { readIntendedLogin } from "@/lib/save";
 import { isNewer, type UpdateNotice } from "@/lib/update";
-import { looksLikeAddress, readOrigin } from "@/lib/address";
+import { readOrigin } from "@/lib/address";
 import { localPermissions, type ReachStatus } from "@/lib/local-address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { Picker } from "./picker";
 import { CheckMark, CopyMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
+import { addable, AddressNote, useAddressCheck } from "./server-check";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useWords } from "./words";
 import type { Words } from "@/lib/words";
@@ -415,7 +416,9 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
     // Not "is it non-empty": one letter is a URL the moment a scheme goes in
     // front of it, so the button went live on the first keystroke and pressing
     // it spent the one prompt a gesture is good for on a host that cannot exist.
-    const usable = looksLikeAddress(typed);
+    // Nor "is it an address": it has to answer as a Polaris, asked as it is typed.
+    const check = useAddressCheck(typed);
+    const usable = addable(check);
 
     const connect = async (): Promise<void> => {
         const origin = readOrigin(typed);
@@ -465,10 +468,17 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
                 value={typed}
                 // i18n-ignore an example address, the same in every language
                 placeholder="polaris.example.com"
-                onChange={(event) => setTyped(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && void connect()}
+                onChange={(event) => {
+                    setTyped(event.target.value);
+                    setError(null);
+                }}
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                onKeyDown={(event) => event.key === "Enter" && usable && void connect()}
             />
-            <Problem text={error} />
+            {error ? <Problem text={error} /> : <AddressNote check={check} />}
             {/* `usable`, not "something was typed". The permission prompt is the
                 thing being protected: a browser grants one per gesture, and a
                 button that lights up on the first keystroke spends it on a host

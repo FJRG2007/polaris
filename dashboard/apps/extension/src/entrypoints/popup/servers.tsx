@@ -18,7 +18,8 @@
 import { useWords } from "./words";
 import { BinMark, PencilMark } from "./marks";
 import { useEffect, useRef, useState } from "react";
-import { looksLikeAddress, readOrigin } from "@/lib/address";
+import { readOrigin } from "@/lib/address";
+import { addable, AddressNote, useAddressCheck } from "./server-check";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 import {
     describeServer,
@@ -265,7 +266,10 @@ function AddServer({
     const [typed, setTyped] = useState("");
     const origin = readOrigin(typed);
     const already = origin !== null && known.some((one) => one.origin === origin);
-    const usable = looksLikeAddress(typed) && !already && !busy;
+    // Asked live, so an address that is not a Polaris never reaches the
+    // permission prompt: the button stays off and the line says why.
+    const check = useAddressCheck(typed);
+    const usable = addable(check) && !already && !busy;
 
     const add = async (): Promise<void> => {
         if (!usable || !origin) return;
@@ -301,14 +305,18 @@ function AddServer({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                aria-invalid={already}
+                aria-invalid={already || (check.kind !== "incomplete" && check.kind !== "checking" && !addable(check))}
                 onChange={(event) => setTyped(event.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === "Enter") void add();
                     if (event.key === "Escape") setOpen(false);
                 }}
             />
-            {already ? <p className="problem inline">{t("servers.already")}</p> : null}
+            {already ? (
+                <p className="problem inline">{t("servers.already")}</p>
+            ) : (
+                <AddressNote check={check} />
+            )}
             <div className="rename-acts">
                 <button className="ghost" onClick={() => setOpen(false)}>
                     {t("popup.cancel")}

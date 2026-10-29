@@ -318,7 +318,17 @@
         "already": "That host is already on the list.",
         "removeTitle": "Remove {name}?",
         "removeSignsOut": "{count, plural, one {The account signed in on it here is signed out and this browser is disconnected from it.} other {The # accounts signed in on it here are signed out and this browser is disconnected from them.}}",
-        "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list."
+        "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list.",
+        "check": {
+            "checking": "Checking {host}...",
+            "polaris": "Polaris found at {host}.",
+            "polarisNamed": "Polaris found: {name}.",
+            "notPolaris": "{host} answers, but it is not Polaris. Check the address you open Polaris at.",
+            "redirects": "{host} sends visitors elsewhere. Type the address you open Polaris at.",
+            "unreachable": "{host} did not answer. Check the address, or that the server is on.",
+            "starting": "Polaris at {host} is starting. Try again in a minute.",
+            "unconfirmed": "Answers, but the browser checks it once you allow the address."
+        }
     },
     "polar": {
         "browserForget": "Forget",

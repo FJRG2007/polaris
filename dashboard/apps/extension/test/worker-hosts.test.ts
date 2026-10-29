@@ -59,6 +59,15 @@ let refreshes: { url: string; token: string | null }[] = [];
  */
 async function network(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const url = String(input instanceof Request ? input.url : input);
+    // Every example host is a Polaris except the two named not to be.
+    if (url.endsWith("/api/polaris/identity") && !url.startsWith("https://offline.example.com")) {
+        if (url.startsWith("https://parked.example.com")) {
+            return new Response("<!doctype html>", { headers: { "content-type": "text/html" } });
+        }
+        return new Response(JSON.stringify({ product: "polaris", protocol: 1 }), {
+            headers: { "content-type": "application/json" }
+        });
+    }
     if (url.endsWith("/vault/identity/connect/token")) {
         const token = new URLSearchParams(String(init?.body ?? "")).get("refresh_token");
         refreshes.push({ url, token });
@@ -155,6 +164,24 @@ describe("an install from before the hosts list", () => {
             { origin: WORK, name: null },
             { origin: HOME, name: null }
         ]);
+    });
+});
+
+describe("adding a host", () => {
+    it("refuses an address that answers but is not a Polaris, and keeps the list as it was", async () => {
+        await oldInstall();
+        const reply = await ask({ kind: "addServer", typed: "parked.example.com" });
+        expect(reply.ok).toBe(false);
+        expect(!reply.ok && reply.error).toContain("parked.example.com");
+        const now = await status();
+        expect(now.server).toBe(HOME);
+        expect(now.servers.map((one) => one.origin)).toEqual([HOME]);
+    });
+
+    it("refuses an address that does not answer at all", async () => {
+        await oldInstall();
+        const reply = await ask({ kind: "addServer", typed: "https://offline.example.com" });
+        expect(reply.ok).toBe(false);
     });
 });
 
