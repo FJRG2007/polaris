@@ -58,6 +58,31 @@ function preferences(preload: string, extra: WebPreferences = {}): WebPreference
     };
 }
 
+/** How tall the window buttons are: the dashboard's header, which they sit in. */
+const TITLE_BAR_HEIGHT = 48;
+
+/**
+ * No title bar on a Polaris window on Windows and Linux: the page runs to the top
+ * edge, and the system's own minimize, maximize and close buttons are drawn over
+ * its header (the Window Controls Overlay), the way Discord and Teams look. The
+ * page leaves room for them and is dragged by its header - see `app-titlebar`
+ * in the dashboard - and the preload paints them in the header's colours
+ * (`titleBarColors`). The system's buttons rather than drawn ones, because they
+ * keep Windows' snap layouts on hover. macOS keeps its own title bar.
+ */
+function titleBar(): BrowserWindowConstructorOptions {
+    if (process.platform === "darwin") return {};
+    const dark = nativeTheme.shouldUseDarkColors;
+    return {
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+            color: dark ? "#101114" : "#ffffff",
+            symbolColor: dark ? "#e6e7ea" : "#1c1d21",
+            height: TITLE_BAR_HEIGHT
+        }
+    };
+}
+
 function polarisPreferences(): WebPreferences {
     return preferences("app.js", { additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`] });
 }
@@ -113,6 +138,7 @@ function contain(contents: WebContents, server: () => string | null): void {
             return {
                 action: "allow",
                 overrideBrowserWindowOptions: windowOptions({
+                    ...titleBar(),
                     width: 1100,
                     height: 760,
                     show: true,
@@ -137,6 +163,7 @@ export function openPolarisWindow(
 ): BrowserWindow {
     const window = new BrowserWindow(
         windowOptions({
+            ...titleBar(),
             title: options.title ?? "Polaris",
             width: options.width ?? 1280,
             height: options.height ?? 820,

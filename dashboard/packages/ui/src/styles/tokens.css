@@ -531,3 +531,32 @@ html:has(.page-bleed) {
         width: 100%;
     }
 }
+
+/* The desktop app's window has no title bar: the system's minimize, maximize and
+   close buttons are drawn over the top right of the page (Window Controls
+   Overlay), and the header is what the window is dragged by. The titlebar-area
+   values only exist there, so in a browser the strip and the reserved space
+   are zero wide and app-region is ignored. */
+.app-titlebar {
+    app-region: drag;
+}
+
+.app-titlebar :is(a, button, input, select, textarea, label, [role], [tabindex]) {
+    app-region: no-drag;
+}
+
+/* On the header's last group, so it ends where the window buttons begin. */
+.app-titlebar-end {
+    padding-inline-end: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+}
+
+/* A page with no header still has to be movable: a strip under the buttons'
+   height across the top, below any header that draws its own. */
+.app-drag-strip {
+    position: fixed;
+    inset: 0 auto auto 0;
+    z-index: 30;
+    width: env(titlebar-area-width, 0px);
+    height: env(titlebar-area-height, 0px);
+    app-region: drag;
+}

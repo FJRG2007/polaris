@@ -44,7 +44,7 @@ export function AppShell({
         // the full height of the screen - up beside the header, as if the bar
         // itself were part of what scrolls.
         <div className="relative flex h-[calc(100dvh-var(--connection-banner-height,0px))] flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
-            <header className="z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
+            <header className="app-titlebar z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
                     {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />}
@@ -63,7 +63,11 @@ export function AppShell({
                         {search}
                     </div>
                 ) : null}
-                <div className="flex shrink-0 items-center gap-1 sm:gap-2">{account}</div>
+                {/* app-titlebar-end: room for the desktop app's window buttons,
+                    nothing in a browser. */}
+                <div className="app-titlebar-end flex shrink-0 items-center gap-1 sm:gap-2">
+                    {account}
+                </div>
             </header>
             <div className="flex min-h-0 flex-1 print:block">
                 {sidebar ? (

@@ -11,7 +11,8 @@
  * kept, so the form says "that is not Polaris" instead of opening a window onto
  * somebody else's page, and a window that later fails to load comes back to the
  * same form with the reason in words. Every address opened is kept in a list
- * (File > Servers), so going to another Polaris and back is a press, not typing.
+ * (Servers, in the tray icon - File on macOS), so going to another Polaris and
+ * back is a press, not typing.
  */
 
 import { registerIpc } from "./ipc";
@@ -24,7 +25,8 @@ import { CHANNELS, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
 import { handledSquirrelEvent } from "./squirrel";
 import { installScreenShare } from "./screen-share";
-import { installMenu, type MenuActions, type MenuUpdate } from "./menu";
+import { installTray } from "./tray";
+import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
 import { listServers, normalizeServerName, renameServer, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
 import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
@@ -195,11 +197,15 @@ let menuUpdate: MenuUpdate | undefined;
 let menuActions: MenuActions | null = null;
 
 function refreshMenu(): void {
-    if (menuActions) installMenu(menuActions, menuUpdate, servers());
+    if (!menuActions) return;
+    installMenu(menuActions, menuUpdate, servers());
+    installTray(appItems(menuActions, menuUpdate, servers()), () => showPolaris());
 }
 
 function start(): void {
     current = serverAddress();
+
+    app.on("browser-window-created", (_event, window) => hideMenuBar(window));
 
     app.on("web-contents-created", (_event, contents) => {
         contents.on("will-attach-webview", (event) => event.preventDefault());
@@ -272,7 +278,10 @@ function start(): void {
                       }
                     : {
                           title: `Polaris ${update.version} is available`,
-                          body: "Open its download page from here or from the Help menu.",
+                          body:
+                              process.platform === "darwin"
+                                  ? "Open its download page from here or from the Help menu."
+                                  : "Open its download page from here or from the Polaris icon in the taskbar.",
                           tag: "desktop-update",
                           onClick: open
                       }

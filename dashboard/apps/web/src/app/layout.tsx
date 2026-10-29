@@ -213,6 +213,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <script dangerouslySetInnerHTML={{ __html: CHUNK_RECOVERY_SCRIPT }} />
             </head>
             <body>
+                {/* What the desktop app's window is dragged by on a page with no
+                    header; zero-sized in a browser - see tokens.css. */}
+                <div aria-hidden className="app-drag-strip" />
                 <I18nProvider
                     locale={locale}
                     messages={pickMessages(locale, ["common", "components"])}
