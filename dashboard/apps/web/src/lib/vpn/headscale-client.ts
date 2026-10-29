@@ -104,6 +104,8 @@ export interface HeadscaleClient {
         expiration: Date;
     }): Promise<PreAuthKey>;
     registerNode(user: string, authId: string): Promise<HeadscaleNode>;
+    /** Replace the access policy (policy mode `database`). */
+    setPolicy(policy: string): Promise<void>;
 }
 
 const TIMEOUT_MS = 8_000;
@@ -115,7 +117,7 @@ export function headscaleClient(
     fetcher: typeof fetch = fetch
 ): HeadscaleClient {
     async function call<T>(
-        method: "GET" | "POST" | "DELETE",
+        method: "GET" | "POST" | "PUT" | "DELETE",
         path: string,
         schema: z.ZodType<T>,
         body?: unknown
@@ -180,6 +182,9 @@ export function headscaleClient(
             return (
                 await call("POST", "/auth/register", nodeResponse, { user, auth_id: authId })
             ).node;
+        },
+        async setPolicy(policy) {
+            await call("PUT", "/policy", z.unknown(), { policy });
         }
     };
 }

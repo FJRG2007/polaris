@@ -806,6 +806,35 @@ async function hostnameTaken(hostname: string): Promise<boolean> {
     return domains + tunnels > 0;
 }
 
+/** Why a zone hostname could not be minted at all: no such zone, or one not
+ *  verified yet. */
+export type ZoneHostnameFailure = ZoneMintFailure;
+
+/**
+ * Whether `subdomain` of a zone is free, before any service exists to hold it -
+ * the check `checkZoneSubdomain` makes for one name, for a caller (the VPN's
+ * control server) that picks its hostname before it is created. `owner` is
+ * whose domains it may be taken under.
+ */
+export async function checkZoneHostname(
+    owner: DomainOwner,
+    opts: { zoneLabel?: string; subdomain: string }
+): Promise<ZoneSubdomainCheck | ZoneMintFailure> {
+    const typed = opts.subdomain.trim();
+    const minted = await deployHostname(typed, {
+        zoneLabel: opts.zoneLabel,
+        subdomain: typed,
+        owner
+    });
+    if (minted === "bad-name") return { subdomain: typed, hostname: "", available: false, invalid: true };
+    if (typeof minted === "string") return minted;
+    return {
+        subdomain: normalizeZoneName(typed),
+        hostname: minted.hostname,
+        available: !(await hostnameTaken(minted.hostname))
+    };
+}
+
 export interface ZoneSubdomainCheck {
     /** The label the field should hold: what was asked for, or a free default. */
     subdomain: string;

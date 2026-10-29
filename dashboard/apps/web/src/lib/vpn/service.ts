@@ -30,7 +30,7 @@ import { openText, sealText } from "@/lib/tls/managed-certificates";
 import { resolveContainerName } from "@/lib/container-files-service";
 import { encodeHeadscaleConfig, PUBLIC_NAMESERVERS } from "./render";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
-import { addApplicationDomain, deployApplication } from "@/lib/deploy-service";
+import * as deploy from "@/lib/deploy-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { headscaleClient, type HeadscaleClient, type HeadscaleNode } from "./headscale-client";
 
@@ -134,6 +134,9 @@ async function renderedConfig(settings: rules.VpnSettings): Promise<string> {
 export interface VpnStatus {
     readonly state: "off" | "starting" | "running" | "failed";
     readonly hostname: string | null;
+    /** Whether a control server turned off still holds its devices, which only
+     *  Remove deletes. */
+    readonly kept: boolean;
     /** The address every client is pointed at as its login server. */
     readonly loginServer: string | null;
 }
@@ -143,17 +146,34 @@ export async function vpnStatus(): Promise<VpnStatus> {
     const engine = await engineRow();
     const hostname = settings.hostname;
     const loginServer = hostname ? `https://${hostname}` : null;
-    if (!engine?.applicationId) return { state: "off", hostname, loginServer };
-    if (engine.status === "failed") return { state: "failed", hostname, loginServer };
+    const kept = Boolean(engine?.applicationId);
+    if (!engine?.applicationId || !settings.enabled)
+        return { state: "off", hostname, loginServer, kept };
+    if (engine.status === "failed") return { state: "failed", hostname, loginServer, kept };
     const healthy = await engineClient(engine, settings)
         .then((api) => api.health())
         .catch(() => false);
-    return { state: healthy ? "running" : "starting", hostname, loginServer };
+    return { state: healthy ? "running" : "starting", hostname, loginServer, kept };
 }
 
 /** The deploy zones the hostname may be taken in, for the picker. */
 export async function hostnameZones(): Promise<{ label: string; host: string; primary: boolean }[]> {
     return (await listDeployZones()).map(({ label, host, primary }) => ({ label, host, primary }));
+}
+
+/**
+ * Whether `subdomain` in a zone is free for the control server, the same check
+ * Deploy's domain field makes. Asked for the administrator who will turn it on,
+ * whose personal project the server is created in.
+ */
+export async function checkHostname(
+    actorId: string,
+    choice: { zoneLabel?: string; subdomain: string }
+): Promise<deploy.ZoneSubdomainCheck | deploy.ZoneHostnameFailure> {
+    return deploy.checkZoneHostname(
+        { kind: "user", id: actorId },
+        { zoneLabel: choice.zoneLabel, subdomain: choice.subdomain || rules.DEFAULT_SUBDOMAIN }
+    );
 }
 
 /**
@@ -206,8 +226,34 @@ async function engineClient(
 async function client(): Promise<HeadscaleClient> {
     const { settings } = await requireApp();
     const engine = await engineRow();
-    if (!engine) throw new VpnRefusal("notRunning");
+    if (!engine || !settings.enabled) throw new VpnRefusal("notRunning");
     return engineClient(engine, settings);
+}
+
+/** How many administrators the policy names at most. */
+const POLICY_ADMINS = 200;
+
+/**
+ * Write the access policy (`rules.vpnPolicy`): everybody kept to their own
+ * devices, administrators reaching all of them. Every administrator gets a
+ * Headscale user first, so the group the policy names never refers to a user
+ * that does not exist. Applied on every Turn on and whenever a user is created.
+ */
+async function applyPolicy(api: HeadscaleClient): Promise<void> {
+    const admins = await prisma.user.findMany({
+        where: { isAdmin: true },
+        select: { id: true, name: true, email: true },
+        orderBy: { createdAt: "asc" },
+        take: POLICY_ADMINS
+    });
+    const known = new Set((await api.listUsers()).map((user) => user.name));
+    for (const admin of admins) {
+        const name = rules.headscaleUserName(admin.id);
+        if (known.has(name)) continue;
+        await api.createUser({ name, displayName: admin.name, email: admin.email });
+        known.add(name);
+    }
+    await api.setPolicy(rules.vpnPolicy(admins.map((admin) => rules.headscaleUserName(admin.id))));
 }
 
 async function publishEdge(hostname: string | null): Promise<void> {
@@ -259,7 +305,7 @@ export async function turnOn(
     }
     if (!engine?.applicationId) throw new VpnRefusal("notRunning");
     if (!settings.hostname) {
-        const hostname = await addApplicationDomain(engine.applicationId, engine.ownerId, {
+        const hostname = await deploy.addApplicationDomain(engine.applicationId, engine.ownerId, {
             targetPort: rules.VPN_PORT,
             cert: "le",
             zoneLabel: choice.zoneLabel ?? "",
@@ -274,7 +320,7 @@ export async function turnOn(
         isSecret: false
     });
     try {
-        await deployApplication(engine.applicationId, engine.ownerId, actorId);
+        await deploy.deployApplication(engine.applicationId, engine.ownerId, actorId);
         await prisma.installedApp.update({ where: { id: engine.id }, data: { status: "running" } });
     } catch (error) {
         console.error("polaris: the VPN's control server did not deploy:", error);
@@ -284,22 +330,43 @@ export async function turnOn(
     await publishEdge(settings.hostname);
     if (!openText(settings.apiKey)) {
         const key = await bootstrapApiKey(engine);
-        await saveSettings(app.id, { ...settings, apiKey: sealText(key) });
+        settings = { ...settings, apiKey: sealText(key) };
     }
+    settings = { ...settings, enabled: true };
+    await saveSettings(app.id, settings);
+    await applyPolicy(await engineClient(engine, settings)).catch((error: unknown) => {
+        console.error("polaris: the VPN's access policy was not applied:", error);
+        throw new VpnRefusal("notApplied");
+    });
 }
 
 /**
- * Stop the control server and remove it. Its database goes with it, and with it
- * every device's sign-in, so the screen asks first. The API key goes too, since
- * it named a database that is gone, and so does the hostname, whose domain row
- * belonged to the removed service.
+ * Stop the control server and keep it: its container comes down, its volume -
+ * and with it the database of users and devices - stays, as do its hostname and
+ * API key, so every device signs back in by itself on the next Turn on.
  */
 export async function turnOff(): Promise<void> {
     const app = await requireApp();
     const engine = await engineRow();
     await publishEdge(null);
+    if (engine?.applicationId) {
+        await deploy.removeApplicationDeployment(engine.applicationId, engine.ownerId);
+    }
+    await saveSettings(app.id, { ...app.settings, enabled: false });
+}
+
+/**
+ * Delete the control server and everything on it: the container, its volume
+ * and database, every device's sign-in, the hostname (whose domain row belonged
+ * to the removed service) and the API key that named that database. The screen
+ * asks first; afterwards every device has to be added again.
+ */
+export async function removeVpn(): Promise<void> {
+    const app = await requireApp();
+    const engine = await engineRow();
+    await publishEdge(null);
     if (engine) await uninstallApp(engine.ownerId, engine.id, { deleteData: true });
-    await saveSettings(app.id, { ...app.settings, hostname: null, apiKey: null });
+    await saveSettings(app.id, { ...app.settings, hostname: null, apiKey: null, enabled: false });
 }
 
 /** A device as the screens show it. */
@@ -400,8 +467,8 @@ export function approvedRoutesFor(
 }
 
 /**
- * Approve or withdraw what a device offers. Administrators only: with no access
- * policy yet, an approved route is one every device on the tailnet can use.
+ * Approve or withdraw what a device offers. Administrators only: an approved
+ * exit node is one every user may send their traffic through.
  */
 export async function setDeviceRoutes(
     viewer: rules.VpnViewer,
@@ -425,7 +492,13 @@ async function ensureUser(api: HeadscaleClient, account: Account) {
     const name = rules.headscaleUserName(account.id);
     const found = (await api.listUsers(name)).find((user) => user.name === name);
     if (found) return found;
-    return api.createUser({ name, displayName: account.name, email: account.email });
+    const created = await api.createUser({ name, displayName: account.name, email: account.email });
+    // Written again for anybody new, though only a new administrator changes
+    // it: one request, and the policy can never lag behind the users.
+    await applyPolicy(api).catch((error: unknown) =>
+        console.error("polaris: the VPN's access policy was not applied:", error)
+    );
+    return created;
 }
 
 /** A one-time key that signs one device in as `account`, valid for an hour. */

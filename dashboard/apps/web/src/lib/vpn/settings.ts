@@ -35,7 +35,10 @@ export const vpnSettingsSchema = z.object({
         .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/)
         .catch(DEFAULT_BASE_DOMAIN),
     /** The Headscale API key, sealed with the master key. */
-    apiKey: z.string().min(1).nullable().catch(null)
+    apiKey: z.string().min(1).nullable().catch(null),
+    /** Whether the control server should be running. Off keeps its database,
+     *  so the devices on it sign back in when it is turned on again. */
+    enabled: z.boolean().catch(false)
 });
 export type VpnSettings = z.infer<typeof vpnSettingsSchema>;
 
@@ -43,7 +46,7 @@ export function readVpnSettings(stored: unknown): VpnSettings {
     const parsed = vpnSettingsSchema.safeParse(stored ?? {});
     return parsed.success
         ? parsed.data
-        : { hostname: null, baseDomain: DEFAULT_BASE_DOMAIN, apiKey: null };
+        : { hostname: null, baseDomain: DEFAULT_BASE_DOMAIN, apiKey: null, enabled: false };
 }
 
 /**
@@ -90,9 +93,9 @@ export function mayOperate(viewer: VpnViewer): boolean {
     return viewer.isAdmin;
 }
 
-/** Whether `viewer` may approve a device's exit node or subnet routes. With no
- *  access policy yet an approved route serves every device on the tailnet, so
- *  this is an administrator's call. */
+/** Whether `viewer` may approve a device's exit node or subnet routes. The
+ *  access policy lets every user through an approved exit node (`vpnPolicy`),
+ *  so approving one is an administrator's call. */
 export function mayApproveRoutes(viewer: VpnViewer): boolean {
     return viewer.isAdmin;
 }
@@ -102,4 +105,42 @@ export const EXIT_ROUTES = ["0.0.0.0/0", "::/0"] as const;
 
 export function isExitRoute(route: string): boolean {
     return (EXIT_ROUTES as readonly string[]).includes(route);
+}
+
+/** The tag a Polaris server signs in with, which every user may reach. */
+export const POLARIS_TAG = "tag:polaris";
+
+/**
+ * The tailnet's access policy, as Headscale reads it in database mode (HuJSON;
+ * plain JSON is a subset). Pure, so what each person reaches is asserted in a
+ * test rather than found out on a device.
+ *
+ * - every user reaches their own devices (`autogroup:self`) and nobody else's;
+ * - administrators reach every device and every approved subnet route;
+ * - a Polaris server (tagged `tag:polaris`) is reachable by everybody;
+ * - an exit node an administrator approved is usable by everybody
+ *   (`autogroup:internet`).
+ *
+ * `adminUsers` are Headscale user names; with none, the administrators' rule is
+ * left out rather than written with an empty group.
+ */
+export function vpnPolicy(adminUsers: readonly string[]): string {
+    const admins = [...new Set(adminUsers)].sort();
+    const everyone = ["autogroup:member"];
+    const grants: { src: string[]; dst: string[]; ip: string[] }[] = [
+        { src: everyone, dst: ["autogroup:self"], ip: ["*"] },
+        { src: everyone, dst: [POLARIS_TAG], ip: ["*"] },
+        { src: everyone, dst: ["autogroup:internet"], ip: ["*"] }
+    ];
+    if (admins.length > 0) grants.push({ src: ["group:admins"], dst: ["*"], ip: ["*"] });
+    const owners = admins.length > 0 ? ["group:admins"] : [];
+    return JSON.stringify(
+        {
+            groups: admins.length > 0 ? { "group:admins": admins.map((name) => `${name}@`) } : {},
+            tagOwners: { [POLARIS_TAG]: owners },
+            grants
+        },
+        null,
+        2
+    );
 }
