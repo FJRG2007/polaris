@@ -310,7 +310,11 @@ export function DriveExplorer({
                 // screen is the one it changed.
                 if (before.length > 0 && running.length < before.length) {
                     dropDriveSnapshots();
-                    void load();
+                    // The latest `load`, not the one this effect closed over on
+                    // mount: that one lists the folder the explorer opened on, so
+                    // deleting a subfolder of X from inside X put the first
+                    // folder's contents - My files - on screen when the job ended.
+                    void latestLoad.current();
                 }
                 return running;
             });
@@ -324,7 +328,8 @@ export function DriveExplorer({
             if (timer) clearTimeout(timer);
         };
         // `load` is rebuilt on every render of this component; depending on it
-        // would restart the poll on every keystroke in the search box.
+        // would restart the poll on every keystroke in the search box, so the
+        // poll reads it through `latestLoad` instead.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -462,6 +467,10 @@ export function DriveExplorer({
         },
         [connectionId, path, unreachable, t]
     );
+    /** The `load` of the location on screen now, for the job poll, which starts
+     *  once and would otherwise keep the first render's. */
+    const latestLoad = useRef(load);
+    latestLoad.current = load;
 
     useEffect(() => {
         // A location change shows the skeleton; background refreshes (mutations) do not.
