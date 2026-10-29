@@ -106,6 +106,7 @@ import {
     MailOpen,
     Paperclip,
     RefreshCw,
+    ShieldCheck,
     Undo2,
     Rows3,
     Star,
@@ -1719,6 +1720,23 @@ export function MailView({
                                     >
                                         <Undo2 className="size-4 shrink-0" aria-hidden />
                                     </Button>
+                                ) : context.emptyRole === "junk" ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={t("list.notJunk")}
+                                        title={t("list.notJunk")}
+                                        disabled={busy}
+                                        onClick={() =>
+                                            act(
+                                                "not-junk",
+                                                selectedMessageIds,
+                                                t("thread.announce.notJunk")
+                                            )
+                                        }
+                                    >
+                                        <ShieldCheck className="size-4 shrink-0" aria-hidden />
+                                    </Button>
                                 ) : (
                                     <Button
                                         variant="ghost"
@@ -1841,6 +1859,7 @@ export function MailView({
                                         canArchive={context.canArchive}
                                         permanentDelete={context.permanentDelete}
                                         restorable={context.restorable}
+                                        inJunk={context.emptyRole === "junk"}
                                         onAct={act}
                                         onSnooze={snooze}
                                         onLabel={label}
@@ -1867,6 +1886,7 @@ export function MailView({
                                             canArchive={context.canArchive}
                                             permanentDelete={context.permanentDelete}
                                             restorable={context.restorable}
+                                            inJunk={context.emptyRole === "junk"}
                                             onAct={(action, announce) =>
                                                 act(action, [thread.leadMessageId], announce)
                                             }
@@ -2530,6 +2550,7 @@ function ThreadRow({
     canArchive,
     permanentDelete,
     restorable,
+    inJunk,
     sort,
     onAct,
     onSnooze,
@@ -2566,6 +2587,8 @@ function ThreadRow({
     permanentDelete: boolean;
     /** Whether this row can go back where it was deleted from. */
     restorable: boolean;
+    /** Whether this is the spam folder, where a row offers "not spam". */
+    inJunk: boolean;
     /** Which way the list is ordered, which decides what the corner of the row
      *  says. */
     sort: core.MailSort;
@@ -2877,6 +2900,13 @@ function ThreadRow({
                                 icon={Undo2}
                                 label={t("view.restore")}
                                 onClick={() => onAct("restore", t("thread.announce.restored"))}
+                            />
+                        ) : null}
+                        {inJunk ? (
+                            <RowAction
+                                icon={ShieldCheck}
+                                label={t("list.notJunk")}
+                                onClick={() => onAct("not-junk", t("thread.announce.notJunk"))}
                             />
                         ) : null}
                         <RowAction

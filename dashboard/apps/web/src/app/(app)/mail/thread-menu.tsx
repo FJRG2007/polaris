@@ -59,6 +59,7 @@ import {
     Mail,
     MailOpen,
     Search,
+    ShieldCheck,
     ShieldOff,
     Star,
     Tag,
@@ -71,6 +72,7 @@ export function ThreadContextMenu({
     canArchive,
     permanentDelete,
     restorable,
+    inJunk,
     onAct,
     onSnooze,
     onLabel,
@@ -89,6 +91,8 @@ export function ThreadContextMenu({
     permanentDelete: boolean;
     /** Whether these can go back where they were deleted from. */
     restorable: boolean;
+    /** Whether this is the spam folder, where the answer is "not spam". */
+    inJunk: boolean;
     onAct: (action: MailAction, messageIds: readonly string[], announce: string) => void;
     onSnooze: (messageIds: readonly string[], until: Date) => void;
     onLabel: (labelId: string, messageIds: readonly string[]) => void;
@@ -326,6 +330,13 @@ export function ThreadContextMenu({
                     >
                         <Undo2 className="size-3.5 shrink-0" aria-hidden />
                         {t("thread.restore", { count: shown })}
+                    </ContextMenuItem>
+                ) : inJunk ? (
+                    <ContextMenuItem
+                        onSelect={() => onAct("not-junk", ids, t("thread.announce.notJunk"))}
+                    >
+                        <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
+                        {t("thread.notJunk", { count: shown })}
                     </ContextMenuItem>
                 ) : (
                     <ContextMenuItem

@@ -462,6 +462,7 @@
         "archive": "{count, plural, one {Archive} other {Archive #}}",
         "restore": "{count, plural, one {Put back where it was} other {Put # back}}",
         "junk": "{count, plural, one {Report as spam} other {Report # as spam}}",
+        "notJunk": "{count, plural, one {Not spam} other {# not spam}}",
         "delete": "{count, plural, one {Delete for ever} other {Delete # for ever}}",
         "trash": "{count, plural, one {Move to trash} other {Move # to the trash}}",
         "announce": {
@@ -478,6 +479,7 @@
             "archived": "Archived.",
             "restored": "Put back.",
             "junk": "Moved to spam.",
+            "notJunk": "Moved to the inbox.",
             "deleted": "Deleted.",
             "trashed": "Moved to the trash.",
             "addressCopied": "Address copied.",
@@ -849,6 +851,7 @@
         "markRead": "Mark as read",
         "snoozeTomorrow": "Snooze until tomorrow morning",
         "junk": "Report as spam",
+        "notJunk": "Not spam",
         "failedTitle": "This list could not be loaded",
         "retry": "Try again",
         "fetching": "Fetching this mailbox. Messages appear as they arrive, newest first.",
