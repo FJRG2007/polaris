@@ -14,7 +14,8 @@ import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
-import { accountHasPasskey, emailLinkOffered, resolveIdentifier, ssoOffered } from "./actions";
+import { signInWithPasskeys } from "@/lib/passkey-sign-in";
+import { accountHasPasskey, emailLinkOffered, passkeysFor, resolveIdentifier, ssoOffered } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { AccountChooser } from "./account-chooser";
 import { prepareAddAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
@@ -213,11 +214,16 @@ export function LoginForm({
     }
 
     /** Sign in with the device's passkey. The ceremony is the browser's; a
-     *  cancelled prompt just leaves the form as it was. */
+     *  cancelled prompt just leaves the form as it was. With an account typed,
+     *  the prompt is narrowed to that account's passkeys so it goes straight to
+     *  it - Windows Hello in the desktop app otherwise asks which one to use. */
     async function signInWithPasskey() {
         setPending(true);
         setError(null);
-        const result = await authClient.signIn.passkey();
+        const identifier = values.identifier.trim();
+        const allow = identifier ? await passkeysFor(identifier).catch(() => []) : [];
+        const result =
+            allow.length > 0 ? await signInWithPasskeys(allow) : await authClient.signIn.passkey();
         setPending(false);
         if (result?.error) {
             if ((result.error as { code?: string }).code === "SSO_REQUIRED") {
@@ -370,7 +376,7 @@ export function LoginForm({
                                     autoComplete="username"
                                     value={values.identifier}
                                     onChange={(event) => update("identifier", event.target.value)}
-                                    onBlur={() => form.markTouched("identifier")}
+                                    onBlur={() => values.identifier.trim() && form.markTouched("identifier")}
                                     aria-invalid={Boolean(form.error("identifier"))}
                                 />
                                 {form.error("identifier") ? (
@@ -386,7 +392,7 @@ export function LoginForm({
                                     autoComplete="current-password"
                                     value={values.password}
                                     onChange={(event) => update("password", event.target.value)}
-                                    onBlur={() => form.markTouched("password")}
+                                    onBlur={() => values.password && form.markTouched("password")}
                                     aria-invalid={Boolean(form.error("password"))}
                                 />
                                 {form.error("password") ? (

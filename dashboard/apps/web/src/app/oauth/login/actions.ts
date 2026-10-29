@@ -105,6 +105,38 @@ export async function accountHasPasskey(identifier: string): Promise<boolean> {
     return count > 0;
 }
 
+/**
+ * The passkeys the typed account holds here, for the prompt to go straight to
+ * that account instead of asking which one (`signInWithPasskeys`).
+ *
+ * Credential ids are what WebAuthn's own username-first sign-in sends to the
+ * browser, and they prove nothing on their own: signing in still takes the
+ * authenticator. Throttled per address like the hint above, capped, and empty
+ * for an identifier with no account, so the caller falls back to the ordinary
+ * prompt either way.
+ */
+export async function passkeysFor(
+    identifier: string
+): Promise<{ id: string; transports: string[] }[]> {
+    const value = typeof identifier === "string" ? identifier.trim().toLowerCase() : "";
+    if (!value || value.length > 320) return [];
+    const rpId = await currentRelyingPartyId();
+    if (!rpId) return [];
+    const throttle = await rateLimit(`passkey-allow:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
+    if (!throttle.ok) return [];
+    const email = await resolveIdentifier(value);
+    if (!email) return [];
+    const passkeys = await prisma.passkey.findMany({
+        where: { user: { email }, OR: boundHere(rpId) },
+        select: { credentialID: true, transports: true },
+        take: 20
+    });
+    return passkeys.map((passkey) => ({
+        id: passkey.credentialID,
+        transports: (passkey.transports ?? "").split(",").map((transport) => transport.trim()).filter(Boolean)
+    }));
+}
+
 /** The address this request came in on, or null when it could not hold a passkey.
  *  Unverified on purpose: it only decides whether to offer a button to the caller
  *  about their own browser, and a forged header buys nothing but a useless one. */
