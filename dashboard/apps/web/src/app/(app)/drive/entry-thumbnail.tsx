@@ -47,6 +47,7 @@ export function EntryThumbnail({
     path,
     version,
     moving = false,
+    fill = false,
     className,
     children
 }: {
@@ -55,6 +56,9 @@ export function EntryThumbnail({
     /** A video, which the browser draws for itself from the file rather than
      *  being handed a picture the server made. */
     readonly moving?: boolean;
+    /** Crop the picture to fill the whole box, as a photo tile does, rather
+     *  than fit it inside with its own proportions. */
+    readonly fill?: boolean;
     /** What makes this file this version of itself - when it changed and how big
      *  it is. In the URL so the answer can be cached forever and still never be
      *  wrong. */
@@ -185,30 +189,34 @@ export function EntryThumbnail({
                 of that put a film strip on top of the still. */}
             {drawn || frame ? null : children}
             {frame ? (
-                <img
-                    src={frame}
-                    alt=""
-                    draggable={false}
-                    className="max-h-full max-w-full rounded-sm object-contain"
-                />
+                <img src={frame} alt="" draggable={false} className={pictureClass(fill)} />
             ) : null}
             {asked && !moving ? (
                 <img
                     src={source}
                     alt=""
-                    loading="lazy"
                     decoding="async"
                     draggable={false}
+                    // Marks a picture that has not arrived, for the preview
+                    // that grows out of the tile and must not grow out of it.
+                    data-pending={drawn ? undefined : ""}
                     onLoad={() => setDrawn(true)}
                     // A file that cannot be drawn answers 404, which is not an
                     // error: it is how a tile is told to keep its icon.
                     onError={() => setDrawn(false)}
-                    className={cn(
-                        "max-h-full max-w-full rounded-sm object-contain",
-                        drawn ? "" : "hidden"
-                    )}
+                    // Not `display: none` while it loads, and not `loading="lazy"`:
+                    // a lazy image with no box is never in the viewport, so the
+                    // browser never fetched it, `onLoad` never fired, and every
+                    // tile kept its icon forever. The observer above already
+                    // decides when to ask; until the picture arrives it is
+                    // invisible and out of the flow instead.
+                    className={cn(pictureClass(fill), drawn ? "" : "invisible absolute")}
                 />
             ) : null}
         </span>
     );
+}
+
+function pictureClass(fill: boolean): string {
+    return fill ? "size-full object-cover" : "max-h-full max-w-full rounded-sm object-contain";
 }

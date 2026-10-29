@@ -29,6 +29,10 @@ import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
 import { crumbEntry } from "./crumb-entry";
+import { PhotoGrid, type PhotoGridHandle } from "./photo-grid";
+import { ViewerStepper, useSwipeToStep } from "./viewer-stepper";
+import { isMediaFolder, fileSteps, steppedFile } from "@/lib/drive-media";
+import { rememberViewMode, rememberedViewMode, type DriveViewMode } from "./view-mode";
 import { usePolarContext } from "@/components/polar/polar-panel";
 import * as flying from "@polaris/ui/image-flight";
 import { useDriveInsights } from "./use-drive-insights";
@@ -132,6 +136,7 @@ import {
     Info,
     KeyRound,
     LayoutGrid,
+    Images,
     Link2,
     List,
     Lock,
@@ -506,6 +511,9 @@ export function FilesView({
     const [searchTruncated, setSearchTruncated] = useState(false);
     const [sortKey, setSortKey] = useState<SortKey>(trash ? "deleted" : "name");
     const [sortDir, setSortDir] = useState<SortDir>(trash ? "desc" : "asc");
+    // Until somebody picks an order, each layout opens in its own: the photo
+    // view newest first, so its days read as a timeline, and the others by name.
+    const sortChosen = useRef(false);
 
     /**
      * What pressing a column means.
@@ -516,6 +524,7 @@ export function FilesView({
      * its own.
      */
     const chooseSort = (column: SortKey) => {
+        sortChosen.current = true;
         if (column === sortKey) {
             setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
             return;
@@ -551,7 +560,7 @@ export function FilesView({
     const [viewerFrom, setViewerFrom] = useState<flying.Box | null>(null);
     const preview = useRef<HTMLDivElement>(null);
     const [showHidden, setShowHidden] = useState(false);
-    const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+    const [viewMode, setViewMode] = useState<DriveViewMode>("list");
     // Breadcrumb segment currently under a drag, highlighted as a move target.
     const [dropSegment, setDropSegment] = useState<string | null>(null);
     // Breadcrumb segment whose folder menu is open.
@@ -782,15 +791,20 @@ export function FilesView({
     function closeViewer() {
         const picture = preview.current?.querySelector<HTMLImageElement>("[data-preview-picture]");
         const path = viewerTarget?.path;
+        const index = path ? visible.findIndex((entry) => entry.path === path) : -1;
+        // The listing has to be back on the page before it can be scrolled to
+        // the file the preview stepped to, or its thumbnail measured.
+        const reveal = () => {
+            flushSync(() => setViewerTarget(null));
+            if (index >= 0) scrollCursorIntoView(index);
+        };
         if (!path || !flying.canFly(picture) || picture.offsetWidth < 1) {
-            setViewerTarget(null);
+            reveal();
             return;
         }
         const at = flying.boxOf(picture);
         const copy = flying.pictureCopy(picture.currentSrc || picture.src, at);
-        // The listing has to be back on the page before its thumbnail can be
-        // measured.
-        flushSync(() => setViewerTarget(null));
+        reveal();
         const into = flying.visibleBox(thumbnailFor(path), flying.viewportSize());
         void flying.shrinkOut(copy, at, into).then(() => copy.remove());
     }
@@ -1796,6 +1810,59 @@ export function FilesView({
         [viewMode, visible, gridShown]
     );
 
+    /**
+     * The layout is chosen per folder: the one somebody last picked for it on
+     * this device, else the photo view for a folder that is mostly pictures and
+     * videos, else whichever of list and grid they were last using.
+     */
+    const mediaFolder = useMemo(() => !inTrash && isMediaFolder(entries), [inTrash, entries]);
+    const lastPlainView = useRef<DriveViewMode>("list");
+    const photoGrid = useRef<PhotoGridHandle>(null);
+    useEffect(() => {
+        if (loading) return;
+        const remembered = rememberedViewMode(connectionId, path);
+        setViewMode(remembered ?? (mediaFolder ? "photos" : lastPlainView.current));
+    }, [connectionId, path, loading, mediaFolder]);
+
+    useEffect(() => {
+        if (inTrash || sortChosen.current) return;
+        const photos = viewMode === "photos";
+        setSortKey(photos ? "modified" : "name");
+        setSortDir(photos ? "desc" : "asc");
+    }, [inTrash, viewMode]);
+
+    function chooseView(mode: DriveViewMode) {
+        if (mode !== "photos") lastPlainView.current = mode;
+        setViewMode(mode);
+        rememberViewMode(connectionId, path, mode);
+    }
+
+    /** Move the keyboard cursor to a listing position the photo view worked out. */
+    function moveCursorTo(index: number, extend: boolean) {
+        const start = cursorStart();
+        moveCursor(start < 0 ? (index === 0 ? 1 : -1) : index - start, extend);
+    }
+
+    /** Where the keyboard cursor is, as a position in the listing, or -1. */
+    function cursorStart(): number {
+        return (
+            cursorRef.current ??
+            lastIndex.current ??
+            (selectedEntries[0] ? visible.indexOf(selectedEntries[0]) : -1)
+        );
+    }
+
+    /** The preview's previous and next: the listing's files, in its order. */
+    function stepViewer(by: -1 | 1) {
+        const next = viewerTarget ? steppedFile(visible, viewerTarget.path, by) : null;
+        if (!next) return;
+        const index = visible.indexOf(next);
+        cursorRef.current = index;
+        lastIndex.current = index;
+        openViewer(next);
+    }
+    const viewerSwipe = useSwipeToStep(viewerTarget?.name ?? "", stepViewer);
+
     // A different folder, a search, or a switch away from the grid all start it
     // again: what was shown for the last set of files says nothing about this one.
     useEffect(() => {
@@ -1958,7 +2025,9 @@ export function FilesView({
 
     /** Bring the keyboard cursor into view in whichever layout is active. */
     function scrollCursorIntoView(index: number) {
-        if (viewMode === "grid") {
+        if (viewMode === "photos") {
+            photoGrid.current?.scrollToIndex(index);
+        } else if (viewMode === "grid") {
             (gridRef.current?.children[index] as HTMLElement | undefined)?.scrollIntoView({
                 block: "nearest"
             });
@@ -2039,6 +2108,9 @@ export function FilesView({
         else if (event.key === "Escape") setRenaming(null);
     }
 
+    const downloadLabel =
+        preparing > 0 ? t("filesView.viewer.fetching") : t("filesView.viewer.download");
+
     return (
         <>
             {viewerTarget ? (
@@ -2053,17 +2125,32 @@ export function FilesView({
                                 {viewerTarget.name}
                             </span>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                            <ViewerStepper
+                                name={viewerTarget.name}
+                                {...fileSteps(visible, viewerTarget.path)}
+                                onStep={stepViewer}
+                            />
                             {onShare ? (
-                                <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    aria-label={t("filesView.viewer.getLink")}
+                                    title={t("filesView.viewer.getLink")}
+                                    onClick={shareViewerTarget}
+                                >
                                     <Share2 className="size-4" />
-                                    {t("filesView.viewer.getLink")}
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.viewer.getLink")}
+                                    </span>
                                 </Button>
                             ) : null}
                             <Button
                                 size="sm"
                                 variant="secondary"
                                 disabled={preparing > 0}
+                                aria-label={downloadLabel}
+                                title={downloadLabel}
                                 onClick={() =>
                                     startDownload(
                                         downloadUrl(connectionId, viewerTarget.path),
@@ -2076,14 +2163,13 @@ export function FilesView({
                                 ) : (
                                     <Download className="size-4" />
                                 )}
-                                {preparing > 0
-                                    ? t("filesView.viewer.fetching")
-                                    : t("filesView.viewer.download")}
+                                <span className="hidden sm:inline">{downloadLabel}</span>
                             </Button>
                         </div>
                     </div>
                     <div
                         ref={preview}
+                        {...viewerSwipe}
                         className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border bg-surface/40"
                     >
                         <FilePreview target={viewerTarget} onSaved={onSaved} from={viewerFrom} />
@@ -2392,7 +2478,7 @@ export function FilesView({
                         The grid has no headings, so it keeps a control - one
                         menu rather than a row of buttons, since there is nothing
                         on screen for it to be redundant with. */}
-                    {viewMode === "grid" ? (
+                    {viewMode !== "list" ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button
@@ -2431,7 +2517,7 @@ export function FilesView({
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                         <button
                             type="button"
-                            onClick={() => setViewMode("list")}
+                            onClick={() => chooseView("list")}
                             aria-label={t("filesView.view.list")}
                             title={t("filesView.view.list")}
                             className={cn(
@@ -2445,7 +2531,7 @@ export function FilesView({
                         </button>
                         <button
                             type="button"
-                            onClick={() => setViewMode("grid")}
+                            onClick={() => chooseView("grid")}
                             aria-label={t("filesView.view.grid")}
                             title={t("filesView.view.grid")}
                             className={cn(
@@ -2457,6 +2543,24 @@ export function FilesView({
                         >
                             <LayoutGrid className="size-4" />
                         </button>
+                        {/* Offered where it means something - a folder of
+                            photos - and kept while it is the one in use. */}
+                        {mediaFolder || viewMode === "photos" ? (
+                            <button
+                                type="button"
+                                onClick={() => chooseView("photos")}
+                                aria-label={t("filesView.view.photos")}
+                                title={t("filesView.view.photos")}
+                                className={cn(
+                                    "rounded p-1 transition-colors hover:bg-muted",
+                                    viewMode === "photos"
+                                        ? "bg-muted text-foreground"
+                                        : "text-muted-foreground"
+                                )}
+                            >
+                                <Images className="size-4" />
+                            </button>
+                        ) : null}
                     </div>
                     <Button
                         size="sm"
@@ -2758,7 +2862,7 @@ export function FilesView({
                             onDrop={onUploadDrop}
                         >
                             {loading ? (
-                                <ListingSkeleton viewMode={viewMode} />
+                                <ListingSkeleton viewMode={viewMode === "list" ? "list" : "grid"} />
                             ) : error ? (
                                 <ListingError
                                     error={error}
@@ -2839,6 +2943,78 @@ export function FilesView({
                                                       : t("filesView.empty.folderEmpty")
                                                   : t("filesView.empty.noMatches")}
                                         </p>
+                                    ) : viewMode === "photos" ? (
+                                        <PhotoGrid
+                                            handle={photoGrid}
+                                            entries={visible}
+                                            selected={selected}
+                                            cursor={cursorStart}
+                                            byDate={
+                                                sortKey === "created"
+                                                    ? "createdAt"
+                                                    : sortKey === "modified" ||
+                                                        sortKey === "deleted"
+                                                      ? "modifiedAt"
+                                                      : null
+                                            }
+                                            source={thumbSource}
+                                            icon={(entry) => (
+                                                <EntryIcon entry={entry} className="size-10" />
+                                            )}
+                                            onTileClick={rowClick}
+                                            onOpen={(entry) => {
+                                                if (renaming !== entry.path) openEntry(entry);
+                                            }}
+                                            onCursor={moveCursorTo}
+                                            wrap={(entry, index, tile) => (
+                                                <ContextMenu key={entry.path}>
+                                                    <ContextMenuTrigger asChild>
+                                                        <div
+                                                            onContextMenu={() =>
+                                                                adoptForMenu(index, entry)
+                                                            }
+                                                            {...entryDragProps(
+                                                                entry,
+                                                                renaming === entry.path
+                                                            )}
+                                                            className={cn(
+                                                                "relative shrink-0 rounded-md",
+                                                                cutPaths?.has(entry.path) &&
+                                                                    "opacity-40",
+                                                                leaving.has(entry.path) &&
+                                                                    "pointer-events-none opacity-40",
+                                                                dropFolder === entry.path &&
+                                                                    "ring-2 ring-primary"
+                                                            )}
+                                                        >
+                                                            {tile}
+                                                            {renaming === entry.path ? (
+                                                                <Input
+                                                                    ref={renameField}
+                                                                    value={renameValue}
+                                                                    onChange={(e) =>
+                                                                        setRenameValue(
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                    onKeyDown={(e) =>
+                                                                        onRenameKey(e, entry)
+                                                                    }
+                                                                    onBlur={() =>
+                                                                        submitRename(entry)
+                                                                    }
+                                                                    onClick={(e) =>
+                                                                        e.stopPropagation()
+                                                                    }
+                                                                    className="absolute inset-x-1 bottom-1 h-7 w-auto py-1 text-center text-xs"
+                                                                />
+                                                            ) : null}
+                                                        </div>
+                                                    </ContextMenuTrigger>
+                                                    {entryMenu(entry)}
+                                                </ContextMenu>
+                                            )}
+                                        />
                                     ) : viewMode === "grid" ? (
                                         <div className="max-h-[65vh] overflow-auto overscroll-contain p-1">
                                             <div
@@ -3487,7 +3663,9 @@ export function FilesView({
                 </ContextMenu>
             </div>
             {!inTrash && selectedEntries.length === 1 && selectedEntries[0] ? (
-                <aside className="fixed right-0 top-header bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
+                // Fixed to the viewport, not stuck inside the scrolling content:
+                // its top is the connection strip above the shell plus the header.
+                <aside className="fixed right-0 top-[calc(var(--connection-banner-height,0px)+var(--header-height))] bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         {/* The file, not a mark standing for its type. This panel
                             exists to answer "which one is this", and for a
@@ -4045,7 +4223,7 @@ function GridIcon({
  *  details panel - for its preview to grow out of and shrink back into. Drive's
  *  thumbnails have their own address, so it is found by path, not by picture. */
 function thumbnailFor(path: string): Element | null {
-    return flying.thumbnailBy("data-drive-thumbnail", path, "img:not(.hidden)");
+    return flying.thumbnailBy("data-drive-thumbnail", path, "img:not([data-pending])");
 }
 
 /** The icon for an entry: a user-set one, else the folder mark or the file type's. */

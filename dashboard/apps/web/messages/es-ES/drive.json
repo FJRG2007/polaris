@@ -171,7 +171,8 @@
         },
         "view": {
             "list": "Lista",
-            "grid": "Cuadrícula"
+            "grid": "Cuadrícula",
+            "photos": "Fotos"
         },
         "filters": {
             "button": "Filtros",

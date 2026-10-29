@@ -31,18 +31,11 @@ import { SheetEditor } from "./viewer/sheet-editor";
 import { MarkdownView } from "./viewer/markdown-view";
 import { PlainTextEditor } from "./viewer/text-editor";
 import { useDisplayFormat } from "@/components/display-format";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { StepControls, stepOfKey } from "./viewer-stepper";
 import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { ChevronLeft, ChevronRight, Download, Loader2, Share2 } from "lucide-react";
-import {
-    Button,
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    shortcutPressed
-} from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export type { ViewerTarget, ViewerUrlFor, ViewerKind } from "./viewer/types";
 export { isViewable, viewerKind } from "./viewer/kind";
@@ -174,29 +167,6 @@ export interface ViewerSteps {
     readonly onStep: (by: -1 | 1) => void;
 }
 
-/** What answers Left and Right itself: text being edited, and anything that
- *  slides - a media player's seek bar, a zoom. */
-const OWNS_ARROW_KEYS = [
-    "input",
-    "textarea",
-    "select",
-    "[contenteditable='']",
-    "[contenteditable='true']",
-    "[role='slider']",
-    "[role='textbox']"
-].join(", ");
-
-/** Whether a key press belongs to whatever it was pressed in rather than to the
- *  viewer's own Left/Right: a field, an editor, or a control that already
- *  answered it. */
-function keyBelongsToTarget(event: ReactKeyboardEvent): boolean {
-    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
-        return true;
-    const target = event.target as HTMLElement | null;
-    if (!target || typeof target.closest !== "function") return false;
-    return target.closest(OWNS_ARROW_KEYS) !== null;
-}
-
 export function FileViewer({
     target,
     onOpenChange,
@@ -277,14 +247,11 @@ export function FileViewer({
                 ref={content}
                 className="flex max-h-[90vh] max-w-6xl flex-col gap-0 overflow-hidden p-0"
                 onKeyDown={(event) => {
-                    if (!stepping || keyBelongsToTarget(event)) return;
-                    if (canBack && shortcutPressed(event, "viewer.previousFile")) {
-                        event.preventDefault();
-                        stepping.onStep(-1);
-                    } else if (canForward && shortcutPressed(event, "viewer.nextFile")) {
-                        event.preventDefault();
-                        stepping.onStep(1);
-                    }
+                    if (!stepping) return;
+                    const by = stepOfKey(event, stepping.index, stepping.count);
+                    if (by === 0) return;
+                    event.preventDefault();
+                    stepping.onStep(by);
                 }}
             >
                 <DialogHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
@@ -292,34 +259,11 @@ export function FileViewer({
                     {target ? (
                         <div className="mr-8 flex shrink-0 items-center gap-2">
                             {stepping ? (
-                                <div className="flex items-center gap-0.5">
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        aria-label={t("viewer.previousFile")}
-                                        title={t("viewer.previousFile")}
-                                        disabled={!canBack}
-                                        onClick={() => stepping.onStep(-1)}
-                                    >
-                                        <ChevronLeft className="size-4 shrink-0" aria-hidden />
-                                    </Button>
-                                    <span
-                                        className="min-w-[3.5rem] text-center text-xs tabular-nums text-muted-foreground"
-                                        aria-live="polite"
-                                    >
-                                        {stepping.index + 1} of {stepping.count}
-                                    </span>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        aria-label={t("viewer.nextFile")}
-                                        title={t("viewer.nextFile")}
-                                        disabled={!canForward}
-                                        onClick={() => stepping.onStep(1)}
-                                    >
-                                        <ChevronRight className="size-4 shrink-0" aria-hidden />
-                                    </Button>
-                                </div>
+                                <StepControls
+                                    index={stepping.index}
+                                    count={stepping.count}
+                                    onStep={stepping.onStep}
+                                />
                             ) : null}
                             {onShare ? (
                                 <Button size="sm" variant="ghost" onClick={() => onShare(target)}>

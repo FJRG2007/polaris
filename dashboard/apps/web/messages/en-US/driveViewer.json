@@ -57,6 +57,7 @@
     "viewer": {
         "previousFile": "Previous file",
         "nextFile": "Next file",
+        "position": "{index} of {count}",
         "share": "Share",
         "fetching": "Fetching",
         "download": "Download",

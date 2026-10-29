@@ -171,7 +171,8 @@
         },
         "view": {
             "list": "List view",
-            "grid": "Grid view"
+            "grid": "Grid view",
+            "photos": "Photo view"
         },
         "filters": {
             "button": "Filters",
