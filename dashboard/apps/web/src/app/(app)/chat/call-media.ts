@@ -163,14 +163,21 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
     // Polaris's own picker first; the pick is handed over just before the
     // request below, which then shares exactly that. Closing it is the same
     // answer as cancelling a browser's picker.
+    // The picker opens at once and fills itself in: listing what can be shared
+    // takes the app most of a second on Windows. A capture device (a capture
+    // card, a camera) picked there is opened as a camera and goes out as the
+    // share; macOS, whose own picker is the one to use, never sees this one.
     const desktop = desktopBridge();
-    if (desktop?.shareSources && desktop.chooseShare && canPickDesktopShare()) {
-        const listed = await desktop.shareSources().catch(() => null);
-        if (listed) {
-            const pick = await pickDesktopShare(desktop, listed);
-            if (!pick) throw new DOMException("The share was cancelled.", "AbortError");
-            await desktop.chooseShare(pick);
-        }
+    if (
+        desktop?.shareSources &&
+        desktop.chooseShare &&
+        desktop.platform !== "darwin" &&
+        canPickDesktopShare()
+    ) {
+        const pick = await pickDesktopShare(desktop);
+        if (!pick) throw new DOMException("The share was cancelled.", "AbortError");
+        if (pick.kind === "device") return openCaptureDevice(pick, video);
+        if (pick.kind === "source") await desktop.chooseShare({ id: pick.id, sound: pick.sound });
     }
     const ask = (withSound: boolean) =>
         navigator.mediaDevices.getDisplayMedia(
@@ -211,6 +218,33 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
         if (cannotCarrySound(caught)) rememberNoScreenSound();
         return await ask(false);
     }
+}
+
+/**
+ * Open a capture device picked in the desktop picker, as a share.
+ *
+ * `getUserMedia` rather than `getDisplayMedia`: a capture card is a camera as
+ * far as the browser is concerned. Its sound, when asked for, is the audio
+ * input that belongs to the same device, raw for the reason a screen's is.
+ *
+ * @param video - The size to ask for, from `call-quality`; only ideals, so a
+ *   device that cannot meet them still opens.
+ */
+async function openCaptureDevice(
+    pick: { readonly deviceId: string; readonly audioId: string | null },
+    video: MediaTrackConstraints
+): Promise<MediaStream> {
+    return navigator.mediaDevices.getUserMedia({
+        video: { ...video, deviceId: { exact: pick.deviceId } },
+        audio: pick.audioId
+            ? {
+                  deviceId: { exact: pick.audioId },
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false
+              }
+            : false
+    });
 }
 
 /**

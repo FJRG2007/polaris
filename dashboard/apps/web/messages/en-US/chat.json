@@ -2086,15 +2086,20 @@
     "sharePicker": {
         "title": "Choose what to share",
         "description": "Everyone in the call sees what you pick.",
-        "screens": "Screens ({count})",
-        "windows": "Windows ({count})",
+        "applications": "Applications",
+        "entireScreen": "Entire Screen",
+        "devices": "Devices",
+        "loading": "Finding what you can share",
         "noScreens": "No screens found.",
         "noWindows": "No open windows to share.",
+        "noDevices": "No cameras or capture devices found.",
+        "untitledDevice": "Video device {number}",
         "untitled": "Untitled window",
         "sound": "Share this computer's sound",
+        "deviceSound": "Share the device's sound",
         "cancel": "Cancel",
         "share": "Start sharing",
-        "pickFirst": "Pick a screen or a window first."
+        "pickFirst": "Pick something to share first."
     },
     "annotate": {
         "askToDraw": "Ask to draw on this screen",

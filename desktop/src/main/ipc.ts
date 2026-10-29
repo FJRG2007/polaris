@@ -237,9 +237,10 @@ export function registerIpc(host: IpcHost): void {
         return [...new Set(names)].sort((a, b) => a.localeCompare(b)).slice(0, 2000);
     });
 
-    ipcMain.handle(CHANNELS.shareSources, async (event) => {
+    ipcMain.handle(CHANNELS.shareSources, async (event, raw: unknown) => {
         if (!fromPolaris(event)) return null;
-        return listShareSources().catch((caught: unknown) => {
+        const input = z.object({ thumbnails: z.boolean().optional() }).optional().safeParse(raw);
+        return listShareSources(input.success ? input.data : undefined).catch((caught: unknown) => {
             console.error("[screen-share]", caught);
             return null;
         });

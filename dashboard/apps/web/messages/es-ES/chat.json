@@ -2086,15 +2086,20 @@
     "sharePicker": {
         "title": "Elige qué compartir",
         "description": "Todos en la llamada verán lo que elijas.",
-        "screens": "Pantallas ({count})",
-        "windows": "Ventanas ({count})",
+        "applications": "Aplicaciones",
+        "entireScreen": "Pantalla completa",
+        "devices": "Cámaras",
+        "loading": "Buscando qué puedes compartir",
         "noScreens": "No hay pantallas.",
         "noWindows": "No hay ventanas para compartir.",
+        "noDevices": "No hay cámaras ni capturadoras.",
+        "untitledDevice": "Dispositivo de vídeo {number}",
         "untitled": "Ventana sin título",
         "sound": "Compartir el sonido del PC",
+        "deviceSound": "Compartir el sonido del equipo",
         "cancel": "Cancelar",
         "share": "Compartir",
-        "pickFirst": "Elige antes pantalla o ventana."
+        "pickFirst": "Elige antes qué compartir."
     },
     "annotate": {
         "askToDraw": "Pedir dibujar en esta pantalla",

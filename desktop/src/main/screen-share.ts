@@ -64,10 +64,18 @@ function label(source: DesktopCapturerSource): string {
 }
 
 /** The screens and windows, each with a small picture, for the page's picker.
- *  Null where the system's own picker is the one to use. */
-export async function listShareSources(): Promise<ShareSources | null> {
+ *  Null where the system's own picker is the one to use.
+ *
+ *  Listing alone costs most of a second on Windows (measured: 0.6-1.0 s for
+ *  16 sources, 1.1-1.7 s with pictures and icons), so the picker opens at once
+ *  and asks twice: names first (`thumbnails: false`), pictures right after. */
+export async function listShareSources({ thumbnails = true }: { readonly thumbnails?: boolean; } = {}): Promise<ShareSources | null> {
     if (process.platform === "darwin") return null;
-    const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: THUMBNAIL, fetchWindowIcons: true });
+    const sources = await desktopCapturer.getSources(
+        thumbnails
+            ? { types: ["screen", "window"], thumbnailSize: THUMBNAIL, fetchWindowIcons: true }
+            : { types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } }
+    );
     const screens = sources.filter((source) => source.id.startsWith("screen:"));
     const windows = sources.filter((source) => !source.id.startsWith("screen:")).slice(0, MAX_WINDOWS);
     const shape = (source: DesktopCapturerSource): ShareSource => ({
