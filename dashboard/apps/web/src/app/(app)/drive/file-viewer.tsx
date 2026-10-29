@@ -183,13 +183,21 @@ const OWNS_ARROW_KEYS = [
     "[contenteditable='']",
     "[contenteditable='true']",
     "[role='slider']",
-    "[role='textbox']"
+    "[role='textbox']",
+    // A focused player seeks with the arrows.
+    "video",
+    "audio"
 ].join(", ");
 
 /** Whether a key press belongs to whatever it was pressed in rather than to the
  *  viewer's own Left/Right: a field, an editor, or a control that already
  *  answered it. */
-function keyBelongsToTarget(event: ReactKeyboardEvent): boolean {
+export function keyBelongsToTarget(
+    event: Pick<
+        ReactKeyboardEvent | KeyboardEvent,
+        "defaultPrevented" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "target"
+    >
+): boolean {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return true;
     const target = event.target as HTMLElement | null;
@@ -307,7 +315,10 @@ export function FileViewer({
                                         className="min-w-[3.5rem] text-center text-xs tabular-nums text-muted-foreground"
                                         aria-live="polite"
                                     >
-                                        {stepping.index + 1} of {stepping.count}
+                                        {t("viewer.position", {
+                                            index: stepping.index + 1,
+                                            count: stepping.count
+                                        })}
                                     </span>
                                     <Button
                                         size="icon"
