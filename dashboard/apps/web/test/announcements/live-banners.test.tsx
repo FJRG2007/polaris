@@ -254,9 +254,7 @@ describe("the banner stack follows along", () => {
             countdownTo: new Date(Date.now() + 60_000).toISOString()
         });
         read.mockResolvedValue({
-            banners: [
-                banner({ title: "Database upgrade", phase: "inProgress" })
-            ],
+            banners: [banner({ title: "Database upgrade", phase: "inProgress" })],
             nextChangeInMs: 3_600_000
         });
         render(

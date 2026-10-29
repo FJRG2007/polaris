@@ -293,7 +293,13 @@ describe("new releases are scanned on their own", () => {
                 project,
                 labels: {}
             },
-            { name: "fixture-other", ref: "aaa/fixture-alias:1", imageId, project: null, labels: {} },
+            {
+                name: "fixture-other",
+                ref: "aaa/fixture-alias:1",
+                imageId,
+                project: null,
+                labels: {}
+            },
             {
                 name: "fixture-relay",
                 ref: "docker.io/library/fixture-relay:latest",
