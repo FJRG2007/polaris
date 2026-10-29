@@ -45,7 +45,8 @@ window (on Windows, with a switch for the computer's sound); macOS shows its own
 When you let somebody in the call draw on a shared screen, their strokes also
 appear on that display, in a window that takes no clicks and, on Windows 10 2004
 and later and macOS, stays out of the share itself. A shared window, rather than
-a whole screen, is drawn on only for the others.
+a whole screen, and a share picked in macOS's own picker are drawn on only for
+the others, and the request to draw says so.
 
 When a newer version is released, Windows installs it in the background and it
 opens the next time the app starts; a notice and the Help menu offer to restart

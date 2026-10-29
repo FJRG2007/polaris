@@ -15,7 +15,8 @@
  *   or an AppImage is the package manager's or the user's to replace.
  *
  * A failed check says nothing and is tried again at the next interval; a
- * failed download falls back to the page.
+ * failed download, or a release Squirrel finds nothing newer in, falls back to
+ * the page.
  */
 
 import { existsSync } from "node:fs";
@@ -50,15 +51,17 @@ export function watchForUpdates(found: (update: Update) => void): void {
     const quiet = squirrelInstalled();
 
     if (quiet) {
-        autoUpdater.on("error", () => {
-            // The page is the way left: say it once for the version that failed.
+        // The page is the way left: say it once for the version that failed.
+        const fallBack = () => {
             const failed = installing;
             installing = null;
             if (failed && failed !== announced) {
                 announced = failed;
                 found({ version: failed, page: source.page(`desktop-v${failed}`) });
             }
-        });
+        };
+        autoUpdater.on("error", fallBack);
+        autoUpdater.on("update-not-available", fallBack);
         autoUpdater.on("update-downloaded", () => {
             const version = installing;
             if (!version) return;

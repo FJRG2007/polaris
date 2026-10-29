@@ -264,6 +264,15 @@ export function AnnotateLayer({
     aspectRef.current = aspect;
     const active = annotate?.drawing === owner;
 
+    useEffect(
+        () => () => {
+            const current = pen.current;
+            if (current?.timer) clearInterval(current.timer);
+            pen.current = null;
+        },
+        [active]
+    );
+
     useEffect(() => {
         const node = canvas.current;
         if (!annotate || !node) return;
@@ -355,6 +364,7 @@ export function AnnotateLayer({
                           const point = at(event);
                           if (!point) return;
                           event.currentTarget.setPointerCapture(event.pointerId);
+                          if (pen.current) flush(true);
                           pen.current = {
                               id: annotation.strokeId(),
                               pending: [point],
@@ -453,8 +463,29 @@ export function AnnotateButton({ owner }: { owner: string }) {
 export function AnnotateStrip() {
     const t = useTranslations("chat");
     const annotate = useAnnotate();
+    const [ownOverlay, setOwnOverlay] = useState<"none" | "share" | "shown">("none");
+    const asking = (annotate?.asks.length ?? 0) > 0;
+    useEffect(() => {
+        if (!asking) return;
+        const desktop = desktopBridge();
+        if (!desktop?.drawOnShare) {
+            setOwnOverlay("none");
+            return;
+        }
+        if (!desktop.canDrawOnShare) {
+            setOwnOverlay("shown");
+            return;
+        }
+        let live = true;
+        desktop.canDrawOnShare().then(
+            (drawable) => live && setOwnOverlay(drawable ? "shown" : "share"),
+            () => live && setOwnOverlay("share")
+        );
+        return () => {
+            live = false;
+        };
+    }, [asking]);
     if (!annotate) return null;
-    const ownOverlay = Boolean(desktopBridge()?.drawOnShare);
     const named = (seat: string) => annotate.nameOf(seat) ?? t("callRoom.somebody");
 
     return (
@@ -467,8 +498,10 @@ export function AnnotateStrip() {
                     <Pencil className="size-4 shrink-0 text-primary" aria-hidden />
                     <span className="min-w-0 flex-1">
                         {t("annotate.wantsToDraw", { name: named(seat) })}
-                        {!ownOverlay && (
-                            <span className="block text-muted-foreground">{t("annotate.onlyOthersSee")}</span>
+                        {ownOverlay !== "shown" && (
+                            <span className="block text-muted-foreground">
+                                {ownOverlay === "share" ? t("annotate.onlyOthersSeeShare") : t("annotate.onlyOthersSee")}
+                            </span>
                         )}
                     </span>
                     <Button size="sm" onClick={() => annotate.allow(seat)}>

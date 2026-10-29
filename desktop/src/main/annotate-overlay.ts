@@ -56,6 +56,11 @@ function open(display: Display): Overlay {
     return opened;
 }
 
+/** Whether what is being shared now is a display the strokes can be shown on. */
+export function canDrawOnShare(): boolean {
+    return sharedDisplay() !== null;
+}
+
 /** Show one stroke on the shared display. False when there is none to show it on. */
 export function drawOnShare(stroke: StrokeInput): boolean {
     const display = sharedDisplay();

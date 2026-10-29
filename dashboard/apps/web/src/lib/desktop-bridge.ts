@@ -81,6 +81,9 @@ export interface PolarisDesktop {
      *  display itself. False when there is nothing to draw on - a window share,
      *  or a share the app did not pick. */
     drawOnShare?(stroke: DesktopStroke): Promise<boolean>;
+    /** Whether the share going out now is one `drawOnShare` can draw on.
+     *  Absent from an app older than it. */
+    canDrawOnShare?(): Promise<boolean>;
     /** Take the drawing off the display: the share ended. */
     stopDrawing?(): Promise<void>;
 }

@@ -54,6 +54,7 @@ const bridge: PolarisDesktop = {
     shareSources: () => ipcRenderer.invoke(CHANNELS.shareSources),
     chooseShare: (input) => ipcRenderer.invoke(CHANNELS.chooseShare, input),
     drawOnShare: (stroke) => ipcRenderer.invoke(CHANNELS.drawOnShare, stroke),
+    canDrawOnShare: () => ipcRenderer.invoke(CHANNELS.canDrawOnShare),
     stopDrawing: () => ipcRenderer.invoke(CHANNELS.stopDrawing)
 };
 

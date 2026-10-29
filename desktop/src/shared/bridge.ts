@@ -93,7 +93,9 @@ export interface PolarisDesktop {
      *  display. False when there is nothing to draw on: a window share, or a
      *  share this app did not pick. */
     drawOnShare(stroke: StrokeInput): Promise<boolean>;
-    /** Take the drawing off the display. */
+    /** Whether the share going out now is one `drawOnShare` can draw on. */
+    canDrawOnShare(): Promise<boolean>;
+    /** Take the drawing off the display: the share ended. */
     stopDrawing(): Promise<void>;
 }
 
@@ -210,6 +212,7 @@ export const CHANNELS = {
     shareSources: "desktop:share-sources",
     chooseShare: "desktop:choose-share",
     drawOnShare: "desktop:draw-on-share",
+    canDrawOnShare: "desktop:can-draw-on-share",
     stopDrawing: "desktop:stop-drawing",
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",

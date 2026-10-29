@@ -10,8 +10,8 @@
 
 import { z } from "zod";
 import { runningPrograms } from "./game-detect";
-import { chooseShare, listShareSources, SOURCE_ID } from "./screen-share";
-import { drawOnShare, stopDrawing } from "./annotate-overlay";
+import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-share";
+import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { closeNotice, showNotice } from "./notices";
 import { isServerUrl, serverPath } from "./navigation";
@@ -259,8 +259,12 @@ export function registerIpc(host: IpcHost): void {
         return stroke.success ? drawOnShare(stroke.data) : false;
     });
 
+    ipcMain.handle(CHANNELS.canDrawOnShare, (event): boolean => fromPolaris(event) && canDrawOnShare());
+
     ipcMain.handle(CHANNELS.stopDrawing, (event): void => {
-        if (fromPolaris(event)) stopDrawing();
+        if (!fromPolaris(event)) return;
+        stopDrawing();
+        endShare();
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));

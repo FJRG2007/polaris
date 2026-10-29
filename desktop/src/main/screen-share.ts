@@ -53,6 +53,11 @@ export function sharedSource(): { readonly id: string; readonly displayId: strin
     return shared;
 }
 
+/** The share the page was drawing on ended. */
+export function endShare(): void {
+    shared = null;
+}
+
 function label(source: DesktopCapturerSource): string {
     const name = source.name.trim() || (source.id.startsWith("screen:") ? "Screen" : "Window");
     return name.length > MAX_LABEL ? `${name.slice(0, MAX_LABEL - 3)}...` : name;
@@ -125,6 +130,7 @@ export function installScreenShare(server: () => string | null): void {
                 refuse();
                 return;
             }
+            shared = null;
             choose(request.frame).then(
                 (chosen) => {
                     if (!chosen) {

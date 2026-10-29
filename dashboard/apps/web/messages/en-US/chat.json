@@ -2105,6 +2105,7 @@
         "color": "Pen {number}",
         "wantsToDraw": "{name} wants to draw on your screen.",
         "onlyOthersSee": "Everyone else sees it. To see it on your own screen, use the desktop app.",
+        "onlyOthersSeeShare": "Everyone else sees it. It won't show on your own screen for this share.",
         "allow": "Allow",
         "decline": "Decline",
         "canDraw": "Can draw on your screen: {names}",

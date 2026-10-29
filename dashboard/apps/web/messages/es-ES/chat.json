@@ -2105,6 +2105,7 @@
         "color": "Lápiz {number}",
         "wantsToDraw": "{name} quiere dibujar en tu pantalla.",
         "onlyOthersSee": "Los demás lo ven. Para verlo en tu pantalla, usa la app de escritorio.",
+        "onlyOthersSeeShare": "Los demás lo ven. En tu pantalla no aparece con lo que compartes.",
         "allow": "Permitir",
         "decline": "Rechazar",
         "canDraw": "Pueden dibujar en tu pantalla: {names}",
