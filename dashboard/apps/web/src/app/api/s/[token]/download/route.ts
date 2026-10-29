@@ -15,6 +15,7 @@ import { gateShareRequest } from "@/lib/share-access";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { logShareAccess, registerDownload, resolveWithinShare } from "@/lib/share-service";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
+import { drawsItsOwnFrame } from "@/lib/drive-thumbnail-kind";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,16 @@ export async function GET(
     const target = resolveWithinShare(share.path, requested);
     if (target === null) return deny(400, "path_outside_share");
 
+    // A grid tile taking one frame out of a video: the browser reads a few
+    // ranges of the file to draw it, and none of them is somebody downloading or
+    // watching it - so they are neither counted nor logged. Only a preview of a
+    // video asks this way, and never on a link with a download cap, where an
+    // uncounted read would be a way around the cap; that tile keeps its icon.
+    const frame = new URL(request.url).searchParams.get("purpose") === "thumbnail";
+    if (frame && (!inline || !drawsItsOwnFrame(target) || share.maxDownloads !== null)) {
+        return new Response(null, { status: 404 });
+    }
+
     const driver = await getDriverForConnection(share.connectionId);
     let disposed = false;
     try {
@@ -60,9 +71,16 @@ export async function GET(
 
         // Count the download atomically before streaming; if the cap was hit by a
         // concurrent request this returns false and we serve nothing.
-        if (!(await registerDownload(share.id))) return deny(410, "exhausted");
-
-        await logShareAccess({ shareId: share.id, action: "download", ip, ipHash, userAgentHash });
+        if (!frame) {
+            if (!(await registerDownload(share.id))) return deny(410, "exhausted");
+            await logShareAccess({
+                shareId: share.id,
+                action: "download",
+                ip,
+                ipHash,
+                userAgentHash
+            });
+        }
 
         const headerStore = await headers();
         const contentType =

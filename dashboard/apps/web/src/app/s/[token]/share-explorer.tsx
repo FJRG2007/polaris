@@ -32,6 +32,15 @@ import {
     PATH_SEARCH
 } from "@/app/(app)/drive/search-query";
 import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
+import { PhotoGrid, type PhotoGridHandle } from "@/app/(app)/drive/photo-grid";
+import { EntryThumbnail, type ThumbnailUrls } from "@/app/(app)/drive/entry-thumbnail";
+import { drawsItsOwnFrame, thumbnailKind } from "@/lib/drive-thumbnail-kind";
+import { fileSteps, isMediaFolder, steppedFile } from "@/lib/drive-media";
+import {
+    rememberViewMode,
+    rememberedViewMode,
+    type DriveViewMode
+} from "@/app/(app)/drive/view-mode";
 import {
     FILE_CATEGORIES,
     categoryOfExtension,
@@ -59,6 +68,7 @@ import {
     FolderOpen,
     FolderPlus,
     FolderTree,
+    Images,
     Info,
     LayoutGrid,
     List,
@@ -104,6 +114,64 @@ function fileUrl(token: string, path: string, inline: boolean): string {
     const query = new URLSearchParams({ p: path });
     if (inline) query.set("disposition", "inline");
     return `/api/s/${token}/download?${query.toString()}`;
+}
+
+/**
+ * Where a tile's picture is read from on a share: the share's own thumbnail
+ * route, and for a video the file itself, marked as a frame being taken so it is
+ * neither counted as a download nor logged as a visit.
+ */
+function shareThumbnailUrls(token: string, path: string, version: string): ThumbnailUrls {
+    const picture = new URLSearchParams({ p: path, v: version });
+    return {
+        picture: `/api/s/${token}/thumbnail?${picture.toString()}`,
+        video: `${fileUrl(token, path, true)}&purpose=thumbnail`
+    };
+}
+
+/** What makes a file this version of itself, for an address that can be cached. */
+function versionOf(entry: DriveEntry): string {
+    return `${entry.modifiedAt}-${entry.size}`;
+}
+
+/** A plain tap of a finger, which on a phone opens what it lands on: a double
+ *  tap is not something anybody does to a photo. */
+function plainTap(event: MouseEvent): boolean {
+    const pointer = (event.nativeEvent as PointerEvent).pointerType;
+    return pointer === "touch" && !event.shiftKey && !event.ctrlKey && !event.metaKey;
+}
+
+/**
+ * A grid tile's face: the picture where one can be drawn, else the icon. Outside
+ * the explorer so a re-render of it keeps the tile (and the picture it already
+ * has) rather than making a new one.
+ */
+function ShareTileFace({
+    token,
+    entry,
+    allowPreview,
+    icon
+}: {
+    readonly token: string;
+    readonly entry: DriveEntry;
+    readonly allowPreview: boolean;
+    readonly icon: React.ReactNode;
+}) {
+    const moving = entry.kind === "file" && drawsItsOwnFrame(entry.name);
+    if (!allowPreview || entry.kind !== "file" || (!moving && !thumbnailKind(entry.name))) {
+        return <>{icon}</>;
+    }
+    return (
+        <EntryThumbnail
+            urls={shareThumbnailUrls(token, entry.path, versionOf(entry))}
+            path={entry.path}
+            version={versionOf(entry)}
+            moving={moving}
+            className="h-24 w-full overflow-hidden rounded-md"
+        >
+            {icon}
+        </EntryThumbnail>
+    );
 }
 
 /** URL of the token ZIP route bundling several paths (files and/or folders). */
@@ -187,7 +255,10 @@ export function ShareExplorer({
 
     const [sortKey, setSortKey] = useState<SortKey>("name");
     const [sortDir, setSortDir] = useState<SortDir>("asc");
-    const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+    // Until the visitor picks an order, each layout opens in its own, as on the
+    // owner's side: the photo view newest first, the others by name.
+    const sortChosen = useRef(false);
+    const [viewMode, setViewMode] = useState<DriveViewMode>("list");
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
     const [extFilter, setExtFilter] = useState("");
@@ -382,6 +453,51 @@ export function ShareExplorer({
         });
     }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir]);
 
+    /*
+     * The layout is chosen per folder, as on the owner's side: the one this
+     * visitor last picked for it on this device, else the photo view for a
+     * folder that is mostly pictures and videos, else list or grid as last used.
+     * A link with previews off shows no pictures, so it is never a photo view.
+     */
+    const mediaFolder = useMemo(
+        () => allowPreview && isMediaFolder(entries),
+        [allowPreview, entries]
+    );
+    const lastPlainView = useRef<DriveViewMode>("list");
+    const photoGrid = useRef<PhotoGridHandle>(null);
+    /** Where the keyboard is in the photo view, apart from the range anchor. */
+    const photoCursor = useRef<number | null>(null);
+    const viewKey = `share:${token}`;
+    useEffect(() => {
+        if (loading) return;
+        photoCursor.current = null;
+        const remembered = rememberedViewMode(viewKey, path);
+        const mode = remembered ?? (mediaFolder ? "photos" : lastPlainView.current);
+        setViewMode(mode === "photos" && !allowPreview ? lastPlainView.current : mode);
+    }, [viewKey, path, loading, mediaFolder, allowPreview]);
+
+    useEffect(() => {
+        if (sortChosen.current) return;
+        const photos = viewMode === "photos";
+        setSortKey(photos ? "modified" : "name");
+        setSortDir(photos ? "desc" : "asc");
+    }, [viewMode]);
+
+    function chooseView(mode: DriveViewMode) {
+        if (mode !== "photos") lastPlainView.current = mode;
+        setViewMode(mode);
+        rememberViewMode(viewKey, path, mode);
+    }
+
+    /** The files the preview steps through: the viewable ones, in display order. */
+    const viewable = useMemo(
+        () =>
+            allowPreview
+                ? visible.filter((entry) => entry.kind === "file" && isViewable(entry.name))
+                : [],
+        [allowPreview, visible]
+    );
+
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
     const searchError = useMemo(() => parseSearch(query).error, [query]);
@@ -410,6 +526,32 @@ export function ShareExplorer({
             modifiedAt: entry.modifiedAt,
             locationLabel: parentRel ? `${rootName}/${parentRel}` : rootName
         });
+    }
+
+    function stepViewer(by: -1 | 1) {
+        const next = viewerTarget ? steppedFile(viewable, viewerTarget.path, by) : null;
+        if (next) openViewer(next);
+    }
+
+    /** A tile clicked in the grid or the photo view: selected, and opened by a
+     *  finger. */
+    function tileClick(event: MouseEvent, index: number, entry: DriveEntry) {
+        photoCursor.current = index;
+        rowClick(event, index, entry);
+        if (plainTap(event)) openEntry(entry);
+    }
+
+    /** The photo view's arrow keys landed on a listing position. */
+    function movePhotoCursor(index: number, extend: boolean) {
+        const entry = visible[index];
+        if (!entry) return;
+        photoCursor.current = index;
+        if (extend) selectRange(index);
+        else {
+            setSelected(new Set([entry.path]));
+            lastIndex.current = index;
+        }
+        photoGrid.current?.scrollToIndex(index);
     }
 
     /** Open an item: folders navigate; files preview when allowed, else download. */
@@ -880,7 +1022,10 @@ export function ShareExplorer({
                         <button
                             key={key}
                             type="button"
-                            onClick={() => setSortKey(key)}
+                            onClick={() => {
+                                sortChosen.current = true;
+                                setSortKey(key);
+                            }}
                             className={cn(
                                 "rounded px-2 py-1 text-xs capitalize transition-colors hover:bg-muted",
                                 sortKey === key && "bg-muted font-medium"
@@ -891,7 +1036,10 @@ export function ShareExplorer({
                     ))}
                     <button
                         type="button"
-                        onClick={() => setSortDir((prev) => (prev === "asc" ? "desc" : "asc"))}
+                        onClick={() => {
+                            sortChosen.current = true;
+                            setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+                        }}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
                         aria-label={
                             sortDir === "asc"
@@ -909,8 +1057,9 @@ export function ShareExplorer({
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                     <button
                         type="button"
-                        onClick={() => setViewMode("list")}
+                        onClick={() => chooseView("list")}
                         aria-label={td("filesView.view.list")}
+                        title={td("filesView.view.list")}
                         className={cn(
                             "rounded p-1 transition-colors hover:bg-muted",
                             viewMode === "list"
@@ -922,8 +1071,9 @@ export function ShareExplorer({
                     </button>
                     <button
                         type="button"
-                        onClick={() => setViewMode("grid")}
+                        onClick={() => chooseView("grid")}
                         aria-label={td("filesView.view.grid")}
+                        title={td("filesView.view.grid")}
                         className={cn(
                             "rounded p-1 transition-colors hover:bg-muted",
                             viewMode === "grid"
@@ -933,6 +1083,24 @@ export function ShareExplorer({
                     >
                         <LayoutGrid className="size-4" />
                     </button>
+                    {/* Offered where it means something - a folder of photos -
+                        and kept while it is the one in use. */}
+                    {mediaFolder || viewMode === "photos" ? (
+                        <button
+                            type="button"
+                            onClick={() => chooseView("photos")}
+                            aria-label={td("filesView.view.photos")}
+                            title={td("filesView.view.photos")}
+                            className={cn(
+                                "rounded p-1 transition-colors hover:bg-muted",
+                                viewMode === "photos"
+                                    ? "bg-muted text-foreground"
+                                    : "text-muted-foreground"
+                            )}
+                        >
+                            <Images className="size-4" />
+                        </button>
+                    ) : null}
                 </div>
                 <Button
                     size="sm"
@@ -1124,7 +1292,7 @@ export function ShareExplorer({
                 ) : null}
 
                 {loading ? (
-                    <ListingSkeleton viewMode={viewMode} />
+                    <ListingSkeleton viewMode={viewMode === "list" ? "list" : "grid"} />
                 ) : error ? (
                     <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         {error}
@@ -1137,6 +1305,43 @@ export function ShareExplorer({
                               ? t("share.empty.dropHere")
                               : td("filesView.empty.folderEmpty")}
                     </p>
+                ) : viewMode === "photos" ? (
+                    <div onKeyDown={onListKeyDown}>
+                        <PhotoGrid
+                            handle={photoGrid}
+                            entries={visible}
+                            selected={selected}
+                            cursor={() => photoCursor.current ?? lastIndex.current ?? -1}
+                            byDate={
+                                sortKey === "created"
+                                    ? "createdAt"
+                                    : sortKey === "modified"
+                                      ? "modifiedAt"
+                                      : null
+                            }
+                            source={(entry) => ({
+                                path: entry.path,
+                                urls: shareThumbnailUrls(token, entry.path, versionOf(entry))
+                            })}
+                            icon={(entry) => <EntryIcon entry={entry} className="size-10" />}
+                            onTileClick={tileClick}
+                            onOpen={openEntry}
+                            onCursor={movePhotoCursor}
+                            wrap={(entry, index, tile) => (
+                                <ContextMenu key={entry.path}>
+                                    <ContextMenuTrigger asChild>
+                                        <div
+                                            onContextMenu={() => rowContextMenu(index, entry)}
+                                            className="relative shrink-0 rounded-md"
+                                        >
+                                            {tile}
+                                        </div>
+                                    </ContextMenuTrigger>
+                                    {entryMenu(entry)}
+                                </ContextMenu>
+                            )}
+                        />
+                    </div>
                 ) : viewMode === "grid" ? (
                     <div
                         onKeyDown={onListKeyDown}
@@ -1147,17 +1352,22 @@ export function ShareExplorer({
                                 <ContextMenuTrigger asChild>
                                     <button
                                         type="button"
-                                        onClick={(event) => rowClick(event, index, entry)}
+                                        onClick={(event) => tileClick(event, index, entry)}
                                         onContextMenu={() => rowContextMenu(index, entry)}
                                         onDoubleClick={() => openEntry(entry)}
                                         className={cn(
-                                            "group flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
+                                            "group flex min-w-0 flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
                                             selected.has(entry.path)
                                                 ? "border-primary/50 bg-primary/5"
                                                 : "border-border hover:bg-card-hover"
                                         )}
                                     >
-                                        <EntryIcon entry={entry} className="size-10" />
+                                        <ShareTileFace
+                                            token={token}
+                                            entry={entry}
+                                            allowPreview={allowPreview}
+                                            icon={<EntryIcon entry={entry} className="size-10" />}
+                                        />
                                         <span className="line-clamp-2 w-full break-words text-xs">
                                             {entry.name}
                                         </span>
@@ -1396,7 +1606,19 @@ export function ShareExplorer({
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
                 token={token}
                 readOnly
-                thumbnailFor={(target) => flying.thumbnailBy("data-share-thumbnail", target.path)}
+                allowDownload={allowDownload}
+                steps={
+                    viewerTarget
+                        ? { ...fileSteps(viewable, viewerTarget.path), onStep: stepViewer }
+                        : undefined
+                }
+                thumbnailFor={(target) =>
+                    flying.thumbnailBy(
+                        "data-drive-thumbnail",
+                        target.path,
+                        "img:not([data-pending])"
+                    ) ?? flying.thumbnailBy("data-share-thumbnail", target.path)
+                }
             />
         </div>
     );
