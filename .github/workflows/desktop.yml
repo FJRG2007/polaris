@@ -10,7 +10,12 @@ name: Desktop
 # Unsigned unless the signing secrets exist (see desktop/README.md for their
 # names). Secrets are handed only to the step that signs, never to `npm ci`,
 # which runs third-party install scripts, and only on a `desktop-v*` tag or on
-# main: a run by hand from any other branch builds unsigned.
+# main: a run by hand from any other branch builds unsigned. Windows is signed
+# through SignPath once its token and variables exist, and with the certificate
+# file otherwise.
+#
+# The release also carries the macOS update feeds and a SHA256SUMS of every
+# file, which the app's self-update reads (desktop/src/main/updates.ts).
 #
 # Node 22 on purpose: the packager's zip extractor stops silently, reporting
 # success, on newer Node, and the installers come out empty.
@@ -71,7 +76,8 @@ jobs:
           - os: ubuntu-latest
             arch: x64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # Windows waits for SignPath requests to be approved, once SignPath is set up.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 150 || 45 }}
     defaults:
       run:
         working-directory: desktop
@@ -117,8 +123,18 @@ jobs:
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
         run: |
-          echo "windows=$([ -n "$WINDOWS_CERTIFICATE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          signpath=false
+          if [ -n "$SIGNPATH_API_TOKEN" ] && [ -n "$SIGNPATH_ORGANIZATION_ID" ] && [ -n "$SIGNPATH_PROJECT_SLUG" ] && [ -n "$SIGNPATH_SIGNING_POLICY_SLUG" ]; then
+            signpath=true
+          fi
+          echo "signpath=$signpath" >> "$GITHUB_OUTPUT"
+          # SignPath, once set up, signs Windows instead of the certificate file.
+          echo "windows=$([ -n "$WINDOWS_CERTIFICATE_BASE64" ] && [ "$signpath" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "apple=$([ -n "$APPLE_CERTIFICATE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Windows code-signing certificate
@@ -149,6 +165,7 @@ jobs:
           rm -f "$certificate"
 
       - name: Build the installers
+        if: runner.os != 'Windows' || steps.signing.outputs.signpath != 'true'
         env:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ steps.signing.outputs.windows == 'true' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
@@ -158,6 +175,79 @@ jobs:
         run: |
           npm run build
           npx electron-forge make --arch=${{ matrix.arch }}
+
+      # Windows through SignPath, in two rounds, because Squirrel packs the app
+      # into the installer: the packaged app is signed first and the installer
+      # is made from it, so the package inside carries the signed polaris.exe;
+      # then the installer itself is signed. Squirrel's own helpers (Update.exe
+      # and the shortcut stub) are upstream binaries and stay unsigned, as
+      # SignPath Foundation signs only what is built from this repository.
+      - name: Package the app to sign
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        run: |
+          npm run build
+          npx electron-forge package --arch=${{ matrix.arch }}
+
+      - name: Upload the app to sign
+        id: unsigned-app
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app-${{ runner.os }}-${{ matrix.arch }}
+          path: desktop/out/Polaris-win32-${{ matrix.arch }}/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Sign the app
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          # A release signing request waits for a person to approve it.
+          wait-for-completion-timeout-in-seconds: 2700
+          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-app
+
+      - name: Make the installer from the signed app
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        run: |
+          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/polaris.exe').Status -ne 'Valid') { Write-Error 'polaris.exe came back without a valid signature.'; exit 1 }"
+          rm -rf "out/Polaris-win32-${{ matrix.arch }}"
+          mv out/signed-app "out/Polaris-win32-${{ matrix.arch }}"
+          npx electron-forge make --skip-package --arch=${{ matrix.arch }}
+
+      - name: Upload the installer to sign
+        id: unsigned-installer
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer-${{ runner.os }}-${{ matrix.arch }}
+          path: desktop/out/make/squirrel.windows/${{ matrix.arch }}/Polaris-Setup.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Sign the installer
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 2700
+          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-installer
+
+      - name: Put the signed installer in place
+        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
+        run: |
+          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-installer/Polaris-Setup.exe').Status -ne 'Valid') { Write-Error 'Polaris-Setup.exe came back without a valid signature.'; exit 1 }"
+          mv -f out/signed-installer/Polaris-Setup.exe "out/make/squirrel.windows/${{ matrix.arch }}/Polaris-Setup.exe"
 
       - name: Remove the signing material
         if: always()
@@ -181,10 +271,36 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: desktop/build
       - uses: actions/download-artifact@v4
         with:
           pattern: polaris-desktop-*
           path: installers
+      # The macOS update feeds name this release's zips (src/main/updates.ts);
+      # the checksums are what an AppImage checks its replacement against.
+      - name: Update feeds and checksums
+        env:
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          version="${TAG#desktop-v}"
+          for arch in arm64 x64; do
+            zip="$(find installers -path "*/zip/darwin/$arch/*.zip" -print -quit)"
+            if [ -z "$zip" ]; then
+              echo "No macOS $arch zip to point the update feed at." >&2
+              exit 1
+            fi
+            node desktop/build/mac-feed.cjs "$arch" "$version" "https://github.com/$REPOSITORY/releases/download/$TAG/$(basename "$zip")" installers
+          done
+          find installers -type f \( -name '*.exe' -o -name '*.nupkg' -o -name 'RELEASES' -o -name 'RELEASES-darwin-*.json' -o -name '*.dmg' -o -name '*.zip' -o -name '*.deb' -o -name '*.AppImage' \) \
+            -exec sha256sum {} + | sed -E 's#^([0-9a-f]{64}) [ *].*/#\1  #' | sort -k 2 > SHA256SUMS
+          if [ -n "$(cut -c 67- SHA256SUMS | uniq -d)" ]; then
+            echo "Two release files share a name." >&2
+            exit 1
+          fi
+          mv SHA256SUMS installers/SHA256SUMS
       - name: Attach to release
         uses: softprops/action-gh-release@v2
         with:
@@ -201,3 +317,5 @@ jobs:
             installers/**/*.zip
             installers/**/*.deb
             installers/**/*.AppImage
+            installers/RELEASES-darwin-*.json
+            installers/SHA256SUMS

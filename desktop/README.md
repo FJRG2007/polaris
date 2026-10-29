@@ -48,10 +48,12 @@ and later and macOS, stays out of the share itself. A shared window, rather than
 a whole screen, and a share picked in macOS's own picker are drawn on only for
 the others, and the request to draw says so.
 
-When a newer version is released, Windows installs it in the background and it
-opens the next time the app starts; a notice and the Help menu offer to restart
-into it now. On macOS and Linux a notice says so and the Help menu offers its
-download page.
+When a newer version is released, it is downloaded and installed in the
+background and opens the next time the app starts; a notice and the Help menu
+offer to restart into it now. That is the Windows installer, a macOS app signed
+with a Developer ID, and the AppImage, which is replaced only once the download
+matches the release's `SHA256SUMS`. For the .deb, an unsigned Mac app, or when
+an update fails, a notice says so and the Help menu offers its download page.
 
 On Linux systems that forbid unprivileged user namespaces (Ubuntu 24.04 and
 later by default), the .deb uses Chromium's setuid sandbox helper instead. The
@@ -80,7 +82,9 @@ the results are committed.
 Push a tag `desktop-v<version>` matching `version` in `package.json`.
 `.github/workflows/desktop.yml` builds the Windows installer (Squirrel), macOS
 `.dmg` and `.zip` for arm64 and x64, and a Linux `.deb` and AppImage, and
-attaches them to the tag's release. It can also be run by hand, which keeps the
+attaches them to the tag's release, with what self-update reads: a
+`RELEASES-darwin-<arch>.json` feed per Mac architecture (`build/mac-feed.cjs`)
+and a `SHA256SUMS` of every file. It can also be run by hand, which keeps the
 installers as workflow artifacts.
 
 Builds are unsigned unless these repository secrets exist. They are only used on
@@ -88,6 +92,7 @@ a `desktop-v*` tag or on `main`; a run by hand from another branch is unsigned.
 
 | Secret | Used for |
 | --- | --- |
+| `SIGNPATH_API_TOKEN` | Windows through SignPath (below); with it, the certificate file is not used |
 | `WINDOWS_CERTIFICATE_BASE64` | The code-signing certificate (`.pfx`), base64-encoded |
 | `WINDOWS_CERTIFICATE_PASSWORD` | Its password |
 | `APPLE_CERTIFICATE_BASE64` | The Developer ID Application certificate (`.p12`), base64-encoded |
@@ -96,7 +101,56 @@ a `desktop-v*` tag or on `main`; a run by hand from another branch is unsigned.
 | `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Notarization; skipped unless all three are set |
 
 An unsigned macOS app has to be opened with right-click > Open the first time,
-and Windows SmartScreen warns about an unsigned installer.
+and Windows SmartScreen warns about an unsigned installer. A Mac app updates
+itself only when it is signed with a Developer ID: Squirrel.Mac checks each
+update against the running app's signature.
+
+### Windows signing through SignPath
+
+Windows can be signed by the [SignPath Foundation](https://signpath.org) program
+for open-source projects instead of a certificate of our own. It is used once
+the secret above and these repository **variables** (Settings > Secrets and
+variables > Actions > Variables) exist, all copied from the SignPath project:
+
+| Variable | Value |
+| --- | --- |
+| `SIGNPATH_ORGANIZATION_ID` | The organization ID |
+| `SIGNPATH_PROJECT_SLUG` | The project's slug |
+| `SIGNPATH_SIGNING_POLICY_SLUG` | The signing policy's slug |
+
+The SignPath GitHub App has to be installed on the repository, and the project
+linked to it as a trusted build system. The project's default artifact
+configuration must be this one, since the workflow sends two zips through it:
+the packaged app, then the installer made from it.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="polaris.exe" min-matches="0">
+      <authenticode-sign/>
+    </pe-file>
+    <pe-file path="Polaris-Setup.exe" min-matches="0">
+      <authenticode-sign/>
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
+```
+
+Squirrel puts the app into the installer, so the app is signed first, the
+installer and update package are made from the signed app, and the installer is
+signed last; the workflow fails if either comes back without a valid signature.
+Squirrel's own `Update.exe` and the small launcher it puts in front of
+`polaris.exe` are upstream binaries, which SignPath Foundation does not sign, so
+they stay unsigned; SmartScreen judges the downloaded installer, which is signed.
+Each release asks an approver in SignPath twice, and the Windows build waits for
+both.
+
+SignPath Foundation requires the project to publish [CODE_SIGNING.md](CODE_SIGNING.md),
+linked as "Code signing policy" from the repository's home page and from the
+release notes, with this attribution:
+
+> Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org)
 
 ## Dependencies
 
