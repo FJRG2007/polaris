@@ -2095,5 +2095,19 @@
         "cancel": "Cancelar",
         "share": "Compartir",
         "pickFirst": "Elige antes pantalla o ventana."
+    },
+    "annotate": {
+        "askToDraw": "Pedir dibujar en esta pantalla",
+        "asked": "Petición enviada",
+        "declined": "No te dejó dibujar. Pídelo otra vez",
+        "draw": "Dibujar en esta pantalla",
+        "stopDrawing": "Dejar de dibujar",
+        "color": "Lápiz {number}",
+        "wantsToDraw": "{name} quiere dibujar en tu pantalla.",
+        "onlyOthersSee": "Los demás lo ven. Para verlo en tu pantalla, usa la app de escritorio.",
+        "allow": "Permitir",
+        "decline": "Rechazar",
+        "canDraw": "Pueden dibujar en tu pantalla: {names}",
+        "stopAll": "Quitar lápices"
     }
 }

@@ -11,6 +11,8 @@
 import { z } from "zod";
 import { runningPrograms } from "./game-detect";
 import { chooseShare, listShareSources, SOURCE_ID } from "./screen-share";
+import { drawOnShare, stopDrawing } from "./annotate-overlay";
+import { strokeSchema } from "@/shared/annotate";
 import { closeNotice, showNotice } from "./notices";
 import { isServerUrl, serverPath } from "./navigation";
 import { FolderRefusal, zipFolder } from "./folder-zip";
@@ -249,6 +251,16 @@ export function registerIpc(host: IpcHost): void {
         if (!input.success) return false;
         chooseShare(input.data.id, input.data.sound);
         return true;
+    });
+
+    ipcMain.handle(CHANNELS.drawOnShare, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const stroke = strokeSchema.safeParse(raw);
+        return stroke.success ? drawOnShare(stroke.data) : false;
+    });
+
+    ipcMain.handle(CHANNELS.stopDrawing, (event): void => {
+        if (fromPolaris(event)) stopDrawing();
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));

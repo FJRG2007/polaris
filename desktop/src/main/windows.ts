@@ -16,6 +16,7 @@
  */
 
 import { join } from "node:path";
+import { release } from "node:os";
 import { VERSION_ARGUMENT } from "@/shared/bridge";
 import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
@@ -28,7 +29,7 @@ import {
     type WebPreferences
 } from "electron";
 
-export type WindowKind = "polaris" | "connect" | "api-key" | "push";
+export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "overlay";
 
 const kinds = new Map<number, WindowKind>();
 
@@ -154,9 +155,53 @@ export function openPolarisWindow(
     return window;
 }
 
+/** The Windows build number, `10.0.<build>`; 0 when it cannot be read. */
+function windowsBuild(): number {
+    return Number(release().split(".")[2]) || 0;
+}
+
+/**
+ * The see-through window strokes are drawn in, over a whole display.
+ *
+ * It takes no clicks and no focus, so the person sharing goes on using their
+ * screen underneath it, and it is kept out of screen captures where the system
+ * allows that (Windows 10 2004 and later, macOS), so the share does not carry
+ * the strokes a second time behind the ones the room already draws.
+ */
+export function openOverlayWindow(bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; }): BrowserWindow {
+    const window = new BrowserWindow({
+        ...bounds,
+        show: false,
+        frame: false,
+        transparent: true,
+        backgroundColor: "#00000000",
+        hasShadow: false,
+        resizable: false,
+        movable: false,
+        minimizable: false,
+        maximizable: false,
+        fullscreenable: false,
+        focusable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        webPreferences: preferences("local.js")
+    });
+    register(window.webContents, "overlay");
+    window.setIgnoreMouseEvents(true);
+    // Before Windows 10 2004 a protected window is captured black rather than
+    // left out, which would black out the whole share.
+    if (process.platform !== "win32" || windowsBuild() >= 19041) window.setContentProtection(true);
+    window.setAlwaysOnTop(true, "screen-saver");
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    window.webContents.on("will-navigate", (event) => event.preventDefault());
+    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    void window.loadFile(join(__dirname, "..", "renderer", "overlay.html"));
+    return window;
+}
+
 /** A window showing one of this app's own pages. */
 export function openLocalWindow(
-    kind: Exclude<WindowKind, "polaris">,
+    kind: Exclude<WindowKind, "polaris" | "overlay">,
     options: { readonly title: string; readonly width: number; readonly height: number; readonly parent?: BrowserWindow; }
 ): BrowserWindow {
     const window = new BrowserWindow(

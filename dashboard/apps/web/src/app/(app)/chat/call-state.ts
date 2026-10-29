@@ -55,6 +55,8 @@ export interface PeerState {
     /** The game they claim to be playing in this call, as their attribute
      *  carries it; empty for none. Unvouched - see `lib/chat/call-activity`. */
     readonly activity?: string;
+    /** Who they let draw on the screen they are sharing. */
+    readonly annotators?: readonly string[];
 }
 
 /** One microphone or camera, as the picker lists it. */
@@ -256,6 +258,14 @@ export interface CallState {
     sendActivity: (to: readonly string[], message: unknown) => void;
     /** Hear game messages from the other seats; returns the way to stop. */
     listenActivity: (listener: (from: string, raw: unknown) => void) => () => void;
+
+    /** Say who may draw on this browser's shared screen (see
+     *  `lib/chat/call-annotate`), send a drawing message to some seats or the
+     *  whole room, and hear the room's. Optional so a hand-made state need not
+     *  say; a call without them offers no drawing. */
+    setAnnotators?: (value: string) => void;
+    sendAnnotate?: (to: readonly string[] | null, message: unknown) => void;
+    listenAnnotate?: (listener: (from: string, raw: unknown) => void) => () => void;
 
     /**
      * Whether sound is actually flowing, and what to say when it is not.

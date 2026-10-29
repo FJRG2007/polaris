@@ -52,7 +52,9 @@ const bridge: PolarisDesktop = {
     setCustomGames: (games) => ipcRenderer.invoke(CHANNELS.gameCustom, games),
     runningPrograms: () => ipcRenderer.invoke(CHANNELS.gamePrograms),
     shareSources: () => ipcRenderer.invoke(CHANNELS.shareSources),
-    chooseShare: (input) => ipcRenderer.invoke(CHANNELS.chooseShare, input)
+    chooseShare: (input) => ipcRenderer.invoke(CHANNELS.chooseShare, input),
+    drawOnShare: (stroke) => ipcRenderer.invoke(CHANNELS.drawOnShare, stroke),
+    stopDrawing: () => ipcRenderer.invoke(CHANNELS.stopDrawing)
 };
 
 contextBridge.exposeInMainWorld("polarisDesktop", bridge);

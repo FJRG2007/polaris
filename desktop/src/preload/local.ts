@@ -7,6 +7,7 @@
  */
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type { StrokeInput } from "@/shared/annotate";
 import { CHANNELS, type PolarisLocal, type PushEvent } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
@@ -33,6 +34,13 @@ const bridge: PolarisLocal = {
             const handler = (_event: IpcRendererEvent, payload: PushEvent) => listener(payload);
             ipcRenderer.on(CHANNELS.pushEvent, handler);
             return () => ipcRenderer.removeListener(CHANNELS.pushEvent, handler);
+        }
+    },
+    overlay: {
+        onStroke: (listener) => {
+            const handler = (_event: IpcRendererEvent, stroke: StrokeInput) => listener(stroke);
+            ipcRenderer.on(CHANNELS.overlayStroke, handler);
+            return () => ipcRenderer.removeListener(CHANNELS.overlayStroke, handler);
         }
     }
 };

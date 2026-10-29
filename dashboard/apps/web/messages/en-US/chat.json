@@ -2095,5 +2095,19 @@
         "cancel": "Cancel",
         "share": "Start sharing",
         "pickFirst": "Pick a screen or a window first."
+    },
+    "annotate": {
+        "askToDraw": "Ask to draw on this screen",
+        "asked": "Asked to draw",
+        "declined": "Not allowed to draw. Ask again",
+        "draw": "Draw on this screen",
+        "stopDrawing": "Put the pen down",
+        "color": "Pen {number}",
+        "wantsToDraw": "{name} wants to draw on your screen.",
+        "onlyOthersSee": "Everyone else sees it. To see it on your own screen, use the desktop app.",
+        "allow": "Allow",
+        "decline": "Decline",
+        "canDraw": "Can draw on your screen: {names}",
+        "stopAll": "Stop drawing"
     }
 }

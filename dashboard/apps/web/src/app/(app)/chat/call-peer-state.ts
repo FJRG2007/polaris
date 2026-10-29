@@ -30,6 +30,7 @@ import type { PeerState } from "./call-state";
 import { AUDIO_GROUP } from "./call-combine";
 import { handRaised, handRaisedAt } from "./call-signals";
 import { ACTIVITY_ATTRIBUTE } from "@/lib/chat/call-activity";
+import { annotatorsOf } from "@/lib/chat/call-annotate";
 
 /** The keys a browser writes about itself. */
 export const MUTED = "muted";
@@ -93,6 +94,7 @@ export function peerState(participant: PeerFacts): PeerState {
         group: participant.attributes?.[AUDIO_GROUP] || null,
         // A game they are playing in this call, as they claim it - believed
         // only once the server vouches for it. See `lib/chat/call-activity`.
-        activity: participant.attributes?.[ACTIVITY_ATTRIBUTE] ?? ""
+        activity: participant.attributes?.[ACTIVITY_ATTRIBUTE] ?? "",
+        annotators: annotatorsOf(participant.attributes)
     };
 }

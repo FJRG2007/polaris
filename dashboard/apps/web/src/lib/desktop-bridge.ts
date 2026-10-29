@@ -77,6 +77,20 @@ export interface PolarisDesktop {
     shareSources?(): Promise<DesktopShareSources | null>;
     /** What the picker chose, for the `getDisplayMedia` call that follows. */
     chooseShare?(input: { readonly id: string; readonly sound: boolean }): Promise<boolean>;
+    /** Draw a stroke somebody made on this browser's share over the shared
+     *  display itself. False when there is nothing to draw on - a window share,
+     *  or a share the app did not pick. */
+    drawOnShare?(stroke: DesktopStroke): Promise<boolean>;
+    /** Take the drawing off the display: the share ended. */
+    stopDrawing?(): Promise<void>;
+}
+
+/** Points of a stroke, as fractions of the shared picture. */
+export interface DesktopStroke {
+    readonly key: string;
+    readonly color: string;
+    readonly points: readonly (readonly [number, number])[];
+    readonly end: boolean;
 }
 
 /** A screen or a window the desktop app can share. */

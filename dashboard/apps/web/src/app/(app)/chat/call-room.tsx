@@ -91,6 +91,7 @@ import { useMutedSpeech } from "./muted-speech";
 import type { SeatModeration } from "./call-moderation-menu";
 import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
+import { AnnotateButton, AnnotateLayer, AnnotateProvider, AnnotateStrip } from "./call-annotate";
 import type { PickedPerson } from "@/components/people-picker";
 import {
     canShareScreen,
@@ -673,6 +674,7 @@ export function CallRoom({
         // may paint over the conversation underneath - which is what a short
         // window with a notice up used to look like: the messages drawn under
         // the call's own rows.
+        <AnnotateProvider call={call}>
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
             {/* What is not a control: raising a hand, bringing somebody in, and
                 writing the call down. None of them is reached for mid-sentence,
@@ -794,6 +796,9 @@ export function CallRoom({
             <CallNoticeStrip order={notices} />
 
             <CombineStrip call={call} />
+
+            {/* Who is asking to draw on this browser's share, and who can. */}
+            <AnnotateStrip />
 
             {/* Who has asked to speak, and in what order. Here rather than only
                 on the faces because a hand raised in a grid of eight thumbnails
@@ -1005,6 +1010,11 @@ export function CallRoom({
                             backLabel={letGo ? t("callRoom.backToThePeople") : undefined}
                             {...column}
                             screen
+                            annotate={
+                                stage.key === LOCAL_SCREEN_KEY
+                                    ? (call.participantId ?? undefined)
+                                    : stage.key.slice("screen:".length)
+                            }
                             // A shared screen is usually text, and the reason
                             // anybody stares at one is to read a line of it.
                             zoomable
@@ -1556,6 +1566,7 @@ export function CallRoom({
                 </DialogContent>
             </Dialog>
         </div>
+        </AnnotateProvider>
     );
 }
 
@@ -2509,7 +2520,8 @@ function Tile({
     streamMenu,
     moderation,
     hosting,
-    volumeKey
+    volumeKey,
+    annotate
 }: {
     stream: MediaStream | null;
     name: string;
@@ -2590,6 +2602,9 @@ function Tile({
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
+    /** On a shared screen: whose it is, so strokes can be drawn on it - see
+     *  `call-annotate`. */
+    annotate?: string;
 }) {
     const t = useTranslations("chat");
     const video = useRef<HTMLVideoElement>(null);
@@ -2852,6 +2867,13 @@ function Tile({
                     blank && "invisible"
                 )}
             />
+            {annotate && !blank && (
+                <AnnotateLayer
+                    owner={annotate}
+                    aspect={pictureShape}
+                    transform={zoomable ? look.transform : undefined}
+                />
+            )}
             {blank && (
                 // A face rather than a name in the middle of an empty rectangle.
                 // Most of a call is spent with the cameras off, so this is what
@@ -3031,6 +3053,7 @@ function Tile({
                 clear of the name. */}
             {!blank && (
                 <span {...controlsBox(screen ? "bottom-1 right-1" : "right-1 top-1")}>
+                    {screen && annotate && <AnnotateButton owner={annotate} />}
                     {screen && streamMenu && (
                         <StreamVolumeControl
                             name={streamMenu.name}

@@ -15,6 +15,7 @@
  * sentence anybody should be shown.
  */
 
+import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
@@ -88,6 +89,12 @@ export interface PolarisDesktop {
     shareSources(): Promise<ShareSources | null>;
     /** What the page's picker chose, for the `getDisplayMedia` that follows. */
     chooseShare(input: { readonly id: string; readonly sound: boolean; }): Promise<boolean>;
+    /** Draw a stroke somebody made on this computer's share over the shared
+     *  display. False when there is nothing to draw on: a window share, or a
+     *  share this app did not pick. */
+    drawOnShare(stroke: StrokeInput): Promise<boolean>;
+    /** Take the drawing off the display. */
+    stopDrawing(): Promise<void>;
 }
 
 /** A screen or a window that can be shared. */
@@ -165,6 +172,9 @@ export interface PolarisLocal {
         openService(): Promise<void>;
         onEvent(listener: (event: PushEvent) => void): () => void;
     };
+    readonly overlay: {
+        onStroke(listener: (stroke: StrokeInput) => void): () => void;
+    };
 }
 
 /** A button on a notice. */
@@ -199,6 +209,9 @@ export const CHANNELS = {
     gamePrograms: "desktop:game-programs",
     shareSources: "desktop:share-sources",
     chooseShare: "desktop:choose-share",
+    drawOnShare: "desktop:draw-on-share",
+    stopDrawing: "desktop:stop-drawing",
+    overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
     connectSwitch: "local:connect-switch",

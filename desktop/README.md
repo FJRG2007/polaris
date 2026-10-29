@@ -40,6 +40,13 @@ provider's pages in the window, since that is where the sign-in it started
 lives. File > Back returns to Polaris from a provider's page. Any other address
 opens in the system browser.
 
+Sharing your screen in a call opens a picker with a picture of every screen and
+window (on Windows, with a switch for the computer's sound); macOS shows its own.
+When you let somebody in the call draw on a shared screen, their strokes also
+appear on that display, in a window that takes no clicks and, on Windows 10 2004
+and later and macOS, stays out of the share itself. A shared window, rather than
+a whole screen, is drawn on only for the others.
+
 When a newer version is released, a notice says so and the Help menu offers its
 download page.
 
