@@ -8,8 +8,8 @@
  * along: the live channel says when one is published, edited, withdrawn or
  * closed in another tab, and a timer reads again at the next phase boundary
  * (maintenance ahead, under way, over), so nobody has to reload. Closing one hides it at
- * once and is undone if the server refuses; critical ones and maintenance under
- * way have no close button. A countdown ticks while maintenance is ahead.
+ * once and is undone if the server refuses; critical ones have no close button. A
+ * countdown ticks while maintenance is ahead.
  */
 
 import Link from "next/link";

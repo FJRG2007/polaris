@@ -25,6 +25,8 @@ export interface ListedContainer {
 export interface ServerImage {
     readonly imageId: string;
     readonly ref: string;
+    /** Every ref its containers were started from, `ref` among them. */
+    readonly refs: readonly string[];
     readonly source: ImageSource;
     /** Who uses it, as the screen names them: an app, a Polaris part, a container. */
     readonly users: readonly string[];
@@ -105,6 +107,24 @@ export function fromCliListing(ps: string, inspect: string): ListedContainer[] {
     return out;
 }
 
+/**
+ * One spelling of an image ref, as the engine resolves it: Docker Hub's
+ * registry and `library/` namespace spelled out, and `:latest` when no tag or
+ * digest is given - so `nginx` and `docker.io/library/nginx:latest` match.
+ */
+export function canonicalRef(ref: string): string {
+    const parts = ref.trim().split("/");
+    const first = parts[0] ?? "";
+    const hasRegistry =
+        parts.length > 1 && (first.includes(".") || first.includes(":") || first === "localhost");
+    const registry = hasRegistry ? parts.shift()! : "docker.io";
+    const hub = registry === "docker.io" || registry === "index.docker.io";
+    if (hub && parts.length === 1) parts.unshift("library");
+    const last = parts.pop() ?? "";
+    const tagged = last.includes("@") || last.includes(":");
+    return [hub ? "docker.io" : registry, ...parts, tagged ? last : `${last}:latest`].join("/");
+}
+
 /** Who put a container there. */
 export function sourceOf(container: ListedContainer): ImageSource {
     if (container.project && OWN_PROJECTS.has(container.project)) return "polaris";
@@ -132,6 +152,7 @@ export function groupImages(
         string,
         {
             ref: string;
+            refs: Set<string>;
             source: ImageSource;
             users: Set<string>;
             apps: Set<string>;
@@ -156,6 +177,7 @@ export function groupImages(
         if (!entry) {
             byId.set(container.imageId, {
                 ref: container.ref,
+                refs: new Set([container.ref]),
                 source,
                 users: new Set([user]),
                 apps: new Set(appId ? [appId] : []),
@@ -166,6 +188,7 @@ export function groupImages(
         if (appId && entry.apps.size < MAX_USERS) entry.apps.add(appId);
         if (partId && entry.parts.size < MAX_USERS) entry.parts.add(partId);
         if (rank[source] < rank[entry.source]) entry.source = source;
+        if (entry.refs.size < MAX_USERS) entry.refs.add(container.ref);
         // A ref someone typed reads better than the bare id a container may show.
         if (entry.ref.startsWith("sha256:") && !container.ref.startsWith("sha256:"))
             entry.ref = container.ref;
@@ -175,6 +198,7 @@ export function groupImages(
         .map(([imageId, entry]) => ({
             imageId,
             ref: entry.ref,
+            refs: [...entry.refs].sort(),
             source: entry.source,
             users: [...entry.users].filter(Boolean).sort(),
             applicationIds: [...entry.apps].sort(),

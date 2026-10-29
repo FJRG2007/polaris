@@ -75,16 +75,17 @@ describe("maintenance phases", () => {
 });
 
 describe("banner dismissal", () => {
-    it("critical and in-progress cannot be closed", () => {
-        expect(bannerDismissible("critical", "live")).toBe(false);
-        expect(bannerDismissible("info", "inProgress")).toBe(false);
-        expect(bannerDismissible("warning", "upcoming")).toBe(true);
+    it("only critical cannot be closed", () => {
+        expect(bannerDismissible("critical")).toBe(false);
+        expect(bannerDismissible("info")).toBe(true);
+        expect(bannerDismissible("warning")).toBe(true);
     });
 
     it("a banner closed in one phase comes back in the next", () => {
         expect(bannerHidden("upcoming", "upcoming", "warning")).toBe(true);
         expect(bannerHidden("finished", "upcoming", "warning")).toBe(false);
-        expect(bannerHidden("inProgress", "inProgress", "warning")).toBe(false);
+        expect(bannerHidden("inProgress", "inProgress", "warning")).toBe(true);
+        expect(bannerHidden("finished", "inProgress", "warning")).toBe(false);
         expect(bannerHidden("live", "live", "critical")).toBe(false);
     });
 });

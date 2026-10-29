@@ -54,9 +54,13 @@ export function bannerShowing(phase: Phase): boolean {
     return SHOWING.has(phase);
 }
 
-/** A critical message and maintenance under way stay until they are over. */
-export function bannerDismissible(severity: string, phase: Phase): boolean {
-    return severity !== "critical" && phase !== "inProgress";
+/**
+ * A critical message stays until it is over. Anything else can be closed, maintenance
+ * under way included: closing it hides it for this phase only, so it is back once the
+ * maintenance is finished.
+ */
+export function bannerDismissible(severity: string): boolean {
+    return severity !== "critical";
 }
 
 /** A banner closed in an earlier phase comes back when the phase changes. */
@@ -65,7 +69,7 @@ export function bannerHidden(
     dismissedPhase: string | null | undefined,
     severity: string
 ): boolean {
-    return dismissedPhase === phase && bannerDismissible(severity, phase);
+    return dismissedPhase === phase && bannerDismissible(severity);
 }
 
 /**

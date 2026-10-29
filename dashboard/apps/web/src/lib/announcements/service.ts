@@ -540,7 +540,7 @@ async function readBanners(
                 linkUrl: row.linkUrl,
                 linkLabel: row.linkLabel,
                 detailsUrl: hasDetails(row, row._count?.updates ?? 0) ? detailsPath(row.id) : null,
-                dismissible: bannerDismissible(row.severity, phase),
+                dismissible: bannerDismissible(row.severity),
                 countdownTo:
                     phase === "upcoming" && row.windowStart ? row.windowStart.toISOString() : null
             };
@@ -663,7 +663,7 @@ export async function dismissBanner(
     const row = await prisma.announcement.findUnique({ where: { id } });
     if (!row || !row.showBanner) return false;
     const phase = phaseAt(row, now);
-    if (!bannerShowing(phase) || !bannerDismissible(row.severity, phase)) return false;
+    if (!bannerShowing(phase) || !bannerDismissible(row.severity)) return false;
     const audience = readAudience(row.audience);
     if (!audience.everyone && !matchesAudience(await membershipOf(userId), audience)) return false;
     await prisma.announcementDismissal.upsert({

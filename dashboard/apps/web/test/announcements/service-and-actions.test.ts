@@ -180,6 +180,28 @@ describe("banner visibility", () => {
             expect.objectContaining({ create: { announcementId: ID, userId: "u1", phase: "live" } })
         );
     });
+
+    it("lets a reader close maintenance under way, for that phase", async () => {
+        const maintenance = row({
+            kind: "maintenance",
+            template: "maintenanceInProgress",
+            localized: true,
+            severity: "warning",
+            windowStart: new Date(now.getTime() - 60_000),
+            windowEnd: new Date(now.getTime() + 3_600_000)
+        });
+        db.announcement.findMany.mockResolvedValue([maintenance]);
+        const [banner] = await service.bannersFor("u1", reader, now);
+        expect(banner!.phase).toBe("inProgress");
+        expect(banner!.dismissible).toBe(true);
+        db.announcement.findUnique.mockResolvedValueOnce(maintenance);
+        expect(await service.dismissBanner("u1", ID, now)).toBe(true);
+        expect(db.announcementDismissal.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                create: { announcementId: ID, userId: "u1", phase: "inProgress" }
+            })
+        );
+    });
 });
 
 describe("the clock", () => {
