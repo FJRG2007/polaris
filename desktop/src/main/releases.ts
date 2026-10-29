@@ -16,7 +16,8 @@ const releasesSchema = z.array(
     z.object({
         tag_name: z.string(),
         draft: z.boolean(),
-        prerelease: z.boolean()
+        prerelease: z.boolean(),
+        assets: z.array(z.object({ name: z.string(), size: z.number().int().nonnegative() })).default([])
     })
 );
 
@@ -49,9 +50,16 @@ export function releaseSource(
     };
 }
 
+/** A file attached to a release, as the release list names and sizes it. */
+export interface Asset {
+    readonly name: string;
+    readonly size: number;
+}
+
 export interface Release {
     readonly version: string;
     readonly tag: string;
+    readonly assets: readonly Asset[];
 }
 
 /** The newest published release in the list that is newer than `current`, or
@@ -66,7 +74,53 @@ export function newerRelease(body: unknown, current: string): Release | null {
         const text = release.tag_name.slice(TAG_PREFIX.length);
         const version = parseVersion(text);
         if (!version || compare(version, running) <= 0) continue;
-        if (!newest || compare(version, newest.version) > 0) newest = { release: { version: text, tag: release.tag_name }, version };
+        if (!newest || compare(version, newest.version) > 0) newest = { release: { version: text, tag: release.tag_name, assets: release.assets }, version };
     }
     return newest?.release ?? null;
+}
+
+/** The checksums file the release job attaches beside the installers. */
+export const CHECKSUMS = "SHA256SUMS";
+
+/** The update feed the release job writes for a macOS architecture, read by
+ *  Squirrel.Mac as a `json` server. Named the same in build/release-files.cjs. */
+export function macFeedName(arch: string): string {
+    return `RELEASES-darwin-${arch}.json`;
+}
+
+/** `sha256sum` output as file name to lowercase digest. Lines that are not one
+ *  are skipped; a name listed twice keeps neither, since it is not known which
+ *  one is right. */
+export function parseChecksums(text: string): Map<string, string> {
+    const sums = new Map<string, string>();
+    const repeated = new Set<string>();
+    for (const line of text.split("\n")) {
+        const match = /^([0-9a-fA-F]{64}) [ *](.+)$/.exec(line.trim());
+        if (!match) continue;
+        const [, digest, name] = match;
+        if (!digest || !name) continue;
+        if (sums.has(name)) repeated.add(name);
+        sums.set(name, digest.toLowerCase());
+    }
+    for (const name of repeated) sums.delete(name);
+    return sums;
+}
+
+const ARCH_NAMES: Readonly<Record<string, readonly string[]>> = {
+    x64: ["x64", "x86_64", "amd64"],
+    arm64: ["arm64", "aarch64"]
+};
+
+/** The release's AppImage for this architecture, or null when it has none or
+ *  more than one could be meant. */
+export function appImageAsset(assets: readonly Asset[], arch: string): Asset | null {
+    const names = ARCH_NAMES[arch];
+    if (!names) return null;
+    const matching = assets.filter(
+        (asset) =>
+            asset.name.endsWith(".AppImage") &&
+            asset.size > 0 &&
+            names.some((name) => asset.name.slice(0, -".AppImage".length).split(/[-.]/).includes(name))
+    );
+    return matching.length === 1 ? (matching[0] ?? null) : null;
 }
