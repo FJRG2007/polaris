@@ -28,6 +28,7 @@ import type { DriveAbilities } from "@/lib/drive-authz";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
+import { crumbEntry } from "./crumb-entry";
 import { usePolarContext } from "@/components/polar/polar-panel";
 import * as flying from "@polaris/ui/image-flight";
 import { useDriveInsights } from "./use-drive-insights";
@@ -553,6 +554,8 @@ export function FilesView({
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
     // Breadcrumb segment currently under a drag, highlighted as a move target.
     const [dropSegment, setDropSegment] = useState<string | null>(null);
+    // Breadcrumb segment whose folder menu is open.
+    const [crumbMenu, setCrumbMenu] = useState<string | null>(null);
     // Folder row/cell currently under a drag, highlighted as the drop target.
     const [dropFolder, setDropFolder] = useState<string | null>(null);
     // Folder picked for upload, awaiting an in-app confirmation (not the browser's).
@@ -1433,9 +1436,11 @@ export function FilesView({
      *  only make sense for a single thing (open, rename, notes, details) drop out.
      *  Rename puts an input where the name was, so the menu leaves focus there
      *  instead of taking it back and blurring the field away. */
-    function entryMenu(entry: DriveEntry) {
+    function entryMenu(entry: DriveEntry, alone = false) {
         if (trash) return trashMenu(entry);
-        const targets = menuTargets(entry);
+        // `alone`: the menu of a breadcrumb segment, which is about that folder
+        // and never the selection in the listing below it.
+        const targets = alone ? [entry] : menuTargets(entry);
         const many = targets.length > 1;
         const label = many
             ? t("filesView.menu.itemsSelected", { count: targets.length })
@@ -1506,7 +1511,8 @@ export function FilesView({
                         ) : null}
                     </>
                 )}
-                {many || !abilities.write ? null : (
+                {/* Renaming happens in the row, and a segment has none. */}
+                {many || alone || !abilities.write ? null : (
                     <ContextMenuItem onSelect={() => startRename(entry)}>
                         <Pencil className="size-4" />
                         {t("filesView.menu.rename")}
@@ -2121,20 +2127,35 @@ export function FilesView({
                                 const target = segments
                                     .slice(0, depthOf(rootPath) + index + 1)
                                     .join("/");
+                                // Right-click, the menu key or Shift+F10 on a
+                                // segment opens that folder's own row menu.
                                 return (
                                     <span key={target} className="flex items-center gap-1">
                                         <ChevronRight className="size-3" />
-                                        <Link
-                                            href={href(connectionId, target)}
-                                            {...segmentDropProps(target)}
-                                            className={cn(
-                                                "truncate rounded px-1 py-0.5 hover:text-foreground",
-                                                dropSegment === target &&
-                                                    "bg-primary/15 text-primary ring-1 ring-primary/40"
-                                            )}
+                                        <ContextMenu
+                                            onOpenChange={(open) =>
+                                                setCrumbMenu(open ? target : null)
+                                            }
                                         >
-                                            {segment}
-                                        </Link>
+                                            <ContextMenuTrigger asChild>
+                                                <Link
+                                                    href={href(connectionId, target)}
+                                                    {...segmentDropProps(target)}
+                                                    className={cn(
+                                                        "truncate rounded px-1 py-0.5 hover:text-foreground",
+                                                        dropSegment === target &&
+                                                            "bg-primary/15 text-primary ring-1 ring-primary/40"
+                                                    )}
+                                                >
+                                                    {segment}
+                                                </Link>
+                                            </ContextMenuTrigger>
+                                            {/* Built only while open: it reads the
+                                                parent's cached listing. */}
+                                            {crumbMenu === target
+                                                ? entryMenu(crumbEntry(connectionId, target), true)
+                                                : null}
+                                        </ContextMenu>
                                     </span>
                                 );
                             })}
