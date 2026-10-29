@@ -71,6 +71,16 @@ describe("newestPerRef", () => {
         expect(newestPerRef(rows).map((r) => r.id)).toEqual(["new"]);
     });
 
+    it("keeps apart two images one part of Polaris runs", () => {
+        const input = '{"applicationIds":["fixture-relay"],"part":"fixture-relay"}';
+        const rows = [
+            { label: "fixture/socat:1.8@sha256:" + "a".repeat(64), input, id: "forwarder" },
+            { label: "fixture/relay:build-2", input, id: "relay" },
+            { label: "fixture/relay:build-1", input, id: "older" }
+        ];
+        expect(newestPerRef(rows).map((r) => r.id)).toEqual(["forwarder", "relay"]);
+    });
+
     it("keeps apart two core images an app shares with Polaris", () => {
         const input = '{"applicationIds":["fixture-app"]}';
         const rows = [
