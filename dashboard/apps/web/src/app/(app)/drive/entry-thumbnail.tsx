@@ -80,7 +80,7 @@ export function EntryThumbnail({
     // The file itself for a video, which is seeked and read a frame at a time,
     // and the picture the server drew for everything else.
     const source = moving
-        ? `/api/drive/download?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}`
+        ? `/api/drive/download?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}&disposition=inline&purpose=thumbnail`
         : `/api/drive/thumbnail?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;
 
     /**

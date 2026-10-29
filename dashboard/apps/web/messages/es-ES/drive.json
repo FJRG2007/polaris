@@ -25,6 +25,8 @@
         "archives": "Comprimidos"
     },
     "filesView": {
+        "uploadHere": "Subir a esta carpeta",
+        "pastedImage": "Imagen pegada",
         "sort": {
             "labels": {
                 "name": "Nombre",

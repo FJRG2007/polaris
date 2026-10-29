@@ -202,7 +202,7 @@ async function recentlyOpened(
         where: {
             actorId: userId,
             targetId: connectionId,
-            action: { in: ["drive.download", "drive.upload"] }
+            action: { in: ["drive.download", "drive.view", "drive.upload"] }
         },
         orderBy: { at: "desc" },
         take: OPENED_SCAN,

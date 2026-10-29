@@ -82,9 +82,11 @@ export async function GET(request: Request): Promise<Response> {
     // are narrowed to drive events and matched here.
     const keyed = isUuid(connectionId);
     const rows = await prisma.auditLog.findMany({
+        // Views are left out: they are for Recent, and a feed that lists every
+        // time somebody looked at a picture buries what was done to it.
         where: keyed
-            ? { targetId: connectionId, action: { startsWith: "drive." } }
-            : { targetType: "connection", action: { startsWith: "drive." } },
+            ? { targetId: connectionId, action: { startsWith: "drive.", not: "drive.view" } }
+            : { targetType: "connection", action: { startsWith: "drive.", not: "drive.view" } },
         orderBy: { at: "desc" },
         take: SCAN_WINDOW,
         select: { id: true, action: true, actorId: true, metadata: true, at: true }
