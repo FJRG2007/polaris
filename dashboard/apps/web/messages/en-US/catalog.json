@@ -146,6 +146,10 @@
         "arcade": {
             "summary": "Games to play on your own, or together from a call.",
             "description": "Open a game from the Games page, or start one in a call and everyone there can join and see each other play. Games run in the browser and nothing runs on your servers. Admins choose who may play and who may play in calls."
+        },
+        "vpn": {
+            "summary": "Reach your own devices from anywhere, through the Tailscale apps.",
+            "description": "A private network between your phones, computers and TVs, run on this machine. Each person signs their devices in with their Polaris account through the official Tailscale apps and reaches only their own; administrators reach all of them and decide which devices may act as an exit node or share a home network. Installing downloads nothing: the control server starts on this machine when an administrator turns it on, at an address in one of your domains."
         }
     },
     "help": {

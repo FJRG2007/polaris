@@ -114,6 +114,7 @@ import {
     TrendingUp,
     Stethoscope,
     Waypoints,
+    Plus,
     EthernetPort,
     FileBadge,
     type LucideIcon
@@ -644,6 +645,18 @@ const OBSERVABILITY_GROUP = "Observability";
 
 /** What people call the Network filter when they search for it: the rail and the
  *  store both find it by these. */
+/** What somebody looking for the VPN types: the product they know it as, and
+ *  what it lets them do. */
+export const VPN_KEYWORDS: readonly string[] = [
+    "vpn",
+    "tailscale",
+    "headscale",
+    "wireguard",
+    "remote access",
+    "exit node",
+    "tailnet"
+];
+
 export const DNS_BLOCKER_KEYWORDS: readonly string[] = [
     "dns",
     "dns filter",
@@ -2802,6 +2815,39 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 requiresApp: "dns-blocker",
                 icon: SlidersHorizontal,
                 keywords: ["upstream", "safe search", "cache", "export", "import", "backup"]
+            }
+        ]
+    },
+    {
+        // Everybody's, not only an administrator's: each person adds and manages
+        // their own devices here. What only an administrator may do (turning it
+        // on, approving exit nodes) is hidden on the screens themselves.
+        id: "vpn",
+        label: "VPN", // i18n-ignore
+        icon: Waypoints,
+        base: "/apps/vpn",
+        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
+        sections: [
+            {
+                label: "Overview", // i18n-ignore
+                href: "/apps/vpn",
+                requiresApp: "vpn",
+                icon: LayoutDashboard,
+                keywords: [...VPN_KEYWORDS, "turn on", "hostname", "status"]
+            },
+            {
+                label: "Devices", // i18n-ignore
+                href: "/apps/vpn/devices",
+                requiresApp: "vpn",
+                icon: MonitorSmartphone,
+                keywords: ["machines", "nodes", "exit node", "subnet routes", "rename"]
+            },
+            {
+                label: "Add a device", // i18n-ignore
+                href: "/apps/vpn/add",
+                requiresApp: "vpn",
+                icon: Plus,
+                keywords: ["install", "login server", "key", "phone", "tv", "router"]
             }
         ]
     }

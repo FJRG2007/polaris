@@ -371,6 +371,20 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // The VPN: three devices joined through one point.
+    vpn: {
+        palette: ["#5EEAD4", "#0D9488", "#115E59"],
+        draw: ({ base, face }) => (
+            <>
+                <path d="M16 16L7.5 8M16 16l8.5-8M16 16v9" {...LINE} stroke={base} strokeWidth={2.6} />
+                <circle cx="16" cy="16" r="4.5" fill={base} />
+                <circle cx="16" cy="16" r="2" fill={face} />
+                <circle cx="7.5" cy="8" r="3.5" fill={base} />
+                <circle cx="24.5" cy="8" r="3.5" fill={base} />
+                <circle cx="16" cy="25.5" r="3.5" fill={base} />
+            </>
+        )
+    },
     // Management: three sliders set to different values.
     admin: {
         palette: ["#CBD5E1", "#64748B", "#334155"],

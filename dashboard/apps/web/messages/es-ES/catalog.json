@@ -146,6 +146,10 @@
         "arcade": {
             "summary": "Juegos para jugar solo o con otros desde una llamada.",
             "description": "Abre un juego desde la página de Juegos, o empieza uno en una llamada y todos los que estén pueden unirse y verse jugar. Los juegos se ejecutan en el navegador y nada se ejecuta en tus servidores. Los administradores eligen quién puede jugar y quién puede jugar en llamadas."
+        },
+        "vpn": {
+            "summary": "Accede a tus propios dispositivos desde cualquier sitio, con las apps de Tailscale.",
+            "description": "Una red privada entre tus móviles, ordenadores y televisores, alojada en esta máquina. Cada persona conecta sus dispositivos con su cuenta de Polaris desde las apps oficiales de Tailscale y solo llega a los suyos; los administradores llegan a todos y deciden qué dispositivos pueden servir de nodo de salida o compartir una red de casa. Instalarla no descarga nada: el servidor de control arranca en esta máquina cuando un administrador la enciende, en una dirección de uno de tus dominios."
         }
     },
     "help": {
