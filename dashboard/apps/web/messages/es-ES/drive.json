@@ -172,7 +172,7 @@
         "view": {
             "list": "Lista",
             "grid": "Cuadrícula",
-            "photos": "Ver fotos"
+            "photos": "Fotos"
         },
         "filters": {
             "button": "Filtros",

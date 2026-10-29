@@ -63,9 +63,9 @@ export function PhotoGrid({
     /** Where the keyboard is, as a listing position, or -1. Asked when a key is
      *  pressed, because the listing keeps it outside of React state. */
     readonly cursor: () => number;
-    /** Whether the listing is sorted by date, which is when day headings mean
-     *  anything. */
-    readonly byDate: boolean;
+    /** The date the listing is sorted by, which is when day headings mean
+     *  anything, or null. */
+    readonly byDate: "modifiedAt" | "createdAt" | null;
     /** Where a tile's picture is read from (a binned item lives elsewhere). */
     readonly source: (entry: DriveEntry) => { connectionId: string; path: string };
     /** The icon a tile shows while it has no picture, or for good. */

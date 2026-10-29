@@ -77,7 +77,7 @@ describe("photoRows", () => {
             file("d.jpg", "2026-10-03T07:00:00"),
             file("e.jpg", "2026-10-01T10:00:00")
         ];
-        const rows = photoRows(entries, 3, true);
+        const rows = photoRows(entries, 3, "modifiedAt");
         expect(rows).toEqual([
             { kind: "tiles", indices: [0] },
             { kind: "heading", day: "2026-10-03", count: 4 },
@@ -90,7 +90,7 @@ describe("photoRows", () => {
 
     it("draws no headings when the listing is not sorted by date", () => {
         const entries = ["a.jpg", "b.jpg", "c.jpg", "d.jpg"].map((name) => file(name));
-        expect(photoRows(entries, 3, false)).toEqual([
+        expect(photoRows(entries, 3, null)).toEqual([
             { kind: "tiles", indices: [0, 1, 2] },
             { kind: "tiles", indices: [3] }
         ]);
@@ -111,7 +111,7 @@ describe("photoNeighbour", () => {
         file("f.jpg", "2026-10-01T09:00:00")
     ];
     // [heading] [0 1 2] [3] [heading] [4 5]
-    const rows = photoRows(entries, 3, true);
+    const rows = photoRows(entries, 3, "modifiedAt");
 
     it("moves along the listing's order with left and right, stopping at the ends", () => {
         expect(photoNeighbour(rows, 2, "right", 6)).toBe(3);

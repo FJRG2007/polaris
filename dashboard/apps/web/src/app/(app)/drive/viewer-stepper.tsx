@@ -11,15 +11,72 @@
  */
 
 import { useEffect, useRef } from "react";
+import { viewerKind } from "./viewer/kind";
 import { Button, shortcutPressed } from "@polaris/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { keyBelongsToTarget, viewerKind } from "./file-viewer";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** How far a finger has to travel sideways, and how little up or down, before a
  *  touch counts as a swipe rather than a scroll or a tap. */
 const SWIPE_DISTANCE = 60;
 const SWIPE_DRIFT = 40;
+
+/** What answers Left and Right itself: text being edited, and anything that
+ *  slides - a media player's seek bar, a zoom. */
+const OWNS_ARROW_KEYS = [
+    "input",
+    "textarea",
+    "select",
+    "[contenteditable='']",
+    "[contenteditable='true']",
+    "[role='slider']",
+    "[role='textbox']",
+    // A focused player seeks with the arrows.
+    "video",
+    "audio"
+].join(", ");
+
+/** Whether a key press belongs to whatever it was pressed in rather than to the
+ *  viewer's own Left/Right: a field, an editor, or a control that already
+ *  answered it. */
+export function keyBelongsToTarget(
+    event: Pick<
+        ReactKeyboardEvent | KeyboardEvent,
+        "defaultPrevented" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "target"
+    >
+): boolean {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+        return true;
+    const target = event.target as HTMLElement | null;
+    if (!target || typeof target.closest !== "function") return false;
+    return target.closest(OWNS_ARROW_KEYS) !== null;
+}
+
+function stepBounds(index: number, count: number) {
+    return { canBack: index > 0, canForward: index >= 0 && index < count - 1 };
+}
+
+/** The way a key press asks to step, -1 or 1, or 0 when it is not a step key
+ *  or belongs to what it was pressed in. */
+function keyDirection(event: ReactKeyboardEvent | KeyboardEvent): -1 | 0 | 1 {
+    if (keyBelongsToTarget(event)) return 0;
+    if (shortcutPressed(event, "viewer.previousFile")) return -1;
+    if (shortcutPressed(event, "viewer.nextFile")) return 1;
+    return 0;
+}
+
+/** The step a key press takes from `index` of `count`: -1, 1, or 0 when it is
+ *  not a step key or there is nowhere to go that way. */
+export function stepOfKey(
+    event: ReactKeyboardEvent | KeyboardEvent,
+    index: number,
+    count: number
+): -1 | 0 | 1 {
+    const by = keyDirection(event);
+    const { canBack, canForward } = stepBounds(index, count);
+    return (by < 0 && canBack) || (by > 0 && canForward) ? by : 0;
+}
 
 /** The kinds whose preview has no use of its own for the arrow keys. */
 export function arrowsStep(name: string): boolean {
@@ -40,37 +97,46 @@ export function ViewerStepper({
     readonly count: number;
     readonly onStep: (by: -1 | 1) => void;
 }) {
-    const t = useTranslations("driveViewer");
-    const canBack = index > 0;
-    const canForward = index >= 0 && index < count - 1;
     const step = useRef(onStep);
     step.current = onStep;
 
     useEffect(() => {
         if (!arrowsStep(name)) return;
         function onKey(event: KeyboardEvent) {
-            if (keyBelongsToTarget(event)) return;
             // A dialog opened over the preview (share, details) has the keys.
             const target = event.target as HTMLElement | null;
             if (target?.closest?.("[role='dialog'], [role='menu']")) return;
-            const by = shortcutPressed(event, "viewer.previousFile")
-                ? -1
-                : shortcutPressed(event, "viewer.nextFile")
-                  ? 1
-                  : 0;
-            if (by === 0) return;
+            if (keyDirection(event) === 0) return;
+            const by = stepOfKey(event, index, count);
             // Kept from the listing underneath, which may still hold the focus
             // while it is hidden and would move its own cursor with the same key.
             event.preventDefault();
             event.stopPropagation();
-            if (by < 0 ? canBack : canForward) step.current(by);
+            if (by !== 0) step.current(by);
         }
         // Captured, so it is answered before anything on the page sees it.
         window.addEventListener("keydown", onKey, true);
         return () => window.removeEventListener("keydown", onKey, true);
-    }, [name, canBack, canForward]);
+    }, [name, index, count]);
 
+    return <StepControls index={index} count={count} onStep={onStep} />;
+}
+
+/** The previous and next buttons with the position between them, the same in
+ *  every preview that steps. Nothing is drawn for a single file. */
+export function StepControls({
+    index,
+    count,
+    onStep
+}: {
+    /** Zero-based position of the open file, or -1. */
+    readonly index: number;
+    readonly count: number;
+    readonly onStep: (by: -1 | 1) => void;
+}) {
+    const t = useTranslations("driveViewer");
     if (count < 2 || index < 0) return null;
+    const { canBack, canForward } = stepBounds(index, count);
     return (
         <div className="flex items-center gap-0.5">
             <Button

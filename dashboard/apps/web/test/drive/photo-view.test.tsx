@@ -119,8 +119,35 @@ describe("a folder of photos", () => {
         renderFilesView(ALBUM);
         const toggle = await screen.findByRole("button", { name: "Photo view" });
         expect(toggle.className).toMatch(ACTIVE);
-        const thumbnails = document.querySelectorAll("img[src*='/api/drive/thumbnail']");
-        expect(thumbnails.length).toBe(8);
+        // Every photo tile drawn so far carries its picture; the rest are
+        // virtualized below the fold.
+        const tiles = Array.from(document.querySelectorAll("[data-drive-row]")).filter((tile) =>
+            /\.jpg$/.test(tile.getAttribute("aria-label") ?? "")
+        );
+        expect(tiles.length).toBeGreaterThan(0);
+        for (const tile of tiles) {
+            expect(tile.querySelector("img[src*='/api/drive/thumbnail']")).not.toBeNull();
+        }
+    });
+
+    it("lays the photos out under a heading per day, newest first, without choosing a sort", async () => {
+        const shuffled = [ALBUM[0]!, ...ALBUM.slice(1).reverse()];
+        renderFilesView(shuffled);
+        await screen.findByRole("button", { name: "Photo view" });
+        const headings = await screen.findAllByRole("heading", { level: 3 });
+        expect(headings.length).toBeGreaterThan(1);
+        expect(headings[0]!.textContent).toMatch(/\bOct 20\b/);
+        expect(headings[1]!.textContent).toMatch(/\bOct 19\b/);
+    });
+
+    it("goes back to sorting by name in the list", async () => {
+        const user = userEvent.setup();
+        renderFilesView([ALBUM[0]!, ...ALBUM.slice(1).reverse()]);
+        await user.click(await screen.findByRole("button", { name: "List view" }));
+        const names = Array.from(document.querySelectorAll("[data-drive-row]")).map(
+            (row) => row.textContent?.match(/IMG_\d/)?.[0]
+        );
+        expect(names.filter(Boolean).slice(0, 3)).toEqual(["IMG_1", "IMG_2", "IMG_3"]);
     });
 
     it("remembers a switch back to the list for that folder", async () => {
@@ -167,6 +194,23 @@ describe("the preview of a photo", () => {
         // The first file: back goes nowhere, and does not wrap to a folder.
         await user.keyboard("{ArrowLeft}");
         expect(within(header).getByText("IMG_1.jpg")).toBeTruthy();
+    });
+
+    it("leaves the listing's cursor on the file it stepped to", async () => {
+        const user = userEvent.setup();
+        renderFilesView(ALBUM);
+        await user.dblClick(await screen.findByLabelText("IMG_1.jpg"));
+        await screen.findByText("1 of 8");
+        await user.keyboard("{ArrowRight}{ArrowRight}");
+        expect(screen.getByText("3 of 8")).toBeTruthy();
+        await user.click(screen.getByRole("button", { name: "Back" }));
+
+        const third = await screen.findByLabelText("IMG_3.jpg");
+        expect(third.className).toMatch(/ring-primary/);
+        (third.closest("[tabindex='0']") as HTMLElement).focus();
+        await user.keyboard("{ArrowRight}");
+        expect(screen.getByLabelText("IMG_4.jpg").className).toMatch(/ring-primary/);
+        expect(screen.getByLabelText("IMG_3.jpg").className).not.toMatch(/ring-primary/);
     });
 
     it("leaves the arrows to a field that has focus", async () => {

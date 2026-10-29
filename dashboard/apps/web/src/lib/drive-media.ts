@@ -68,14 +68,14 @@ export function dayOf(iso: string): string {
  *
  * The tiles keep the listing's order, so selection, Shift ranges, the keyboard
  * and the viewer's next and previous all agree with what is on screen. Headings
- * are drawn only when that order is by date (`byDate`): grouping a list sorted
- * by name would scatter the same day into a heading per file. Folders lead,
+ * are drawn only when that order is by date (`byDate` names which one): grouping
+ * a list sorted by name would scatter the same day into a heading per file. Folders lead,
  * under no heading, the way they lead every other view.
  */
 export function photoRows(
-    entries: readonly (Listed & { readonly modifiedAt: string })[],
+    entries: readonly (Listed & { readonly modifiedAt: string; readonly createdAt?: string })[],
     columns: number,
-    byDate: boolean
+    byDate: "modifiedAt" | "createdAt" | null
 ): PhotoRow[] {
     const width = Math.max(1, Math.floor(columns));
     const rows: PhotoRow[] = [];
@@ -90,7 +90,7 @@ export function photoRows(
     let heading: { kind: "heading"; day: string; count: number } | null = null;
     entries.forEach((entry, index) => {
         if (byDate && entry.kind === "file") {
-            const next = dayOf(entry.modifiedAt);
+            const next = dayOf(entry[byDate] ?? "");
             if (next !== day) {
                 flush();
                 day = next;

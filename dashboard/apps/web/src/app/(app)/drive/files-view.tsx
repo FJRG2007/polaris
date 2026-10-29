@@ -511,6 +511,9 @@ export function FilesView({
     const [searchTruncated, setSearchTruncated] = useState(false);
     const [sortKey, setSortKey] = useState<SortKey>(trash ? "deleted" : "name");
     const [sortDir, setSortDir] = useState<SortDir>(trash ? "desc" : "asc");
+    // Until somebody picks an order, each layout opens in its own: the photo
+    // view newest first, so its days read as a timeline, and the others by name.
+    const sortChosen = useRef(false);
 
     /**
      * What pressing a column means.
@@ -521,6 +524,7 @@ export function FilesView({
      * its own.
      */
     const chooseSort = (column: SortKey) => {
+        sortChosen.current = true;
         if (column === sortKey) {
             setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
             return;
@@ -787,15 +791,20 @@ export function FilesView({
     function closeViewer() {
         const picture = preview.current?.querySelector<HTMLImageElement>("[data-preview-picture]");
         const path = viewerTarget?.path;
+        const index = path ? visible.findIndex((entry) => entry.path === path) : -1;
+        // The listing has to be back on the page before it can be scrolled to
+        // the file the preview stepped to, or its thumbnail measured.
+        const reveal = () => {
+            flushSync(() => setViewerTarget(null));
+            if (index >= 0) scrollCursorIntoView(index);
+        };
         if (!path || !flying.canFly(picture) || picture.offsetWidth < 1) {
-            setViewerTarget(null);
+            reveal();
             return;
         }
         const at = flying.boxOf(picture);
         const copy = flying.pictureCopy(picture.currentSrc || picture.src, at);
-        // The listing has to be back on the page before its thumbnail can be
-        // measured.
-        flushSync(() => setViewerTarget(null));
+        reveal();
         const into = flying.visibleBox(thumbnailFor(path), flying.viewportSize());
         void flying.shrinkOut(copy, at, into).then(() => copy.remove());
     }
@@ -1815,6 +1824,13 @@ export function FilesView({
         setViewMode(remembered ?? (mediaFolder ? "photos" : lastPlainView.current));
     }, [connectionId, path, loading, mediaFolder]);
 
+    useEffect(() => {
+        if (inTrash || sortChosen.current) return;
+        const photos = viewMode === "photos";
+        setSortKey(photos ? "modified" : "name");
+        setSortDir(photos ? "desc" : "asc");
+    }, [inTrash, viewMode]);
+
     function chooseView(mode: DriveViewMode) {
         if (mode !== "photos") lastPlainView.current = mode;
         setViewMode(mode);
@@ -1839,7 +1855,11 @@ export function FilesView({
     /** The preview's previous and next: the listing's files, in its order. */
     function stepViewer(by: -1 | 1) {
         const next = viewerTarget ? steppedFile(visible, viewerTarget.path, by) : null;
-        if (next) openViewer(next);
+        if (!next) return;
+        const index = visible.indexOf(next);
+        cursorRef.current = index;
+        lastIndex.current = index;
+        openViewer(next);
     }
     const viewerSwipe = useSwipeToStep(viewerTarget?.name ?? "", stepViewer);
 
@@ -2088,6 +2108,9 @@ export function FilesView({
         else if (event.key === "Escape") setRenaming(null);
     }
 
+    const downloadLabel =
+        preparing > 0 ? t("filesView.viewer.fetching") : t("filesView.viewer.download");
+
     return (
         <>
             {viewerTarget ? (
@@ -2102,22 +2125,32 @@ export function FilesView({
                                 {viewerTarget.name}
                             </span>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                             <ViewerStepper
                                 name={viewerTarget.name}
                                 {...fileSteps(visible, viewerTarget.path)}
                                 onStep={stepViewer}
                             />
                             {onShare ? (
-                                <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    aria-label={t("filesView.viewer.getLink")}
+                                    title={t("filesView.viewer.getLink")}
+                                    onClick={shareViewerTarget}
+                                >
                                     <Share2 className="size-4" />
-                                    {t("filesView.viewer.getLink")}
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.viewer.getLink")}
+                                    </span>
                                 </Button>
                             ) : null}
                             <Button
                                 size="sm"
                                 variant="secondary"
                                 disabled={preparing > 0}
+                                aria-label={downloadLabel}
+                                title={downloadLabel}
                                 onClick={() =>
                                     startDownload(
                                         downloadUrl(connectionId, viewerTarget.path),
@@ -2130,9 +2163,7 @@ export function FilesView({
                                 ) : (
                                     <Download className="size-4" />
                                 )}
-                                {preparing > 0
-                                    ? t("filesView.viewer.fetching")
-                                    : t("filesView.viewer.download")}
+                                <span className="hidden sm:inline">{downloadLabel}</span>
                             </Button>
                         </div>
                     </div>
@@ -2918,7 +2949,14 @@ export function FilesView({
                                             entries={visible}
                                             selected={selected}
                                             cursor={cursorStart}
-                                            byDate={sortKey === "modified"}
+                                            byDate={
+                                                sortKey === "created"
+                                                    ? "createdAt"
+                                                    : sortKey === "modified" ||
+                                                        sortKey === "deleted"
+                                                      ? "modifiedAt"
+                                                      : null
+                                            }
                                             source={thumbSource}
                                             icon={(entry) => (
                                                 <EntryIcon entry={entry} className="size-10" />
