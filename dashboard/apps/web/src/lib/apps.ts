@@ -1471,6 +1471,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: NETWORK_GROUP
         },
         {
+            // Everybody's once installed: each person manages their own devices
+            // in it, like the VPN rail it leads to.
+            label: "VPN", // i18n-ignore
+            href: "/apps/vpn",
+            requiresApp: "vpn",
+            icon: Waypoints,
+            keywords: [...VPN_KEYWORDS],
+            group: NETWORK_GROUP
+        },
+        {
             label: "Databases", // i18n-ignore
             href: "/apps/databases",
             icon: Database,

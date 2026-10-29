@@ -65,7 +65,7 @@ describe("filtering and sorting the listing", () => {
         const shown = filterStoreApps(offered(), { query: "", category: "all", sort: "recent" });
         const dates = shown.filter((item) => !item.comingSoon).map((item) => ADDED_ON[item.id]!);
         expect(dates).toEqual([...dates].sort().reverse());
-        expect(shown[0]!.id).toBe("arcade");
+        expect(shown[0]!.id).toBe("vpn");
     });
 
     it("keeps the catalog's order under Featured, with what is only announced last", () => {

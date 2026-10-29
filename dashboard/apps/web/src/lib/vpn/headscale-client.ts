@@ -100,7 +100,7 @@ const healthResponse = z.object({
 });
 
 /** Parse a response body, camel-casing it first. Exported for the fixture tests. */
-export function parseResponse<T>(schema: z.ZodType<T>, body: unknown): T {
+export function parseResponse<S extends z.ZodTypeAny>(schema: S, body: unknown): z.output<S> {
     return schema.parse(camelKeys(body));
 }
 
@@ -147,12 +147,12 @@ export function headscaleClient(
     apiKey: string,
     fetcher: typeof fetch = fetch
 ): HeadscaleClient {
-    async function call<T>(
+    async function call<S extends z.ZodTypeAny>(
         method: "GET" | "POST" | "PUT" | "DELETE",
         path: string,
-        schema: z.ZodType<T>,
+        schema: S,
         body?: unknown
-    ): Promise<T> {
+    ): Promise<z.output<S>> {
         const response = await fetcher(`${origin}/api/v1${path}`, {
             method,
             headers: {
