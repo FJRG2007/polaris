@@ -162,7 +162,7 @@ function Picker({ request }: { request: Request }) {
                         </button>
                     ))}
                 </div>
-                <div role="tabpanel" className="max-h-[55vh] min-h-40 overflow-y-auto">
+                <div role="tabpanel" className="max-h-[55vh] min-h-40 overflow-y-auto overscroll-contain">
                     {shown.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             {tab === "screen"
