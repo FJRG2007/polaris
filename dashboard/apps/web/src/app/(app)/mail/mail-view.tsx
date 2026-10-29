@@ -1290,7 +1290,12 @@ export function MailView({
                               ? t("thread.announce.deleted")
                               : t("thread.announce.trashed")
                       ),
-                  junk: () => act("junk", rowMessageIds, t("thread.announce.junk")),
+                  // In the spam folder the same key answers "not spam", as the
+                  // buttons there do, rather than filing it where it already is.
+                  junk: () =>
+                      context.emptyRole === "junk"
+                          ? act("not-junk", rowMessageIds, t("thread.announce.notJunk"))
+                          : act("junk", rowMessageIds, t("thread.announce.junk")),
                   star: () => {
                       if (!onRow) return;
                       act(
