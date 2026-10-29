@@ -254,6 +254,32 @@ describe("new releases are scanned on their own", () => {
         expect(db.scans).toHaveLength(1);
     });
 
+    it("scans a part's release image, not the port forwarder beside it, and only once", async () => {
+        const relay = "polaris-release/fixture-relay:1.0.0";
+        const imageId = `sha256:${"a".repeat(64)}`;
+        const project = `polaris-${shortHash("relay-1", 8)}`;
+        release("relay-1", relay);
+        db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });
+        // Listed first: the images are sorted by ref and this one sorts ahead.
+        db.containers.push(
+            {
+                name: "fixture-relay-p80",
+                ref: "alpine/socat:1.8.1.3",
+                imageId: `sha256:${"b".repeat(64)}`,
+                project,
+                labels: {}
+            },
+            { name: "fixture-relay", ref: relay, imageId, project, labels: {} }
+        );
+        await pass();
+        await settled();
+        expect(db.scans).toHaveLength(1);
+        expect(db.scans[0]).toMatchObject({ imageId, label: relay });
+        await pass();
+        await pass();
+        expect(db.scans).toHaveLength(1);
+    });
+
     it("never files a part of Polaris as an app while its container is not up yet", async () => {
         release("relay-1", "polaris-release/fixture-relay:1.0.0");
         db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });

@@ -456,9 +456,14 @@ export async function queueImage(targetId: string, applicationId: string, userId
     // runs, so its findings land with the others in Management and the next
     // step it names is updating Polaris rather than an app nobody installed.
     if ((await polarisParts([applicationId])).has(applicationId)) {
-        const own = (await imagesOn(await targetRow(targetId)))?.find(
+        // A part can run more than one image (a port forwarder beside its own),
+        // so the release's image is the one scanned: picking another left
+        // `planNewImages` finding the release unscanned and queueing it again.
+        const mine = (await imagesOn(await targetRow(targetId)))?.filter(
             (image) => image.part === applicationId
         );
+        const release = await imageOf(applicationId);
+        const own = mine?.find((image) => image.ref === release) ?? mine?.[0];
         if (!own) throw new ScanFailure("imageMissing");
         return queueServerImage(targetId, own.imageId, userId, own);
     }
