@@ -1,0 +1,176 @@
+{
+    "page": {
+        "title": "VPN",
+        "description": "Accede a tus dispositivos desde cualquier sitio, con las apps de Tailscale."
+    },
+    "install": {
+        "title": "Instala la VPN",
+        "body": "Instalarla no descarga nada. El servidor de control arranca en esta máquina cuando la enciendes, en una dirección de uno de tus dominios.",
+        "askAdmin": "La VPN no está instalada. Un administrador puede instalarla desde Aplicaciones.",
+        "install": "Instalar",
+        "pending": "Instalando",
+        "view": "Ver en Aplicaciones"
+    },
+    "errors": {
+        "notInstalled": "La VPN no está instalada.",
+        "notRunning": "La VPN está apagada. Un administrador puede encenderla en el resumen.",
+        "noHostname": "Elige primero la dirección en la que responde la VPN.",
+        "noApiKey": "El servidor de control arrancó pero no dejó entrar a Polaris. Pulsa Repetir en un minuto.",
+        "notAllowed": "Solo un administrador puede hacer eso.",
+        "notFound": "Ese dispositivo ya no está en la VPN.",
+        "badName": "Usa minúsculas, cifras y guiones, hasta 63 caracteres.",
+        "badAuthId": "Este enlace no es una solicitud de dispositivo de esta VPN.",
+        "notApplied": "No se pudo arrancar el servidor de control. Pulsa Repetir; si sigue fallando, abre su servicio en Deploy.",
+        "invalid": "Algo de la solicitud no era válido. Recarga la página y vuelve a intentarlo.",
+        "generic": "La VPN no respondió. Vuelve a intentarlo en un momento."
+    },
+    "zoneErrors": {
+        "no-domain": "Aún no hay ningún dominio donde poner la VPN. Añade uno en Dominios.",
+        "unknown-zone": "Ese dominio no es uno que puedas usar. Elige otro.",
+        "unverified": "Ese dominio aún no está verificado. Termínalo en Dominios.",
+        "bad-name": "Usa minúsculas, cifras y guiones."
+    },
+    "overview": {
+        "title": "Estado",
+        "loginServer": "Dirección del servidor",
+        "copy": "Copiar dirección",
+        "keptHint": "Sus dispositivos se conservan. Vuelven a conectarse solos cuando la enciendas.",
+        "askAdmin": "Un administrador enciende la VPN. Podrás añadir tus dispositivos cuando funcione."
+    },
+    "state": {
+        "off": "Apagada",
+        "starting": "Arrancando",
+        "running": "Encendida",
+        "failed": "No arrancó"
+    },
+    "stateHint": {
+        "off": "Ningún dispositivo puede conectarse.",
+        "starting": "El servidor de control está arrancando.",
+        "running": "Los dispositivos pueden conectarse y verse entre sí.",
+        "failed": "No se pudo arrancar el servidor de control."
+    },
+    "actions": {
+        "retry": "Repetir",
+        "turnOn": "Encender",
+        "turnOff": "Apagar",
+        "addDevice": "Añadir equipo",
+        "cancel": "Cancelar"
+    },
+    "turnOff": {
+        "title": "¿Apagar la VPN?",
+        "body": "Todos los dispositivos pierden la conexión hasta que se vuelva a encender. Los dispositivos y sus direcciones se conservan."
+    },
+    "remove": {
+        "title": "Eliminar la VPN y sus dispositivos",
+        "body": "Borra el servidor de control, su dirección y todos sus dispositivos. Después habrá que volver a añadir cada dispositivo.",
+        "confirm": "Esto borra todos los dispositivos de la VPN para todo el mundo, y no se puede deshacer.",
+        "action": "Eliminar la VPN",
+        "kind": "VPN"
+    },
+    "hostname": {
+        "label": "Dirección",
+        "subdomain": "Subdominio",
+        "hint": "Los dispositivos apuntan a esta dirección. Se mantiene hasta que se elimine la VPN.",
+        "free": "{hostname} está libre.",
+        "taken": "{hostname} ya está en uso. Elige otro nombre.",
+        "invalid": "Usa minúsculas, cifras y guiones.",
+        "noZones": "La VPN necesita una dirección en uno de tus dominios, y aún no hay ninguno.",
+        "openDomains": "Abrir Dominios"
+    },
+    "devices": {
+        "intro": "Tus dispositivos en la VPN. Cada uno llega a tus otros dispositivos y a los servidores de Polaris.",
+        "adminIntro": "Todos los dispositivos de la VPN. Cada persona llega solo a los suyos; los administradores, a todos.",
+        "emptyTitle": "Sin dispositivos",
+        "emptyBody": "Instala la app de Tailscale en un dispositivo y apúntala a esta VPN.",
+        "kind": "equipo",
+        "removeBody": "Se desconecta de la VPN y habrá que volver a añadirlo para que vuelva.",
+        "remove": "Quitar equipo",
+        "rename": "Renombrar",
+        "name": "Nombre del equipo",
+        "saveName": "Guardar",
+        "badName": "Usa minúsculas, cifras y guiones, hasta 63 caracteres.",
+        "online": "Conectado",
+        "offline": "Inactivo",
+        "owner": "Dueño",
+        "addresses": "Direcciones",
+        "copyAddress": "Copiar dirección",
+        "lastSeen": "Última vez",
+        "now": "Ahora",
+        "never": "Nunca",
+        "exitNode": "Nodo de salida para todos",
+        "adminApproves": "Lo aprueba un administrador.",
+        "subnet": "Compartir red {route}"
+    },
+    "add": {
+        "serverTitle": "Dirección de esta VPN",
+        "qrHint": "Escanéala con un móvil para copiar la dirección en la app de Tailscale.",
+        "notRunning": "La VPN aún no está encendida, así que no se puede añadir ningún dispositivo.",
+        "openOverview": "Abrir el resumen",
+        "platformTitle": "Tu dispositivo",
+        "copyCommand": "Copiar comando",
+        "keyTitle": "Una clave para servidor, router o TV",
+        "keyBody": "Para un dispositivo que no puede abrir un navegador para iniciar sesión. La clave añade un dispositivo a tu cuenta y deja de funcionar al cabo de una hora.",
+        "createKey": "Crear una clave",
+        "anotherKey": "Crear otra clave",
+        "copyKey": "Copiar clave",
+        "keyExpires": "Funciona hasta las {time}, para un dispositivo.",
+        "windows": {
+            "name": "Windows",
+            "step1": "Instala Tailscale para Windows desde tailscale.com/download.",
+            "step2": "La app de Windows no tiene un campo para otro servidor: abre el Símbolo del sistema o PowerShell y ejecuta el comando de abajo.",
+            "step3": "Se abre un navegador en Polaris. Inicia sesión si te lo pide y pulsa Añadir este equipo."
+        },
+        "macos": {
+            "name": "macOS",
+            "step1": "Instala Tailscale para macOS desde la App Store o tailscale.com/download.",
+            "step2": "Abre un terminal y ejecuta el comando de abajo. Si ya hay otra red de Tailscale iniciada, también puedes abrir Ajustes, Cuentas, pulsar la flecha de la esquina inferior izquierda e introducir la dirección de esta VPN.",
+            "step3": "Se abre un navegador en Polaris. Pulsa Añadir este equipo."
+        },
+        "linux": {
+            "name": "Linux",
+            "step1": "Instala Tailscale con las instrucciones de tu distribución en tailscale.com/download/linux.",
+            "step2": "Ejecuta el comando de abajo, abre el enlace que muestra y pulsa Añadir este equipo."
+        },
+        "ios": {
+            "name": "iPhone y iPad",
+            "step1": "Instala Tailscale desde la App Store y ábrela.",
+            "step2": "Toca el icono de perfil arriba a la derecha y después Iniciar sesión (o la cuenta ya iniciada).",
+            "step3": "Abre el menú de arriba a la derecha, elige Use a custom coordination server, introduce la dirección de esta VPN y toca Log in.",
+            "step4": "Se abre Polaris. Pulsa Añadir este equipo."
+        },
+        "android": {
+            "name": "Android",
+            "step1": "Instala Tailscale desde Google Play y ábrela.",
+            "step2": "Toca el icono de perfil arriba a la derecha y después Iniciar sesión (o la cuenta ya iniciada).",
+            "step3": "Abre el menú de arriba a la derecha, elige Use an alternate server, introduce la dirección de esta VPN y toca Log in.",
+            "step4": "Se abre Polaris. Pulsa Añadir este equipo."
+        },
+        "androidTv": {
+            "name": "Android TV",
+            "step1": "Instala Tailscale desde Google Play en la tele.",
+            "step2": "Abre su menú, elige Use an alternate server e introduce la dirección de esta VPN.",
+            "step3": "Si la tele muestra un código o enlace, ábrelo en tu móvil y pulsa Añadir este equipo allí."
+        },
+        "appleTv": {
+            "name": "Apple TV",
+            "step1": "Instala Tailscale desde la App Store en el Apple TV.",
+            "step2": "Abre la app Ajustes, ve a Apps, Tailscale, selecciona URL en Alternate coordination server URL, introduce la dirección de esta VPN y selecciona Done.",
+            "step3": "Vuelve a Tailscale e inicia sesión; abre en tu móvil el enlace que muestra y pulsa Añadir este equipo."
+        },
+        "router": {
+            "name": "Router o servidor",
+            "step1": "Instala Tailscale en él: la mayoría de routers con OpenWrt, pfSense u OPNsense lo ofrecen como paquete.",
+            "step2": "Crea una clave abajo y ejecuta el comando con ella en el dispositivo. Se une a tus dispositivos sin navegador."
+        }
+    },
+    "register": {
+        "title": "¿Añadir este dispositivo a la VPN?",
+        "body": "Un dispositivo ha pedido unirse. Se añade a los dispositivos de {account} y solo llega a ellos. Añádelo solo si acabas de iniciarlo tú.",
+        "add": "Añadir este equipo",
+        "addedTitle": "Se añadió {name}",
+        "addedBody": "El dispositivo está conectado. Puedes cerrar esta página.",
+        "openDevices": "Abrir tus dispositivos",
+        "badTitle": "Este enlace no es válido",
+        "badBody": "No es una solicitud de dispositivo de esta VPN. Vuelve a iniciar sesión desde la app de Tailscale."
+    }
+}
