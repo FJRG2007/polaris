@@ -83,6 +83,28 @@ export interface PolarisDesktop {
     /** The names of the programs running now, for picking one to add as a game.
      *  Only ever handed to the page that asked, on a press. */
     runningPrograms(): Promise<readonly string[]>;
+    /** The screens and windows to share, each with a small picture, for the
+     *  page's own picker. Null where the system's picker is the one to use. */
+    shareSources(): Promise<ShareSources | null>;
+    /** What the page's picker chose, for the `getDisplayMedia` that follows. */
+    chooseShare(input: { readonly id: string; readonly sound: boolean; }): Promise<boolean>;
+}
+
+/** A screen or a window that can be shared. */
+export interface ShareSource {
+    readonly id: string;
+    readonly name: string;
+    readonly kind: "screen" | "window";
+    /** A JPEG data URL, or null when the system gave no picture. */
+    readonly thumbnail: string | null;
+    /** The program's icon as a PNG data URL, for a window. */
+    readonly icon: string | null;
+}
+
+export interface ShareSources {
+    readonly sources: readonly ShareSource[];
+    /** Whether this computer's sound can go with a share. */
+    readonly sound: boolean;
 }
 
 /** A game running on this computer, as the dashboard is told it. */
@@ -175,6 +197,8 @@ export const CHANNELS = {
     gameCurrent: "desktop:game-current",
     gameCustom: "desktop:game-custom",
     gamePrograms: "desktop:game-programs",
+    shareSources: "desktop:share-sources",
+    chooseShare: "desktop:choose-share",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
     connectSwitch: "local:connect-switch",

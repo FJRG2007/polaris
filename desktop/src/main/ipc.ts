@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { runningPrograms } from "./game-detect";
+import { chooseShare, listShareSources, SOURCE_ID } from "./screen-share";
 import { closeNotice, showNotice } from "./notices";
 import { isServerUrl, serverPath } from "./navigation";
 import { FolderRefusal, zipFolder } from "./folder-zip";
@@ -232,6 +233,22 @@ export function registerIpc(host: IpcHost): void {
         if (!fromPolaris(event)) return [];
         const names = await runningPrograms().catch(() => [] as string[]);
         return [...new Set(names)].sort((a, b) => a.localeCompare(b)).slice(0, 2000);
+    });
+
+    ipcMain.handle(CHANNELS.shareSources, async (event) => {
+        if (!fromPolaris(event)) return null;
+        return listShareSources().catch((caught: unknown) => {
+            console.error("[screen-share]", caught);
+            return null;
+        });
+    });
+
+    ipcMain.handle(CHANNELS.chooseShare, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const input = z.object({ id: z.string().max(200).regex(SOURCE_ID), sound: z.boolean() }).safeParse(raw);
+        if (!input.success) return false;
+        chooseShare(input.data.id, input.data.sound);
+        return true;
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));

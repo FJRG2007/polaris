@@ -2082,5 +2082,18 @@
             "language": "El dictado no está disponible en este idioma aquí. Prueba el dictado privado en el menú del micrófono.",
             "notSetUp": "El dictado privado aún no está disponible aquí. Desactívalo en el menú del micrófono."
         }
+    },
+    "sharePicker": {
+        "title": "Elige qué compartir",
+        "description": "Todos en la llamada verán lo que elijas.",
+        "screens": "Pantallas ({count})",
+        "windows": "Ventanas ({count})",
+        "noScreens": "No hay pantallas.",
+        "noWindows": "No hay ventanas para compartir.",
+        "untitled": "Ventana sin título",
+        "sound": "Compartir el sonido del PC",
+        "cancel": "Cancelar",
+        "share": "Compartir",
+        "pickFirst": "Elige antes pantalla o ventana."
     }
 }

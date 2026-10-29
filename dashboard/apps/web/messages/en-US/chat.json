@@ -2082,5 +2082,18 @@
             "language": "Dictation is not available in this language here. Try Private dictation in the mic menu.",
             "notSetUp": "Private dictation is not available here yet. Turn it off in the mic menu."
         }
+    },
+    "sharePicker": {
+        "title": "Choose what to share",
+        "description": "Everyone in the call sees what you pick.",
+        "screens": "Screens ({count})",
+        "windows": "Windows ({count})",
+        "noScreens": "No screens found.",
+        "noWindows": "No open windows to share.",
+        "untitled": "Untitled window",
+        "sound": "Share this computer's sound",
+        "cancel": "Cancel",
+        "share": "Start sharing",
+        "pickFirst": "Pick a screen or a window first."
     }
 }

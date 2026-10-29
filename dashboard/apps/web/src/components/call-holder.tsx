@@ -14,6 +14,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { CallBar, CallProvider } from "@/app/(app)/chat/call-session";
+import { DesktopSharePickerHost } from "@/app/(app)/chat/desktop-share-picker";
 
 export function CallHolder({
     viewerId,
@@ -36,6 +37,8 @@ export function CallHolder({
     return (
         <CallProvider viewerId={viewerId}>
             <CallBar onScreen={onScreen} />
+            {/* The desktop app's share picker, drawn wherever the call is. */}
+            <DesktopSharePickerHost />
             {children}
         </CallProvider>
     );
