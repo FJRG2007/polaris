@@ -21,6 +21,7 @@ import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
 import { watchForUpdates } from "./updates";
+import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
 import { handledSquirrelEvent } from "./squirrel";
@@ -56,6 +57,19 @@ const games = new GameWatcher((game) => {
 });
 
 const server = (): string | null => current;
+
+/**
+ * The update installed and waiting for a restart, told to every Polaris window
+ * as it changes so the page's header can offer the restart. A window opened
+ * later asks for it (`updateCurrent`).
+ */
+const updates = new UpdateReadyState((state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+        const contents = window.webContents;
+        if (contents.isDestroyed() || kindOf(contents) !== "polaris") continue;
+        if (current && isServerUrl(contents.getURL(), current)) contents.send(CHANNELS.updateReady, state);
+    }
+});
 
 /** Show the Polaris - at a path when one is given - in the main window. */
 function showPolaris(path?: string): void {
@@ -246,7 +260,8 @@ function start(): void {
             connectCheck,
             switchServer,
             nameServer,
-            removeServer
+            removeServer,
+            updates
         });
 
         installScreenShare(server);
@@ -283,6 +298,7 @@ function start(): void {
             const open = () => void shell.openExternal(update.page);
             menuUpdate = { version: update.version, open, ...(update.restart ? { restart: update.restart } : {}) };
             refreshMenu();
+            updates.found(update);
             showNotice(
                 update.restart
                     ? {

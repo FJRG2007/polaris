@@ -28,6 +28,7 @@ import {
     type PickedFolder
 } from "@/shared/bridge";
 import type { ServerRow } from "@/shared/servers";
+import type { UpdateReadyState } from "./update-ready";
 import { readServerAddress } from "@/shared/server-address";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
@@ -45,6 +46,8 @@ export interface IpcHost extends PushHost {
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
     readonly removeServer: (origin: string) => Outcome;
+    /** The update waiting for a restart, and the restart into it. */
+    readonly updates: Pick<UpdateReadyState, "current" | "install">;
 }
 
 /** A server named by the list: an address in the one stored form. */
@@ -282,6 +285,15 @@ export function registerIpc(host: IpcHost): void {
             symbolColor: colors.data.symbol,
             height: overlayHeight(event.sender.getZoomFactor())
         });
+    });
+
+    ipcMain.handle(CHANNELS.updateCurrent, (event) => (fromPolaris(event) ? host.updates.current() : null));
+
+    // Takes nothing: what is installed is what the app downloaded and checked
+    // itself, never anything the page names.
+    ipcMain.handle(CHANNELS.installUpdate, (event, ...args: unknown[]): Outcome => {
+        if (!fromPolaris(event) || !z.tuple([]).safeParse(args).success) return REFUSED;
+        return host.updates.install();
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));

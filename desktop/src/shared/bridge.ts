@@ -17,6 +17,7 @@
 
 import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
+import type { UpdateReady } from "./update-ready";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
@@ -103,6 +104,13 @@ export interface PolarisDesktop {
     canDrawOnShare(): Promise<boolean>;
     /** Take the drawing off the display: the share ended. */
     stopDrawing(): Promise<void>;
+    /** The update of this app that is installed and waits for a restart, or
+     *  null. */
+    updateReady(): Promise<UpdateReady>;
+    /** Hear an update become ready (or stop being). Answers the way to stop. */
+    onUpdateReady(listener: (update: UpdateReady) => void): () => void;
+    /** Restart into the waiting update. */
+    installUpdate(): Promise<Outcome>;
 }
 
 /** A screen or a window that can be shared. */
@@ -223,6 +231,9 @@ export const CHANNELS = {
     canDrawOnShare: "desktop:can-draw-on-share",
     stopDrawing: "desktop:stop-drawing",
     titleBarColors: "desktop:title-bar-colors",
+    updateReady: "desktop:update-ready",
+    updateCurrent: "desktop:update-current",
+    installUpdate: "desktop:install-update",
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",

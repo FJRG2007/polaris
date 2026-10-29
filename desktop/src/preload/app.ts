@@ -9,6 +9,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
+import { readUpdateReady } from "@/shared/update-ready";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
@@ -56,7 +57,16 @@ const bridge: PolarisDesktop = {
     chooseShare: (input) => ipcRenderer.invoke(CHANNELS.chooseShare, input),
     drawOnShare: (stroke) => ipcRenderer.invoke(CHANNELS.drawOnShare, stroke),
     canDrawOnShare: () => ipcRenderer.invoke(CHANNELS.canDrawOnShare),
-    stopDrawing: () => ipcRenderer.invoke(CHANNELS.stopDrawing)
+    stopDrawing: () => ipcRenderer.invoke(CHANNELS.stopDrawing),
+    updateReady: async () => readUpdateReady(await ipcRenderer.invoke(CHANNELS.updateCurrent)),
+    onUpdateReady: (listener) => {
+        const heard = (_event: unknown, update: unknown) => listener(readUpdateReady(update));
+        ipcRenderer.on(CHANNELS.updateReady, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.updateReady, heard);
+        };
+    },
+    installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate)
 };
 
 contextBridge.exposeInMainWorld("polarisDesktop", bridge);

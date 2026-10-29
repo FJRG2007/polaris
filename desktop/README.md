@@ -49,8 +49,8 @@ a whole screen, and a share picked in macOS's own picker are drawn on only for
 the others, and the request to draw says so.
 
 When a newer version is released, it is downloaded and installed in the
-background and opens the next time the app starts; a notice and the Help menu
-offer to restart into it now. That is the Windows installer, a macOS app signed
+background and opens the next time the app starts; a notice, the Help menu and
+a green download button in the page's header offer to restart into it now. That is the Windows installer, a macOS app signed
 with a Developer ID, and the AppImage, which is replaced only once the download
 matches the release's `SHA256SUMS`. For the .deb, an unsigned Mac app, or when
 an update fails, a notice says so and the Help menu offers its download page.

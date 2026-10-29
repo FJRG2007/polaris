@@ -15,7 +15,8 @@
  *   beside it, checked against the release's checksums and put in its place
  *   (`appimage.ts`).
  *
- * In each, one notice and the Help menu offer to restart into it now.
+ * In each, one notice, the Help menu and a button in the page's header
+ * (`update-ready.ts`) offer to restart into it now.
  * Everywhere else - a .deb, an unsigned Mac app, a Windows copy not installed
  * by Squirrel - a notice once per version, and the Help menu, open the
  * release's page, where the installers are.
