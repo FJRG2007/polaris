@@ -373,7 +373,7 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
     },
     // The VPN: three devices joined through one point.
     vpn: {
-        palette: ["#5EEAD4", "#0D9488", "#115E59"],
+        palette: ["#7DD3FC", "#0284C7", "#075985"],
         draw: ({ base, face }) => (
             <>
                 <path
