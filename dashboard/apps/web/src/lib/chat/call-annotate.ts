@@ -34,7 +34,14 @@ export const MAX_ANNOTATORS = 32;
 
 /** The pens, by index on the wire, so a message cannot carry a colour of its
  *  own choosing into a style. */
-export const STROKE_COLORS = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7", "#ffffff"] as const;
+export const STROKE_COLORS = [
+    "#ef4444",
+    "#f59e0b",
+    "#22c55e",
+    "#3b82f6",
+    "#a855f7",
+    "#ffffff"
+] as const;
 
 /** The most points one message carries; a longer stroke goes in several. */
 export const STROKE_POINTS_MAX = 64;
@@ -70,7 +77,10 @@ export const annotateMessageSchema = z.discriminatedUnion("kind", [
                 .int()
                 .min(0)
                 .max(STROKE_COLORS.length - 1),
-            points: z.array(z.tuple([unit, unit])).min(1).max(STROKE_POINTS_MAX),
+            points: z
+                .array(z.tuple([unit, unit]))
+                .min(1)
+                .max(STROKE_POINTS_MAX),
             /** The pen came up: nothing more will be added to this stroke. */
             end: z.boolean()
         })
@@ -114,7 +124,12 @@ export function pictureBox(box: Box, aspect: number | null): Box {
     if (!aspect || !(aspect > 0) || box.width <= 0 || box.height <= 0) return box;
     if (box.width / box.height > aspect) {
         const width = box.height * aspect;
-        return { left: box.left + (box.width - width) / 2, top: box.top, width, height: box.height };
+        return {
+            left: box.left + (box.width - width) / 2,
+            top: box.top,
+            width,
+            height: box.height
+        };
     }
     const height = box.width / aspect;
     return { left: box.left, top: box.top + (box.height - height) / 2, width: box.width, height };

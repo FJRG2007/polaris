@@ -9,7 +9,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { DesktopShareSources, PolarisDesktop } from "@/lib/desktop-bridge";
-import { DesktopSharePickerHost, canPickDesktopShare, pickDesktopShare } from "@/app/(app)/chat/desktop-share-picker";
+import {
+    DesktopSharePickerHost,
+    canPickDesktopShare,
+    pickDesktopShare
+} from "@/app/(app)/chat/desktop-share-picker";
 
 const listed: DesktopShareSources = {
     sound: true,

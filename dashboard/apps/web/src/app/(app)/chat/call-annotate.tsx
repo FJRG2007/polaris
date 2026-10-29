@@ -105,7 +105,9 @@ export function AnnotateProvider({ call, children }: { call: CallState; children
         if (sharing) return;
         setAllowed([]);
         setAsks([]);
-        void desktopBridge()?.stopDrawing?.().catch(() => undefined);
+        void desktopBridge()
+            ?.stopDrawing?.()
+            .catch(() => undefined);
     }, [sharing]);
 
     const annotatorsOf = useCallback(
@@ -133,7 +135,9 @@ export function AnnotateProvider({ call, children }: { call: CallState; children
                     sendAnnotate?.([from], { kind: "draw-answer", allowed: true });
                     return;
                 }
-                setAsks((current) => (current.includes(from) ? current : [...current, from].slice(-8)));
+                setAsks((current) =>
+                    current.includes(from) ? current : [...current, from].slice(-8)
+                );
                 return;
             }
             if (message.kind === "draw-answer") {
@@ -153,7 +157,8 @@ export function AnnotateProvider({ call, children }: { call: CallState; children
                 void desktop
                     ?.drawOnShare?.({
                         key: `${from}/${message.id}`,
-                        color: annotation.STROKE_COLORS[message.color] ?? annotation.STROKE_COLORS[0],
+                        color:
+                            annotation.STROKE_COLORS[message.color] ?? annotation.STROKE_COLORS[0],
                         points: message.points,
                         end: message.end
                     })
@@ -228,7 +233,19 @@ export function AnnotateProvider({ call, children }: { call: CallState; children
             nameOf: (seat) =>
                 call.meeting?.participants.find((person) => person.id === seat)?.name ?? null
         }),
-        [allowed, asked, asks, board, call.meeting, canDraw, changed, color, drawing, me, sendAnnotate]
+        [
+            allowed,
+            asked,
+            asks,
+            board,
+            call.meeting,
+            canDraw,
+            changed,
+            color,
+            drawing,
+            me,
+            sendAnnotate
+        ]
     );
 
     return <AnnotateContext.Provider value={value}>{children}</AnnotateContext.Provider>;
@@ -257,9 +274,11 @@ export function AnnotateLayer({
 }) {
     const annotate = useAnnotate();
     const canvas = useRef<HTMLCanvasElement>(null);
-    const pen = useRef<{ id: string; pending: Point[]; timer: ReturnType<typeof setInterval> | null } | null>(
-        null
-    );
+    const pen = useRef<{
+        id: string;
+        pending: Point[];
+        timer: ReturnType<typeof setInterval> | null;
+    } | null>(null);
     const aspectRef = useRef(aspect);
     aspectRef.current = aspect;
     const active = annotate?.drawing === owner;
@@ -286,7 +305,8 @@ export function AnnotateLayer({
             const width = node.offsetWidth;
             const height = node.offsetHeight;
             if (node.width !== Math.round(width * ratio)) node.width = Math.round(width * ratio);
-            if (node.height !== Math.round(height * ratio)) node.height = Math.round(height * ratio);
+            if (node.height !== Math.round(height * ratio))
+                node.height = Math.round(height * ratio);
             const context = node.getContext("2d");
             if (!context || rect.width <= 0) return;
             context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -294,7 +314,10 @@ export function AnnotateLayer({
             const now = Date.now();
             const board = annotate.board(owner);
             const left = annotation.pruneBoard(board, now);
-            const box = annotation.pictureBox({ left: 0, top: 0, width, height }, aspectRef.current);
+            const box = annotation.pictureBox(
+                { left: 0, top: 0, width, height },
+                aspectRef.current
+            );
             context.lineCap = "round";
             context.lineJoin = "round";
             context.lineWidth = Math.max(2, Math.min(width, height) / 160);
@@ -311,7 +334,10 @@ export function AnnotateLayer({
                 // A tap is a dot: a line to where it started draws nothing.
                 const [first] = stroke.points;
                 if (stroke.points.length === 1 && first) {
-                    context.lineTo(box.left + first[0] * box.width + 0.1, box.top + first[1] * box.height);
+                    context.lineTo(
+                        box.left + first[0] * box.width + 0.1,
+                        box.top + first[1] * box.height
+                    );
                 }
                 context.stroke();
             }
@@ -333,14 +359,20 @@ export function AnnotateLayer({
     if (!annotate) return null;
 
     const at = (event: React.PointerEvent<HTMLCanvasElement>): Point | null =>
-        annotation.toPicture(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), aspect);
+        annotation.toPicture(
+            event.clientX,
+            event.clientY,
+            event.currentTarget.getBoundingClientRect(),
+            aspect
+        );
 
     const flush = (end: boolean) => {
         const current = pen.current;
         if (!current) return;
         const points = current.pending;
         current.pending = [];
-        if (points.length > 0 || end) annotate.draw(owner, current.id, points.length > 0 ? points : [], end);
+        if (points.length > 0 || end)
+            annotate.draw(owner, current.id, points.length > 0 ? points : [], end);
         if (end) {
             if (current.timer) clearInterval(current.timer);
             pen.current = null;
@@ -500,7 +532,9 @@ export function AnnotateStrip() {
                         {t("annotate.wantsToDraw", { name: named(seat) })}
                         {ownOverlay !== "shown" && (
                             <span className="block text-muted-foreground">
-                                {ownOverlay === "share" ? t("annotate.onlyOthersSeeShare") : t("annotate.onlyOthersSee")}
+                                {ownOverlay === "share"
+                                    ? t("annotate.onlyOthersSeeShare")
+                                    : t("annotate.onlyOthersSee")}
                             </span>
                         )}
                     </span>

@@ -45,7 +45,9 @@ describe("messages", () => {
         expect(parse(stroke([[1.2, 0.2]]))).toBe(false);
         expect(parse(stroke([]))).toBe(false);
         expect(parse({ ...stroke([[0, 0]]), style: "x" })).toBe(false);
-        expect(parse(stroke(Array.from({ length: 65 }, () => [0, 0] as [number, number])))).toBe(false);
+        expect(parse(stroke(Array.from({ length: 65 }, () => [0, 0] as [number, number])))).toBe(
+            false
+        );
     });
 });
 

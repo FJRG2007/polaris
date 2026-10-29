@@ -46,7 +46,10 @@ describe("drawing on a share", () => {
         render(wrap(call, <AnnotateButton owner="presenter" />));
         fireEvent.click(screen.getByRole("button", { name: "Ask to draw on this screen" }));
         expect(call.sendAnnotate).toHaveBeenCalledWith(["presenter"], { kind: "draw-ask" });
-        expect(screen.getByRole("button", { name: "Asked to draw" })).toHaveProperty("disabled", true);
+        expect(screen.getByRole("button", { name: "Asked to draw" })).toHaveProperty(
+            "disabled",
+            true
+        );
     });
 
     it("offers the pen once the sharer's attribute names this seat", () => {
@@ -66,7 +69,10 @@ describe("drawing on a share", () => {
         expect(screen.getByText(/Ana wants to draw on your screen/)).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Allow" }));
         expect(call.setAnnotators).toHaveBeenLastCalledWith("viewer");
-        expect(call.sendAnnotate).toHaveBeenCalledWith(["viewer"], { kind: "draw-answer", allowed: true });
+        expect(call.sendAnnotate).toHaveBeenCalledWith(["viewer"], {
+            kind: "draw-answer",
+            allowed: true
+        });
         fireEvent.click(screen.getByRole("button", { name: "Stop drawing" }));
         expect(call.setAnnotators).toHaveBeenLastCalledWith("");
     });

@@ -165,7 +165,9 @@ function Picker({ request }: { request: Request }) {
                 <div role="tabpanel" className="max-h-[55vh] min-h-40 overflow-y-auto">
                     {shown.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            {tab === "screen" ? t("sharePicker.noScreens") : t("sharePicker.noWindows")}
+                            {tab === "screen"
+                                ? t("sharePicker.noScreens")
+                                : t("sharePicker.noWindows")}
                         </p>
                     ) : (
                         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -186,19 +188,36 @@ function Picker({ request }: { request: Request }) {
                                         <span className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-md bg-muted">
                                             {source.thumbnail ? (
                                                 // eslint-disable-next-line @next/next/no-img-element -- a data URL the app took a moment ago
-                                                <img src={source.thumbnail} alt="" className="h-full w-full object-contain" />
+                                                <img
+                                                    src={source.thumbnail}
+                                                    alt=""
+                                                    className="h-full w-full object-contain"
+                                                />
                                             ) : source.kind === "screen" ? (
-                                                <Monitor className="size-6 shrink-0 text-muted-foreground" aria-hidden />
+                                                <Monitor
+                                                    className="size-6 shrink-0 text-muted-foreground"
+                                                    aria-hidden
+                                                />
                                             ) : (
-                                                <AppWindow className="size-6 shrink-0 text-muted-foreground" aria-hidden />
+                                                <AppWindow
+                                                    className="size-6 shrink-0 text-muted-foreground"
+                                                    aria-hidden
+                                                />
                                             )}
                                         </span>
                                         <span className="flex min-w-0 items-center gap-1.5 px-0.5">
                                             {source.icon ? (
                                                 // eslint-disable-next-line @next/next/no-img-element -- the program's own icon, a data URL
-                                                <img src={source.icon} alt="" className="size-4 shrink-0" />
+                                                <img
+                                                    src={source.icon}
+                                                    alt=""
+                                                    className="size-4 shrink-0"
+                                                />
                                             ) : null}
-                                            <span className="min-w-0 truncate text-xs" title={source.name}>
+                                            <span
+                                                className="min-w-0 truncate text-xs"
+                                                title={source.name}
+                                            >
                                                 {source.name || t("sharePicker.untitled")}
                                             </span>
                                         </span>
