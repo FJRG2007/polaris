@@ -255,7 +255,7 @@ describe("the banner stack follows along", () => {
         });
         read.mockResolvedValue({
             banners: [
-                banner({ title: "Database upgrade", phase: "inProgress", dismissible: false })
+                banner({ title: "Database upgrade", phase: "inProgress" })
             ],
             nextChangeInMs: 3_600_000
         });
@@ -278,8 +278,8 @@ describe("the banner stack follows along", () => {
         });
         expect(read).toHaveBeenCalledTimes(1);
         expect(screen.getByText("Maintenance in progress")).toBeTruthy();
-        // Under way: no close button.
-        expect(screen.queryByRole("button", { name: /dismiss|close/i })).toBeNull();
+        // Under way it can still be closed, for this phase.
+        expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
     });
 
     it("offers See details when the banner has a page", () => {
