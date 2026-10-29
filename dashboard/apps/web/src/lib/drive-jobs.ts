@@ -362,7 +362,9 @@ async function runBatch(
 function readPaths(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }

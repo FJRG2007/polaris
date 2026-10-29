@@ -33,11 +33,18 @@ export function readDrivePreferences(raw: string | null | undefined): DrivePrefe
     }
     const value = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
     const confirmTrash = fields.confirmTrash.safeParse(value.confirmTrash);
-    return { confirmTrash: confirmTrash.success ? confirmTrash.data : DEFAULT_DRIVE_PREFERENCES.confirmTrash };
+    return {
+        confirmTrash: confirmTrash.success
+            ? confirmTrash.data
+            : DEFAULT_DRIVE_PREFERENCES.confirmTrash
+    };
 }
 
 export async function loadDrivePreferences(userId: string): Promise<DrivePreferences> {
-    const row = await prisma.drivePreference.findUnique({ where: { userId }, select: { value: true } });
+    const row = await prisma.drivePreference.findUnique({
+        where: { userId },
+        select: { value: true }
+    });
     return readDrivePreferences(row?.value);
 }
 
@@ -51,6 +58,10 @@ export async function saveDrivePreferences(
     const next = drivePreferencesSchema.parse({ ...current, ...patch });
     if (next.confirmTrash === current.confirmTrash) return current;
     const value = JSON.stringify(next);
-    await prisma.drivePreference.upsert({ where: { userId }, create: { userId, value }, update: { value } });
+    await prisma.drivePreference.upsert({
+        where: { userId },
+        create: { userId, value },
+        update: { value }
+    });
     return next;
 }

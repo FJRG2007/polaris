@@ -167,10 +167,7 @@ export default async function DrivePage({
 
     return (
         <>
-            <PageHeader
-                title={t("pages.drive.title")}
-                description={t("pages.drive.description")}
-            />
+            <PageHeader title={t("pages.drive.title")} description={t("pages.drive.description")} />
             <DriveExplorer
                 connections={connections}
                 connectionId={connectionId}

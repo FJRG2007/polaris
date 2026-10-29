@@ -1072,9 +1072,7 @@ export function DriveExplorer({
                         onDelete={
                             // A container and a registered server have no recycle
                             // bin to move anything into - see `moveManyToTrash`.
-                            isSavedConnection(connectionId)
-                                ? askToTrash
-                                : undefined
+                            isSavedConnection(connectionId) ? askToTrash : undefined
                         }
                         onDeletePermanent={(items) => setPermanentTargets(items)}
                         onEmptyFolder={(entry, permanent) => setEmptyTarget({ entry, permanent })}

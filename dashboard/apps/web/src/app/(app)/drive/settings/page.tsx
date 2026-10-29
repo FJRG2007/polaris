@@ -20,7 +20,10 @@ export default async function DriveSettingsPage() {
 
     return (
         <div className="flex flex-col gap-4">
-            <PageHeader title={t("pages.settings.title")} description={t("pages.settings.description")} />
+            <PageHeader
+                title={t("pages.settings.title")}
+                description={t("pages.settings.description")}
+            />
             <DriveSettings initial={preferences} />
         </div>
     );

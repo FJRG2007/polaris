@@ -31,10 +31,12 @@ let row: JobRow;
 
 /** Every call into the bulk trash, so "one session per batch" can be asserted
  *  rather than assumed. */
-const moveManyToTrash = vi.fn(async (_owner: string, _connection: string, paths: readonly string[]) => ({
-    moved: [...paths],
-    failures: [] as { path: string; reason: string }[]
-}));
+const moveManyToTrash = vi.fn(
+    async (_owner: string, _connection: string, paths: readonly string[]) => ({
+        moved: [...paths],
+        failures: [] as { path: string; reason: string }[]
+    })
+);
 
 const deleteDriveEntry = vi.fn(async (_driver: unknown, _path: string): Promise<void> => undefined);
 const disposed = vi.fn(async () => undefined);
@@ -53,11 +55,22 @@ vi.mock("@polaris/db", () => ({
                 Object.assign(row, data);
                 return { ...row };
             },
-            updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Record<string, unknown>;
+            }) => {
                 // The take: only a queued job, or one whose worker has gone quiet.
                 const wanted = where.state as string | undefined;
                 if (wanted !== undefined && row.state !== wanted) return { count: 0 };
-                if (where.OR && row.state !== "queued" && row.leaseUntil && row.leaseUntil > new Date()) {
+                if (
+                    where.OR &&
+                    row.state !== "queued" &&
+                    row.leaseUntil &&
+                    row.leaseUntil > new Date()
+                ) {
                     return { count: 0 };
                 }
                 Object.assign(row, data);

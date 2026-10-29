@@ -39,7 +39,10 @@ export function DriveSettings({ initial }: { initial: DrivePreferences }) {
                         <span id="drive-confirm-trash" className="text-sm font-medium">
                             {t("settings.confirmTrash")}
                         </span>
-                        <span id="drive-confirm-trash-hint" className="text-muted-foreground text-sm">
+                        <span
+                            id="drive-confirm-trash-hint"
+                            className="text-muted-foreground text-sm"
+                        >
                             {t("settings.confirmTrashHint")}
                         </span>
                     </div>
