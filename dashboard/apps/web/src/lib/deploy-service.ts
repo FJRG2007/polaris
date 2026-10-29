@@ -1479,14 +1479,18 @@ async function stagedCutoverRoutes(rows: readonly RouteDomain[]): Promise<RouteD
  *  rule. Empty when it is off, or when the read fails: a failure here must not
  *  cost the rest of the edge its routes. */
 async function vpnEngineApplicationIds(): Promise<ReadonlySet<string>> {
-    // One at most: the engine is an instance-wide singleton.
-    const row = await prisma.installedApp
-        .findFirst({
+    // One at most: the engine is an instance-wide singleton. Awaited inside a
+    // try rather than chained on `.catch`, so a lookup that throws before it
+    // returns a promise is caught too.
+    try {
+        const row = await prisma.installedApp.findFirst({
             where: { catalogId: VPN_ENGINE_APP, status: { not: "removed" } },
             select: { applicationId: true }
-        })
-        .catch(() => null);
-    return new Set(row?.applicationId ? [row.applicationId] : []);
+        });
+        return new Set(row?.applicationId ? [row.applicationId] : []);
+    } catch {
+        return new Set();
+    }
 }
 
 async function publishAppRoutes(
