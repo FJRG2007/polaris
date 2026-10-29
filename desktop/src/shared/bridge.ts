@@ -107,7 +107,10 @@ export interface PolarisDesktop {
     /** The update of this app that is installed and waits for a restart, or
      *  null. */
     updateReady(): Promise<UpdateReady>;
-    /** Hear an update become ready (or stop being). Answers the way to stop. */
+    /** Hear an update become ready (or stop being). Answers the way to stop.
+     *  Listening is how a page says it draws the restart button; while none of
+     *  the focused window's listeners are left the app announces the update
+     *  with a notice of its own. */
     onUpdateReady(listener: (update: UpdateReady) => void): () => void;
     /** Restart into the waiting update. */
     installUpdate(): Promise<Outcome>;
@@ -234,6 +237,7 @@ export const CHANNELS = {
     updateReady: "desktop:update-ready",
     updateCurrent: "desktop:update-current",
     installUpdate: "desktop:install-update",
+    offerUpdate: "desktop:offer-update",
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",

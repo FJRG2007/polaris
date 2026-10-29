@@ -21,6 +21,9 @@ import {
 
 const version = process.argv.find((arg) => arg.startsWith(VERSION_ARGUMENT))?.slice(VERSION_ARGUMENT.length) ?? "";
 
+/** How many of the page's `onUpdateReady` listeners are attached. */
+let updateListeners = 0;
+
 const bridge: PolarisDesktop = {
     version,
     platform: process.platform,
@@ -62,8 +65,15 @@ const bridge: PolarisDesktop = {
     onUpdateReady: (listener) => {
         const heard = (_event: unknown, update: unknown) => listener(readUpdateReady(update));
         ipcRenderer.on(CHANNELS.updateReady, heard);
+        // The first listener says this page draws the button, the last one gone
+        // that it stopped - so the app knows whether to announce it itself.
+        if (updateListeners++ === 0) void ipcRenderer.invoke(CHANNELS.offerUpdate, true);
+        let stopped = false;
         return () => {
+            if (stopped) return;
+            stopped = true;
             ipcRenderer.removeListener(CHANNELS.updateReady, heard);
+            if (--updateListeners === 0) void ipcRenderer.invoke(CHANNELS.offerUpdate, false);
         };
     },
     installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate)

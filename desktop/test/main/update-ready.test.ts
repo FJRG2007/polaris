@@ -84,6 +84,40 @@ describe("UpdateReadyState", () => {
     });
 });
 
+describe("which pages draw the button", () => {
+    it("counts no page until one says it draws the button - an older dashboard never does", () => {
+        const state = new UpdateReadyState(vi.fn());
+        expect(state.offeredBy(7)).toBe(false);
+        expect(state.offeredBy(null)).toBe(false);
+    });
+
+    it("follows each window's page on its own", () => {
+        const state = new UpdateReadyState(vi.fn());
+        state.offer(1, true);
+        state.offer(2, true);
+        expect(state.offeredBy(1)).toBe(true);
+        expect(state.offeredBy(2)).toBe(true);
+        state.offer(1, false);
+        expect(state.offeredBy(1)).toBe(false);
+        expect(state.offeredBy(2)).toBe(true);
+        expect(state.offeredBy(3)).toBe(false);
+    });
+
+    it("announces an installed update itself unless the page in front draws the button", () => {
+        const state = new UpdateReadyState(vi.fn());
+        const installed = { version: "0.1.3", restart: vi.fn() };
+        // An older dashboard, the address form, no window at all.
+        expect(state.needsNotice(installed, 1)).toBe(true);
+        expect(state.needsNotice(installed, null)).toBe(true);
+        state.offer(1, true);
+        expect(state.needsNotice(installed, 1)).toBe(false);
+        // Another window in front, on a page without the button.
+        expect(state.needsNotice(installed, 2)).toBe(true);
+        // A download page is never the button's.
+        expect(state.needsNotice({ version: "0.1.4" }, 1)).toBe(true);
+    });
+});
+
 describe("the update state on the bridge", () => {
     it("reads a ready update and nothing else", () => {
         expect(readUpdateReady({ version: "0.1.3" })).toEqual({ version: "0.1.3" });

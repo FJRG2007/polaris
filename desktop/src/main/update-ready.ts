@@ -6,6 +6,11 @@
  * Only an update with a way to restart into it is held - one that is installed
  * already. An update that can only be downloaded from its page is the menu's and
  * the notice's to offer, not a button that would have to open a browser.
+ *
+ * The page's version and this app's are independent - one app opens Polaris
+ * servers of any version - so a page says it draws the button (it listens with
+ * `onUpdateReady`), and only then is the app's own notice left out. A page that
+ * never says so, an older dashboard, gets the notice and the tray as before.
  */
 
 import type { Outcome } from "@/shared/bridge";
@@ -19,6 +24,8 @@ export interface FoundUpdate {
 export class UpdateReadyState {
     private ready: { readonly state: NonNullable<UpdateReady>; readonly restart: () => void; } | null = null;
     private installing = false;
+    /** The pages, by their web contents, that draw the button now. */
+    private readonly offering = new Set<number>();
 
     constructor(private readonly changed: (state: UpdateReady) => void) {}
 
@@ -34,6 +41,24 @@ export class UpdateReadyState {
         this.ready = { state, restart: update.restart };
         this.installing = false;
         this.changed(this.current());
+    }
+
+    /** A page saying it draws the button, or that it stopped. */
+    offer(page: number, on: boolean): void {
+        if (on) this.offering.add(page);
+        else this.offering.delete(page);
+    }
+
+    /** Whether this page draws the button: the app's notice is then not needed. */
+    offeredBy(page: number | null): boolean {
+        return page !== null && this.offering.has(page);
+    }
+
+    /** Whether the app announces this update with a notice of its own: always
+     *  for one that can only be downloaded, and for an installed one unless the
+     *  page in front draws the button. */
+    needsNotice(update: FoundUpdate, front: number | null): boolean {
+        return !update.restart || !this.offeredBy(front);
     }
 
     current(): UpdateReady {

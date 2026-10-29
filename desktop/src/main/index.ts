@@ -63,6 +63,15 @@ const server = (): string | null => current;
  * as it changes so the page's header can offer the restart. A window opened
  * later asks for it (`updateCurrent`).
  */
+/** The page of the Polaris window in front - the focused one, else the main
+ *  one - by its web contents, or null when neither is a Polaris page. */
+function frontPage(): number | null {
+    const focused = BrowserWindow.getFocusedWindow();
+    const window = focused && kindOf(focused.webContents) === "polaris" ? focused : main;
+    if (!window || window.isDestroyed() || !current || !isServerUrl(window.webContents.getURL(), current)) return null;
+    return window.webContents.id;
+}
+
 const updates = new UpdateReadyState((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
         const contents = window.webContents;
@@ -299,6 +308,11 @@ function start(): void {
             menuUpdate = { version: update.version, open, ...(update.restart ? { restart: update.restart } : {}) };
             refreshMenu();
             updates.found(update);
+            // The window in front draws the restart button itself: no notice
+            // on top of it. A page that does not (an older Polaris, the address
+            // form) gets the notice, as do the other windows' pages through the
+            // button they draw.
+            if (!updates.needsNotice(update, frontPage())) return;
             showNotice(
                 update.restart
                     ? {

@@ -47,7 +47,7 @@ export interface IpcHost extends PushHost {
     readonly nameServer: (origin: string, name: string) => Outcome;
     readonly removeServer: (origin: string) => Outcome;
     /** The update waiting for a restart, and the restart into it. */
-    readonly updates: Pick<UpdateReadyState, "current" | "install">;
+    readonly updates: Pick<UpdateReadyState, "current" | "install" | "offer">;
 }
 
 /** A server named by the list: an address in the one stored form. */
@@ -294,6 +294,26 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.installUpdate, (event, ...args: unknown[]): Outcome => {
         if (!fromPolaris(event) || !z.tuple([]).safeParse(args).success) return REFUSED;
         return host.updates.install();
+    });
+
+    // A page saying it draws the restart button. Forgotten with the page: a
+    // reload or another site in the window is a page that has not said it.
+    const watched = new Set<number>();
+    ipcMain.handle(CHANNELS.offerUpdate, (event, raw: unknown): void => {
+        const on = z.boolean().safeParse(raw);
+        if (!fromPolaris(event) || !on.success) return;
+        const sender = event.sender;
+        host.updates.offer(sender.id, on.data);
+        if (watched.has(sender.id)) return;
+        watched.add(sender.id);
+        const forget = () => host.updates.offer(sender.id, false);
+        sender.on("did-start-navigation", (details: { isMainFrame?: boolean; isSameDocument?: boolean; }) => {
+            if (details.isMainFrame && !details.isSameDocument) forget();
+        });
+        sender.once("destroyed", () => {
+            forget();
+            watched.delete(sender.id);
+        });
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));
