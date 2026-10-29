@@ -3663,7 +3663,9 @@ export function FilesView({
                 </ContextMenu>
             </div>
             {!inTrash && selectedEntries.length === 1 && selectedEntries[0] ? (
-                <aside className="fixed right-0 top-header bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
+                // Fixed to the viewport, not stuck inside the scrolling content:
+                // its top is the connection strip above the shell plus the header.
+                <aside className="fixed right-0 top-[calc(var(--connection-banner-height,0px)+var(--header-height))] bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         {/* The file, not a mark standing for its type. This panel
                             exists to answer "which one is this", and for a
