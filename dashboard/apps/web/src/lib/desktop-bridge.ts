@@ -14,6 +14,8 @@
  * trusting that something with the right name is the app.
  */
 
+import { z } from "zod";
+
 export type DesktopOutcome = { readonly ok: true } | { readonly ok: false; readonly error: string };
 
 export type DesktopFolder =
@@ -87,6 +89,27 @@ export interface PolarisDesktop {
     canDrawOnShare?(): Promise<boolean>;
     /** Take the drawing off the display: the share ended. */
     stopDrawing?(): Promise<void>;
+    /** The update of the app that is installed and waits for a restart, or
+     *  null. Absent, with the two below, from an app older than 0.1.3, which
+     *  offers the restart only from its own menu. */
+    updateReady?(): Promise<DesktopUpdate | null>;
+    /** Hear an update become ready. Answers the way to stop. */
+    onUpdateReady?(listener: (update: DesktopUpdate | null) => void): () => void;
+    /** Restart the app into the waiting update. */
+    installUpdate?(): Promise<DesktopOutcome>;
+}
+
+/** An update of the desktop app that waits for a restart. */
+export interface DesktopUpdate {
+    readonly version: string;
+}
+
+const desktopUpdateSchema = z.object({ version: z.string().trim().min(1).max(64) });
+
+/** What the app said about its update, as one: anything else is no update. */
+export function readDesktopUpdate(raw: unknown): DesktopUpdate | null {
+    const parsed = desktopUpdateSchema.safeParse(raw);
+    return parsed.success ? { version: parsed.data.version } : null;
 }
 
 /** Points of a stroke, as fractions of the shared picture. */

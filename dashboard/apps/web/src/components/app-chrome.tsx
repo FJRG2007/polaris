@@ -59,6 +59,7 @@ import { UpdateIndicator } from "@/components/update-indicator";
 import { SessionScopeProvider } from "@/components/session-scope";
 import { ShelfScopeProvider } from "@/components/shelf-scope";
 import { NotificationBell } from "@/components/notification-bell";
+import { DesktopUpdateButton } from "@/components/desktop-update-button";
 import { headerSlots } from "@/lib/app-extensions/registry";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { openShelfFor, resolveScope, scopeChoices } from "@/lib/workspace-scope";
@@ -499,6 +500,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                                     )
                                                                                                 )}
                                                                                                 <PolarToggle />
+                                                                                                <DesktopUpdateButton />
                                                                                                 <NotificationBell />
                                                                                                 <AccountMenu
                                                                                                     id={

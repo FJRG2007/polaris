@@ -1084,6 +1084,10 @@
         "push": "Enviar desde este ordenador",
         "pushHint": "Enviar desde este ordenador: compila con su Docker y despliega la imagen"
     },
+    "desktopUpdate": {
+        "label": "Polaris {version} está lista - reinicia para actualizar",
+        "failed": "No se pudo empezar la actualización."
+    },
     "installApp": {
         "title": "App de escritorio",
         "usingDesktop": "Estás usando la app de escritorio de Polaris.",

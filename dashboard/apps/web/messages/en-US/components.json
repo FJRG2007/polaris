@@ -1084,6 +1084,10 @@
         "push": "Push from this computer",
         "pushHint": "Push from this computer - build with its Docker and deploy the image"
     },
+    "desktopUpdate": {
+        "label": "Polaris {version} is ready - restart to update",
+        "failed": "The update could not be started."
+    },
     "installApp": {
         "title": "Desktop app",
         "usingDesktop": "You are using the Polaris desktop app.",
