@@ -40,6 +40,8 @@ import { closingInFlight, mustCloseDirectPort } from "@/lib/deploy/direct-port";
 import { appBaseUrl, getPublicIp } from "./domain-service";
 import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
+import { passthroughWaf } from "./vpn/edge";
+import { VPN_ENGINE_APP } from "./vpn/settings";
 import { projectEntryWhere } from "./deploy-project-access";
 import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
@@ -1444,6 +1446,20 @@ async function stagedCutoverRoutes(rows: readonly RouteDomain[]): Promise<RouteD
     }));
 }
 
+/** The VPN control servers' application ids, whose routes carry no firewall
+ *  rule. Empty when it is off, or when the read fails: a failure here must not
+ *  cost the rest of the edge its routes. */
+async function vpnEngineApplicationIds(): Promise<ReadonlySet<string>> {
+    const rows = await prisma.installedApp
+        .findMany({
+            where: { catalogId: VPN_ENGINE_APP, status: { not: "removed" } },
+            select: { applicationId: true },
+            take: 10
+        })
+        .catch(() => []);
+    return new Set(rows.map((row) => row.applicationId).filter((id) => id !== null));
+}
+
 async function publishAppRoutes(
     force = false
 ): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
@@ -1463,13 +1479,19 @@ async function publishAppRoutes(
     // What each service asks of the edge, read once per service rather than per
     // hostname, and which services are under the flood check's challenge right now.
     const flooded = await floodedServices();
+    // The VPN's control server is published with nothing in front of it: its
+    // clients speak the control protocol, which no challenge or guard page can
+    // be answered in (see lib/vpn/edge.ts).
+    const machineProtocol = await vpnEngineApplicationIds();
     const edgeOf = new Map<string, EdgeRouteFields>();
     for (const domain of domains) {
         if (edgeOf.has(domain.applicationId)) continue;
         const edge = parseAppEdgeConfig(domain.application.edgeConfig);
         edgeOf.set(domain.applicationId, {
             edge,
-            challenge: await challengeActive(domain.applicationId, edge.challenge, flooded),
+            challenge: machineProtocol.has(domain.applicationId)
+                ? false
+                : await challengeActive(domain.applicationId, edge.challenge, flooded),
             appHostnames: domains
                 .filter((other) => other.applicationId === domain.applicationId)
                 .map((other) => normalizeDeployHostname(other.hostname) ?? other.hostname)
@@ -1629,7 +1651,9 @@ async function publishAppRoutes(
         const loginUrl = await appBaseUrl();
         const loginKeys = await edgeLoginKeys();
         for (const domain of localDomains) {
-            const rule = waf.get(domain.applicationId) ?? emptyWaf;
+            const rule = machineProtocol.has(domain.applicationId)
+                ? passthroughWaf
+                : (waf.get(domain.applicationId) ?? emptyWaf);
             // A remote app fronted by this edge is dialled on its own machine's
             // address and the port that machine publishes it on. Skipped when the
             // address is not known rather than dialled on this box, which would
