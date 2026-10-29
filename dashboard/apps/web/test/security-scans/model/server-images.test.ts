@@ -79,6 +79,20 @@ describe("server images", () => {
         ]);
     });
 
+    it("spells a ref the way the engine resolves it", () => {
+        expect(images.canonicalRef("nginx")).toBe("docker.io/library/nginx:latest");
+        expect(images.canonicalRef("alpine/socat:1.8.1.3")).toBe("docker.io/alpine/socat:1.8.1.3");
+        expect(images.canonicalRef("index.docker.io/library/node:22")).toBe(
+            "docker.io/library/node:22"
+        );
+        expect(images.canonicalRef("localhost:5000/fixture-app")).toBe(
+            "localhost:5000/fixture-app:latest"
+        );
+        expect(images.canonicalRef("ghcr.io/example/app@sha256:abc")).toBe(
+            "ghcr.io/example/app@sha256:abc"
+        );
+    });
+
     it("counts a part of Polaris run as an app as Polaris's own, under the app's name", () => {
         const grouped = images.groupImages(
             listed,

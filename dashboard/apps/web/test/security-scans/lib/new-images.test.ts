@@ -280,6 +280,63 @@ describe("new releases are scanned on their own", () => {
         expect(db.scans).toHaveLength(1);
     });
 
+    it("finds a part's release under the ref the engine spells out, or one it shares", async () => {
+        const project = `polaris-${shortHash("relay-1", 8)}`;
+        const imageId = `sha256:${"a".repeat(64)}`;
+        release("relay-1", "fixture-relay");
+        db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });
+        db.containers.push(
+            {
+                name: "fixture-relay-p80",
+                ref: "alpine/socat:1.8.1.3",
+                imageId: `sha256:${"b".repeat(64)}`,
+                project,
+                labels: {}
+            },
+            { name: "fixture-other", ref: "aaa/fixture-alias:1", imageId, project: null, labels: {} },
+            {
+                name: "fixture-relay",
+                ref: "docker.io/library/fixture-relay:latest",
+                imageId,
+                project,
+                labels: {}
+            }
+        );
+        await pass();
+        await settled();
+        expect(db.scans).toHaveLength(1);
+        expect(db.scans[0]).toMatchObject({ imageId });
+        expect(JSON.parse(db.scans[0]!.input)).toMatchObject({ release: "fixture-relay" });
+        await pass();
+        await pass();
+        expect(db.scans).toHaveLength(1);
+    });
+
+    it("never scans a part's port forwarder when none of its images is the release", async () => {
+        const project = `polaris-${shortHash("relay-1", 8)}`;
+        release("relay-1", "polaris-release/fixture-relay:2.0.0");
+        db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });
+        db.containers.push(
+            {
+                name: "fixture-relay-p80",
+                ref: "alpine/socat:1.8.1.3",
+                imageId: `sha256:${"b".repeat(64)}`,
+                project,
+                labels: {}
+            },
+            {
+                name: "fixture-relay",
+                ref: "polaris-release/fixture-relay:1.0.0",
+                imageId: `sha256:${"a".repeat(64)}`,
+                project,
+                labels: {}
+            }
+        );
+        await pass();
+        await settled();
+        expect(db.scans).toHaveLength(0);
+    });
+
     it("never files a part of Polaris as an app while its container is not up yet", async () => {
         release("relay-1", "polaris-release/fixture-relay:1.0.0");
         db.installs.push({ applicationId: "relay-1", catalogId: "camera-hub" });

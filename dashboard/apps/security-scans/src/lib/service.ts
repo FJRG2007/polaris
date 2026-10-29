@@ -463,9 +463,12 @@ export async function queueImage(targetId: string, applicationId: string, userId
             (image) => image.part === applicationId
         );
         const release = await imageOf(applicationId);
-        const own = mine?.find((image) => image.ref === release) ?? mine?.[0];
+        const wanted = release ? images.canonicalRef(release) : null;
+        const own =
+            mine?.find((image) => image.refs.some((ref) => images.canonicalRef(ref) === wanted)) ??
+            (mine?.length === 1 ? mine[0] : undefined);
         if (!own) throw new ScanFailure("imageMissing");
-        return queueServerImage(targetId, own.imageId, userId, own);
+        return queueServerImage(targetId, own.imageId, userId, own, release);
     }
     // The image is recorded so a new release's image is told apart from one
     // already scanned (see `planNewImages`).
@@ -578,7 +581,8 @@ export async function queueServerImage(
     targetId: string,
     imageId: string,
     userId: string | null,
-    known?: images.ServerImage
+    known?: images.ServerImage,
+    release?: string | null
 ): Promise<string> {
     const image =
         known ?? (await imagesOn(await targetRow(targetId)))?.find((i) => i.imageId === imageId);
@@ -597,7 +601,8 @@ export async function queueServerImage(
             ref: image.ref,
             users: image.users,
             applicationIds: image.applicationIds,
-            ...(image.part ? { part: image.part } : {})
+            ...(image.part ? { part: image.part } : {}),
+            ...(release ? { release } : {})
         },
         userId,
         { imageId: image.imageId, source: image.source }
