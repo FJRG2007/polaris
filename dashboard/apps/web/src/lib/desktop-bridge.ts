@@ -70,6 +70,47 @@ export interface PolarisDesktop {
     ): Promise<boolean>;
     /** The programs running now, for picking one to add as a game. */
     runningPrograms?(): Promise<readonly string[]>;
+    /** The screens and windows to share, each with a small picture, for the
+     *  picker this page draws. Null where the system's own picker is the one to
+     *  use (macOS). Absent from an app older than the picker, which then shows
+     *  its own dialog. */
+    shareSources?(): Promise<DesktopShareSources | null>;
+    /** What the picker chose, for the `getDisplayMedia` call that follows. */
+    chooseShare?(input: { readonly id: string; readonly sound: boolean }): Promise<boolean>;
+    /** Draw a stroke somebody made on this browser's share over the shared
+     *  display itself. False when there is nothing to draw on - a window share,
+     *  or a share the app did not pick. */
+    drawOnShare?(stroke: DesktopStroke): Promise<boolean>;
+    /** Whether the share going out now is one `drawOnShare` can draw on.
+     *  Absent from an app older than it. */
+    canDrawOnShare?(): Promise<boolean>;
+    /** Take the drawing off the display: the share ended. */
+    stopDrawing?(): Promise<void>;
+}
+
+/** Points of a stroke, as fractions of the shared picture. */
+export interface DesktopStroke {
+    readonly key: string;
+    readonly color: string;
+    readonly points: readonly (readonly [number, number])[];
+    readonly end: boolean;
+}
+
+/** A screen or a window the desktop app can share. */
+export interface DesktopShareSource {
+    readonly id: string;
+    readonly name: string;
+    readonly kind: "screen" | "window";
+    /** A small picture as a data URL, or null when the system gave none. */
+    readonly thumbnail: string | null;
+    /** The program's icon as a data URL, for a window. */
+    readonly icon: string | null;
+}
+
+export interface DesktopShareSources {
+    readonly sources: readonly DesktopShareSource[];
+    /** Whether this computer's sound can go with a share. */
+    readonly sound: boolean;
 }
 
 /** A game the desktop app saw running, as it reports it. */

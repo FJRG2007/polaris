@@ -11,8 +11,10 @@
  */
 
 import type { CallDevice } from "./call-state";
+import { desktopBridge } from "@/lib/desktop-bridge";
 import { micConstraints } from "./mic-cleanup";
 import { withCameraDevice } from "./camera-device";
+import { canPickDesktopShare, pickDesktopShare } from "./desktop-share-picker";
 
 /**
  * Open what this browser can, and say what it could not.
@@ -157,6 +159,19 @@ export function canShareScreen(): boolean {
  * @param video - The size to ask the screen for, from `call-quality`.
  */
 export async function openScreen(video: MediaTrackConstraints): Promise<MediaStream> {
+    // Inside the desktop app, the app's screens and windows are offered in
+    // Polaris's own picker first; the pick is handed over just before the
+    // request below, which then shares exactly that. Closing it is the same
+    // answer as cancelling a browser's picker.
+    const desktop = desktopBridge();
+    if (desktop?.shareSources && desktop.chooseShare && canPickDesktopShare()) {
+        const listed = await desktop.shareSources().catch(() => null);
+        if (listed) {
+            const pick = await pickDesktopShare(desktop, listed);
+            if (!pick) throw new DOMException("The share was cancelled.", "AbortError");
+            await desktop.chooseShare(pick);
+        }
+    }
     const ask = (withSound: boolean) =>
         navigator.mediaDevices.getDisplayMedia(
             withSound

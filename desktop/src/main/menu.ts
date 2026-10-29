@@ -1,5 +1,5 @@
 /**
- * The application menu: File (Change server, Back, Reload, Forget API key),
+ * The application menu: File (Servers, Switch to, Back, Reload, Forget API key),
  * Edit, View, Window and Help - which also offers a newer version once one is
  * out.
  *
@@ -10,9 +10,11 @@
  */
 
 import { app, Menu, type MenuItemConstructorOptions } from "electron";
+import { describeServer, type ServerRow } from "@/shared/servers";
 
 export interface MenuActions {
     readonly changeServer: () => void;
+    readonly switchServer: (origin: string) => void;
     readonly back: () => void;
     readonly reload: () => void;
     readonly forgetApiKey: () => void;
@@ -26,9 +28,30 @@ const isMac = process.platform === "darwin";
 export interface MenuUpdate {
     readonly version: string;
     readonly open: () => void;
+    /** Set once it is installed: restart into it instead of downloading. */
+    readonly restart?: () => void;
 }
 
-export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
+export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: readonly ServerRow[] = []): void {
+    // One line per server, the one in use ticked. Only worth a submenu once
+    // there is somewhere else to go.
+    const switchTo: MenuItemConstructorOptions[] =
+        servers.length > 1
+            ? [
+                  {
+                      label: "Switch to",
+                      submenu: servers.map((server) => ({
+                          label: describeServer(server),
+                          sublabel: server.name ? server.host : undefined,
+                          type: "radio" as const,
+                          checked: server.active,
+                          click: () => {
+                              if (!server.active) actions.switchServer(server.origin);
+                          }
+                      }))
+                  }
+              ]
+            : [];
     const template: MenuItemConstructorOptions[] = [
         ...(isMac
             ? ([
@@ -51,7 +74,8 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
         {
             label: "File",
             submenu: [
-                { label: "Change server...", click: actions.changeServer },
+                { label: "Servers...", click: actions.changeServer },
+                ...switchTo,
                 { label: "Back", accelerator: isMac ? "Cmd+[" : "Alt+Left", click: actions.back },
                 { label: "Reload", accelerator: "CmdOrCtrl+R", click: actions.reload },
                 { type: "separator" },
@@ -103,7 +127,9 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate): void {
             submenu: [
                 ...(update
                     ? ([
-                          { label: `Download Polaris ${update.version}...`, click: update.open },
+                          update.restart
+                              ? { label: `Restart to update to Polaris ${update.version}`, click: update.restart }
+                              : { label: `Download Polaris ${update.version}...`, click: update.open },
                           { type: "separator" }
                       ] satisfies MenuItemConstructorOptions[])
                     : []),

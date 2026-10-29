@@ -25,7 +25,10 @@ nothing to download.
 
 The first run asks for the address you open Polaris at: https://, or http:// for
 an address only your own network reaches (a private IP, a name with no dot, or
-one ending in `.local`, `.lan`, `.home.arpa` or `.internal`). Pushing asks once
+one ending in `.local`, `.lan`, `.home.arpa` or `.internal`). Every address
+opened is kept under File > Servers, where each one can be named, opened or
+removed, and File > Switch to goes straight to another; each server keeps its
+own sign-in and its own saved API key. Pushing asks once
 for an API key with the Deploy scope (Account > API keys); the key is encrypted
 by the operating system's password store (Keychain, Windows DPAPI, or the
 desktop's secret service on Linux) and never written in plain text. On a Linux
@@ -37,7 +40,17 @@ provider's pages in the window, since that is where the sign-in it started
 lives. File > Back returns to Polaris from a provider's page. Any other address
 opens in the system browser.
 
-When a newer version is released, a notice says so and the Help menu offers its
+Sharing your screen in a call opens a picker with a picture of every screen and
+window (on Windows, with a switch for the computer's sound); macOS shows its own.
+When you let somebody in the call draw on a shared screen, their strokes also
+appear on that display, in a window that takes no clicks and, on Windows 10 2004
+and later and macOS, stays out of the share itself. A shared window, rather than
+a whole screen, and a share picked in macOS's own picker are drawn on only for
+the others, and the request to draw says so.
+
+When a newer version is released, Windows installs it in the background and it
+opens the next time the app starts; a notice and the Help menu offer to restart
+into it now. On macOS and Linux a notice says so and the Help menu offers its
 download page.
 
 On Linux systems that forbid unprivileged user namespaces (Ubuntu 24.04 and

@@ -7,12 +7,16 @@
  */
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type { StrokeInput } from "@/shared/annotate";
 import { CHANNELS, type PolarisLocal, type PushEvent } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
     connect: {
         state: () => ipcRenderer.invoke(CHANNELS.connectState),
-        submit: (address) => ipcRenderer.invoke(CHANNELS.connectSubmit, address)
+        submit: (address) => ipcRenderer.invoke(CHANNELS.connectSubmit, address),
+        switchTo: (origin) => ipcRenderer.invoke(CHANNELS.connectSwitch, origin),
+        rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
+        remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin)
     },
     apiKey: {
         state: () => ipcRenderer.invoke(CHANNELS.keyState),
@@ -30,6 +34,13 @@ const bridge: PolarisLocal = {
             const handler = (_event: IpcRendererEvent, payload: PushEvent) => listener(payload);
             ipcRenderer.on(CHANNELS.pushEvent, handler);
             return () => ipcRenderer.removeListener(CHANNELS.pushEvent, handler);
+        }
+    },
+    overlay: {
+        onStroke: (listener) => {
+            const handler = (_event: IpcRendererEvent, stroke: StrokeInput) => listener(stroke);
+            ipcRenderer.on(CHANNELS.overlayStroke, handler);
+            return () => ipcRenderer.removeListener(CHANNELS.overlayStroke, handler);
         }
     }
 };

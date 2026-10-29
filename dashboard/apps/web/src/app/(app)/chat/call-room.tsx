@@ -91,6 +91,7 @@ import { useMutedSpeech } from "./muted-speech";
 import type { SeatModeration } from "./call-moderation-menu";
 import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
+import { AnnotateButton, AnnotateLayer, AnnotateProvider, AnnotateStrip } from "./call-annotate";
 import type { PickedPerson } from "@/components/people-picker";
 import {
     canShareScreen,
@@ -673,206 +674,212 @@ export function CallRoom({
         // may paint over the conversation underneath - which is what a short
         // window with a notice up used to look like: the messages drawn under
         // the call's own rows.
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
-            {/* What is not a control: raising a hand, bringing somebody in, and
+        <AnnotateProvider call={call}>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
+                {/* What is not a control: raising a hand, bringing somebody in, and
                 writing the call down. None of them is reached for mid-sentence,
                 so they sit up here as icons and leave the bar at the bottom to
                 the controls that are. Always drawn, because the hand is
                 everybody's - a guest included. */}
-            <div className="flex shrink-0 items-center justify-end gap-1">
-                {/* A hand stays up until it is put down, and everybody who
+                <div className="flex shrink-0 items-center justify-end gap-1">
+                    {/* A hand stays up until it is put down, and everybody who
                     joins later sees it. The number says how many are up, on
                     the button that is about hands; the strip below says
                     who. */}
-                <button
-                    type="button"
-                    onClick={() => call.setHandRaised(!call.handRaised)}
-                    aria-pressed={call.handRaised}
-                    aria-label={
-                        call.handRaised ? t("callRoom.lowerYourHand") : t("callRoom.raiseYourHand")
-                    }
-                    title={
-                        call.hands.length > 0
-                            ? t(
-                                  call.handRaised
-                                      ? "callRoom.handsUpLower"
-                                      : "callRoom.handsUpRaise",
-                                  {
-                                      count: call.hands.length
-                                  }
-                              )
-                            : t("callRoom.raiseYourHand")
-                    }
-                    className={cn(
-                        "flex items-center gap-1 rounded p-1.5 transition-colors",
-                        call.handRaised
-                            ? "bg-warning-soft text-warning-ink hover:bg-warning-soft"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                >
-                    <Hand className="size-4 shrink-0" />
-                    {call.hands.length > 0 && (
-                        <span aria-hidden className="text-xs font-semibold tabular-nums">
-                            {call.hands.length}
-                        </span>
-                    )}
-                </button>
-                {/* Play a game together, like an activity in the call. Only
-                    for an account: a guest holds no permission to play. */}
-                {viewerId && <CallGamesButton activity={activity} />}
-                {/* The band, made the whole column and back. Where a
-                    watched stream gets the people in a row under it -
-                    see `directLayout`. */}
-                {onExpand && (
                     <button
                         type="button"
-                        onClick={() => onExpand(!expanded)}
-                        aria-pressed={expanded}
+                        onClick={() => call.setHandRaised(!call.handRaised)}
+                        aria-pressed={call.handRaised}
                         aria-label={
-                            expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")
+                            call.handRaised
+                                ? t("callRoom.lowerYourHand")
+                                : t("callRoom.raiseYourHand")
                         }
                         title={
-                            expanded
-                                ? t("callRoom.shrinkTheCallTheConversation")
-                                : t("callRoom.expandTheCallToThe")
+                            call.hands.length > 0
+                                ? t(
+                                      call.handRaised
+                                          ? "callRoom.handsUpLower"
+                                          : "callRoom.handsUpRaise",
+                                      {
+                                          count: call.hands.length
+                                      }
+                                  )
+                                : t("callRoom.raiseYourHand")
                         }
-                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className={cn(
+                            "flex items-center gap-1 rounded p-1.5 transition-colors",
+                            call.handRaised
+                                ? "bg-warning-soft text-warning-ink hover:bg-warning-soft"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
                     >
-                        {expanded ? (
-                            <ChevronsUp className="size-4" />
-                        ) : (
-                            <ChevronsDown className="size-4" />
+                        <Hand className="size-4 shrink-0" />
+                        {call.hands.length > 0 && (
+                            <span aria-hidden className="text-xs font-semibold tabular-nums">
+                                {call.hands.length}
+                            </span>
                         )}
                     </button>
-                )}
-                {/* A recording running, said up here and nowhere bigger: the
+                    {/* Play a game together, like an activity in the call. Only
+                    for an account: a guest holds no permission to play. */}
+                    {viewerId && <CallGamesButton activity={activity} />}
+                    {/* The band, made the whole column and back. Where a
+                    watched stream gets the people in a row under it -
+                    see `directLayout`. */}
+                    {onExpand && (
+                        <button
+                            type="button"
+                            onClick={() => onExpand(!expanded)}
+                            aria-pressed={expanded}
+                            aria-label={
+                                expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")
+                            }
+                            title={
+                                expanded
+                                    ? t("callRoom.shrinkTheCallTheConversation")
+                                    : t("callRoom.expandTheCallToThe")
+                            }
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            {expanded ? (
+                                <ChevronsUp className="size-4" />
+                            ) : (
+                                <ChevronsDown className="size-4" />
+                            )}
+                        </button>
+                    )}
+                    {/* A recording running, said up here and nowhere bigger: the
                     time on the button that stops it for whoever is recording,
                     a red mark for everybody else. What it means is in its
                     title rather than in a banner taking the room's height. */}
-                {call.recording ? (
-                    <button
-                        type="button"
-                        onClick={() => held?.recording.stop()}
-                        aria-pressed
-                        aria-label={t("callRoom.stopRecording")}
-                        // What does not move. The time runs in the button
-                        // itself; a tooltip carrying it changed every second,
-                        // and a browser hides one whose text changes.
-                        title={t("callRoom.youAreRecordingThisCall")}
-                        className="flex items-center gap-1.5 rounded border border-danger-edge bg-danger-soft px-2 py-1 text-danger transition-colors hover:border-danger"
-                    >
-                        <Circle
-                            aria-hidden
-                            className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
-                        />
-                        <span className="text-xs font-medium tabular-nums">
-                            {clock(held?.recording.seconds ?? 0)}
-                        </span>
-                        <Square aria-hidden className="size-3 shrink-0 fill-current" />
-                    </button>
-                ) : (
-                    recorded && (
-                        <span
-                            role="status"
-                            title={t("callRoom.recordedBy", { name: recordedBy })}
-                            className="flex items-center gap-1.5 rounded border border-danger-edge bg-danger-soft px-2 py-1 text-xs font-medium text-danger"
+                    {call.recording ? (
+                        <button
+                            type="button"
+                            onClick={() => held?.recording.stop()}
+                            aria-pressed
+                            aria-label={t("callRoom.stopRecording")}
+                            // What does not move. The time runs in the button
+                            // itself; a tooltip carrying it changed every second,
+                            // and a browser hides one whose text changes.
+                            title={t("callRoom.youAreRecordingThisCall")}
+                            className="flex items-center gap-1.5 rounded border border-danger-edge bg-danger-soft px-2 py-1 text-danger transition-colors hover:border-danger"
                         >
-                            <Circle aria-hidden className="size-2.5 shrink-0 fill-current" />
-                            <span className="sr-only">
-                                {t("callRoom.recordedBy", { name: recordedBy })}
+                            <Circle
+                                aria-hidden
+                                className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
+                            />
+                            <span className="text-xs font-medium tabular-nums">
+                                {clock(held?.recording.seconds ?? 0)}
                             </span>
-                            <span aria-hidden>{t("callRoom.recShort")}</span>
-                        </span>
-                    )
-                )}
-            </div>
+                            <Square aria-hidden className="size-3 shrink-0 fill-current" />
+                        </button>
+                    ) : (
+                        recorded && (
+                            <span
+                                role="status"
+                                title={t("callRoom.recordedBy", { name: recordedBy })}
+                                className="flex items-center gap-1.5 rounded border border-danger-edge bg-danger-soft px-2 py-1 text-xs font-medium text-danger"
+                            >
+                                <Circle aria-hidden className="size-2.5 shrink-0 fill-current" />
+                                <span className="sr-only">
+                                    {t("callRoom.recordedBy", { name: recordedBy })}
+                                </span>
+                                <span aria-hidden>{t("callRoom.recShort")}</span>
+                            </span>
+                        )
+                    )}
+                </div>
 
-            {/* What the call says about itself, as one line. These used to be a
+                {/* What the call says about itself, as one line. These used to be a
                 stack of banners, and when the call server went four of them took
                 the height the pictures and the controls needed - three of them
                 that same fault seen from the microphone. See `call-notice-strip`. */}
-            <CallNoticeStrip order={notices} />
+                <CallNoticeStrip order={notices} />
 
-            <CombineStrip call={call} />
+                <CombineStrip call={call} />
 
-            {/* Who has asked to speak, and in what order. Here rather than only
+                {/* Who is asking to draw on this browser's share, and who can. */}
+                <AnnotateStrip />
+
+                {/* Who has asked to speak, and in what order. Here rather than only
                 on the faces because a hand raised in a grid of eight thumbnails
                 is a hand nobody sees - see `call-hands-panel`. */}
-            <HandStrip call={call} />
+                <HandStrip call={call} />
 
-            {/* A game somebody started in the call: offered to the others, and
+                {/* A game somebody started in the call: offered to the others, and
                 played here by whoever joined. */}
-            {viewerId && (
-                <CallGamesPanel
-                    activity={activity}
-                    onInvite={() => {
-                        const game = activity.session?.game;
-                        if (!game) return;
-                        void callSessionId(meetingId, game)
-                            .then((id) => id && setGameInvite({ id, game }))
-                            .catch(() => undefined);
-                    }}
-                />
-            )}
-            {gameInvite && (
-                <GameInviteDialog
-                    sessionId={gameInvite.id}
-                    game={gameInvite.game}
-                    gameName={activity.gameName(gameInvite.game) ?? ""}
-                    onClose={() => setGameInvite(null)}
-                />
-            )}
+                {viewerId && (
+                    <CallGamesPanel
+                        activity={activity}
+                        onInvite={() => {
+                            const game = activity.session?.game;
+                            if (!game) return;
+                            void callSessionId(meetingId, game)
+                                .then((id) => id && setGameInvite({ id, game }))
+                                .catch(() => undefined);
+                        }}
+                    />
+                )}
+                {gameInvite && (
+                    <GameInviteDialog
+                        sessionId={gameInvite.id}
+                        game={gameInvite.game}
+                        gameName={activity.gameName(gameInvite.game) ?? ""}
+                        onClose={() => setGameInvite(null)}
+                    />
+                )}
 
-            {waiting && waiting.length > 0 && (
-                <ul className="flex flex-col gap-1">
-                    {waiting.map((person) => (
-                        <li
-                            key={person.id}
-                            className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
-                        >
-                            <span className="min-w-0 flex-1 truncate">
-                                {t.rich("callRoom.wantsToJoin", {
-                                    name: person.name,
-                                    who: (chunks) => (
-                                        <span key="who" className="font-medium">
-                                            {chunks}
-                                        </span>
-                                    ),
-                                    rest: (chunks) => (
-                                        <span key="rest" className="text-muted-foreground">
-                                            {chunks}
-                                        </span>
-                                    )
-                                })}
-                            </span>
-                            <button
-                                type="button"
-                                aria-label={t("callRoom.letIn", { name: person.name })}
-                                onClick={async () => {
-                                    await actions.admitAction(meetingId, person.id, true);
-                                    call.refresh();
-                                }}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                {waiting && waiting.length > 0 && (
+                    <ul className="flex flex-col gap-1">
+                        {waiting.map((person) => (
+                            <li
+                                key={person.id}
+                                className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
                             >
-                                <Check className="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                aria-label={t("callRoom.turnAway", { name: person.name })}
-                                onClick={async () => {
-                                    await actions.admitAction(meetingId, person.id, false);
-                                    call.refresh();
-                                }}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                            >
-                                <X className="size-4" />
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+                                <span className="min-w-0 flex-1 truncate">
+                                    {t.rich("callRoom.wantsToJoin", {
+                                        name: person.name,
+                                        who: (chunks) => (
+                                            <span key="who" className="font-medium">
+                                                {chunks}
+                                            </span>
+                                        ),
+                                        rest: (chunks) => (
+                                            <span key="rest" className="text-muted-foreground">
+                                                {chunks}
+                                            </span>
+                                        )
+                                    })}
+                                </span>
+                                <button
+                                    type="button"
+                                    aria-label={t("callRoom.letIn", { name: person.name })}
+                                    onClick={async () => {
+                                        await actions.admitAction(meetingId, person.id, true);
+                                        call.refresh();
+                                    }}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <Check className="size-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label={t("callRoom.turnAway", { name: person.name })}
+                                    onClick={async () => {
+                                        await actions.admitAction(meetingId, person.id, false);
+                                        call.refresh();
+                                    }}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
-            {/* Whether to watch what is being shared.
+                {/* Whether to watch what is being shared.
 
                 Somebody putting a screen up decides how much room the call
                 takes on everybody else's screen, and on a small one that is all
@@ -895,26 +902,26 @@ export function CallRoom({
                 leaves the row, and a pressed state that never changes on a
                 control that disappears is read out as the opposite of what
                 happened. */}
-            {stages.length > 0 && (
-                <ul className="flex shrink-0 flex-wrap items-center gap-1">
-                    {stages.map((stage) => (
-                        <li key={stage.key}>
-                            <button
-                                type="button"
-                                onClick={() => setAway((was) => [...was, stage.key])}
-                                aria-label={t("callRoom.stopWatching", { name: stage.name })}
-                                title={t("callRoom.stopWatchingHint", { name: stage.name })}
-                                className="flex max-w-52 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-foreground transition-colors"
-                            >
-                                <Eye className="size-3.5 shrink-0" />
-                                <span className="truncate">{stage.name}</span>
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+                {stages.length > 0 && (
+                    <ul className="flex shrink-0 flex-wrap items-center gap-1">
+                        {stages.map((stage) => (
+                            <li key={stage.key}>
+                                <button
+                                    type="button"
+                                    onClick={() => setAway((was) => [...was, stage.key])}
+                                    aria-label={t("callRoom.stopWatching", { name: stage.name })}
+                                    title={t("callRoom.stopWatchingHint", { name: stage.name })}
+                                    className="flex max-w-52 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-foreground transition-colors"
+                                >
+                                    <Eye className="size-3.5 shrink-0" />
+                                    <span className="truncate">{stage.name}</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
-            {/* A share somebody put away, said out loud rather than left to
+                {/* A share somebody put away, said out loud rather than left to
                 vanish.
 
                 Putting one away removes it from the room - that is what gives
@@ -925,7 +932,7 @@ export function CallRoom({
                 keeps a tile for the stream with the way back on it; this is
                 that, at the size of a line rather than a picture, because the
                 reason it was put away was that pictures were taking the room. */}
-            {/* Two shapes, because in a direct message these are not the same
+                {/* Two shapes, because in a direct message these are not the same
                 thing. Everywhere else this list is what is left after somebody
                 decided they would rather have the room back, and a line is the
                 right size for a decision already made. In a direct message a
@@ -933,93 +940,220 @@ export function CallRoom({
                 an offer nobody has answered yet - and an offer reads as a card
                 beside the people, the way every client draws one, rather than as
                 a row of small print above them. */}
-            {putAway.length > 0 && !offersInline && (
-                <ul
-                    className={cn(
-                        "shrink-0",
-                        place === "direct"
-                            ? "flex flex-wrap items-stretch gap-2"
-                            : "flex flex-col gap-1.5"
-                    )}
-                >
-                    {putAway.map((stage) =>
-                        place === "direct" ? (
-                            <li key={stage.key}>{offer(stage, "h-24 w-40")}</li>
-                        ) : (
-                            <MaybeStreamMenu key={stage.key} menu={streamMenu(stage)}>
-                                <li className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
-                                    <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
-                                        <EyeOff
-                                            className="size-4 text-muted-foreground"
-                                            aria-hidden
-                                        />
-                                    </span>
-                                    <span className="flex min-w-0 flex-col">
-                                        <span
-                                            className="truncate text-sm font-medium"
-                                            title={stage.name}
+                {putAway.length > 0 && !offersInline && (
+                    <ul
+                        className={cn(
+                            "shrink-0",
+                            place === "direct"
+                                ? "flex flex-wrap items-stretch gap-2"
+                                : "flex flex-col gap-1.5"
+                        )}
+                    >
+                        {putAway.map((stage) =>
+                            place === "direct" ? (
+                                <li key={stage.key}>{offer(stage, "h-24 w-40")}</li>
+                            ) : (
+                                <MaybeStreamMenu key={stage.key} menu={streamMenu(stage)}>
+                                    <li className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
+                                        <span className="flex size-8 shrink-0 items-center justify-center rounded bg-background">
+                                            <EyeOff
+                                                className="size-4 text-muted-foreground"
+                                                aria-hidden
+                                            />
+                                        </span>
+                                        <span className="flex min-w-0 flex-col">
+                                            <span
+                                                className="truncate text-sm font-medium"
+                                                title={stage.name}
+                                            >
+                                                {stage.name}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {t("callRoom.stillSharingYouAreNot")}
+                                            </span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setAway((was) =>
+                                                    was.filter((key) => key !== stage.key)
+                                                )
+                                            }
+                                            className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
                                         >
-                                            {stage.name}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {t("callRoom.stillSharingYouAreNot")}
-                                        </span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setAway((was) => was.filter((key) => key !== stage.key))
-                                        }
-                                        className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
-                                    >
-                                        {t("callRoom.watch")}
-                                    </button>
-                                </li>
-                            </MaybeStreamMenu>
-                        )
-                    )}
-                </ul>
-            )}
+                                            {t("callRoom.watch")}
+                                        </button>
+                                    </li>
+                                </MaybeStreamMenu>
+                            )
+                        )}
+                    </ul>
+                )}
 
-            {/* The screens, which are the thing everybody is looking at while
+                {/* The screens, which are the thing everybody is looking at while
                 they are there. Above the faces and across the whole width rather
                 than in a tile the size of a head: a shared screen is usually
                 text, and text in a ninth of a window is not readable. Side by
                 side when there are several, rather than stacked - two shares
                 stacked in a panel this tall leave each of them a strip. */}
-            {showing.length > 0 && (
-                <div
-                    className={cn(
-                        "grid min-h-0 min-w-0 flex-[3] gap-2",
-                        gridColumns(showing.length)
-                    )}
-                >
-                    {showing.map((stage) => (
-                        <Tile
-                            key={stage.key}
-                            stream={stage.stream}
-                            name={stage.name}
-                            personId={null}
-                            focused={letGo || live === stage.key}
-                            onFocus={() => focus(stage.key)}
-                            backLabel={letGo ? t("callRoom.backToThePeople") : undefined}
-                            {...column}
-                            screen
-                            // A shared screen is usually text, and the reason
-                            // anybody stares at one is to read a line of it.
-                            zoomable
-                            volumeKey={undefined}
-                            streamMenu={streamMenu(stage)}
-                        />
-                    ))}
-                </div>
-            )}
+                {showing.length > 0 && (
+                    <div
+                        className={cn(
+                            "grid min-h-0 min-w-0 flex-[3] gap-2",
+                            gridColumns(showing.length)
+                        )}
+                    >
+                        {showing.map((stage) => (
+                            <Tile
+                                key={stage.key}
+                                stream={stage.stream}
+                                name={stage.name}
+                                personId={null}
+                                focused={letGo || live === stage.key}
+                                onFocus={() => focus(stage.key)}
+                                backLabel={letGo ? t("callRoom.backToThePeople") : undefined}
+                                {...column}
+                                screen
+                                annotate={
+                                    stage.key === LOCAL_SCREEN_KEY
+                                        ? (call.participantId ?? undefined)
+                                        : stage.key.slice("screen:".length)
+                                }
+                                // A shared screen is usually text, and the reason
+                                // anybody stares at one is to read a line of it.
+                                zoomable
+                                volumeKey={undefined}
+                                streamMenu={streamMenu(stage)}
+                            />
+                        ))}
+                    </div>
+                )}
 
-            {/* A face somebody asked to see bigger takes the same place a screen
+                {/* A face somebody asked to see bigger takes the same place a screen
                 would. One at a time: two big pictures is the grid again. */}
-            {live?.startsWith("camera:") && (
-                <div className="min-h-0 flex-[3]">
-                    {live === `camera:${call.participantId}` ? (
+                {live?.startsWith("camera:") && (
+                    <div className="min-h-0 flex-[3]">
+                        {live === `camera:${call.participantId}` ? (
+                            <Tile
+                                stream={call.localStream}
+                                name={ownName}
+                                label={you}
+                                personId={mine?.userId ?? viewerId ?? null}
+                                own
+                                mirrored={call.mirrored}
+                                focused
+                                onFocus={() => focus(live)}
+                                {...column}
+                                cameraOff={!call.cameraOn}
+                                muted={!call.micOn}
+                                deafened={call.deafened}
+                                hand={call.handRaised}
+                                handPlace={
+                                    queued && call.participantId
+                                        ? (places.get(call.participantId) ?? null)
+                                        : null
+                                }
+                            />
+                        ) : (
+                            (() => {
+                                const personId = live.slice("camera:".length);
+                                const person = admitted?.find((entry) => entry.id === personId);
+                                return (
+                                    <Tile
+                                        stream={call.remote.get(personId) ?? null}
+                                        name={person?.name ?? t("callRoom.somebody")}
+                                        personId={person?.userId ?? null}
+                                        guest={person?.guest}
+                                        focused
+                                        onFocus={() => focus(live)}
+                                        {...column}
+                                        muted={call.states.get(personId)?.muted}
+                                        deafened={call.states.get(personId)?.deafened}
+                                        speaking={call.speaking.has(personId)}
+                                        recording={call.states.get(personId)?.recording}
+                                        hand={call.states.get(personId)?.hand}
+                                        handPlace={queued ? (places.get(personId) ?? null) : null}
+                                        reactions={reactionsFor(personId)}
+                                        volumeKey={person?.userId ?? personId}
+                                        {...combining(personId)}
+                                        {...moderating(personId)}
+                                        hosting={hostSeat?.(personId)}
+                                    />
+                                );
+                            })()
+                        )}
+                    </div>
+                )}
+
+                {/* The faces. Gone entirely while a screen has been asked for by
+                name, because they are the only room left to give it: the tile
+                asked to be bigger, and the strip along the bottom is the last
+                thing between it and the whole panel. */}
+                {/* Bounded and scrolled, the way both tile layouts already are. A
+                row of faces that cannot shrink is the one child of a capped band
+                that can grow past it: eight people in a group call wrap to a
+                second row, and that row plus the control bar under it spill over
+                the conversation the band exists to leave room for - taking the
+                Leave button with them, which is the failure the comment below
+                the bar already records. */}
+                {peopleShown && bareFaces && (
+                    <ul className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-3 overflow-y-auto overscroll-contain py-1">
+                        {offersInline &&
+                            putAway.map((stage) => (
+                                <li key={stage.key} className="shrink-0">
+                                    {offer(stage, "h-24 w-40")}
+                                </li>
+                            ))}
+                        {faces()}
+                    </ul>
+                )}
+
+                {peopleShown && !bareFaces && (
+                    <div
+                        ref={staged ? undefined : tiles.ref}
+                        style={
+                            !staged && tiles.fit.width > 0
+                                ? ({
+                                      "--tile-w": `${tiles.fit.width}px`,
+                                      "--tile-h": `${tiles.fit.height}px`
+                                  } as React.CSSProperties)
+                                : undefined
+                        }
+                        className={cn(
+                            // Room inside the edges for the speaking ring, which is
+                            // drawn outside a tile (ring-2): the strip scrolls
+                            // sideways, which clips top and bottom too, and the ring
+                            // of whoever was talking was cut in half.
+                            "grid min-h-0 gap-2 p-0.5",
+                            // A strip of thumbnails along the bottom while something
+                            // has the room, and an even grid when nothing does.
+                            // Scrolling sideways rather than shrinking further: eight
+                            // faces on a phone, each a twelfth of a strip, are eight
+                            // grey squares.
+                            //
+                            // As wide as its faces and centred under the screen,
+                            // never wider than the panel. Centred with the box, not
+                            // with justify-content: a centred track list that
+                            // overflows hangs off both ends, and the left one
+                            // cannot be scrolled to.
+                            staged
+                                ? "h-[6.25rem] w-max max-w-full shrink-0 self-center auto-cols-[9rem] grid-flow-col overflow-x-auto"
+                                : tiles.fit.width > 0
+                                  ? // Wide tiles, as big as the panel allows, with a
+                                    // short last row centred under the others - the
+                                    // shape every voice channel has. Until the panel
+                                    // has been measured, the even grid stands in.
+                                    "flex flex-1 flex-wrap content-center justify-center [&>*]:h-[var(--tile-h)] [&>*]:w-[var(--tile-w)] [&>*]:flex-none"
+                                  : cn("flex-1", columns)
+                        )}
+                    >
+                        {offersInline &&
+                            putAway.map((stage) =>
+                                offer(
+                                    stage,
+                                    cn("size-full", (staged || tiles.fit.width === 0) && "min-h-24")
+                                )
+                            )}
                         <Tile
                             stream={call.localStream}
                             name={ownName}
@@ -1027,535 +1161,425 @@ export function CallRoom({
                             personId={mine?.userId ?? viewerId ?? null}
                             own
                             mirrored={call.mirrored}
-                            focused
-                            onFocus={() => focus(live)}
-                            {...column}
+                            speaking={
+                                call.participantId !== null &&
+                                call.speaking.has(call.participantId) &&
+                                call.micOn
+                            }
                             cameraOff={!call.cameraOn}
+                            sharing={call.sharing}
+                            // Your own tile says it too. It used to be the one tile
+                            // that did not: everybody else's face carried the icon
+                            // and yours carried nothing, so the only way to tell
+                            // whether you were muted was to look away from the
+                            // people and down at the buttons - which is the moment
+                            // somebody talks into a dead microphone.
                             muted={!call.micOn}
                             deafened={call.deafened}
+                            recording={call.recording}
                             hand={call.handRaised}
                             handPlace={
                                 queued && call.participantId
                                     ? (places.get(call.participantId) ?? null)
                                     : null
                             }
+                            reactions={reactionsFor(call.participantId)}
+                            sameRoom={call.audioRole !== null}
+                            focused={live === `camera:${call.participantId}`}
+                            onFocus={
+                                call.participantId
+                                    ? () => focus(`camera:${call.participantId}`)
+                                    : undefined
+                            }
                         />
-                    ) : (
-                        (() => {
-                            const personId = live.slice("camera:".length);
-                            const person = admitted?.find((entry) => entry.id === personId);
-                            return (
+                        {(admitted ?? [])
+                            .filter((person) => person.id !== call.participantId)
+                            .map((person) => (
                                 <Tile
-                                    stream={call.remote.get(personId) ?? null}
-                                    name={person?.name ?? t("callRoom.somebody")}
-                                    personId={person?.userId ?? null}
-                                    guest={person?.guest}
-                                    focused
-                                    onFocus={() => focus(live)}
-                                    {...column}
-                                    muted={call.states.get(personId)?.muted}
-                                    deafened={call.states.get(personId)?.deafened}
-                                    speaking={call.speaking.has(personId)}
-                                    recording={call.states.get(personId)?.recording}
-                                    hand={call.states.get(personId)?.hand}
-                                    handPlace={queued ? (places.get(personId) ?? null) : null}
-                                    reactions={reactionsFor(personId)}
-                                    volumeKey={person?.userId ?? personId}
-                                    {...combining(personId)}
-                                    {...moderating(personId)}
-                                    hosting={hostSeat?.(personId)}
+                                    key={person.id}
+                                    stream={call.remote.get(person.id) ?? null}
+                                    name={person.name}
+                                    personId={person.userId ?? null}
+                                    guest={person.guest}
+                                    speaking={call.speaking.has(person.id)}
+                                    muted={call.states.get(person.id)?.muted}
+                                    deafened={call.states.get(person.id)?.deafened}
+                                    sharing={call.screens.has(person.id)}
+                                    recording={call.states.get(person.id)?.recording}
+                                    hand={call.states.get(person.id)?.hand}
+                                    handPlace={queued ? (places.get(person.id) ?? null) : null}
+                                    reactions={reactionsFor(person.id)}
+                                    focused={live === `camera:${person.id}`}
+                                    onFocus={() => focus(`camera:${person.id}`)}
+                                    {...combining(person.id)}
+                                    {...moderating(person.id)}
+                                    hosting={hostSeat?.(person.id)}
+                                    // Their account where they have one, so turning
+                                    // somebody down holds across calls; their seat
+                                    // where they do not, which lasts as long as the
+                                    // seat.
+                                    volumeKey={person.userId ?? person.id}
                                 />
-                            );
-                        })()
-                    )}
-                </div>
-            )}
+                            ))}
+                    </div>
+                )}
 
-            {/* The faces. Gone entirely while a screen has been asked for by
-                name, because they are the only room left to give it: the tile
-                asked to be bigger, and the strip along the bottom is the last
-                thing between it and the whole panel. */}
-            {/* Bounded and scrolled, the way both tile layouts already are. A
-                row of faces that cannot shrink is the one child of a capped band
-                that can grow past it: eight people in a group call wrap to a
-                second row, and that row plus the control bar under it spill over
-                the conversation the band exists to leave room for - taking the
-                Leave button with them, which is the failure the comment below
-                the bar already records. */}
-            {peopleShown && bareFaces && (
-                <ul className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-3 overflow-y-auto overscroll-contain py-1">
-                    {offersInline &&
-                        putAway.map((stage) => (
-                            <li key={stage.key} className="shrink-0">
-                                {offer(stage, "h-24 w-40")}
-                            </li>
-                        ))}
-                    {faces()}
-                </ul>
-            )}
-
-            {peopleShown && !bareFaces && (
-                <div
-                    ref={staged ? undefined : tiles.ref}
-                    style={
-                        !staged && tiles.fit.width > 0
-                            ? ({
-                                  "--tile-w": `${tiles.fit.width}px`,
-                                  "--tile-h": `${tiles.fit.height}px`
-                              } as React.CSSProperties)
-                            : undefined
-                    }
-                    className={cn(
-                        // Room inside the edges for the speaking ring, which is
-                        // drawn outside a tile (ring-2): the strip scrolls
-                        // sideways, which clips top and bottom too, and the ring
-                        // of whoever was talking was cut in half.
-                        "grid min-h-0 gap-2 p-0.5",
-                        // A strip of thumbnails along the bottom while something
-                        // has the room, and an even grid when nothing does.
-                        // Scrolling sideways rather than shrinking further: eight
-                        // faces on a phone, each a twelfth of a strip, are eight
-                        // grey squares.
-                        //
-                        // As wide as its faces and centred under the screen,
-                        // never wider than the panel. Centred with the box, not
-                        // with justify-content: a centred track list that
-                        // overflows hangs off both ends, and the left one
-                        // cannot be scrolled to.
-                        staged
-                            ? "h-[6.25rem] w-max max-w-full shrink-0 self-center auto-cols-[9rem] grid-flow-col overflow-x-auto"
-                            : tiles.fit.width > 0
-                              ? // Wide tiles, as big as the panel allows, with a
-                                // short last row centred under the others - the
-                                // shape every voice channel has. Until the panel
-                                // has been measured, the even grid stands in.
-                                "flex flex-1 flex-wrap content-center justify-center [&>*]:h-[var(--tile-h)] [&>*]:w-[var(--tile-w)] [&>*]:flex-none"
-                              : cn("flex-1", columns)
-                    )}
-                >
-                    {offersInline &&
-                        putAway.map((stage) =>
-                            offer(
-                                stage,
-                                cn("size-full", (staged || tiles.fit.width === 0) && "min-h-24")
-                            )
-                        )}
-                    <Tile
-                        stream={call.localStream}
-                        name={ownName}
-                        label={you}
-                        personId={mine?.userId ?? viewerId ?? null}
-                        own
-                        mirrored={call.mirrored}
-                        speaking={
-                            call.participantId !== null &&
-                            call.speaking.has(call.participantId) &&
-                            call.micOn
-                        }
-                        cameraOff={!call.cameraOn}
-                        sharing={call.sharing}
-                        // Your own tile says it too. It used to be the one tile
-                        // that did not: everybody else's face carried the icon
-                        // and yours carried nothing, so the only way to tell
-                        // whether you were muted was to look away from the
-                        // people and down at the buttons - which is the moment
-                        // somebody talks into a dead microphone.
-                        muted={!call.micOn}
-                        deafened={call.deafened}
-                        recording={call.recording}
-                        hand={call.handRaised}
-                        handPlace={
-                            queued && call.participantId
-                                ? (places.get(call.participantId) ?? null)
-                                : null
-                        }
-                        reactions={reactionsFor(call.participantId)}
-                        sameRoom={call.audioRole !== null}
-                        focused={live === `camera:${call.participantId}`}
-                        onFocus={
-                            call.participantId
-                                ? () => focus(`camera:${call.participantId}`)
-                                : undefined
-                        }
-                    />
-                    {(admitted ?? [])
-                        .filter((person) => person.id !== call.participantId)
-                        .map((person) => (
-                            <Tile
-                                key={person.id}
-                                stream={call.remote.get(person.id) ?? null}
-                                name={person.name}
-                                personId={person.userId ?? null}
-                                guest={person.guest}
-                                speaking={call.speaking.has(person.id)}
-                                muted={call.states.get(person.id)?.muted}
-                                deafened={call.states.get(person.id)?.deafened}
-                                sharing={call.screens.has(person.id)}
-                                recording={call.states.get(person.id)?.recording}
-                                hand={call.states.get(person.id)?.hand}
-                                handPlace={queued ? (places.get(person.id) ?? null) : null}
-                                reactions={reactionsFor(person.id)}
-                                focused={live === `camera:${person.id}`}
-                                onFocus={() => focus(`camera:${person.id}`)}
-                                {...combining(person.id)}
-                                {...moderating(person.id)}
-                                hosting={hostSeat?.(person.id)}
-                                // Their account where they have one, so turning
-                                // somebody down holds across calls; their seat
-                                // where they do not, which lasts as long as the
-                                // seat.
-                                volumeKey={person.userId ?? person.id}
-                            />
-                        ))}
-                </div>
-            )}
-
-            {/* Grouped the way voice clients draw it: what you send, each with
+                {/* Grouped the way voice clients draw it: what you send, each with
                 its menu; what you put in front of the room; and leaving, apart,
                 so it is never the button pressed on the way to another. Never
                 squeezed: it wraps to a second row on a narrow window, and a
                 flex row that is allowed to shrink gives that second row away
                 to the pictures above it - which is how the button somebody
                 needed to leave the call ended up half off the panel. */}
-            <div ref={bar} className="flex shrink-0 flex-wrap items-center justify-center gap-3">
-                <div role="group" aria-label={t("callRoom.bar.media")} className={CLUSTER}>
-                    <Split
-                        label={call.micOn ? t("callRoom.mute") : t("callRoom.unmute")}
-                        // Only a moderator lifts their own mute, so the button says
-                        // who has it rather than offering to undo it.
-                        title={
-                            call.moderation.serverMuted || call.moderation.serverDeafened
-                                ? t("callRoom.aModeratorMutedYou")
-                                : call.deafened
-                                  ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
-                                  : undefined
-                        }
-                        icon={
-                            call.micOn && !call.deafened ? (
-                                <Mic className="size-4" />
-                            ) : (
-                                <MicOff className="size-4" />
-                            )
-                        }
-                        hint={micHint}
-                        alert={
-                            notices.mic
-                                ? { reason: notices.mic.short, tone: notices.mic.severity }
-                                : null
-                        }
-                        variant={call.micOn && !call.deafened ? "secondary" : "danger"}
-                        pressed={!call.micOn}
-                        onClick={call.toggleMic}
-                        devices={call.microphones}
-                        chosenId={call.microphoneId}
-                        devicesLabel={t("callRoom.devices.microphone")}
-                        onChoose={call.chooseMicrophone}
-                        cleanMic={call.cleanMic}
-                        onCleanMic={call.setCleanMic}
-                        filterRunning={call.micFilter}
-                        licensedOffered={call.licensedFilter}
-                        // The call's own microphone, never a second one - see
-                        // `MicLevelMeter`.
-                        meter={call.localStream?.getAudioTracks()[0] ?? null}
-                        sent={call.outgoing}
-                        // Deafening and the output it silences live in this menu,
-                        // beside the input, the way voice clients lay it out.
-                        outputs={speakers}
-                        deafen={{
-                            on: call.deafened,
-                            toggle: call.toggleDeafen,
-                            title: deafenTitle
-                        }}
-                        voiceSettings={Boolean(viewerId)}
-                    />
+                <div
+                    ref={bar}
+                    className="flex shrink-0 flex-wrap items-center justify-center gap-3"
+                >
+                    <div role="group" aria-label={t("callRoom.bar.media")} className={CLUSTER}>
+                        <Split
+                            label={call.micOn ? t("callRoom.mute") : t("callRoom.unmute")}
+                            // Only a moderator lifts their own mute, so the button says
+                            // who has it rather than offering to undo it.
+                            title={
+                                call.moderation.serverMuted || call.moderation.serverDeafened
+                                    ? t("callRoom.aModeratorMutedYou")
+                                    : call.deafened
+                                      ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
+                                      : undefined
+                            }
+                            icon={
+                                call.micOn && !call.deafened ? (
+                                    <Mic className="size-4" />
+                                ) : (
+                                    <MicOff className="size-4" />
+                                )
+                            }
+                            hint={micHint}
+                            alert={
+                                notices.mic
+                                    ? { reason: notices.mic.short, tone: notices.mic.severity }
+                                    : null
+                            }
+                            variant={call.micOn && !call.deafened ? "secondary" : "danger"}
+                            pressed={!call.micOn}
+                            onClick={call.toggleMic}
+                            devices={call.microphones}
+                            chosenId={call.microphoneId}
+                            devicesLabel={t("callRoom.devices.microphone")}
+                            onChoose={call.chooseMicrophone}
+                            cleanMic={call.cleanMic}
+                            onCleanMic={call.setCleanMic}
+                            filterRunning={call.micFilter}
+                            licensedOffered={call.licensedFilter}
+                            // The call's own microphone, never a second one - see
+                            // `MicLevelMeter`.
+                            meter={call.localStream?.getAudioTracks()[0] ?? null}
+                            sent={call.outgoing}
+                            // Deafening and the output it silences live in this menu,
+                            // beside the input, the way voice clients lay it out.
+                            outputs={speakers}
+                            deafen={{
+                                on: call.deafened,
+                                toggle: call.toggleDeafen,
+                                title: deafenTitle
+                            }}
+                            voiceSettings={Boolean(viewerId)}
+                        />
 
-                    {/* Deafening, beside the microphone where voice clients put
+                        {/* Deafening, beside the microphone where voice clients put
                         it, rather than only in the microphone's menu and on a
                         key nobody can find - with its own menu of the outputs,
                         the way the microphone's lists the inputs. A moderator's
                         deafen is drawn locked, with who did it; the title is on
                         a wrapper because a disabled button gets no hover. */}
-                    <span title={deafenTitle} className="inline-flex">
+                        <span title={deafenTitle} className="inline-flex">
+                            <Split
+                                label={
+                                    call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")
+                                }
+                                title={deafenTitle}
+                                icon={
+                                    call.deafened ? (
+                                        <HeadphoneOff className="size-4" />
+                                    ) : (
+                                        <Headphones className="size-4" />
+                                    )
+                                }
+                                variant={call.deafened ? "danger" : "secondary"}
+                                pressed={call.deafened}
+                                onClick={call.toggleDeafen}
+                                disabled={call.moderation.serverDeafened}
+                                devices={speakers.devices}
+                                chosenId={speakers.chosenId}
+                                devicesLabel={t("callRoom.outputDevice")}
+                                onChoose={speakers.choose}
+                                listOne
+                            />
+                        </span>
+
                         <Split
-                            label={call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")}
-                            title={deafenTitle}
+                            label={
+                                call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")
+                            }
                             icon={
-                                call.deafened ? (
-                                    <HeadphoneOff className="size-4" />
+                                call.cameraOn ? (
+                                    <Video className="size-4" />
                                 ) : (
-                                    <Headphones className="size-4" />
+                                    <VideoOff className="size-4" />
                                 )
                             }
-                            variant={call.deafened ? "danger" : "secondary"}
-                            pressed={call.deafened}
-                            onClick={call.toggleDeafen}
-                            disabled={call.moderation.serverDeafened}
-                            devices={speakers.devices}
-                            chosenId={speakers.chosenId}
-                            devicesLabel={t("callRoom.outputDevice")}
-                            onChoose={speakers.choose}
-                            listOne
+                            variant={call.cameraOn ? "success" : "secondary"}
+                            pressed={!call.cameraOn}
+                            onClick={call.toggleCamera}
+                            devices={call.cameras}
+                            chosenId={call.cameraId}
+                            devicesLabel={t("callRoom.devices.camera")}
+                            onChoose={call.chooseCamera}
+                            ladder={CAMERA_LADDER}
+                            quality={call.cameraQuality}
+                            level={call.cameraLevel}
+                            onQuality={call.setCameraQuality}
+                            qualityLabel="Video quality"
+                            mirrored={call.mirrored}
+                            onMirror={call.flipCamera}
+                            background={call.background}
+                            onBackground={call.setBackground}
+                            backgroundImage={call.backgroundImage}
+                            onPickBackground={call.pickBackground}
+                            onScene={call.chooseBackgroundScene}
+                            backgroundRunning={call.backgroundRunning}
+                            backgroundProblem={call.backgroundProblem}
+                            look={call.look}
+                            onLook={call.setLook}
                         />
-                    </span>
+                    </div>
 
-                    <Split
-                        label={call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")}
-                        icon={
-                            call.cameraOn ? (
-                                <Video className="size-4" />
-                            ) : (
-                                <VideoOff className="size-4" />
-                            )
-                        }
-                        variant={call.cameraOn ? "success" : "secondary"}
-                        pressed={!call.cameraOn}
-                        onClick={call.toggleCamera}
-                        devices={call.cameras}
-                        chosenId={call.cameraId}
-                        devicesLabel={t("callRoom.devices.camera")}
-                        onChoose={call.chooseCamera}
-                        ladder={CAMERA_LADDER}
-                        quality={call.cameraQuality}
-                        level={call.cameraLevel}
-                        onQuality={call.setCameraQuality}
-                        qualityLabel="Video quality"
-                        mirrored={call.mirrored}
-                        onMirror={call.flipCamera}
-                        background={call.background}
-                        onBackground={call.setBackground}
-                        backgroundImage={call.backgroundImage}
-                        onPickBackground={call.pickBackground}
-                        onScene={call.chooseBackgroundScene}
-                        backgroundRunning={call.backgroundRunning}
-                        backgroundProblem={call.backgroundProblem}
-                        look={call.look}
-                        onLook={call.setLook}
-                    />
-                </div>
-
-                <div role="group" aria-label={t("callRoom.bar.sharing")} className={CLUSTER}>
-                    {/* Left out where it could only fail - every phone - rather
+                    <div role="group" aria-label={t("callRoom.bar.sharing")} className={CLUSTER}>
+                        {/* Left out where it could only fail - every phone - rather
                         than offered and answered with an error. A share already
                         running is always given its stop. On a narrow bar it
                         moves into the menu at the end of this group. */}
-                    {(!narrow || shareAsked) && (screenShareable || call.sharing) && (
-                        <Split
-                            hint={
-                                shareAsked
-                                    ? { text: t("callRoom.hints.shareAsked"), tone: "warn" }
-                                    : null
-                            }
-                            label={
-                                call.sharing
-                                    ? t("callRoom.shareMenu.label")
-                                    : t("callRoom.shareScreen")
-                            }
-                            icon={
-                                call.sharing ? (
-                                    <MonitorX className="size-4" />
-                                ) : (
-                                    <MonitorUp className="size-4" />
-                                )
-                            }
-                            variant={call.sharing ? "primary" : "secondary"}
-                            pressed={call.sharing}
-                            onClick={call.toggleShare}
-                            // While a screen is going out the button opens
-                            // its menu instead: stop, change what is shared,
-                            // quality and sound.
-                            pressMenu={
-                                sharePress({
-                                    sharing: call.sharing,
-                                    canShare: screenShareable
-                                }) === "menu" ? (
-                                    <ShareStreamItems call={call} canShare={screenShareable} />
-                                ) : undefined
-                            }
-                            // A screen is not a device to pick between: the browser's own
-                            // picker does that, every time, and it is the only thing
-                            // allowed to.
-                            devices={[]}
-                            chosenId={null}
-                            devicesLabel={t("callRoom.devices.screen")}
-                            onChoose={() => undefined}
-                            ladder={SCREEN_LADDER}
-                            quality={call.screenQuality}
-                            level={call.screenLevel}
-                            onQuality={call.setScreenQuality}
-                            qualityLabel="Screen quality"
-                        />
-                    )}
+                        {(!narrow || shareAsked) && (screenShareable || call.sharing) && (
+                            <Split
+                                hint={
+                                    shareAsked
+                                        ? { text: t("callRoom.hints.shareAsked"), tone: "warn" }
+                                        : null
+                                }
+                                label={
+                                    call.sharing
+                                        ? t("callRoom.shareMenu.label")
+                                        : t("callRoom.shareScreen")
+                                }
+                                icon={
+                                    call.sharing ? (
+                                        <MonitorX className="size-4" />
+                                    ) : (
+                                        <MonitorUp className="size-4" />
+                                    )
+                                }
+                                variant={call.sharing ? "primary" : "secondary"}
+                                pressed={call.sharing}
+                                onClick={call.toggleShare}
+                                // While a screen is going out the button opens
+                                // its menu instead: stop, change what is shared,
+                                // quality and sound.
+                                pressMenu={
+                                    sharePress({
+                                        sharing: call.sharing,
+                                        canShare: screenShareable
+                                    }) === "menu" ? (
+                                        <ShareStreamItems call={call} canShare={screenShareable} />
+                                    ) : undefined
+                                }
+                                // A screen is not a device to pick between: the browser's own
+                                // picker does that, every time, and it is the only thing
+                                // allowed to.
+                                devices={[]}
+                                chosenId={null}
+                                devicesLabel={t("callRoom.devices.screen")}
+                                onChoose={() => undefined}
+                                ladder={SCREEN_LADDER}
+                                quality={call.screenQuality}
+                                level={call.screenLevel}
+                                onQuality={call.setScreenQuality}
+                                qualityLabel="Screen quality"
+                            />
+                        )}
 
-                    {/* A reaction is over in three seconds, so it stays beside
+                        {/* A reaction is over in three seconds, so it stays beside
                         the controls. The raised hand, which stays up until it is
                         put down, sits in the row at the top. */}
-                    {!narrow && <ReactionMenu onReact={call.react} />}
+                        {!narrow && <ReactionMenu onReact={call.react} />}
 
-                    {/* Sounds everybody hears - see `soundboard-picker`. Drawn
+                        {/* Sounds everybody hears - see `soundboard-picker`. Drawn
                         for every seat, disabled with the reason for one that may
                         not play. Its picker is anchored to its own button, so it
                         stays out even on a narrow bar. */}
-                    <SoundboardButton meetingId={meetingId} call={call} />
+                        <SoundboardButton meetingId={meetingId} call={call} />
 
-                    {/* Everything not reached for mid-sentence: recording,
+                        {/* Everything not reached for mid-sentence: recording,
                         bringing somebody in, what the caller adds - a meeting's
                         doors - and, on a narrow bar, the rest of this group. */}
-                    {(narrow || callItems || viewerId) && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    size="icon"
-                                    variant="secondary"
-                                    aria-label={t("callRoom.moreForThisCall")}
-                                    title={t("callRoom.moreForThisCall")}
-                                >
-                                    <MoreHorizontal className="size-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" side="top" className="w-72">
-                                {narrow && !shareAsked && call.sharing && (
-                                    <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger>
-                                            <MonitorUp className="size-4 shrink-0" />
-                                            {t("callRoom.shareMenu.label")}
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuSubContent className="w-64">
-                                            <ShareStreamItems
-                                                call={call}
-                                                canShare={screenShareable}
-                                            />
-                                        </DropdownMenuSubContent>
-                                    </DropdownMenuSub>
-                                )}
-                                {narrow && !shareAsked && screenShareable && !call.sharing && (
-                                    <DropdownMenuItem onSelect={call.toggleShare}>
-                                        <MonitorUp className="size-4 shrink-0" />
-                                        {t("callRoom.shareScreen")}
-                                    </DropdownMenuItem>
-                                )}
-                                {narrow && (
-                                    <>
+                        {(narrow || callItems || viewerId) && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        size="icon"
+                                        variant="secondary"
+                                        aria-label={t("callRoom.moreForThisCall")}
+                                        title={t("callRoom.moreForThisCall")}
+                                    >
+                                        <MoreHorizontal className="size-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" side="top" className="w-72">
+                                    {narrow && !shareAsked && call.sharing && (
                                         <DropdownMenuSub>
                                             <DropdownMenuSubTrigger>
-                                                <Smile className="size-4 shrink-0" />
-                                                {t("callRoom.react")}
+                                                <MonitorUp className="size-4 shrink-0" />
+                                                {t("callRoom.shareMenu.label")}
                                             </DropdownMenuSubTrigger>
-                                            <DropdownMenuSubContent className="flex w-auto gap-1 p-1">
-                                                <ReactionItems onReact={call.react} />
+                                            <DropdownMenuSubContent className="w-64">
+                                                <ShareStreamItems
+                                                    call={call}
+                                                    canShare={screenShareable}
+                                                />
                                             </DropdownMenuSubContent>
                                         </DropdownMenuSub>
-                                        {(callItems || viewerId) && <DropdownMenuSeparator />}
-                                    </>
-                                )}
-                                {canRecord && !call.recording && (
-                                    <DropdownMenuItem
-                                        title={t("callRoom.writeThisCallToA")}
-                                        onSelect={() => setAsking(true)}
-                                    >
-                                        <RecordGlyph />
-                                        {t("callRoom.recordThisCall")}
-                                    </DropdownMenuItem>
-                                )}
-                                {mayAdd && (
-                                    <DropdownMenuItem onSelect={() => setInviting(true)}>
-                                        <UserPlus className="size-4" />
-                                        {mayInvite
-                                            ? t("callRoom.addPeople")
-                                            : t("callRoom.shareALinkToThis")}
-                                    </DropdownMenuItem>
-                                )}
-                                {moreItems && (
-                                    <>
-                                        {((canRecord && !call.recording) || mayAdd) && (
-                                            <DropdownMenuSeparator />
-                                        )}
-                                        {moreItems}
-                                    </>
-                                )}
-                                {viewerId && (
-                                    <>
-                                        {callItems && <DropdownMenuSeparator />}
-                                        <VoiceSettingsItem />
-                                    </>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
+                                    )}
+                                    {narrow && !shareAsked && screenShareable && !call.sharing && (
+                                        <DropdownMenuItem onSelect={call.toggleShare}>
+                                            <MonitorUp className="size-4 shrink-0" />
+                                            {t("callRoom.shareScreen")}
+                                        </DropdownMenuItem>
+                                    )}
+                                    {narrow && (
+                                        <>
+                                            <DropdownMenuSub>
+                                                <DropdownMenuSubTrigger>
+                                                    <Smile className="size-4 shrink-0" />
+                                                    {t("callRoom.react")}
+                                                </DropdownMenuSubTrigger>
+                                                <DropdownMenuSubContent className="flex w-auto gap-1 p-1">
+                                                    <ReactionItems onReact={call.react} />
+                                                </DropdownMenuSubContent>
+                                            </DropdownMenuSub>
+                                            {(callItems || viewerId) && <DropdownMenuSeparator />}
+                                        </>
+                                    )}
+                                    {canRecord && !call.recording && (
+                                        <DropdownMenuItem
+                                            title={t("callRoom.writeThisCallToA")}
+                                            onSelect={() => setAsking(true)}
+                                        >
+                                            <RecordGlyph />
+                                            {t("callRoom.recordThisCall")}
+                                        </DropdownMenuItem>
+                                    )}
+                                    {mayAdd && (
+                                        <DropdownMenuItem onSelect={() => setInviting(true)}>
+                                            <UserPlus className="size-4" />
+                                            {mayInvite
+                                                ? t("callRoom.addPeople")
+                                                : t("callRoom.shareALinkToThis")}
+                                        </DropdownMenuItem>
+                                    )}
+                                    {moreItems && (
+                                        <>
+                                            {((canRecord && !call.recording) || mayAdd) && (
+                                                <DropdownMenuSeparator />
+                                            )}
+                                            {moreItems}
+                                        </>
+                                    )}
+                                    {viewerId && (
+                                        <>
+                                            {callItems && <DropdownMenuSeparator />}
+                                            <VoiceSettingsItem />
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
+
+                    {/* Red and nothing else, as tall as the groups beside it (their
+                    button, padding and frame) so it does not sit lower than them. */}
+                    <Button
+                        variant="hangUp"
+                        className="h-[2.625rem] w-[3.25rem] rounded-xl"
+                        aria-label={t("callRoom.leaveTheCall")}
+                        title={t("callRoom.leaveTheCall")}
+                        onClick={() => {
+                            // A held call sounds it as the provider lets go (`leave`
+                            // in `call-session`), whichever control hung up; the
+                            // guest page has no provider, so it is sounded here.
+                            if (!held) playCallSound("hangUp");
+                            onLeave();
+                        }}
+                    >
+                        <PhoneOff className="size-4" />
+                    </Button>
                 </div>
 
-                {/* Red and nothing else, as tall as the groups beside it (their
-                    button, padding and frame) so it does not sit lower than them. */}
-                <Button
-                    variant="hangUp"
-                    className="h-[2.625rem] w-[3.25rem] rounded-xl"
-                    aria-label={t("callRoom.leaveTheCall")}
-                    title={t("callRoom.leaveTheCall")}
-                    onClick={() => {
-                        // A held call sounds it as the provider lets go (`leave`
-                        // in `call-session`), whichever control hung up; the
-                        // guest page has no provider, so it is sounded here.
-                        if (!held) playCallSound("hangUp");
-                        onLeave();
-                    }}
-                >
-                    <PhoneOff className="size-4" />
-                </Button>
-            </div>
+                {viewerId && (mayInvite || canShare) && (
+                    <InviteToCallDialog
+                        open={inviting}
+                        // Whether people in Polaris may be picked. The link beside
+                        // the picker is the host's own and answers to nothing here:
+                        // it adds nobody to the conversation.
+                        mayInvite={mayInvite}
+                        forGroup={place === "direct"}
+                        onOpenChange={setInviting}
+                        meetingId={meetingId}
+                        already={(admitted ?? [])
+                            .map((person) => person.userId)
+                            .filter((id): id is string => Boolean(id))}
+                        // The link is a second way to do the same thing - bring
+                        // somebody in - so it is offered where that is asked for
+                        // rather than as a button of its own beside the microphone.
+                        canShare={canShare}
+                        guestToken={call.meeting?.guestToken ?? null}
+                        onShared={call.refresh}
+                        onDone={(to) => {
+                            setInviting(false);
+                            if (to) onMoved?.(to);
+                            call.refresh();
+                        }}
+                    />
+                )}
 
-            {viewerId && (mayInvite || canShare) && (
-                <InviteToCallDialog
-                    open={inviting}
-                    // Whether people in Polaris may be picked. The link beside
-                    // the picker is the host's own and answers to nothing here:
-                    // it adds nobody to the conversation.
-                    mayInvite={mayInvite}
-                    forGroup={place === "direct"}
-                    onOpenChange={setInviting}
-                    meetingId={meetingId}
-                    already={(admitted ?? [])
-                        .map((person) => person.userId)
-                        .filter((id): id is string => Boolean(id))}
-                    // The link is a second way to do the same thing - bring
-                    // somebody in - so it is offered where that is asked for
-                    // rather than as a button of its own beside the microphone.
-                    canShare={canShare}
-                    guestToken={call.meeting?.guestToken ?? null}
-                    onShared={call.refresh}
-                    onDone={(to) => {
-                        setInviting(false);
-                        if (to) onMoved?.(to);
-                        call.refresh();
-                    }}
-                />
-            )}
+                <CombineRequestDialog call={call} />
 
-            <CombineRequestDialog call={call} />
-
-            {/* Asked once, because it is a decision about everybody in the room
+                {/* Asked once, because it is a decision about everybody in the room
                 rather than about the person pressing it. */}
-            <Dialog open={asking} onOpenChange={setAsking}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t("callRoom.recordThisCall2")}</DialogTitle>
-                        <DialogDescription>{t("callRoom.theRecordingIsMadeIn")}</DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => setAsking(false)}>
-                            {t("callRoom.cancel")}
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                setAsking(false);
-                                held?.recording.start();
-                            }}
-                        >
-                            <Circle aria-hidden className="size-3 fill-current text-danger" />
-                            {t("callRoom.startRecording")}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
+                <Dialog open={asking} onOpenChange={setAsking}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{t("callRoom.recordThisCall2")}</DialogTitle>
+                            <DialogDescription>
+                                {t("callRoom.theRecordingIsMadeIn")}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setAsking(false)}>
+                                {t("callRoom.cancel")}
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setAsking(false);
+                                    held?.recording.start();
+                                }}
+                            >
+                                <Circle aria-hidden className="size-3 fill-current text-danger" />
+                                {t("callRoom.startRecording")}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </AnnotateProvider>
     );
 }
 
@@ -2509,7 +2533,8 @@ function Tile({
     streamMenu,
     moderation,
     hosting,
-    volumeKey
+    volumeKey,
+    annotate
 }: {
     stream: MediaStream | null;
     name: string;
@@ -2590,6 +2615,9 @@ function Tile({
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
+    /** On a shared screen: whose it is, so strokes can be drawn on it - see
+     *  `call-annotate`. */
+    annotate?: string;
 }) {
     const t = useTranslations("chat");
     const video = useRef<HTMLVideoElement>(null);
@@ -2852,6 +2880,13 @@ function Tile({
                     blank && "invisible"
                 )}
             />
+            {annotate && !blank && (
+                <AnnotateLayer
+                    owner={annotate}
+                    aspect={pictureShape}
+                    transform={zoomable ? look.transform : undefined}
+                />
+            )}
             {blank && (
                 // A face rather than a name in the middle of an empty rectangle.
                 // Most of a call is spent with the cameras off, so this is what
@@ -3031,6 +3066,7 @@ function Tile({
                 clear of the name. */}
             {!blank && (
                 <span {...controlsBox(screen ? "bottom-1 right-1" : "right-1 top-1")}>
+                    {screen && annotate && <AnnotateButton owner={annotate} />}
                     {screen && streamMenu && (
                         <StreamVolumeControl
                             name={streamMenu.name}

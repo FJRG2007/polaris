@@ -57,6 +57,8 @@ describe("releaseSource", () => {
         const source = releaseSource(manifest.repository);
         expect(source?.api).toMatch(/^https:\/\/api\.github\.com\/repos\/[\w.-]+\/[\w.-]+\/releases\?per_page=100$/);
         expect(source?.page(`${TAG_PREFIX}1.2.3`)).toMatch(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/tag\/desktop-v1\.2\.3$/);
+        // Squirrel reads RELEASES and the package from beside each other.
+        expect(source?.download(`${TAG_PREFIX}1.2.3`)).toMatch(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/desktop-v1\.2\.3$/);
 
         const workflow = readFileSync(join(__dirname, "../../../.github/workflows/desktop.yml"), "utf8");
         expect(workflow).toContain(`- "${TAG_PREFIX}*"`);

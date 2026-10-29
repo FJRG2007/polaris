@@ -269,3 +269,96 @@ pre.log {
 [hidden] {
     display: none !important;
 }
+
+h2 {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.servers {
+    margin-bottom: 20px;
+}
+
+.server-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.server {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+.server[data-active="true"] {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.server .names {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.server .name,
+.server .host {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.server .name {
+    font-weight: 500;
+}
+
+.server .host {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.server .badge {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--accent);
+}
+
+.server input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 9px;
+}
+
+button.icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+}
+
+button.icon:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+button.icon svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}

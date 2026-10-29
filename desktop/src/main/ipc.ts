@@ -10,6 +10,9 @@
 
 import { z } from "zod";
 import { runningPrograms } from "./game-detect";
+import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-share";
+import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
+import { strokeSchema } from "@/shared/annotate";
 import { closeNotice, showNotice } from "./notices";
 import { isServerUrl, serverPath } from "./navigation";
 import { FolderRefusal, zipFolder } from "./folder-zip";
@@ -22,6 +25,8 @@ import {
     type Outcome,
     type PickedFolder
 } from "@/shared/bridge";
+import type { ServerRow } from "@/shared/servers";
+import { readServerAddress } from "@/shared/server-address";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
 
@@ -32,9 +37,15 @@ export interface IpcHost extends PushHost {
     readonly isReporter: (sender: WebContents) => boolean;
     readonly setCustomGames: (games: readonly CustomGameInput[]) => void;
     /** The address form's state: the address in use and why it failed to open. */
-    readonly connectState: () => { address: string | null; error: string | null; };
+    readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
     readonly connectSubmit: (raw: unknown) => Promise<Outcome>;
+    readonly switchServer: (origin: string) => Promise<Outcome>;
+    readonly nameServer: (origin: string, name: string) => Outcome;
+    readonly removeServer: (origin: string) => Outcome;
 }
+
+/** A server named by the list: an address in the one stored form. */
+const listedSchema = z.unknown().transform(readServerAddress).pipe(z.string());
 
 const noticeSchema = z.object({
     title: z.string().trim().min(1).max(200),
@@ -226,10 +237,52 @@ export function registerIpc(host: IpcHost): void {
         return [...new Set(names)].sort((a, b) => a.localeCompare(b)).slice(0, 2000);
     });
 
+    ipcMain.handle(CHANNELS.shareSources, async (event) => {
+        if (!fromPolaris(event)) return null;
+        return listShareSources().catch((caught: unknown) => {
+            console.error("[screen-share]", caught);
+            return null;
+        });
+    });
+
+    ipcMain.handle(CHANNELS.chooseShare, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const input = z.object({ id: z.string().max(200).regex(SOURCE_ID), sound: z.boolean() }).safeParse(raw);
+        if (!input.success) return false;
+        chooseShare(input.data.id, input.data.sound);
+        return true;
+    });
+
+    ipcMain.handle(CHANNELS.drawOnShare, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const stroke = strokeSchema.safeParse(raw);
+        return stroke.success ? drawOnShare(stroke.data) : false;
+    });
+
+    ipcMain.handle(CHANNELS.canDrawOnShare, (event): boolean => fromPolaris(event) && canDrawOnShare());
+
+    ipcMain.handle(CHANNELS.stopDrawing, (event): void => {
+        if (!fromPolaris(event)) return;
+        stopDrawing();
+        endShare();
+    });
+
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));
     ipcMain.handle(CHANNELS.connectSubmit, (event, raw: unknown) =>
         from(event, "connect") ? host.connectSubmit(raw) : REFUSED
     );
+    ipcMain.handle(CHANNELS.connectSwitch, (event, raw: unknown) => {
+        const origin = listedSchema.safeParse(raw);
+        return from(event, "connect") && origin.success ? host.switchServer(origin.data) : REFUSED;
+    });
+    ipcMain.handle(CHANNELS.connectRename, (event, raw: unknown) => {
+        const input = z.object({ origin: listedSchema, name: z.string().max(200) }).safeParse(raw);
+        return from(event, "connect") && input.success ? host.nameServer(input.data.origin, input.data.name) : REFUSED;
+    });
+    ipcMain.handle(CHANNELS.connectRemove, (event, raw: unknown) => {
+        const origin = listedSchema.safeParse(raw);
+        return from(event, "connect") && origin.success ? host.removeServer(origin.data) : REFUSED;
+    });
 
     ipcMain.handle(CHANNELS.keyState, (event) => (from(event, "api-key") ? keyFormState() : null));
     ipcMain.handle(CHANNELS.keySubmit, (event, raw: unknown) => (from(event, "api-key") ? submitApiKey(raw) : REFUSED));

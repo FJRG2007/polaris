@@ -15,6 +15,9 @@
  * sentence anybody should be shown.
  */
 
+import type { StrokeInput } from "./annotate";
+import type { ServerRow } from "./servers";
+
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
 export interface NoticeInput {
@@ -81,6 +84,36 @@ export interface PolarisDesktop {
     /** The names of the programs running now, for picking one to add as a game.
      *  Only ever handed to the page that asked, on a press. */
     runningPrograms(): Promise<readonly string[]>;
+    /** The screens and windows to share, each with a small picture, for the
+     *  page's own picker. Null where the system's picker is the one to use. */
+    shareSources(): Promise<ShareSources | null>;
+    /** What the page's picker chose, for the `getDisplayMedia` that follows. */
+    chooseShare(input: { readonly id: string; readonly sound: boolean; }): Promise<boolean>;
+    /** Draw a stroke somebody made on this computer's share over the shared
+     *  display. False when there is nothing to draw on: a window share, or a
+     *  share this app did not pick. */
+    drawOnShare(stroke: StrokeInput): Promise<boolean>;
+    /** Whether the share going out now is one `drawOnShare` can draw on. */
+    canDrawOnShare(): Promise<boolean>;
+    /** Take the drawing off the display: the share ended. */
+    stopDrawing(): Promise<void>;
+}
+
+/** A screen or a window that can be shared. */
+export interface ShareSource {
+    readonly id: string;
+    readonly name: string;
+    readonly kind: "screen" | "window";
+    /** A JPEG data URL, or null when the system gave no picture. */
+    readonly thumbnail: string | null;
+    /** The program's icon as a PNG data URL, for a window. */
+    readonly icon: string | null;
+}
+
+export interface ShareSources {
+    readonly sources: readonly ShareSource[];
+    /** Whether this computer's sound can go with a share. */
+    readonly sound: boolean;
 }
 
 /** A game running on this computer, as the dashboard is told it. */
@@ -117,9 +150,14 @@ export type PushEvent =
 
 export interface PolarisLocal {
     readonly connect: {
-        /** The address in use and why it could not be opened, if it could not. */
-        state(): Promise<{ readonly address: string | null; readonly error: string | null; }>;
+        /** The address in use, why it could not be opened if it could not, and
+         *  every server kept. */
+        state(): Promise<{ readonly address: string | null; readonly error: string | null; readonly servers: readonly ServerRow[]; }>;
         submit(address: string): Promise<Outcome>;
+        /** Open a server from the list. */
+        switchTo(origin: string): Promise<Outcome>;
+        rename(origin: string, name: string): Promise<Outcome>;
+        remove(origin: string): Promise<Outcome>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -135,6 +173,9 @@ export interface PolarisLocal {
         cancel(): Promise<void>;
         openService(): Promise<void>;
         onEvent(listener: (event: PushEvent) => void): () => void;
+    };
+    readonly overlay: {
+        onStroke(listener: (stroke: StrokeInput) => void): () => void;
     };
 }
 
@@ -168,8 +209,17 @@ export const CHANNELS = {
     gameCurrent: "desktop:game-current",
     gameCustom: "desktop:game-custom",
     gamePrograms: "desktop:game-programs",
+    shareSources: "desktop:share-sources",
+    chooseShare: "desktop:choose-share",
+    drawOnShare: "desktop:draw-on-share",
+    canDrawOnShare: "desktop:can-draw-on-share",
+    stopDrawing: "desktop:stop-drawing",
+    overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
+    connectSwitch: "local:connect-switch",
+    connectRename: "local:connect-rename",
+    connectRemove: "local:connect-remove",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

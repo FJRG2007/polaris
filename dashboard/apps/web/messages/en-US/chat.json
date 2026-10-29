@@ -2082,5 +2082,33 @@
             "language": "Dictation is not available in this language here. Try Private dictation in the mic menu.",
             "notSetUp": "Private dictation is not available here yet. Turn it off in the mic menu."
         }
+    },
+    "sharePicker": {
+        "title": "Choose what to share",
+        "description": "Everyone in the call sees what you pick.",
+        "screens": "Screens ({count})",
+        "windows": "Windows ({count})",
+        "noScreens": "No screens found.",
+        "noWindows": "No open windows to share.",
+        "untitled": "Untitled window",
+        "sound": "Share this computer's sound",
+        "cancel": "Cancel",
+        "share": "Start sharing",
+        "pickFirst": "Pick a screen or a window first."
+    },
+    "annotate": {
+        "askToDraw": "Ask to draw on this screen",
+        "asked": "Asked to draw",
+        "declined": "Not allowed to draw. Ask again",
+        "draw": "Draw on this screen",
+        "stopDrawing": "Put the pen down",
+        "color": "Pen {number}",
+        "wantsToDraw": "{name} wants to draw on your screen.",
+        "onlyOthersSee": "Everyone else sees it. To see it on your own screen, use the desktop app.",
+        "onlyOthersSeeShare": "Everyone else sees it. It won't show on your own screen for this share.",
+        "allow": "Allow",
+        "decline": "Decline",
+        "canDraw": "Can draw on your screen: {names}",
+        "stopAll": "Stop drawing"
     }
 }

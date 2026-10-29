@@ -104,6 +104,7 @@ import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./
 import { retuneScreenEncoding, swapScreen, type EncodedTrack } from "./call-share-menu";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC } from "@/lib/chat/call-activity";
+import { ANNOTATE_TOPIC, ANNOTATORS } from "@/lib/chat/call-annotate";
 import {
     cameraBackground,
     useCameraBackground,
@@ -751,6 +752,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const activityRef = useRef("");
     /** Who hears game messages: the call's game panel, while it is open. */
     const heardActivity = useRef<((from: string, raw: unknown) => void) | null>(null);
+    /** Who this browser lets draw on its screen, said again on every announce. */
+    const annotatorsRef = useRef("");
+    /** Who hears drawing messages: the call's drawing layer, while it is mounted. */
+    const heardAnnotate = useRef<((from: string, raw: unknown) => void) | null>(null);
 
     const say = useCallback((attributes: Record<string, string>) => {
         void room.current?.localParticipant.setAttributes(attributes).catch(() => undefined);
@@ -792,7 +797,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 [AUDIO_GROUP]: groupRef.current ?? "",
                 [HAND]: handUpAt.current ? "1" : "",
                 [HAND_AT]: handUpAt.current ? String(handUpAt.current) : "",
-                [ACTIVITY_ATTRIBUTE]: activityRef.current
+                [ACTIVITY_ATTRIBUTE]: activityRef.current,
+                [ANNOTATORS]: annotatorsRef.current
             })
             .catch(() => undefined);
     }, []);
@@ -1932,6 +1938,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 if (participant) heardActivity.current?.(participant.identity, raw);
                 return;
             }
+            // Drawing on a shared screen: handed to the drawing layer, which
+            // validates it and believes a stroke only from a seat the sharer
+            // let draw - see `lib/chat/call-annotate`.
+            if (topic === ANNOTATE_TOPIC) {
+                if (participant) heardAnnotate.current?.(participant.identity, raw);
+                return;
+            }
             if (topic === SOUNDBOARD_TOPIC) {
                 if (participant) return;
                 const played = soundPlayedSchema.safeParse(raw);
@@ -2504,6 +2517,36 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 destinationIdentities: [...to]
             })
             .catch(() => undefined);
+    }, []);
+
+    const setAnnotators = useCallback(
+        (value: string) => {
+            if (annotatorsRef.current === value) return;
+            annotatorsRef.current = value;
+            say({ [ANNOTATORS]: value });
+        },
+        [say]
+    );
+
+    /** A drawing message: to these seats, or to the whole room for null.
+     *  Reliable, because a stroke with a gap in it is drawn wrong for good. */
+    const sendAnnotate = useCallback((to: readonly string[] | null, message: unknown) => {
+        const local = room.current?.localParticipant;
+        if (!local || to?.length === 0) return;
+        void local
+            .publishData(new TextEncoder().encode(JSON.stringify(message)), {
+                reliable: true,
+                topic: ANNOTATE_TOPIC,
+                ...(to ? { destinationIdentities: [...to] } : {})
+            })
+            .catch(() => undefined);
+    }, []);
+
+    const listenAnnotate = useCallback((listener: (from: string, raw: unknown) => void) => {
+        heardAnnotate.current = listener;
+        return () => {
+            if (heardAnnotate.current === listener) heardAnnotate.current = null;
+        };
     }, []);
 
     const listenActivity = useCallback((listener: (from: string, raw: unknown) => void) => {
@@ -4061,6 +4104,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setActivity,
         sendActivity,
         listenActivity,
+        setAnnotators,
+        sendAnnotate,
+        listenAnnotate,
         audio,
         outgoing: filteredTrack ?? micTrack
     };
