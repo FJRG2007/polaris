@@ -12,7 +12,7 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE } from "@polaris/core";
-import { DNS_BLOCKER_KEYWORDS } from "@/lib/apps";
+import { DNS_BLOCKER_KEYWORDS, VPN_KEYWORDS } from "@/lib/apps";
 import { NATIVE_APPS, isNativeApp } from "@/lib/apps/native-apps";
 import {
     Bot,
@@ -31,6 +31,7 @@ import {
     RadioTower,
     ShieldBan,
     Wrench,
+    Waypoints,
     type LucideIcon
 } from "lucide-react";
 
@@ -50,6 +51,7 @@ export type AppCapability =
     | "home-hub"
     | "mail-server"
     | "dns-blocker"
+    | "vpn"
     | "tool";
 
 /** How an app is provisioned. `compose-template` runs a compose stack via Deploy;
@@ -481,6 +483,60 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             ports: [{ container: 53, protocol: "udp", host: 53, label: "DNS" }], // i18n-ignore
             // The query log and the lists Polaris writes, kept across redeploys.
             volumes: [{ name: "query-log", mountPath: "/logs", label: "Query log" }] // i18n-ignore
+        }
+    },
+    {
+        // Your own Tailscale network. Installing it runs nothing: it puts the VPN
+        // screens here, and the control server starts only when an administrator
+        // presses Turn on - it needs a hostname in one of the deploy zones, which
+        // is chosen on that same screen.
+        id: "vpn",
+        name: "VPN",
+        category: "Tools",
+        icon: Waypoints,
+        opensAt: "/apps/vpn",
+        summary: "Reach your own devices from anywhere, through the Tailscale apps.",
+        keywords: VPN_KEYWORDS,
+        description:
+            "A private network between your phones, computers and TVs, run on this machine. Each person signs their devices in with their Polaris account through the official Tailscale apps and reaches only their own; administrators reach all of them and decide which devices may act as an exit node or share a home network. Installing downloads nothing: the control server starts on this machine when an administrator turns it on, at an address in one of your domains.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["vpn"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // The control server behind the VPN (Headscale). Never offered on its own:
+        // the VPN installs it on the first Turn on, Turn off stops it and keeps its
+        // volume, and only Remove deletes it. Its port is never published on the
+        // host's public side: the edge reaches it by the hostname Turn on takes, and
+        // the dashboard by this machine's address and the port Deploy gives it.
+        id: "vpn-engine",
+        name: "VPN control server",
+        internal: true,
+        ownedBy: "vpn",
+        category: "Tools",
+        icon: Waypoints,
+        summary: "The server your devices sign in to and find each other through.",
+        description:
+            "The control server behind the VPN. It signs devices in, hands out their addresses and keys, and tells each one which others it may reach. The traffic between devices does not pass through it.", // i18n-ignore
+        docsUrl: "https://headscale.net/stable/",
+        installMethod: "compose-template",
+        capabilities: ["vpn"],
+        dashboard: "generic",
+        singleton: true,
+        instanceWide: true,
+        template: {
+            // Published by CI (.github/workflows/dashboard-publish.yml, `vpn` job)
+            // from dashboard/services/vpn: the pinned Headscale release, with an
+            // entrypoint that writes the configuration Polaris renders
+            // (HEADSCALE_CONFIG_BASE64).
+            image: "ghcr.io/fjrg2007/polaris-dashboard:latest-service-vpn",
+            build: "dashboard/services/vpn",
+            ports: [{ container: 8080, protocol: "http", label: "Control server" }], // i18n-ignore
+            // The database of users and devices, and the server's noise key: what
+            // lets every device sign back in after Turn off and Turn on.
+            volumes: [{ name: "data", mountPath: "/var/lib/headscale", label: "Devices" }] // i18n-ignore
         }
     },
     {

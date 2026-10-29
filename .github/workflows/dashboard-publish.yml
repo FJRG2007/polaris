@@ -45,6 +45,7 @@ on:
       - "dashboard/services/camera-relay/**"
       - "dashboard/services/mqtt-broker/**"
       - "dashboard/services/dns-blocker/**"
+      - "dashboard/services/vpn/**"
       - "dashboard/services/vision/**"
       - "dashboard/services/face/**"
       - "dashboard/package.json"
@@ -127,6 +128,7 @@ jobs:
       relay: ${{ steps.filter.outputs.relay }}
       broker: ${{ steps.filter.outputs.broker }}
       dnsblock: ${{ steps.filter.outputs.dnsblock }}
+      vpn: ${{ steps.filter.outputs.vpn }}
       vision: ${{ steps.filter.outputs.vision }}
       face: ${{ steps.filter.outputs.face }}
     steps:
@@ -143,7 +145,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out broker true; out dnsblock true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
           # Measured from the last run that published, not from the push before
           # this one. A run that failed its suites or was cancelled built nothing
           # that got tagged, so its changes are still unpublished - and measured
@@ -229,6 +231,8 @@ jobs:
           has '^dashboard/services/mqtt-broker/' && out broker true || out broker false
           # The network filter is Blocky plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/dns-blocker/' && out dnsblock true || out dnsblock false
+          # The VPN is the pinned Headscale release plus an entrypoint.
+          has '^dashboard/services/vpn/' && out vpn true || out vpn false
           # The worker bundles part of @polaris/core - the zone geometry, the
           # detector's decoder and the tracker - so a change to those is a change
           # to the worker. The whole of core was the pattern here, and core is
@@ -809,6 +813,38 @@ jobs:
           provenance: false
           sbom: false
 
+  # The VPN's control server: the pinned Headscale release with an entrypoint
+  # that writes the configuration Polaris renders. Into the dashboard's package
+  # under `latest-service-vpn`, for the reason given on the dnsblock job.
+  vpn:
+    needs: changes
+    if: ${{ needs.changes.outputs.vpn == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: dashboard
+          file: dashboard/services/vpn/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
+          # No attestation manifests, for the reason given on the relay job.
+          provenance: false
+          sbom: false
+
   # The vision worker: ffmpeg and one bundled file. Published so a house does not
   # build a video pipeline the first time somebody asks a camera to watch for
   # people.
@@ -905,7 +941,7 @@ jobs:
   # the extension does run dashboard-ci, so this runs and tags nothing - every
   # step below is guarded on its own image's result, and all of them were skipped.
   tag:
-    needs: [dashboard-ci, web, bridge, guard, hytale, relay, broker, dnsblock, vision, face]
+    needs: [dashboard-ci, web, bridge, guard, hytale, relay, broker, dnsblock, vpn, vision, face]
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -968,6 +1004,10 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest-service-dns-blocker \
             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.dnsblock.outputs.digest }}
+      - name: Tag the VPN
+        if: ${{ env.PUBLISH == 'true' && needs.vpn.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest-service-vpn             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.vpn.outputs.digest }}
       - name: Tag the vision worker
         if: ${{ env.PUBLISH == 'true' && needs.vision.result == 'success' }}
         run: |

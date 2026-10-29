@@ -17,5 +17,6 @@ export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">>
     "home-hub": "capabilities.homeHub",
     "mail-server": "capabilities.mailServer",
     "dns-blocker": "capabilities.dnsBlocker",
+    vpn: "capabilities.vpn",
     tool: "capabilities.tool"
 };

@@ -52,6 +52,8 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/apps/servers/security/[[...path]]", kind: null },
     { route: "/apps/servers/ups/[upsId]", kind: "ups", id: "upsId" },
     { route: "/apps/servers/[serverId]", kind: "server", id: "serverId" },
+    // A device's one-time registration id, never a record to pass along.
+    { route: "/apps/vpn/register/[authId]", kind: null },
     { route: "/automations/runs/[runId]", kind: "automation run", id: "runId" },
     { route: "/automations/[id]", kind: "automation", id: "id" },
     { route: "/calendar/booking/[id]", kind: "booking page", id: "id" },

@@ -378,7 +378,9 @@
         "People & access": "Personas y acceso",
         "Platform": "Plataforma",
         "Areas": "Áreas",
-        "Ranks": "Rangos"
+        "Ranks": "Rangos",
+        "VPN": "VPN",
+        "Add a device": "Añadir equipo"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

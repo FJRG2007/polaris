@@ -378,7 +378,9 @@
         "People & access": "People & access",
         "Platform": "Platform",
         "Areas": "Areas",
-        "Ranks": "Ranks"
+        "Ranks": "Ranks",
+        "VPN": "VPN",
+        "Add a device": "Add a device"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

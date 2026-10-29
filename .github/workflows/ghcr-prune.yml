@@ -90,7 +90,7 @@ jobs:
           # else was ever going to collect it.
           CACHE_PACKAGES: polaris-buildcache
           # Service images living in the dashboard's package under their own tag.
-          SERVICE_TAGS: latest-service-dns-blocker
+          SERVICE_TAGS: latest-service-dns-blocker latest-service-vpn
         run: |
           set -uo pipefail
           repo=$(echo "$OWNER" | tr "[:upper:]" "[:lower:]")

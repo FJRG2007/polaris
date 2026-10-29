@@ -10,7 +10,8 @@
         "homeHub": "Home",
         "mailServer": "Mail",
         "dnsBlocker": "DNS blocking",
-        "tool": "Tool"
+        "tool": "Tool",
+        "vpn": "VPN"
     },
     "statuses": {
         "installing": "Installing",

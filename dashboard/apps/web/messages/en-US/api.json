@@ -105,7 +105,8 @@
             "notAnApp": "That is not an app.",
             "appMissing": "This version of Polaris does not have that app.",
             "native": "This is part of Servers and cannot be uninstalled.",
-            "dnsBlockerRunning": "Turn the network filter off on its screen first. Uninstalling it while it runs would leave every device pointed at it without DNS."
+            "dnsBlockerRunning": "Turn the network filter off on its screen first. Uninstalling it while it runs would leave every device pointed at it without DNS.",
+            "vpnKept": "Remove the VPN on its own screen first. Its control server still holds every device that was added to it."
         },
         "mail": {
             "channelGone": "That email channel no longer exists.",

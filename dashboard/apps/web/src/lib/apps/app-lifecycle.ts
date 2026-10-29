@@ -20,6 +20,7 @@ import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 import { isNativeApp } from "@/lib/apps/native-apps";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { DNS_BLOCKER_APP, DNS_ENGINE_APP } from "@/lib/dns-blocker/settings";
+import { VPN_APP, VPN_ENGINE_APP } from "@/lib/vpn/settings";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { deployApplication, removeApplicationDeployment } from "@/lib/deploy-service";
 
@@ -56,6 +57,16 @@ export async function appUninstallRefusal(row: {
             select: { id: true }
         });
         return engine ? (await readerWords("api"))("refusals.apps.dnsBlockerRunning") : null;
+    }
+    // The VPN's control server holds every device's sign-in, kept across Turn
+    // off on purpose. Deleting it is the Remove on the VPN's own screen, which
+    // says so; uninstalling the screens must not do it on the way past.
+    if (row.catalogId === VPN_APP) {
+        const engine = await prisma.installedApp.findFirst({
+            where: { catalogId: VPN_ENGINE_APP, status: { not: "removed" } },
+            select: { id: true }
+        });
+        return engine ? (await readerWords("api"))("refusals.apps.vpnKept") : null;
     }
     if (row.catalogId !== GAME_SERVERS_APP_ID) return null;
     const servers = await prisma.installedApp.findMany({

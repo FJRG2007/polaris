@@ -54,6 +54,7 @@ import containers from "./containers.json";
 import deployData from "./deployData.json";
 import mailServer from "./mailServer.json";
 import dnsBlocker from "./dnsBlocker.json";
+import vpn from "./vpn.json";
 import tasksViews from "./tasksViews.json";
 import validation from "./validation.json";
 import mcpConnect from "./mcpConnect.json";
@@ -125,6 +126,7 @@ export default {
     mailCompose,
     mailServer,
     dnsBlocker,
+    vpn,
     mailSettings,
     marketplace,
     mcp,
