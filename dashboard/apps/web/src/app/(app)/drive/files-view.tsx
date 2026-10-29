@@ -975,6 +975,21 @@ export function FilesView({
         moveDraggedTo(folder.path, source);
     }
 
+    // Escape leaves the preview, whatever kind of file it shows. Listened for on
+    // the window and in the bubbling phase, so a find bar, a field or an open
+    // dialog or menu that answers Escape itself keeps it.
+    useEffect(() => {
+        if (!viewerTarget) return;
+        function onEscape(event: globalThis.KeyboardEvent) {
+            if (event.key !== "Escape" || event.defaultPrevented) return;
+            if (keyboardIsBusy(event)) return;
+            event.preventDefault();
+            closeViewer();
+        }
+        window.addEventListener("keydown", onEscape);
+        return () => window.removeEventListener("keydown", onEscape);
+    });
+
     // Create and upload shortcuts. They listen on the window so they work wherever
     // the focus sits in the explorer, and stand down whenever something else owns
     // the keyboard: a text field, an inline rename, an open dialog or menu, or the
@@ -3472,7 +3487,7 @@ export function FilesView({
                 </ContextMenu>
             </div>
             {!inTrash && selectedEntries.length === 1 && selectedEntries[0] ? (
-                <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
+                <aside className="fixed right-0 top-[calc(var(--header-height)+var(--connection-banner-height,0px))] bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         {/* The file, not a mark standing for its type. This panel
                             exists to answer "which one is this", and for a
