@@ -35,6 +35,7 @@ import { revokeCliSession, revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 
 /** One person, as the directory lists them. */
 export interface DirectoryUser {
@@ -325,7 +326,7 @@ export async function banUser(
     // Immediate, rather than only on their next sign-in.
     await dropSessions(userId);
     // And their devices off the VPN, which a session ending does not reach.
-    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
+    refreshVpnAccessLater();
     await recordAudit({
         actorId,
         action: until ? "user.suspend" : "user.ban",
@@ -392,7 +393,7 @@ export async function setAdminAccess(
     }
     await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
     // Administrators reach every device on the VPN; its policy names them.
-    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
+    refreshVpnAccessLater();
     await recordAudit({
         actorId,
         action: isAdmin ? "user.promote" : "user.demote",
@@ -622,7 +623,7 @@ export async function deleteUser(actorId: string, userId: string): Promise<{ err
     if (driveLeft) leftBehind.push(driveLeft);
     await (await import("@/lib/cloud-servers-host")).handOverOrgCloudAccounts(userId);
     await prisma.user.delete({ where: { id: userId } });
-    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
+    refreshVpnAccessLater();
     await recordAudit({
         actorId,
         action: "user.delete",

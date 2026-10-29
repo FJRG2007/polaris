@@ -32,6 +32,7 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { revokeStepUpGrants } from "@/lib/step-up-grant";
 import { revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 
 /** Where the account itself reads about any of this. */
 const SECURITY_HREF = "/account/security";
@@ -154,7 +155,7 @@ export async function closeAccount(userId: string, closure: core.AccountClosure)
     await revokeExtensionSessions(userId);
     await revokeCliSessions(userId);
     await revokeStepUpGrants(userId);
-    void import("@/lib/vpn/service").then((vpn) => vpn.refreshVpnAccess());
+    refreshVpnAccessLater();
     await recordAudit({
         actorId: userId,
         action: closure === "deleting" ? "account.deletion.requested" : "account.disabled"
