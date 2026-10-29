@@ -62,7 +62,10 @@ describe("reading a drive file", () => {
         await read("&disposition=inline", "bytes=50-");
         expect(recorded()).toEqual([
             expect.objectContaining({ action: "drive.view" }),
-            expect.objectContaining({ action: "drive.range", metadata: expect.objectContaining({ from: "50" }) })
+            expect.objectContaining({
+                action: "drive.range",
+                metadata: expect.objectContaining({ from: "50" })
+            })
         ]);
     });
 

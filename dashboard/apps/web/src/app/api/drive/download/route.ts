@@ -85,7 +85,9 @@ export async function GET(request: Request): Promise<Response> {
             metadata: {
                 path,
                 size: stat.size.toString(),
-                ...(start > 0 ? { from: String(start), disposition: inline ? "inline" : "attachment" } : {})
+                ...(start > 0
+                    ? { from: String(start), disposition: inline ? "inline" : "attachment" }
+                    : {})
             }
         });
         const contentType = stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream";
