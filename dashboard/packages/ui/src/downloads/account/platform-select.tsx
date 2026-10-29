@@ -9,8 +9,36 @@
  */
 
 import { Select } from "../../index";
+import { useEffect, useRef, useState } from "react";
 import { SystemMark } from "./client-marks";
-import { INSTALL_PLATFORMS, PLATFORM_LABELS, type InstallPlatform } from "./install-platform";
+import {
+    detectPlatform,
+    INSTALL_PLATFORMS,
+    PLATFORM_LABELS,
+    type InstallPlatform
+} from "./install-platform";
+
+/**
+ * The system a picker starts on: the reader's own, once the browser has said
+ * which. Detected in an effect rather than during render - this renders on the
+ * server too, where there is no navigator, and seeding from one would have the
+ * browser hydrate something the HTML does not contain. A system the reader
+ * picked before the detection lands is kept.
+ */
+export function useInstallPlatform(): [InstallPlatform, (platform: InstallPlatform) => void] {
+    const [platform, setPlatform] = useState<InstallPlatform>("linux");
+    const picked = useRef(false);
+    useEffect(() => {
+        if (!picked.current) setPlatform(detectPlatform(navigator.userAgent));
+    }, []);
+    return [
+        platform,
+        (next) => {
+            picked.current = true;
+            setPlatform(next);
+        }
+    ];
+}
 
 export function PlatformSelect({
     value,

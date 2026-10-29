@@ -105,9 +105,9 @@ describe("waiting on GitHub", () => {
 
 describe("loading it by hand", () => {
     it("is a guided sequence, not a paragraph with the steps inside it", async () => {
-        // Opened from each browser's row, with that browser already picked.
+        // Under the browser picked on the card, which starts on the reader's own.
         const source = await extensionCard;
-        expect(source).toContain("<ExtensionSteps initial={guide.id} />");
+        expect(source).toContain("<ExtensionSteps key={browser} initial={browser} picker={false} />");
         expect(source).toContain("<ExtensionCommand repo={repo} />");
         expect(await page).toContain("<ExtensionCard");
     });

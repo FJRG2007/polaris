@@ -1142,6 +1142,7 @@
             "appImage": "AppImage, runs anywhere"
         },
         "download": "Download",
+        "system": "Which system it is for",
         "notInRelease": "Not in this release",
         "whatChanged": "What changed",
         "noDesktopVersion": "No version has been published yet. Installing Polaris as an app above is how to have it in a window of its own today.",

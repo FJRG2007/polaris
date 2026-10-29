@@ -10,21 +10,21 @@
  * deployment and only the sign-in line carries this one's address: the one it is
  * configured to be reached at, or the address this page is open on when none is.
  *
- * Both install lines are rows of their own, the reader's system first: somebody
- * may be setting it up on a machine that is not the one they are reading on, and
- * two lines read faster than a picker that hides one of them.
+ * The install line is shown for one system at a time, the reader's own first,
+ * with the same system picker as every other install line on the page: somebody
+ * setting it up on another machine picks that one.
  */
 
 import { Skeleton } from "../../index";
 import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
+import { InstallLine } from "./install-line";
 import { TerminalPreview } from "./download-previews";
 import { CopyButton } from "../../index";
-import { SystemMark } from "./client-marks";
 import { useTranslations } from "../../i18n";
-import { DownloadCard, DownloadRow, DownloadRows } from "../download-card";
+import { DownloadCard } from "../download-card";
+import { useInstallPlatform } from "./platform-select";
 import { cliInstallLine, cliLoginLine } from "./cli-install-line";
-import { detectPlatform, PLATFORM_LABELS, type InstallPlatform } from "./install-platform";
 
 /** A command on a line of its own, with the button that copies it. */
 function CommandLine({ command }: { command: string }) {
@@ -52,37 +52,14 @@ export function CliSection({
     // navigator and no address bar, and seeding from them would hydrate markup
     // the HTML does not contain. Only a sign-in line with no configured address
     // waits, as a skeleton of its own size.
-    const [platform, setPlatform] = useState<InstallPlatform>("linux");
+    const [platform, setPlatform] = useInstallPlatform();
     const [origin, setOrigin] = useState(serverUrl ?? "");
 
     useEffect(() => {
-        setPlatform(detectPlatform(navigator.userAgent));
         if (!serverUrl) setOrigin(window.location.origin);
     }, [serverUrl]);
 
-    const unix = cliInstallLine("linux", repo);
-    const windows = cliInstallLine("windows", repo);
-    const rows = [
-        {
-            key: "unix",
-            line: unix,
-            detail: t("downloads.cli.unixSystems"),
-            mark: (
-                <span className="flex items-center gap-0.5">
-                    <SystemMark os={PLATFORM_LABELS.macos} className="size-3.5" />
-                    <SystemMark os={PLATFORM_LABELS.linux} className="size-3.5" />
-                </span>
-            )
-        },
-        {
-            key: "windows",
-            line: windows,
-            detail: PLATFORM_LABELS.windows,
-            mark: <SystemMark os={PLATFORM_LABELS.windows} />
-        }
-    ];
-    // The reader's own system first.
-    if (platform === "windows") rows.reverse();
+    const line = cliInstallLine(platform, repo);
 
     return (
         <DownloadCard
@@ -93,21 +70,14 @@ export function CliSection({
             description={t("downloads.cli.description")}
             preview={<TerminalPreview />}
         >
-            <div className="flex min-w-0 flex-col gap-2">
-                <DownloadRows label={t("downloads.cli.install")}>
-                    {rows.map((row) => (
-                        <DownloadRow
-                            key={row.key}
-                            mark={row.mark}
-                            name={row.line.shell}
-                            detail={row.detail}
-                        >
-                            <CommandLine command={row.line.command} />
-                        </DownloadRow>
-                    ))}
-                </DownloadRows>
-                <p className="text-xs text-muted-foreground">{t("downloads.cli.hint")}</p>
-            </div>
+            <InstallLine
+                title={t("downloads.cli.install")}
+                systemLabel={t("downloads.command.system")}
+                platform={platform}
+                onPlatformChange={setPlatform}
+                command={line.command}
+                hint={t("downloads.cli.hint", { shell: line.shell })}
+            />
 
             <div className="flex min-w-0 flex-col gap-2">
                 <p className="text-xs font-medium text-muted-foreground">

@@ -55,24 +55,19 @@ describe("the install line", () => {
 });
 
 describe("the CLI card", () => {
-    it("shows both official install lines, the reader's system first, then signs in to this Polaris", () => {
+    it("shows the official install line for the reader's system, then signs in to this Polaris", () => {
         render(<CliSection repo={REPO} serverUrl="https://polaris.example.com/" />, {
             wrapper: MessagesWrapper
         });
         expect(screen.getByText("Command line")).toBeTruthy();
-        // A row per shell, so a line for another machine is never hidden.
-        const unix = cliInstallLine("linux", REPO).command;
-        const windows = cliInstallLine("windows", REPO).command;
-        expect(screen.getByText(unix)).toBeTruthy();
-        expect(screen.getByText(windows)).toBeTruthy();
-        expect(screen.getByText("Terminal")).toBeTruthy();
-        expect(screen.getByText("PowerShell")).toBeTruthy();
-        expect(screen.getByText("macOS and Linux")).toBeTruthy();
-        // The reader's own system is first - which one depends on where this
-        // test runs, so the expected order is worked out the same way.
-        const first = detectPlatform(navigator.userAgent) === "windows" ? windows : unix;
+        // One system at a time, starting on the reader's - which one depends on
+        // where this test runs, so it is worked out the same way.
+        const own = cliInstallLine(detectPlatform(navigator.userAgent), REPO);
         const lines = [...document.querySelectorAll("code")].map((node) => node.textContent);
-        expect(lines[0]).toBe(first);
+        expect(lines[0]).toBe(own.command);
+        expect(screen.getByText(new RegExp(`Paste it into ${own.shell}`))).toBeTruthy();
+        // The picker that reaches the other systems' line.
+        expect(screen.getByRole("combobox", { name: "Which system you are installing on" })).toBeTruthy();
         expect(screen.getByText("Install")).toBeTruthy();
         expect(screen.getByText("Sign in")).toBeTruthy();
         expect(screen.getByText("Try")).toBeTruthy();
@@ -80,7 +75,7 @@ describe("the CLI card", () => {
         // The drawing at the foot of the card shows it too, hidden from readers.
         expect(screen.getByText("plr projects", { selector: "code" })).toBeTruthy();
         // Every line can be copied with one press.
-        expect(screen.getAllByRole("button", { name: /copy/i })).toHaveLength(4);
+        expect(screen.getAllByRole("button", { name: /copy/i })).toHaveLength(3);
     });
 
     it("signs in to the address the page is open on when none is configured", () => {
@@ -93,7 +88,6 @@ describe("the CLI card", () => {
             withMessages(<CliSection repo={REPO} serverUrl="https://polaris.example.com" />)
         );
         expect(html).toContain(`curl -fsSL ${SCRIPTS}/install.sh | sh`);
-        expect(html).toContain(`irm ${SCRIPTS}/install.ps1 | iex`);
         expect(html).toContain("plr login --url https://polaris.example.com");
         expect(html).not.toContain("/cli/install");
     });

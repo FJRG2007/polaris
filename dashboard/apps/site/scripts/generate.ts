@@ -649,6 +649,12 @@ for (const file of logos)
     copyFileSync(join(logosDir, file), join(siteDir, "public", "logos", file));
 for (const file of readdirSync(appLogosDir))
     copyFileSync(join(appLogosDir, file), join(siteDir, "public", "app-logos", file));
+// The marks the shared downloads cards draw from the dashboard's public folder
+// (the deck apps, the AI assistants): the site serves the same cards, so it has
+// to serve their files too. The README's logos above win where both have one.
+for (const file of readdirSync(join(web, "public", "logos")))
+    if (!logos.has(file))
+        copyFileSync(join(web, "public", "logos", file), join(siteDir, "public", "logos", file));
 // The dashboard's own mark, so a tab, a home screen and a shared link show the
 // same Polaris icon the product does.
 copyFileSync(join(web, "src", "app", "icon.svg"), join(siteDir, "public", "icon.svg"));

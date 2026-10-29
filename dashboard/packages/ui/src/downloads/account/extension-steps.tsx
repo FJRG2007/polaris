@@ -54,16 +54,17 @@ function Press({ text }: { text: string }) {
     return <b className="font-medium text-foreground">{text}</b>;
 }
 
-export function ExtensionSteps({
-    initial
-}: {
-    /** The browser whose row opened these steps; detected when left out. */
-    initial?: BrowserId;
-} = {}) {
+/**
+ * The browser to start on - the one the reader is in, once it has said which -
+ * the one detected (null when it has no build, undefined until known), and the
+ * setter for a browser the reader picks.
+ */
+export function useBrowserChoice(
+    initial?: BrowserId
+): [BrowserId, (browser: BrowserId) => void, BrowserId | null | undefined] {
     // Detected in an effect, not during render: this is rendered on the server
     // too, where there is no navigator, and seeding from one would have the
     // browser hydrate something the HTML does not contain.
-    const t = useTranslations("account");
     const [browser, setBrowser] = useState<BrowserId>(initial ?? "chrome");
     const [detected, setDetected] = useState<BrowserId | null | undefined>(undefined);
     // A browser the reader picked outranks the one that was detected. They may
@@ -88,20 +89,38 @@ export function ExtensionSteps({
         };
     }, []);
 
+    return [
+        browser,
+        (next) => {
+            picked.current = true;
+            setBrowser(next);
+        },
+        detected
+    ];
+}
+
+export function ExtensionSteps({
+    initial,
+    picker = true
+}: {
+    /** The browser whose row opened these steps; detected when left out. */
+    initial?: BrowserId;
+    /** False where the browser is picked above these steps already. */
+    picker?: boolean;
+} = {}) {
+    const t = useTranslations("account");
+    const [browser, setBrowser, detected] = useBrowserChoice(initial);
     const guide = browserGuide(browser);
 
     return (
         <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-end gap-2">
+            <div className={picker ? "flex flex-wrap items-end gap-2" : "hidden"}>
                 <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
                     {t("downloads.steps.yourBrowser")}
                     <Select
                         value={browser}
                         aria-label={t("downloads.steps.whichBrowser")}
-                        onValueChange={(value) => {
-                            picked.current = true;
-                            setBrowser(value as BrowserId);
-                        }}
+                        onValueChange={(value) => setBrowser(value as BrowserId)}
                         options={BROWSER_GUIDES.map((entry) => ({
                             value: entry.id,
                             label: entry.label,

@@ -21,6 +21,8 @@ import { Badge, Button } from "../../index";
 import { useTranslations } from "../../i18n";
 import { pickFile, type AppDownload, type AppFile } from "./app-releases";
 import { DownloadWithGuide } from "./download-guide";
+import type { InstallPlatform } from "./install-platform";
+import { PlatformSelect, useInstallPlatform } from "./platform-select";
 import type { GuideItem } from "@polaris/ui/install-guide-steps";
 
 /** The desktop app's download, or the fact that there is not one yet. */
@@ -108,14 +110,16 @@ interface PlatformRow {
     readonly not?: readonly string[];
     /** The install guide its download opens. */
     readonly guide: GuideItem;
+    /** The system it runs on, for a list that shows one system at a time. */
+    readonly os?: InstallPlatform;
 }
 
 const DESKTOP_ROWS: readonly PlatformRow[] = [
-    { platform: "windows", note: "installer", has: [".exe"], guide: "desktop" },
-    { platform: "macArm", note: "diskImage", has: [".dmg", "arm64"], guide: "desktop" },
-    { platform: "macIntel", note: "diskImage", has: [".dmg", "x64"], guide: "desktop" },
-    { platform: "linux", note: "debian", has: [".deb"], guide: "desktop" },
-    { platform: "linux", note: "appImage", has: [".appimage"], guide: "desktop" }
+    { platform: "windows", note: "installer", has: [".exe"], guide: "desktop", os: "windows" },
+    { platform: "macArm", note: "diskImage", has: [".dmg", "arm64"], guide: "desktop", os: "macos" },
+    { platform: "macIntel", note: "diskImage", has: [".dmg", "x64"], guide: "desktop", os: "macos" },
+    { platform: "linux", note: "debian", has: [".deb"], guide: "desktop", os: "linux" },
+    { platform: "linux", note: "appImage", has: [".appimage"], guide: "desktop", os: "linux" }
 ];
 
 const EXTENSION_ROWS: readonly PlatformRow[] = [
@@ -159,7 +163,12 @@ function PlatformFile({ row, file }: { row: PlatformRow; file: AppFile | null })
     );
 }
 
-/** Every row of one app's release, or one sentence saying there is no release. */
+/**
+ * Every row of one app's release, or one sentence saying there is no release.
+ * Rows that name a system are shown one system at a time, the reader's own
+ * first, with the picker every install line on the page uses: five installers
+ * for four systems is a list to read, one is an answer.
+ */
 function PlatformList({
     rows,
     download,
@@ -170,6 +179,9 @@ function PlatformList({
     nothing: string;
 }) {
     const t = useTranslations("components");
+    const [os, setOs] = useInstallPlatform();
+    const bySystem = rows.some((row) => row.os);
+    const shown = bySystem ? rows.filter((row) => row.os === os) : rows;
     if (!download) {
         return (
             <p className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
@@ -182,14 +194,24 @@ function PlatformList({
             {/* The version sits on the list rather than over it: what somebody
                 is deciding is which file, and the version is a fact about all of
                 them. */}
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Badge variant="neutral">{download.version}</Badge>
-                <a className="underline" href={download.url} target="_blank" rel="noreferrer">
-                    {t("downloads.whatChanged")}
-                </a>
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Badge variant="neutral">{download.version}</Badge>
+                    <a className="underline" href={download.url} target="_blank" rel="noreferrer">
+                        {t("downloads.whatChanged")}
+                    </a>
+                </p>
+                {bySystem ? (
+                    <PlatformSelect
+                        className="w-44"
+                        value={os}
+                        label={t("downloads.system")}
+                        onChange={setOs}
+                    />
+                ) : null}
+            </div>
             <div className="flex flex-col divide-y divide-border rounded-md border border-border px-3">
-                {rows.map((row) => (
+                {shown.map((row) => (
                     <PlatformFile
                         key={`${row.platform}-${row.has.join("-")}`}
                         row={row}

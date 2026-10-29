@@ -14,22 +14,15 @@
  * the one they are reading on.
  */
 
-import { useEffect, useState } from "react";
 import { InstallLine } from "./install-line";
 import { installCommand } from "./install-command";
 import { useTranslations } from "../../i18n";
-import { detectPlatform, platformShell, type InstallPlatform } from "./install-platform";
+import { platformShell } from "./install-platform";
+import { useInstallPlatform } from "./platform-select";
 
 export function ExtensionCommand({ repo }: { repo: string }) {
-    // Detected in an effect rather than during render: this is rendered on the
-    // server too, where there is no navigator, and seeding from one would have
-    // the browser hydrate something the HTML does not contain.
     const t = useTranslations("account");
-    const [platform, setPlatform] = useState<InstallPlatform>("linux");
-
-    useEffect(() => {
-        setPlatform(detectPlatform(navigator.userAgent));
-    }, []);
+    const [platform, setPlatform] = useInstallPlatform();
 
     const chosen = installCommand(platformShell(platform), repo);
 

@@ -1142,6 +1142,7 @@
             "appImage": "AppImage, funciona en todo"
         },
         "download": "Descargar",
+        "system": "Para qué sistema es",
         "notInRelease": "No está en esta versión",
         "whatChanged": "Qué ha cambiado",
         "noDesktopVersion": "Aún no se ha publicado ninguna versión. Instalar Polaris como app arriba es la forma de tenerlo hoy en su propia ventana.",

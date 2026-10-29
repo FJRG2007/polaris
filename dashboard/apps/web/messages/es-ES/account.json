@@ -1229,10 +1229,12 @@
             "description": "Rellena un inicio de sesión, guarda uno nuevo y desbloquea desde tu bóveda. Pide permiso al navegador para hablar con este Polaris y con ningún otro, y no tiene acceso permanente a las páginas que abres.",
             "store": "Desde la tienda de tu navegador",
             "notYet": "Todavía no está",
-            "storeHint": "Cargarla tú mismo abajo la mantiene igual de al día, así que no hace falta esperar a la tienda.",
-            "loadYourself": "Cárgala tú mismo",
+            "storeHint": "Aún no está en las tiendas de los navegadores. El comando la mantiene igual de al día, así que no hace falta esperarlas.",
+            "how": "Cómo instalarla",
+            "wayStore": "Tienda",
+            "wayDownload": "Descarga",
+            "wayCommand": "Comando",
             "alreadyHave": "¿Ya la tienes? <link>Conéctala a esta cuenta</link>. Tu bóveda es el segundo paso, desde la propia extensión.",
-            "rowChromium": "Se actualiza sola",
             "rowFirefox": "Hasta cerrar Firefox"
         },
         "later": {
@@ -1264,12 +1266,11 @@
             "title": "Terminal",
             "description": "Despliega, lee registros y reinicia tus apps desde una terminal. Inicia sesión una vez desde el navegador; cada comando posterior usa esa sesión.",
             "install": "Instalar",
-            "hint": "Pega la línea de tu sistema. Necesita Node.js 20 o posterior. Instala la última versión desde GitHub como plr y polaris; plr update la mantiene al día.",
+            "hint": "Pégala en {shell}. Necesita Node.js 20 o posterior. Instala la última versión desde GitHub como plr y polaris; plr update la mantiene al día.",
             "signIn": "Entrar",
             "signInHint": "Conecta la CLI a este Polaris y lo abre en el navegador para aprobarlo. Sin navegador, muestra un código para escribirlo aquí.",
             "server": "No se instala en un equipo que ejecuta un servidor Polaris: ambos responden a plr y polaris.",
-            "next": "Prueba",
-            "unixSystems": "macOS y Linux"
+            "next": "Prueba"
         },
         "streamdeck": {
             "title": "Stream Deck",

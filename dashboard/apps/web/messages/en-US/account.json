@@ -1229,10 +1229,12 @@
             "description": "Fills a login, saves a new one, and unlocks from your vault. It asks the browser for permission to talk to this Polaris and no other, and holds no standing access to the pages you open.",
             "store": "From your browser's store",
             "notYet": "Not there yet",
-            "storeHint": "Loading it yourself below keeps it just as current now, so there is no need to wait for the store.",
-            "loadYourself": "Load it yourself",
+            "storeHint": "Not in the browsers' stores yet. The command keeps it just as current, so there is no need to wait for them.",
+            "how": "How to install it",
+            "wayStore": "Store",
+            "wayDownload": "Download",
+            "wayCommand": "Command",
             "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself.",
-            "rowChromium": "Keeps itself up to date",
             "rowFirefox": "Until Firefox closes"
         },
         "later": {
@@ -1264,12 +1266,11 @@
             "title": "Command line",
             "description": "Deploy, read logs and restart your apps from a terminal. Sign in once from your browser; every command after that uses that sign-in.",
             "install": "Install",
-            "hint": "Paste the line for your system. Needs Node.js 20 or newer. Installs the latest release from GitHub as plr and polaris; plr update keeps it current.",
+            "hint": "Paste it into {shell}. Needs Node.js 20 or newer. Installs the latest release from GitHub as plr and polaris; plr update keeps it current.",
             "signIn": "Sign in",
             "signInHint": "Points the CLI at this Polaris and opens it in your browser to approve. With no browser, it shows a code to enter here.",
             "server": "It will not install on a computer that runs a Polaris server: both answer to plr and polaris.",
-            "next": "Try",
-            "unixSystems": "macOS and Linux"
+            "next": "Try"
         },
         "streamdeck": {
             "title": "Stream Deck",

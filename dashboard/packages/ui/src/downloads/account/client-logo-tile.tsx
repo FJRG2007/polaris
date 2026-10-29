@@ -5,6 +5,7 @@
 
 import { cn } from "../../index";
 import { Plug } from "lucide-react";
+import { publicAsset } from "../../lib/public-asset";
 import type { ClientLogo } from "./client-guides";
 import { ClaudeMark, CursorMark, OpenAiMark } from "./model-marks";
 
@@ -25,7 +26,7 @@ export function LogoTile({ logo, className }: { logo: ClientLogo | null; classNa
         ) : (
             // The vendors' own files, served as they ship: their gradients and
             // clip paths carry ids that would collide inline.
-            <img src={logo.src} alt="" className="size-5 object-contain" />
+            <img src={publicAsset(logo.src)} alt="" className="size-5 object-contain" />
         );
     return (
         <span

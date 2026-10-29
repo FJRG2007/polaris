@@ -15,6 +15,7 @@
  * in their own boundaries; the picker and the steps draw at once.
  */
 
+import { publicAsset } from "../../lib/public-asset";
 import { cn, Select } from "../../index";
 import { useEffect, useRef, useState } from "react";
 import { DeckCommand } from "./deck-command";
@@ -61,7 +62,7 @@ export function DeckHostMark({ host, className }: { host: DeckHost; className?: 
             </svg>
         );
     const src = host === "opendeck" ? "/logos/opendeck.webp" : "/logos/bitfocus-companion.webp";
-    return <img src={src} alt="" aria-hidden="true" className={size} />;
+    return <img src={publicAsset(src)} alt="" aria-hidden="true" className={size} />;
 }
 
 /** Where Node.js is downloaded from, for OpenDeck. */

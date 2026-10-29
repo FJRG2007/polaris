@@ -14,12 +14,18 @@ import { MessagesWrapper } from "../setup/i18n";
 import { BROWSER_GUIDES } from "@/lib/browser-guide";
 import { CLIENT_GUIDES } from "@/lib/mcp/client-guides";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { cleanup, render, screen } from "@testing-library/react";
 import { ExtensionCard } from "@/app/(app)/account/downloads/extension-card";
 import { AssistantsCard, FEATURED_ASSISTANTS } from "@/app/(app)/account/downloads/assistants-card";
 
-// jsdom has no layout; the pickers scroll their chosen option into view.
-Element.prototype.scrollIntoView ??= () => undefined;
+// What jsdom does not implement and the pickers call on the way open.
+Object.assign(Element.prototype, {
+    hasPointerCapture: () => false,
+    setPointerCapture: () => undefined,
+    releasePointerCapture: () => undefined,
+    scrollIntoView: () => undefined
+});
 
 afterEach(cleanup);
 
@@ -38,34 +44,41 @@ function extensionCard() {
 }
 
 describe("the extension card", () => {
-    it("has a row per browser, each with its own mark", () => {
+    it("picks a browser, offers every one with its mark, and shows the store as not there yet", async () => {
         extensionCard();
-        for (const guide of BROWSER_GUIDES) {
-            expect(screen.getByText(guide.label)).toBeTruthy();
-            expect(screen.getByRole("button", { name: `Install in ${guide.label}` })).toBeTruthy();
-        }
-        // The store row says plainly that it is not there yet.
-        expect(screen.getByText("From your browser's store")).toBeTruthy();
-        expect(screen.getByText("Not there yet")).toBeTruthy();
+        await userEvent.click(
+            screen.getByRole("combobox", { name: "Which browser you are loading it into" })
+        );
+        for (const guide of BROWSER_GUIDES)
+            expect(await screen.findByRole("option", { name: guide.label })).toBeTruthy();
+        await userEvent.keyboard("{Escape}");
+        // The store is a choice that cannot be made yet, and says why.
+        const store = screen.getByRole("radio", { name: "Store" });
+        expect(store.hasAttribute("disabled")).toBe(true);
         expect(
             screen.getByRole("link", { name: "Connect it to this account" }).getAttribute("href")
         ).toBe("/account/extension");
     });
 
-    it("opens a Chromium browser's steps with that browser picked, the line and the files", async () => {
+    it("starts a Chromium browser on the line that keeps it current, and has the files and steps under Download", async () => {
         extensionCard();
-        fireEvent.click(screen.getByRole("button", { name: "Install in Edge" }));
-        expect(await screen.findByText("edge://extensions")).toBeTruthy();
         expect(screen.getByText("One line, and it keeps itself up to date")).toBeTruthy();
+        expect(screen.queryByRole("link", { name: "release files" })).toBeNull();
+        await userEvent.click(screen.getByRole("radio", { name: "Download" }));
         expect(screen.getByRole("link", { name: "release files" })).toBeTruthy();
+        expect(screen.getByText("chrome://extensions")).toBeTruthy();
         expect(screen.getByText("Developer mode")).toBeTruthy();
     });
 
     it("gives Firefox its steps and files but no line, which cannot keep it current", async () => {
         extensionCard();
-        fireEvent.click(screen.getByRole("button", { name: "Install in Firefox" }));
+        await userEvent.click(
+            screen.getByRole("combobox", { name: "Which browser you are loading it into" })
+        );
+        await userEvent.click(await screen.findByRole("option", { name: "Firefox" }));
         expect(await screen.findByText("about:debugging#/runtime/this-firefox")).toBeTruthy();
         expect(screen.queryByText("One line, and it keeps itself up to date")).toBeNull();
+        expect(screen.getByRole("radio", { name: "Command" }).hasAttribute("disabled")).toBe(true);
         expect(screen.getByRole("link", { name: "release files" })).toBeTruthy();
     });
 });
