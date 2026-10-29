@@ -47,6 +47,11 @@ vi.mock("../../src/app/(app)/drive/actions", () => ({
     startDriveJobAction: async () => ({}),
     moveIntoAction: (...args: unknown[]) => moveIntoAction(...args)
 }));
+// Saving "don't ask again" is a server action file that reaches the session
+// as it is imported; nothing here answers that question.
+vi.mock("../../src/app/(app)/drive/settings/actions", () => ({
+    setConfirmTrashAction: async () => ({ confirmTrash: true })
+}));
 vi.mock("../../src/app/(app)/drive/conflict-actions", () => ({
     nameClashesAction: (...args: unknown[]) => nameClashesAction(...args),
     reserveFolderAction: (...args: unknown[]) => reserveFolderAction(...args)

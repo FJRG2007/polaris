@@ -4,6 +4,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { DriveExplorer } from "./drive-explorer";
 import { requirePermission } from "@/lib/session";
 import { driveAbilities } from "@/lib/drive-authz";
+import { loadDrivePreferences } from "@/lib/drive-preferences";
 import { isSavedConnection, type ConnectionSummary } from "./types";
 import { isPersonalKind, type StorageProviderKind } from "@polaris/core";
 import { ensurePersonalDrive, PERSONAL_DRIVE_TAKEN } from "@/lib/personal-drive";
@@ -157,22 +158,23 @@ export default async function DrivePage({
     // to somebody with read-only access lies four times and then shows an error,
     // which reads as Polaris being broken rather than as a permission they do not
     // have.
-    const abilities = connectionId
-        ? await driveAbilities(user.id, connectionId, path)
-        : { read: true, write: false, remove: false };
+    const [abilities, preferences] = await Promise.all([
+        connectionId
+            ? driveAbilities(user.id, connectionId, path)
+            : { read: true, write: false, remove: false },
+        loadDrivePreferences(user.id)
+    ]);
 
     return (
         <>
-            <PageHeader
-                title={t("pages.drive.title")}
-                description={t("pages.drive.description")}
-            />
+            <PageHeader title={t("pages.drive.title")} description={t("pages.drive.description")} />
             <DriveExplorer
                 connections={connections}
                 connectionId={connectionId}
                 path={path}
                 notice={driveNotice}
                 abilities={abilities}
+                confirmTrash={preferences.confirmTrash}
             />
         </>
     );

@@ -366,7 +366,9 @@
             "titleMany": "Mover {count} elementos a la papelera",
             "bodyOne": "{name} irá a la papelera. Puedes restaurarlo desde allí.",
             "bodyMany": "Los elementos elegidos irán a la papelera. Puedes restaurarlos desde allí.",
-            "confirm": "A la papelera"
+            "confirm": "A la papelera",
+            "dontAskAgain": "No preguntar más",
+            "dontAskAgainHint": "Se reactiva en Drive > Ajustes."
         },
         "empty": {
             "titlePermanent": "Vaciar para siempre",
@@ -818,6 +820,10 @@
             "description": "Enlaces que recogen cosas por ti: archivos en tus carpetas y texto en tus fragmentos.",
             "files": "Archivos",
             "text": "Texto"
+        },
+        "settings": {
+            "title": "Ajustes",
+            "description": "Cómo funciona Drive para ti."
         }
     },
     "share": {
@@ -1168,5 +1174,10 @@
             "kind": "No puedes reemplazarlo: uno es un archivo y el otro una carpeta.",
             "merge": "Al mover o copiar una carpeta sobre otra con el mismo nombre se conservan ambas."
         }
+    },
+    "settings": {
+        "confirmTrash": "Confirmar envío a papelera",
+        "confirmTrashHint": "Pide confirmación antes de mover algo a la papelera. Borrar para siempre pregunta siempre.",
+        "saveFailed": "No se pudo guardar. Inténtalo de nuevo."
     }
 }
