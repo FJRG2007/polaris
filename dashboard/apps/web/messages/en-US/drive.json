@@ -366,7 +366,9 @@
             "titleMany": "Move {count} items to Trash",
             "bodyOne": "{name} will be moved to the recycle bin. You can restore it from Trash.",
             "bodyMany": "The selected items will be moved to the recycle bin. You can restore them from Trash.",
-            "confirm": "Move to Trash"
+            "confirm": "Move to Trash",
+            "dontAskAgain": "Don't ask again",
+            "dontAskAgainHint": "Turn it back on in Drive > Settings."
         },
         "empty": {
             "titlePermanent": "Empty folder permanently",
@@ -818,6 +820,10 @@
             "description": "Links that collect things for you: files into your folders, text into your snippets.",
             "files": "Files",
             "text": "Text"
+        },
+        "settings": {
+            "title": "Settings",
+            "description": "How Drive behaves for you."
         }
     },
     "share": {
@@ -1168,5 +1174,10 @@
             "kind": "You can't replace it: one is a file and the other is a folder.",
             "merge": "Moving or copying a folder onto one with the same name keeps both."
         }
+    },
+    "settings": {
+        "confirmTrash": "Ask before moving to Trash",
+        "confirmTrashHint": "Show a confirmation before anything goes to the recycle bin. Deleting permanently always asks.",
+        "saveFailed": "Could not save that. Try again."
     }
 }

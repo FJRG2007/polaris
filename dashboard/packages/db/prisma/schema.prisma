@@ -405,6 +405,7 @@ model User {
     calendarBookingPages CalendarBookingPage[]
     calendarProposals    CalendarProposal[]
     calendarPreference   CalendarPreference?
+    drivePreference      DrivePreference?
     crmCompanies            CrmCompany[]     @relation("CrmCompanyShelf")
     crmAccountsOwned        CrmCompany[]     @relation("CrmCompanyAccountOwner")
     crmCompaniesCreated     CrmCompany[]     @relation("CrmCompanyCreatedBy")
@@ -13791,6 +13792,16 @@ model CalendarLease {
 
 // One person's calendar settings, a JSON document read through a schema.
 model CalendarPreference {
+    userId    String   @id @db.Uuid
+    value     String   @default("{}")
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One person's Drive settings, a JSON document read through a schema
+// (`lib/drive-preferences`).
+model DrivePreference {
     userId    String   @id @db.Uuid
     value     String   @default("{}")
     updatedAt DateTime @updatedAt

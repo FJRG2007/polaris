@@ -37,6 +37,7 @@ import {
     type UploadConflict
 } from "./upload-plan";
 import * as driveActions from "./actions";
+import * as settingsActions from "./settings/actions";
 import { SendDialog } from "./send-dialog";
 import { useRouter } from "next/navigation";
 import { TransfersPanel } from "./transfers-panel";
@@ -157,7 +158,8 @@ export function DriveExplorer({
     connectionId,
     path,
     notice,
-    abilities
+    abilities,
+    confirmTrash: askBeforeTrash
 }: {
     connections: ConnectionSummary[];
     connectionId: string | null;
@@ -168,6 +170,9 @@ export function DriveExplorer({
     /** What this reader may do in the folder that is open. Worked out by the page
      *  from the same gate the writes go through - see `driveAbilities`. */
     abilities: DriveAbilities;
+    /** Whether moving something to the bin asks first. The reader turns it off
+     *  from the question itself and back on in Drive > Settings. */
+    confirmTrash: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("drive");
@@ -194,6 +199,8 @@ export function DriveExplorer({
     const [newFileOpen, setNewFileOpen] = useState(false);
     const [newFileName, setNewFileName] = useState("Untitled.txt");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
+    const [confirmTrash, setConfirmTrash] = useState(askBeforeTrash);
+    const [stopAsking, setStopAsking] = useState(false);
     const [permanentTargets, setPermanentTargets] = useState<DriveEntry[] | null>(null);
     const [emptyTarget, setEmptyTarget] = useState<{
         entry: DriveEntry;
@@ -777,10 +784,35 @@ export function DriveExplorer({
         return {};
     }
 
+    /** Delete pressed: straight to the bin when the reader said not to ask. */
+    function askToTrash(items: DriveEntry[]) {
+        if (confirmTrash) {
+            setStopAsking(false);
+            setDeleteTargets(items);
+            return;
+        }
+        trash(items);
+    }
+
     function confirmDelete() {
         if (!connectionId || !deleteTargets) return;
         const targets = deleteTargets;
         setDeleteTargets(null);
+        if (stopAsking) {
+            // Shown as off at once; asked again if the account could not keep it.
+            setConfirmTrash(false);
+            void settingsActions.setConfirmTrashAction(false).then(
+                (result) => {
+                    if ("error" in result) setConfirmTrash(true);
+                },
+                () => setConfirmTrash(true)
+            );
+        }
+        trash(targets);
+    }
+
+    function trash(targets: DriveEntry[]) {
+        if (!connectionId) return;
         const paths = new Set(targets.map((entry) => entry.path));
         setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
         // One job rather than one request per file. See `lib/drive-jobs`: the
@@ -1041,7 +1073,7 @@ export function DriveExplorer({
                             // A container and a registered server have no recycle
                             // bin to move anything into - see `moveManyToTrash`.
                             isSavedConnection(connectionId)
-                                ? (items) => setDeleteTargets(items)
+                                ? askToTrash
                                 : undefined
                         }
                         onDeletePermanent={(items) => setPermanentTargets(items)}
@@ -1352,6 +1384,17 @@ export function DriveExplorer({
                                 : t("explorer.trash.bodyMany")}
                         </DialogDescription>
                     </DialogHeader>
+                    <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                            checked={stopAsking}
+                            onChange={(event) => setStopAsking(event.target.checked)}
+                            aria-describedby="drive-trash-ask-hint"
+                        />
+                        {t("explorer.trash.dontAskAgain")}
+                    </label>
+                    <p id="drive-trash-ask-hint" className="text-xs text-muted-foreground">
+                        {t("explorer.trash.dontAskAgainHint")}
+                    </p>
                     <div className="flex justify-end gap-2">
                         <Button
                             type="button"

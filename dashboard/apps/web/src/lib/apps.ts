@@ -1220,7 +1220,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "analyzer"
             ]
         },
-        { label: "Trash", href: "/drive/trash", icon: Trash2, keywords: ["deleted", "bin"] } // i18n-ignore
+        { label: "Trash", href: "/drive/trash", icon: Trash2, keywords: ["deleted", "bin"] }, // i18n-ignore
+        {
+            label: "Settings", // i18n-ignore
+            href: "/drive/settings",
+            icon: SlidersHorizontal,
+            keywords: ["confirm", "ask before", "trash", "preferences"]
+        }
     ],
     vault: [
         {
