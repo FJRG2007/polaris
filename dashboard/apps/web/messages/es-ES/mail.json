@@ -462,6 +462,7 @@
         "archive": "{count, plural, one {Archivar} other {Archivar #}}",
         "restore": "{count, plural, one {Devolver a donde estaba} other {Devolver #}}",
         "junk": "{count, plural, one {Marcar como spam} other {Marcar # como spam}}",
+        "notJunk": "{count, plural, one {No es spam} other {# no son spam}}",
         "delete": "{count, plural, one {Eliminar para siempre} other {Eliminar # para siempre}}",
         "trash": "{count, plural, one {Mover a la papelera} other {Mover # a la papelera}}",
         "announce": {
@@ -478,6 +479,7 @@
             "archived": "Archivado.",
             "restored": "Devuelto.",
             "junk": "Movido a spam.",
+            "notJunk": "Movido a la bandeja de entrada.",
             "deleted": "Eliminado.",
             "trashed": "Movido a la papelera.",
             "addressCopied": "Dirección copiada.",
@@ -849,6 +851,7 @@
         "markRead": "Marcar leído",
         "snoozeTomorrow": "Posponer hasta mañana por la mañana",
         "junk": "Marcar como spam",
+        "notJunk": "No es spam",
         "failedTitle": "No se pudo cargar esta lista",
         "retry": "Reintentar",
         "fetching": "Descargando este buzón. Los mensajes aparecen a medida que llegan, los más recientes primero.",

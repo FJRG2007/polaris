@@ -87,6 +87,7 @@ import {
     ArrowLeft,
     Archive,
     Bell,
+    Bug,
     BellOff,
     Bookmark,
     ChevronDown,
@@ -103,6 +104,7 @@ import {
     MoreVertical,
     Paperclip,
     ShieldAlert,
+    ShieldCheck,
     Star,
     Tag,
     Trash2,
@@ -591,6 +593,32 @@ export function ThreadView({
                             <Archive className="size-4 shrink-0" aria-hidden />
                         </Button>
                     ) : null}
+                    {/* Spam beside Archive, where a reader who has just
+                        opened one looks for it; inside the spam folder the same
+                        place says it is not, and puts it back in the inbox. */}
+                    {context.restorable ? null : context.emptyRole === "junk" ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("list.notJunk")}
+                            title={t("list.notJunk")}
+                            disabled={busy}
+                            onClick={() => act("not-junk")}
+                        >
+                            <ShieldCheck className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("list.junk")}
+                            title={t("list.junk")}
+                            disabled={busy}
+                            onClick={() => act("junk")}
+                        >
+                            <Bug className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                    )}
                     <LabelMenu
                         thread={thread}
                         messageIds={messages.map((message) => message.id)}
