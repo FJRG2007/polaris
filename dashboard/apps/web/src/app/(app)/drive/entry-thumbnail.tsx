@@ -42,8 +42,31 @@ const LOOKAHEAD = "300px";
  *  full-size frame would be held in memory once per file in the folder. */
 const STILL_EDGE = 320;
 
+/** Where a tile's picture comes from: the drawn thumbnail, and the file itself
+ *  for a video the browser takes a frame out of. Drive's own routes by default;
+ *  a public share hands in its token routes. */
+export interface ThumbnailUrls {
+    readonly picture: string;
+    readonly video: string;
+}
+
+/** The addresses for a file in one of the signed-in reader's own drives. */
+export function driveThumbnailUrls(
+    connectionId: string,
+    path: string,
+    version: string
+): ThumbnailUrls {
+    const c = encodeURIComponent(connectionId);
+    const p = encodeURIComponent(path);
+    return {
+        picture: `/api/drive/thumbnail?c=${c}&p=${p}&v=${encodeURIComponent(version)}`,
+        video: `/api/drive/download?c=${c}&p=${p}&disposition=inline&purpose=thumbnail`
+    };
+}
+
 export function EntryThumbnail({
-    connectionId,
+    connectionId = "",
+    urls,
     path,
     version,
     moving = false,
@@ -51,7 +74,10 @@ export function EntryThumbnail({
     className,
     children
 }: {
-    readonly connectionId: string;
+    /** The drive the file is in, for Drive's own routes. Unused with `urls`. */
+    readonly connectionId?: string;
+    /** Where the picture is read from instead of Drive's own routes. */
+    readonly urls?: ThumbnailUrls;
     readonly path: string;
     /** A video, which the browser draws for itself from the file rather than
      *  being handed a picture the server made. */
@@ -83,9 +109,8 @@ export function EntryThumbnail({
 
     // The file itself for a video, which is seeked and read a frame at a time,
     // and the picture the server drew for everything else.
-    const source = moving
-        ? `/api/drive/download?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}&disposition=inline&purpose=thumbnail`
-        : `/api/drive/thumbnail?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;
+    const from = urls ?? driveThumbnailUrls(connectionId, path, version);
+    const source = moving ? from.video : from.picture;
 
     /**
      * Take one frame out of a video and let the video go.
@@ -148,9 +173,9 @@ export function EntryThumbnail({
             live = false;
             done();
         };
-        // `source` is derived from these three and nothing else.
+        // `source` is derived from these and nothing else.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [asked, moving, connectionId, path, version]);
+    }, [asked, moving, connectionId, path, version, source]);
 
     useEffect(() => {
         if (asked) return;

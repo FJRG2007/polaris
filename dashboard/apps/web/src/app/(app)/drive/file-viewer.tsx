@@ -31,7 +31,7 @@ import { SheetEditor } from "./viewer/sheet-editor";
 import { MarkdownView } from "./viewer/markdown-view";
 import { PlainTextEditor } from "./viewer/text-editor";
 import { useDisplayFormat } from "@/components/display-format";
-import { StepControls, stepOfKey } from "./viewer-stepper";
+import { StepControls, stepOfKey, useSwipeToStep } from "./viewer-stepper";
 import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { ChevronLeft, ChevronRight, Download, Loader2, Share2 } from "lucide-react";
@@ -58,6 +58,7 @@ export function FilePreview({
     urlFor,
     token,
     readOnly = false,
+    allowDownload = true,
     from
 }: {
     target: ViewerTarget;
@@ -68,6 +69,9 @@ export function FilePreview({
      *  came through - a share visitor has no session to authorise it. */
     token?: string;
     readOnly?: boolean;
+    /** Whether the file may be saved from here. A view-only share link says no,
+     *  and then no save is offered anywhere in the preview. */
+    allowDownload?: boolean;
     /** Where an image grows from when it opens: its thumbnail's box, measured
      *  before the preview took the listing's place. Null fades it in place;
      *  left out, it simply appears. */
@@ -88,7 +92,11 @@ export function FilePreview({
         // than to be played, which is the difference between saving it and
         // navigating to it.
         return (
-            <MediaView src={src} kind={kind} download={(urlFor ?? driveByteUrl)(target, false)} />
+            <MediaView
+                src={src}
+                kind={kind}
+                download={allowDownload ? (urlFor ?? driveByteUrl)(target, false) : undefined}
+            />
         );
     }
     if (kind === "pdf")
@@ -175,6 +183,7 @@ export function FileViewer({
     urlFor,
     token,
     readOnly = false,
+    allowDownload = true,
     steps,
     thumbnailFor
 }: {
@@ -187,6 +196,8 @@ export function FileViewer({
     urlFor?: ViewerUrlFor;
     /** Read-only viewing: hide inline editing (a share visitor cannot write back). */
     readOnly?: boolean;
+    /** Whether the file may be saved from here - see `FilePreview`. */
+    allowDownload?: boolean;
     /** The share token this is opened through, when it is a public link. */
     token?: string;
     /** Several files opened together - see `ViewerSteps`. Nothing is drawn for one. */
@@ -240,6 +251,11 @@ export function FileViewer({
     const stepping = steps && steps.count > 1 ? steps : null;
     const canBack = stepping !== null && stepping.index > 0;
     const canForward = stepping !== null && stepping.index < stepping.count - 1;
+    // A sideways swipe steps too, on the kinds the arrow keys step on - the
+    // reader of a shared album is most likely on a phone.
+    const swipe = useSwipeToStep(target?.name ?? "", (by) => {
+        if (stepping && (by < 0 ? canBack : canForward)) stepping.onStep(by);
+    });
 
     return (
         <Dialog open={target !== null} onOpenChange={changeOpen}>
@@ -271,25 +287,32 @@ export function FileViewer({
                                     {t("viewer.share")}
                                 </Button>
                             ) : null}
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={preparing > 0}
-                                onClick={() => startDownload(byteUrl(target, false), target.name)}
-                            >
-                                {preparing > 0 ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    <Download className="size-4" />
-                                )}
-                                {preparing > 0 ? t("viewer.fetching") : t("viewer.download")}
-                            </Button>
+                            {allowDownload ? (
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={preparing > 0}
+                                    onClick={() =>
+                                        startDownload(byteUrl(target, false), target.name)
+                                    }
+                                >
+                                    {preparing > 0 ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Download className="size-4" />
+                                    )}
+                                    {preparing > 0 ? t("viewer.fetching") : t("viewer.download")}
+                                </Button>
+                            ) : null}
                         </div>
                     ) : null}
                 </DialogHeader>
                 <div className="flex min-h-0 flex-1">
                     <div className="relative flex min-h-0 min-w-0 flex-1">
-                        <div className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain bg-surface/40">
+                        <div
+                            {...swipe}
+                            className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain bg-surface/40"
+                        >
                             {target ? (
                                 // Keyed on the file, so stepping to the next one
                                 // starts its viewer fresh rather than carrying
@@ -300,6 +323,7 @@ export function FileViewer({
                                     urlFor={urlFor}
                                     token={token}
                                     readOnly={readOnly}
+                                    allowDownload={allowDownload}
                                     onSaved={onSaved}
                                     from={from}
                                 />

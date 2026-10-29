@@ -18,7 +18,7 @@
 import { cn } from "@polaris/ui";
 import { Play } from "lucide-react";
 import type { DriveEntry } from "./types";
-import { EntryThumbnail } from "./entry-thumbnail";
+import { EntryThumbnail, type ThumbnailUrls } from "./entry-thumbnail";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLocale } from "@/components/i18n/i18n-provider";
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from "react";
@@ -31,6 +31,13 @@ const TILE_TARGET = 168;
 const MIN_COLUMNS = 3;
 const GAP = 4;
 const HEADING_HEIGHT = 44;
+
+/** A tile's file, and either the drive it is in or the addresses to read it at. */
+export interface TileSource {
+    readonly path: string;
+    readonly connectionId?: string;
+    readonly urls?: ThumbnailUrls;
+}
 
 export interface PhotoGridHandle {
     /** Bring a listing position into view, wherever its row is. */
@@ -66,8 +73,9 @@ export function PhotoGrid({
     /** The date the listing is sorted by, which is when day headings mean
      *  anything, or null. */
     readonly byDate: "modifiedAt" | "createdAt" | null;
-    /** Where a tile's picture is read from (a binned item lives elsewhere). */
-    readonly source: (entry: DriveEntry) => { connectionId: string; path: string };
+    /** Where a tile's picture is read from (a binned item lives elsewhere, a
+     *  public share reads through its own token routes). */
+    readonly source: (entry: DriveEntry) => TileSource;
     /** The icon a tile shows while it has no picture, or for good. */
     readonly icon: (entry: DriveEntry) => ReactNode;
     /** The listing's own wrapper for a tile: its context menu and drag. */
@@ -220,7 +228,7 @@ function PhotoTile({
     readonly index: number;
     readonly size: number;
     readonly selected: boolean;
-    readonly source: { connectionId: string; path: string };
+    readonly source: TileSource;
     readonly icon: ReactNode;
     readonly wrap: (entry: DriveEntry, index: number, tile: ReactNode) => ReactNode;
     readonly onClick: (event: MouseEvent, index: number, entry: DriveEntry) => void;
@@ -230,6 +238,7 @@ function PhotoTile({
     const face = kind ? (
         <EntryThumbnail
             connectionId={source.connectionId}
+            urls={source.urls}
             path={source.path}
             version={`${entry.modifiedAt}-${entry.size}`}
             moving={kind === "video"}
