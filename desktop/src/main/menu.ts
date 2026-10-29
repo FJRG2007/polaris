@@ -28,6 +28,8 @@ const isMac = process.platform === "darwin";
 export interface MenuUpdate {
     readonly version: string;
     readonly open: () => void;
+    /** Set once it is installed: restart into it instead of downloading. */
+    readonly restart?: () => void;
 }
 
 export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: readonly ServerRow[] = []): void {
@@ -125,7 +127,9 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: 
             submenu: [
                 ...(update
                     ? ([
-                          { label: `Download Polaris ${update.version}...`, click: update.open },
+                          update.restart
+                              ? { label: `Restart to update to Polaris ${update.version}`, click: update.restart }
+                              : { label: `Download Polaris ${update.version}...`, click: update.open },
                           { type: "separator" }
                       ] satisfies MenuItemConstructorOptions[])
                     : []),

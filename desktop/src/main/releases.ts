@@ -34,13 +34,18 @@ function compare(a: Version, b: Version): number {
 
 /** Where the app's releases are listed and shown, from package.json's
  *  `repository`. Null when that is not a GitHub repository. */
-export function releaseSource(repository: string): { readonly api: string; readonly page: (tag: string) => string; } | null {
+export function releaseSource(
+    repository: string
+): { readonly api: string; readonly page: (tag: string) => string; readonly download: (tag: string) => string; } | null {
     const match = /^(?:git\+)?https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(repository);
     if (!match) return null;
     const [, owner, repo] = match;
     return {
         api: `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
-        page: (tag) => `https://github.com/${owner}/${repo}/releases/tag/${encodeURIComponent(tag)}`
+        page: (tag) => `https://github.com/${owner}/${repo}/releases/tag/${encodeURIComponent(tag)}`,
+        /** Where a release's files are, as the folder Squirrel reads `RELEASES`
+         *  and the package from. */
+        download: (tag) => `https://github.com/${owner}/${repo}/releases/download/${encodeURIComponent(tag)}`
     };
 }
 

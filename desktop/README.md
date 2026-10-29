@@ -47,7 +47,9 @@ appear on that display, in a window that takes no clicks and, on Windows 10 2004
 and later and macOS, stays out of the share itself. A shared window, rather than
 a whole screen, is drawn on only for the others.
 
-When a newer version is released, a notice says so and the Help menu offers its
+When a newer version is released, Windows installs it in the background and it
+opens the next time the app starts; a notice and the Help menu offer to restart
+into it now. On macOS and Linux a notice says so and the Help menu offers its
 download page.
 
 On Linux systems that forbid unprivileged user namespaces (Ubuntu 24.04 and

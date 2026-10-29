@@ -260,14 +260,23 @@ function start(): void {
         refreshMenu();
         watchForUpdates((update) => {
             const open = () => void shell.openExternal(update.page);
-            menuUpdate = { version: update.version, open };
+            menuUpdate = { version: update.version, open, ...(update.restart ? { restart: update.restart } : {}) };
             refreshMenu();
-            showNotice({
-                title: `Polaris ${update.version} is available`,
-                body: "Open its download page from here or from the Help menu.",
-                tag: "desktop-update",
-                onClick: open
-            });
+            showNotice(
+                update.restart
+                    ? {
+                          title: `Polaris ${update.version} is installed`,
+                          body: "It opens the next time Polaris starts. Click to restart now.",
+                          tag: "desktop-update",
+                          onClick: update.restart
+                      }
+                    : {
+                          title: `Polaris ${update.version} is available`,
+                          body: "Open its download page from here or from the Help menu.",
+                          tag: "desktop-update",
+                          onClick: open
+                      }
+            );
         });
 
         if (current) openMain(`${current}${START}`);
