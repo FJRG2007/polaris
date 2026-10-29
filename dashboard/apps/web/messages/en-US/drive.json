@@ -829,6 +829,11 @@
         }
     },
     "share": {
+        "existing": {
+            "title": "Your links to this item",
+            "none": "No links to this item yet.",
+            "failed": "Your links to this item could not be loaded."
+        },
         "createFailed": "Could not create the link.",
         "titleMany": "Share {count} items",
         "titleFolder": "Share folder",

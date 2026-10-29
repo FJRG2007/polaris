@@ -14,7 +14,11 @@ import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { ensureShareReachability } from "@/lib/public-reach";
+import { z } from "zod";
+import { toShareRow } from "./shared-links/share-row";
+import type { ShareRow } from "./shared-links/shared-links-view";
 import {
+    normalizeRelPath,
     createShareSchema,
     updateShareSchema,
     type DriveAction,
@@ -25,6 +29,7 @@ import { toLinkVisitor, type LinkVisitor } from "@/lib/link-visitor";
 import {
     createShare,
     findOwnedShareTarget,
+    listSharesForOwner,
     listShareAccessLogs,
     resolveShareByToken,
     revealShareLink,
@@ -226,6 +231,34 @@ export async function getShareLogsAction(shareId: string): Promise<{ logs: Share
             visitor: toLinkVisitor(row.user)
         }))
     };
+}
+
+const itemLinksSchema = z.object({
+    connectionId: z.string().trim().min(1).max(200),
+    path: z.string().max(4096)
+});
+
+/**
+ * The links that already exist for one item, for the dialog that shares it.
+ * The caller's own, the same set the shared-links page lists: a link somebody
+ * else made is theirs to see and manage, not the reader's. Revoked ones are
+ * left out - they no longer open anything.
+ */
+export async function itemLinksAction(input: unknown): Promise<{ links: ShareRow[] }> {
+    const user = await requirePermission("drive.read");
+    const parsed = itemLinksSchema.safeParse(input);
+    if (!parsed.success) return { links: [] };
+    let path: string;
+    try {
+        path = normalizeRelPath(parsed.data.path);
+    } catch {
+        return { links: [] };
+    }
+    const shares = await listSharesForOwner(user.id, {
+        connectionId: parsed.data.connectionId,
+        path
+    });
+    return { links: shares.filter((share) => !share.revokedAt).map(toShareRow) };
 }
 
 /** Revoke a share the caller owns. Owner-scoped, so it cannot touch others'. */

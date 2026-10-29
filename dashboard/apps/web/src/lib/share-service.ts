@@ -85,9 +85,13 @@ export async function createShare(
 }
 
 /** Every share owned by a user, with its connection name, newest first. */
-export async function listSharesForOwner(ownerId: string) {
+export async function listSharesForOwner(
+    ownerId: string,
+    /** Only the links of this one item, for the dialog that shares it. */
+    item?: { connectionId: string; path: string }
+) {
     return prisma.share.findMany({
-        where: { ownerId },
+        where: item ? { ownerId, connectionId: item.connectionId, path: item.path } : { ownerId },
         orderBy: { createdAt: "desc" },
         select: {
             id: true,

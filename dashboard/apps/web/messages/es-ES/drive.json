@@ -829,6 +829,11 @@
         }
     },
     "share": {
+        "existing": {
+            "title": "Tus enlaces a esto",
+            "none": "Aún no hay enlaces a esto.",
+            "failed": "No se pudieron cargar tus enlaces."
+        },
         "createFailed": "No se pudo crear el enlace.",
         "titleMany": "Compartir {count} elementos",
         "titleFolder": "Compartir",

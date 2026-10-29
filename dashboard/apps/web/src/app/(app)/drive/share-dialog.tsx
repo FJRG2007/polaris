@@ -22,6 +22,7 @@ import {
     linkPeopleLimits,
     type LinkAdvancedValue
 } from "@/components/link-advanced-fields";
+import { ItemLinks } from "./item-links";
 import { createShareAction } from "./share-actions";
 import { useEffect, useState, type FormEvent } from "react";
 import {
@@ -150,6 +151,15 @@ export function ShareDialog({
                         {many ? items.map((target) => target.name).join(", ") : items[0]?.name}
                     </DialogDescription>
                 </DialogHeader>
+
+                {/* What already exists for this item, before a new link is made. */}
+                {!many && items[0] ? (
+                    <ItemLinks
+                        connectionId={items[0].connectionId}
+                        path={items[0].path}
+                        revision={results ? 1 : 0}
+                    />
+                ) : null}
 
                 {results ? (
                     <div className="flex flex-col gap-3">
