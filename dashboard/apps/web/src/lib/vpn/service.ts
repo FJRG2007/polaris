@@ -157,7 +157,9 @@ export async function vpnStatus(): Promise<VpnStatus> {
 }
 
 /** The deploy zones the hostname may be taken in, for the picker. */
-export async function hostnameZones(): Promise<{ label: string; host: string; primary: boolean }[]> {
+export async function hostnameZones(): Promise<
+    { label: string; host: string; primary: boolean }[]
+> {
     return (await listDeployZones()).map(({ label, host, primary }) => ({ label, host, primary }));
 }
 
@@ -280,7 +282,10 @@ async function syncAccess(api: HeadscaleClient): Promise<void> {
         select: { id: true, bannedAt: true, disabledAt: true }
     });
     const standing = new Map(
-        accounts.map((account) => [account.id, account.bannedAt !== null || account.disabledAt !== null])
+        accounts.map((account) => [
+            account.id,
+            account.bannedAt !== null || account.disabledAt !== null
+        ])
     );
     for (const user of users) {
         const banned = standing.get(user.accountId);
@@ -470,9 +475,7 @@ export function deviceOf(node: HeadscaleNode): VpnDevice {
 /** The nodes `viewer` may see: every one for an administrator, their own
  *  otherwise - asked of the server by user, never filtered here after the fact. */
 async function visibleNodes(api: HeadscaleClient, viewer: rules.VpnViewer) {
-    return viewer.isAdmin
-        ? api.listNodes()
-        : api.listNodes(rules.headscaleUserName(viewer.id));
+    return viewer.isAdmin ? api.listNodes() : api.listNodes(rules.headscaleUserName(viewer.id));
 }
 
 export async function listDevices(viewer: rules.VpnViewer): Promise<VpnDevice[]> {
@@ -539,7 +542,9 @@ export async function setDeviceRoutes(
     if (!rules.mayApproveRoutes(viewer)) throw new VpnRefusal("notAllowed");
     const api = await client();
     const node = await ownedNode(api, viewer, nodeId);
-    return deviceOf(await api.approveRoutes(nodeId, approvedRoutesFor(node.availableRoutes, wanted)));
+    return deviceOf(
+        await api.approveRoutes(nodeId, approvedRoutesFor(node.availableRoutes, wanted))
+    );
 }
 
 interface Account {

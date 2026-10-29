@@ -826,7 +826,8 @@ export async function checkZoneHostname(
         subdomain: typed,
         owner
     });
-    if (minted === "bad-name") return { subdomain: typed, hostname: "", available: false, invalid: true };
+    if (minted === "bad-name")
+        return { subdomain: typed, hostname: "", available: false, invalid: true };
     if (typeof minted === "string") return minted;
     return {
         subdomain: normalizeZoneName(typed),

@@ -41,7 +41,10 @@ function viewerOf(user: { id: string; isAdmin: boolean }): rules.VpnViewer {
     return { id: user.id, isAdmin: user.isAdmin };
 }
 
-const nodeIdSchema = z.string().trim().regex(/^\d{1,20}$/);
+const nodeIdSchema = z
+    .string()
+    .trim()
+    .regex(/^\d{1,20}$/);
 const hostnameChoiceSchema = z.object({
     zoneLabel: z.string().trim().max(253).optional(),
     subdomain: z
@@ -58,7 +61,11 @@ export async function installVpnAppAction(): Promise<Result> {
     try {
         const manifest = findApp(rules.VPN_APP);
         if (!manifest) return failed(new vpn.VpnRefusal("notInstalled"));
-        const { installedAppId } = await installApp(user.id, user.id, defaultInstallInput(manifest));
+        const { installedAppId } = await installApp(
+            user.id,
+            user.id,
+            defaultInstallInput(manifest)
+        );
         await recordAudit({
             actorId: user.id,
             action: "apps.install",
@@ -210,7 +217,11 @@ export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
     }
 }
 
-const routeSchema = z.string().trim().max(64).regex(/^[0-9a-fA-F:.]+\/\d{1,3}$/);
+const routeSchema = z
+    .string()
+    .trim()
+    .max(64)
+    .regex(/^[0-9a-fA-F:.]+\/\d{1,3}$/);
 
 export async function setVpnDeviceRoutesAction(
     input: unknown

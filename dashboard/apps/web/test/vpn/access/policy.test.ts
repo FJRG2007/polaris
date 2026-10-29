@@ -47,7 +47,9 @@ describe("the VPN's access policy", () => {
 
 describe("the VPN's stored settings", () => {
     it("read a row from before Turn off kept the server as off", () => {
-        expect(readVpnSettings({ hostname: "vpn.example.test", apiKey: "sealed" }).enabled).toBe(false);
+        expect(readVpnSettings({ hostname: "vpn.example.test", apiKey: "sealed" }).enabled).toBe(
+            false
+        );
     });
 
     it("keep enabled once written", () => {

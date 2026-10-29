@@ -50,13 +50,18 @@ const STEPS: Record<Platform, number> = {
 function commandFor(platform: Platform, server: string, key: string | null): string | null {
     if (platform === "windows" || platform === "macos" || platform === "linux")
         return `tailscale login --login-server=${server}`;
-    if (platform === "router") return `tailscale up --login-server=${server} --authkey=${key ?? "<key>"}`;
+    if (platform === "router")
+        return `tailscale up --login-server=${server} --authkey=${key ?? "<key>"}`;
     return null;
 }
 
 export function AddDeviceSection() {
     const t = useTranslations("vpn");
-    const read = useVpnRead<actions.VpnOverview>("overview", actions.vpnOverviewAction, t("errors.generic"));
+    const read = useVpnRead<actions.VpnOverview>(
+        "overview",
+        actions.vpnOverviewAction,
+        t("errors.generic")
+    );
     const [platform, setPlatform] = useState<Platform>("windows");
     const [key, setKey] = useState<{ key: string; expiresAt: string } | null>(null);
     const [keyError, setKeyError] = useState<string | null>(null);
@@ -82,7 +87,9 @@ export function AddDeviceSection() {
     function createKey(): void {
         setKeyError(null);
         startTransition(async () => {
-            const result = await actions.createVpnKeyAction().catch(() => ({ error: t("errors.generic") }));
+            const result = await actions
+                .createVpnKeyAction()
+                .catch(() => ({ error: t("errors.generic") }));
             if (result.error !== undefined) setKeyError(result.error);
             else setKey({ key: result.key, expiresAt: result.expiresAt });
         });
@@ -111,10 +118,17 @@ export function AddDeviceSection() {
                     ) : server && status.state === "running" ? (
                         <div className="flex min-w-0 flex-wrap items-center gap-4">
                             <div className="rounded-md bg-white p-2">
-                                <QRCodeSVG value={server} size={112} bgColor="#ffffff" fgColor="#000000" />
+                                <QRCodeSVG
+                                    value={server}
+                                    size={112}
+                                    bgColor="#ffffff"
+                                    fgColor="#000000"
+                                />
                             </div>
                             <div className="flex min-w-0 flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("overview.loginServer")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("overview.loginServer")}
+                                </span>
                                 <div className="flex min-w-0 items-center gap-2">
                                     <code className="truncate font-mono text-sm" title={server}>
                                         {server}
@@ -168,12 +182,17 @@ export function AddDeviceSection() {
                     </div>
                     <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm">
                         {Array.from({ length: STEPS[platform] }, (_, index) => (
-                            <li key={index}>{t(`add.${platform}.step${index + 1}` as "add.windows.step1")}</li>
+                            <li key={index}>
+                                {t(`add.${platform}.step${index + 1}` as "add.windows.step1")}
+                            </li>
                         ))}
                     </ol>
                     {command ? (
                         <div className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2">
-                            <code className="min-w-0 flex-1 truncate font-mono text-xs" title={command}>
+                            <code
+                                className="min-w-0 flex-1 truncate font-mono text-xs"
+                                title={command}
+                            >
                                 {command}
                             </code>
                             <ui.CopyButton value={command} label={t("add.copyCommand")} />
@@ -191,13 +210,18 @@ export function AddDeviceSection() {
                     {key ? (
                         <div className="flex w-full min-w-0 flex-col gap-1">
                             <div className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2">
-                                <code className="min-w-0 flex-1 truncate font-mono text-xs" title={key.key}>
+                                <code
+                                    className="min-w-0 flex-1 truncate font-mono text-xs"
+                                    title={key.key}
+                                >
                                     {key.key}
                                 </code>
                                 <ui.CopyButton value={key.key} label={t("add.copyKey")} />
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                {t("add.keyExpires", { time: new Date(key.expiresAt).toLocaleTimeString() })}
+                                {t("add.keyExpires", {
+                                    time: new Date(key.expiresAt).toLocaleTimeString()
+                                })}
                             </p>
                         </div>
                     ) : null}

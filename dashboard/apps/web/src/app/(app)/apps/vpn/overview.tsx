@@ -93,10 +93,16 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                         {t("overview.loginServer")}
                                     </span>
                                     <div className="flex min-w-0 items-center gap-2">
-                                        <code className="truncate font-mono text-sm" title={status.loginServer}>
+                                        <code
+                                            className="truncate font-mono text-sm"
+                                            title={status.loginServer}
+                                        >
                                             {status.loginServer}
                                         </code>
-                                        <ui.CopyButton value={status.loginServer} label={t("overview.copy")} />
+                                        <ui.CopyButton
+                                            value={status.loginServer}
+                                            label={t("overview.copy")}
+                                        />
                                     </div>
                                 </div>
                             ) : null}
@@ -110,20 +116,26 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                 />
                             ) : null}
                             {isAdmin && status.state === "off" && status.kept ? (
-                                <p className="text-sm text-muted-foreground">{t("overview.keptHint")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("overview.keptHint")}
+                                </p>
                             ) : null}
                             <div className="flex flex-wrap gap-2">
-                                {isAdmin && (status.state === "off" || status.state === "failed") ? (
+                                {isAdmin &&
+                                (status.state === "off" || status.state === "failed") ? (
                                     <ui.Button
                                         size="sm"
                                         disabled={pending || (picking && !check?.ok)}
                                         onClick={() => run(() => actions.turnOnVpnAction(choice))}
                                     >
                                         {pending ? <Loader2 className="animate-spin" /> : null}
-                                        {status.state === "failed" ? t("actions.retry") : t("actions.turnOn")}
+                                        {status.state === "failed"
+                                            ? t("actions.retry")
+                                            : t("actions.turnOn")}
                                     </ui.Button>
                                 ) : null}
-                                {isAdmin && (status.state === "running" || status.state === "starting") ? (
+                                {isAdmin &&
+                                (status.state === "running" || status.state === "starting") ? (
                                     <ui.Button
                                         size="sm"
                                         variant="outline"
@@ -134,13 +146,19 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                     </ui.Button>
                                 ) : null}
                                 {status.state === "running" ? (
-                                    <ui.Button asChild size="sm" variant={isAdmin ? "ghost" : "primary"}>
+                                    <ui.Button
+                                        asChild
+                                        size="sm"
+                                        variant={isAdmin ? "ghost" : "primary"}
+                                    >
                                         <Link href="/apps/vpn/add">{t("actions.addDevice")}</Link>
                                     </ui.Button>
                                 ) : null}
                             </div>
                             {!isAdmin && status.state === "off" ? (
-                                <p className="text-sm text-muted-foreground">{t("overview.askAdmin")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("overview.askAdmin")}
+                                </p>
                             ) : null}
                             {actionError ? (
                                 <p role="alert" className="text-sm text-danger">
@@ -186,7 +204,9 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                         <ui.Button
                             size="sm"
                             disabled={pending}
-                            onClick={() => run(actions.turnOffVpnAction, () => setConfirmOff(false))}
+                            onClick={() =>
+                                run(actions.turnOffVpnAction, () => setConfirmOff(false))
+                            }
                         >
                             {pending ? <Loader2 className="animate-spin" /> : null}
                             {t("actions.turnOff")}
@@ -247,7 +267,8 @@ function HostnamePicker({
     onCheck: (next: HostnameCheck | null) => void;
 }) {
     const t = useTranslations("vpn");
-    const zoneLabel = choice.zoneLabel || zones.find((zone) => zone.primary)?.label || zones[0]?.label || "";
+    const zoneLabel =
+        choice.zoneLabel || zones.find((zone) => zone.primary)?.label || zones[0]?.label || "";
 
     useEffect(() => {
         setCheck(null);
@@ -301,7 +322,9 @@ function HostnamePicker({
                 />
             </div>
             {check ? (
-                <p className={check.ok ? "text-xs text-muted-foreground" : "text-xs text-danger"}>{check.text}</p>
+                <p className={check.ok ? "text-xs text-muted-foreground" : "text-xs text-danger"}>
+                    {check.text}
+                </p>
             ) : null}
             <p className="text-xs text-muted-foreground">{t("hostname.hint")}</p>
         </div>

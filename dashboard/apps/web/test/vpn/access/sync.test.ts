@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
     app: null as { id: string; config: string | null } | null,
-    engine: null as { id: string; ownerId: string; applicationId: string | null; status: string } | null,
+    engine: null as {
+        id: string;
+        ownerId: string;
+        applicationId: string | null;
+        status: string;
+    } | null,
     accounts: [] as { id: string; bannedAt: Date | null; disabledAt: Date | null }[],
     admins: [] as { id: string; name: string; email: string }[]
 }));
@@ -74,7 +79,12 @@ function headscale() {
 
 beforeEach(() => {
     vi.unstubAllGlobals();
-    db.app = { id: "app", config: JSON.stringify({ vpn: { enabled: true, apiKey: "key", hostname: "vpn.example.test" } }) };
+    db.app = {
+        id: "app",
+        config: JSON.stringify({
+            vpn: { enabled: true, apiKey: "key", hostname: "vpn.example.test" }
+        })
+    };
     db.engine = { id: "engine", ownerId: "owner", applicationId: "application", status: "running" };
     db.accounts = [
         { id: KEPT, bannedAt: null, disabledAt: null },
@@ -105,10 +115,14 @@ describe("bringing the VPN in line with the accounts", () => {
         // A switched-off account is signed out like a banned one, and kept.
         expect(calls).toContain("POST /api/v1/node/50/expire");
         expect(calls).not.toContain("DELETE /api/v1/user/5");
-        expect(calls.filter((call) => call.includes("/user/1") || call.includes("/user/4"))).toEqual([]);
+        expect(
+            calls.filter((call) => call.includes("/user/1") || call.includes("/user/4"))
+        ).toEqual([]);
         expect(calls).not.toContain(`GET /api/v1/node?user=${headscaleUserName(KEPT)}`);
         // A device is deleted before its user, which Headscale refuses otherwise.
-        expect(calls.indexOf("DELETE /api/v1/node/20")).toBeLessThan(calls.indexOf("DELETE /api/v1/user/2"));
+        expect(calls.indexOf("DELETE /api/v1/node/20")).toBeLessThan(
+            calls.indexOf("DELETE /api/v1/user/2")
+        );
     });
 
     it("re-writes the policy for the administrators there are now", async () => {
@@ -119,7 +133,9 @@ describe("bringing the VPN in line with the accounts", () => {
             .mocked(fetch)
             .mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
         const { policy } = JSON.parse(String((put?.[1] as RequestInit).body)) as { policy: string };
-        expect(JSON.parse(policy).groups).toEqual({ "group:admins": [`${headscaleUserName(KEPT)}@`] });
+        expect(JSON.parse(policy).groups).toEqual({
+            "group:admins": [`${headscaleUserName(KEPT)}@`]
+        });
     });
 
     it("does nothing while the VPN is off", async () => {
@@ -137,7 +153,10 @@ describe("bringing the VPN in line with the accounts", () => {
     });
 
     it("never throws when the server cannot be reached", async () => {
-        vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 502 })));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response("down", { status: 502 }))
+        );
         const error = vi.spyOn(console, "error").mockImplementation(() => {});
         await expect(refreshVpnAccess()).resolves.toBeUndefined();
         expect(error).toHaveBeenCalled();

@@ -326,7 +326,10 @@ function DeviceRow({
                         </label>
                     ) : null}
                     {device.routes.map((one) => (
-                        <label key={one.route} className="flex items-center justify-between gap-3 text-sm">
+                        <label
+                            key={one.route}
+                            className="flex items-center justify-between gap-3 text-sm"
+                        >
                             <span className="min-w-0 truncate">
                                 {t("devices.subnet", { route: one.route })}
                             </span>

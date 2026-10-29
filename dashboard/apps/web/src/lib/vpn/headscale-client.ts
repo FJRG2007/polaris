@@ -26,24 +26,42 @@ function camelKeys(value: unknown): unknown {
 }
 
 const id = z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]).transform(String);
-const timestamp = z.string().nullish().transform((value) => value ?? null);
-const strings = z.array(z.string()).nullish().transform((value) => value ?? []);
+const timestamp = z
+    .string()
+    .nullish()
+    .transform((value) => value ?? null);
+const strings = z
+    .array(z.string())
+    .nullish()
+    .transform((value) => value ?? []);
 
 export const headscaleUserSchema = z.object({
     id,
     name: z.string(),
-    displayName: z.string().nullish().transform((value) => value ?? ""),
-    email: z.string().nullish().transform((value) => value ?? "")
+    displayName: z
+        .string()
+        .nullish()
+        .transform((value) => value ?? ""),
+    email: z
+        .string()
+        .nullish()
+        .transform((value) => value ?? "")
 });
 export type HeadscaleUser = z.infer<typeof headscaleUserSchema>;
 
 export const headscaleNodeSchema = z.object({
     id,
     name: z.string(),
-    givenName: z.string().nullish().transform((value) => value ?? ""),
+    givenName: z
+        .string()
+        .nullish()
+        .transform((value) => value ?? ""),
     user: headscaleUserSchema.nullish().transform((value) => value ?? null),
     ipAddresses: strings,
-    online: z.boolean().nullish().transform((value) => value ?? false),
+    online: z
+        .boolean()
+        .nullish()
+        .transform((value) => value ?? false),
     lastSeen: timestamp,
     expiry: timestamp,
     createdAt: timestamp,
@@ -57,8 +75,14 @@ export type HeadscaleNode = z.infer<typeof headscaleNodeSchema>;
 export const preAuthKeySchema = z.object({
     id,
     key: z.string().min(1),
-    reusable: z.boolean().nullish().transform((value) => value ?? false),
-    ephemeral: z.boolean().nullish().transform((value) => value ?? false),
+    reusable: z
+        .boolean()
+        .nullish()
+        .transform((value) => value ?? false),
+    ephemeral: z
+        .boolean()
+        .nullish()
+        .transform((value) => value ?? false),
     expiration: timestamp
 });
 export type PreAuthKey = z.infer<typeof preAuthKeySchema>;
@@ -69,7 +93,10 @@ const nodesResponse = z.object({ nodes: z.array(headscaleNodeSchema).nullish() }
 const nodeResponse = z.object({ node: headscaleNodeSchema });
 const preAuthKeyResponse = z.object({ preAuthKey: preAuthKeySchema });
 const healthResponse = z.object({
-    databaseConnectivity: z.boolean().nullish().transform((value) => value ?? false)
+    databaseConnectivity: z
+        .boolean()
+        .nullish()
+        .transform((value) => value ?? false)
 });
 
 /** Parse a response body, camel-casing it first. Exported for the fixture tests. */
@@ -189,9 +216,8 @@ export function headscaleClient(
             ).preAuthKey;
         },
         async registerNode(user, authId) {
-            return (
-                await call("POST", "/auth/register", nodeResponse, { user, auth_id: authId })
-            ).node;
+            return (await call("POST", "/auth/register", nodeResponse, { user, auth_id: authId }))
+                .node;
         },
         async setPolicy(policy) {
             await call("PUT", "/policy", z.unknown(), { policy });
