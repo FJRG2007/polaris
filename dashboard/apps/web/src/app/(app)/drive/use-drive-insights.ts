@@ -12,7 +12,7 @@
  * of measuring them again.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 export interface FolderWeight {
     readonly bytes: bigint;
@@ -43,6 +43,30 @@ const CACHE_TTL_MS = 30_000;
 const cache = new Map<string, { at: number; insights: DriveInsights }>();
 /** Folders remembered at once; a write mints a new key, so this stays bounded. */
 const CACHE_LIMIT = 50;
+
+/** Bumped by `forgetDriveInsights`, so the folder on screen measures again. */
+let generation = 0;
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
+
+/**
+ * Forget every weight measured so far and measure the folder on screen again.
+ *
+ * A listing's signature changes when a write lands in it, but not when one lands
+ * further down: deleting a folder inside "Videos" changes what "Videos" weighs
+ * one level up, where nothing in the listing moved. And a delete runs as a job
+ * after the row has already left the screen, so a weight measured while it ran
+ * still counted what it was removing. Called after every write.
+ */
+export function forgetDriveInsights(): void {
+    cache.clear();
+    generation += 1;
+    for (const listener of listeners) listener();
+}
 
 function remember(key: string, insights: DriveInsights): void {
     cache.set(key, { at: Date.now(), insights });
@@ -89,13 +113,18 @@ export function useDriveInsights(
     revision: string
 ): DriveInsights {
     const [insights, setInsights] = useState<DriveInsights>(EMPTY);
+    const forgotten = useSyncExternalStore(
+        subscribe,
+        () => generation,
+        () => 0
+    );
 
     useEffect(() => {
         if (!enabled) {
             setInsights(EMPTY);
             return;
         }
-        const key = `${connectionId}|${path}|${revision}`;
+        const key = `${connectionId}|${path}|${revision}|${forgotten}`;
         const hit = cache.get(key);
         if (hit && Date.now() - hit.at < CACHE_TTL_MS && hit.insights.pending.size === 0) {
             setInsights(hit.insights);
@@ -134,7 +163,7 @@ export function useDriveInsights(
             controller.abort();
             if (timer) clearTimeout(timer);
         };
-    }, [connectionId, path, enabled, revision]);
+    }, [connectionId, path, enabled, revision, forgotten]);
 
     return insights;
 }

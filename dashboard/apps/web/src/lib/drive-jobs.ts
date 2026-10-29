@@ -33,6 +33,7 @@ import * as core from "@polaris/core";
 import { getDriver } from "@/lib/storage-service";
 import { restoreTrash } from "@/lib/trash-service";
 import { moveManyToTrash } from "@/lib/trash-service";
+import { invalidateFolderSizesMany } from "@/lib/drive-folder-size";
 import { deleteDriveEntry } from "@/lib/drive-delete";
 
 /**
@@ -333,12 +334,14 @@ async function runBatch(
 
     // Permanent. One driver for the batch, same as the bin.
     const failures: { path: string; reason: string }[] = [];
+    const deleted: string[] = [];
     let done = 0;
     const driver = await getDriver(connectionId, ownerId);
     try {
         for (const path of paths) {
             try {
                 await deleteDriveEntry(driver, path);
+                deleted.push(path);
                 done += 1;
             } catch (caught) {
                 failures.push({
@@ -350,6 +353,9 @@ async function runBatch(
     } finally {
         await driver.dispose();
     }
+    // The folders these were in weigh less now. Without this a stored weight
+    // kept showing the space as taken until it went stale on its own.
+    await invalidateFolderSizesMany(connectionId, deleted);
     return { done, failures };
 }
 

@@ -21,6 +21,7 @@
  */
 
 import type { DriveEntry } from "./types";
+import { forgetDriveInsights } from "./use-drive-insights";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 
 /**
@@ -70,6 +71,7 @@ export function writeListing(connectionId: string, path: string, entries: DriveE
  *  file the other two would otherwise keep listing. */
 export function dropDriveSnapshots(): void {
     for (const prefix of DRIVE_KEY_PREFIXES) dropSnapshots(prefix);
+    forgetDriveInsights();
 }
 
 /**
