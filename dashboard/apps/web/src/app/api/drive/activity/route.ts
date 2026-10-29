@@ -24,6 +24,8 @@ export const dynamic = "force-dynamic";
 const SCAN_WINDOW = 400;
 /** Events returned for the panel. */
 const MAX_RESULTS = 25;
+/** Reads of a file that only looked at it, kept out of the panel. */
+const LOOKS_ONLY = ["drive.view", "drive.range", "drive.thumbnail"];
 
 /** The source an audit row was about, for the rows whose id is not a uuid and so
  *  lives in the metadata rather than in the column - see `recordAudit`. */
@@ -52,25 +54,38 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
+    if (!connectionId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.missingConnection") },
+            { status: 400 }
+        );
 
     let path: string;
     try {
         path = normalizeRelPath(url.searchParams.get("p") ?? "");
     } catch {
-        return Response.json({ error: (await readerWords("api"))("errors.invalidPath") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.invalidPath") },
+            { status: 400 }
+        );
     }
 
     try {
         await authorizeDrive(user.id, connectionId, path, "read");
     } catch (caught) {
         if (caught instanceof DriveLockedError || caught instanceof DriveAccessError) {
-            return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+            return Response.json(
+                { error: (await readerWords("api"))("errors.forbidden") },
+                { status: 403 }
+            );
         }
         throw caught;
     }
@@ -82,9 +97,12 @@ export async function GET(request: Request): Promise<Response> {
     // are narrowed to drive events and matched here.
     const keyed = isUuid(connectionId);
     const rows = await prisma.auditLog.findMany({
+        // Reads that only looked are left out: views are for Recent, and a feed
+        // that lists every time somebody looked at a picture, a tile or a seek
+        // of a video buries what was done to it.
         where: keyed
-            ? { targetId: connectionId, action: { startsWith: "drive." } }
-            : { targetType: "connection", action: { startsWith: "drive." } },
+            ? { targetId: connectionId, action: { startsWith: "drive.", notIn: LOOKS_ONLY } }
+            : { targetType: "connection", action: { startsWith: "drive.", notIn: LOOKS_ONLY } },
         orderBy: { at: "desc" },
         take: SCAN_WINDOW,
         select: { id: true, action: true, actorId: true, metadata: true, at: true }

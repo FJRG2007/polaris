@@ -35,10 +35,10 @@ import {
 } from "lucide-react";
 
 /** Where the dialog is looking. */
-type Tab = "recent" | "mine" | "shared" | "upload" | "url";
+export type FilePickerTab = "recent" | "mine" | "shared" | "upload" | "url";
 
 /** Each is named as `files.tabs.<id>`. */
-const TABS: readonly { id: Tab; icon: typeof Clock }[] = [
+const TABS: readonly { id: FilePickerTab; icon: typeof Clock }[] = [
     { id: "recent", icon: Clock },
     { id: "mine", icon: HardDrive },
     { id: "shared", icon: Users },
@@ -99,7 +99,8 @@ export function FilePickerDialog({
     accept,
     multiple = true,
     title,
-    storageOnly = false
+    storageOnly = false,
+    initialTab = "recent"
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
@@ -112,10 +113,13 @@ export function FilePickerDialog({
     /** Offer only files already on a storage, for a screen that points at a
      *  file where it is and so has nowhere to put an upload. */
     storageOnly?: boolean;
+    /** Where it opens. Recent files suit a screen attaching something; a screen
+     *  that IS a storage opens on the reader's machine instead. */
+    initialTab?: FilePickerTab;
 }) {
     const t = useTranslations("components");
     const heading = title ?? t("files.title");
-    const [tab, setTab] = useState<Tab>("recent");
+    const [tab, setTab] = useState<FilePickerTab>(initialTab);
     const [sources, setSources] = useState<Source[]>([]);
     const [sourceId, setSourceId] = useState("");
     const [path, setPath] = useState("");

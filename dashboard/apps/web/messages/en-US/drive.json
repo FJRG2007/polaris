@@ -25,6 +25,8 @@
         "archives": "Compressed"
     },
     "filesView": {
+        "uploadHere": "Upload to this folder",
+        "pastedImage": "Pasted image",
         "sort": {
             "labels": {
                 "name": "Name",

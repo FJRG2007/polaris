@@ -18,6 +18,13 @@ export const dynamic = "force-dynamic";
 
 const RANGE = /^bytes=(\d+)-(\d*)$/;
 
+/** The audit action a read of a file is recorded under. */
+function readAction(inline: boolean, thumbnail: boolean, continuing: boolean): string {
+    if (thumbnail) return "drive.thumbnail";
+    if (continuing) return "drive.range";
+    return inline ? "drive.view" : "drive.download";
+}
+
 export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
@@ -53,20 +60,36 @@ export async function GET(request: Request): Promise<Response> {
         const stat = await driver.stat(path);
         if (stat.kind !== "file") return new Response("Not a file", { status: 400 });
 
-        await recordAudit({
-            actorId: user.id,
-            action: "drive.download",
-            targetType: "connection",
-            targetId: connectionId,
-            metadata: { path, size: stat.size.toString() }
-        });
-
         // An inline request feeds an in-dashboard viewer (image/pdf/media); the default
         // is an attachment download. Both stream the same bytes and honor Range.
         // Either way the bytes are whatever somebody put on the storage, served
         // from this origin: an HTML or SVG file opened inline must not run as the
         // reader.
         const inline = url.searchParams.get("disposition") === "inline";
+
+        // Looking at a file is not downloading it: the activity feed said
+        // "Downloaded" under a picture somebody had only uploaded and previewed.
+        // A view is recorded as one, because Recent lists what was opened. A
+        // request for a later part of the file is the same open being played or
+        // seeked, and a tile's frame out of a video is a thumbnail: both are
+        // still recorded, under their own actions that neither the feed nor
+        // Recent lists, so what the caller asks for never decides whether a
+        // read leaves a record.
+        const start = Number(RANGE.exec(request.headers.get("range") ?? "")?.[1] ?? 0);
+        const thumbnail = inline && url.searchParams.get("purpose") === "thumbnail";
+        await recordAudit({
+            actorId: user.id,
+            action: readAction(inline, thumbnail, start > 0),
+            targetType: "connection",
+            targetId: connectionId,
+            metadata: {
+                path,
+                size: stat.size.toString(),
+                ...(start > 0
+                    ? { from: String(start), disposition: inline ? "inline" : "attachment" }
+                    : {})
+            }
+        });
         const contentType = stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream";
         const headers = new Headers({
             "content-type": contentType,

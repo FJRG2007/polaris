@@ -36,6 +36,10 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import { drawsItsOwnFrame, thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { matchShortcut, SHORTCUT_IDS } from "./shortcuts";
+import { pastedItems } from "./pasted-files";
+import { asFiles } from "@/components/file-picker/as-files";
+import type { PickedFile } from "@/components/file-picker/picked-file";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { activityKey, prefetchListing } from "./listing-cache";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { useDisplayFormat } from "@/components/display-format";
@@ -97,6 +101,7 @@ import {
     shortcutPressed,
     shellScroller,
     useShortcutHint,
+    useToast,
     DateInput
 } from "@polaris/ui";
 import {
@@ -329,6 +334,12 @@ function selectionTally(t: DriveT, entries: readonly DriveEntry[]): string {
  *  new empty set on every render. */
 const EMPTY_PATHS: ReadonlySet<string> = new Set();
 
+/** Ctrl+V (Cmd+V): the keys after which the browser fires its own paste event. */
+function isNativePaste(event: KeyboardEvent): boolean {
+    if (event.altKey || event.shiftKey) return false;
+    return (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v";
+}
+
 export function FilesView({
     connectionId,
     path,
@@ -479,7 +490,10 @@ export function FilesView({
     const format = useDisplayFormat();
     const t = useTranslations("drive");
     const tc = useTranslations("common");
+    const tFiles = useTranslations("components");
+    const toast = useToast();
     const inTrash = trash !== undefined;
+    const [picking, setPicking] = useState(false);
     const [query, setQuery] = useState("");
     // Search scope: the current folder only, or a recursive walk from here.
     // Recursive by default so a search finds nested items without an extra click.
@@ -680,6 +694,72 @@ export function FilesView({
         pasteInto(path);
     }
 
+    /**
+     * Hold items for a paste. Their names go on the system clipboard too, the way
+     * a desktop file manager does it: a paste uploads whatever files the system
+     * clipboard holds, so a screenshot taken before this copy must not win over it.
+     */
+    function holdInClipboard(items: DriveEntry[], mode: "copy" | "cut") {
+        setClipboard({ entries: items, mode });
+        explorerIsNewest.current = true;
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(items.map((item) => item.name).join("\n")).then(
+            () => {
+                explorerIsNewest.current = false;
+            },
+            () => undefined
+        );
+    }
+
+    /**
+     * Files chosen in the picker, into the open folder. One already on this
+     * storage is copied by the server, the way a paste is; anything else - another
+     * storage, an address - is fetched and uploaded like a file off the machine.
+     */
+    async function uploadPicked(picked: PickedFile[]) {
+        const here = picked.flatMap((one) =>
+            one.kind === "drive" && one.connectionId === connectionId ? [one] : []
+        );
+        if (here.length > 0) {
+            const now = new Date().toISOString();
+            onCopy(
+                here.map((one) => ({
+                    name: one.name,
+                    path: one.path,
+                    kind: "file",
+                    size: String(one.size),
+                    modifiedAt: now,
+                    createdAt: now
+                })),
+                path
+            );
+        }
+        const elsewhere = picked.filter(
+            (one) => one.kind !== "drive" || one.connectionId !== connectionId
+        );
+        if (elsewhere.length === 0) return;
+        const { files, failed } = await asFiles(elsewhere, {
+            unreachable: tFiles("files.fetchFailed")
+        });
+        for (const said of failed) toast.show({ title: said });
+        if (files.length > 0) onUpload(files.map((file) => ({ file, relPath: file.name })));
+    }
+
+    // Set when the paste shortcut is the browser's own paste: the paste event that
+    // follows decides between the system clipboard's files and the explorer's.
+    const pasteFromKeys = useRef(false);
+    // Set while the explorer's copy is newer than whatever the system clipboard
+    // holds - its write was refused or is not offered here - so files found on the
+    // system clipboard are older than it. Leaving the page may change that.
+    const explorerIsNewest = useRef(false);
+    useEffect(() => {
+        function onBlur() {
+            explorerIsNewest.current = false;
+        }
+        window.addEventListener("blur", onBlur);
+        return () => window.removeEventListener("blur", onBlur);
+    }, []);
+
     function openViewer(entry: DriveEntry) {
         // The preview takes over the listing area and the details panel beside it
         // describes what is open, so the file has to be the selected one.
@@ -788,10 +868,19 @@ export function FilesView({
             cursorRef.current = null;
         } else if (pressed("drive.copy") && !inTrash && selectedEntries.length > 0) {
             event.preventDefault();
-            setClipboard({ entries: selectedEntries, mode: "copy" });
+            holdInClipboard(selectedEntries, "copy");
         } else if (pressed("drive.cut") && !inTrash && selectedEntries.length > 0) {
             event.preventDefault();
-            setClipboard({ entries: selectedEntries, mode: "cut" });
+            holdInClipboard(selectedEntries, "cut");
+        } else if (pressed("drive.paste") && isNativePaste(event)) {
+            // Not prevented: that would cancel the paste event, and with it any
+            // files on the system clipboard.
+            pasteFromKeys.current = true;
+            window.setTimeout(() => {
+                if (!pasteFromKeys.current) return;
+                pasteFromKeys.current = false;
+                if (clipboard) paste();
+            }, 0);
         } else if (pressed("drive.paste") && clipboard) {
             event.preventDefault();
             paste();
@@ -831,14 +920,14 @@ export function FilesView({
 
     /** External file drag over the listing highlights it as an upload drop zone. */
     function onUploadDragOver(event: React.DragEvent) {
-        if (inTrash) return;
+        if (inTrash || !abilities.write) return;
         if (!event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         setDragUpload(true);
     }
 
     function onUploadDrop(event: React.DragEvent) {
-        if (inTrash) return;
+        if (inTrash || !abilities.write) return;
         if (!event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         setDragUpload(false);
@@ -895,7 +984,7 @@ export function FilesView({
             const shortcut = matchShortcut(event, shortcutBindings());
             if (!shortcut) return;
             if (shortcut === "new-folder" || shortcut === "new-file") {
-                if (pending) return;
+                if (pending || !abilities.write) return;
                 event.preventDefault();
                 if (shortcut === "new-folder") onNewFolder();
                 else onNewFile();
@@ -907,13 +996,40 @@ export function FilesView({
                 onRequestFiles(path, path.split("/").pop() ?? "");
                 return;
             }
-            if (uploading) return;
+            if (uploading || !abilities.write) return;
             event.preventDefault();
             if (shortcut === "upload-folder") void pickFolder();
-            else fileInput.current?.click();
+            else setPicking(true);
         }
         window.addEventListener("keydown", onShortcut);
         return () => window.removeEventListener("keydown", onShortcut);
+    });
+
+    // Pasting files uploads them into the open folder: a screenshot, a picture
+    // copied in a browser, files copied in the system's file manager. With none
+    // on the system clipboard, the browser's paste keys paste the explorer's own
+    // clipboard instead. Stands down where the shortcuts above do, and where the
+    // person may not write.
+    useEffect(() => {
+        function onPaste(event: ClipboardEvent) {
+            const fromKeys = pasteFromKeys.current;
+            pasteFromKeys.current = false;
+            if (renaming || viewerTarget || pendingFolder) return;
+            if (keyboardIsBusy(event)) return;
+            const files = Array.from(event.clipboardData?.files ?? []);
+            if (files.length === 0 || (fromKeys && clipboard && explorerIsNewest.current)) {
+                if (fromKeys && clipboard) {
+                    event.preventDefault();
+                    paste();
+                }
+                return;
+            }
+            if (inTrash || !abilities.write || uploading) return;
+            event.preventDefault();
+            onUpload(pastedItems(files, t("filesView.pastedImage"), new Date()));
+        }
+        window.addEventListener("paste", onPaste);
+        return () => window.removeEventListener("paste", onPaste);
     });
 
     // Selection, rename and the open preview are tied to a specific listing; drop
@@ -1398,14 +1514,14 @@ export function FilesView({
                         <ShortcutHint id="general.rename" />
                     </ContextMenuItem>
                 )}
-                <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
+                <ContextMenuItem onSelect={() => holdInClipboard(targets, "copy")}>
                     <Copy className="size-4" />
                     {many
                         ? t("filesView.menu.copyMany", { count: targets.length })
                         : t("filesView.menu.copy")}
                     <ShortcutHint id="drive.copy" />
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
+                <ContextMenuItem onSelect={() => holdInClipboard(targets, "cut")}>
                     <Scissors className="size-4" />
                     {many
                         ? t("filesView.menu.cutMany", { count: targets.length })
@@ -2142,7 +2258,7 @@ export function FilesView({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                                    <DropdownMenuItem onSelect={() => setPicking(true)}>
                                         <Upload className="size-4" />
                                         {t("filesView.toolbar.uploadFiles")}
                                         <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
@@ -2154,6 +2270,14 @@ export function FilesView({
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
+                            {picking ? (
+                                <FilePickerDialog
+                                    initialTab="upload"
+                                    title={t("filesView.uploadHere")}
+                                    onPick={(picked) => void uploadPicked(picked)}
+                                    onClose={() => setPicking(false)}
+                                />
+                            ) : null}
                             <input
                                 ref={fileInput}
                                 type="file"
@@ -3262,23 +3386,29 @@ export function FilesView({
                         </ContextMenuContent>
                     ) : (
                         <ContextMenuContent>
-                            <ContextMenuItem onSelect={onNewFolder}>
+                            <ContextMenuItem disabled={!abilities.write} onSelect={onNewFolder}>
                                 <FolderPlus className="size-4" />
                                 {t("filesView.menu.newFolder")}
                                 <ShortcutHint id={SHORTCUT_IDS["new-folder"]} />
                             </ContextMenuItem>
-                            <ContextMenuItem onSelect={onNewFile}>
+                            <ContextMenuItem disabled={!abilities.write} onSelect={onNewFile}>
                                 <FilePlus className="size-4" />
                                 {t("filesView.menu.newFile")}
                                 <ShortcutHint id={SHORTCUT_IDS["new-file"]} />
                             </ContextMenuItem>
                             <ContextMenuSeparator />
-                            <ContextMenuItem onSelect={() => fileInput.current?.click()}>
+                            <ContextMenuItem
+                                disabled={!abilities.write || uploading}
+                                onSelect={() => setPicking(true)}
+                            >
                                 <Upload className="size-4" />
                                 {t("filesView.menu.uploadFiles")}
                                 <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
                             </ContextMenuItem>
-                            <ContextMenuItem onSelect={() => void pickFolder()}>
+                            <ContextMenuItem
+                                disabled={!abilities.write || uploading}
+                                onSelect={() => void pickFolder()}
+                            >
                                 <FolderUp className="size-4" />
                                 {t("filesView.menu.uploadFolder")}
                                 <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />

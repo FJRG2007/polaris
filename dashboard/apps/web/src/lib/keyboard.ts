@@ -14,8 +14,8 @@
 /** What swallows a key press: real fields, and anything made editable. */
 const EDITING = "input, textarea, select, [contenteditable='true']";
 
-/** True when the press belongs to a field, a dialog or an open menu. */
-export function keyboardIsBusy(event: KeyboardEvent): boolean {
+/** True when the press (or paste) belongs to a field, a dialog or an open menu. */
+export function keyboardIsBusy(event: Event): boolean {
     const target = event.target as HTMLElement | null;
     if (target?.closest(EDITING)) return true;
     return document.querySelector("[role='dialog'], [role='menu']") !== null;
