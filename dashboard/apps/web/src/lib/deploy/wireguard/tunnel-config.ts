@@ -16,6 +16,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import type { ComposeSpec } from "@polaris/deploy";
 import { isRouteHostname } from "./tunnel-hostname";
+import { FIRST_LISTEN_PORT, LAST_LISTEN_PORT } from "./listen-ports";
 
 export { isRouteHostname };
 
@@ -35,9 +36,7 @@ export const WIREGUARD_IMAGE = "ghcr.io/windtf/wireproxy:31a9a34498267d7fb8aeff0
  */
 export const HELPER_IMAGE = "busybox:1.37.0";
 
-/** The first UDP port a public server listens on, and the last one handed out. */
-export const FIRST_LISTEN_PORT = 51820;
-export const LAST_LISTEN_PORT = 51999;
+export { FIRST_LISTEN_PORT, LAST_LISTEN_PORT };
 
 /** The TCP port each end forwards through the tunnel. Inside the containers only. */
 export const TUNNEL_TCP_PORT = 8080;

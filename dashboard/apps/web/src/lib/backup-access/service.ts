@@ -221,7 +221,9 @@ const probeSchema = z.object({
     detail: z.string().nullable(),
     conflicts: z.array(z.string()).default([]),
     /** The relay's TCP ports that did not answer from here; null when not looked at. */
-    relayClosed: z.array(z.number()).nullable().default(null)
+    relayClosed: z.array(z.number()).nullable().default(null),
+    /** Those that failed some other way, which does not point at the firewall. */
+    relayUnclear: z.array(z.number()).default([])
 });
 type Probe = z.infer<typeof probeSchema>;
 
@@ -958,23 +960,35 @@ async function keepUp(
     }
 }
 
+/** How long a TCP connection takes to open, or how it failed to. */
+function knock(
+    host: string,
+    port: number,
+    timeoutMs: number
+): Promise<number | "silent" | "failed"> {
+    return new Promise((resolve) => {
+        const started = performance.now();
+        const socket = connect({ host, port });
+        const done = (value: number | "silent" | "failed") => {
+            socket.destroy();
+            resolve(value);
+        };
+        socket.setTimeout(timeoutMs, () => done("silent"));
+        socket.once("connect", () => done(Math.round(performance.now() - started)));
+        socket.once("error", (caught: NodeJS.ErrnoException) =>
+            done(caught.code === "ETIMEDOUT" ? "silent" : "failed")
+        );
+    });
+}
+
 /** How long a TCP connection takes to open, or null when it does not. */
-export function connectTime(
+export async function connectTime(
     host: string,
     port: number,
     timeoutMs = CONNECT_TIMEOUT_MS
 ): Promise<number | null> {
-    return new Promise((resolve) => {
-        const started = performance.now();
-        const socket = connect({ host, port });
-        const done = (value: number | null) => {
-            socket.destroy();
-            resolve(value);
-        };
-        socket.setTimeout(timeoutMs, () => done(null));
-        socket.once("connect", () => done(Math.round(performance.now() - started)));
-        socket.once("error", () => done(null));
-    });
+    const answer = await knock(host, port, timeoutMs);
+    return typeof answer === "number" ? answer : null;
 }
 
 /**
@@ -995,6 +1009,22 @@ async function relayTime(address: string, zones: DomainZones): Promise<number | 
     return !home || home.certificate === through.certificate ? through.ms : null;
 }
 
+/** The ports a server's firewall still shuts, and the ones that say nothing about
+ *  it. Each one is published there and a cloud firewall drops what it refuses, so
+ *  silence means the way in, while a refusal got past it to nothing listening. */
+async function firewallPorts(
+    address: string,
+    ports: readonly number[]
+): Promise<{ closed: number[]; unclear: number[] }> {
+    const answers = await Promise.all(
+        ports.map((port) => knock(address, port, CONNECT_TIMEOUT_MS))
+    );
+    return {
+        closed: ports.filter((_, index) => answers[index] === "silent"),
+        unclear: ports.filter((_, index) => answers[index] === "failed")
+    };
+}
+
 /**
  * Check the direct path and time each path.
  *
@@ -1007,13 +1037,6 @@ async function relayTime(address: string, zones: DomainZones): Promise<number | 
  * once it has worked here. Until then the public address is compared with the
  * one the records name. No uplink at all is the breaker's to say.
  */
-/** The ports a server's firewall still shuts. Each one is published there, so
- *  silence from here means the way in, not the service behind it. */
-async function closedPorts(address: string, ports: readonly number[]): Promise<number[]> {
-    const answers = await Promise.all(ports.map((port) => connectTime(address, port)));
-    return ports.filter((_, index) => answers[index] === null);
-}
-
 async function measure(
     before: Probe | null,
     serving: FlipState["serving"],
@@ -1035,14 +1058,15 @@ async function measure(
             from: null,
             lastIp: before?.lastIp ?? null,
             relayClosed: before?.relayClosed ?? null,
+            relayUnclear: before?.relayUnclear ?? [],
             evidence: { ip: null, outside: null, hairpin: false }
         };
-    const [direct, tunnelMs, relayMs, ip, relayClosed] = await Promise.all([
+    const [direct, tunnelMs, relayMs, ip, relayPorts] = await Promise.all([
         published ? connectTime(published, 443) : Promise.resolve(null),
         tunnel ? connectTime(TUNNEL_EDGE.host, TUNNEL_EDGE.port) : Promise.resolve(null),
         relay ? relayTime(relay.address, zones).catch(() => null) : Promise.resolve(null),
         probePublicIp(0),
-        relay ? closedPorts(relay.address, relay.tcp) : Promise.resolve(null)
+        relay ? firewallPorts(relay.address, relay.tcp) : Promise.resolve(null)
     ]);
     const nowCalibrated = calibrated || direct !== null;
     let inside: Verdict;
@@ -1063,7 +1087,8 @@ async function measure(
         calibrated: nowCalibrated,
         from: outside?.from ?? null,
         lastIp: ip ?? before?.lastIp ?? null,
-        relayClosed,
+        relayClosed: relayPorts?.closed ?? null,
+        relayUnclear: relayPorts?.unclear ?? [],
         evidence: {
             ip,
             // Only a check aimed at the address the line has now says anything about it.

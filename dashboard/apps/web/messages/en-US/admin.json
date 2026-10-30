@@ -737,6 +737,7 @@
                     "link": "The link back to this server. Nothing works without it",
                     "web": "Websites and the dashboard",
                     "calls": "Calls",
+                    "tunnels": "Tunnels that end at this server",
                     "games": "Games"
                 },
                 "states": {
@@ -744,7 +745,7 @@
                     "closed": "Blocked",
                     "unknown": "Cannot be checked"
                 },
-                "after": "Open only these ports. Polaris checks them every minute, so each one turns to Open by itself.",
+                "after": "Add these rules to the ones already there, and leave those in place. Polaris checks the link and the TCP ports every minute, so those turn to Open by themselves. Other UDP ports cannot be checked from here and keep saying so.",
                 "clouds": {
                     "ionos": {
                         "step1": "Sign in to IONOS and open <b>Menu > Server & Cloud</b>.",
@@ -783,7 +784,7 @@
                 "ports-busy": "Something on the relay server already uses one of the ports it has to carry. Pick another server or free them there.",
                 "ports-held": "Ports 80 and 443 on the relay server are in use by {detail}.",
                 "edge-outdated": "The edge on the relay server is too old to carry the relay.",
-                "relay-unreachable": "Visitors cannot get through the relay to this server. The server's provider is blocking UDP {detail}: open the ports listed below.",
+                "relay-unreachable": "Visitors cannot get through the relay to this server. If the server's provider has a firewall, check that UDP {detail} and the ports listed below are open.",
                 "setting-up": "Preparing the relay server. This can take a few minutes.",
                 "failed": "The last pass failed: {detail}"
             },
@@ -820,7 +821,7 @@
                 "web": "Dashboard and websites",
                 "ownDomain": "Your own domain",
                 "calls": "Calls with people outside",
-                "games": "Games",
+                "games": "Game servers",
                 "mail": "Incoming mail"
             },
             "compare": {

@@ -18,8 +18,7 @@
  */
 
 import { Button, Select } from "@polaris/ui";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { CopyButton } from "@/components/copy-button";
+import { useEffect, useRef, useState } from "react";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronDown, ExternalLink } from "lucide-react";
@@ -35,17 +34,8 @@ import {
     type RouterForwardRule,
     type RouterFormField
 } from "@/lib/router-guide";
+import { bold, portText, Value } from "./guide-parts";
 import { routerGuideIn } from "./router-words";
-
-/** A value to type elsewhere: shown verbatim, copied in one click. */
-function Value({ text }: { text: string }) {
-    return (
-        <span className="inline-flex items-center gap-1">
-            <code className="text-foreground">{text}</code>
-            <CopyButton value={text} className="[&_svg]:size-3" />
-        </span>
-    );
-}
 
 /** The generic labels, for the brands whose form asks for the usual five things. */
 function genericForwardFields(t: NamespaceTranslator<"admin">): readonly RouterFormField[] {
@@ -56,23 +46,6 @@ function genericForwardFields(t: NamespaceTranslator<"admin">): readonly RouterF
         { label: t("domainsRouter.fields.internalPort"), value: "port" },
         { label: t("domainsRouter.fields.internalIp"), value: "ip" }
     ];
-}
-
-/** A value from the router's own menus, as it is shown there. */
-function bold(chunks: ReactNode[]) {
-    return (
-        <b key="b" className="font-medium text-foreground">
-            {chunks}
-        </b>
-    );
-}
-
-/** A range rule fills the same single field with `start-end`, which every brand's
- *  form accepts - it is how a router is asked for a run of ports. */
-function portText(rule: RouterForwardRule): string {
-    return rule.endPort && rule.endPort !== rule.port
-        ? `${rule.port}-${rule.endPort}`
-        : `${rule.port}`;
 }
 
 /** One cell of the forwarding table: what to put in this field for this rule. */

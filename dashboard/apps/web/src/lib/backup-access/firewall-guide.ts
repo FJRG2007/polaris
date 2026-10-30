@@ -7,8 +7,9 @@
  */
 
 import { CALL_PORTS } from "@/lib/chat/call-ports";
+import { FIRST_LISTEN_PORT, LAST_LISTEN_PORT } from "@/lib/deploy/wireguard/listen-ports";
 
-export type FirewallPurpose = "link" | "web" | "calls" | "games";
+export type FirewallPurpose = "link" | "web" | "calls" | "tunnels" | "games";
 
 export interface FirewallRule {
     readonly protocol: "TCP" | "UDP";
@@ -20,6 +21,14 @@ export interface FirewallRule {
 /** Whether a rule is known to work. UDP says nothing when knocked on, so only
  *  the link's own port can be told apart, by the link coming up. */
 export type FirewallRuleState = "open" | "closed" | "unknown";
+
+/** The part of a pass's findings that speaks for the relay's firewall. */
+export interface RelayFirewallProbe {
+    readonly latency: { readonly relay: number | null };
+    readonly problem: string | null;
+    readonly relayClosed: readonly number[] | null;
+    readonly relayUnclear: readonly number[];
+}
 
 export const CLOUD_FIREWALLS = [
     { id: "ionos", label: "IONOS", url: "https://my.ionos.com/account", steps: 3 },
@@ -44,9 +53,10 @@ export function detectCloud(serverName: string | null): CloudFirewall {
 
 function purposeOf(protocol: "tcp" | "udp", port: number): FirewallPurpose {
     if (protocol === "tcp" && (port === 80 || port === 443)) return "web";
-    return CALL_PORTS.some((call) => call.protocol === protocol && call.port === port)
-        ? "calls"
-        : "games";
+    if (CALL_PORTS.some((call) => call.protocol === protocol && call.port === port)) return "calls";
+    if (protocol === "udp" && port >= FIRST_LISTEN_PORT && port <= LAST_LISTEN_PORT)
+        return "tunnels";
+    return "games";
 }
 
 /** Every rule the relay needs, the link first since nothing works without it.
@@ -64,7 +74,7 @@ export function relayFirewallRules(
         for (const port of [...(protocol === "tcp" ? tcp : udp)].sort((a, b) => a - b)) {
             const purpose = purposeOf(protocol, port);
             if (open && open.endPort + 1 === port && open.purpose === purpose) {
-                open = { ...open, endPort: port };
+                open = { protocol: open.protocol, port: open.port, endPort: port, purpose };
                 rules[rules.length - 1] = open;
                 continue;
             }
@@ -75,18 +85,26 @@ export function relayFirewallRules(
     return rules;
 }
 
-/** `closed` is what the last pass found shut, or null before one has looked. */
-export function ruleState(
-    rule: FirewallRule,
-    linkUp: boolean,
-    closed: readonly number[] | null
-): FirewallRuleState {
-    if (rule.purpose === "link") return linkUp ? "open" : "closed";
-    if (rule.protocol === "UDP" || closed === null) return "unknown";
-    const shut = closed.some((port) => port >= rule.port && port <= rule.endPort);
-    return shut ? "closed" : "open";
+/** The link's rule, shut only when the relay's own 443 answers and visitors
+ *  still do not get through: anything else says nothing about its UDP port. */
+export function linkState(probe: RelayFirewallProbe | null): FirewallRuleState {
+    if (probe?.latency.relay != null) return "open";
+    if (probe?.problem !== "relay-unreachable" || probe.relayClosed === null) return "unknown";
+    const answered = !probe.relayClosed.includes(443) && !probe.relayUnclear.includes(443);
+    return answered ? "closed" : "unknown";
 }
 
-export function rulePort(rule: FirewallRule): string {
-    return rule.endPort === rule.port ? `${rule.port}` : `${rule.port}-${rule.endPort}`;
+/** `closed` is what the last pass found shut, or null before one has looked, and
+ *  `unclear` what failed in a way that does not point at the firewall. */
+export function ruleState(
+    rule: FirewallRule,
+    link: FirewallRuleState,
+    closed: readonly number[] | null,
+    unclear: readonly number[]
+): FirewallRuleState {
+    if (rule.purpose === "link") return link;
+    if (rule.protocol === "UDP" || closed === null) return "unknown";
+    const inRule = (port: number) => port >= rule.port && port <= rule.endPort;
+    if (closed.some(inRule)) return "closed";
+    return unclear.some(inRule) ? "unknown" : "open";
 }

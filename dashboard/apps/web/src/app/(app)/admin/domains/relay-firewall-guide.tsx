@@ -9,15 +9,15 @@
  */
 
 import { Button, Select } from "@polaris/ui";
-import { CopyButton } from "@/components/copy-button";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import { bold, portText, Value } from "./guide-parts";
 import {
     CLOUD_FIREWALLS,
     detectCloud,
+    linkState,
     relayFirewallRules,
-    rulePort,
     ruleState,
     type CloudFirewall,
     type FirewallRuleState
@@ -31,19 +31,10 @@ const STATE_TONE: Record<FirewallRuleState, string> = {
     unknown: "text-muted-foreground"
 };
 
-function bold(chunks: ReactNode[]) {
-    return (
-        <b key="b" className="font-medium text-foreground">
-            {chunks}
-        </b>
-    );
-}
-
 export function RelayFirewallGuide({ view }: { view: BackupView }) {
     const t = useTranslations("admin");
     const relay = view.relay;
-    const closed = view.probe?.relayClosed ?? null;
-    const linkUp = view.probe?.latency.relay != null;
+    const probe = view.probe;
     const server = view.servers.find((entry) => entry.id === view.config.relayTargetId);
     const detected = detectCloud(server?.name ?? null);
     const [cloud, setCloud] = useState<CloudFirewall>(detected);
@@ -54,10 +45,14 @@ export function RelayFirewallGuide({ view }: { view: BackupView }) {
     }, [detected]);
 
     const rules = relay ? relayFirewallRules(relay.listenPort, relay.tcp, relay.udp) : [];
-    const states = rules.map((rule) => ruleState(rule, linkUp, closed));
+    const link = linkState(probe);
+    const states = rules.map((rule) =>
+        ruleState(rule, link, probe?.relayClosed ?? null, probe?.relayUnclear ?? [])
+    );
     const [toggled, setToggled] = useState<boolean | null>(null);
-    // Open on its own while something is blocked; a choice made here stands.
-    const open = toggled ?? states.includes("closed");
+    // Open on its own while something is blocked or the relay's problem points
+    // here; a choice made here stands.
+    const open = toggled ?? (states.includes("closed") || probe?.problem === "relay-unreachable");
     if (!relay) return null;
     const guide = CLOUD_FIREWALLS.find((entry) => entry.id === cloud) ?? CLOUD_FIREWALLS[0];
 
@@ -121,12 +116,8 @@ export function RelayFirewallGuide({ view }: { view: BackupView }) {
                                     className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
                                 >
                                     <code className="w-8 text-foreground">{rule.protocol}</code>
-                                    <span className="inline-flex min-w-24 items-center gap-1">
-                                        <code className="text-foreground">{rulePort(rule)}</code>
-                                        <CopyButton
-                                            value={rulePort(rule)}
-                                            className="[&_svg]:size-3"
-                                        />
+                                    <span className="min-w-24">
+                                        <Value text={portText(rule)} />
                                     </span>
                                     <span className="min-w-0 flex-1 text-muted-foreground">
                                         {t(`domains.backup.firewall.purposes.${rule.purpose}`)}

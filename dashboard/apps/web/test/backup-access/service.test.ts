@@ -29,6 +29,7 @@ const zone = new Map<string, FakeRecord>();
 const containers = new Map<string, number>();
 let nextId = 1;
 let lineUp = true;
+let portAnswers = new Map<number, "silent" | "refused">();
 let relayCarries = true;
 let homeEdgeUp = true;
 const handshakes: { host: string; servername: string }[] = [];
@@ -73,14 +74,24 @@ vi.mock("node:net", async (original) => {
     const actual = await original<typeof import("node:net")>();
     return {
         ...actual,
-        connect: () => {
+        connect: ({ port }: { port: number }) => {
+            let timedOut = () => undefined as void;
             const socket = Object.assign(new EventEmitter(), {
-                setTimeout: () => undefined,
+                setTimeout: (_: number, callback: () => void) => {
+                    timedOut = callback;
+                },
                 destroy: () => undefined
             });
-            setImmediate(() =>
-                lineUp ? socket.emit("connect") : socket.emit("error", new Error("refused"))
-            );
+            setImmediate(() => {
+                const answer = portAnswers.get(port);
+                if (answer === "silent") timedOut();
+                else if (answer === "refused")
+                    socket.emit(
+                        "error",
+                        Object.assign(new Error("refused"), { code: "ECONNREFUSED" })
+                    );
+                else lineUp ? socket.emit("connect") : socket.emit("error", new Error("refused"));
+            });
             return socket;
         }
     };
@@ -722,6 +733,18 @@ describe("runBackupAccess", () => {
             udp: [7882, 19132]
         });
         expect((await service.backupView()).probe?.relayClosed).toEqual([]);
+        expect((await service.backupView()).probe?.relayUnclear).toEqual([]);
+
+        // A firewall drops what it refuses; a refusal got past it to nothing listening.
+        portAnswers = new Map([
+            [7881, "silent"],
+            [25565, "refused"]
+        ]);
+        await pass();
+        expect((await service.backupView()).probe?.relayClosed).toEqual([7881]);
+        expect((await service.backupView()).probe?.relayUnclear).toEqual([25565]);
+        portAnswers = new Map();
+        await pass();
 
         // Nothing changed: nothing is brought up again.
         brought.clear();

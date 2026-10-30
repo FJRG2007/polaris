@@ -737,6 +737,7 @@
                     "link": "El enlace con este servidor. Sin él no funciona nada",
                     "web": "Webs y panel",
                     "calls": "Llamadas",
+                    "tunnels": "Túneles que terminan en este servidor",
                     "games": "Juegos"
                 },
                 "states": {
@@ -744,7 +745,7 @@
                     "closed": "Bloqueado",
                     "unknown": "No se puede comprobar"
                 },
-                "after": "Abre solo estos puertos. Polaris los comprueba cada minuto, así que cada uno pasará a Abierto solo.",
+                "after": "Añade estas reglas a las que ya hay y deja esas como están. Polaris comprueba el enlace y los puertos TCP cada minuto, así que esos pasarán a Abierto solos. Los demás puertos UDP no se pueden comprobar desde aquí y lo seguirán indicando.",
                 "clouds": {
                     "ionos": {
                         "step1": "Entra en IONOS y abre <b>tus servidores</b>.",
@@ -782,7 +783,7 @@
                 "no-address": "El servidor relé no tiene dirección pública.",
                 "ports-held": "Los puertos 80 y 443 del servidor relé están en uso por {detail}.",
                 "edge-outdated": "El edge del servidor relé es demasiado antiguo para llevar el relé.",
-                "relay-unreachable": "El proveedor del servidor está bloqueando UDP {detail}: abre los puertos de la lista de abajo.",
+                "relay-unreachable": "Las visitas no llegan a este servidor a través del relé. Si el proveedor del servidor tiene firewall, comprueba que UDP {detail} y los puertos de la lista de abajo están abiertos.",
                 "setting-up": "Preparando el servidor relé. Puede tardar unos minutos.",
                 "ports-busy": "Algo en el servidor relé ya usa uno de los puertos que tiene que llevar. Elige otro servidor o libéralos allí.",
                 "failed": "La última pasada falló: {detail}"
