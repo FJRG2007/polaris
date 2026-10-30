@@ -340,8 +340,9 @@ export async function renameServerAction(input: unknown): Promise<{ error?: stri
     const { hostId, name } = parsed.data;
     if (hostId) {
         if (!name) return { error: await say("errors.nameIt") };
-        if (!(await renameHost(user.id, hostId, name)))
-            return { error: await say("errors.notFound") };
+        const outcome = await renameHost(user.id, hostId, name);
+        if (outcome === "missing") return { error: await say("errors.notFound") };
+        if (outcome === "taken") return { error: await say("errors.nameTaken") };
     } else {
         await setLocalServerName(name);
     }
