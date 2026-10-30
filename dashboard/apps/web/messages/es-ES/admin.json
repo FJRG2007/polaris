@@ -727,6 +727,52 @@
             "ms": "{ms} ms",
             "insideOnly": "Solo comprobado desde dentro: este router no vuelve a su propia IP pública, así que una línea con CGNAT puede pasar inadvertida. Añade un servidor en la nube para comprobar desde fuera.",
             "udpCarried": "El relé lleva UDP {ports}.",
+            "firewall": {
+                "show": "Muéstrame qué puertos abrir en el proveedor de este servidor",
+                "hide": "Ocultar los pasos",
+                "provider": "Proveedor",
+                "otherCloud": "Otro proveedor",
+                "open": "Abrir {provider}",
+                "purposes": {
+                    "link": "El enlace con este servidor. Sin él no funciona nada",
+                    "web": "Webs y panel",
+                    "calls": "Llamadas",
+                    "tunnels": "Túneles que terminan en este servidor",
+                    "games": "Juegos"
+                },
+                "states": {
+                    "open": "Abierto",
+                    "closed": "Bloqueado",
+                    "unknown": "No se puede comprobar"
+                },
+                "after": "Añade estas reglas a las que ya hay y deja esas como están. Polaris comprueba el enlace y los puertos TCP cada minuto, así que esos pasarán a Abierto solos. Los demás puertos UDP no se pueden comprobar desde aquí y lo seguirán indicando.",
+                "clouds": {
+                    "ionos": {
+                        "step1": "Entra en IONOS y abre <b>tus servidores</b>.",
+                        "step2": "Ve a <b>Políticas de Firewall</b> y abre la política del servidor {address}.",
+                        "step3": "En <b>la configuración</b>, rellena la última fila de la tabla una vez por cada regla de abajo, con la IP permitida abierta a todos, y guarda cada una con su icono de guardar."
+                    },
+                    "hetzner": {
+                        "step1": "Abre tu proyecto en Hetzner Console y pulsa <b>Firewalls</b>.",
+                        "step2": "Abre el firewall aplicado al servidor {address}.",
+                        "step3": "Añade una regla de entrada por cada fila de abajo, desde cualquier dirección IPv4 e IPv6, y guarda."
+                    },
+                    "digitalocean": {
+                        "step1": "Abre <b>Networking > Firewalls</b>, después el firewall del servidor {address} y su pestaña <b>Rules</b>.",
+                        "step2": "Por cada fila de abajo, pulsa <b>Add inbound rule</b> y pon <b>Type</b> en <b>Custom</b>.",
+                        "step3": "Rellena <b>Protocol</b> y <b>Port</b>, deja <b>Sources</b> en All IPv4 y All IPv6, y pulsa <b>Add inbound rule</b>."
+                    },
+                    "aws": {
+                        "step1": "En la consola de EC2, abre <b>Security Groups</b> y elige el grupo del servidor {address}.",
+                        "step2": "Elige <b>Edit inbound rules</b> y pulsa <b>Add rule</b> una vez por cada fila de abajo.",
+                        "step3": "Usa <b>Custom TCP</b> o <b>Custom UDP</b>, el puerto tal como aparece y <b>Anywhere-IPv4</b> como origen. Termina con <b>Save rules</b>."
+                    },
+                    "other": {
+                        "step1": "En el panel de tu proveedor, busca el firewall o grupo de seguridad del servidor {address}.",
+                        "step2": "Añade una regla de entrada por cada fila de abajo, desde cualquier dirección, y guarda."
+                    }
+                }
+            },
             "physics": "Las dos rutas salen desde aquí. Ayudan si el router pasa a una línea móvil o se bloquea la entrada, no si no sale nada.",
             "conflicts": "No se tocaron porque alguien los cambió durante el respaldo: {names}.",
             "problems": {
@@ -737,7 +783,7 @@
                 "no-address": "El servidor relé no tiene dirección pública.",
                 "ports-held": "Los puertos 80 y 443 del servidor relé están en uso por {detail}.",
                 "edge-outdated": "El edge del servidor relé es demasiado antiguo para llevar el relé.",
-                "relay-unreachable": "Las visitas no llegan a este servidor a través del relé. Permite UDP {detail} y los puertos de abajo en el firewall de tu proveedor.",
+                "relay-unreachable": "Las visitas no llegan a este servidor a través del relé. Si el proveedor del servidor tiene firewall, comprueba que UDP {detail} y los puertos de la lista de abajo están abiertos.",
                 "setting-up": "Preparando el servidor relé. Puede tardar unos minutos.",
                 "ports-busy": "Algo en el servidor relé ya usa uno de los puertos que tiene que llevar. Elige otro servidor o libéralos allí.",
                 "failed": "La última pasada falló: {detail}"

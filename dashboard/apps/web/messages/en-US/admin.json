@@ -727,6 +727,52 @@
             "ms": "{ms} ms",
             "insideOnly": "Checked from inside only: this router does not loop back to its own public address, so a carrier-NAT line can go unnoticed. Add a cloud server to check from outside.",
             "udpCarried": "The relay carries UDP {ports}.",
+            "firewall": {
+                "show": "Show which ports to open at this server's provider",
+                "hide": "Hide the steps",
+                "provider": "Provider",
+                "otherCloud": "Other provider",
+                "open": "Open {provider}",
+                "purposes": {
+                    "link": "The link back to this server. Nothing works without it",
+                    "web": "Websites and the dashboard",
+                    "calls": "Calls",
+                    "tunnels": "Tunnels that end at this server",
+                    "games": "Games"
+                },
+                "states": {
+                    "open": "Open",
+                    "closed": "Blocked",
+                    "unknown": "Cannot be checked"
+                },
+                "after": "Add these rules to the ones already there, and leave those in place. Polaris checks the link and the TCP ports every minute, so those turn to Open by themselves. Other UDP ports cannot be checked from here and keep saying so.",
+                "clouds": {
+                    "ionos": {
+                        "step1": "Sign in to IONOS and open <b>Menu > Server & Cloud</b>.",
+                        "step2": "Go to <b>Network > Firewall policies</b> and open the policy of the server at {address}.",
+                        "step3": "Under <b>Configuration</b>, fill in the last row of the table once per rule below, with <b>Allowed IP</b> open to everyone, and save each one with its save icon."
+                    },
+                    "hetzner": {
+                        "step1": "Open your project in the Hetzner Console and click <b>Firewalls</b>.",
+                        "step2": "Open the firewall applied to the server at {address}.",
+                        "step3": "Add one inbound rule per row below, from any IPv4 and IPv6 address, then save."
+                    },
+                    "digitalocean": {
+                        "step1": "Open <b>Networking > Firewalls</b>, then the firewall of the server at {address}, then its <b>Rules</b> tab.",
+                        "step2": "For each row below, click <b>Add inbound rule</b> and set <b>Type</b> to <b>Custom</b>.",
+                        "step3": "Fill in <b>Protocol</b> and <b>Port</b>, leave <b>Sources</b> on All IPv4 and All IPv6, and click <b>Add inbound rule</b>."
+                    },
+                    "aws": {
+                        "step1": "In the EC2 console, open <b>Security Groups</b> and select the group of the server at {address}.",
+                        "step2": "Choose <b>Edit inbound rules</b>, then <b>Add rule</b> once per row below.",
+                        "step3": "Use <b>Custom TCP</b> or <b>Custom UDP</b>, the port as shown, and <b>Anywhere-IPv4</b> as the source. Finish with <b>Save rules</b>."
+                    },
+                    "other": {
+                        "step1": "In your provider's panel, find the firewall or security group of the server at {address}.",
+                        "step2": "Add one inbound rule per row below, from any address, and save."
+                    }
+                }
+            },
             "physics": "Both paths dial out from here. They help when the router fails over to a mobile line or inbound is blocked, not when nothing gets out at all.",
             "conflicts": "Left alone because someone changed them while on backup: {names}.",
             "problems": {
@@ -738,7 +784,7 @@
                 "ports-busy": "Something on the relay server already uses one of the ports it has to carry. Pick another server or free them there.",
                 "ports-held": "Ports 80 and 443 on the relay server are in use by {detail}.",
                 "edge-outdated": "The edge on the relay server is too old to carry the relay.",
-                "relay-unreachable": "Visitors cannot get through the relay to this server. Allow UDP {detail} and the ports below in your cloud provider's firewall.",
+                "relay-unreachable": "Visitors cannot get through the relay to this server. If the server's provider has a firewall, check that UDP {detail} and the ports listed below are open.",
                 "setting-up": "Preparing the relay server. This can take a few minutes.",
                 "failed": "The last pass failed: {detail}"
             },

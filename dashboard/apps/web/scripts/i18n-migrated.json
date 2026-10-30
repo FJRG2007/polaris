@@ -522,6 +522,8 @@
         "web/src/app/(app)/admin/domains/ports-read-failed.tsx",
         "web/src/app/(app)/admin/domains/port-policy-form.tsx",
         "web/src/app/(app)/admin/domains/router-steps.tsx",
+        "web/src/app/(app)/admin/domains/relay-firewall-guide.tsx",
+        "web/src/app/(app)/admin/domains/guide-parts.tsx",
         "web/src/app/(app)/admin/domains/setup-actions.ts",
         "web/src/app/(app)/admin/domains/setup-wizard.tsx",
         "web/src/app/(app)/admin/email/actions.ts",
