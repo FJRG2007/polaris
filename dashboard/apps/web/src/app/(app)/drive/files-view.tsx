@@ -789,7 +789,7 @@ export function FilesView({
     /** Back to the listing. A picture shrinks into its thumbnail on the way,
      *  as a copy, because the real one goes with the preview. */
     function closeViewer() {
-        const picture = preview.current?.querySelector<HTMLImageElement>("[data-preview-picture]");
+        const picture = preview.current?.querySelector<HTMLImageElement>("[data-viewer-picture]");
         const path = viewerTarget?.path;
         const index = path ? visible.findIndex((entry) => entry.path === path) : -1;
         // The listing has to be back on the page before it can be scrolled to

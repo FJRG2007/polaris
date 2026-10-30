@@ -24,6 +24,12 @@
  * click - because those are two habits and neither is wrong. What is in it is
  * `image-actions`, shared with the conversation: right-clicking a picture in a
  * message offers the same things without opening it first.
+ *
+ * Embedded, it is only the stage: a screen with its own frame around a picture
+ * (Drive's preview, with its header, stepping and flight) draws the picture
+ * here so zoom, pan and fit behave the way they do everywhere else, and keeps
+ * everything else its own. The frame never resizes while stepping: the last
+ * picture stays up until the next one has decoded, then swaps in place.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -82,6 +88,8 @@ export interface ViewerLabels {
     readonly close: string;
     readonly previous: string;
     readonly next: string;
+    /** Back to fit, for the embedded stage's zoom chip. Falls back to zoomOut. */
+    readonly fit?: string;
     /** "3 of 7", for a picture that is one of a set. */
     position(index: number, count: number): string;
 }
@@ -128,7 +136,9 @@ export function ImageViewer({
     menu,
     gallery,
     onNavigate,
-    origin = thumbnailOf
+    origin = thumbnailOf,
+    embedded = false,
+    onPictureLoad
 }: {
     /** The picture being looked at, or null for none. */
     image: ViewedImage | null;
@@ -144,6 +154,11 @@ export function ImageViewer({
     /** The picture's menu. With none, the viewer has no three dots and leaves
      *  the right click to the browser. */
     menu?: ViewerMenu;
+    /** Only the stage, filling the caller's frame: no dialog, bar, arrows,
+     *  Escape or flight - the caller has its own. Zoom, pan and fit stay. */
+    embedded?: boolean;
+    /** The picture on screen finished loading (each one, as it swaps in). */
+    onPictureLoad?: (picture: HTMLImageElement) => void;
 }) {
     const [zoom, setZoom] = useState(1);
     const [at, setAt] = useState({ x: 0, y: 0 });
@@ -159,12 +174,32 @@ export function ImageViewer({
     const flown = useRef(false);
     const closing = useRef(false);
     const shown = image !== null;
+    // Embedded, what is painted lags what was asked for until it has decoded,
+    // so a step never blanks the frame or collapses it to nothing first.
+    const [painted, setPainted] = useState<string | null>(image?.url ?? null);
+    const wanted = image?.url ?? null;
+    useEffect(() => {
+        if (!embedded || wanted === null || wanted === painted) return;
+        let live = true;
+        const probe = new Image();
+        probe.src = wanted;
+        const swap = () => {
+            if (live) setPainted(wanted);
+        };
+        // A picture that will not decode still swaps, so its own failure shows
+        // rather than the last picture under the wrong name.
+        if (typeof probe.decode === "function") probe.decode().then(swap, swap);
+        else swap();
+        return () => {
+            live = false;
+        };
+    }, [embedded, wanted, painted]);
 
     /** Which way the last arrow went, so the next picture slides in from there. */
     const sliding = useRef<-1 | 1 | null>(null);
 
     useLayoutEffect(() => {
-        if (!shown) return;
+        if (!shown || embedded) return;
         flown.current = false;
         closing.current = false;
         if (!flying.reducedMotion()) fadeChrome(root.current, 0, 1, flying.OPEN_MS);
@@ -179,7 +214,7 @@ export function ImageViewer({
                 before.focus({ preventScroll: true });
             }
         };
-    }, [shown]);
+    }, [shown, embedded]);
 
     /** The next picture comes in from the side it was asked for. */
     const slideIn = useCallback(() => {
@@ -200,7 +235,7 @@ export function ImageViewer({
     /** Grow the picture out of its thumbnail, once it has a size to grow to. */
     const flyIn = useCallback(() => {
         const element = picture.current;
-        if (!image || !element || flown.current || closing.current) return;
+        if (embedded || !image || !element || flown.current || closing.current) return;
         if (element.offsetWidth < 1) return;
         flown.current = true;
         if (!flying.canFly(element)) return;
@@ -209,7 +244,7 @@ export function ImageViewer({
             flying.boxOf(element),
             flying.visibleBox(origin(image), flying.viewportSize())
         );
-    }, [image, origin]);
+    }, [image, origin, embedded]);
 
     useLayoutEffect(() => {
         if (picture.current?.complete) flyIn();
@@ -272,6 +307,14 @@ export function ImageViewer({
     useEffect(() => {
         if (!image) return;
         const onKey = (event: KeyboardEvent) => {
+            if (embedded) {
+                // The caller owns Escape and stepping; the zoom keys are the
+                // picture's, unless somebody is typing somewhere on the page.
+                if (typingIn(event.target)) return;
+                if (shortcutPressed(event, "viewer.zoomIn")) setZoom((now) => step(now, 1));
+                if (shortcutPressed(event, "viewer.zoomOut")) setZoom((now) => step(now, -1));
+                return;
+            }
             if (event.key === "Escape") {
                 event.preventDefault();
                 close();
@@ -292,7 +335,7 @@ export function ImageViewer({
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [image, close, go]);
+    }, [image, close, go, embedded]);
 
     const say = useCallback((words: string) => {
         setSaid(words);
@@ -307,6 +350,10 @@ export function ImageViewer({
     const stage = (
         <div
             className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+            // A zoomed picture is being moved, not swiped past: the caller's
+            // swipe-to-step never hears a touch that is panning it.
+            onTouchStart={embedded && zoom > 1 ? (event) => event.stopPropagation() : undefined}
+            onTouchEnd={embedded && zoom > 1 ? (event) => event.stopPropagation() : undefined}
             onWheel={(event) => {
                 setZoom((current) => clamp(current * Math.exp(-event.deltaY * WHEEL_STEP)));
             }}
@@ -341,7 +388,7 @@ export function ImageViewer({
                 const from = press.current;
                 dragging.current = null;
                 press.current = null;
-                if (closesOnRelease(from, event)) close();
+                if (!embedded && closesOnRelease(from, event)) close();
             }}
             onPointerCancel={() => {
                 dragging.current = null;
@@ -351,11 +398,13 @@ export function ImageViewer({
             {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
             <img
                 ref={picture}
-                onLoad={() => {
+                data-viewer-picture=""
+                onLoad={(event) => {
                     flyIn();
                     slideIn();
+                    onPictureLoad?.(event.currentTarget);
                 }}
-                src={image.url}
+                src={embedded ? (painted ?? image.url) : image.url}
                 alt={image.name}
                 draggable={false}
                 style={{
@@ -368,6 +417,42 @@ export function ImageViewer({
             />
         </div>
     );
+
+    if (embedded) {
+        return (
+            <div
+                data-image-viewer=""
+                data-image-stage=""
+                className="relative flex size-full min-h-0 min-w-0 flex-col"
+            >
+                {menu ? (
+                    <ContextMenu>
+                        <ContextMenuTrigger asChild>{stage}</ContextMenuTrigger>
+                        <ContextMenuContent className="w-56">
+                            {items(ContextMenuItem, ContextMenuSeparator)}
+                        </ContextMenuContent>
+                    </ContextMenu>
+                ) : (
+                    stage
+                )}
+                {/* Only once it has been zoomed: back to fit in one press. */}
+                {zoom !== 1 ? (
+                    <button
+                        type="button"
+                        aria-label={labels.fit ?? labels.zoomOut}
+                        title={labels.fit ?? labels.zoomOut}
+                        onClick={() => {
+                            setZoom(1);
+                            setAt({ x: 0, y: 0 });
+                        }}
+                        className="absolute right-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        {Math.round(zoom * 100)}%
+                    </button>
+                ) : null}
+            </div>
+        );
+    }
 
     return (
         <div
@@ -505,6 +590,12 @@ export function closesOnRelease(
 ): boolean {
     if (!press?.outside) return false;
     return Math.hypot(at.clientX - press.x, at.clientY - press.y) <= DRAG_SLOP;
+}
+
+/** Whether a key went to something being typed in. */
+function typingIn(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 function clamp(value: number): number {

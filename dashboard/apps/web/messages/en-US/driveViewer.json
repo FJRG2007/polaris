@@ -209,5 +209,12 @@
     "loading": {
         "editor": "Opening the editor",
         "document": "Opening the document"
+    },
+    "picture": {
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "fit": "Fit the picture again",
+        "more": "More",
+        "close": "Close"
     }
 }

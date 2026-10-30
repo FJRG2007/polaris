@@ -17,7 +17,7 @@
  */
 
 import { viewerKind } from "./viewer/kind";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
@@ -35,7 +35,8 @@ import { StepControls, stepOfKey, useSwipeToStep } from "./viewer-stepper";
 import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { ChevronLeft, ChevronRight, Download, Loader2, Share2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { ImageViewer, type ViewerLabels } from "@polaris/ui/image-viewer";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, cn } from "@polaris/ui";
 
 export type { ViewerTarget, ViewerUrlFor, ViewerKind } from "./viewer/types";
 export { isViewable, viewerKind } from "./viewer/kind";
@@ -59,7 +60,8 @@ export function FilePreview({
     token,
     readOnly = false,
     allowDownload = true,
-    from
+    from,
+    fill = false
 }: {
     target: ViewerTarget;
     onSaved?: (name: string) => void;
@@ -76,13 +78,20 @@ export function FilePreview({
      *  before the preview took the listing's place. Null fades it in place;
      *  left out, it simply appears. */
     from?: flying.Box | null;
+    /** A picture fills the box it is in (a frame with a height of its own, like
+     *  the dialog). Otherwise it gets a fixed share of the window, so stepping
+     *  between pictures of different shapes never resizes the frame. */
+    fill?: boolean;
 }) {
     const src = (urlFor ?? driveByteUrl)(target, true);
     const kind = viewerKind(target.name);
 
     if (kind === "image") {
         return (
-            <div className="flex items-center justify-center p-4">
+            <div
+                data-preview-frame=""
+                className={cn("w-full p-4", fill ? "h-full" : "h-[70vh] min-h-64")}
+            >
                 <PreviewPicture src={src} alt={target.name} from={from} />
             </div>
         );
@@ -114,11 +123,15 @@ export function FilePreview({
 }
 
 /**
- * The image preview's picture, grown out of its thumbnail once it has a size.
+ * The image preview's picture, drawn by the viewer every picture in Polaris
+ * opens in, so zoom, pan and fit answer here the way they do everywhere else.
+ * Embedded: the header, stepping, Escape and the flight are Drive's own.
  *
- * The flight is made by a copy above the page, because the picture sits in a
- * scrolling box that would clip it on the way in; the real one waits hidden
- * underneath and shows when the copy lands. Once per opening.
+ * It grows out of its thumbnail once it has a size. The flight is made by a
+ * copy above the page, because the picture sits in a scrolling box that would
+ * clip it on the way in; the real one waits hidden underneath and shows when
+ * the copy lands. Once per opening: stepping keeps this mounted, so the next
+ * picture swaps in place rather than opening again.
  */
 function PreviewPicture({
     src,
@@ -129,20 +142,36 @@ function PreviewPicture({
     alt: string;
     from: flying.Box | null | undefined;
 }) {
+    const t = useTranslations("driveViewer");
     const flown = useRef(false);
+    // Read when the first picture loads, which may be renders after `from`
+    // was handed in.
+    const fromRef = useRef(from);
+    fromRef.current = from;
+    const image = useMemo(() => ({ url: src, name: alt }), [src, alt]);
+    const labels: ViewerLabels = {
+        zoomIn: t("picture.zoomIn"),
+        zoomOut: t("picture.zoomOut"),
+        fit: t("picture.fit"),
+        more: t("picture.more"),
+        close: t("picture.close"),
+        previous: t("viewer.previousFile"),
+        next: t("viewer.nextFile"),
+        position: (index, count) => t("viewer.position", { index, count })
+    };
     return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-            src={src}
-            alt={alt}
-            data-preview-picture=""
-            onLoad={(event) => {
-                const picture = event.currentTarget;
-                if (from === undefined || flown.current || picture.offsetWidth < 1) return;
+        <ImageViewer
+            embedded
+            image={image}
+            onClose={() => undefined}
+            labels={labels}
+            onPictureLoad={(picture) => {
+                const origin = fromRef.current;
+                if (origin === undefined || flown.current || picture.offsetWidth < 1) return;
                 flown.current = true;
                 if (!flying.canFly(picture)) return;
                 const at = flying.boxOf(picture);
-                if (!from) {
+                if (!origin) {
                     flying.growIn(picture, at, null);
                     return;
                 }
@@ -152,11 +181,10 @@ function PreviewPicture({
                     copy.remove();
                     picture.style.visibility = "";
                 };
-                flying.growIn(copy, at, from).finished.then(land, land);
+                flying.growIn(copy, at, origin).finished.then(land, land);
                 // A tab in the background may never finish it.
                 setTimeout(land, flying.OPEN_MS + 120);
             }}
-            className="max-h-[80vh] max-w-full object-contain"
         />
     );
 }
@@ -224,7 +252,7 @@ export function FileViewer({
     /** Closed: a picture shrinks back into its thumbnail on the way, as a copy,
      *  because the real one goes with the dialog. */
     function changeOpen(open: boolean) {
-        const picture = content.current?.querySelector<HTMLImageElement>("[data-preview-picture]");
+        const picture = content.current?.querySelector<HTMLImageElement>("[data-viewer-picture]");
         if (
             open ||
             !target ||
