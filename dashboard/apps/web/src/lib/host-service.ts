@@ -172,18 +172,28 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
 }
 
 /** Rename a host, and the deploy target that carries its name. Owner-scoped:
- *  false when no host of this owner matched, so a caller never reports a change
- *  that did not happen. */
-export async function renameHost(ownerId: string, hostId: string, name: string): Promise<boolean> {
-    return prisma.$transaction(async (tx) => {
-        const { count } = await tx.host.updateMany({
-            where: { id: hostId, ownerId },
-            data: { name }
+ *  "missing" when no host of this owner matched, so a caller never reports a
+ *  change that did not happen. Target names are unique per owner, so "taken"
+ *  when another target holds the name, and neither row changes. */
+export async function renameHost(
+    ownerId: string,
+    hostId: string,
+    name: string
+): Promise<"renamed" | "missing" | "taken"> {
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const { count } = await tx.host.updateMany({
+                where: { id: hostId, ownerId },
+                data: { name }
+            });
+            if (count === 0) return "missing";
+            await tx.deployTarget.updateMany({ where: { hostId, kind: "host" }, data: { name } });
+            return "renamed";
         });
-        if (count === 0) return false;
-        await tx.deployTarget.updateMany({ where: { hostId, kind: "host" }, data: { name } });
-        return true;
-    });
+    } catch (caught) {
+        if ((caught as { code?: string } | null)?.code === "P2002") return "taken";
+        throw caught;
+    }
 }
 
 /** Record where a host lives, which decides how a domain can be pointed at it.

@@ -385,6 +385,7 @@
         "lookNetwork": "Could not look for this server on the network",
         "invalidName": "Invalid name",
         "nameIt": "Name this server",
+        "nameTaken": "That name is already in use. Choose another.",
         "invalidDomain": "Invalid domain",
         "saveDomain": "Could not save the domain",
         "invalidEnrollment": "Invalid enrollment",

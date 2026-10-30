@@ -385,6 +385,7 @@
         "lookNetwork": "No se pudo buscar este servidor en la red",
         "invalidName": "Nombre inválido",
         "nameIt": "Nombra este servidor",
+        "nameTaken": "Ese nombre ya está en uso. Elige otro.",
         "invalidDomain": "Dominio no válido",
         "saveDomain": "No se pudo guardar el dominio",
         "invalidEnrollment": "Registro no válido",
