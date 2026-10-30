@@ -38,7 +38,9 @@ export function MicSettings({ className }: { className?: string }) {
         <div className={cn("flex flex-col gap-3 text-xs", className)}>
             {devices.length > 1 && (
                 <div className="flex flex-col gap-1">
-                    <p className="font-medium text-foreground-subtle">{t("micSettings.microphone")}</p>
+                    <p className="font-medium text-foreground-subtle">
+                        {t("micSettings.microphone")}
+                    </p>
                     {devices.map((device) => (
                         <button
                             key={device.id}
@@ -61,7 +63,9 @@ export function MicSettings({ className }: { className?: string }) {
             )}
 
             <div className="flex flex-col gap-1">
-                <p className="font-medium text-foreground-subtle">{t("micSettings.backgroundNoise")}</p>
+                <p className="font-medium text-foreground-subtle">
+                    {t("micSettings.backgroundNoise")}
+                </p>
                 {NOISE_LEVELS.map((level) => (
                     <button
                         key={level.value}
@@ -76,14 +80,18 @@ export function MicSettings({ className }: { className?: string }) {
                                 level.value === cleanup ? "opacity-100" : "opacity-0"
                             )}
                         />
-                        <span className="truncate" title={t(level.label)}>{t(level.label)}</span>
+                        <span className="truncate" title={t(level.label)}>
+                            {t(level.label)}
+                        </span>
                     </button>
                 ))}
             </div>
 
             <div className="flex flex-col gap-1">
                 <span className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-foreground-subtle">{t("micSettings.microphoneVolume")}</span>
+                    <span className="font-medium text-foreground-subtle">
+                        {t("micSettings.microphoneVolume")}
+                    </span>
                     <span className="tabular-nums text-muted-foreground">{percent(gain)}</span>
                 </span>
                 <input
@@ -96,9 +104,7 @@ export function MicSettings({ className }: { className?: string }) {
                     onChange={(event) => setGain(Number(event.target.value) / 100)}
                     className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
                 />
-                <p className="text-muted-foreground">
-                    {t("micSettings.howLoudYouGoOut")}
-                </p>
+                <p className="text-muted-foreground">{t("micSettings.howLoudYouGoOut")}</p>
             </div>
         </div>
     );
