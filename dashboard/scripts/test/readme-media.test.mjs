@@ -134,7 +134,6 @@ test("covers every screen the README promises", () => {
         "office-doc",
         "vault",
         "vault-sends",
-        "vault-browser",
         "extension-autofill",
         "polar",
         "polar-side-panel",

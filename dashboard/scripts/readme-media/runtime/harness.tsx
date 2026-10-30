@@ -11,7 +11,7 @@
  * that was missing data.
  */
 
-import { INNER_SCENES, SCENES } from "../scenes";
+import { SCENES } from "../scenes";
 import { chromeActions, chromeApi } from "../fixtures/chrome";
 import { scenePath } from "./route";
 import { pollAnswer } from "./poll-routes";
@@ -40,11 +40,7 @@ declare global {
 const params = new URLSearchParams(location.search);
 const locale = (params.get("locale") === "es-ES" ? "es-ES" : "en-US") satisfies SceneLocale;
 const theme = (params.get("theme") === "light" ? "light" : "dark") satisfies SceneTheme;
-// A scene drawn only inside another's frame (`SceneWindow`) is found here too,
-// but is never listed, so it is never taken as a picture of its own.
-const scene = [...SCENES, ...INNER_SCENES].find(
-    (candidate) => candidate.id === params.get("scene")
-);
+const scene = SCENES.find((candidate) => candidate.id === params.get("scene"));
 
 const ctx: SceneContext = {
     locale,

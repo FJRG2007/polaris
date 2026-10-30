@@ -142,7 +142,7 @@ the full feature list. Mobile versions are in
       <a href="docs/features/polar.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-light-en-desktop.webp">
-        <img src="docs/assets/media/polar-dark-en-desktop.webp" alt="Polar answering a question in the browser">
+        <img src="docs/assets/media/polar-dark-en-desktop.webp" alt="Polar answering a question">
       </picture>
       </a>
       <br><sub><a href="docs/features/polar.md"><b>Polar</b></a>: ask anything and have things done</sub>
@@ -166,8 +166,8 @@ the full feature list. Mobile versions are in
     <td width="50%" valign="top">
       <a href="docs/features/vault.md">
       <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-browser-light-en-desktop.webp">
-        <img src="docs/assets/media/vault-browser-dark-en-desktop.webp" alt="Vault: passwords and one-time codes in the browser">
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-en-desktop.webp">
+        <img src="docs/assets/media/vault-dark-en-desktop.webp" alt="Vault: passwords and one-time codes">
       </picture>
       </a>
       <br><sub><a href="docs/features/vault.md"><b>Vault</b></a>: passwords and one-time codes, shared with your team</sub>

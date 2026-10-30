@@ -11,7 +11,7 @@
  */
 
 import { PolarisMark } from "@polaris/ui";
-import type { SceneContext, SceneDefinition } from "./scene";
+import type { SceneContext } from "./scene";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Lock, Minus, Plus, RotateCw, Square, X } from "lucide-react";
 
@@ -381,42 +381,4 @@ export async function windowsReady(): Promise<void> {
     }
     for (const inner of windows())
         for (const what of inner.__MISSING__ ?? []) (globalThis.__MISSING__ ??= []).push(what);
-}
-
-/**
- * `inner` drawn in a browser: the same screen, the same animation, with tabs and
- * an address bar around it. The inner scene runs in its own frame, so its
- * answers stay its own; this one answers nothing.
- */
-export function framedScene(
-    id: string,
-    inner: SceneDefinition,
-    frame: (ctx: SceneContext) => { tabs: readonly BrowserTab[]; url: string }
-): SceneDefinition {
-    const animation = inner.animation;
-    return {
-        id,
-        path: inner.path,
-        params: inner.params,
-        render: (ctx) => {
-            const { tabs, url } = frame(ctx);
-            return (
-                <BrowserFrame ctx={ctx} tabs={tabs} url={url}>
-                    <SceneWindow ctx={ctx} scene={inner.id} title={tabs[0]?.title ?? inner.id} />
-                </BrowserFrame>
-            );
-        },
-        prepare: windowsReady,
-        animation: animation && {
-            get frames() {
-                return animation.frames;
-            },
-            step: async (index) => {
-                await windowsReady();
-                await windows()[0]!.__scene!.step(index);
-            },
-            hold: (index) => animation.hold(index),
-            advance: (index) => animation.advance?.(index) ?? 400
-        }
-    };
 }
