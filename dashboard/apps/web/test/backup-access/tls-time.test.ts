@@ -6,7 +6,7 @@
 import { createServer, type Server } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { tlsTime } from "@/lib/backup-access/tls-time";
+import { tlsHandshake } from "@/lib/backup-access/tls-time";
 
 let server: Server | null = null;
 const silent = (): Promise<number> =>
@@ -26,6 +26,6 @@ afterEach(() => {
 describe("tlsTime", () => {
     it("gets no time from a port that accepts and never shakes hands", async () => {
         const port = await silent();
-        expect(await tlsTime("127.0.0.1", port, "example.test", 300)).toBeNull();
+        expect(await tlsHandshake("127.0.0.1", port, "example.test", 300)).toBeNull();
     });
 });

@@ -20,7 +20,9 @@ interface FakeRecord {
 const HOME = "203.0.113.10";
 // Public-looking on purpose: the call server is never pointed at a documentation range.
 const RELAY = "51.0.0.30";
-const NAMES = ["example.test", "www.example.test"];
+// The default layout: the base domain itself is not among the names the relay routes.
+const NAMES = ["polaris.example.test", "plr.example.test"];
+const HOME_CERTIFICATE = "home-certificate";
 
 const settings = new Map<string, string>();
 const zone = new Map<string, FakeRecord>();
@@ -28,6 +30,8 @@ const containers = new Map<string, number>();
 let nextId = 1;
 let lineUp = true;
 let relayCarries = true;
+let homeEdgeUp = true;
+const handshakes: { host: string; servername: string }[] = [];
 let games: { ports: { port: number; protocol: "tcp" | "udp" }[] }[] = [];
 let tunnelPorts: number[] = [];
 const tunnelRelays: (string | null)[] = [];
@@ -86,13 +90,20 @@ vi.mock("node:tls", async (original) => {
     const actual = await original<typeof import("node:tls")>();
     return {
         ...actual,
-        connect: () => {
+        connect: ({ host, servername }: { host: string; servername: string }) => {
+            handshakes.push({ host, servername });
+            const home = host !== RELAY;
+            // A name the relay server's edge does not route ends at that edge.
+            const routed = edgeFiles.get("polaris-relay.yml")?.includes(`\`${servername}\``);
             const socket = Object.assign(new EventEmitter(), {
                 setTimeout: () => undefined,
-                destroy: () => undefined
+                destroy: () => undefined,
+                getPeerCertificate: () => ({
+                    fingerprint256: home || routed ? HOME_CERTIFICATE : "relay-edge-certificate"
+                })
             });
             setImmediate(() =>
-                relayCarries
+                (home ? homeEdgeUp : relayCarries)
                     ? socket.emit("secureConnect")
                     : socket.emit("error", new Error("reset"))
             );
@@ -283,6 +294,8 @@ beforeEach(() => {
     nextId = 1;
     lineUp = true;
     relayCarries = true;
+    homeEdgeUp = true;
+    handshakes.length = 0;
     reachNow = null;
     callNodeIps.length = 0;
     tunnelRelays.length = 0;
@@ -476,7 +489,9 @@ describe("runBackupAccess", () => {
         relayCarries = false;
         await relayOn("automatic");
         reachNow = { publicIp: HOME, cgnat: true, certain: true, reason: "carrier-address" };
-        await passes(FAIL_TO_FLIP);
+        await pass();
+        expect((await service.backupView()).probe?.problem).toBeNull();
+        await passes(FAIL_TO_FLIP - 1);
         expect(serving()).toBe("direct");
         const probe = (await service.backupView()).probe;
         expect(probe?.problem).toBe("relay-unreachable");
@@ -497,6 +512,63 @@ describe("runBackupAccess", () => {
         relayCarries = false;
         await pass();
         expect(serving()).toBe("backup");
+    });
+
+    it("probes the relay with a name its routes carry", async () => {
+        wildcards = ["*.plr.example.test"];
+        await relayOn();
+        await pass();
+        const sent = handshakes.filter((entry) => entry.host === RELAY);
+        expect(sent.map((entry) => entry.servername)).toEqual(["polaris.example.test"]);
+        expect(serving()).toBe("backup");
+    });
+
+    it("keeps the records on the working path while the new relay is dead", async () => {
+        await service.saveConfig({
+            mode: "always",
+            path: "tunnel",
+            relayTargetId: null,
+            dataSaver: true,
+            manualOn: false
+        });
+        await pass();
+        expect(serving()).toBe("backup");
+
+        relayCarries = false;
+        await relayOn();
+        await pass();
+        expect(records().every((record) => record.content.endsWith("cfargotunnel.com"))).toBe(true);
+        expect(deletedTunnels).toEqual([]);
+
+        relayCarries = true;
+        await pass();
+        expect(records().map((record) => record.content)).toEqual([RELAY, RELAY]);
+        expect(deletedTunnels).toEqual(["tunnel-1"]);
+    });
+
+    it("does not take the relay server's own edge for the way home, and puts the routes back", async () => {
+        await relayOn("automatic");
+        await pass();
+        expect((await service.backupView()).probe?.latency.relay).not.toBeNull();
+
+        edgeFiles.clear();
+        await pass();
+        const lost = (await service.backupView()).probe;
+        expect(lost?.latency.relay).toBeNull();
+        expect(lost?.relayMisses).toBe(1);
+
+        await pass();
+        const back = (await service.backupView()).probe;
+        expect(edgeFiles.has("polaris-relay.yml")).toBe(true);
+        expect(back?.latency.relay).not.toBeNull();
+        expect(back?.relayMisses).toBe(0);
+    });
+
+    it("trusts the handshake alone when the house's edge cannot be asked", async () => {
+        homeEdgeUp = false;
+        await relayOn("automatic");
+        await pass();
+        expect((await service.backupView()).probe?.latency.relay).not.toBeNull();
     });
 
     it("re-pushes the routes when an app on the relay server takes a house name", async () => {
