@@ -269,12 +269,12 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
     const alias = input.hostAlias;
     if (alias && !/^[a-z0-9][a-z0-9.-]*$/.test(alias))
         throw new Error("A tunnel host alias is not a plain name");
-    const pin = alias ? ` | sed "s/${alias}/\\${PINNED:-${alias}}/g"` : "";
+    const pin = alias ? ` | sed "s/${alias}/\${PINNED:-${alias}}/g"` : "";
     const script = [
         "set -e",
         ...(alias
             ? [
-                  `PINNED=$(grep -F ${alias} /etc/hosts | head -n 1 | tr -s ' \t' ' ' | cut -d ' ' -f 1)`
+                  `PINNED=$(grep -F ${alias} /etc/hosts | head -n 1 | tr -s ' \\t' ' ' | cut -d ' ' -f 1)`
               ]
             : []),
         `printf %s "$WG_CONFIG" | base64 -d${pin} > /etc/wireproxy/config`,
