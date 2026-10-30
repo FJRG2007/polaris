@@ -194,4 +194,14 @@ describe("a finger on a shared folder", () => {
         tap((await screen.findByText("b.pdf")).closest("[data-share-row]")!);
         expect(await screen.findByRole("dialog")).toBeTruthy();
     });
+
+    it("opens when the only pick is hidden by the search", async () => {
+        share(["a.jpg", "b.pdf", "c.txt", "d.xlsx", "e.md", "f.csv"].map((n) => photo(n, 1)));
+        const row = (await screen.findByText("a.jpg")).closest("[data-share-row]") as HTMLElement;
+        fireEvent.click(within(row).getByRole("checkbox"));
+        fireEvent.click(screen.getByRole("button", { name: /scope/i }));
+        fireEvent.change(screen.getByPlaceholderText(/^Search/), { target: { value: "b.pdf" } });
+        tap((await screen.findByText("b.pdf")).closest("[data-share-row]")!);
+        expect(await screen.findByRole("dialog")).toBeTruthy();
+    });
 });

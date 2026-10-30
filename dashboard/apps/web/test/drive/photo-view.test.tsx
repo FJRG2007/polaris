@@ -258,6 +258,43 @@ describe("a finger in Drive", () => {
         expect(screen.queryByText("1 of 8")).toBeNull();
     });
 
+    it("opens the next photo with one tap after coming back from the preview", async () => {
+        renderFilesView(ALBUM);
+        tap(await screen.findByLabelText("IMG_1.jpg"));
+        expect(await screen.findByText("1 of 8")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Back" }));
+        tap(await screen.findByLabelText("IMG_2.jpg"));
+        expect(await screen.findByText("2 of 8")).toBeTruthy();
+    });
+
+    it("keeps the selection a mouse left after closing the preview", async () => {
+        renderFilesView(ALBUM);
+        const tile = await screen.findByLabelText("IMG_1.jpg");
+        fireEvent.click(tile);
+        fireEvent.doubleClick(tile);
+        expect(await screen.findByText("1 of 8")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Back" }));
+        expect(await screen.findByRole("button", { name: /Clear/ })).toBeTruthy();
+    });
+
+    it("does not open a second time when a double tap ends in a double click", async () => {
+        renderFilesView(docs);
+        const row = (await screen.findByText("Edits")).closest("[data-drive-row]")!;
+        tap(row);
+        tap(row, 2);
+        fireEvent.doubleClick(row);
+        expect(push).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens when the only pick is hidden by the search", async () => {
+        renderFilesView(docs);
+        const row = (await screen.findByText("a.docx")).closest("[data-drive-row]")!;
+        fireEvent.click(within(row as HTMLElement).getByRole("checkbox"));
+        fireEvent.change(screen.getByPlaceholderText(/^Search/), { target: { value: "Edits" } });
+        tap((await screen.findByText("Edits")).closest("[data-drive-row]")!);
+        expect(push).toHaveBeenCalledWith("/drive?c=c1&p=Edits");
+    });
+
     it("picks instead of opening once something is picked", async () => {
         renderFilesView(docs);
         const row = (await screen.findByText("a.docx")).closest("[data-drive-row]")!;

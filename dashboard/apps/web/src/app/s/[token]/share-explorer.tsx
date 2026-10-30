@@ -759,7 +759,7 @@ export function ShareExplorer({
             // The second tap of a double tap: the first already opened it.
             if (event.detail > 1) return;
             // Once something is picked a tap picks, as in any phone's file manager.
-            if (selected.size > 0) toggleOne(entry.path);
+            if (selectedEntries.length > 0) toggleOne(entry.path);
             else openEntry(entry);
             lastIndex.current = index;
             return;
@@ -1478,8 +1478,8 @@ export function ShareExplorer({
                                                         rowContextMenu(row.index, entry)
                                                     }
                                                     onDoubleClick={(event) => {
-                                            if (!plainTap(event)) openEntry(entry);
-                                        }}
+                                                        if (!plainTap(event)) openEntry(entry);
+                                                    }}
                                                     style={{
                                                         position: "absolute",
                                                         top: 0,
