@@ -689,6 +689,9 @@
                 "always": "Siempre",
                 "manual": "Manual"
             },
+            "freePorts": "Liberar puertos",
+            "freePortsTitle": "¿Detener lo que usa los puertos 80 y 443?",
+            "freePortsBody": "Polaris detendrá {holders} en el servidor relé y caerán todas las webs que sirva allí. El servidor pasará a usar el edge de Polaris, que lleva el relé y también puede alojar apps.",
             "useBackup": "Pasar al respaldo",
             "useDirect": "Volver a directa",
             "needsToken": "Conecta antes un token de Cloudflare",
@@ -722,6 +725,8 @@
                 "no-daemon": "Esta edición no puede ejecutar el conector. La edición completa sí.",
                 "no-server": "El servidor relé ya no existe. Elige otro.",
                 "no-address": "El servidor relé no tiene dirección pública.",
+                "ports-held": "{detail} está usando los puertos 80 y 443 en el servidor relé.",
+                "setting-up": "Preparando el servidor relé. Puede tardar unos minutos.",
                 "ports-busy": "Algo en el servidor relé ya usa uno de los puertos que tiene que llevar. Elige otro servidor o libéralos allí.",
                 "failed": "La última pasada falló: {detail}"
             },

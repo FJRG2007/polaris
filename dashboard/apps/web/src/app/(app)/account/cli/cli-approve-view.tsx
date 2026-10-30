@@ -60,7 +60,7 @@ export function CliApproveView({ account, kind = "cli" }: { account?: string; ki
     const [typed, setTyped] = useState(asked);
     const [pending, setPending] = useState<PendingCliSignIn | null>(null);
     const [error, setError] = useState("");
-    const [busy, setBusy] = useState(false);
+    const [busy, setBusy] = useState(asked.trim() !== "");
     const [answered, setAnswered] = useState<"in" | "away" | null>(null);
 
     const look = async (code: string): Promise<void> => {
@@ -121,10 +121,11 @@ export function CliApproveView({ account, kind = "cli" }: { account?: string; ki
     }
 
     if (!pending) {
+        const checking = busy && typed === asked;
         return (
             <ConsentCard
                 requester={<Requester className="text-muted-foreground" />}
-                title={t(`${words}.codeLabel`)}
+                title={checking ? t(`${words}.looking`) : t(`${words}.codeLabel`)}
                 account={account}
                 error={error}
             >
@@ -135,6 +136,7 @@ export function CliApproveView({ account, kind = "cli" }: { account?: string; ki
                     label={t(`${words}.codeLabel`)}
                     submit={busy ? t(`${words}.looking`) : t(`${words}.find`)}
                     busy={busy}
+                    checking={checking}
                 />
             </ConsentCard>
         );

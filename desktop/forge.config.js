@@ -105,7 +105,10 @@ module.exports = {
             name: "@electron-forge/maker-squirrel",
             platforms: ["win32"],
             config: {
-                name: "polaris",
+                // Not "polaris": Squirrel owns %LOCALAPPDATA%\\<name>, wiping it on install,
+                // and the extension, Stream Deck and CLI installers keep their files
+                // in %LOCALAPPDATA%\\Polaris.
+                name: "polaris-desktop",
                 setupExe: "Polaris-Setup.exe",
                 setupIcon: `${ICON}.ico`,
                 ...(windowsCertificate ?? {})

@@ -11,6 +11,7 @@ import {
     relayPorts,
     relayProject,
     relaySpec,
+    renderRelayRoutes,
     renderHomeConfig,
     renderHomeFrp,
     renderRelayConfig,
@@ -116,13 +117,39 @@ describe("backup relay config", () => {
         expect(() => renderRelayConfig(keys, { tcp: [0], udp: [] })).toThrow();
     });
 
+    it("joins the edge's network on the relay end", () => {
+        const configs = relayConfigs(keys, "198.51.100.20", webOnly);
+        const relay = relaySpec("relay", configs.relay, webOnly, ["polaris-proxy"]);
+        expect(relay.networks).toEqual(["polaris-proxy"]);
+        expect(relay.services[0].networks).toEqual(["polaris-proxy"]);
+    });
+
+    it("routes only the house's hostnames to the relay", () => {
+        const yaml = renderRelayRoutes(["Polaris.example.com", "*.plr.example.com"]);
+        expect(yaml).toContain(
+            "rule: 'HostSNI(`polaris.example.com`) || HostSNIRegexp(`^.+[.]plr[.]example[.]com$`)'"
+        );
+        expect(yaml).toContain(
+            "rule: 'Host(`polaris.example.com`) || HostRegexp(`^.+[.]plr[.]example[.]com$`)'"
+        );
+        expect(yaml).toContain("passthrough: true");
+        expect(yaml).toContain("wg-pub-000000backu".slice(0, 7));
+        expect(yaml).not.toContain("\\");
+    });
+
+    it("refuses a name that could change the rule", () => {
+        expect(() => renderRelayRoutes(["a.com`) || Host(`b.com"])).toThrow();
+        expect(() => renderRelayRoutes(["a.com' #"])).toThrow();
+    });
+
     it("publishes the carried ports on the relay end only", () => {
         const configs = relayConfigs(keys, "198.51.100.20", webOnly);
         expect(configs.relay.frp).toBeNull();
         expect(configs.home.frp).toBeNull();
         const relay = relaySpec("relay", configs.relay, webOnly);
         const ports = relay.services[0].ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`);
-        expect(ports).toEqual([`${RELAY_LISTEN_PORT}/udp`, "80/tcp", "443/tcp"]);
+        // 80 and 443 belong to the server's edge, so the server can serve its own apps.
+        expect(ports).toEqual([`${RELAY_LISTEN_PORT}/udp`]);
         expect(relay.services).toHaveLength(2);
         const home = relaySpec("home", configs.home, webOnly);
         expect(home.services[0].ports).toEqual([]);
@@ -139,8 +166,6 @@ describe("backup relay config", () => {
         const [helper, , frps] = relay.services;
         expect(helper.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)).toEqual([
             `${RELAY_LISTEN_PORT}/udp`,
-            "80/tcp",
-            "443/tcp",
             "25565/tcp",
             "19132/udp",
             "25565/udp"

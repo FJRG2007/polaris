@@ -22,6 +22,7 @@ import {
     ExtensionDownloadOffer,
     ExtensionFilesOffer
 } from "@/components/app-download";
+import { BrowserChoice } from "@polaris/ui/account-downloads/browser-choice";
 import { withMessages } from "../setup/i18n";
 
 describe("the desktop app's offer", () => {
@@ -135,13 +136,36 @@ describe("the desktop app's files", () => {
 
     it("offers nothing to press when nothing has been released", () => {
         const html = renderToStaticMarkup(withMessages(<DesktopFilesOffer download={null} />));
-        expect(html).toContain("No version has been published yet");
-        expect(html).toContain("in a window of its own");
+        expect(html).toContain("Not available yet");
+        expect(html).toContain("in its own window");
         expect(html).not.toContain("href=");
     });
 });
 
 describe("the extension's files", () => {
+    it("shows only the package of the browser picked on the card", () => {
+        const download = {
+            version: "0.1.89",
+            url: "https://example.test/release",
+            files: [
+                { name: "polaris-0.1.89-chrome.zip", url: "https://example.test/chrome.zip" },
+                { name: "polaris-0.1.89-firefox.zip", url: "https://example.test/firefox.zip" }
+            ]
+        };
+        const offer = (browser: "brave" | "firefox") =>
+            renderToStaticMarkup(
+                withMessages(
+                    <BrowserChoice.Provider value={browser}>
+                        <ExtensionFilesOffer download={download as never} />
+                    </BrowserChoice.Provider>
+                )
+            );
+        expect(offer("brave")).toContain("Brave");
+        expect(offer("brave")).not.toContain("Firefox");
+        expect(offer("firefox")).toContain("Firefox");
+        expect(offer("firefox")).not.toContain("Brave");
+    });
+
     it("offers the package for each browser, never the sources archive", () => {
         // The sources archive is a zip on the same release, and handing it to
         // somebody as the add-on is a download that installs nothing.

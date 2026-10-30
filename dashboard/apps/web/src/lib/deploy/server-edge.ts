@@ -40,6 +40,7 @@
 import { loadEnv } from "@polaris/config";
 import { onboardingScript } from "@polaris/deploy";
 import { publicAppUrl } from "@/lib/domain-service";
+import { FREEABLE_SERVICES, readPortHolders } from "@/lib/backup-access/port-holders";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { currentAcmeEmail } from "@/lib/tls/acme-edge";
 import { getHostConnection } from "@/lib/host-service";
@@ -235,6 +236,62 @@ export async function readServerEdge(hostId: string, ownerId: string): Promise<S
                     : (await readerWords("api"))("refusals.deploy.unreachable")
         };
     }
+}
+
+/** Runs a script on a server, handed the prefix that gives it root when the login
+ *  has that, and answers what it printed. */
+async function runWithRoot(
+    hostId: string,
+    ownerId: string,
+    script: (root: string) => string
+): Promise<string> {
+    const connection = await getHostConnection(hostId, ownerId);
+    const client = await openSshClient({
+        host: connection.address,
+        port: connection.port,
+        username: connection.username,
+        auth: connection.auth,
+        pinnedHostKey: connection.hostKey
+    });
+    try {
+        let said = "";
+        const root = connection.username !== "root" && connection.sudo ? "sudo -n " : "";
+        const result = await execCommand(client, script(root), {
+            onStdout: (chunk) => {
+                said += chunk.toString("utf8");
+            }
+        });
+        if (result.code !== 0) throw new Error(`That server refused, exit ${result.code}`);
+        return said;
+    } finally {
+        client.end();
+    }
+}
+
+/** What holds 80 or 443 on a server, the Polaris edge aside. Naming another user's
+ *  process takes root; without it the holder comes back as unknown. */
+export async function serverPortHolders(hostId: string, ownerId: string): Promise<string[]> {
+    const output = await runWithRoot(
+        hostId,
+        ownerId,
+        (root) =>
+            `${root}ss -ltnpH 'sport = :80 or sport = :443'; docker ps --filter publish=80 --format 'container={{.Names}}' 2>/dev/null; docker ps --filter publish=443 --format 'container={{.Names}}' 2>/dev/null; true`
+    );
+    return readPortHolders(output);
+}
+
+/** Stop and disable the web servers holding a server's ports. Undone with
+ *  `systemctl enable --now`; a name off the allowlist is refused. */
+export async function freeServerPorts(
+    hostId: string,
+    ownerId: string,
+    holders: readonly string[]
+): Promise<void> {
+    if (holders.some((name) => !FREEABLE_SERVICES.includes(name)))
+        throw new Error("Those ports are not held by a web server Polaris may stop");
+    await runWithRoot(hostId, ownerId, (root) =>
+        holders.map((name) => `${root}systemctl disable --now ${name}`).join(" && ")
+    );
 }
 
 /**

@@ -30,7 +30,7 @@ export function ExtensionConnectView({ account }: { account?: string }) {
     const [typed, setTyped] = useState(asked);
     const [pending, setPending] = useState<PendingConnection | null>(null);
     const [error, setError] = useState("");
-    const [busy, setBusy] = useState(false);
+    const [busy, setBusy] = useState(asked.trim() !== "");
     const [answered, setAnswered] = useState<"in" | "away" | null>(null);
 
     const look = async (code: string): Promise<void> => {
@@ -91,10 +91,11 @@ export function ExtensionConnectView({ account }: { account?: string }) {
     }
 
     if (!pending) {
+        const checking = busy && typed === asked;
         return (
             <ConsentCard
                 requester={requester}
-                title={t("extension.codeLabel")}
+                title={checking ? t("extension.looking") : t("extension.codeLabel")}
                 account={account}
                 error={error}
             >
@@ -105,6 +106,7 @@ export function ExtensionConnectView({ account }: { account?: string }) {
                     label={t("extension.codeLabel")}
                     submit={busy ? t("extension.looking") : t("extension.find")}
                     busy={busy}
+                    checking={checking}
                 />
             </ConsentCard>
         );

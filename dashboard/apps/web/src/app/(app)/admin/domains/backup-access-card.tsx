@@ -11,7 +11,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Skeleton, Checkbox } from "@polaris/ui";
-import { saveBackupAccessAction } from "./actions";
+import { useConfirm } from "@/components/confirm-dialog";
+import { holdersCanBeFreed } from "@/lib/backup-access/port-holders";
+import { freeRelayPortsAction, saveBackupAccessAction } from "./actions";
 import { TAILSCALE_CONNECT_ID } from "./tailscale-card";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
@@ -33,6 +35,7 @@ export function BackupAccessCard() {
     });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [confirm, confirmDialog] = useConfirm();
     const view = live.data;
 
     async function save(change: Partial<BackupConfig>) {
@@ -46,6 +49,21 @@ export function BackupAccessCard() {
         const result = await runAction(() => saveBackupAccessAction(next), setError);
         setBusy(false);
         live.replace(result ?? before);
+    }
+
+    async function freePorts() {
+        const yes = await confirm({
+            title: t("domains.backup.freePortsTitle"),
+            description: t("domains.backup.freePortsBody", { holders: view?.probe?.detail ?? "" }),
+            confirmLabel: t("domains.backup.freePorts"),
+            danger: true
+        });
+        if (!yes) return;
+        setBusy(true);
+        setError("");
+        const result = await runAction(() => freeRelayPortsAction(), setError);
+        setBusy(false);
+        if (result) live.replace(result);
     }
 
     if (view && !view.configured) return null;
@@ -186,7 +204,7 @@ export function BackupAccessCard() {
                     ) : null}
 
                     <Latency view={view} />
-                    <Problem view={view} />
+                    <Problem view={view} busy={busy} onFree={() => void freePorts()} />
 
                     {view.relay && view.relay.tcp.length > 0 ? (
                         <p className="text-xs text-muted-foreground">
@@ -206,6 +224,7 @@ export function BackupAccessCard() {
                     ) : null}
                 </div>
             )}
+            {confirmDialog}
         </PageSection>
     );
 }
@@ -322,16 +341,33 @@ function Latency({ view }: { view: BackupView }) {
     );
 }
 
-function Problem({ view }: { view: BackupView }) {
+function Problem({
+    view,
+    busy,
+    onFree
+}: {
+    view: BackupView;
+    busy: boolean;
+    onFree: () => void;
+}) {
     const t = useTranslations("admin");
     const probe = view.probe;
     if (!probe?.problem && !probe?.conflicts.length) return null;
+    const freeable =
+        probe.problem === "ports-held" && holdersCanBeFreed((probe.detail ?? "").split(", "));
     return (
-        <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
-            {probe.problem
-                ? t(`domains.backup.problems.${probe.problem}`, { detail: probe.detail ?? "-" })
-                : t("domains.backup.conflicts", { names: probe.conflicts.join(", ") })}
-        </p>
+        <div className="flex flex-col items-start gap-2">
+            <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
+                {probe.problem
+                    ? t(`domains.backup.problems.${probe.problem}`, { detail: probe.detail ?? "-" })
+                    : t("domains.backup.conflicts", { names: probe.conflicts.join(", ") })}
+            </p>
+            {freeable ? (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={onFree}>
+                    {t("domains.backup.freePorts")}
+                </Button>
+            ) : null}
+        </div>
     );
 }
 

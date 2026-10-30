@@ -91,6 +91,10 @@
             "types": "./src/downloads/account/deck-install-steps.tsx",
             "import": "./src/downloads/account/deck-install-steps.tsx"
         },
+        "./account-downloads/browser-choice": {
+            "types": "./src/downloads/account/browser-choice.ts",
+            "import": "./src/downloads/account/browser-choice.ts"
+        },
         "./account-downloads/extension-card": {
             "types": "./src/downloads/account/extension-card.tsx",
             "import": "./src/downloads/account/extension-card.tsx"

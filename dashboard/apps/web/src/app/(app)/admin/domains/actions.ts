@@ -25,6 +25,7 @@ import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domain
 import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-sync";
 import {
     backupView,
+    freeRelayPorts,
     configSchema as backupConfigSchema,
     saveConfig as saveBackupConfig,
     type BackupView
@@ -421,6 +422,19 @@ export async function checkPublicAddressAction(): Promise<AddressFollowView> {
  * card shows what it found. Through the scheduler, so a pass already running is
  * not doubled.
  */
+export async function freeRelayPortsAction(): Promise<BackupView> {
+    const actor = await requireAdmin();
+    await freeRelayPorts();
+    await recordAudit({
+        actorId: actor.id,
+        action: "domains.backup-access.free-ports",
+        targetType: "setting",
+        targetId: "backup-access"
+    }).catch(() => undefined);
+    await runScheduledJob("backup-access");
+    return backupView();
+}
+
 export async function saveBackupAccessAction(input: unknown): Promise<BackupView> {
     const actor = await requireAdmin();
     const config = backupConfigSchema.parse(input);

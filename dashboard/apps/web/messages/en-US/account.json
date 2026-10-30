@@ -1321,7 +1321,7 @@
             "title": "Polaris as an app"
         },
         "desktop": {
-            "description": "A native app for Windows, macOS and Linux: it pushes a build from your own computer and follows a service's logs in a window of its own."
+            "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window."
         },
         "cards": {
             "install": "Install",

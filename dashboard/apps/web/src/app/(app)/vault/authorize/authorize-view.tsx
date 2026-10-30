@@ -32,7 +32,7 @@ export function AuthorizeView({ account }: { account?: string }) {
     const [typed, setTyped] = useState(asked);
     const [pending, setPending] = useState<PendingAuthorization | null>(null);
     const [error, setError] = useState("");
-    const [busy, setBusy] = useState(false);
+    const [busy, setBusy] = useState(asked.trim() !== "");
     const [answered, setAnswered] = useState<"in" | "away" | null>(null);
 
     const look = async (code: string): Promise<void> => {
@@ -115,8 +115,14 @@ export function AuthorizeView({ account }: { account?: string }) {
     }
 
     if (!pending) {
+        const checking = busy && typed === asked;
         return (
-            <ConsentCard {...card} title={t("authorize.codeLabel")} account={account} error={error}>
+            <ConsentCard
+                {...card}
+                title={checking ? t("authorize.looking") : t("authorize.codeLabel")}
+                account={account}
+                error={error}
+            >
                 <ConsentCodeEntry
                     value={typed}
                     onChange={setTyped}
@@ -124,6 +130,7 @@ export function AuthorizeView({ account }: { account?: string }) {
                     label={t("authorize.codeLabel")}
                     submit={busy ? t("authorize.looking") : t("authorize.findIt")}
                     busy={busy}
+                    checking={checking}
                 />
             </ConsentCard>
         );

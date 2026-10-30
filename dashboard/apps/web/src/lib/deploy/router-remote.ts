@@ -171,8 +171,14 @@ export function remoteIntelScript(nonce = randomBytes(6).toString("hex")): strin
 
 /** The script that takes Polaris's file off a server - for a server that no longer
  *  runs anything of ours, so its edge stops holding routes to nothing. */
-export function remoteClearScript(): string {
-    return `rm -f ${quoteArg(`${DYNAMIC_DIR}/${FILE}`)}`;
+export function remoteClearScript(file = FILE): string {
+    return `rm -f ${quoteArg(`${DYNAMIC_DIR}/${file}`)}`;
+}
+
+function assertOwnFile(file: string): void {
+    if (!/^polaris-[a-z0-9-]+\.yml$/.test(file) || file === FILE) {
+        throw new Error(`Not a file Polaris may write on an edge: ${file}`);
+    }
 }
 
 export class RemoteRouter implements Router {
@@ -225,10 +231,14 @@ export class RemoteRouter implements Router {
      * the app routes' file. The name is the caller's constant, never input.
      */
     public async pushFile(file: string, yaml: string): Promise<void> {
-        if (!/^polaris-[a-z0-9-]+\.yml$/.test(file) || file === FILE) {
-            throw new Error(`Not a file Polaris may write on an edge: ${file}`);
-        }
+        assertOwnFile(file);
         await this.run(remoteWriteScript(yaml, undefined, file));
+    }
+
+    /** Take a file `pushFile` put there off the server's edge. */
+    public async clearFile(file: string): Promise<void> {
+        assertOwnFile(file);
+        await this.run(remoteClearScript(file));
     }
 
     private async run(script: string, what = "its routes", input?: string): Promise<void> {
