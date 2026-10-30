@@ -12,8 +12,8 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Skeleton, Checkbox } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
-import { holdersCanBeFreed } from "@/lib/backup-access/port-holders";
-import { freeRelayPortsAction, saveBackupAccessAction } from "./actions";
+import { holdersCanBeFreed, UNKNOWN_HOLDER } from "@/lib/backup-access/port-holders";
+import { freeRelayPortsAction, saveBackupAccessAction, updateRelayEdgeAction } from "./actions";
 import { TAILSCALE_CONNECT_ID } from "./tailscale-card";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
@@ -58,12 +58,27 @@ export function BackupAccessCard() {
             confirmLabel: t("domains.backup.freePorts"),
             danger: true
         });
-        if (!yes) return;
+        if (yes) await repair(freeRelayPortsAction);
+    }
+
+    async function updateEdge() {
+        const yes = await confirm({
+            title: t("domains.backup.updateEdgeTitle"),
+            description: t("domains.backup.updateEdgeBody"),
+            confirmLabel: t("domains.backup.updateEdge"),
+            danger: true
+        });
+        if (yes) await repair(updateRelayEdgeAction);
+    }
+
+    async function repair(action: typeof freeRelayPortsAction) {
         setBusy(true);
         setError("");
-        const result = await runAction(() => freeRelayPortsAction(), setError);
+        const result = await runAction(action, setError);
         setBusy(false);
-        if (result) live.replace(result);
+        if (!result) return;
+        live.replace(result.view);
+        if (result.failure) setError(t(`domains.backup.repairFailed.${result.failure}`));
     }
 
     if (view && !view.configured) return null;
@@ -204,7 +219,12 @@ export function BackupAccessCard() {
                     ) : null}
 
                     <Latency view={view} />
-                    <Problem view={view} busy={busy} onFree={() => void freePorts()} />
+                    <Problem
+                        view={view}
+                        busy={busy}
+                        onFree={() => void freePorts()}
+                        onUpdateEdge={() => void updateEdge()}
+                    />
 
                     {view.relay && view.relay.tcp.length > 0 ? (
                         <p className="text-xs text-muted-foreground">
@@ -344,27 +364,43 @@ function Latency({ view }: { view: BackupView }) {
 function Problem({
     view,
     busy,
-    onFree
+    onFree,
+    onUpdateEdge
 }: {
     view: BackupView;
     busy: boolean;
     onFree: () => void;
+    onUpdateEdge: () => void;
 }) {
     const t = useTranslations("admin");
     const probe = view.probe;
     if (!probe?.problem && !probe?.conflicts.length) return null;
-    const freeable =
-        probe.problem === "ports-held" && holdersCanBeFreed((probe.detail ?? "").split(", "));
+    const holders = (probe.detail ?? "").split(", ");
+    const held = probe.problem === "ports-held";
+    const freeable = held && holdersCanBeFreed(holders);
+    const named = holders.filter((name) => name && name !== UNKNOWN_HOLDER);
+    const portsHeld = named.length
+        ? t("domains.backup.portsHeldStuck", { detail: named.join(", ") })
+        : t("domains.backup.portsHeldUnnamed");
     return (
         <div className="flex flex-col items-start gap-2">
             <p className="break-words rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
-                {probe.problem
-                    ? t(`domains.backup.problems.${probe.problem}`, { detail: probe.detail ?? "-" })
-                    : t("domains.backup.conflicts", { names: probe.conflicts.join(", ") })}
+                {held && !freeable
+                    ? portsHeld
+                    : probe.problem
+                      ? t(`domains.backup.problems.${probe.problem}`, {
+                            detail: probe.detail ?? "-"
+                        })
+                      : t("domains.backup.conflicts", { names: probe.conflicts.join(", ") })}
             </p>
             {freeable ? (
                 <Button size="sm" variant="secondary" disabled={busy} onClick={onFree}>
                     {t("domains.backup.freePorts")}
+                </Button>
+            ) : null}
+            {probe.problem === "edge-outdated" ? (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={onUpdateEdge}>
+                    {t("domains.backup.updateEdge")}
                 </Button>
             ) : null}
         </div>

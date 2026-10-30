@@ -28,7 +28,9 @@ import {
     freeRelayPorts,
     configSchema as backupConfigSchema,
     saveConfig as saveBackupConfig,
-    type BackupView
+    updateRelayEdge,
+    type BackupView,
+    type RelayRepairFailure
 } from "@/lib/backup-access/service";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import {
@@ -422,17 +424,35 @@ export async function checkPublicAddressAction(): Promise<AddressFollowView> {
  * card shows what it found. Through the scheduler, so a pass already running is
  * not doubled.
  */
-export async function freeRelayPortsAction(): Promise<BackupView> {
+/** What a repair on the relay server came to: the card as it stands, and why not. */
+interface RelayRepair {
+    readonly view: BackupView;
+    readonly failure: RelayRepairFailure | null;
+}
+
+async function repairRelayServer(
+    repair: () => Promise<RelayRepairFailure | null>,
+    action: string
+): Promise<RelayRepair> {
     const actor = await requireAdmin();
-    await freeRelayPorts();
+    const failure = await repair();
+    if (failure) return { view: await backupView(), failure };
     await recordAudit({
         actorId: actor.id,
-        action: "domains.backup-access.free-ports",
+        action,
         targetType: "setting",
         targetId: "backup-access"
     }).catch(() => undefined);
     await runScheduledJob("backup-access");
-    return backupView();
+    return { view: await backupView(), failure };
+}
+
+export async function freeRelayPortsAction(): Promise<RelayRepair> {
+    return repairRelayServer(freeRelayPorts, "domains.backup-access.free-ports");
+}
+
+export async function updateRelayEdgeAction(): Promise<RelayRepair> {
+    return repairRelayServer(updateRelayEdge, "domains.backup-access.update-edge");
 }
 
 export async function saveBackupAccessAction(input: unknown): Promise<BackupView> {

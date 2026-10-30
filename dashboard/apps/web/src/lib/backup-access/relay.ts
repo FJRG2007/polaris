@@ -229,18 +229,33 @@ export const RELAY_ID = "000000backup";
 
 /** The file on the relay server's edge that sends the house's hostnames to the relay. */
 export const RELAY_ROUTES_FILE = "polaris-relay.yml";
-/** Above a route a container declares for itself on the same edge. */
-const RELAY_ROUTE_PRIORITY = 100;
+/** Above an app's route on the same edge and the route to its certificate
+ *  challenges, so a challenge for a house name reaches the house. */
+const RELAY_ROUTE_PRIORITY = 200;
+
+const ROUTABLE_HOST = /^(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
 
 /** A hostname as a Traefik matcher. `[.]` rather than an escaped dot, so no layer of
  *  YAML or shell has a backslash to eat. A wildcard covers every depth, as its DNS
  *  record does. */
 function hostMatcher(name: string, exact: string, regexp: string): string {
     const host = name.toLowerCase();
-    if (!/^(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(host))
+    if (!ROUTABLE_HOST.test(host))
         throw new Error(`Not a hostname the relay can route: ${name}`);
     if (!host.startsWith("*.")) return `${exact}(\`${host}\`)`;
     return `${regexp}(\`^.+[.]${host.slice(2).replaceAll(".", "[.]")}$\`)`;
+}
+
+/** The names under a house wildcard that this server answers itself. A name the
+ *  house owns outright stays the house's. */
+function ownNames(names: readonly string[], served: readonly string[]): string[] {
+    const house = new Set(names.map((name) => name.toLowerCase()));
+    const zones = [...house].filter((name) => name.startsWith("*.")).map((name) => name.slice(1));
+    const own = served
+        .map((name) => name.toLowerCase())
+        .filter((name) => ROUTABLE_HOST.test(name) && !house.has(name))
+        .filter((name) => zones.some((zone) => name.endsWith(zone)));
+    return [...new Set(own)].sort();
 }
 
 /**
@@ -248,12 +263,22 @@ function hostMatcher(name: string, exact: string, regexp: string): string {
  *
  * TLS passes through untouched, so the house's edge keeps terminating it with its
  * own certificates, and port 80 is carried so Let's Encrypt can still reach it. Any
- * other hostname falls through to whatever that server serves itself.
+ * other hostname falls through to whatever that server serves itself, and so do the
+ * `served` names of the apps deployed there, which sit under a house wildcard.
  */
-export function renderRelayRoutes(names: readonly string[]): string {
-    const upstream = wg.endNames(RELAY_ID, "public").helper;
-    const rule = (exact: string, regexp: string) =>
-        `'${names.map((name) => hostMatcher(name, exact, regexp)).join(" || ")}'`;
+export function renderRelayRoutes(
+    names: readonly string[],
+    served: readonly string[] = []
+): string {
+    const upstream = relayHelper();
+    const own = ownNames(names, served);
+    const rule = (exact: string, regexp: string) => {
+        const matches = (list: readonly string[]) =>
+            list.map((name) => hostMatcher(name, exact, regexp)).join(" || ");
+        return own.length > 0
+            ? `'(${matches(names)}) && !(${matches(own)})'`
+            : `'${matches(names)}'`;
+    };
     return [
         "tcp:",
         "  routers:",
@@ -377,6 +402,11 @@ export function relaySpec(
             ...frp
         ]
     };
+}
+
+/** The relay end's container, which holds the link and the carried ports. */
+export function relayHelper(): string {
+    return wg.endNames(RELAY_ID, "public").helper;
 }
 
 /** The compose project of one end, for taking it down. */

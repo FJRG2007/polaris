@@ -163,6 +163,8 @@ export { SwarmRuntime } from "./runtime/swarm.js";
 export { parseContainerState, type ContainerState } from "./runtime/status.js";
 export {
     onboardingScript,
+    renderChallengeRoutes,
+    CHALLENGE_ROUTES_FILE,
     DYNAMIC_DIR,
     EDGE_INTEL_DIR,
     EDGE_INTEL_FILE,

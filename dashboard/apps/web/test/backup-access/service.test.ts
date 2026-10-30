@@ -6,6 +6,7 @@
 
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { relayHelper } from "../../src/lib/backup-access/relay";
 
 interface FakeRecord {
     id: string;
@@ -57,6 +58,7 @@ vi.mock("@polaris/db", () => ({
                       }
                     : null
         },
+        domain: { findMany: async () => servedDomains.map((hostname) => ({ hostname })) },
         host: { findMany: async () => [] },
         user: { findMany: async () => [{ id: "admin" }] }
     }
@@ -85,7 +87,7 @@ vi.mock("@/lib/host-service", () => ({ getHostConnection: vi.fn() }));
 vi.mock("@/lib/domain-zones", () => ({
     getDomainZones: async () => ({ baseDomain: "example.test" })
 }));
-vi.mock("@/lib/domain-dns", () => ({ ownedZoneNames: async () => NAMES }));
+vi.mock("@/lib/domain-dns", () => ({ ownedZoneNames: async () => [...NAMES, ...wildcards] }));
 vi.mock("@/lib/domain-address-sync", () => ({ PUBLISHED_KEY: "published" }));
 vi.mock("@/lib/network-service", () => ({ probePublicIp: async () => HOME }));
 let reachNow: Record<string, unknown> | null = null;
@@ -113,23 +115,27 @@ vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     followHomeRelay: async (ip: string | null) => void tunnelRelays.push(ip)
 }));
 
-let serverEdge = { traefik: true, pushable: true, error: null as string | null };
+let serverEdge = { traefik: true, pushable: true, challenges: true, error: null as string | null };
 let portHolders: string[] = [];
 const prepared: string[] = [];
 const freed: string[][] = [];
+let servedDomains: string[] = [];
+let wildcards: string[] = [];
+let stopFails = false;
 const edgeFiles = new Map<string, string>();
 vi.mock("@/lib/deploy/server-edge", () => ({
     isSettingUp: () => false,
     readServerEdge: async () => serverEdge,
     serverPortHolders: async () => portHolders,
     freeServerPorts: async (_host: string, _owner: string, holders: string[]) => {
+        if (stopFails) throw new Error("That server refused, exit 5");
         freed.push(holders);
         portHolders = [];
     },
     withSetupLock: async (_host: string, task: () => Promise<void>) => task(),
     prepareServerEdge: async (hostId: string) => {
         prepared.push(hostId);
-        serverEdge = { traefik: true, pushable: true, error: null };
+        serverEdge = { traefik: true, pushable: true, challenges: true, error: null };
     }
 }));
 vi.mock("@/lib/deploy/router-remote", () => ({
@@ -160,6 +166,7 @@ class FakePorts {
         brought.set(`${this.where}/${spec.project}`, spec);
     }
     async composeDown(project: string) {
+        portHolders = portHolders.filter((name) => name !== relayHelper());
         containers.delete(`${this.where}/${project}`);
     }
     async dispose() {}
@@ -237,10 +244,13 @@ function serving() {
 
 beforeEach(() => {
     tunnelPorts = [];
-    serverEdge = { traefik: true, pushable: true, error: null };
+    serverEdge = { traefik: true, pushable: true, challenges: true, error: null };
     portHolders = [];
     prepared.length = 0;
     freed.length = 0;
+    stopFails = false;
+    servedDomains = [];
+    wildcards = [];
     edgeFiles.clear();
     vi.useFakeTimers({ toFake: ["Date"] });
     settings.clear();
@@ -442,8 +452,18 @@ describe("runBackupAccess", () => {
         expect(hosts).not.toContain(443);
     });
 
+    it("re-pushes the routes when an app on the relay server takes a house name", async () => {
+        wildcards = ["*.plr.example.test"];
+        await relayOn();
+        await pass();
+        expect(edgeFiles.get("polaris-relay.yml")).not.toContain("!(");
+        servedDomains = ["shop.plr.example.test"];
+        await pass();
+        expect(edgeFiles.get("polaris-relay.yml")).toContain("!(HostSNI(`shop.plr.example.test`))");
+    });
+
     it("sets the edge up on a server with free ports, so nobody has to", async () => {
-        serverEdge = { traefik: false, pushable: false, error: null };
+        serverEdge = { traefik: false, pushable: false, challenges: false, error: null };
         await relayOn();
         await pass();
         expect(prepared).toHaveLength(1);
@@ -451,7 +471,7 @@ describe("runBackupAccess", () => {
     });
 
     it("names what holds the ports, touches nothing, and frees them on request", async () => {
-        serverEdge = { traefik: false, pushable: false, error: null };
+        serverEdge = { traefik: false, pushable: false, challenges: false, error: null };
         portHolders = ["nginx"];
         await relayOn();
         await pass();
@@ -470,11 +490,42 @@ describe("runBackupAccess", () => {
     });
 
     it("refuses to stop anything but a web server", async () => {
-        serverEdge = { traefik: false, pushable: false, error: null };
+        serverEdge = { traefik: false, pushable: false, challenges: false, error: null };
         portHolders = ["someones-proxy"];
         await relayOn();
-        await expect(service.freeRelayPorts()).rejects.toThrow();
+        expect(await service.freeRelayPorts()).toBe("not-web-server");
         expect(freed).toEqual([]);
+    });
+
+    it("answers a stop that failed as a key the card can word", async () => {
+        serverEdge = { traefik: false, pushable: false, challenges: false, error: null };
+        portHolders = ["nginx"];
+        stopFails = true;
+        await relayOn();
+        expect(await service.freeRelayPorts()).toBe("refused");
+    });
+
+    it("takes a relay that holds the ports itself down, then puts the edge there", async () => {
+        serverEdge = { traefik: false, pushable: false, challenges: false, error: null };
+        portHolders = [relayHelper()];
+        await relayOn();
+        await pass();
+        expect(prepared).toHaveLength(1);
+        expect(serving()).toBe("backup");
+    });
+
+    it("leaves a running edge that is too old alone until the operator says so", async () => {
+        serverEdge = { traefik: true, pushable: true, challenges: false, error: null };
+        await relayOn();
+        await pass();
+        expect((await service.backupView()).probe?.problem).toBe("edge-outdated");
+        expect(prepared).toEqual([]);
+        expect(serving()).toBe("direct");
+
+        expect(await service.updateRelayEdge()).toBeNull();
+        expect(prepared).toHaveLength(1);
+        await pass();
+        expect(serving()).toBe("backup");
     });
 
     it("takes its routes off the edge when the relay is retired", async () => {

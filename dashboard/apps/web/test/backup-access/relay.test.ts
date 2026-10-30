@@ -8,6 +8,7 @@ import {
     RELAY_SLOT,
     frpToken,
     relayConfigs,
+    relayHelper,
     relayPorts,
     relayProject,
     relaySpec,
@@ -133,8 +134,28 @@ describe("backup relay config", () => {
             "rule: 'Host(`polaris.example.com`) || HostRegexp(`^.+[.]plr[.]example[.]com$`)'"
         );
         expect(yaml).toContain("passthrough: true");
-        expect(yaml).toContain("wg-pub-000000backu".slice(0, 7));
+        expect(yaml).toContain(`address: "${relayHelper()}:443"`);
+        expect(yaml).toContain(`url: "http://${relayHelper()}:80"`);
         expect(yaml).not.toContain("\\");
+    });
+
+    it("leaves the server's own apps under a house wildcard to its edge", () => {
+        const yaml = renderRelayRoutes(
+            ["polaris.example.com", "*.plr.example.com"],
+            ["Shop.plr.example.com", "shop.plr.example.com", "shop.other.com", "polaris.example.com"]
+        );
+        expect(yaml).toContain(
+            "rule: '(HostSNI(`polaris.example.com`) || HostSNIRegexp(`^.+[.]plr[.]example[.]com$`)) && !(HostSNI(`shop.plr.example.com`))'"
+        );
+        expect(yaml).toContain(
+            "rule: '(Host(`polaris.example.com`) || HostRegexp(`^.+[.]plr[.]example[.]com$`)) && !(Host(`shop.plr.example.com`))'"
+        );
+        expect(yaml).not.toContain("shop.other.com");
+    });
+
+    it("skips a stored name it could not route rather than failing the relay", () => {
+        const yaml = renderRelayRoutes(["*.plr.example.com"], ["bad name.plr.example.com"]);
+        expect(yaml).not.toContain("bad name");
     });
 
     it("refuses a name that could change the rule", () => {

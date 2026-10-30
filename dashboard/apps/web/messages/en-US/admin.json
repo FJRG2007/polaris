@@ -692,6 +692,16 @@
             "freePorts": "Free the ports",
             "freePortsTitle": "Stop what is using ports 80 and 443?",
             "freePortsBody": "Polaris will stop {holders} on the relay server, and every site it serves there goes down. The server then runs Polaris' edge, which carries the relay and can host apps too.",
+            "portsHeldStuck": "Ports 80 and 443 on the relay server are in use by {detail}. Pick another server.",
+            "portsHeldUnnamed": "Another program is using ports 80 and 443 on the relay server. Pick another server.",
+            "updateEdge": "Update the edge",
+            "updateEdgeTitle": "Update the edge on the relay server?",
+            "updateEdgeBody": "Everything that server serves stops for a moment while its edge restarts.",
+            "repairFailed": {
+                "no-server": "The relay server is gone. Pick another one.",
+                "not-web-server": "Polaris can only stop web servers. Pick another server.",
+                "refused": "The relay server would not do it. Try again or pick another server."
+            },
             "useBackup": "Switch to backup",
             "useDirect": "Back to direct",
             "needsToken": "Connect a Cloudflare token first",
@@ -726,7 +736,8 @@
                 "no-server": "The relay server is gone. Pick another one.",
                 "no-address": "The relay server has no public address.",
                 "ports-busy": "Something on the relay server already uses one of the ports it has to carry. Pick another server or free them there.",
-                "ports-held": "{detail} is using ports 80 and 443 on the relay server.",
+                "ports-held": "Ports 80 and 443 on the relay server are in use by {detail}.",
+                "edge-outdated": "The edge on the relay server is too old to carry the relay.",
                 "setting-up": "Preparing the relay server. This can take a few minutes.",
                 "failed": "The last pass failed: {detail}"
             },

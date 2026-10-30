@@ -98,8 +98,9 @@ decision.
 Traefik ranks routers by **the length of the rule** unless a priority says
 otherwise, and the dashboard's own host rule is long enough to outrank every path
 router in the deployment. **Give every router an explicit `priority`.** The
-ordering in use: 110 guarded call path, 100 path prefixes with no host of their
-own (`/api/deploy/ws`, `/livekit`), 60 the tailnet app paths
+ordering in use: 200 the backup relay's hostnames on a server's edge, 150 that
+edge's route to its certificate challenges, 110 guarded call path, 100 path
+prefixes with no host of their own (`/api/deploy/ws`, `/livekit`), 60 the tailnet app paths
 (`/.polaris-ts/<port>/` on the machine's ts.net name), 50 the dashboard's public hostnames and an
 installed app's own custom-domain routes, 10 the compose-label catch-all.
 

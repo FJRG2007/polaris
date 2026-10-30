@@ -155,6 +155,10 @@ export interface ServerEdgeState {
      *  arrive. One started by an older Polaris cuts any upload that takes longer
      *  than a minute to send. */
     readonly uploads: boolean;
+    /** Whether that Traefik answers certificate challenges away from port 80's own
+     *  routes. One started by an older Polaris swallows a challenge meant for a name
+     *  it relays, so it cannot carry the backup relay. */
+    readonly challenges: boolean;
     /** Whether Polaris is setting this server up right now. */
     readonly settingUp: boolean;
     /** Why the server could not be asked, where it could not. Its own words. */
@@ -167,6 +171,7 @@ const UNREACHABLE: ServerEdgeState = {
     pushable: false,
     offline: false,
     uploads: false,
+    challenges: false,
     settingUp: false,
     error: null
 };
@@ -184,7 +189,8 @@ const PROBE = [
     "printf 'guard=%s\\n' \"$(docker inspect -f '{{.State.Running}}' polaris-edge-guard 2>/dev/null || echo none)\"",
     "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'providers.file.directory'; then printf 'pushable=true\\n'; else printf 'pushable=false\\n'; fi",
     "if docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' polaris-edge-guard 2>/dev/null | grep -q '/edge-intel'; then printf 'offline=true\\n'; else printf 'offline=false\\n'; fi",
-    "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'respondingTimeouts.readTimeout'; then printf 'uploads=true\\n'; else printf 'uploads=false\\n'; fi"
+    "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'respondingTimeouts.readTimeout'; then printf 'uploads=true\\n'; else printf 'uploads=false\\n'; fi",
+    "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'httpchallenge.entrypoint=acme'; then printf 'challenges=true\\n'; else printf 'challenges=false\\n'; fi"
 ].join("\n");
 
 /** What the probe said, out of its own output. Anything unrecognised is false,
@@ -199,7 +205,8 @@ export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error" | "
         guard: said("guard") === "true",
         pushable: said("pushable") === "true",
         offline: said("offline") === "true",
-        uploads: said("uploads") === "true"
+        uploads: said("uploads") === "true",
+        challenges: said("challenges") === "true"
     };
 }
 

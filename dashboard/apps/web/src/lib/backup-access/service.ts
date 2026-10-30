@@ -93,6 +93,7 @@ import {
 import {
     RELAY_ROUTES_FILE,
     relayConfigs,
+    relayHelper,
     relayPorts,
     relayProject,
     relaySpec,
@@ -133,6 +134,8 @@ const TUNNEL_EDGE = { host: "region1.v2.argotunnel.com", port: 7844 };
 const CONNECT_TIMEOUT_MS = 3_000;
 /** How long the cloud server is given to answer the SSH handshake. */
 const OUTSIDE_READY_MS = 8_000;
+/** The relay server's own hostnames kept out of the routes to the house. */
+const MAX_SERVED_NAMES = 2_000;
 
 export const configSchema = z.object({
     mode: z.enum(BACKUP_MODES),
@@ -185,6 +188,7 @@ const PATH_PROBLEMS = [
     "no-address",
     "ports-busy",
     "ports-held",
+    "edge-outdated",
     "setting-up",
     "failed"
 ] as const;
@@ -736,7 +740,16 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
         stored.udp.join(",") !== ports.udp.join(",");
     const names = await ownedZoneNames(await getDomainZones());
     if (names.length === 0) throw new PathRefusal("no-domain");
-    const routes = renderRelayRoutes(names);
+    const served = await prisma.domain.findMany({
+        where: { enabled: true, servedBy: "server", application: { targetId: target.id } },
+        select: { hostname: true },
+        orderBy: { hostname: "asc" },
+        take: MAX_SERVED_NAMES
+    });
+    const routes = renderRelayRoutes(
+        names,
+        served.map((domain) => domain.hostname)
+    );
     // The keys are kept now and the ports only once both ends run with them, so a
     // bring-up that failed is tried again on the next pass.
     await setSetting(RELAY_KEY, JSON.stringify(stored));
@@ -778,41 +791,76 @@ async function relayEdge(target: { hostId: string | null; ownerId: string }) {
     return new RemoteRouter(await getHostConnection(target.hostId, target.ownerId));
 }
 
+type RelayTarget = Awaited<ReturnType<typeof relayTarget>>;
+
 /**
  * The relay shares the server's edge instead of taking its ports, so the server
- * stays free to serve its own apps. An edge that is missing, or too old to take
- * routes, is set up here; a program of somebody else's on the ports is reported
- * by name, because stopping it is the operator's call.
+ * stays free to serve its own apps. A missing edge is set up here; a running one
+ * too old to carry the relay is left for the operator to replace, since that stops
+ * what it serves for a moment; a program of somebody else's on the ports is reported
+ * by name, because stopping it is the operator's call too. A relay from before the
+ * edge holds the ports itself, so it comes down first and is started again after.
  */
-async function shareServerEdge(target: {
-    hostId: string | null;
-    ownerId: string;
-    proxyNetwork: string;
-}): Promise<void> {
+async function shareServerEdge(target: RelayTarget): Promise<void> {
     const { hostId, ownerId, proxyNetwork } = target;
     if (!hostId) throw new PathRefusal("no-server");
     if (isSettingUp(hostId)) throw new PathRefusal("setting-up");
     const edge = await readServerEdge(hostId, ownerId);
     if (edge.error) throw new Error(edge.error);
-    if (edge.traefik && edge.pushable) return;
-    const holders = await serverPortHolders(hostId, ownerId);
+    if (edge.traefik && edge.pushable && edge.challenges) return;
+    if (edge.traefik) throw new PathRefusal("edge-outdated");
+    let holders = await serverPortHolders(hostId, ownerId);
+    if (holders.includes(relayHelper())) {
+        await stopRelayEnd(target);
+        holders = await serverPortHolders(hostId, ownerId);
+    }
     if (holders.length > 0) throw new PathRefusal("ports-held", holders.join(", "));
     await withSetupLock(hostId, () => prepareServerEdge(hostId, ownerId, proxyNetwork));
+}
+
+/** Why a repair asked for on the card did not happen, as a key the card words. */
+export type RelayRepairFailure = "no-server" | "not-web-server" | "refused";
+
+/** The relay server, or the failure to report; anything that goes wrong in `task` is
+ *  logged and answered as a key, because the browser never sees a server's message. */
+async function repairRelay(
+    task: (target: RelayTarget, hostId: string) => Promise<void>
+): Promise<RelayRepairFailure | null> {
+    try {
+        const config = await readConfig();
+        if (!config.relayTargetId) return "no-server";
+        const target = await relayTarget(config.relayTargetId);
+        if (!target.hostId) return "no-server";
+        await task(target, target.hostId);
+        return null;
+    } catch (caught) {
+        if (caught instanceof PathRefusal) {
+            if (caught.code === "no-server") return "no-server";
+            if (caught.code === "ports-held") return "not-web-server";
+        }
+        console.error("polaris: could not repair the relay server:", caught);
+        return "refused";
+    }
 }
 
 /**
  * Stop the web servers holding the relay server's ports, on the operator's word, so
  * the next pass can put the edge there. Refuses anything but a web server.
  */
-export async function freeRelayPorts(): Promise<void> {
-    const config = await readConfig();
-    if (!config.relayTargetId) throw new PathRefusal("no-server");
-    const target = await relayTarget(config.relayTargetId);
-    if (!target.hostId) throw new PathRefusal("no-server");
-    const holders = await serverPortHolders(target.hostId, target.ownerId);
-    if (holders.length === 0) return;
-    if (!holdersCanBeFreed(holders)) throw new PathRefusal("ports-held", holders.join(", "));
-    await freeServerPorts(target.hostId, target.ownerId, holders);
+export function freeRelayPorts(): Promise<RelayRepairFailure | null> {
+    return repairRelay(async (target, hostId) => {
+        const holders = await serverPortHolders(hostId, target.ownerId);
+        if (holders.length === 0) return;
+        if (!holdersCanBeFreed(holders)) throw new PathRefusal("ports-held", holders.join(", "));
+        await freeServerPorts(hostId, target.ownerId, holders);
+    });
+}
+
+/** Replace the relay server's outdated edge, on the operator's word. */
+export function updateRelayEdge(): Promise<RelayRepairFailure | null> {
+    return repairRelay((target, hostId) =>
+        withSetupLock(hostId, () => prepareServerEdge(hostId, target.ownerId, target.proxyNetwork))
+    );
 }
 
 async function retireRelay(): Promise<void> {
@@ -831,13 +879,17 @@ async function retireRelayEnd(targetId: string): Promise<void> {
     // Taking our own relay down, wherever it was left.
     const target = await relayTarget(targetId, true).catch(() => null);
     if (!target) return;
+    await stopRelayEnd(target);
+    await (await relayEdge(target)).clearFile(RELAY_ROUTES_FILE).catch(() => undefined);
+}
+
+async function stopRelayEnd(target: RelayTarget): Promise<void> {
     const ports = await getPorts(target, target.ownerId);
     try {
         await ports.composeDown(relayProject("relay"));
     } finally {
         await ports.dispose();
     }
-    await (await relayEdge(target)).clearFile(RELAY_ROUTES_FILE).catch(() => undefined);
 }
 
 /**

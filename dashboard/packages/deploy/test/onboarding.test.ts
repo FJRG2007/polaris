@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { onboardingScript } from "../src/onboarding.js";
+import { CHALLENGE_ROUTES_FILE, onboardingScript, renderChallengeRoutes } from "../src/onboarding.js";
 
 const script = onboardingScript({ proxyNetwork: "polaris-net", acmeEmail: "ops@example.com" });
 
@@ -39,6 +39,25 @@ describe("the edge it leaves running", () => {
         expect(script).toContain("-v /var/lib/polaris/traefik/dynamic:/dynamic");
         expect(script).toContain("mkdir -p");
         expect(script).toContain("/var/lib/polaris/traefik/dynamic");
+    });
+});
+
+describe("certificate challenges", () => {
+    it("leaves port 80 free for a relayed name's challenge", () => {
+        expect(script).toContain("--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=acme");
+        expect(script).not.toContain("httpchallenge.entrypoint=web");
+        expect(script).toContain("--entrypoints.acme.address=:8081");
+        expect(script).not.toContain("-p 8081");
+    });
+
+    it("writes the route that brings port 80's challenges back before the edge starts", () => {
+        expect(script.indexOf(`/${CHALLENGE_ROUTES_FILE}`)).toBeLessThan(
+            script.indexOf("starting Traefik")
+        );
+        const routes = renderChallengeRoutes();
+        expect(routes).toContain("rule: 'PathPrefix(`/.well-known/acme-challenge/`)'");
+        expect(routes).toContain("priority: 150");
+        expect(routes).toContain('url: "http://127.0.0.1:8081"');
     });
 });
 
