@@ -289,7 +289,7 @@ export function FileViewer({
         <Dialog open={target !== null} onOpenChange={changeOpen}>
             <DialogContent
                 ref={content}
-                className="flex max-h-[90vh] max-w-6xl flex-col gap-0 overflow-hidden p-0"
+                className="flex h-[90vh] max-w-6xl flex-col gap-0 overflow-hidden p-0"
                 onKeyDown={(event) => {
                     if (!stepping) return;
                     const by = stepOfKey(event, stepping.index, stepping.count);
@@ -345,8 +345,16 @@ export function FileViewer({
                                 // Keyed on the file, so stepping to the next one
                                 // starts its viewer fresh rather than carrying
                                 // the last one's page, scroll or zoom.
+                                // A picture is the exception: the stage stays and
+                                // swaps the next one in place, so the frame does
+                                // not collapse and the opening does not replay.
                                 <FilePreview
-                                    key={`${target.connectionId ?? ""}:${target.path}`}
+                                    key={
+                                        viewerKind(target.name) === "image"
+                                            ? "image"
+                                            : `${target.connectionId ?? ""}:${target.path}`
+                                    }
+                                    fill
                                     target={target}
                                     urlFor={urlFor}
                                     token={token}
