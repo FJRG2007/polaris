@@ -9,7 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import { normalizeRelPath } from "@polaris/core";
+import { normalizeRelPath, parentPath } from "@polaris/core";
 import type { CreateShareInput, LinkSchedule } from "@polaris/core";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
@@ -420,4 +420,58 @@ export function resolveWithinShare(sharePath: string, requested: string | null):
     if (target === root) return target;
     if (root === "" || target.startsWith(`${root}/`)) return target;
     return null;
+}
+
+/** What a share address resolved to once it was checked against the source. */
+export type ShareLanding = {
+    /** The path that exists: the requested one, or its nearest ancestor inside the share. */
+    path: string;
+    kind: "file" | "dir" | "symlink";
+    size: bigint;
+    /**
+     * The requested path when it no longer exists and an ancestor was shown in
+     * its place (renamed, moved or deleted since the link was copied). Always
+     * inside the share, so naming it reveals nothing the visitor could not see.
+     */
+    missing: string | null;
+};
+
+/**
+ * Land a share address on something that exists. A `?p` that points at a
+ * folder or file renamed, moved or deleted after the link was copied must not
+ * take the whole share down with it: walk up to the nearest ancestor that still
+ * stats, stopping at the share's own root. Returns null only when the shared
+ * item itself cannot be read - the one case that really is "link unavailable".
+ * A request outside the subtree lands on the root, as it always has.
+ */
+export async function landWithinShare(
+    sharePath: string,
+    requested: string | null,
+    stat: (path: string) => Promise<{ kind: ShareLanding["kind"]; size: bigint }>
+): Promise<ShareLanding | null> {
+    const root = normalizeRelPath(sharePath);
+    const target = resolveWithinShare(sharePath, requested) ?? root;
+    let candidate = target;
+    for (;;) {
+        try {
+            const found = await stat(candidate);
+            // An ancestor stands in for what went missing; it is a folder by
+            // construction, but a file that took a folder's place is not one.
+            if (candidate !== target && found.kind !== "dir" && candidate !== root) {
+                throw new Error("not a folder");
+            }
+            return {
+                path: candidate,
+                kind: found.kind,
+                size: found.size,
+                missing: candidate === target ? null : target
+            };
+        } catch {
+            if (candidate === root) return null;
+            const parent = parentPath(candidate);
+            // parentPath of a top-level entry is the source root (""): only a
+            // share rooted there may climb to it.
+            candidate = parent.length >= root.length ? parent : root;
+        }
+    }
 }

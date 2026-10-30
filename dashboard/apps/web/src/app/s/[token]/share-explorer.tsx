@@ -18,7 +18,7 @@ import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TransfersView } from "@/components/transfers/transfers-view";
-import { formatBytes } from "@polaris/core";
+import { baseName, formatBytes } from "@polaris/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import type { DriveEntry } from "@/app/(app)/drive/types";
@@ -220,6 +220,7 @@ export function ShareExplorer({
     rootName,
     rootPath,
     initialPath,
+    initialMissing = null,
     allowDownload,
     allowPreview,
     allowUpload,
@@ -231,6 +232,8 @@ export function ShareExplorer({
     rootName: string;
     rootPath: string;
     initialPath: string;
+    /** The address the link pointed at when it no longer exists (landed on an ancestor). */
+    initialMissing?: string | null;
     allowDownload: boolean;
     allowPreview: boolean;
     allowUpload: boolean;
@@ -241,6 +244,9 @@ export function ShareExplorer({
     const t = useTranslations("publicPages");
     const td = useTranslations("drive");
     const [path, setPath] = useState(initialPath);
+    // The folder or file the visitor had open that is gone now; the page landed
+    // on the nearest ancestor and says so until they move on or dismiss it.
+    const [missing, setMissing] = useState<string | null>(initialMissing);
     const [entries, setEntries] = useState<DriveEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -299,12 +305,19 @@ export function ShareExplorer({
     const navigate = useCallback(
         (next: string) => {
             setPath(next);
+            setMissing(null);
             window.history.pushState({}, "", urlForPath(next));
         },
         [urlForPath]
     );
 
     const reload = useCallback(() => setReloadKey((key) => key + 1), []);
+
+    // The server already landed on a surviving ancestor; put that in the address
+    // bar so a refresh or a copied URL no longer points at what is gone.
+    useEffect(() => {
+        if (initialMissing) window.history.replaceState({}, "", urlForPath(initialPath));
+    }, [initialMissing, initialPath, urlForPath]);
 
     // Keep the view in sync with back/forward navigation.
     useEffect(() => {
@@ -329,6 +342,19 @@ export function ShareExplorer({
             .then(async (res) => {
                 const body = await res.json();
                 if (controller.signal.aborted) return;
+                // Renamed, moved or deleted while open (or reached with Back):
+                // land on the nearest folder that still exists, and say so.
+                if (
+                    res.status === 404 &&
+                    body?.error === "folder_missing" &&
+                    typeof body.nearest === "string"
+                ) {
+                    const nearest = body.nearest as string;
+                    setMissing(path);
+                    setPath(nearest);
+                    window.history.replaceState({}, "", urlForPath(nearest));
+                    return;
+                }
                 if (!res.ok) {
                     setEntries([]);
                     setError(t("share.errors.folder"));
@@ -346,7 +372,7 @@ export function ShareExplorer({
                 }
             });
         return () => controller.abort();
-    }, [token, path, rootPath, reloadKey, t]);
+    }, [token, path, rootPath, reloadKey, t, urlForPath]);
 
     // Drop selection whenever the folder or the searched result set changes.
     useEffect(() => {
@@ -1276,6 +1302,27 @@ export function ShareExplorer({
                     </span>
                 )}
             </div>
+
+            {missing ? (
+                <div
+                    role="status"
+                    data-share-missing
+                    className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink"
+                >
+                    <Info className="mt-0.5 size-4 shrink-0" />
+                    <span className="min-w-0 flex-1 break-words">
+                        {t("share.missing", { name: baseName(missing) })}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setMissing(null)}
+                        className="shrink-0 rounded p-0.5 hover:bg-warning-soft"
+                        aria-label={td("explorer.dismiss")}
+                    >
+                        <X className="size-4" />
+                    </button>
+                </div>
+            ) : null}
 
             {/* Listing (also the upload drop zone when the share allows uploads). */}
             <div

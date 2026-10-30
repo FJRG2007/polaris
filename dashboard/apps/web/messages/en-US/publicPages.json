@@ -94,6 +94,7 @@
         "closed": "This link is outside its hours. Try again during the times it opens."
     },
     "share": {
+        "missing": "\"{name}\" is not here any more. It was renamed, moved or deleted, so this is the nearest folder.",
         "unreadable": "The shared item could not be read. It may have been moved or deleted.",
         "title": "Shared with you",
         "downloadsLeft": "{count} download(s) left",

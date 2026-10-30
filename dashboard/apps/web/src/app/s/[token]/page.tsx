@@ -29,9 +29,9 @@ import { getTranslations } from "@/lib/i18n/request";
 import { linkDenialMessage } from "@/lib/link-denial";
 import {
     checkShare,
+    landWithinShare,
     logShareAccess,
     resolveShareByToken,
-    resolveWithinShare,
     shareUnlockCookie,
     verifyShareUnlock
 } from "@/lib/share-service";
@@ -101,22 +101,22 @@ export default async function SharePage({
     });
 
     const root = normalizeRelPath(share.path);
-    const current = resolveWithinShare(share.path, p ?? null) ?? root;
 
     // Resolve whether the current target is a file or a folder up front; the driver
-    // is only needed for this one stat - the explorer streams its own listings.
-    let isFile: boolean;
-    let fileSize = "0";
+    // is only needed for this stat - the explorer streams its own listings. A `?p`
+    // renamed or deleted since the link was copied lands on its nearest surviving
+    // ancestor; only the shared item itself being gone makes the link unavailable.
     const driver = await getDriverForConnection(share.connectionId);
+    let landing: Awaited<ReturnType<typeof landWithinShare>>;
     try {
-        const stat = await driver.stat(current);
-        isFile = stat.kind === "file";
-        if (isFile) fileSize = stat.size.toString();
-    } catch {
-        return <LinkUnavailable signedIn={signedIn} message={t("share.unreadable")} />;
+        landing = await landWithinShare(share.path, p ?? null, (path) => driver.stat(path));
     } finally {
         await driver.dispose();
     }
+    if (!landing) return <LinkUnavailable signedIn={signedIn} message={t("share.unreadable")} />;
+    const current = landing.path;
+    const isFile = landing.kind === "file";
+    const fileSize = isFile ? landing.size.toString() : "0";
 
     return (
         <PublicShell signedIn={signedIn} className="max-w-6xl">
@@ -149,6 +149,7 @@ export default async function SharePage({
                         rootName={share.connection.name}
                         rootPath={root}
                         initialPath={current}
+                        initialMissing={landing.missing}
                         allowDownload={share.allowDownload}
                         allowPreview={share.allowPreview}
                         allowUpload={share.allowUpload}

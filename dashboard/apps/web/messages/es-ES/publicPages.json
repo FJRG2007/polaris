@@ -94,6 +94,7 @@
         "closed": "Este enlace está fuera de su horario. Vuelve a intentarlo en las horas en que se abre."
     },
     "share": {
+        "missing": "\"{name}\" ya no está aquí. Se renombró, movió o eliminó; esta es la carpeta más cercana.",
         "unreadable": "No se ha podido leer lo compartido. Puede que se haya movido o eliminado.",
         "title": "Compartido contigo",
         "downloadsLeft": "{count, plural, one {Queda # descarga} other {Quedan # descargas}}",

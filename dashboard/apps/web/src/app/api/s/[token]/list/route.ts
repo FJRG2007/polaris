@@ -8,7 +8,7 @@
  */
 
 import { getDriverForConnection } from "@/lib/storage-service";
-import { resolveWithinShare } from "@/lib/share-service";
+import { landWithinShare, resolveWithinShare } from "@/lib/share-service";
 import { gateShareRequest } from "@/lib/share-access";
 import { isReservedRootPath } from "@/lib/system-paths";
 
@@ -29,7 +29,15 @@ export async function GET(
 
     const driver = await getDriverForConnection(gate.share.connectionId);
     try {
-        const stat = await driver.stat(target);
+        // A folder renamed, moved or deleted while somebody had it open: answer
+        // with the nearest folder that still exists inside the share, so the
+        // page can land there and say what happened instead of dead-ending.
+        const landing = await landWithinShare(gate.share.path, target, (path) => driver.stat(path));
+        if (!landing) return Response.json({ error: "share_unreadable" }, { status: 410 });
+        if (landing.missing !== null) {
+            return Response.json({ error: "folder_missing", nearest: landing.path }, { status: 404 });
+        }
+        const stat = landing;
         if (stat.kind !== "dir") return Response.json({ error: "not_a_folder" }, { status: 400 });
 
         const listing = await driver.list(target);
