@@ -94,6 +94,7 @@ import {
 import { tlsHandshake } from "./tls-time";
 import {
     RELAY_LISTEN_PORT,
+    RELAY_SPEC,
     RELAY_ROUTES_FILE,
     relayConfigs,
     relayHelper,
@@ -182,7 +183,9 @@ const relaySchema = z.object({
     tcp: z.array(z.number()).default([]),
     udp: z.array(z.number()).default([]),
     /** The routes last given to the relay server's edge. */
-    routes: z.string().nullable().default(null)
+    routes: z.string().nullable().default(null),
+    /** The `RELAY_SPEC` both ends last came up with. */
+    spec: z.number().int().default(0)
 });
 
 /** Why a path cannot be used right now, as a key the screen words. */
@@ -742,7 +745,8 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
             homePrivate: sealKey(home.privateKey),
             tcp: [],
             udp: [],
-            routes: null
+            routes: null,
+            spec: 0
         };
     }
     // The ports the installed game servers publish, as the router is asked to
@@ -763,6 +767,7 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
     // ports comes up again with them.
     const changed =
         stored.routes === null ||
+        stored.spec !== RELAY_SPEC ||
         stored.tcp.join(",") !== ports.tcp.join(",") ||
         stored.udp.join(",") !== ports.udp.join(",");
     const names = await ownedZoneNames(await getDomainZones());
@@ -807,7 +812,7 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         await (await relayEdge(target)).pushFile(RELAY_ROUTES_FILE, routes);
         await setSetting(
             RELAY_KEY,
-            JSON.stringify({ ...stored, tcp: ports.tcp, udp: ports.udp, routes })
+            JSON.stringify({ ...stored, tcp: ports.tcp, udp: ports.udp, routes, spec: RELAY_SPEC })
         );
     }
     return { kind: "relay", address };

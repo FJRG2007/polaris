@@ -33,6 +33,8 @@ export const RELAY_LISTEN_PORT = wg.LAST_LISTEN_PORT + 1;
 /** The link's addresses. Each end runs in its own network namespace, so the slot
  *  never meets a tunnel's. */
 export const RELAY_SLOT = 16383;
+/** Raised when both ends must be brought up again with what this build renders. */
+export const RELAY_SPEC = 1;
 /** The web ports every relay carries. */
 export const WEB_PORTS = [80, 443] as const;
 /**
@@ -352,7 +354,8 @@ export function relaySpec(
         config: config.wireguard,
         networks,
         listenPort: end === "relay" ? RELAY_LISTEN_PORT : undefined,
-        extraFiles: config.frp ? [{ name: FRP_FILE, content: config.frp }] : []
+        extraFiles: config.frp ? [{ name: FRP_FILE, content: config.frp }] : [],
+        hostAlias: end === "home" ? HOST_ALIAS : undefined
     });
     const [helper, ...rest] = spec.services;
     if (!helper) throw new Error("A WireGuard end has no helper container");

@@ -238,6 +238,9 @@ export interface EndSpecInput {
     /** More files the helper writes beside the config, for a container that joins
      *  the same namespace. Root-owned and readable by root only. */
     readonly extraFiles?: readonly { name: string; content: string }[];
+    /** A name Docker keeps in the helper's hosts file. WireGuard's resolver asks DNS
+     *  only and never finds it, so the files get the address instead. */
+    readonly hostAlias?: string;
 }
 
 /**
@@ -263,14 +266,23 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
     const owned = ["config", ...extras.map((file) => file.name)]
         .map((name) => `/etc/wireproxy/${name}`)
         .join(" ");
+    const alias = input.hostAlias;
+    if (alias && !/^[a-z0-9][a-z0-9.-]*$/.test(alias))
+        throw new Error("A tunnel host alias is not a plain name");
+    const pin = alias ? ` | sed "s/${alias}/\\${PINNED:-${alias}}/g"` : "";
     const script = [
         "set -e",
-        'printf %s "$WG_CONFIG" | base64 -d > /etc/wireproxy/config',
+        ...(alias
+            ? [
+                  `PINNED=$(grep -F ${alias} /etc/hosts | head -n 1 | tr -s ' \t' ' ' | cut -d ' ' -f 1)`
+              ]
+            : []),
+        `printf %s "$WG_CONFIG" | base64 -d${pin} > /etc/wireproxy/config`,
         // The WireGuard image runs as the distroless nonroot user.
         "chown 65532:65532 /etc/wireproxy/config",
         "chmod 0400 /etc/wireproxy/config",
         ...extras.flatMap((file, index) => [
-            `printf %s "$WG_FILE_${index}" | base64 -d > /etc/wireproxy/${file.name}`,
+            `printf %s "$WG_FILE_${index}" | base64 -d${pin} > /etc/wireproxy/${file.name}`,
             `chmod 0400 /etc/wireproxy/${file.name}`
         ]),
         // The files hold secrets: they do not outlive the tunnel's containers.
