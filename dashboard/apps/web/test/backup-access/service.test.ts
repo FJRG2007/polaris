@@ -27,6 +27,7 @@ const zone = new Map<string, FakeRecord>();
 const containers = new Map<string, number>();
 let nextId = 1;
 let lineUp = true;
+let relayCarries = true;
 let games: { ports: { port: number; protocol: "tcp" | "udp" }[] }[] = [];
 let tunnelPorts: number[] = [];
 const tunnelRelays: (string | null)[] = [];
@@ -75,6 +76,25 @@ vi.mock("node:net", async (original) => {
             });
             setImmediate(() =>
                 lineUp ? socket.emit("connect") : socket.emit("error", new Error("refused"))
+            );
+            return socket;
+        }
+    };
+});
+
+vi.mock("node:tls", async (original) => {
+    const actual = await original<typeof import("node:tls")>();
+    return {
+        ...actual,
+        connect: () => {
+            const socket = Object.assign(new EventEmitter(), {
+                setTimeout: () => undefined,
+                destroy: () => undefined
+            });
+            setImmediate(() =>
+                relayCarries
+                    ? socket.emit("secureConnect")
+                    : socket.emit("error", new Error("reset"))
             );
             return socket;
         }
@@ -262,6 +282,7 @@ beforeEach(() => {
     deletedTunnels.length = 0;
     nextId = 1;
     lineUp = true;
+    relayCarries = true;
     reachNow = null;
     callNodeIps.length = 0;
     tunnelRelays.length = 0;
@@ -449,6 +470,33 @@ describe("runBackupAccess", () => {
         const hosts = (spec?.services[0]?.ports ?? []).map((port) => port.host);
         expect(hosts).not.toContain(80);
         expect(hosts).not.toContain(443);
+    });
+
+    it("says so and stays on the line when the relay does not carry a visitor home", async () => {
+        relayCarries = false;
+        await relayOn("automatic");
+        reachNow = { publicIp: HOME, cgnat: true, certain: true, reason: "carrier-address" };
+        await passes(FAIL_TO_FLIP);
+        expect(serving()).toBe("direct");
+        const probe = (await service.backupView()).probe;
+        expect(probe?.problem).toBe("relay-unreachable");
+        expect(probe?.detail).toBe("52000");
+        expect(probe?.latency.relay).toBeNull();
+
+        relayCarries = true;
+        await pass();
+        expect(serving()).toBe("backup");
+        expect((await service.backupView()).probe?.problem).toBeNull();
+    });
+
+    it("stays on a relay that stops answering rather than going back to a dead line", async () => {
+        await relayOn("automatic");
+        reachNow = { publicIp: HOME, cgnat: true, certain: true, reason: "carrier-address" };
+        await passes(FAIL_TO_FLIP);
+        expect(serving()).toBe("backup");
+        relayCarries = false;
+        await pass();
+        expect(serving()).toBe("backup");
     });
 
     it("re-pushes the routes when an app on the relay server takes a house name", async () => {

@@ -90,7 +90,9 @@ import {
     type LiveRecord,
     type RecordOp
 } from "./records";
+import { tlsTime } from "./tls-time";
 import {
+    RELAY_LISTEN_PORT,
     RELAY_ROUTES_FILE,
     relayConfigs,
     relayHelper,
@@ -189,6 +191,7 @@ const PATH_PROBLEMS = [
     "ports-busy",
     "ports-held",
     "edge-outdated",
+    "relay-unreachable",
     "setting-up",
     "failed"
 ] as const;
@@ -376,8 +379,18 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         before,
         previous.serving,
         uplink,
-        config.relayTargetId
+        config.relayTargetId,
+        zones.baseDomain
     );
+    // A relay that answers on its own but does not carry a visitor home. Never
+    // moved onto, since that swaps a line for nothing; while already on it, the
+    // records stay where they are, because the line that failed is no better.
+    const deadRelay =
+        uplink && config.path === "relay" && target !== null && measured.latency.relay === null;
+    if (deadRelay) {
+        problem = problem ?? "relay-unreachable";
+        detail = detail ?? String(RELAY_LISTEN_PORT);
+    }
     // The IPv6 way in: this box's own global address, checked from outside the
     // same way as the line. Published as AAAA only once that check gets in.
     const ipv6 = uplink ? await getHostGlobalIpv6().catch(() => null) : null;
@@ -402,7 +415,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     const decision = decide(previous, {
         mode: config.mode,
         manualOn: config.manualOn,
-        pathReady: target !== null,
+        pathReady: target !== null && !(deadRelay && previous.serving === "direct"),
         verdict,
         failToFlip: cgnat.failToFlip,
         now
@@ -952,7 +965,8 @@ async function measure(
     before: Probe | null,
     serving: FlipState["serving"],
     uplink: boolean,
-    relayTargetId: string | null
+    relayTargetId: string | null,
+    baseDomain: string
 ): Promise<Measured> {
     const [published, tunnel, relay] = await Promise.all([
         getSetting(PUBLISHED_KEY),
@@ -972,7 +986,7 @@ async function measure(
     const [direct, tunnelMs, relayMs, ip] = await Promise.all([
         published ? connectTime(published, 443) : Promise.resolve(null),
         tunnel ? connectTime(TUNNEL_EDGE.host, TUNNEL_EDGE.port) : Promise.resolve(null),
-        relay ? connectTime(relay.address, 443) : Promise.resolve(null),
+        relay ? tlsTime(relay.address, 443, baseDomain, CONNECT_TIMEOUT_MS) : Promise.resolve(null),
         probePublicIp(0)
     ]);
     const nowCalibrated = calibrated || direct !== null;
