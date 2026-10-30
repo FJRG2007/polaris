@@ -419,11 +419,6 @@ export async function checkPublicAddressAction(): Promise<AddressFollowView> {
     return addressFollowView();
 }
 
-/**
- * Save the backup access choices and run a pass now, so the path comes up and the
- * card shows what it found. Through the scheduler, so a pass already running is
- * not doubled.
- */
 /** What a repair on the relay server came to: the card as it stands, and why not. */
 interface RelayRepair {
     readonly view: BackupView;
@@ -431,14 +426,14 @@ interface RelayRepair {
 }
 
 async function repairRelayServer(
+    actorId: string,
     repair: () => Promise<RelayRepairFailure | null>,
     action: string
 ): Promise<RelayRepair> {
-    const actor = await requireAdmin();
     const failure = await repair();
     if (failure) return { view: await backupView(), failure };
     await recordAudit({
-        actorId: actor.id,
+        actorId,
         action,
         targetType: "setting",
         targetId: "backup-access"
@@ -448,13 +443,20 @@ async function repairRelayServer(
 }
 
 export async function freeRelayPortsAction(): Promise<RelayRepair> {
-    return repairRelayServer(freeRelayPorts, "domains.backup-access.free-ports");
+    const actor = await requireAdmin();
+    return repairRelayServer(actor.id, freeRelayPorts, "domains.backup-access.free-ports");
 }
 
 export async function updateRelayEdgeAction(): Promise<RelayRepair> {
-    return repairRelayServer(updateRelayEdge, "domains.backup-access.update-edge");
+    const actor = await requireAdmin();
+    return repairRelayServer(actor.id, updateRelayEdge, "domains.backup-access.update-edge");
 }
 
+/**
+ * Save the backup access choices and run a pass now, so the path comes up and the
+ * card shows what it found. Through the scheduler, so a pass already running is
+ * not doubled.
+ */
 export async function saveBackupAccessAction(input: unknown): Promise<BackupView> {
     const actor = await requireAdmin();
     const config = backupConfigSchema.parse(input);

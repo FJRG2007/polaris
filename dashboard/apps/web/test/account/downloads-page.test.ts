@@ -58,7 +58,7 @@ describe("when nothing has been published", () => {
             "No version has been published yet. The files appear here, one per browser, as soon as one is."
         );
         expect(source).toContain(
-            "No version has been published yet. Installing Polaris as an app above"
+            "Not available yet. To use Polaris in its own window today, install it as an app below."
         );
     });
 
@@ -107,7 +107,9 @@ describe("loading it by hand", () => {
     it("is a guided sequence, not a paragraph with the steps inside it", async () => {
         // Under the browser picked on the card, which starts on the reader's own.
         const source = await extensionCard;
-        expect(source).toContain("<ExtensionSteps key={browser} initial={browser} picker={false} />");
+        expect(source).toContain(
+            "<ExtensionSteps key={browser} initial={browser} picker={false} />"
+        );
         expect(source).toContain("<ExtensionCommand repo={repo} />");
         expect(await page).toContain("<ExtensionCard");
     });

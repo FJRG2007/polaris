@@ -144,7 +144,7 @@ describe("the install offer", () => {
         // holding the page: the offer beside them does not wait on them. The
         // two states of that list are asserted in `app-download`.
         const html = renderToStaticMarkup(withMessages(<InstallAppOffer />));
-        expect(html).toContain("Your browser installs it from its own menu");
+        expect(html).toContain("Install Polaris in Chrome and Edge");
         expect(html).not.toContain("Download the desktop app");
     });
 });
