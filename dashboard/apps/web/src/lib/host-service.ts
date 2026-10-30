@@ -171,14 +171,19 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
     });
 }
 
-/** Rename a host. Owner-scoped: false when no host of this owner matched, so a
- *  caller never reports a change that did not happen. */
+/** Rename a host, and the deploy target that carries its name. Owner-scoped:
+ *  false when no host of this owner matched, so a caller never reports a change
+ *  that did not happen. */
 export async function renameHost(ownerId: string, hostId: string, name: string): Promise<boolean> {
-    const { count } = await prisma.host.updateMany({
-        where: { id: hostId, ownerId },
-        data: { name }
+    return prisma.$transaction(async (tx) => {
+        const { count } = await tx.host.updateMany({
+            where: { id: hostId, ownerId },
+            data: { name }
+        });
+        if (count === 0) return false;
+        await tx.deployTarget.updateMany({ where: { hostId, kind: "host" }, data: { name } });
+        return true;
     });
-    return count > 0;
 }
 
 /** Record where a host lives, which decides how a domain can be pointed at it.
