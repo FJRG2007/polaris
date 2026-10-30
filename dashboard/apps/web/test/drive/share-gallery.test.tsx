@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import type { DriveEntry } from "@/app/(app)/drive/types";
 import { useMemoryStorage } from "./fixtures/memory-storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
     usePathname: () => "/",
@@ -178,5 +178,20 @@ describe("the preview of a shared photo", () => {
         await user.dblClick(await screen.findByLabelText("IMG_1.jpg"));
         const dialog = await screen.findByRole("dialog");
         expect(within(dialog).getByRole("button", { name: /Download/ })).toBeTruthy();
+    });
+});
+
+describe("a finger on a shared folder", () => {
+    /** A click as a finger sends it: jsdom's MouseEvent carries no pointer type. */
+    function tap(element: Element) {
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 });
+        Object.defineProperty(click, "pointerType", { value: "touch" });
+        fireEvent(element, click);
+    }
+
+    it("opens a file from the list with one tap", async () => {
+        share(["a.jpg", "b.pdf", "c.txt", "d.xlsx", "e.md", "f.csv"].map((n) => photo(n, 1)));
+        tap((await screen.findByText("b.pdf")).closest("[data-share-row]")!);
+        expect(await screen.findByRole("dialog")).toBeTruthy();
     });
 });

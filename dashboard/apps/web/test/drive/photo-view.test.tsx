@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { FilesView } from "@/app/(app)/drive/files-view";
 import type { DriveEntry } from "@/app/(app)/drive/types";
 import { EntryThumbnail } from "@/app/(app)/drive/entry-thumbnail";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
@@ -224,5 +224,55 @@ describe("the preview of a photo", () => {
         await user.keyboard("{ArrowRight}");
         expect(screen.getByText("3 of 8")).toBeTruthy();
         field.remove();
+    });
+});
+
+/** A click as a finger sends it: jsdom's MouseEvent carries no pointer type. */
+function tap(element: Element, detail = 1) {
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true, detail });
+    Object.defineProperty(click, "pointerType", { value: "touch" });
+    fireEvent(element, click);
+}
+
+describe("a finger in Drive", () => {
+    const docs = [
+        { ...photo("Edits", 1), kind: "dir" as const, size: "0" },
+        photo("a.docx", 2),
+        photo("b.pdf", 3)
+    ];
+
+    it("opens a folder with one tap in the list", async () => {
+        renderFilesView(docs);
+        const row = (await screen.findByText("Edits")).closest("[data-drive-row]")!;
+        tap(row);
+        expect(push).toHaveBeenCalledWith("/drive?c=c1&p=Edits");
+    });
+
+    it("opens a photo with one tap, and a double tap does not count twice", async () => {
+        renderFilesView(ALBUM);
+        const tile = await screen.findByLabelText("IMG_1.jpg");
+        tap(tile);
+        expect(await screen.findByText("1 of 8")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Back" }));
+        tap(tile, 2);
+        expect(screen.queryByText("1 of 8")).toBeNull();
+    });
+
+    it("picks instead of opening once something is picked", async () => {
+        renderFilesView(docs);
+        const row = (await screen.findByText("a.docx")).closest("[data-drive-row]")!;
+        fireEvent.click(within(row as HTMLElement).getByRole("checkbox"));
+        const other = (await screen.findByText("Edits")).closest("[data-drive-row]")!;
+        tap(other);
+        expect(push).not.toHaveBeenCalled();
+    });
+
+    it("still selects with a mouse click and leaves opening to the double click", async () => {
+        renderFilesView(docs);
+        const row = (await screen.findByText("Edits")).closest("[data-drive-row]")!;
+        fireEvent.click(row);
+        expect(push).not.toHaveBeenCalled();
+        fireEvent.doubleClick(row);
+        expect(push).toHaveBeenCalledWith("/drive?c=c1&p=Edits");
     });
 });
