@@ -117,6 +117,15 @@ describe("containers", () => {
                 expect(value).not.toMatch(/[\u0000-\u001f]/);
             }
         }
+        const pinned = wg.endSpec({
+            tunnelId: ID,
+            end: "public",
+            config: "[Interface]\nA = 1\n",
+            networks: ["polaris-proxy"],
+            hostAlias: "host.docker.internal"
+        });
+        for (const value of pinned.services[0].command ?? [])
+            expect(value).not.toMatch(/[\u0000-\u001f]/);
         expect(Buffer.from(helper.env.WG_CONFIG, "base64").toString("utf8")).toBe(
             "[Interface]\nA = 1\n"
         );

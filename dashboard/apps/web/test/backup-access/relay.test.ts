@@ -180,6 +180,11 @@ describe("backup relay config", () => {
         const home = relaySpec("home", configs.home, webOnly);
         expect(home.services[0].ports).toEqual([]);
         expect(home.services[0].extraHosts).toContain("host.docker.internal:host-gateway");
+        // WireGuard's resolver never reads the hosts file the entry above lands in.
+        const script = home.services[0].command?.[2] ?? "";
+        expect(script).toContain("grep -F host.docker.internal /etc/hosts");
+        expect(script).toContain('sed "s/host.docker.internal/${PINNED:-host.docker.internal}/g"');
+        expect(relay.services[0].command?.[2]).not.toContain("PINNED");
         expect(home.services).toHaveLength(2);
         expect(relay.project).toBe(relayProject("relay"));
         expect(home.project).toBe(relayProject("home"));
