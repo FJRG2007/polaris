@@ -738,6 +738,7 @@
                 "ports-busy": "Something on the relay server already uses one of the ports it has to carry. Pick another server or free them there.",
                 "ports-held": "Ports 80 and 443 on the relay server are in use by {detail}.",
                 "edge-outdated": "The edge on the relay server is too old to carry the relay.",
+                "relay-unreachable": "Visitors cannot get through the relay to this server. Allow UDP {detail} and the ports below in your cloud provider's firewall.",
                 "setting-up": "Preparing the relay server. This can take a few minutes.",
                 "failed": "The last pass failed: {detail}"
             },

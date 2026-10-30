@@ -76,6 +76,7 @@ import {
     BACKUP_MODES,
     BACKUP_PATHS,
     decide,
+    FAIL_TO_FLIP,
     readState,
     type Flip,
     type FlipState,
@@ -90,7 +91,9 @@ import {
     type LiveRecord,
     type RecordOp
 } from "./records";
+import { tlsHandshake } from "./tls-time";
 import {
+    RELAY_LISTEN_PORT,
     RELAY_ROUTES_FILE,
     relayConfigs,
     relayHelper,
@@ -128,7 +131,8 @@ const TUNNEL_PROJECT = "polaris-backup-tunnel";
 const TUNNEL_IMAGE = "cloudflare/cloudflared:latest";
 const PROXY_NETWORK = "polaris-proxy";
 /** The edge, as the connector reaches it on the proxy network. */
-const EDGE_ORIGIN = "https://traefik:443";
+const EDGE_HOST = "traefik";
+const EDGE_ORIGIN = `https://${EDGE_HOST}:443`;
 /** Where a tunnel connector dials: what the tunnel path adds before the edge. */
 const TUNNEL_EDGE = { host: "region1.v2.argotunnel.com", port: 7844 };
 const CONNECT_TIMEOUT_MS = 3_000;
@@ -136,6 +140,8 @@ const CONNECT_TIMEOUT_MS = 3_000;
 const OUTSIDE_READY_MS = 8_000;
 /** The relay server's own hostnames kept out of the routes to the house. */
 const MAX_SERVED_NAMES = 2_000;
+
+type DomainZones = Awaited<ReturnType<typeof getDomainZones>>;
 
 export const configSchema = z.object({
     mode: z.enum(BACKUP_MODES),
@@ -189,6 +195,7 @@ const PATH_PROBLEMS = [
     "ports-busy",
     "ports-held",
     "edge-outdated",
+    "relay-unreachable",
     "setting-up",
     "failed"
 ] as const;
@@ -205,6 +212,8 @@ const probeSchema = z.object({
     }),
     /** This box reached its own public address once, so that check means something. */
     calibrated: z.boolean(),
+    /** Passes in a row the relay failed to reach the house with nothing else wrong. */
+    relayMisses: z.number().int().min(0).default(0),
     /** The cloud server that checked from outside; null when only the inside check ran. */
     from: z.string().nullable().default(null),
     lastIp: z.string().nullable(),
@@ -362,7 +371,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             target =
                 config.path === "tunnel"
                     ? await warmTunnel(zones.baseDomain)
-                    : await warmRelay(config);
+                    : await warmRelay(config, (before?.relayMisses ?? 0) > 0);
         } catch (caught) {
             problem = caught instanceof PathRefusal ? caught.code : "failed";
             detail = caught instanceof PathRefusal ? caught.detail : message(caught);
@@ -376,8 +385,20 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         before,
         previous.serving,
         uplink,
-        config.relayTargetId
+        config.relayTargetId,
+        zones
     );
+    // A relay that answers on its own but does not carry a visitor home. Never
+    // moved onto, since that swaps a line for nothing; while already on it, the
+    // records stay where they are, because the line that failed is no better.
+    // One miss is a link still coming up, so only a run of them is reported.
+    const deadRelay =
+        uplink && config.path === "relay" && target !== null && measured.latency.relay === null;
+    const relayMisses = deadRelay && !problem ? (before?.relayMisses ?? 0) + 1 : 0;
+    if (relayMisses >= FAIL_TO_FLIP) {
+        problem = "relay-unreachable";
+        detail = String(RELAY_LISTEN_PORT);
+    }
     // The IPv6 way in: this box's own global address, checked from outside the
     // same way as the line. Published as AAAA only once that check gets in.
     const ipv6 = uplink ? await getHostGlobalIpv6().catch(() => null) : null;
@@ -402,7 +423,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
     const decision = decide(previous, {
         mode: config.mode,
         manualOn: config.manualOn,
-        pathReady: target !== null,
+        pathReady: target !== null && !(deadRelay && previous.serving === "direct"),
         verdict,
         failToFlip: cgnat.failToFlip,
         now
@@ -417,6 +438,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             decision.state.serving === "backup" &&
             target &&
             saved &&
+            !deadRelay &&
             !sameTarget(saved.target, target)
         )
             await toBackup(zones.baseDomain, target);
@@ -469,6 +491,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
         PROBE_KEY,
         JSON.stringify({
             ...measured,
+            relayMisses,
             verdict,
             checkedAt: now.toISOString(),
             problem,
@@ -693,8 +716,12 @@ async function relayTarget(id: string, anyOwner = false) {
     return row;
 }
 
-/** Both ends of the relay link, keys generated once and kept sealed. */
-async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
+/**
+ * Both ends of the relay link, keys generated once and kept sealed. `repush` gives
+ * the server's edge its routes again, for a relay that stopped reaching the house:
+ * they are the one piece that can vanish over there with nothing here noticing.
+ */
+async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupTarget> {
     if (!config.relayTargetId) throw new PathRefusal("no-server");
     const target = await relayTarget(config.relayTargetId);
     const address = target.host?.address ?? null;
@@ -776,7 +803,7 @@ async function warmRelay(config: BackupConfig): Promise<BackupTarget> {
         () => relaySpec("home", configs.home, ports),
         changed
     );
-    if (changed || stored.routes !== routes) {
+    if (changed || repush || stored.routes !== routes) {
         await (await relayEdge(target)).pushFile(RELAY_ROUTES_FILE, routes);
         await setSetting(
             RELAY_KEY,
@@ -937,6 +964,24 @@ export function connectTime(
 }
 
 /**
+ * How long a visitor's handshake takes through the relay, or null when it does not
+ * reach the house. Sent with a name the relay routes, and the certificate has to be
+ * the one the house's edge gives for that name: the relay server's own edge shakes
+ * hands too, and a name it does not route ends there. The house's edge not answering
+ * here says nothing about the relay, so the handshake then stands alone.
+ */
+async function relayTime(address: string, zones: DomainZones): Promise<number | null> {
+    const name = (await ownedZoneNames(zones)).find((entry) => !entry.startsWith("*."));
+    if (!name) return null;
+    const [through, home] = await Promise.all([
+        tlsHandshake(address, 443, name, CONNECT_TIMEOUT_MS),
+        tlsHandshake(EDGE_HOST, 443, name, CONNECT_TIMEOUT_MS)
+    ]);
+    if (!through) return null;
+    return !home || home.certificate === through.certificate ? through.ms : null;
+}
+
+/**
  * Check the direct path and time each path.
  *
  * From outside first: when an enrolled cloud server exists, it opens 443 on the
@@ -952,7 +997,8 @@ async function measure(
     before: Probe | null,
     serving: FlipState["serving"],
     uplink: boolean,
-    relayTargetId: string | null
+    relayTargetId: string | null,
+    zones: DomainZones
 ): Promise<Measured> {
     const [published, tunnel, relay] = await Promise.all([
         getSetting(PUBLISHED_KEY),
@@ -972,7 +1018,7 @@ async function measure(
     const [direct, tunnelMs, relayMs, ip] = await Promise.all([
         published ? connectTime(published, 443) : Promise.resolve(null),
         tunnel ? connectTime(TUNNEL_EDGE.host, TUNNEL_EDGE.port) : Promise.resolve(null),
-        relay ? connectTime(relay.address, 443) : Promise.resolve(null),
+        relay ? relayTime(relay.address, zones).catch(() => null) : Promise.resolve(null),
         probePublicIp(0)
     ]);
     const nowCalibrated = calibrated || direct !== null;
@@ -1003,7 +1049,7 @@ async function measure(
     };
 }
 
-type Measured = Omit<Probe, "checkedAt" | "problem" | "detail" | "conflicts"> & {
+type Measured = Omit<Probe, "checkedAt" | "problem" | "detail" | "conflicts" | "relayMisses"> & {
     readonly evidence: {
         readonly ip: string | null;
         readonly outside: "up" | "down" | null;

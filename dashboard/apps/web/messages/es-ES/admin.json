@@ -737,6 +737,7 @@
                 "no-address": "El servidor relé no tiene dirección pública.",
                 "ports-held": "Los puertos 80 y 443 del servidor relé están en uso por {detail}.",
                 "edge-outdated": "El edge del servidor relé es demasiado antiguo para llevar el relé.",
+                "relay-unreachable": "Las visitas no llegan a este servidor a través del relé. Permite UDP {detail} y los puertos de abajo en el firewall de tu proveedor.",
                 "setting-up": "Preparando el servidor relé. Puede tardar unos minutos.",
                 "ports-busy": "Algo en el servidor relé ya usa uno de los puertos que tiene que llevar. Elige otro servidor o libéralos allí.",
                 "failed": "La última pasada falló: {detail}"
