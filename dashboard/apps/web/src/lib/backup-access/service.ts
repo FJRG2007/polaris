@@ -1031,6 +1031,39 @@ async function firewallPorts(
 }
 
 /**
+ * Look at the relay again on the operator's word, between passes. Only what the
+ * screen shows about it is refreshed: the streaks and misses stay with the passes,
+ * so the time a flip or a reported problem has to wait stays what it is. Answers
+ * nothing without an uplink, where every port would look shut.
+ */
+export async function recheckRelay(): Promise<void> {
+    const relay = parse(relaySchema, await getSetting(RELAY_KEY));
+    if (!relay || internetOffline()) return;
+    const zones = await getDomainZones();
+    const [ms, ports] = await Promise.all([
+        relayTime(relay.address, zones).catch(() => null),
+        firewallPorts(relay.address, relay.tcp)
+    ]);
+    // Read last, so what a pass wrote during the knocks is kept.
+    const probe = parse(probeSchema, await getSetting(PROBE_KEY));
+    if (!probe) return;
+    const reached = ms !== null && probe.problem === "relay-unreachable";
+    await setSetting(
+        PROBE_KEY,
+        JSON.stringify({
+            ...probe,
+            latency: { ...probe.latency, relay: ms },
+            relayClosed: ports.closed,
+            relayUnclear: ports.unclear,
+            checkedAt: new Date().toISOString(),
+            relayMisses: ms === null ? probe.relayMisses : 0,
+            problem: reached ? null : probe.problem,
+            detail: reached ? null : probe.detail
+        } satisfies Probe)
+    );
+}
+
+/**
  * Check the direct path and time each path.
  *
  * From outside first: when an enrolled cloud server exists, it opens 443 on the

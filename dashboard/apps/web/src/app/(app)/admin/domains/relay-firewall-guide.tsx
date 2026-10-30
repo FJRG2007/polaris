@@ -14,6 +14,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState } from "react";
 import { bold, portText, Value } from "./guide-parts";
 import {
+    blockedPorts,
     CLOUD_FIREWALLS,
     detectCloud,
     linkState,
@@ -31,7 +32,17 @@ const STATE_TONE: Record<FirewallRuleState, string> = {
     unknown: "text-muted-foreground"
 };
 
-export function RelayFirewallGuide({ view }: { view: BackupView }) {
+export function RelayFirewallGuide({
+    view,
+    busy,
+    rechecking,
+    onRecheck
+}: {
+    view: BackupView;
+    busy: boolean;
+    rechecking: boolean;
+    onRecheck: () => void;
+}) {
     const t = useTranslations("admin");
     const relay = view.relay;
     const probe = view.probe;
@@ -55,9 +66,26 @@ export function RelayFirewallGuide({ view }: { view: BackupView }) {
     const open = toggled ?? (states.includes("closed") || probe?.problem === "relay-unreachable");
     if (!relay) return null;
     const guide = CLOUD_FIREWALLS.find((entry) => entry.id === cloud) ?? CLOUD_FIREWALLS[0];
+    const blocked = rules.reduce(
+        (sum, rule, index) =>
+            sum + blockedPorts(rule, states[index] ?? "unknown", probe?.relayClosed ?? []),
+        0
+    );
 
     return (
         <div className="flex flex-col gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className={blocked > 0 ? "text-danger" : "text-muted-foreground"}>
+                    {blocked > 0
+                        ? t("domains.backup.firewall.blocked", { count: blocked })
+                        : t("domains.backup.firewall.noneBlocked")}
+                </span>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={onRecheck}>
+                    {rechecking
+                        ? t("domains.backup.firewall.rechecking")
+                        : t("domains.backup.firewall.recheck")}
+                </Button>
+            </div>
             <button
                 type="button"
                 aria-expanded={open}

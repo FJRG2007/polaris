@@ -728,6 +728,10 @@
             "insideOnly": "Checked from inside only: this router does not loop back to its own public address, so a carrier-NAT line can go unnoticed. Add a cloud server to check from outside.",
             "udpCarried": "The relay carries UDP {ports}.",
             "firewall": {
+                "blocked": "{count, plural, one {# port still blocked} other {# ports still blocked}}",
+                "noneBlocked": "No port shows as blocked",
+                "recheck": "Check again",
+                "rechecking": "Checking...",
                 "show": "Show which ports to open at this server's provider",
                 "hide": "Hide the steps",
                 "provider": "Provider",

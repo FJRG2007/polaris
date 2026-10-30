@@ -94,6 +94,10 @@ export function linkState(probe: RelayFirewallProbe | null): FirewallRuleState {
     return answered ? "closed" : "unknown";
 }
 
+function inRule(rule: FirewallRule, port: number): boolean {
+    return port >= rule.port && port <= rule.endPort;
+}
+
 /** `closed` is what the last pass found shut, or null before one has looked, and
  *  `unclear` what failed in a way that does not point at the firewall. */
 export function ruleState(
@@ -104,7 +108,16 @@ export function ruleState(
 ): FirewallRuleState {
     if (rule.purpose === "link") return link;
     if (rule.protocol === "UDP" || closed === null) return "unknown";
-    const inRule = (port: number) => port >= rule.port && port <= rule.endPort;
-    if (closed.some(inRule)) return "closed";
-    return unclear.some(inRule) ? "unknown" : "open";
+    if (closed.some((port) => inRule(rule, port))) return "closed";
+    return unclear.some((port) => inRule(rule, port)) ? "unknown" : "open";
+}
+
+/** How many ports a rule in `state` still has shut, since a range is several. */
+export function blockedPorts(
+    rule: FirewallRule,
+    state: FirewallRuleState,
+    closed: readonly number[]
+): number {
+    if (state !== "closed") return 0;
+    return rule.purpose === "link" ? 1 : closed.filter((port) => inRule(rule, port)).length;
 }

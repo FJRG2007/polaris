@@ -728,6 +728,10 @@
             "insideOnly": "Solo comprobado desde dentro: este router no vuelve a su propia IP pública, así que una línea con CGNAT puede pasar inadvertida. Añade un servidor en la nube para comprobar desde fuera.",
             "udpCarried": "El relé lleva UDP {ports}.",
             "firewall": {
+                "blocked": "{count, plural, one {Falta # puerto por abrir} other {Faltan # puertos por abrir}}",
+                "noneBlocked": "Ningún puerto sale bloqueado",
+                "recheck": "Recomprobar",
+                "rechecking": "Comprobando...",
                 "show": "Muéstrame qué puertos abrir en el proveedor de este servidor",
                 "hide": "Ocultar los pasos",
                 "provider": "Proveedor",
