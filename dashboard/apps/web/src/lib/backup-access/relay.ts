@@ -240,8 +240,7 @@ const ROUTABLE_HOST = /^(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
  *  record does. */
 function hostMatcher(name: string, exact: string, regexp: string): string {
     const host = name.toLowerCase();
-    if (!ROUTABLE_HOST.test(host))
-        throw new Error(`Not a hostname the relay can route: ${name}`);
+    if (!ROUTABLE_HOST.test(host)) throw new Error(`Not a hostname the relay can route: ${name}`);
     if (!host.startsWith("*.")) return `${exact}(\`${host}\`)`;
     return `${regexp}(\`^.+[.]${host.slice(2).replaceAll(".", "[.]")}$\`)`;
 }

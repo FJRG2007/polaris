@@ -119,8 +119,20 @@ interface PlatformRow {
 
 const DESKTOP_ROWS: readonly PlatformRow[] = [
     { platform: "windows", note: "installer", has: [".exe"], guide: "desktop", os: "windows" },
-    { platform: "macArm", note: "diskImage", has: [".dmg", "arm64"], guide: "desktop", os: "macos" },
-    { platform: "macIntel", note: "diskImage", has: [".dmg", "x64"], guide: "desktop", os: "macos" },
+    {
+        platform: "macArm",
+        note: "diskImage",
+        has: [".dmg", "arm64"],
+        guide: "desktop",
+        os: "macos"
+    },
+    {
+        platform: "macIntel",
+        note: "diskImage",
+        has: [".dmg", "x64"],
+        guide: "desktop",
+        os: "macos"
+    },
     { platform: "linux", note: "debian", has: [".deb"], guide: "desktop", os: "linux" },
     { platform: "linux", note: "appImage", has: [".appimage"], guide: "desktop", os: "linux" }
 ];

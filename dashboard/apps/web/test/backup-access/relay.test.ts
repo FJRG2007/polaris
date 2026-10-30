@@ -142,7 +142,12 @@ describe("backup relay config", () => {
     it("leaves the server's own apps under a house wildcard to its edge", () => {
         const yaml = renderRelayRoutes(
             ["polaris.example.com", "*.plr.example.com"],
-            ["Shop.plr.example.com", "shop.plr.example.com", "shop.other.com", "polaris.example.com"]
+            [
+                "Shop.plr.example.com",
+                "shop.plr.example.com",
+                "shop.other.com",
+                "polaris.example.com"
+            ]
         );
         expect(yaml).toContain(
             "rule: '(HostSNI(`polaris.example.com`) || HostSNIRegexp(`^.+[.]plr[.]example[.]com$`)) && !(HostSNI(`shop.plr.example.com`))'"

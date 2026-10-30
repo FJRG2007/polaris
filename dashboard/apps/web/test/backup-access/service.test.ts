@@ -445,8 +445,7 @@ describe("runBackupAccess", () => {
         expect(prepared).toEqual([]);
         expect(edgeFiles.get("polaris-relay.yml")).toContain("passthrough: true");
         const spec = [...brought.values()].find((entry) => entry.project.includes("-pub-")) as
-            | { services: { ports?: { host: number }[] }[] }
-            | undefined;
+            { services: { ports?: { host: number }[] }[] } | undefined;
         const hosts = (spec?.services[0]?.ports ?? []).map((port) => port.host);
         expect(hosts).not.toContain(80);
         expect(hosts).not.toContain(443);
