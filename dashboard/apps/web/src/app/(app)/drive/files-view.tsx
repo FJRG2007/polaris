@@ -3058,7 +3058,10 @@ export function FilesView({
                                                                         adoptForMenu(index, entry)
                                                                     }
                                                                     onDoubleClick={(event) => {
-                                                                        if (!isRenaming && !plainTap(event))
+                                                                        if (
+                                                                            !isRenaming &&
+                                                                            !plainTap(event)
+                                                                        )
                                                                             openEntry(entry);
                                                                     }}
                                                                     {...entryDragProps(
@@ -3234,7 +3237,10 @@ export function FilesView({
                                                                             )
                                                                         }
                                                                         onDoubleClick={(event) => {
-                                                                            if (!isRenaming && !plainTap(event))
+                                                                            if (
+                                                                                !isRenaming &&
+                                                                                !plainTap(event)
+                                                                            )
                                                                                 openEntry(entry);
                                                                         }}
                                                                         {...entryDragProps(

@@ -3,7 +3,13 @@ import { plainTap } from "@/lib/plain-tap";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 function event(type: string, pointerType?: string, shiftKey = false): MouseEvent {
-    return { type, shiftKey, ctrlKey: false, metaKey: false, nativeEvent: { pointerType } } as never;
+    return {
+        type,
+        shiftKey,
+        ctrlKey: false,
+        metaKey: false,
+        nativeEvent: { pointerType }
+    } as never;
 }
 
 afterEach(() => vi.unstubAllGlobals());
