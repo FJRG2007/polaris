@@ -717,9 +717,11 @@ describe("runBackupAccess", () => {
         expect(stored.udp).toEqual([7882, 19132]);
         expect((await service.backupView()).relay).toEqual({
             address: RELAY,
+            listenPort: 52000,
             tcp: [80, 443, 7881, 25565],
             udp: [7882, 19132]
         });
+        expect((await service.backupView()).probe?.relayClosed).toEqual([]);
 
         // Nothing changed: nothing is brought up again.
         brought.clear();

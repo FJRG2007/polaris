@@ -219,7 +219,9 @@ const probeSchema = z.object({
     lastIp: z.string().nullable(),
     problem: z.enum(PATH_PROBLEMS).nullable().catch(null),
     detail: z.string().nullable(),
-    conflicts: z.array(z.string()).default([])
+    conflicts: z.array(z.string()).default([]),
+    /** The relay's TCP ports that did not answer from here; null when not looked at. */
+    relayClosed: z.array(z.number()).nullable().default(null)
 });
 type Probe = z.infer<typeof probeSchema>;
 
@@ -260,7 +262,12 @@ export interface BackupView {
     readonly state: FlipState;
     readonly probe: Probe | null;
     readonly tunnelReady: boolean;
-    readonly relay: { address: string; tcp: number[]; udp: number[] } | null;
+    readonly relay: {
+        address: string;
+        listenPort: number;
+        tcp: number[];
+        udp: number[];
+    } | null;
     readonly servers: { id: string; name: string }[];
     readonly cloudflare: boolean;
     /** Whether visitors can reach the line itself; null before the first check. */
@@ -311,7 +318,14 @@ export async function backupView(): Promise<BackupView> {
         state,
         probe,
         tunnelReady: tunnel !== null,
-        relay: relay ? { address: relay.address, tcp: relay.tcp, udp: relay.udp } : null,
+        relay: relay
+            ? {
+                  address: relay.address,
+                  listenPort: RELAY_LISTEN_PORT,
+                  tcp: relay.tcp,
+                  udp: relay.udp
+              }
+            : null,
         servers,
         cloudflare: Boolean(token),
         reach,
@@ -993,6 +1007,13 @@ async function relayTime(address: string, zones: DomainZones): Promise<number | 
  * once it has worked here. Until then the public address is compared with the
  * one the records name. No uplink at all is the breaker's to say.
  */
+/** The ports a server's firewall still shuts. Each one is published there, so
+ *  silence from here means the way in, not the service behind it. */
+async function closedPorts(address: string, ports: readonly number[]): Promise<number[]> {
+    const answers = await Promise.all(ports.map((port) => connectTime(address, port)));
+    return ports.filter((_, index) => answers[index] === null);
+}
+
 async function measure(
     before: Probe | null,
     serving: FlipState["serving"],
@@ -1013,13 +1034,15 @@ async function measure(
             calibrated,
             from: null,
             lastIp: before?.lastIp ?? null,
+            relayClosed: before?.relayClosed ?? null,
             evidence: { ip: null, outside: null, hairpin: false }
         };
-    const [direct, tunnelMs, relayMs, ip] = await Promise.all([
+    const [direct, tunnelMs, relayMs, ip, relayClosed] = await Promise.all([
         published ? connectTime(published, 443) : Promise.resolve(null),
         tunnel ? connectTime(TUNNEL_EDGE.host, TUNNEL_EDGE.port) : Promise.resolve(null),
         relay ? relayTime(relay.address, zones).catch(() => null) : Promise.resolve(null),
-        probePublicIp(0)
+        probePublicIp(0),
+        relay ? closedPorts(relay.address, relay.tcp) : Promise.resolve(null)
     ]);
     const nowCalibrated = calibrated || direct !== null;
     let inside: Verdict;
@@ -1040,6 +1063,7 @@ async function measure(
         calibrated: nowCalibrated,
         from: outside?.from ?? null,
         lastIp: ip ?? before?.lastIp ?? null,
+        relayClosed,
         evidence: {
             ip,
             // Only a check aimed at the address the line has now says anything about it.
