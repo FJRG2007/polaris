@@ -203,6 +203,12 @@ export interface ViewerSteps {
     readonly onStep: (by: -1 | 1) => void;
 }
 
+/** Whether a file's preview has a size of its own that would move the dialog. */
+function fixedFrame(name: string | undefined): boolean {
+    const kind = name ? viewerKind(name) : null;
+    return kind === "image" || kind === "video";
+}
+
 export function FileViewer({
     target,
     onOpenChange,
@@ -289,7 +295,14 @@ export function FileViewer({
         <Dialog open={target !== null} onOpenChange={changeOpen}>
             <DialogContent
                 ref={content}
-                className="flex h-[90vh] max-w-6xl flex-col gap-0 overflow-hidden p-0"
+                className={cn(
+                    "flex max-w-6xl flex-col gap-0 overflow-hidden p-0",
+                    // A fixed frame wherever the content would otherwise resize
+                    // it from one file to the next: pictures and clips, and any
+                    // set being stepped through. A lone sound or short text keeps
+                    // a dialog its own size.
+                    stepping || fixedFrame(target?.name) ? "h-[90vh]" : "max-h-[90vh]"
+                )}
                 onKeyDown={(event) => {
                     if (!stepping) return;
                     const by = stepOfKey(event, stepping.index, stepping.count);
