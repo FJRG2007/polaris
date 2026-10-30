@@ -16,10 +16,13 @@
  * the half above it does nothing but await.
  */
 
+import { useContext } from "react";
 import { Download } from "lucide-react";
 import { Badge, Button } from "../../index";
 import { useTranslations } from "../../i18n";
 import { pickFile, type AppDownload, type AppFile } from "./app-releases";
+import { BrowserChoice } from "./browser-choice";
+import { browserGuide } from "./browser-guide";
 import { DownloadWithGuide } from "./download-guide";
 import type { InstallPlatform } from "./install-platform";
 import { PlatformSelect, useInstallPlatform } from "./platform-select";
@@ -116,8 +119,20 @@ interface PlatformRow {
 
 const DESKTOP_ROWS: readonly PlatformRow[] = [
     { platform: "windows", note: "installer", has: [".exe"], guide: "desktop", os: "windows" },
-    { platform: "macArm", note: "diskImage", has: [".dmg", "arm64"], guide: "desktop", os: "macos" },
-    { platform: "macIntel", note: "diskImage", has: [".dmg", "x64"], guide: "desktop", os: "macos" },
+    {
+        platform: "macArm",
+        note: "diskImage",
+        has: [".dmg", "arm64"],
+        guide: "desktop",
+        os: "macos"
+    },
+    {
+        platform: "macIntel",
+        note: "diskImage",
+        has: [".dmg", "x64"],
+        guide: "desktop",
+        os: "macos"
+    },
     { platform: "linux", note: "debian", has: [".deb"], guide: "desktop", os: "linux" },
     { platform: "linux", note: "appImage", has: [".appimage"], guide: "desktop", os: "linux" }
 ];
@@ -136,12 +151,21 @@ const EXTENSION_ROWS: readonly PlatformRow[] = [
 ];
 
 /** One row: the file to fetch, or the fact that this release has not got one. */
-function PlatformFile({ row, file }: { row: PlatformRow; file: AppFile | null }) {
+function PlatformFile({
+    row,
+    file,
+    name
+}: {
+    row: PlatformRow;
+    file: AppFile | null;
+    /** What to call it instead of the platform, for a browser already picked. */
+    name?: string;
+}) {
     const t = useTranslations("components");
     return (
-        <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+        <div className="flex items-center justify-between gap-3 py-2">
             <div className="min-w-0">
-                <p className="text-sm">{t(`downloads.platforms.${row.platform}`)}</p>
+                <p className="text-sm">{name ?? t(`downloads.platforms.${row.platform}`)}</p>
                 {row.note ? (
                     <p className="text-xs text-muted-foreground">
                         {t(`downloads.notes.${row.note}`)}
@@ -172,11 +196,13 @@ function PlatformFile({ row, file }: { row: PlatformRow; file: AppFile | null })
 function PlatformList({
     rows,
     download,
-    nothing
+    nothing,
+    name
 }: {
     rows: readonly PlatformRow[];
     download: AppDownload | null;
     nothing: string;
+    name?: string;
 }) {
     const t = useTranslations("components");
     const [os, setOs] = useInstallPlatform();
@@ -215,6 +241,7 @@ function PlatformList({
                     <PlatformFile
                         key={`${row.platform}-${row.has.join("-")}`}
                         row={row}
+                        name={name}
                         file={pickFile(download.files, row.has, row.not)}
                     />
                 ))}
@@ -235,12 +262,15 @@ export function DesktopFilesOffer({ download }: { download: AppDownload | null }
     );
 }
 
-/** The extension, one package per browser. */
+/** The extension's package for the browser picked on its card, or one per browser. */
 export function ExtensionFilesOffer({ download }: { download: AppDownload | null }) {
     const t = useTranslations("components");
+    const browser = useContext(BrowserChoice);
+    const build = browser === "firefox" ? "firefox" : "chromium";
     return (
         <PlatformList
-            rows={EXTENSION_ROWS}
+            rows={browser ? EXTENSION_ROWS.filter((row) => row.platform === build) : EXTENSION_ROWS}
+            name={browser ? browserGuide(browser).label : undefined}
             download={download}
             nothing={t("downloads.noExtensionVersion")}
         />

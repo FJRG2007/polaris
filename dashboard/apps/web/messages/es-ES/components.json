@@ -1092,11 +1092,11 @@
         "title": "App de escritorio",
         "usingDesktop": "Estás usando la app de escritorio de Polaris.",
         "usingDesktopVersion": "Estás usando la app de escritorio de Polaris, versión {version}.",
-        "intro": "Instala Polaris para abrirlo en su propia ventana, con su propio icono en el dock, la barra de tareas o la pantalla de inicio. Se actualiza con el propio Polaris.",
+        "intro": "Abre Polaris en su propia ventana, con su propio icono, como cualquier otra app. Se mantiene al día por sí solo.",
         "installed": "Estás usando la app instalada.",
         "install": "Instalar Polaris",
-        "fromMenu": "Tu navegador lo instala desde su propio menú: Instalar Polaris en Chrome y Edge, Añadir al Dock en Safari, Añadir a pantalla de inicio en un móvil. Necesita que Polaris esté abierto por https.",
-        "native": "También hay una app nativa para Windows, macOS y Linux: envía una compilación desde tu propio ordenador y sigue los registros de un servicio en su propia ventana."
+        "fromMenu": "Instálalo desde el menú de tu navegador: Instalar Polaris en Chrome y Edge, Añadir al Dock en Safari o Añadir a pantalla de inicio en tu móvil.",
+        "native": "También hay una app para Windows, macOS y Linux."
     },
     "logViewer": {
         "search": "Buscar texto",
@@ -1149,7 +1149,7 @@
         "system": "Para qué sistema es",
         "notInRelease": "No está en esta versión",
         "whatChanged": "Qué ha cambiado",
-        "noDesktopVersion": "Aún no se ha publicado ninguna versión. Instalar Polaris como app arriba es la forma de tenerlo hoy en su propia ventana.",
+        "noDesktopVersion": "Aún no está disponible. Para usar Polaris en su propia ventana hoy mismo, instálalo como app más abajo.",
         "noExtensionVersion": "Aún no se ha publicado ninguna versión. Los archivos aparecerán aquí, uno por navegador, en cuanto se publique."
     },
     "ruleList": {

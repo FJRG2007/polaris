@@ -1092,11 +1092,11 @@
         "title": "Desktop app",
         "usingDesktop": "You are using the Polaris desktop app.",
         "usingDesktopVersion": "You are using the Polaris desktop app, version {version}.",
-        "intro": "Install Polaris to open it in its own window, with its own icon in the dock, taskbar or home screen. It updates with Polaris itself.",
+        "intro": "Open Polaris in its own window, with its own icon, like any other app. It stays up to date by itself.",
         "installed": "You are using the installed app.",
         "install": "Install Polaris",
-        "fromMenu": "Your browser installs it from its own menu: Install Polaris in Chrome and Edge, Add to Dock in Safari, Add to Home Screen on a phone. It needs Polaris to be open over https.",
-        "native": "There is also a native app for Windows, macOS and Linux: it pushes a build from your own computer and follows a service's logs in a window of its own."
+        "fromMenu": "Install it from your browser's menu: Install Polaris in Chrome and Edge, Add to Dock in Safari, or Add to Home Screen on your phone.",
+        "native": "There is also an app for Windows, macOS and Linux."
     },
     "logViewer": {
         "search": "Search logs",
@@ -1149,7 +1149,7 @@
         "system": "Which system it is for",
         "notInRelease": "Not in this release",
         "whatChanged": "What changed",
-        "noDesktopVersion": "No version has been published yet. Installing Polaris as an app above is how to have it in a window of its own today.",
+        "noDesktopVersion": "Not available yet. To use Polaris in its own window today, install it as an app below.",
         "noExtensionVersion": "No version has been published yet. The files appear here, one per browser, as soon as one is."
     },
     "ruleList": {

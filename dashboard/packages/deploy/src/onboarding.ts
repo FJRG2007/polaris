@@ -56,6 +56,34 @@ export interface OnboardingOptions {
  * directory, and two spellings of a path is how a route silently lands nowhere.
  */
 export const DYNAMIC_DIR = "/var/lib/polaris/traefik/dynamic";
+/** The file that hands certificate challenges to the edge's private entrypoint. */
+export const CHALLENGE_ROUTES_FILE = "polaris-acme.yml";
+/** The entrypoint Traefik answers its own challenges on: unpublished, because the
+ *  router it adds there outranks everything and answers 404 for a token it does not
+ *  hold, which on `web` would stop a challenge meant for a name this edge relays. */
+const CHALLENGE_ENTRYPOINT = "acme";
+const CHALLENGE_PORT = 8081;
+/** Under a relayed hostname's route (200), over every app's (at most 106). */
+const CHALLENGE_PRIORITY = 150;
+
+/** The route from port 80 to the challenge entrypoint. */
+export function renderChallengeRoutes(): string {
+    return [
+        "http:",
+        "  routers:",
+        "    polaris-acme:",
+        "      rule: 'PathPrefix(`/.well-known/acme-challenge/`)'",
+        "      entryPoints: [web]",
+        "      service: polaris-acme",
+        `      priority: ${CHALLENGE_PRIORITY}`,
+        "  services:",
+        "    polaris-acme:",
+        "      loadBalancer:",
+        "        servers:",
+        `          - url: "http://127.0.0.1:${CHALLENGE_PORT}"`,
+        ""
+    ].join("\n");
+}
 
 /**
  * Where this server's guard reads the firewall's address list and the accounts
@@ -166,6 +194,9 @@ export function onboardingScript(options: OnboardingOptions): string {
         `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik ${DYNAMIC_DIR} ${EDGE_INTEL_DIR}`,
         ...ownerSteps(options.owner, deployRoot, volumeRoot),
         `docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}`,
+        // Renamed into place, so the edge never reads half a file.
+        `printf %s ${quoteArg(renderChallengeRoutes())} > ${DYNAMIC_DIR}/.${CHALLENGE_ROUTES_FILE}`,
+        `mv -f ${DYNAMIC_DIR}/.${CHALLENGE_ROUTES_FILE} ${DYNAMIC_DIR}/${CHALLENGE_ROUTES_FILE}`,
         'echo "== starting Traefik =="',
         "docker rm -f polaris-traefik >/dev/null 2>&1 || true",
         [
@@ -186,13 +217,14 @@ export function onboardingScript(options: OnboardingOptions): string {
             "--providers.file.watch=true",
             "--entrypoints.web.address=:80",
             "--entrypoints.websecure.address=:443",
+            `--entrypoints.${CHALLENGE_ENTRYPOINT}.address=:${CHALLENGE_PORT}`,
             // Traefik 3 drops a request whose body takes longer than 60 seconds,
             // which cuts any large upload on a slow line; the same bound as the edge
             // on the Polaris host.
             "--entrypoints.web.transport.respondingTimeouts.readTimeout=6h",
             "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=6h",
             "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",
-            "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web",
+            `--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=${CHALLENGE_ENTRYPOINT}`,
             `--certificatesresolvers.letsencrypt.acme.email=${options.acmeEmail}`,
             "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json",
             // ECDSA keys, the same as the edge on the Polaris host.

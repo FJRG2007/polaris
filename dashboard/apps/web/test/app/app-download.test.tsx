@@ -22,19 +22,22 @@ import {
     ExtensionDownloadOffer,
     ExtensionFilesOffer
 } from "@/components/app-download";
+import { BrowserChoice } from "@polaris/ui/account-downloads/browser-choice";
 import { withMessages } from "../setup/i18n";
 
 describe("the desktop app's offer", () => {
     it("offers the download when a release exists, and names the version", () => {
-        const html = renderToStaticMarkup(withMessages(
-            <DesktopDownloadOffer
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
-                    version: "0.2.0",
-                    files: []
-                }}
-            />
-        ));
+        const html = renderToStaticMarkup(
+            withMessages(
+                <DesktopDownloadOffer
+                    download={{
+                        url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
+                        version: "0.2.0",
+                        files: []
+                    }}
+                />
+            )
+        );
         expect(html).toContain(
             'href="https://github.com/example/polaris/releases/tag/desktop-v0.2.0"'
         );
@@ -84,15 +87,17 @@ describe("the desktop app's files", () => {
      *  reader's own first. */
     function filesOn(system: keyof typeof AGENTS, released: typeof files) {
         vi.spyOn(navigator, "userAgent", "get").mockReturnValue(AGENTS[system]);
-        const { container } = render(withMessages(
-            <DesktopFilesOffer
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
-                    version: "0.2.0",
-                    files: released
-                }}
-            />
-        ));
+        const { container } = render(
+            withMessages(
+                <DesktopFilesOffer
+                    download={{
+                        url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
+                        version: "0.2.0",
+                        files: released
+                    }}
+                />
+            )
+        );
         return container.innerHTML;
     }
 
@@ -135,29 +140,63 @@ describe("the desktop app's files", () => {
 
     it("offers nothing to press when nothing has been released", () => {
         const html = renderToStaticMarkup(withMessages(<DesktopFilesOffer download={null} />));
-        expect(html).toContain("No version has been published yet");
-        expect(html).toContain("in a window of its own");
+        expect(html).toContain("Not available yet");
+        expect(html).toContain("in its own window");
         expect(html).not.toContain("href=");
     });
 });
 
 describe("the extension's files", () => {
+    it("shows only the package of the browser picked on the card", () => {
+        const download = {
+            version: "0.1.89",
+            url: "https://example.test/release",
+            files: [
+                { name: "polaris-0.1.89-chrome.zip", url: "https://example.test/chrome.zip" },
+                { name: "polaris-0.1.89-firefox.zip", url: "https://example.test/firefox.zip" }
+            ]
+        };
+        const offer = (browser: "brave" | "firefox") =>
+            renderToStaticMarkup(
+                withMessages(
+                    <BrowserChoice.Provider value={browser}>
+                        <ExtensionFilesOffer download={download as never} />
+                    </BrowserChoice.Provider>
+                )
+            );
+        expect(offer("brave")).toContain("Brave");
+        expect(offer("brave")).not.toContain("Firefox");
+        expect(offer("firefox")).toContain("Firefox");
+        expect(offer("firefox")).not.toContain("Brave");
+    });
+
     it("offers the package for each browser, never the sources archive", () => {
         // The sources archive is a zip on the same release, and handing it to
         // somebody as the add-on is a download that installs nothing.
-        const html = renderToStaticMarkup(withMessages(
-            <ExtensionFilesOffer
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/extension-v0.1.0",
-                    version: "0.1.0",
-                    files: [
-                        { name: "polaris-0.1.0-sources.zip", url: "https://example.test/sources.zip" },
-                        { name: "polaris-0.1.0-chrome.zip", url: "https://example.test/chrome.zip" },
-                        { name: "polaris-0.1.0-firefox.zip", url: "https://example.test/firefox.zip" }
-                    ]
-                }}
-            />
-        ));
+        const html = renderToStaticMarkup(
+            withMessages(
+                <ExtensionFilesOffer
+                    download={{
+                        url: "https://github.com/example/polaris/releases/tag/extension-v0.1.0",
+                        version: "0.1.0",
+                        files: [
+                            {
+                                name: "polaris-0.1.0-sources.zip",
+                                url: "https://example.test/sources.zip"
+                            },
+                            {
+                                name: "polaris-0.1.0-chrome.zip",
+                                url: "https://example.test/chrome.zip"
+                            },
+                            {
+                                name: "polaris-0.1.0-firefox.zip",
+                                url: "https://example.test/firefox.zip"
+                            }
+                        ]
+                    }}
+                />
+            )
+        );
         expect(html).toContain('href="https://example.test/chrome.zip"');
         expect(html).toContain('href="https://example.test/firefox.zip"');
         expect(html).not.toContain("sources.zip");
@@ -173,15 +212,17 @@ describe("the extension's files", () => {
 
 describe("the extension's offer", () => {
     it("offers the package when one has been published, and names the version", () => {
-        const html = renderToStaticMarkup(withMessages(
-            <ExtensionDownloadOffer
-                download={{
-                    url: "https://github.com/example/polaris/releases/tag/extension-v0.1.0",
-                    version: "0.1.0",
-                    files: []
-                }}
-            />
-        ));
+        const html = renderToStaticMarkup(
+            withMessages(
+                <ExtensionDownloadOffer
+                    download={{
+                        url: "https://github.com/example/polaris/releases/tag/extension-v0.1.0",
+                        version: "0.1.0",
+                        files: []
+                    }}
+                />
+            )
+        );
         expect(html).toContain(
             'href="https://github.com/example/polaris/releases/tag/extension-v0.1.0"'
         );

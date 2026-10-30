@@ -689,6 +689,19 @@
                 "always": "Siempre",
                 "manual": "Manual"
             },
+            "freePorts": "Liberar puertos",
+            "freePortsTitle": "¿Detener lo que usa los puertos 80 y 443?",
+            "freePortsBody": "Polaris detendrá {holders} en el servidor relé y caerán todas las webs que sirva allí. El servidor pasará a usar el edge de Polaris, que lleva el relé y también puede alojar apps.",
+            "portsHeldStuck": "Los puertos 80 y 443 del servidor relé están en uso por {detail}. Elige otro servidor.",
+            "portsHeldUnnamed": "Otro programa usa los puertos 80 y 443 del servidor relé. Elige otro servidor.",
+            "updateEdge": "Actualizar edge",
+            "updateEdgeTitle": "¿Actualizar el edge del servidor relé?",
+            "updateEdgeBody": "Todo lo que sirve ese servidor se detiene un momento mientras su edge se reinicia.",
+            "repairFailed": {
+                "no-server": "El servidor relé ya no existe. Elige otro.",
+                "not-web-server": "Polaris solo puede detener servidores web. Elige otro servidor.",
+                "refused": "El servidor relé no pudo hacerlo. Reinténtalo o elige otro servidor."
+            },
             "useBackup": "Pasar al respaldo",
             "useDirect": "Volver a directa",
             "needsToken": "Conecta antes un token de Cloudflare",
@@ -722,6 +735,9 @@
                 "no-daemon": "Esta edición no puede ejecutar el conector. La edición completa sí.",
                 "no-server": "El servidor relé ya no existe. Elige otro.",
                 "no-address": "El servidor relé no tiene dirección pública.",
+                "ports-held": "Los puertos 80 y 443 del servidor relé están en uso por {detail}.",
+                "edge-outdated": "El edge del servidor relé es demasiado antiguo para llevar el relé.",
+                "setting-up": "Preparando el servidor relé. Puede tardar unos minutos.",
                 "ports-busy": "Algo en el servidor relé ya usa uno de los puertos que tiene que llevar. Elige otro servidor o libéralos allí.",
                 "failed": "La última pasada falló: {detail}"
             },

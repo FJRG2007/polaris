@@ -8,10 +8,12 @@
  * WireGuard (wireproxy), so neither end needs NET_ADMIN, a TUN device or a kernel
  * module, and both fit the shapes the host daemon allows.
  *
- * The relay end publishes 80, 443 and the game ports and forwards each one through
- * the link; the house end dials the relay with a keepalive and hands each port to
- * this machine's own published port, so Traefik and the game servers answer as
- * they do on the direct path.
+ * The relay end forwards the game ports it publishes through the link; the house
+ * end dials the relay with a keepalive and hands each port to this machine's own
+ * published port, so Traefik and the game servers answer as they do on the direct
+ * path. The web ports are not published: 80 and 443 belong to the server's own edge,
+ * which hands the house's hostnames to the relay and goes on serving everything
+ * else, so a server can be a relay and a deploy target at once.
  *
  * wireproxy forwards TCP only on the receiving end, so UDP rides inside the same
  * link the way frp carries it for self-hosted game servers: frps on the relay end
@@ -225,6 +227,88 @@ function key(value: string): string {
 /** A stable id for the compose names, so both ends are found again after a restart. */
 export const RELAY_ID = "000000backup";
 
+/** The file on the relay server's edge that sends the house's hostnames to the relay. */
+export const RELAY_ROUTES_FILE = "polaris-relay.yml";
+/** Above an app's route on the same edge and the route to its certificate
+ *  challenges, so a challenge for a house name reaches the house. */
+const RELAY_ROUTE_PRIORITY = 200;
+
+const ROUTABLE_HOST = /^(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
+
+/** A hostname as a Traefik matcher. `[.]` rather than an escaped dot, so no layer of
+ *  YAML or shell has a backslash to eat. A wildcard covers every depth, as its DNS
+ *  record does. */
+function hostMatcher(name: string, exact: string, regexp: string): string {
+    const host = name.toLowerCase();
+    if (!ROUTABLE_HOST.test(host)) throw new Error(`Not a hostname the relay can route: ${name}`);
+    if (!host.startsWith("*.")) return `${exact}(\`${host}\`)`;
+    return `${regexp}(\`^.+[.]${host.slice(2).replaceAll(".", "[.]")}$\`)`;
+}
+
+/** The names under a house wildcard that this server answers itself. A name the
+ *  house owns outright stays the house's. */
+function ownNames(names: readonly string[], served: readonly string[]): string[] {
+    const house = new Set(names.map((name) => name.toLowerCase()));
+    const zones = [...house].filter((name) => name.startsWith("*.")).map((name) => name.slice(1));
+    const own = served
+        .map((name) => name.toLowerCase())
+        .filter((name) => ROUTABLE_HOST.test(name) && !house.has(name))
+        .filter((name) => zones.some((zone) => name.endsWith(zone)));
+    return [...new Set(own)].sort();
+}
+
+/**
+ * The relay server's edge routes for the house's hostnames.
+ *
+ * TLS passes through untouched, so the house's edge keeps terminating it with its
+ * own certificates, and port 80 is carried so Let's Encrypt can still reach it. Any
+ * other hostname falls through to whatever that server serves itself, and so do the
+ * `served` names of the apps deployed there, which sit under a house wildcard.
+ */
+export function renderRelayRoutes(
+    names: readonly string[],
+    served: readonly string[] = []
+): string {
+    const upstream = relayHelper();
+    const own = ownNames(names, served);
+    const rule = (exact: string, regexp: string) => {
+        const matches = (list: readonly string[]) =>
+            list.map((name) => hostMatcher(name, exact, regexp)).join(" || ");
+        return own.length > 0
+            ? `'(${matches(names)}) && !(${matches(own)})'`
+            : `'${matches(names)}'`;
+    };
+    return [
+        "tcp:",
+        "  routers:",
+        "    polaris-relay-tls:",
+        `      rule: ${rule("HostSNI", "HostSNIRegexp")}`,
+        "      entryPoints: [websecure]",
+        "      service: polaris-relay-tls",
+        `      priority: ${RELAY_ROUTE_PRIORITY}`,
+        "      tls:",
+        "        passthrough: true",
+        "  services:",
+        "    polaris-relay-tls:",
+        "      loadBalancer:",
+        "        servers:",
+        `          - address: "${upstream}:443"`,
+        "http:",
+        "  routers:",
+        "    polaris-relay-web:",
+        `      rule: ${rule("Host", "HostRegexp")}`,
+        "      entryPoints: [web]",
+        "      service: polaris-relay-web",
+        `      priority: ${RELAY_ROUTE_PRIORITY}`,
+        "  services:",
+        "    polaris-relay-web:",
+        "      loadBalancer:",
+        "        servers:",
+        `          - url: "http://${upstream}:80"`,
+        ""
+    ].join("\n");
+}
+
 export interface RelayEndConfig {
     readonly wireguard: string;
     /** frps' or frpc's config; null when there is no UDP port to carry. */
@@ -252,20 +336,21 @@ export function relayConfigs(
 
 /**
  * The containers of one end: the WireGuard tunnels' own two-container shape, with
- * the relay end publishing every carried port and the house end able to reach
- * this machine's published ports, plus frp in the same namespace when there is
- * UDP to carry.
+ * the relay end publishing every carried port but the web ones, which reach it over
+ * `networks` from the server's edge, and the house end able to reach this machine's
+ * published ports, plus frp in the same namespace when there is UDP to carry.
  */
 export function relaySpec(
     end: "relay" | "home",
     config: RelayEndConfig,
-    carried: RelayPortSet
+    carried: RelayPortSet,
+    networks: string[] = []
 ): ComposeSpec {
     const spec = wg.endSpec({
         tunnelId: RELAY_ID,
         end: end === "relay" ? "public" : "nat",
         config: config.wireguard,
-        networks: [],
+        networks,
         listenPort: end === "relay" ? RELAY_LISTEN_PORT : undefined,
         extraFiles: config.frp ? [{ name: FRP_FILE, content: config.frp }] : []
     });
@@ -304,7 +389,9 @@ export function relaySpec(
                     end === "relay"
                         ? [
                               ...helper.ports,
-                              ...carriable(carried.tcp).map(published("tcp")),
+                              ...carriable(carried.tcp)
+                                  .filter((port) => !WEB_PORTS.some((web) => web === port))
+                                  .map(published("tcp")),
                               ...(config.frp ? carriable(carried.udp).map(published("udp")) : [])
                           ]
                         : helper.ports,
@@ -314,6 +401,11 @@ export function relaySpec(
             ...frp
         ]
     };
+}
+
+/** The relay end's container, which holds the link and the carried ports. */
+export function relayHelper(): string {
+    return wg.endNames(RELAY_ID, "public").helper;
 }
 
 /** The compose project of one end, for taking it down. */

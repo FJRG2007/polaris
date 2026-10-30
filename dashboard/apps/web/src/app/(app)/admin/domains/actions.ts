@@ -25,9 +25,12 @@ import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domain
 import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-sync";
 import {
     backupView,
+    freeRelayPorts,
     configSchema as backupConfigSchema,
     saveConfig as saveBackupConfig,
-    type BackupView
+    updateRelayEdge,
+    type BackupView,
+    type RelayRepairFailure
 } from "@/lib/backup-access/service";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import {
@@ -414,6 +417,39 @@ export async function checkPublicAddressAction(): Promise<AddressFollowView> {
     await requireAdmin();
     await runScheduledJob("public-ip-follow");
     return addressFollowView();
+}
+
+/** What a repair on the relay server came to: the card as it stands, and why not. */
+interface RelayRepair {
+    readonly view: BackupView;
+    readonly failure: RelayRepairFailure | null;
+}
+
+async function repairRelayServer(
+    actorId: string,
+    repair: () => Promise<RelayRepairFailure | null>,
+    action: string
+): Promise<RelayRepair> {
+    const failure = await repair();
+    if (failure) return { view: await backupView(), failure };
+    await recordAudit({
+        actorId,
+        action,
+        targetType: "setting",
+        targetId: "backup-access"
+    }).catch(() => undefined);
+    await runScheduledJob("backup-access");
+    return { view: await backupView(), failure };
+}
+
+export async function freeRelayPortsAction(): Promise<RelayRepair> {
+    const actor = await requireAdmin();
+    return repairRelayServer(actor.id, freeRelayPorts, "domains.backup-access.free-ports");
+}
+
+export async function updateRelayEdgeAction(): Promise<RelayRepair> {
+    const actor = await requireAdmin();
+    return repairRelayServer(actor.id, updateRelayEdge, "domains.backup-access.update-edge");
 }
 
 /**

@@ -16,6 +16,7 @@ import { AppLink } from "./app-link";
 import { Puzzle } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrowserMark } from "./client-marks";
+import { BrowserChoice } from "./browser-choice";
 import { useTranslations } from "../../i18n";
 import { BROWSER_GUIDES, type BrowserId } from "./browser-guide";
 import { ExtensionCommand } from "./extension-command";
@@ -107,7 +108,7 @@ export function ExtensionCard({
                     <ExtensionCommand repo={repo} />
                 ) : (
                     <>
-                        {files}
+                        <BrowserChoice.Provider value={browser}>{files}</BrowserChoice.Provider>
                         {/* Keyed on the browser so the steps start on it. */}
                         <ExtensionSteps key={browser} initial={browser} picker={false} />
                     </>

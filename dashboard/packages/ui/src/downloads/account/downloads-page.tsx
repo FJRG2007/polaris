@@ -52,18 +52,18 @@ export function DownloadsPage({
             </div>
 
             <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-                {/* The one thing everybody can have right now, wide, with the
-                    browser's own install offer. Nothing in it waits. */}
+                {/* First and wide: the app itself. Its files wait on GitHub behind
+                    their own boundary, so nothing about the card waits with them. */}
                 <DownloadCard
-                    id="app"
-                    tint="violet"
+                    id="desktop"
+                    tint="slate"
                     className="lg:col-span-2"
                     icon={<Monitor className="size-4 shrink-0" />}
-                    title={t("downloads.web.title")}
-                    description={tc("installApp.intro")}
-                    side={<WebAppPreview />}
+                    title={tc("installApp.title")}
+                    description={t("downloads.desktop.description")}
+                    side={<DesktopPreview />}
                 >
-                    {webApp}
+                    {desktopFiles}
                 </DownloadCard>
 
                 <ExtensionCard repo={repo} files={extensionFiles} />
@@ -74,15 +74,16 @@ export function DownloadsPage({
 
                 <AssistantsCard />
 
+                {/* The browser's own install offer. Nothing in it waits. */}
                 <DownloadCard
-                    id="desktop"
-                    tint="slate"
+                    id="app"
+                    tint="violet"
                     icon={<Monitor className="size-4 shrink-0" />}
-                    title={tc("installApp.title")}
-                    description={t("downloads.desktop.description")}
-                    preview={<DesktopPreview />}
+                    title={t("downloads.web.title")}
+                    description={tc("installApp.intro")}
+                    preview={<WebAppPreview />}
                 >
-                    {desktopFiles}
+                    {webApp}
                 </DownloadCard>
 
                 {/* Present, unlinked and honest. A real plan with nothing built,

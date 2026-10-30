@@ -15,7 +15,17 @@
 
 import type { ReactNode } from "react";
 import { Check, MoreHorizontal } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    PolarisMark,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 
 /** One decision button. */
 export interface ConsentAction {
@@ -186,7 +196,8 @@ export function ConsentCodeEntry({
     onSubmit,
     label,
     submit,
-    busy
+    busy,
+    checking
 }: {
     value: string;
     onChange: (value: string) => void;
@@ -194,7 +205,10 @@ export function ConsentCodeEntry({
     label: string;
     submit: string;
     busy: boolean;
+    /** A code that came in the address is being looked up: nobody is typing it. */
+    checking?: boolean;
 }) {
+    if (checking) return <Skeleton className="h-9 w-full" />;
     return (
         <>
             <Input

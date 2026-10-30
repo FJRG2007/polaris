@@ -126,7 +126,7 @@ describe("the page", () => {
             'id="mobile"'
         ])
             expect(source).toContain(card);
-        expect(source.indexOf('id="app"')).toBeLessThan(source.indexOf("<ExtensionCard"));
+        expect(source.indexOf('id="desktop"')).toBeLessThan(source.indexOf("<ExtensionCard"));
         expect(source).toContain('className="lg:col-span-2"');
     });
 
