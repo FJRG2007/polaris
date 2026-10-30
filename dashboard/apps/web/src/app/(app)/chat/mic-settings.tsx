@@ -76,7 +76,7 @@ export function MicSettings({ className }: { className?: string }) {
                                 level.value === cleanup ? "opacity-100" : "opacity-0"
                             )}
                         />
-                        <span className="truncate" title={level.label}>{level.label}</span>
+                        <span className="truncate" title={t(level.label)}>{t(level.label)}</span>
                     </button>
                 ))}
             </div>
