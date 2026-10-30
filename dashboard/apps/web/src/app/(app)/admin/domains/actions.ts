@@ -26,6 +26,7 @@ import { addressFollowView, type AddressFollowView } from "@/lib/domain-address-
 import {
     backupView,
     freeRelayPorts,
+    recheckRelay,
     configSchema as backupConfigSchema,
     saveConfig as saveBackupConfig,
     updateRelayEdge,
@@ -452,10 +453,13 @@ export async function updateRelayEdgeAction(): Promise<RelayRepair> {
     return repairRelayServer(actor.id, updateRelayEdge, "domains.backup-access.update-edge");
 }
 
-/** Run a pass now instead of on the next minute, and show what it found. */
+/**
+ * Look at the relay now and show what it found. Not a pass: a button pressed over
+ * and over must not stand in for the minutes a flip is supposed to wait.
+ */
 export async function recheckBackupAccessAction(): Promise<BackupView> {
     await requireAdmin();
-    await runScheduledJob("backup-access");
+    await recheckRelay();
     return backupView();
 }
 

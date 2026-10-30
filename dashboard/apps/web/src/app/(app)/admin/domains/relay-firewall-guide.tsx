@@ -14,6 +14,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState } from "react";
 import { bold, portText, Value } from "./guide-parts";
 import {
+    blockedPorts,
     CLOUD_FIREWALLS,
     detectCloud,
     linkState,
@@ -33,10 +34,12 @@ const STATE_TONE: Record<FirewallRuleState, string> = {
 
 export function RelayFirewallGuide({
     view,
+    busy,
     rechecking,
     onRecheck
 }: {
     view: BackupView;
+    busy: boolean;
     rechecking: boolean;
     onRecheck: () => void;
 }) {
@@ -63,7 +66,11 @@ export function RelayFirewallGuide({
     const open = toggled ?? (states.includes("closed") || probe?.problem === "relay-unreachable");
     if (!relay) return null;
     const guide = CLOUD_FIREWALLS.find((entry) => entry.id === cloud) ?? CLOUD_FIREWALLS[0];
-    const blocked = states.filter((state) => state === "closed").length;
+    const blocked = rules.reduce(
+        (sum, rule, index) =>
+            sum + blockedPorts(rule, states[index] ?? "unknown", probe?.relayClosed ?? []),
+        0
+    );
 
     return (
         <div className="flex flex-col gap-3 text-xs">
@@ -73,7 +80,7 @@ export function RelayFirewallGuide({
                         ? t("domains.backup.firewall.blocked", { count: blocked })
                         : t("domains.backup.firewall.noneBlocked")}
                 </span>
-                <Button size="sm" variant="secondary" disabled={rechecking} onClick={onRecheck}>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={onRecheck}>
                     {rechecking
                         ? t("domains.backup.firewall.rechecking")
                         : t("domains.backup.firewall.recheck")}

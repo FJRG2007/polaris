@@ -16,7 +16,7 @@ afterEach(cleanup);
 const recheck = vi.fn();
 
 function Guide({ view: shown }: { view: BackupView }) {
-    return <RelayFirewallGuide view={shown} rechecking={false} onRecheck={recheck} />;
+    return <RelayFirewallGuide view={shown} busy={false} rechecking={false} onRecheck={recheck} />;
 }
 
 function view(
@@ -86,6 +86,34 @@ describe("the relay firewall guide", () => {
         expect(screen.getByText("3 ports still blocked")).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Check again" }));
         expect(recheck).toHaveBeenCalledOnce();
+    });
+
+    it("counts every port of a shut range, not the rule", () => {
+        const shut = view(40, [25565, 25566, 25567]);
+        render(
+            <Guide
+                view={{
+                    ...shut,
+                    relay: { ...shut.relay!, tcp: [25565, 25566, 25567], udp: [] }
+                }}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+
+        expect(screen.getByText("3 ports still blocked")).toBeTruthy();
+    });
+
+    it("waits for whatever else the card is doing before checking again", () => {
+        render(
+            <RelayFirewallGuide view={view(40, [])} busy rechecking={false} onRecheck={recheck} />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
+
+        expect(
+            (screen.getByRole("button", { name: "Check again" }) as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 
     it("stays folded once nothing is blocked", () => {

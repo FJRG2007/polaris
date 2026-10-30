@@ -59,10 +59,12 @@ export function BackupAccessCard() {
     }
 
     async function recheck() {
+        setBusy(true);
         setRechecking(true);
         setError("");
         const result = await runAction(recheckBackupAccessAction, setError);
         setRechecking(false);
+        setBusy(false);
         if (result) live.replace(result);
     }
 
@@ -244,6 +246,7 @@ export function BackupAccessCard() {
                     {view.config.path === "relay" ? (
                         <RelayFirewallGuide
                             view={view}
+                            busy={busy}
                             rechecking={rechecking}
                             onRecheck={() => void recheck()}
                         />

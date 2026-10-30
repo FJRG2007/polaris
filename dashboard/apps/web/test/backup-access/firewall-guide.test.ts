@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    blockedPorts,
     CLOUD_FIREWALLS,
     detectCloud,
     linkState,
@@ -84,6 +85,25 @@ describe("ruleState", () => {
     it("never claims what it could not look at", () => {
         expect(ruleState(tcp, "open", null, [])).toBe("unknown");
         expect(ruleState(udp, "open", [], [])).toBe("unknown");
+    });
+});
+
+describe("blockedPorts", () => {
+    const [link, range] = [
+        { protocol: "UDP", port: 52000, endPort: 52000, purpose: "link" },
+        { protocol: "TCP", port: 25565, endPort: 25569, purpose: "games" }
+    ] as const;
+
+    it("counts a range port by port, leaving out what was opened", () => {
+        const shut = [25565, 25566, 25567, 25568, 25569];
+        expect(blockedPorts(range, "closed", shut)).toBe(5);
+        expect(blockedPorts(range, "closed", [25566, 25568, 443])).toBe(2);
+    });
+
+    it("counts the link once and nothing for a rule that is not shut", () => {
+        expect(blockedPorts(link, "closed", [])).toBe(1);
+        expect(blockedPorts(range, "unknown", [25565])).toBe(0);
+        expect(blockedPorts(link, "open", [])).toBe(0);
     });
 });
 

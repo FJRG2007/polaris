@@ -147,7 +147,7 @@ vi.mock("@/lib/chat/call-address-watch", () => ({
     }
 }));
 vi.mock("@/lib/tailscale/tailscale-service", () => ({ getTailscaleHost: async () => null }));
-vi.mock("@/lib/offline/outbound-lookup", () => ({ internetOffline: () => false }));
+vi.mock("@/lib/offline/outbound-lookup", () => ({ internetOffline: () => offline }));
 vi.mock("@/lib/app-extensions/registry", () => ({ forwardedPorts: async () => games }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
@@ -263,6 +263,7 @@ const service = await import("../../src/lib/backup-access/service");
 const { FAIL_TO_FLIP, OK_TO_RETURN } = await import("../../src/lib/backup-access/decision");
 
 let clock = Date.parse("2026-01-01T00:00:00Z");
+let offline = false;
 
 async function pass() {
     clock += 2 * 60 * 1000;
@@ -286,6 +287,8 @@ function serving() {
 
 beforeEach(() => {
     tunnelPorts = [];
+    offline = false;
+    portAnswers = new Map();
     serverEdge = { traefik: true, pushable: true, challenges: true, error: null };
     portHolders = [];
     prepared.length = 0;
@@ -494,6 +497,55 @@ describe("runBackupAccess", () => {
         const hosts = (spec?.services[0]?.ports ?? []).map((port) => port.host);
         expect(hosts).not.toContain(80);
         expect(hosts).not.toContain(443);
+    });
+
+    it("rechecks the relay without spending what a flip has to wait for", async () => {
+        relayCarries = false;
+        await relayOn("automatic");
+        lineUp = false;
+        await pass();
+        const state = settings.get("backupAccess.state");
+        const before = (await service.backupView()).probe;
+
+        portAnswers = new Map([[7881, "silent"]]);
+        for (let i = 0; i < FAIL_TO_FLIP * 2; i += 1) await service.recheckRelay();
+
+        expect(settings.get("backupAccess.state")).toBe(state);
+        expect(serving()).toBe("direct");
+        const after = (await service.backupView()).probe;
+        expect(after?.relayMisses).toBe(before?.relayMisses);
+        expect(after?.problem).toBeNull();
+        expect(after?.relayClosed).toEqual([7881]);
+    });
+
+    it("clears a relay problem the recheck finds gone, and only then", async () => {
+        relayCarries = false;
+        await relayOn("automatic");
+        await passes(FAIL_TO_FLIP);
+        expect((await service.backupView()).probe?.problem).toBe("relay-unreachable");
+
+        await service.recheckRelay();
+        expect((await service.backupView()).probe?.problem).toBe("relay-unreachable");
+
+        relayCarries = true;
+        await service.recheckRelay();
+        const probe = (await service.backupView()).probe;
+        expect(probe?.problem).toBeNull();
+        expect(probe?.detail).toBeNull();
+        expect(probe?.relayMisses).toBe(0);
+        expect(probe?.latency.relay).not.toBeNull();
+    });
+
+    it("leaves the findings alone when nothing gets out", async () => {
+        await relayOn("automatic");
+        await pass();
+        const stored = settings.get("backupAccess.probe");
+
+        offline = true;
+        portAnswers = new Map([[7881, "silent"]]);
+        await service.recheckRelay();
+
+        expect(settings.get("backupAccess.probe")).toBe(stored);
     });
 
     it("says so and stays on the line when the relay does not carry a visitor home", async () => {
