@@ -22,6 +22,7 @@ import { baseName, formatBytes } from "@polaris/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import type { DriveEntry } from "@/app/(app)/drive/types";
+import { plainTap } from "@/lib/plain-tap";
 import { filesToItems, gatherDropItems } from "@/lib/drop-items";
 import { iconColorClass, iconComponent } from "@/app/(app)/drive/item-icons";
 import { searchItems } from "@polaris/core/search-text";
@@ -132,13 +133,6 @@ function shareThumbnailUrls(token: string, path: string, version: string): Thumb
 /** What makes a file this version of itself, for an address that can be cached. */
 function versionOf(entry: DriveEntry): string {
     return `${entry.modifiedAt}-${entry.size}`;
-}
-
-/** A plain tap of a finger, which on a phone opens what it lands on: a double
- *  tap is not something anybody does to a photo. */
-function plainTap(event: MouseEvent): boolean {
-    const pointer = (event.nativeEvent as PointerEvent).pointerType;
-    return pointer === "touch" && !event.shiftKey && !event.ctrlKey && !event.metaKey;
 }
 
 /**
@@ -559,12 +553,10 @@ export function ShareExplorer({
         if (next) openViewer(next);
     }
 
-    /** A tile clicked in the grid or the photo view: selected, and opened by a
-     *  finger. */
+    /** A tile clicked in the grid or the photo view. */
     function tileClick(event: MouseEvent, index: number, entry: DriveEntry) {
         photoCursor.current = index;
         rowClick(event, index, entry);
-        if (plainTap(event)) openEntry(entry);
     }
 
     /** The photo view's arrow keys landed on a listing position. */
@@ -761,8 +753,17 @@ export function ShareExplorer({
         });
     }
 
-    /** Windows-style click: plain selects only this, ctrl toggles, shift extends. */
+    /** Windows-style click: plain selects only this, ctrl toggles, shift extends. A finger opens. */
     function rowClick(event: MouseEvent, index: number, entry: DriveEntry) {
+        if (plainTap(event)) {
+            // The second tap of a double tap: the first already opened it.
+            if (event.detail > 1) return;
+            // Once something is picked a tap picks, as in any phone's file manager.
+            if (selectedEntries.length > 0) toggleOne(entry.path);
+            else openEntry(entry);
+            lastIndex.current = index;
+            return;
+        }
         if (event.shiftKey) {
             selectRange(index);
             return;
@@ -1401,7 +1402,9 @@ export function ShareExplorer({
                                         type="button"
                                         onClick={(event) => tileClick(event, index, entry)}
                                         onContextMenu={() => rowContextMenu(index, entry)}
-                                        onDoubleClick={() => openEntry(entry)}
+                                        onDoubleClick={(event) => {
+                                            if (!plainTap(event)) openEntry(entry);
+                                        }}
                                         className={cn(
                                             "group flex min-w-0 flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
                                             selected.has(entry.path)
@@ -1474,7 +1477,9 @@ export function ShareExplorer({
                                                     onContextMenu={() =>
                                                         rowContextMenu(row.index, entry)
                                                     }
-                                                    onDoubleClick={() => openEntry(entry)}
+                                                    onDoubleClick={(event) => {
+                                                        if (!plainTap(event)) openEntry(entry);
+                                                    }}
                                                     style={{
                                                         position: "absolute",
                                                         top: 0,

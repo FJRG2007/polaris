@@ -55,6 +55,7 @@ import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
 import * as targetRules from "./menu-targets";
+import { plainTap } from "@/lib/plain-tap";
 import { filesToItems, gatherDropItems, type UploadItem } from "@/lib/drop-items";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import {
@@ -548,6 +549,7 @@ export function FilesView({
     // Anchor for shift-range selection; keyboard cursor is tracked separately so a
     // shift+arrow can extend from a fixed anchor while the cursor keeps moving.
     const lastIndex = useRef<number | null>(null);
+    const lastClickWasTap = useRef(false);
     const cursorRef = useRef<number | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
@@ -795,7 +797,12 @@ export function FilesView({
         // The listing has to be back on the page before it can be scrolled to
         // the file the preview stepped to, or its thumbnail measured.
         const reveal = () => {
-            flushSync(() => setViewerTarget(null));
+            flushSync(() => {
+                setViewerTarget(null);
+                // A finger never picked this file, the preview did, and a pick
+                // left behind would turn the next tap into another pick.
+                if (lastClickWasTap.current) setSelected(new Set());
+            });
             if (index >= 0) scrollCursorIntoView(index);
         };
         if (!path || !flying.canFly(picture) || picture.offsetWidth < 1) {
@@ -838,7 +845,7 @@ export function FilesView({
         else triggerDownload(connectionId, entry);
     }
 
-    /** Windows-style row click: plain selects only this, ctrl toggles, shift extends. */
+    /** Windows-style row click: plain selects only this, ctrl toggles, shift extends. A finger opens. */
     function rowClick(event: MouseEvent, index: number, entry: DriveEntry) {
         if (renaming === entry.path) return;
         // Nothing to do to a file that is already going. Ignored rather than
@@ -846,6 +853,17 @@ export function FilesView({
         // already says so.
         if (leaving.has(entry.path)) return;
         cursorRef.current = index;
+        lastClickWasTap.current = plainTap(event);
+        if (lastClickWasTap.current) {
+            // The second tap of a double tap: the first already opened it.
+            if (event.detail > 1) return;
+            // Once something is picked a tap picks, as in any phone's file
+            // manager. The bin has nothing to open, so a tap picks there too.
+            if (selectedEntries.length > 0 || inTrash) toggleOne(entry.path);
+            else openEntry(entry);
+            lastIndex.current = index;
+            return;
+        }
         if (event.shiftKey) {
             selectRange(index);
             return;
@@ -3039,8 +3057,11 @@ export function FilesView({
                                                                     onContextMenu={() =>
                                                                         adoptForMenu(index, entry)
                                                                     }
-                                                                    onDoubleClick={() => {
-                                                                        if (!isRenaming)
+                                                                    onDoubleClick={(event) => {
+                                                                        if (
+                                                                            !isRenaming &&
+                                                                            !plainTap(event)
+                                                                        )
                                                                             openEntry(entry);
                                                                     }}
                                                                     {...entryDragProps(
@@ -3215,8 +3236,11 @@ export function FilesView({
                                                                                 entry
                                                                             )
                                                                         }
-                                                                        onDoubleClick={() => {
-                                                                            if (!isRenaming)
+                                                                        onDoubleClick={(event) => {
+                                                                            if (
+                                                                                !isRenaming &&
+                                                                                !plainTap(event)
+                                                                            )
                                                                                 openEntry(entry);
                                                                         }}
                                                                         {...entryDragProps(

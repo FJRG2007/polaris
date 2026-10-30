@@ -23,6 +23,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLocale } from "@/components/i18n/i18n-provider";
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from "react";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { plainTap } from "@/lib/plain-tap";
 import { mediaKindOf, photoNeighbour, photoRows, rowOfIndex } from "@/lib/drive-media";
 
 /** The tile a row aims for. Columns are however many of these fit. */
@@ -263,7 +264,9 @@ function PhotoTile({
             aria-label={entry.name}
             title={entry.name}
             onClick={(event) => onClick(event, index, entry)}
-            onDoubleClick={() => onOpen(entry)}
+            onDoubleClick={(event) => {
+                if (!plainTap(event)) onOpen(entry);
+            }}
             style={{ width: size, height: size }}
             className={cn(
                 "relative shrink-0 cursor-default overflow-hidden rounded-md bg-muted/40",
