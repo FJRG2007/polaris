@@ -135,7 +135,7 @@ también su propia página.
       <a href="docs/features/polar.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/polar-light-es-desktop.webp">
-        <img src="docs/assets/media/polar-dark-es-desktop.webp" alt="Polar respondiendo una pregunta en el navegador">
+        <img src="docs/assets/media/polar-dark-es-desktop.webp" alt="Polar respondiendo una pregunta">
       </picture>
       </a>
       <br><sub><a href="docs/features/polar.es.md"><b>Polar</b></a>: pregunta lo que sea y haz cosas</sub>
@@ -159,8 +159,8 @@ también su propia página.
     <td width="50%" valign="top">
       <a href="docs/features/vault.es.md">
       <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-browser-light-es-desktop.webp">
-        <img src="docs/assets/media/vault-browser-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso en el navegador">
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-es-desktop.webp">
+        <img src="docs/assets/media/vault-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso">
       </picture>
       </a>
       <br><sub><a href="docs/features/vault.es.md"><b>Bóveda</b></a>: contraseñas y códigos de un solo uso, compartidos con tu equipo</sub>

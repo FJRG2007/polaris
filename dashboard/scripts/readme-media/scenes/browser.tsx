@@ -1,6 +1,5 @@
 /**
- * Polaris in the browser: the extension filling a sign-in form from the vault,
- * and the Vault itself in a tab.
+ * Polaris in the browser: the extension filling a sign-in form from the vault.
  *
  * The sign-in page is an invented site at a reserved address, drawn here only
  * as the page the extension works on. The mark and the chooser are drawn the
@@ -9,7 +8,6 @@
  * words; that script runs inside a real page and cannot be mounted here.
  */
 
-import { vault } from "./vault";
 import { VIEWER } from "../fixtures/people";
 import { useEffect, useState } from "react";
 import { defineScene, type SceneContext } from "../runtime/scene";
@@ -19,8 +17,7 @@ import {
     BrowserFrame,
     EXTENSION_BRAND,
     PHONE_WIDTH,
-    PolarisTabIcon,
-    framedScene
+    PolarisTabIcon
 } from "../runtime/browser-frame";
 
 /** The invented site: its name, address and colour. */
@@ -250,14 +247,3 @@ export const extensionAutofill = defineScene({
         advance: () => 600
     }
 });
-
-export const vaultBrowser = framedScene("vault-browser", vault, (ctx) => ({
-    tabs: [
-        { title: "Vault - Polaris", icon: <PolarisTabIcon /> },
-        {
-            title: ctx.say(`Sign in - ${SITE.name}`, `Iniciar sesión - ${SITE.name}`),
-            color: SITE.brand
-        }
-    ],
-    url: `https://polaris.example.com${vault.path}`
-}));

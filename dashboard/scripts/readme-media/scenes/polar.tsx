@@ -1,8 +1,8 @@
 /**
- * Polar in use, in a browser: asked for release notes on its own page in the
- * dashboard (`polar`), and in the browser extension's side panel beside a
- * shop's product page (`polar-side-panel`), asked about that page, answering
- * it, and then working the page itself - a size picked, the basket filled.
+ * Polar in use: asked for release notes on its own page in the dashboard
+ * (`polar`), and in the browser extension's side panel beside a shop's product
+ * page (`polar-side-panel`), asked about that page, answering it, and then
+ * working the page itself - a size picked, the basket filled.
  *
  * Both chats are `PolarChat` itself. The side panel draws it the way the
  * extension's frame does (`(embed)/polar/embed/polar-embed.tsx`): full page,
@@ -13,7 +13,7 @@
 import { Star } from "lucide-react";
 import { Chrome } from "../runtime/chrome";
 import { useEffect, useState } from "react";
-import { BrowserFrame, PHONE_WIDTH, PolarisTabIcon, framedScene } from "../runtime/browser-frame";
+import { BrowserFrame, PHONE_WIDTH, PolarisTabIcon } from "../runtime/browser-frame";
 import { PAGE_BLEED, cn } from "@polaris/ui";
 import { THREAD_KEY } from "@/lib/polar/stored";
 import { PolarChat } from "@/components/polar/polar-panel";
@@ -322,8 +322,10 @@ function polarApi(ctx: SceneContext, now: () => { stage: PolarStage; shop: boole
             const at = now();
             return { thread: polarThread(ctx, at.stage, at.shop) };
         },
+        "GET /api/polar/threads/:id/goal": () => ({ goal: null }),
         "GET /api/polar/feedback": () => ({ marks: {} }),
-        "GET /api/polar/preferences": () => ({}),
+        // Opening Polar starts a new chat otherwise, and these show one in progress.
+        "GET /api/polar/preferences": () => ({ reopenLastChat: true }),
         "GET /api/polar/commands": () => ({ commands: [] }),
         "GET /api/polar/shared": () => ({ shared: [] }),
         "GET /api/polar/runs": () => ({}),
@@ -338,9 +340,9 @@ function openThread() {
     window.localStorage.setItem(THREAD_KEY, OPEN_THREAD_ID);
 }
 
-/** The dashboard's Polar page, drawn only inside the browser of `polar`. */
-export const polarPage = defineScene({
-    id: "polar-page",
+/** The dashboard's Polar page. */
+export const polar = defineScene({
+    id: "polar",
     path: "/polar",
     api: (ctx) => polarApi(ctx, () => ({ stage: PAGE_PLAY[current]!.stage, shop: false })),
     render: () => {
@@ -357,14 +359,6 @@ export const polarPage = defineScene({
         advance: () => 900
     }
 });
-
-export const polar = framedScene("polar", polarPage, (ctx) => ({
-    tabs: [
-        { title: "Polar - Polaris", icon: <PolarisTabIcon /> },
-        { title: ctx.say("Inbox - Polaris", "Bandeja - Polaris"), icon: <PolarisTabIcon /> }
-    ],
-    url: "https://polaris.example.com/polar"
-}));
 
 export const polarSidePanel = defineScene({
     id: "polar-side-panel",
