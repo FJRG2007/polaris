@@ -13,7 +13,12 @@ import { runAction } from "@/lib/run-action";
 import { Button, Skeleton, Checkbox } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { holdersCanBeFreed, UNKNOWN_HOLDER } from "@/lib/backup-access/port-holders";
-import { freeRelayPortsAction, saveBackupAccessAction, updateRelayEdgeAction } from "./actions";
+import {
+    freeRelayPortsAction,
+    recheckBackupAccessAction,
+    saveBackupAccessAction,
+    updateRelayEdgeAction
+} from "./actions";
 import { RelayFirewallGuide } from "./relay-firewall-guide";
 import { TAILSCALE_CONNECT_ID } from "./tailscale-card";
 import { PageSection } from "@/components/page-section";
@@ -35,6 +40,7 @@ export function BackupAccessCard() {
         select: (body) => body as BackupView
     });
     const [busy, setBusy] = useState(false);
+    const [rechecking, setRechecking] = useState(false);
     const [error, setError] = useState("");
     const [confirm, confirmDialog] = useConfirm();
     const view = live.data;
@@ -50,6 +56,14 @@ export function BackupAccessCard() {
         const result = await runAction(() => saveBackupAccessAction(next), setError);
         setBusy(false);
         live.replace(result ?? before);
+    }
+
+    async function recheck() {
+        setRechecking(true);
+        setError("");
+        const result = await runAction(recheckBackupAccessAction, setError);
+        setRechecking(false);
+        if (result) live.replace(result);
     }
 
     async function freePorts() {
@@ -227,7 +241,13 @@ export function BackupAccessCard() {
                         onUpdateEdge={() => void updateEdge()}
                     />
 
-                    {view.config.path === "relay" ? <RelayFirewallGuide view={view} /> : null}
+                    {view.config.path === "relay" ? (
+                        <RelayFirewallGuide
+                            view={view}
+                            rechecking={rechecking}
+                            onRecheck={() => void recheck()}
+                        />
+                    ) : null}
                     {view.config.path !== "relay" && view.relay && view.relay.tcp.length > 0 ? (
                         <p className="text-xs text-muted-foreground">
                             {t("domains.backup.tcpCarried", { ports: view.relay.tcp.join(", ") })}

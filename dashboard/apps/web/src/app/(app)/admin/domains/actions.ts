@@ -452,6 +452,13 @@ export async function updateRelayEdgeAction(): Promise<RelayRepair> {
     return repairRelayServer(actor.id, updateRelayEdge, "domains.backup-access.update-edge");
 }
 
+/** Run a pass now instead of on the next minute, and show what it found. */
+export async function recheckBackupAccessAction(): Promise<BackupView> {
+    await requireAdmin();
+    await runScheduledJob("backup-access");
+    return backupView();
+}
+
 /**
  * Save the backup access choices and run a pass now, so the path comes up and the
  * card shows what it found. Through the scheduler, so a pass already running is

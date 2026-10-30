@@ -8,10 +8,16 @@
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BackupView } from "@/lib/backup-access/service";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { RelayFirewallGuide } from "@/app/(app)/admin/domains/relay-firewall-guide";
 
 afterEach(cleanup);
+
+const recheck = vi.fn();
+
+function Guide({ view: shown }: { view: BackupView }) {
+    return <RelayFirewallGuide view={shown} rechecking={false} onRecheck={recheck} />;
+}
 
 function view(
     relayMs: number | null,
@@ -34,7 +40,7 @@ function view(
 
 describe("the relay firewall guide", () => {
     it("opens on its own at the right provider, marking what is blocked", () => {
-        render(<RelayFirewallGuide view={view(null, [7881], "relay-unreachable")} />, {
+        render(<Guide view={view(null, [7881], "relay-unreachable")} />, {
             wrapper: MessagesWrapper
         });
 
@@ -48,13 +54,13 @@ describe("the relay firewall guide", () => {
     });
 
     it("does not call the link blocked before anything has shown it", () => {
-        render(<RelayFirewallGuide view={view(null, [7881])} />, { wrapper: MessagesWrapper });
+        render(<Guide view={view(null, [7881])} />, { wrapper: MessagesWrapper });
 
         expect(screen.getAllByText("Blocked")).toHaveLength(1);
     });
 
     it("opens for a relay nobody gets through, even with no rule proven shut", () => {
-        render(<RelayFirewallGuide view={view(null, [443], "relay-unreachable")} />, {
+        render(<Guide view={view(null, [443], "relay-unreachable")} />, {
             wrapper: MessagesWrapper
         });
 
@@ -63,7 +69,7 @@ describe("the relay firewall guide", () => {
 
     it("keeps every bold value in a step apart", () => {
         const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
-        render(<RelayFirewallGuide view={view(null, [7881], null, "aws")} />, {
+        render(<Guide view={view(null, [7881], null, "aws")} />, {
             wrapper: MessagesWrapper
         });
 
@@ -72,10 +78,21 @@ describe("the relay firewall guide", () => {
         logged.mockRestore();
     });
 
+    it("says how many are left and checks again on demand", () => {
+        render(<Guide view={view(null, [7881, 80], "relay-unreachable")} />, {
+            wrapper: MessagesWrapper
+        });
+
+        expect(screen.getByText("3 ports still blocked")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+        expect(recheck).toHaveBeenCalledOnce();
+    });
+
     it("stays folded once nothing is blocked", () => {
-        render(<RelayFirewallGuide view={view(40, [])} />, { wrapper: MessagesWrapper });
+        render(<Guide view={view(40, [])} />, { wrapper: MessagesWrapper });
 
         expect(screen.queryByText("52000")).toBeNull();
         expect(screen.getByRole("button", { expanded: false })).toBeTruthy();
+        expect(screen.getByText("No port shows as blocked")).toBeTruthy();
     });
 });

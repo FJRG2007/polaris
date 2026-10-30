@@ -31,7 +31,15 @@ const STATE_TONE: Record<FirewallRuleState, string> = {
     unknown: "text-muted-foreground"
 };
 
-export function RelayFirewallGuide({ view }: { view: BackupView }) {
+export function RelayFirewallGuide({
+    view,
+    rechecking,
+    onRecheck
+}: {
+    view: BackupView;
+    rechecking: boolean;
+    onRecheck: () => void;
+}) {
     const t = useTranslations("admin");
     const relay = view.relay;
     const probe = view.probe;
@@ -55,9 +63,22 @@ export function RelayFirewallGuide({ view }: { view: BackupView }) {
     const open = toggled ?? (states.includes("closed") || probe?.problem === "relay-unreachable");
     if (!relay) return null;
     const guide = CLOUD_FIREWALLS.find((entry) => entry.id === cloud) ?? CLOUD_FIREWALLS[0];
+    const blocked = states.filter((state) => state === "closed").length;
 
     return (
         <div className="flex flex-col gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className={blocked > 0 ? "text-danger" : "text-muted-foreground"}>
+                    {blocked > 0
+                        ? t("domains.backup.firewall.blocked", { count: blocked })
+                        : t("domains.backup.firewall.noneBlocked")}
+                </span>
+                <Button size="sm" variant="secondary" disabled={rechecking} onClick={onRecheck}>
+                    {rechecking
+                        ? t("domains.backup.firewall.rechecking")
+                        : t("domains.backup.firewall.recheck")}
+                </Button>
+            </div>
             <button
                 type="button"
                 aria-expanded={open}
