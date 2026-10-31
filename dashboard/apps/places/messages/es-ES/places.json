@@ -1,4 +1,10 @@
 {
+    "network": {
+        "title": "Red",
+        "address": "Dirección IP",
+        "mac": "Dirección MAC",
+        "failed": "No se pudieron leer los datos de red."
+    },
     "camera": {
         "batteryNoPicture": "Sin imagen. Abre sus ajustes para probarla.",
         "batteryOpenToWatch": "Con batería: ábrela para verla",

@@ -6,6 +6,7 @@ import { hostSubject } from "@/lib/metrics-shared";
 import { grantedSubjects } from "@/lib/access/grants";
 import { getTranslations } from "@/lib/i18n/request";
 import { homePathForUser, requireUser, sessionCan } from "@/lib/session";
+import { placeChoices } from "@/lib/ups/ups-service";
 import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
 import { UpsListView } from "./ups-list-view";
 
@@ -17,10 +18,11 @@ export const dynamic = "force-dynamic";
 export default async function UpsPage() {
     const user = await requireUser();
     if (await sessionCan(user, "system.manage")) {
-        const rows = await listServerRows(user.id);
+        const [rows, places] = await Promise.all([listServerRows(user.id), placeChoices()]);
         return (
             <UpsListView
                 machines={rows.map((row) => ({ id: hostSubject(row.id), name: row.name }))}
+                places={places}
             />
         );
     }

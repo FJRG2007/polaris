@@ -5,6 +5,7 @@
  */
 
 import { notFound } from "next/navigation";
+import { addressesFor } from "../../../lib/cameras";
 import { panelContents } from "../../../lib/panels";
 import { requireHomeUser } from "../../../lib/access";
 import { PanelWall } from "../../../screens/panels/panel-wall";
@@ -28,7 +29,7 @@ export default async function WallPanelPage({
             cards={contents.panel.cards}
             devices={contents.devices}
             rooms={contents.rooms}
-            cameras={contents.cameras}
+            cameras={addressesFor(contents.cameras, canManage)}
             automations={contents.automations}
             access={{ kind: "session", canControl, canRun: canManage }}
         />

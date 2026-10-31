@@ -19,12 +19,18 @@ import { UpsAnalytics } from "./ups-analytics";
 import { UpsConnectionDialog } from "./ups-connection-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, EmptyState, PageHeader, Skeleton } from "@polaris/ui";
+import { Badge, Button, EmptyState, LanDetails, PageHeader, Skeleton } from "@polaris/ui";
 import { minutesLeft, rounded, upsStatus, type UpsListAnswer, type UpsMachine } from "./ups-words";
 
 const POLL_MS = 10_000;
 
-export function UpsListView({ machines }: { machines: UpsMachine[] }) {
+export function UpsListView({
+    machines,
+    places
+}: {
+    machines: UpsMachine[];
+    places: { id: string; name: string }[];
+}) {
     const t = useTranslations("servers");
     const router = useRouter();
     const [adding, setAdding] = useState(false);
@@ -40,6 +46,8 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
     const offers: UsbOffer[] = data?.usb.offers ?? [];
     const machineName = (id: string | null) =>
         machines.find((machine) => machine.id === id)?.name ?? "";
+
+    const placeName = (id: string | null) => places.find((place) => place.id === id)?.name ?? "";
 
     async function addOffer(offer: UsbOffer) {
         const key = `${offer.machineId}/${offer.deviceId}`;
@@ -135,95 +143,156 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                         description={t("ups.empty.body")}
                     />
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[36rem] text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                    <div className="rounded-lg border border-border">
+                        <table className="w-full table-auto text-sm">
+                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-2 pr-3 font-medium">
+                                    <th className="w-full max-w-0 px-3 py-2 font-medium">
                                         {t("ups.columns.name")}
                                     </th>
-                                    <th className="py-2 pr-3 font-medium">
+                                    <th className="px-3 py-2 font-medium">
                                         {t("ups.columns.status")}
                                     </th>
-                                    <th className="py-2 pr-3 text-right font-medium">
+                                    <th className="px-3 py-2 text-right font-medium">
                                         {t("ups.columns.charge")}
                                     </th>
-                                    <th className="py-2 pr-3 text-right font-medium">
-                                        {t("ups.columns.runtime")}
-                                    </th>
-                                    <th className="py-2 pr-3 text-right font-medium">
+                                    <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">
                                         {t("ups.columns.load")}
                                     </th>
-                                    <th className="py-2 font-medium">
+                                    <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">
+                                        {t("ups.columns.runtime")}
+                                    </th>
+                                    <th className="hidden px-3 py-2 font-medium xl:table-cell">
+                                        {t("ups.columns.place")}
+                                    </th>
+                                    <th className="hidden px-3 py-2 font-medium xl:table-cell">
                                         {t("ups.columns.connection")}
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {data === null
-                                    ? [0, 1].map((row) => (
-                                          <tr key={row} className="border-t border-border">
-                                              <td colSpan={6} className="py-2.5">
-                                                  <Skeleton className="h-5 w-full" />
-                                              </td>
-                                          </tr>
-                                      ))
-                                    : data.ups.map(({ ups, result }) => {
-                                          const reading = result.ok ? result.reading : null;
-                                          const status = upsStatus(reading);
-                                          const charge = rounded(reading?.charge ?? null);
-                                          const minutes = minutesLeft(reading?.runtimeS ?? null);
-                                          const load = rounded(reading?.load ?? null);
-                                          return (
-                                              <tr key={ups.id} className="border-t border-border">
-                                                  <td className="max-w-[16rem] py-2.5 pr-3">
-                                                      <Link
-                                                          href={`/places/ups/${ups.id}`}
-                                                          className="block truncate font-medium hover:underline"
-                                                          title={ups.name}
-                                                      >
-                                                          {ups.name}
-                                                      </Link>
-                                                  </td>
-                                                  <td className="py-2.5 pr-3">
-                                                      <Badge
-                                                          variant={status.tone}
-                                                          title={
-                                                              result.ok
-                                                                  ? undefined
-                                                                  : t(
-                                                                        `ups.unreachable.${result.reason}`
-                                                                    )
-                                                          }
-                                                      >
-                                                          {t(`ups.status.${status.key}`)}
-                                                      </Badge>
-                                                  </td>
-                                                  <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                      {charge === null
-                                                          ? "-"
-                                                          : t("ups.units.percent", {
-                                                                value: charge
-                                                            })}
-                                                  </td>
-                                                  <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                      {minutes === null
-                                                          ? "-"
-                                                          : t("ups.units.minutes", {
-                                                                count: minutes
-                                                            })}
-                                                  </td>
-                                                  <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                      {load === null
-                                                          ? "-"
-                                                          : t("ups.units.percent", { value: load })}
-                                                  </td>
-                                                  <td className="py-2.5 text-muted-foreground">
-                                                      {t(`ups.connection.${ups.connection}`)}
-                                                  </td>
-                                              </tr>
-                                          );
-                                      })}
+                                {live.error && data === null ? (
+                                    <tr className="border-t border-border">
+                                        <td colSpan={7} className="px-3 py-2.5">
+                                            <p role="alert" className="text-sm text-danger-ink">
+                                                {t("ups.errors.failed")}
+                                            </p>
+                                        </td>
+                                    </tr>
+                                ) : data === null ? (
+                                    [0, 1].map((row) => (
+                                        <tr key={row} className="border-t border-border">
+                                            <td colSpan={7} className="px-3 py-2.5">
+                                                <Skeleton className="h-5 w-full" />
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    data.ups.map(({ ups, result }) => {
+                                        const reading = result.ok ? result.reading : null;
+                                        const status = upsStatus(reading);
+                                        const charge = rounded(reading?.charge ?? null);
+                                        const minutes = minutesLeft(reading?.runtimeS ?? null);
+                                        const load = rounded(reading?.load ?? null);
+                                        const href = `/places/ups/${ups.id}`;
+                                        const runtimeText =
+                                            minutes === null
+                                                ? "-"
+                                                : t("ups.units.minutes", { count: minutes });
+                                        const loadText =
+                                            load === null
+                                                ? "-"
+                                                : t("ups.units.percent", { value: load });
+                                        const place = placeName(ups.placeId);
+                                        const connection = t(`ups.connection.${ups.connection}`);
+                                        const network = data.network?.[ups.id] ?? null;
+                                        const placeAndConnection = [place, connection]
+                                            .filter(Boolean)
+                                            .join(" / ");
+                                        const addresses = network ? (
+                                            <div onClick={(event) => event.stopPropagation()}>
+                                                <LanDetails
+                                                    compact
+                                                    details={network}
+                                                    labels={{
+                                                        address: t("network.address"),
+                                                        mac: t("network.mac")
+                                                    }}
+                                                />
+                                            </div>
+                                        ) : null;
+                                        return (
+                                            <tr
+                                                key={ups.id}
+                                                onClick={() => router.push(href)}
+                                                className="cursor-pointer border-t border-border hover:bg-muted/50"
+                                            >
+                                                <td className="w-full max-w-0 px-3 py-2.5">
+                                                    <Link
+                                                        href={href}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        className="block truncate font-medium hover:underline"
+                                                        title={ups.name}
+                                                    >
+                                                        {ups.name}
+                                                    </Link>
+                                                    <span className="block truncate text-xs text-muted-foreground lg:hidden">
+                                                        {[loadText, runtimeText]
+                                                            .filter((value) => value !== "-")
+                                                            .join(" / ")}
+                                                    </span>
+                                                    <span
+                                                        className="block truncate text-xs text-muted-foreground xl:hidden"
+                                                        title={placeAndConnection}
+                                                    >
+                                                        {placeAndConnection}
+                                                    </span>
+                                                    <div className="xl:hidden">{addresses}</div>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <Badge
+                                                        variant={status.tone}
+                                                        title={
+                                                            result.ok
+                                                                ? undefined
+                                                                : t(
+                                                                      `ups.unreachable.${result.reason}`
+                                                                  )
+                                                        }
+                                                    >
+                                                        {t(`ups.status.${status.key}`)}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right tabular-nums">
+                                                    {charge === null
+                                                        ? "-"
+                                                        : t("ups.units.percent", { value: charge })}
+                                                </td>
+                                                <td className="hidden px-3 py-2.5 text-right tabular-nums lg:table-cell">
+                                                    {loadText}
+                                                </td>
+                                                <td className="hidden whitespace-nowrap px-3 py-2.5 text-right tabular-nums lg:table-cell">
+                                                    {runtimeText}
+                                                </td>
+                                                <td
+                                                    className="hidden max-w-[10rem] truncate px-3 py-2.5 text-muted-foreground xl:table-cell"
+                                                    title={place || undefined}
+                                                >
+                                                    {place || "-"}
+                                                </td>
+                                                <td className="hidden max-w-[13rem] px-3 py-2.5 text-muted-foreground xl:table-cell">
+                                                    <span
+                                                        className="block truncate"
+                                                        title={connection}
+                                                    >
+                                                        {connection}
+                                                    </span>
+                                                    {addresses}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
                             </tbody>
                         </table>
                     </div>

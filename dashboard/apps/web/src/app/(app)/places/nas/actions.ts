@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import type { LanDetails } from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { spendGrant, type LiveGrant } from "@/lib/access/grants";
@@ -47,6 +48,14 @@ function failed(error: unknown): NasActionResult {
         return { ok: false, error: "notFound" };
     console.error("polaris: a NAS action failed:", error);
     return { ok: false, error: "failed" };
+}
+
+/** Where it is on the network: its address stays with whoever connected it. */
+export async function nasNetworkAction(id: unknown): Promise<LanDetails | null> {
+    const parsed = idSchema.safeParse(id);
+    if (!parsed.success) return null;
+    const at = await reached(parsed.data, "manage");
+    return at ? nasService.nasNetwork(at.row.id) : null;
 }
 
 export async function setNasFanAction(id: unknown, profile: unknown): Promise<NasActionResult> {

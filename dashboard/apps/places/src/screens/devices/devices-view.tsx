@@ -25,6 +25,7 @@
  */
 
 import * as actions from "../actions";
+import type { AccountNetwork } from "../../lib/network-details";
 import { DeviceDialog } from "./device-dialog";
 import { ConnectDialog, type Connected } from "./connect-dialog";
 import { NukiLocalDialog } from "./nuki-local-dialog";
@@ -42,7 +43,15 @@ import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-k
 import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import { FilterChip } from "./air-controls";
-import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    ConfirmDeleteDialog,
+    EmptyState,
+    LanDetails,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
 import type { PlacesTranslator } from "../../lib/i18n";
@@ -115,6 +124,7 @@ export function DevicesView({
      *  open for. Null is connecting something new. */
     const [reconnecting, setReconnecting] = useState<DeviceAccountView | null>(null);
     const [editing, setEditing] = useState<DeviceView | null>(null);
+    const [networks, setNetworks] = useState<AccountNetwork[]>([]);
     const [opened, setOpened] = useState<DeviceView | null>(null);
     const [disconnecting, setDisconnecting] = useState<DeviceAccountView | null>(null);
     /** The account whose switches are open, by id: read from the list so a
@@ -234,6 +244,22 @@ export function DevicesView({
     const { busy, act } = useDeviceAct({ update, setError, resync: () => void sync(true) });
 
     const connected = accounts.length > 0;
+    const accountList = JSON.stringify(accounts.map(({ id, settings }) => [id, settings]));
+    useEffect(() => {
+        if (!canManage || !connected) return;
+        let current = true;
+        void actions.accountNetworksAction().then(
+            (answer) => {
+                if (current) setNetworks(answer.networks ?? []);
+            },
+            () => {
+                if (current) setNetworks([]);
+            }
+        );
+        return () => {
+            current = false;
+        };
+    }, [canManage, connected, accountList]);
 
     /**
      * A pushed change. Only the devices it names move; the "updated" line moves
@@ -484,6 +510,31 @@ export function DevicesView({
                     <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
                 </Button>
             </div>
+
+            {canManage && connected && networks.length > 0 ? (
+                <section className="flex flex-col gap-2">
+                    <h2 className="text-sm font-medium">{t("network.title")}</h2>
+                    <ul className="flex flex-col gap-3">
+                        {networks.map((network) => (
+                            <li key={network.id} className="flex min-w-0 flex-col gap-1">
+                                <span
+                                    className="truncate text-xs font-medium"
+                                    title={network.label}
+                                >
+                                    {network.label}
+                                </span>
+                                <LanDetails
+                                    details={network.details}
+                                    labels={{
+                                        address: t("network.address"),
+                                        mac: t("network.mac")
+                                    }}
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
 
             {accounts
                 .filter((account) => account.status !== "ok")

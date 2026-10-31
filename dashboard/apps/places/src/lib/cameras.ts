@@ -157,6 +157,12 @@ function toView(row: NonNullable<CameraRow>): CameraView {
     };
 }
 
+/** The cameras as somebody who may not manage them is told about them: where a
+ *  camera sits on the network stays with whoever manages it. */
+export function addressesFor(list: readonly CameraView[], canManage: boolean): CameraView[] {
+    return list.map((camera) => (canManage ? camera : { ...camera, address: "" }));
+}
+
 /**
  * Every camera in one place, grouped the way the wall reads: by zone, then by
  * name. One query - a place has tens of cameras, not thousands.

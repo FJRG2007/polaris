@@ -114,6 +114,12 @@ export async function requireHomeShared(): Promise<{
     return { user, install: await requireHomeInstall(), reach };
 }
 
+/** Whether this account runs the house, for a read a visitor shares with the
+ *  people who live there. A lent thing is never a standing over the house. */
+export async function managesHome(user: SessionUser, reach: PlacesReach): Promise<boolean> {
+    return reach.everything && (await sessionCanAny(user, "home.manage"));
+}
+
 /**
  * The same, for the screens that a visitor can be on.
  *

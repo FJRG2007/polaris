@@ -1,4 +1,10 @@
 {
+    "network": {
+        "title": "Red",
+        "address": "Dirección IP",
+        "mac": "Dirección MAC",
+        "failed": "No se pudieron leer los datos de red."
+    },
     "list": {
         "heading": "Servidores",
         "unset": "Indica dónde {count, plural, one {está <b>{name}</b>} other {están # servidores}}: un servidor en casa detrás de un router y una máquina en un centro de datos se exponen de formas distintas, así que Polaris necesita saberlo antes de decirte cómo apuntar un dominio.",
@@ -779,6 +785,7 @@
             "body": "Uno conectado por USB sale aquí solo. Añade uno de un servidor NUT o leído por SNMP."
         },
         "columns": {
+            "place": "Lugar",
             "name": "Nombre",
             "status": "Estado",
             "charge": "Carga",

@@ -2,12 +2,6 @@
     "$comment": "High/critical npm advisories accepted by scripts/audit-gate.mjs. Each entry needs a GHSA id, the package npm reports it on, why it cannot reach Polaris, and an expiry date - an expired entry fails the gate again. Background and removal conditions: docs/dependencies.md.",
     "accepted": [
         {
-            "id": "GHSA-86w9-cpqp-85rv",
-            "package": "node-forge",
-            "reason": "No fixed node-forge release (<=1.4.0, the latest). Pulled in by acme-client, which only uses forge to generate keys, build CSRs and parse PEM; it never verifies an RSA PKCS#1 v1.5 signature, the only affected function.",
-            "expires": "2027-01-05"
-        },
-        {
             "id": "GHSA-c475-qrg2-pj4r",
             "package": "basic-ftp",
             "reason": "No fixed release. Reached only through whatsapp-web.js -> puppeteer -> proxy-agent, which uses FTP to download a browser; the bridge image sets PUPPETEER_SKIP_DOWNLOAD and runs the system Chromium, so no FTP listing is ever parsed.",

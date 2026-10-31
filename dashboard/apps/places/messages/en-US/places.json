@@ -1,4 +1,10 @@
 {
+    "network": {
+        "title": "Network",
+        "address": "IP address",
+        "mac": "MAC address",
+        "failed": "Could not read the network details."
+    },
     "camera": {
         "batteryNoPicture": "No picture. Open its settings to test it.",
         "batteryOpenToWatch": "On battery - open it to watch",
