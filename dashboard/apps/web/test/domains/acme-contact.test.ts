@@ -141,14 +141,10 @@ function startEdge(dir: string, env: Record<string, string>): string[] {
         encoding: "utf8"
     });
     expect(run.status).toBe(0);
-    return run.stdout
-        .split("\n")
-        .filter(Boolean)
-        .filter((arg) => !arg.startsWith(TRUSTED));
+    return run.stdout.split("\n").filter(Boolean);
 }
 
 const FLAG = "--certificatesresolvers.letsencrypt.acme.email=";
-const TRUSTED = "--entrypoints.websecure.proxyprotocol.trustedips=";
 
 describe("the edge's start-up", () => {
     it("reads the address from the file the dashboard writes, over the installer's", () => {

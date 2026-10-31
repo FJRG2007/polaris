@@ -1675,6 +1675,17 @@ mod tests {
         assert!(rendered.contains("      polaris-proxy:\n        aliases:\n          - \"web\"\n"));
         assert!(rendered.contains("      hub:\n        aliases:\n          - \"web\"\n"));
 
+        // The project's own default network, beside an external one: declared by
+        // compose itself, so it stays out of the external list.
+        let both = spec(
+            r#"{"project":"p","services":[{"name":"wg","image":"busybox","networks":["default","polaris-relay-edge"]}],"networks":["polaris-relay-edge"]}"#,
+        );
+        assert!(validate_spec(&both, &config).is_ok());
+        let rendered = render_compose(&both, &config);
+        assert!(rendered.contains("      - default\n      - polaris-relay-edge\n"));
+        assert!(rendered.contains("  polaris-relay-edge:\n    external: true\n"));
+        assert!(!rendered.contains("  default:\n"));
+
         let bad = spec(
             r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["polaris-proxy"],"aliases":["Not Valid"]}]}"#,
         );

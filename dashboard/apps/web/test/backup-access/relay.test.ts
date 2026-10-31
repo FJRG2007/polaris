@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { generateKeyPair, slotAddresses } from "../../src/lib/deploy/wireguard/tunnel-config";
 import {
     FRP_CONTROL_PORT,
     FRPC_IMAGE,
     FRPS_IMAGE,
+    RELAY_EDGE_ADDRESS,
+    RELAY_EDGE_NETWORK,
     RELAY_LISTEN_PORT,
     RELAY_SLOT,
     frpToken,
@@ -58,6 +61,8 @@ describe("backup relay config", () => {
         expect(text).toContain("PersistentKeepalive = 25");
         expect(text).toContain(`AllowedIPs = ${publicAddress}/32`);
         expect(text).toContain("ListenPort = 25565\nTarget = host.docker.internal:25565");
+        expect(text).toContain("ListenPort = 80\nTarget = host.docker.internal:80");
+        expect(text).toContain(`ListenPort = 443\nTarget = ${RELAY_EDGE_ADDRESS}:443`);
         expect(text).not.toContain("[TCPClientTunnel]");
         expect(text).not.toContain(keys.relay.privateKey);
         expect(renderHomeConfig(keys, "2001:db8::1", webOnly)).toContain(
@@ -193,9 +198,36 @@ describe("backup relay config", () => {
         expect(script).toContain('sed "s/host.docker.internal/${PINNED:-host.docker.internal}/g"');
         expect(relay.services[0].command?.[2]).not.toContain("PINNED");
         expect(home.services).toHaveLength(2);
+        expect(home.services[0].networks).toEqual(["default", RELAY_EDGE_NETWORK]);
+        expect(home.networks).toEqual([RELAY_EDGE_NETWORK]);
+        expect(relay.services[0].networks).not.toContain(RELAY_EDGE_NETWORK);
         expect(relay.project).toBe(relayProject("relay"));
         expect(home.project).toBe(relayProject("home"));
         expect(relay.project).not.toBe(home.project);
+    });
+
+    it("lets only the house end state a visitor's address to the edge", () => {
+        const compose = readFileSync(
+            new URL("../../../../docker/docker-compose.yml", import.meta.url),
+            "utf8"
+        ).replaceAll("\r\n", "\n");
+        expect(compose.match(/proxyprotocol\.trustedips=[^"]*/g)).toEqual([
+            "proxyprotocol.trustedips=10.213.254.4/30"
+        ]);
+        expect(compose).toContain(
+            `${RELAY_EDGE_NETWORK}:\n        ipv4_address: ${RELAY_EDGE_ADDRESS}\n`
+        );
+        expect(compose).toContain(
+            [
+                `  ${RELAY_EDGE_NETWORK}:`,
+                `    name: ${RELAY_EDGE_NETWORK}`,
+                "    internal: true",
+                "    ipam:",
+                "      config:",
+                "        - subnet: 10.213.254.0/29",
+                "          ip_range: 10.213.254.4/30"
+            ].join("\n")
+        );
     });
 
     it("runs frp in each end's namespace and publishes the UDP ports when there are any", () => {

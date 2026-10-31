@@ -22,7 +22,12 @@ import { getWafJails } from "@/lib/waf-ban-service";
 import { getHostConnection } from "@/lib/host-service";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { authAttemptsAsEntries, detectWafBans, parseAuthFailures } from "@polaris/core";
-import { recordWafBan, publishWafIntel, wafTrustedAddresses } from "@/lib/waf-intel-service";
+import {
+    isContainerAddress,
+    publishWafIntel,
+    recordWafBan,
+    wafTrustedAddresses
+} from "@/lib/waf-intel-service";
 
 /** One authenticated session to a host, for the two commands this makes. Opened per
  *  pass rather than pooled: the pass runs every few minutes and holding a connection
@@ -225,6 +230,7 @@ export async function runSshJails(now = Date.now()): Promise<{ hosts: number; ba
             });
 
             for (const verdict of verdicts) {
+                if (isContainerAddress(verdict.ip)) continue;
                 const atHost = await blockAtHost(client, host.sudo, verdict.ip);
                 await recordWafBan({
                     ip: verdict.ip,

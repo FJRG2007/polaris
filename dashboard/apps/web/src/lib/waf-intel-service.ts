@@ -56,7 +56,7 @@ function routable(ip: string): boolean {
         ip.startsWith("127.") ||
         ip.startsWith("169.254.") ||
         ip === "::1" ||
-        /^172\.(1[6-9]|2\d|3[01])\./.test(ip)
+        isContainerAddress(ip)
     );
 }
 
@@ -391,7 +391,7 @@ export async function removeWafBans(ips: readonly string[]): Promise<number> {
 const IGNORE_KEY = "waf.jails.ignore";
 
 /** Docker's default bridge range. */
-function isContainerAddress(ip: string): boolean {
+export function isContainerAddress(ip: string): boolean {
     return /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
 }
 
