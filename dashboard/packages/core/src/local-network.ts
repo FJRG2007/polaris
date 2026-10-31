@@ -33,10 +33,10 @@ export interface LanDetails {
 
 /** A stored host without the scheme, port or path somebody may have kept on it. */
 function bareHost(stored: string): string {
-    return stored
-        .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
-        .replace(/[/?#].*$/, "")
-        .replace(/:\d+$/, "");
+    const host = stored.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/[/?#].*$/, "");
+    const bracketed = /^\[([^\]]*)\](?::\d+)?$/.exec(host);
+    if (bracketed) return bracketed[1] ?? "";
+    return host.split(":").length === 2 ? host.replace(/:\d+$/, "") : host;
 }
 
 /**

@@ -65,7 +65,7 @@ import * as localBroker from "../lib/local-broker";
 import * as deviceConnections from "../lib/device-connections";
 import { cameraActivity, type CameraActivity } from "../lib/vision-activity";
 import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "../lib/discovery";
-import { requireHome, requireHomeInstall, requireHomeShared } from "../lib/access";
+import { managesHome, requireHome, requireHomeInstall, requireHomeShared } from "../lib/access";
 import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "../lib/detection";
 import type { DeviceAction, DeviceEventView, DeviceView } from "../lib/device-kinds";
 import { DEVICE_ACTIONS, deviceCommandSchema } from "../lib/device-kinds";
@@ -176,13 +176,14 @@ export async function listCamerasAction(): Promise<{
     // A visitor lent one camera is here too, and sees that one. Somebody who
     // lives here holds `home.read` and `onlyReachable` hands the list straight
     // back, so this costs them nothing.
-    const { install, reach } = await requireHomeShared();
+    const { user, install, reach } = await requireHomeShared();
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
         const list = await cameras.listCameras(install.id, current.id);
-        const shown = onlyReachable(list, reach.everything || reach.cameras);
-        // Being lent a camera is being lent its picture, not where it sits on the network.
-        return reach.everything ? shown : shown.map((camera) => ({ ...camera, address: "" }));
+        return cameras.addressesFor(
+            onlyReachable(list, reach.everything || reach.cameras),
+            await managesHome(user, reach)
+        );
     });
     return result.error ? { error: result.error } : { cameras: result.value };
 }

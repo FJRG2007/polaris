@@ -244,17 +244,22 @@ export function DevicesView({
     const { busy, act } = useDeviceAct({ update, setError, resync: () => void sync(true) });
 
     const connected = accounts.length > 0;
-    const accountList = accounts.map((account) => account.id).join();
+    const accountList = JSON.stringify(accounts.map(({ id, settings }) => [id, settings]));
     useEffect(() => {
-        if (!canManage || !accountList) return;
+        if (!canManage || !connected) return;
         let current = true;
-        void actions.accountNetworksAction().then((answer) => {
-            if (current) setNetworks(answer.networks ?? []);
-        });
+        void actions.accountNetworksAction().then(
+            (answer) => {
+                if (current) setNetworks(answer.networks ?? []);
+            },
+            () => {
+                if (current) setNetworks([]);
+            }
+        );
         return () => {
             current = false;
         };
-    }, [canManage, accountList]);
+    }, [canManage, connected, accountList]);
 
     /**
      * A pushed change. Only the devices it names move; the "updated" line moves
@@ -506,7 +511,7 @@ export function DevicesView({
                 </Button>
             </div>
 
-            {canManage && networks.length > 0 ? (
+            {canManage && connected && networks.length > 0 ? (
                 <section className="flex flex-col gap-2">
                     <h2 className="text-sm font-medium">{t("network.title")}</h2>
                     <ul className="flex flex-col gap-3">

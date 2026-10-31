@@ -182,13 +182,12 @@ export function NasDetailView({
                 <div className="flex flex-col gap-6">
                     <NasNow answer={answer} />
                     {standing.manage ? (
-                        <section className="flex flex-col gap-2">
-                            <h2 className="text-sm font-medium">{t("network.title")}</h2>
-                            <LanDetailsRegion
-                                load={() => nasNetworkAction(nas.id)}
-                                labels={{ address: t("network.address"), mac: t("network.mac") }}
-                            />
-                        </section>
+                        <LanDetailsRegion
+                            load={() => nasNetworkAction(nas.id)}
+                            labels={{ address: t("network.address"), mac: t("network.mac") }}
+                            title={t("network.title")}
+                            failed={t("network.failed")}
+                        />
                     ) : null}
                     <NasFan
                         id={nas.id}

@@ -6,7 +6,7 @@
 import { PageHeader } from "@polaris/ui";
 import { placesT } from "../../../lib/i18n";
 import { automationChoices, listPanels } from "../../../lib/panels";
-import { listCameras } from "../../../lib/cameras";
+import { addressesFor, listCameras } from "../../../lib/cameras";
 import { listRooms } from "../../../lib/rooms";
 import { listDevices } from "../../../lib/devices";
 import { requireHomeUser } from "../../../lib/access";
@@ -49,7 +49,7 @@ export default async function PanelsPage() {
                 panels={panels}
                 devices={devices}
                 rooms={boardRooms}
-                cameras={cameras}
+                cameras={addressesFor(cameras, canManage)}
                 automations={automations}
                 canControl={canControl}
                 canManage={canManage}

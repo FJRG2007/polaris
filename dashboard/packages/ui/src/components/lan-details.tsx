@@ -6,7 +6,8 @@
  *
  * Either line is left out when it is not known, so a table the host cannot read
  * shows the address alone. `LanDetailsRegion` reads them after the page has
- * painted, because the hardware address comes from the host and takes a moment.
+ * painted, because the hardware address comes from the host and takes a moment,
+ * and owns its heading so nothing is left standing over an empty space.
  */
 
 import { cn } from "../lib/cn";
@@ -67,13 +68,20 @@ export function LanDetails({
 export function LanDetailsRegion({
     load,
     labels,
+    title,
+    failed,
     className
 }: {
     load: () => Promise<LanDetailsValue | null>;
     labels: LanDetailsLabels;
+    /** The section's heading, when it has one. */
+    title?: string;
+    /** Said in its place when the read fails. */
+    failed: string;
     className?: string;
 }) {
     const [details, setDetails] = useState<LanDetailsValue | null | undefined>(undefined);
+    const [broken, setBroken] = useState(false);
 
     useEffect(() => {
         let current = true;
@@ -82,7 +90,7 @@ export function LanDetailsRegion({
                 if (current) setDetails(value);
             },
             () => {
-                if (current) setDetails(null);
+                if (current) setBroken(true);
             }
         );
         return () => {
@@ -92,7 +100,19 @@ export function LanDetailsRegion({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    if (details === undefined) return <Skeleton className={cn("h-11 w-56", className)} />;
     if (details === null) return null;
-    return <LanDetails details={details} labels={labels} className={className} />;
+    return (
+        <section className={cn("flex min-w-0 flex-col gap-2", className)}>
+            {title ? <h2 className="text-sm font-medium">{title}</h2> : null}
+            {broken ? (
+                <p role="alert" className="text-sm text-danger-ink">
+                    {failed}
+                </p>
+            ) : details ? (
+                <LanDetails details={details} labels={labels} />
+            ) : (
+                <Skeleton className="h-11 w-56" />
+            )}
+        </section>
+    );
 }

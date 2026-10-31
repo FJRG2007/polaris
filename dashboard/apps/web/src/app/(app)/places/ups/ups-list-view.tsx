@@ -206,6 +206,21 @@ export function UpsListView({
                                         const place = placeName(ups.placeId);
                                         const connection = t(`ups.connection.${ups.connection}`);
                                         const network = data.network?.[ups.id] ?? null;
+                                        const placeAndConnection = [place, connection]
+                                            .filter(Boolean)
+                                            .join(" / ");
+                                        const addresses = network ? (
+                                            <div onClick={(event) => event.stopPropagation()}>
+                                                <LanDetails
+                                                    compact
+                                                    details={network}
+                                                    labels={{
+                                                        address: t("network.address"),
+                                                        mac: t("network.mac")
+                                                    }}
+                                                />
+                                            </div>
+                                        ) : null;
                                         return (
                                             <tr
                                                 key={ups.id}
@@ -226,11 +241,13 @@ export function UpsListView({
                                                             .filter((value) => value !== "-")
                                                             .join(" / ")}
                                                     </span>
-                                                    <span className="block truncate text-xs text-muted-foreground xl:hidden">
-                                                        {[place, connection, network?.address]
-                                                            .filter(Boolean)
-                                                            .join(" / ")}
+                                                    <span
+                                                        className="block truncate text-xs text-muted-foreground xl:hidden"
+                                                        title={placeAndConnection}
+                                                    >
+                                                        {placeAndConnection}
                                                     </span>
+                                                    <div className="xl:hidden">{addresses}</div>
                                                 </td>
                                                 <td className="px-3 py-2.5">
                                                     <Badge
@@ -257,29 +274,20 @@ export function UpsListView({
                                                 <td className="hidden whitespace-nowrap px-3 py-2.5 text-right tabular-nums lg:table-cell">
                                                     {runtimeText}
                                                 </td>
-                                                <td className="hidden max-w-[10rem] truncate px-3 py-2.5 text-muted-foreground xl:table-cell">
+                                                <td
+                                                    className="hidden max-w-[10rem] truncate px-3 py-2.5 text-muted-foreground xl:table-cell"
+                                                    title={place || undefined}
+                                                >
                                                     {place || "-"}
                                                 </td>
                                                 <td className="hidden max-w-[13rem] px-3 py-2.5 text-muted-foreground xl:table-cell">
-                                                    <span className="block truncate">
+                                                    <span
+                                                        className="block truncate"
+                                                        title={connection}
+                                                    >
                                                         {connection}
                                                     </span>
-                                                    {network ? (
-                                                        <div
-                                                            onClick={(event) =>
-                                                                event.stopPropagation()
-                                                            }
-                                                        >
-                                                            <LanDetails
-                                                                compact
-                                                                details={network}
-                                                                labels={{
-                                                                    address: t("network.address"),
-                                                                    mac: t("network.mac")
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    ) : null}
+                                                    {addresses}
                                                 </td>
                                             </tr>
                                         );

@@ -650,10 +650,13 @@ export function CameraDialog({
                         </div>
                         {camera ? (
                             <LanDetailsRegion
-                                load={async () =>
-                                    (await actions.cameraNetworkAction(camera.id)).details ?? null
-                                }
+                                load={async () => {
+                                    const answer = await actions.cameraNetworkAction(camera.id);
+                                    if (answer.error) throw new Error(answer.error);
+                                    return answer.details ?? null;
+                                }}
                                 labels={{ address: t("network.address"), mac: t("network.mac") }}
+                                failed={t("network.failed")}
                             />
                         ) : null}
                         <div className="grid gap-3 sm:grid-cols-2">

@@ -2,7 +2,8 @@
     "network": {
         "title": "Red",
         "address": "Dirección IP",
-        "mac": "Dirección MAC"
+        "mac": "Dirección MAC",
+        "failed": "No se pudieron leer los datos de red."
     },
     "list": {
         "heading": "Servidores",

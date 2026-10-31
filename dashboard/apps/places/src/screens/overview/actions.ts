@@ -20,7 +20,7 @@ import * as cameras from "../../lib/cameras";
 import { guard } from "../../lib/action-guard";
 import { onlyReachable } from "../../lib/sharing";
 import * as automations from "../../lib/automations";
-import { requireHomeShared } from "../../lib/access";
+import { managesHome, requireHomeShared } from "../../lib/access";
 import { currentPlace } from "../../lib/current-place";
 import type { DeviceView } from "../../lib/device-kinds";
 import type { AutomationView } from "../../lib/automation-kinds";
@@ -70,15 +70,16 @@ export interface PlaceOverview {
 export async function placeOverviewAction(
     options: { sync?: boolean } = {}
 ): Promise<{ overview?: PlaceOverview; error?: string }> {
-    const { install, reach } = await requireHomeShared();
+    const { user, install, reach } = await requireHomeShared();
     const result = await guard(async (): Promise<PlaceOverview> => {
         const { current } = await currentPlace(install.id);
         if (options.sync === true && reach.everything) {
             await devices.syncDevices(install.id, { probe: false });
         }
-        const [deviceList, cameraList, automationList, eventList] = await Promise.all([
+        const [deviceList, cameraList, canManage, automationList, eventList] = await Promise.all([
             devices.listDevices(install.id, current.id),
             cameras.listCameras(install.id, current.id),
+            managesHome(user, reach),
             reach.everything ? automations.listAutomations(install.id, current.id) : null,
             reach.everything
                 ? events.listEvents(install.id, { placeId: current.id, limit: RECENT_EVENTS })
@@ -87,7 +88,10 @@ export async function placeOverviewAction(
         return {
             placeId: current.id,
             devices: onlyReachable(deviceList, reach.everything || reach.devices),
-            cameras: onlyReachable(cameraList, reach.everything || reach.cameras),
+            cameras: cameras.addressesFor(
+                onlyReachable(cameraList, reach.everything || reach.cameras),
+                canManage
+            ),
             automations:
                 automationList?.map((automation) => ({
                     id: automation.id,
