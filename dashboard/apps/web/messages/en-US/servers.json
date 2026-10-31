@@ -1,4 +1,9 @@
 {
+    "network": {
+        "title": "Network",
+        "address": "IP address",
+        "mac": "MAC address"
+    },
     "list": {
         "heading": "Servers",
         "unset": "Set where {count, plural, one {<b>{name}</b> lives} other {# servers live}}: a home server behind a router and a data-center box are exposed in different ways, so Polaris needs the answer before it can tell you how to point a domain.",
@@ -779,6 +784,7 @@
             "body": "One plugged in by USB shows up here by itself. Add one on a NUT server or read over SNMP."
         },
         "columns": {
+            "place": "Place",
             "name": "Name",
             "status": "Status",
             "charge": "Charge",

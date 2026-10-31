@@ -3,6 +3,7 @@
  * a reading turns into a status chip. Client-safe - types only from the service.
  */
 
+import type { LanDetails } from "@polaris/core";
 import type { UpsReading } from "@/lib/ups/ups-reading";
 import type { UsbDiscovery, UpsReadResult, UpsView } from "@/lib/ups/ups-service";
 import type {
@@ -15,6 +16,8 @@ import type {
 export interface UpsListAnswer {
     ups: { ups: UpsView; result: UpsReadResult }[];
     usb: UsbDiscovery;
+    /** Absent in what a tab kept from before this was sent. */
+    network?: Record<string, LanDetails>;
 }
 
 export interface UpsHistoryPoint {

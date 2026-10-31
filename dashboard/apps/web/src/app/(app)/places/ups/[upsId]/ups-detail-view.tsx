@@ -42,6 +42,7 @@ import { UpsBatteryPanel } from "./ups-battery-panel";
 import { UpsCommandsPanel } from "./ups-commands-panel";
 import { UpsSettingsPanel } from "./ups-settings-panel";
 import { UpsVariablesPanel } from "./ups-variables-panel";
+import { LanDetailsRegion } from "@polaris/ui";
 import { ShareDialog } from "@/components/access/share-dialog";
 import {
     fencedCall,
@@ -56,6 +57,7 @@ import {
     removeUpsAction,
     runUpsCommandAction,
     setUpsPlaceAction,
+    upsNetworkAction,
     updateUpsShutdownAction
 } from "../actions";
 import {
@@ -264,6 +266,15 @@ export function UpsDetailView({
                         </section>
                     ) : null}
 
+                    {standing.manage && ups.host ? (
+                        <section className="flex flex-col gap-2">
+                            <h2 className="text-sm font-medium">{t("network.title")}</h2>
+                            <LanDetailsRegion
+                                load={() => upsNetworkAction(ups.id)}
+                                labels={{ address: t("network.address"), mac: t("network.mac") }}
+                            />
+                        </section>
+                    ) : null}
                     {standing.manage ? (
                         <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
                             <h2 id="ups-shutdown" className="text-sm font-medium">

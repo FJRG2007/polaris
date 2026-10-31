@@ -69,7 +69,8 @@ import {
     Skeleton,
     Switch,
     cn,
-    isDirty
+    isDirty,
+    LanDetailsRegion
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -647,6 +648,14 @@ export function CameraDialog({
                                 </Field>
                             ) : null}
                         </div>
+                        {camera ? (
+                            <LanDetailsRegion
+                                load={async () =>
+                                    (await actions.cameraNetworkAction(camera.id)).details ?? null
+                                }
+                                labels={{ address: t("network.address"), mac: t("network.mac") }}
+                            />
+                        ) : null}
                         <div className="grid gap-3 sm:grid-cols-2">
                             {usesRtsp ? (
                                 <Field label={t("dialog.account")}>

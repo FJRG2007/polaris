@@ -23,14 +23,20 @@ import {
     SegmentedControl,
     Select,
     Skeleton,
-    useToast
+    useToast,
+    LanDetailsRegion
 } from "@polaris/ui";
 import { ShareDialog } from "@/components/access/share-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NasAnswer } from "@/lib/nas/nas-service";
 import * as nasView from "@/lib/nas/nas-view";
-import { runNasBackupAction, setNasFanAction, setNasPlaceAction } from "../actions";
+import {
+    nasNetworkAction,
+    runNasBackupAction,
+    setNasFanAction,
+    setNasPlaceAction
+} from "../actions";
 import type { UnasFanProfile } from "@/lib/unifi-unas-control";
 
 const POLL_MS = 30_000;
@@ -175,6 +181,15 @@ export function NasDetailView({
             {tab === "overview" ? (
                 <div className="flex flex-col gap-6">
                     <NasNow answer={answer} />
+                    {standing.manage ? (
+                        <section className="flex flex-col gap-2">
+                            <h2 className="text-sm font-medium">{t("network.title")}</h2>
+                            <LanDetailsRegion
+                                load={() => nasNetworkAction(nas.id)}
+                                labels={{ address: t("network.address"), mac: t("network.mac") }}
+                            />
+                        </section>
+                    ) : null}
                     <NasFan
                         id={nas.id}
                         answer={answer}

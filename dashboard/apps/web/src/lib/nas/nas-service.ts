@@ -8,6 +8,10 @@
  * grant without ever holding its password.
  */
 
+import type * as core from "@polaris/core";
+import { networkDetails } from "@/lib/network-details";
+import { addressOf } from "@/lib/storage-whereabouts/follow";
+import { readRemembered } from "@/lib/storage-whereabouts/identity";
 import { prisma } from "@polaris/db";
 import * as control from "@/lib/unifi-unas-control";
 import { getUnasTarget } from "@/lib/storage-service";
@@ -74,6 +78,17 @@ export async function nasRow(connectionId: string) {
         where: { id: connectionId, kind: "unifi-unas" },
         select: { id: true, name: true, ownerId: true, placeId: true }
     });
+}
+
+/** Where it is on the network, for its owner. The hardware address remembered
+ *  from its last answer stands in when the host's table has lost it. */
+export async function nasNetwork(connectionId: string): Promise<core.LanDetails | null> {
+    const row = await prisma.storageConnection.findFirst({
+        where: { id: connectionId, kind: "unifi-unas" },
+        select: { config: true, deviceIdentity: true }
+    });
+    if (!row) return null;
+    return networkDetails(addressOf(row), readRemembered(row.deviceIdentity)?.mac ?? null);
 }
 
 async function part<T>(read: () => Promise<T>): Promise<Part<T>> {

@@ -34,5 +34,6 @@ export async function GET(): Promise<Response> {
             listUsb
         )
     );
-    return Response.json({ ups, usb });
+    const network = await upsService.upsNetwork(ups.map((entry) => entry.ups));
+    return Response.json({ ups, usb, network });
 }

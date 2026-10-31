@@ -9,6 +9,8 @@
  * daemon. Secrets are sealed with the master key and never leave the server.
  */
 
+import type * as core from "@polaris/core";
+import { networkDetails } from "@/lib/network-details";
 import { z } from "zod";
 import { createHmac } from "node:crypto";
 import { loadEnv } from "@polaris/config";
@@ -515,6 +517,20 @@ export async function upsSnapshot(listUsb: UsbListing = usbListing()): Promise<U
     return Promise.all(
         rows.map(async (row) => ({ ups: toView(row), result: await readUps(row, listUsb) }))
     );
+}
+
+/** Where the UPS reached over the network are, by id. One read of the host's
+ *  table serves them all. */
+export async function upsNetwork(
+    known: readonly UpsView[]
+): Promise<Record<string, core.LanDetails>> {
+    const found = await Promise.all(
+        known.map(async (ups) => [ups.id, await networkDetails(ups.host)] as const)
+    );
+    return Object.fromEntries(found.filter(([, details]) => details !== null)) as Record<
+        string,
+        core.LanDetails
+    >;
 }
 
 /** A UPS on a machine's USB bus that is not added yet, offered in one click. */

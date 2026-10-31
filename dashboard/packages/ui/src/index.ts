@@ -41,6 +41,12 @@ export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, TagList, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton, CopyIcon, useCopied } from "./components/copy-button";
 export {
+    LanDetails,
+    LanDetailsRegion,
+    type LanDetailsLabels,
+    type LanDetailsValue
+} from "./components/lan-details";
+export {
     ENGLISH_UI_STRINGS,
     UiStringsProvider,
     useUiStrings,

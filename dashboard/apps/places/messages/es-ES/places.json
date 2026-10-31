@@ -1,4 +1,9 @@
 {
+    "network": {
+        "title": "Red",
+        "address": "Dirección IP",
+        "mac": "Dirección MAC"
+    },
     "camera": {
         "batteryNoPicture": "Sin imagen. Abre sus ajustes para probarla.",
         "batteryOpenToWatch": "Con batería: ábrela para verla",

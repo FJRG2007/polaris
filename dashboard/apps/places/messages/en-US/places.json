@@ -1,4 +1,9 @@
 {
+    "network": {
+        "title": "Network",
+        "address": "IP address",
+        "mac": "MAC address"
+    },
     "camera": {
         "batteryNoPicture": "No picture. Open its settings to test it.",
         "batteryOpenToWatch": "On battery - open it to watch",

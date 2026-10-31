@@ -11,7 +11,8 @@
  */
 
 import Link from "next/link";
-import { Button } from "@polaris/ui";
+import { Button, LanDetailsRegion } from "@polaris/ui";
+import { machineNetworkAction } from "../../actions";
 import { useMemo, useState } from "react";
 import { formatBytes } from "@polaris/core";
 import { ArrowLeft, ExternalLink, Share2 } from "lucide-react";
@@ -38,6 +39,7 @@ export function MachineDetailView({
     id,
     name,
     detail,
+    owned = false,
     lent = false,
     shareable = false,
     breakdowns = [],
@@ -49,6 +51,8 @@ export function MachineDetailView({
     id: string;
     name: string;
     detail: string | null;
+    /** The reader owns it, so may be told where it is on the network. */
+    owned?: boolean;
     /** Lent to the reader to watch: nothing that leads into the owner's apps. */
     lent?: boolean;
     /** The owner may lend it. The machine Polaris runs on never is. */
@@ -134,6 +138,16 @@ export function MachineDetailView({
             </div>
             {kind === "server" && !lent && !shareable ? (
                 <p className="-mt-3 text-xs text-muted-foreground">{t("machines.localNotLent")}</p>
+            ) : null}
+
+            {kind === "server" && owned ? (
+                <section className="flex flex-col gap-2">
+                    <h2 className="text-sm font-medium">{t("network.title")}</h2>
+                    <LanDetailsRegion
+                        load={() => machineNetworkAction(id)}
+                        labels={{ address: t("network.address"), mac: t("network.mac") }}
+                    />
+                </section>
             ) : null}
 
             {kind === "server" ? (

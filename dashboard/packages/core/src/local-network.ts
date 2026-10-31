@@ -23,6 +23,46 @@
  * that works here would be wrong there.
  */
 
+import { parseMac, sameMac } from "./mac-address.js";
+
+/** A thing's place on this network, as far as anybody can tell. */
+export interface LanDetails {
+    readonly address: string | null;
+    readonly mac: string | null;
+}
+
+/** A stored host without the scheme, port or path somebody may have kept on it. */
+function bareHost(stored: string): string {
+    return stored
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+        .replace(/[/?#].*$/, "")
+        .replace(/:\d+$/, "");
+}
+
+/**
+ * What a stored address says, against the host's neighbour table. A field may
+ * hold a MAC instead of an address, which is then looked up the other way round.
+ * Only a local address has a hardware address worth showing: the table's entry
+ * for anything else is the router's. Null when nothing is stored.
+ */
+export function lanDetails(
+    stored: string | null | undefined,
+    table: ReadonlyMap<string, string>,
+    knownMac: string | null = null
+): LanDetails | null {
+    const value = stored?.trim();
+    if (!value) return null;
+    const given = parseMac(value);
+    if (given) {
+        const found = [...table].find(([, mac]) => sameMac(mac, given));
+        return { address: found?.[0] ?? null, mac: given };
+    }
+    const address = bareHost(value);
+    if (!address) return null;
+    const mac = isLocalAddress(address) ? parseMac(table.get(address) ?? knownMac) : null;
+    return { address, mac };
+}
+
 /** Whether an address is in one of the three ranges a home or office network is
  *  built out of. */
 export function isLocalAddress(value: string): boolean {

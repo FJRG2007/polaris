@@ -25,7 +25,8 @@ import { revalidatePath } from "next/cache";
 import * as events from "../lib/events";
 import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
-import type { Coordinate } from "@polaris/core";
+import type { Coordinate, LanDetails } from "@polaris/core";
+import { addressDetails, listAccountNetworks, type AccountNetwork } from "../lib/network-details";
 import { NearbyRefusal, reportedLocation, type NearbyRefused } from "../lib/nearby";
 import { normalizePlaceLocation, placeLocationSchema } from "../lib/place-kinds";
 import * as people from "../lib/people";
@@ -139,6 +140,35 @@ async function withinControlLimit(
     return limited.ok;
 }
 
+/** Where a camera is on the network. `home.manage`: a camera lent to somebody
+ *  shows them its picture, not this. */
+export async function cameraNetworkAction(id: unknown): Promise<{
+    details?: LanDetails | null;
+    error?: string;
+}> {
+    const { install } = await requireHome("home.manage");
+    const parsed = zod.string().uuid().safeParse(id);
+    if (!parsed.success) return { details: null };
+    const result = await guard(async () => {
+        const camera = await cameras.getCamera(install.id, parsed.data);
+        return camera ? addressDetails(camera.address) : null;
+    });
+    return result.error ? { error: result.error } : { details: result.value };
+}
+
+/** Where each account reached on the network is. One with no address gives
+ *  nothing, which is every device behind a maker's cloud. */
+export async function accountNetworksAction(): Promise<{
+    networks?: AccountNetwork[];
+    error?: string;
+}> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(async () =>
+        listAccountNetworks(await deviceAccounts.listAccounts(install.id))
+    );
+    return result.error ? { error: result.error } : { networks: result.value };
+}
+
 export async function listCamerasAction(): Promise<{
     cameras?: cameras.CameraView[];
     error?: string;
@@ -150,7 +180,9 @@ export async function listCamerasAction(): Promise<{
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
         const list = await cameras.listCameras(install.id, current.id);
-        return onlyReachable(list, reach.everything || reach.cameras);
+        const shown = onlyReachable(list, reach.everything || reach.cameras);
+        // Being lent a camera is being lent its picture, not where it sits on the network.
+        return reach.everything ? shown : shown.map((camera) => ({ ...camera, address: "" }));
     });
     return result.error ? { error: result.error } : { cameras: result.value };
 }

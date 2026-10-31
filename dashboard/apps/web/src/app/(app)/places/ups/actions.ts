@@ -18,6 +18,7 @@ import { upsNearby, upsStanding } from "@/lib/ups/ups-access";
 import { recordAudit } from "@/lib/audit-service";
 import { getHostLanIp } from "@/lib/host-address";
 import { hostSubject } from "@/lib/metrics-shared";
+import { networkDetails } from "@/lib/network-details";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import * as upsData from "@/lib/ups/ups-data";
 import * as upsService from "@/lib/ups/ups-service";
@@ -41,6 +42,15 @@ function refused(error: unknown): { ok: false; error: string } {
 /** The machines this admin can name, as the metric subjects the UPS rows keep. */
 async function knownMachines(userId: string): Promise<Set<string>> {
     return new Set((await listServerRows(userId)).map((row) => hostSubject(row.id)));
+}
+
+/** Where it is on the network, for its administrators. */
+export async function upsNetworkAction(id: unknown): Promise<core.LanDetails | null> {
+    await requirePermission("system.manage");
+    const parsed = idSchema.safeParse(id);
+    if (!parsed.success) return null;
+    const ups = await upsService.getUps(parsed.data);
+    return networkDetails(ups?.host);
 }
 
 /** Whoever may drive this UPS - its administrators, or a visitor lent control

@@ -72,6 +72,7 @@ export default async function MachinePage({
                 // i18n-ignore the same word in both languages
                 name={host?.name ?? "Local"}
                 detail={host ? `${host.username}@${host.address}` : null}
+                owned
                 shareable={id !== LOCAL_SERVER_ID}
                 breakdowns={breakdowns}
                 history={history}
