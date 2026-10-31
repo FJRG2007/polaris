@@ -611,6 +611,11 @@ services:
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Only the relay's end of polaris-relay-edge may state a visitor's address. A
+      # shared bridge's range cannot be trusted here: an IPv6 visitor reaches a
+      # published port from that bridge's gateway and could forge any address. A
+      # connection from there with no header is taken as it stands.
+      - "--entrypoints.websecure.proxyprotocol.trustedips=10.213.254.4/30"
       # Traefik 3 reads a whole request, body included, in 60 seconds by default
       # and then drops it: an upload bigger than the uplink sends in a minute (a
       # drop point, Drive, a backup) failed at exactly 60s with a 502. Long enough
@@ -632,8 +637,10 @@ services:
       - polaris-traefik-dynamic:/dynamic:ro
       - polaris-traefik-log:/var/log/traefik
     networks:
-      - default
-      - polaris-proxy
+      default: {}
+      polaris-proxy: {}
+      polaris-relay-edge:
+        ipv4_address: 10.213.254.2
     # An app's route dials it on its published host port, so the edge has to be able
     # to reach the host from inside the network. By this name rather than by the box's
     # LAN address: that one is detected once and stored, and when the lease moves or
@@ -808,6 +815,19 @@ networks:
   polaris-hub:
     external: true
     name: polaris-hub
+  # The relay's house end and the edge, and nothing else. Internal, so no published
+  # port lands on it and only a member can hold one of its addresses. Fixed, because
+  # the edge's trust is a start-up flag and the house end dials an address: WireGuard's
+  # resolver cannot find a name, and the address must survive the edge being recreated.
+  # `ip_range` keeps the relay's end off the edge's own address. Kept in step with
+  # `RELAY_EDGE_ADDRESS` in apps/web/src/lib/backup-access/relay.ts.
+  polaris-relay-edge:
+    name: polaris-relay-edge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.213.254.0/29
+          ip_range: 10.213.254.4/30
 
 volumes:
   polaris-postgres:

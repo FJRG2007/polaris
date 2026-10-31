@@ -107,6 +107,7 @@ import { holdersCanBeFreed } from "./port-holders";
 import { CALL_PORTS } from "@/lib/chat/call-ports";
 import { getTailscaleHost } from "@/lib/tailscale/tailscale-service";
 import { syncCallNodeIp } from "@/lib/chat/call-address-watch";
+import { getHostLanIp } from "@/lib/host-address";
 import { refreshInboundReach, readInboundReach } from "./inbound-service";
 import { readAaaa, syncAaaa } from "./aaaa-service";
 import { getHostGlobalIpv6 } from "@/lib/host-address";
@@ -185,7 +186,9 @@ const relaySchema = z.object({
     /** The routes last given to the relay server's edge. */
     routes: z.string().nullable().default(null),
     /** The `RELAY_SPEC` both ends last came up with. */
-    spec: z.number().int().default(0)
+    spec: z.number().int().default(0),
+    /** The LAN address the house end last handed UDP to. */
+    lan: z.string().nullable().default(null)
 });
 
 /** Why a path cannot be used right now, as a key the screen words. */
@@ -762,7 +765,8 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
             tcp: [],
             udp: [],
             routes: null,
-            spec: 0
+            spec: 0,
+            lan: null
         };
     }
     // The ports the installed game servers publish, as the router is asked to
@@ -781,9 +785,11 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
     // Fresh keys start with no ports, so they always bring both ends up again; a
     // relay brought up before UDP was carried stored none, so one with UDP game
     // ports comes up again with them.
+    const lan = await getHostLanIp();
     const changed =
         stored.routes === null ||
         stored.spec !== RELAY_SPEC ||
+        stored.lan !== lan ||
         stored.tcp.join(",") !== ports.tcp.join(",") ||
         stored.udp.join(",") !== ports.udp.join(",");
     const names = await ownedZoneNames(await getDomainZones());
@@ -805,7 +811,7 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         relay: { publicKey: stored.relayPublic, privateKey: openKey(stored.relayPrivate) },
         home: { publicKey: stored.homePublic, privateKey: openKey(stored.homePrivate) }
     };
-    const configs = relayConfigs(keys, address, ports);
+    const configs = relayConfigs(keys, address, ports, lan);
     await shareServerEdge(target);
     await keepUp(
         await getPorts(target, target.ownerId),
@@ -828,7 +834,14 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         await (await relayEdge(target)).pushFile(RELAY_ROUTES_FILE, routes);
         await setSetting(
             RELAY_KEY,
-            JSON.stringify({ ...stored, tcp: ports.tcp, udp: ports.udp, routes, spec: RELAY_SPEC })
+            JSON.stringify({
+                ...stored,
+                tcp: ports.tcp,
+                udp: ports.udp,
+                routes,
+                spec: RELAY_SPEC,
+                lan
+            })
         );
     }
     return { kind: "relay", address };

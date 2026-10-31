@@ -131,6 +131,14 @@ deleted, since an absent file is a case `writeDynamicFile`'s rename does not nee
 to handle. `edgeHostnameTaken` is how an app checks a hostname before accepting
 it: taken by the dashboard's own public names or by a deployed domain.
 
+**A PROXY header is believed from one place: the relay's end of
+`polaris-relay-edge`.** That network is internal, with a fixed subnet, and only
+the edge and the relay's house end join it (`docker-compose.yml` and
+`RELAY_EDGE_ADDRESS` in `backup-access/relay.ts` hold the same address). Never
+trust a shared bridge's range: a public IPv6 visitor reaches a published port
+from that bridge's gateway and could forge any address, and so could every
+deployed app on `polaris-proxy`.
+
 ## The browser bundle never carries this machine's paths
 
 Webpack compiles a bare `import.meta.url` to the module's absolute `file://`

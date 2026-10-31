@@ -11,9 +11,10 @@
  * The relay end forwards the game ports it publishes through the link; the house
  * end dials the relay with a keepalive and hands each port to this machine's own
  * published port, so Traefik and the game servers answer as they do on the direct
- * path. The web ports are not published: 80 and 443 belong to the server's own edge,
- * which hands the house's hostnames to the relay and goes on serving everything
- * else, so a server can be a relay and a deploy target at once.
+ * path, except 443, which goes to the edge directly (see `RELAY_EDGE_NETWORK`). The
+ * web ports are not published: 80 and 443 belong to the server's own edge, which
+ * hands the house's hostnames to the relay and goes on serving everything else, so
+ * a server can be a relay and a deploy target at once.
  *
  * wireproxy forwards TCP only on the receiving end, so UDP rides inside the same
  * link the way frp carries it for self-hosted game servers: frps on the relay end
@@ -34,7 +35,7 @@ export const RELAY_LISTEN_PORT = wg.LAST_LISTEN_PORT + 1;
  *  never meets a tunnel's. */
 export const RELAY_SLOT = 16383;
 /** Raised when both ends must be brought up again with what this build renders. */
-export const RELAY_SPEC = 1;
+export const RELAY_SPEC = 3;
 /** The web ports every relay carries. */
 export const WEB_PORTS = [80, 443] as const;
 /**
@@ -53,6 +54,16 @@ const FRP_FILE = "frp.toml";
 const HOST_ALIAS = "host.docker.internal";
 /** The same entry `@polaris/deploy` gives what it starts (its `HOST_GATEWAY`). */
 const HOST_GATEWAY = `${HOST_ALIAS}:host-gateway`;
+/**
+ * The network only the house end and this machine's edge share. The edge believes a
+ * PROXY header from this network's relay range and from nowhere else, so 443 has to
+ * arrive over it: through the published port the house end would be one more Docker
+ * gateway, the same one public IPv6 visitors arrive from.
+ */
+export const RELAY_EDGE_NETWORK = "polaris-relay-edge";
+/** The edge on that network, as `docker-compose.yml` pins it. */
+export const RELAY_EDGE_ADDRESS = "10.213.254.2";
+const TLS_PORT = 443;
 
 export interface RelayPort {
     readonly port: number;
@@ -155,7 +166,7 @@ export function renderHomeConfig(
         ...carriable(carried.tcp).flatMap((port) => [
             "[TCPServerTunnel]",
             `ListenPort = ${port}`,
-            `Target = ${HOST_ALIAS}:${port}`,
+            `Target = ${port === TLS_PORT ? RELAY_EDGE_ADDRESS : HOST_ALIAS}:${port}`,
             ""
         ]),
         ...(carriable(carried.udp).length > 0
@@ -197,8 +208,14 @@ export function renderRelayFrp(keys: RelayKeys, udp: readonly number[]): string 
 }
 
 /** frpc at the house: dials frps through the link, keeps trying until the link is
- *  up, and hands each UDP port to the same port on this machine. */
-export function renderHomeFrp(keys: RelayKeys, udp: readonly number[]): string {
+ *  up, and hands each UDP port to the same port on this machine, at `local`. The
+ *  call server binds its UDP port to the LAN address alone, so the gateway reaches
+ *  a game's published port but drops every packet of a call. */
+export function renderHomeFrp(
+    keys: RelayKeys,
+    udp: readonly number[],
+    local: string = HOST_ALIAS
+): string {
     return [
         'serverAddr = "127.0.0.1"',
         `serverPort = ${FRP_CONTROL_PORT}`,
@@ -213,7 +230,7 @@ export function renderHomeFrp(keys: RelayKeys, udp: readonly number[]): string {
             "[[proxies]]",
             `name = "udp-${port}"`,
             'type = "udp"',
-            `localIP = "${HOST_ALIAS}"`,
+            `localIP = "${local}"`,
             `localPort = ${port}`,
             `remotePort = ${port}`,
             ""
@@ -293,6 +310,11 @@ export function renderRelayRoutes(
         "  services:",
         "    polaris-relay-tls:",
         "      loadBalancer:",
+        // Each visitor's own address, read by the house's edge: without it they all
+        // arrive as one Docker gateway, and one ban or rate limit lands on everyone.
+        // This form, because a relay's Traefik can predate the serversTransport one.
+        "        proxyProtocol:",
+        "          version: 2",
         "        servers:",
         `          - address: "${upstream}:443"`,
         "http:",
@@ -321,7 +343,8 @@ export interface RelayEndConfig {
 export function relayConfigs(
     keys: RelayKeys,
     relayAddress: string,
-    carried: RelayPortSet
+    carried: RelayPortSet,
+    lanAddress: string | null = null
 ): { relay: RelayEndConfig; home: RelayEndConfig } {
     const udp = carried.udp.length > 0;
     return {
@@ -331,7 +354,7 @@ export function relayConfigs(
         },
         home: {
             wireguard: renderHomeConfig(keys, relayAddress, carried),
-            frp: udp ? renderHomeFrp(keys, carried.udp) : null
+            frp: udp ? renderHomeFrp(keys, carried.udp, lanAddress ?? HOST_ALIAS) : null
         }
     };
 }
@@ -359,6 +382,7 @@ export function relaySpec(
     });
     const [helper, ...rest] = spec.services;
     if (!helper) throw new Error("A WireGuard end has no helper container");
+    const home = end === "home";
     const published = (protocol: "tcp" | "udp") => (port: number) => ({
         host: port,
         container: port,
@@ -385,9 +409,12 @@ export function relaySpec(
         : [];
     return {
         ...spec,
+        networks: home ? [RELAY_EDGE_NETWORK] : spec.networks,
         services: [
             {
                 ...helper,
+                // `default` is the way out to the relay: the edge's network is internal.
+                networks: home ? ["default", RELAY_EDGE_NETWORK] : helper.networks,
                 ports:
                     end === "relay"
                         ? [
@@ -398,7 +425,7 @@ export function relaySpec(
                               ...(config.frp ? carriable(carried.udp).map(published("udp")) : [])
                           ]
                         : helper.ports,
-                extraHosts: end === "home" ? [HOST_GATEWAY] : helper.extraHosts
+                extraHosts: home ? [HOST_GATEWAY] : helper.extraHosts
             },
             ...rest,
             ...frp
