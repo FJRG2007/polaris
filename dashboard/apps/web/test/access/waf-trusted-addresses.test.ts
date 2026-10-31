@@ -67,9 +67,8 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { getWafIgnoreList, recordWafBan, setWafIgnoreList, wafTrustedAddresses } = await import(
-    "../../src/lib/waf-intel-service"
-);
+const { getWafIgnoreList, recordWafBan, setWafIgnoreList, wafTrustedAddresses } =
+    await import("../../src/lib/waf-intel-service");
 
 const OPERATOR = "198.51.100.88";
 

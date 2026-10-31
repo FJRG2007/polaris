@@ -834,7 +834,14 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
         await (await relayEdge(target)).pushFile(RELAY_ROUTES_FILE, routes);
         await setSetting(
             RELAY_KEY,
-            JSON.stringify({ ...stored, tcp: ports.tcp, udp: ports.udp, routes, spec: RELAY_SPEC, lan })
+            JSON.stringify({
+                ...stored,
+                tcp: ports.tcp,
+                udp: ports.udp,
+                routes,
+                spec: RELAY_SPEC,
+                lan
+            })
         );
     }
     return { kind: "relay", address };

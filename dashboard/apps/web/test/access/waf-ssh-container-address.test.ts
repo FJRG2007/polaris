@@ -31,7 +31,9 @@ vi.mock("@/lib/waf-ban-service", async () => {
     const { DEFAULT_WAF_JAILS: jails } = await import("@polaris/core");
     return {
         getWafJails: async () =>
-            jails.filter((jail) => jail.id === "ssh-auth").map((jail) => ({ ...jail, enabled: true }))
+            jails
+                .filter((jail) => jail.id === "ssh-auth")
+                .map((jail) => ({ ...jail, enabled: true }))
     };
 });
 vi.mock("@polaris/ssh", () => ({

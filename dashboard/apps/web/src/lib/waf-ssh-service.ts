@@ -201,7 +201,9 @@ export async function runSshJails(now = Date.now()): Promise<{ hosts: number; ba
     // Every enrolled server, whoever owns it. This is instance-wide protection, not
     // one account's, so it is scoped by the instance rather than by a caller - there
     // is no caller, it runs on a timer.
-    const hosts = await prisma.host.findMany({ select: { id: true, name: true, ownerId: true, sudo: true } });
+    const hosts = await prisma.host.findMany({
+        select: { id: true, name: true, ownerId: true, sudo: true }
+    });
     let banned = 0;
     let reached = 0;
 
