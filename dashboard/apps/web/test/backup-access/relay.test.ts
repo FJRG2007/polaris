@@ -98,6 +98,12 @@ describe("backup relay config", () => {
         );
     });
 
+    it("hands UDP to the LAN address, where the call server listens", () => {
+        const configs = relayConfigs(keys, "198.51.100.20", withUdp, "192.0.2.10");
+        expect(configs.home.frp).toContain('localIP = "192.0.2.10"');
+        expect(configs.home.frp).not.toContain("host.docker.internal");
+    });
+
     it("derives one secret token both ends agree on, never a key", () => {
         expect(frpToken(keys)).toMatch(/^[0-9a-f]{64}$/);
         expect(frpToken(keys)).toBe(frpToken({ ...keys }));
@@ -134,6 +140,7 @@ describe("backup relay config", () => {
             "rule: 'Host(`polaris.example.com`) || HostRegexp(`^.+[.]plr[.]example[.]com$`)'"
         );
         expect(yaml).toContain("passthrough: true");
+        expect(yaml).toMatch(/proxyProtocol:\n\s+version: 2/);
         expect(yaml).toContain(`address: "${relayHelper()}:443"`);
         expect(yaml).toContain(`url: "http://${relayHelper()}:80"`);
         expect(yaml).not.toContain("\\");

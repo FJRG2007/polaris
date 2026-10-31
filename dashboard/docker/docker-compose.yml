@@ -589,7 +589,9 @@ services:
         case "$$email" in *@*.*) ;; *) email="";; esac;
         case "$$email" in *[!A-Za-z0-9._%+@-]*) email="";; esac;
         case "$${email#*@}" in example.com|*.example.com|example.net|*.example.net|example.org|*.example.org|*.example|*.invalid|*.localhost|*.test|*.local) email="";; esac;
-        exec /entrypoint.sh "$$@" $${email:+"--certificatesresolvers.letsencrypt.acme.email=$$email"}
+        trusted="";
+        for net in $$(ip -4 route 2>/dev/null | sed -n "s|^\([0-9.]*/[0-9]*\) .*|\1|p"); do trusted="$${trusted:+$$trusted,}$$net"; done;
+        exec /entrypoint.sh "$$@" "--entrypoints.websecure.proxyprotocol.trustedips=$${trusted:-172.16.0.0/12}" $${email:+"--certificatesresolvers.letsencrypt.acme.email=$$email"}
       - --
     command:
       - "--providers.docker=true"
@@ -609,6 +611,9 @@ services:
       - "--accesslog=true"
       - "--accesslog.format=json"
       - "--accesslog.filepath=/var/log/traefik/access.log"
+      # Only this container's own networks may state a visitor's address (added by
+      # the entrypoint above): that is how the relay's connections arrive. Anything
+      # else, and a trusted connection with no header, is taken as it stands.
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       # Traefik 3 reads a whole request, body included, in 60 seconds by default

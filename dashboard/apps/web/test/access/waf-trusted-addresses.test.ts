@@ -117,6 +117,18 @@ describe("trusting an address", () => {
 });
 
 describe("banning an address", () => {
+    it("never lets a detector ban a Docker gateway, which stands in for everyone", async () => {
+        await recordWafBan({ ip: "172.19.0.1", reason: "ban", source: "not-found", until: null });
+
+        expect(bans).toEqual([]);
+    });
+
+    it("leaves that choice to the operator", async () => {
+        await recordWafBan({ ip: "172.19.0.1", reason: "manual", source: "anomaly", until: null });
+
+        expect(bans.map((row) => row.ip)).toEqual(["172.19.0.1"]);
+    });
+
     it("refuses the ones an operator marked as theirs, whichever jail asked", async () => {
         await setWafIgnoreList([OPERATOR]);
 

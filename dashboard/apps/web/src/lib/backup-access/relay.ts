@@ -34,7 +34,7 @@ export const RELAY_LISTEN_PORT = wg.LAST_LISTEN_PORT + 1;
  *  never meets a tunnel's. */
 export const RELAY_SLOT = 16383;
 /** Raised when both ends must be brought up again with what this build renders. */
-export const RELAY_SPEC = 1;
+export const RELAY_SPEC = 2;
 /** The web ports every relay carries. */
 export const WEB_PORTS = [80, 443] as const;
 /**
@@ -197,8 +197,14 @@ export function renderRelayFrp(keys: RelayKeys, udp: readonly number[]): string 
 }
 
 /** frpc at the house: dials frps through the link, keeps trying until the link is
- *  up, and hands each UDP port to the same port on this machine. */
-export function renderHomeFrp(keys: RelayKeys, udp: readonly number[]): string {
+ *  up, and hands each UDP port to the same port on this machine, at `local`. The
+ *  call server binds its UDP port to the LAN address alone, so the gateway reaches
+ *  a game's published port but drops every packet of a call. */
+export function renderHomeFrp(
+    keys: RelayKeys,
+    udp: readonly number[],
+    local: string = HOST_ALIAS
+): string {
     return [
         'serverAddr = "127.0.0.1"',
         `serverPort = ${FRP_CONTROL_PORT}`,
@@ -213,7 +219,7 @@ export function renderHomeFrp(keys: RelayKeys, udp: readonly number[]): string {
             "[[proxies]]",
             `name = "udp-${port}"`,
             'type = "udp"',
-            `localIP = "${HOST_ALIAS}"`,
+            `localIP = "${local}"`,
             `localPort = ${port}`,
             `remotePort = ${port}`,
             ""
@@ -293,6 +299,11 @@ export function renderRelayRoutes(
         "  services:",
         "    polaris-relay-tls:",
         "      loadBalancer:",
+        // Each visitor's own address, read by the house's edge: without it they all
+        // arrive as one Docker gateway, and one ban or rate limit lands on everyone.
+        // This form, because a relay's Traefik can predate the serversTransport one.
+        "        proxyProtocol:",
+        "          version: 2",
         "        servers:",
         `          - address: "${upstream}:443"`,
         "http:",
@@ -321,7 +332,8 @@ export interface RelayEndConfig {
 export function relayConfigs(
     keys: RelayKeys,
     relayAddress: string,
-    carried: RelayPortSet
+    carried: RelayPortSet,
+    lanAddress: string | null = null
 ): { relay: RelayEndConfig; home: RelayEndConfig } {
     const udp = carried.udp.length > 0;
     return {
@@ -331,7 +343,7 @@ export function relayConfigs(
         },
         home: {
             wireguard: renderHomeConfig(keys, relayAddress, carried),
-            frp: udp ? renderHomeFrp(keys, carried.udp) : null
+            frp: udp ? renderHomeFrp(keys, carried.udp, lanAddress ?? HOST_ALIAS) : null
         }
     };
 }

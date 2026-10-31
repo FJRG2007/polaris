@@ -279,6 +279,9 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
     // ends up not doing it, and the address that gets through is by definition the one
     // somebody trusted enough to say so.
     if ((await wafTrustedAddresses()).includes(input.ip)) return;
+    // A container network's address is a Docker gateway standing in for whoever came
+    // through it, so a detector banning it bans them all. Only the operator may.
+    if (input.reason !== "manual" && isContainerAddress(input.ip)) return;
     const existing = await prisma.wafBan.findUnique({
         where: { ip: input.ip },
         select: { until: true, offences: true }
@@ -386,6 +389,11 @@ export async function removeWafBans(ips: readonly string[]): Promise<number> {
 }
 
 const IGNORE_KEY = "waf.jails.ignore";
+
+/** Docker's default bridge range. */
+function isContainerAddress(ip: string): boolean {
+    return /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+}
 
 /** The addresses the firewall never bans, whatever they do. Loopback is here from the
  *  start: banning it would take out the instance's own health checks. */
