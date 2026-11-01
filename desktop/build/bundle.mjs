@@ -48,7 +48,7 @@ await build({
 });
 
 mkdirSync(join(DIST, "renderer"), { recursive: true });
-for (const file of ["connect.html", "api-key.html", "push.html", "overlay.html", "styles.css", "mark.svg"]) {
+for (const file of ["connect.html", "api-key.html", "push.html", "overlay.html", "updating.html", "styles.css", "mark.svg"]) {
     copyFileSync(join(ROOT, "src/renderer", file), join(DIST, "renderer", file));
 }
 // The window icon on Linux - Windows and macOS take theirs from the executable -

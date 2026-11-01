@@ -48,8 +48,9 @@ and later and macOS, stays out of the share itself. A shared window, rather than
 a whole screen, and a share picked in macOS's own picker are drawn on only for
 the others, and the request to draw says so.
 
-When a newer version is released, it is downloaded and installed in the
-background and opens the next time the app starts; a green download button in
+When a newer version is released, opening the app is enough: it updates first
+and opens by itself. If GitHub does not answer right away the app opens as it is,
+installs the update in the background, and that opens the next time it starts; a green download button in
 the page's header, the tray (the Help menu on macOS) and - where the Polaris in
 front is older than that button - a notice offer to restart into it now. That is the Windows installer, a macOS app signed
 with a Developer ID, and the AppImage, which is replaced only once the download

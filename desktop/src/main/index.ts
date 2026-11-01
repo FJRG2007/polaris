@@ -20,7 +20,7 @@ import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
-import { watchForUpdates } from "./updates";
+import { watchForUpdates, type FirstCheck } from "./updates";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
@@ -82,6 +82,11 @@ const updates = new UpdateReadyState((state) => {
 
 /** Show the Polaris - at a path when one is given - in the main window. */
 function showPolaris(path?: string): void {
+    if (updating && !updating.isDestroyed()) {
+        updating.show();
+        updating.focus();
+        return;
+    }
     if (!current) {
         openConnect();
         return;
@@ -95,6 +100,37 @@ function showPolaris(path?: string): void {
         return;
     }
     openMain(url ?? `${current}${START}`);
+}
+
+/** The window shown while an update goes in before the app opens. */
+let updating: BrowserWindow | null = null;
+/** How long the first check may hold the app back: a slow answer updates in the
+ *  background instead, and no network costs a start no more than this. */
+const CHECK_BEFORE_OPENING_MS = 1_500;
+/** The most a start waits for an update before opening the version it has. */
+const UPDATE_BEFORE_OPENING_MS = 3 * 60_000;
+
+function after<T>(ms: number, value: T): Promise<T> {
+    return new Promise((resolve) => setTimeout(() => resolve(value), ms));
+}
+
+/** Update before opening when a newer version is found at once. True when the app
+ *  is restarting into it, so there is nothing more to open. */
+async function updatedBeforeOpening(first: FirstCheck): Promise<boolean> {
+    if (!(await Promise.race([first.installing, after(CHECK_BEFORE_OPENING_MS, false)]))) return false;
+    const window = openLocalWindow("updating", { title: "Polaris", width: 420, height: 320 });
+    updating = window;
+    window.on("closed", () => {
+        if (updating === window) updating = null;
+    });
+    const installed = await Promise.race([first.installed, after(UPDATE_BEFORE_OPENING_MS, false)]);
+    if (installed) {
+        updates.install();
+        return true;
+    }
+    // The caller opens the app first: closing the last window would quit it.
+    updating = null;
+    return false;
 }
 
 function openMain(url: string): void {
@@ -303,11 +339,13 @@ function start(): void {
         };
         menuActions = menu;
         refreshMenu();
-        watchForUpdates((update) => {
+        const first = watchForUpdates((update) => {
             const open = () => void shell.openExternal(update.page);
             menuUpdate = { version: update.version, open, ...(update.restart ? { restart: update.restart } : {}) };
             refreshMenu();
             updates.found(update);
+            // The app is about to restart into it: nothing to announce.
+            if (updating && update.restart) return;
             // The window in front draws the restart button itself: no notice
             // on top of it. A page that does not (an older Polaris, the address
             // form) gets the notice, as do the other windows' pages through the
@@ -335,8 +373,13 @@ function start(): void {
             );
         });
 
-        if (current) openMain(`${current}${START}`);
-        else openConnect();
+        void updatedBeforeOpening(first).then((restarting) => {
+            if (restarting) return;
+            const waited = BrowserWindow.getAllWindows();
+            if (current) openMain(`${current}${START}`);
+            else openConnect();
+            for (const window of waited) if (window !== main && window !== connect) window.close();
+        });
 
         app.on("activate", () => {
             if (BrowserWindow.getAllWindows().length === 0) showPolaris();

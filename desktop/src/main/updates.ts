@@ -1,8 +1,9 @@
 /**
  * Keeping this app up to date.
  *
- * Asked of GitHub shortly after the app starts and every few hours after,
- * without credentials. What happens with a newer release depends on what the
+ * Asked of GitHub as the app starts and every few hours after, without
+ * credentials. When the answer comes straight away, the app updates before it
+ * opens (`index.ts`), so opening it is all an update asks of anybody. What happens with a newer release depends on what the
  * system lets an app do to itself:
  *
  * - **Windows**, installed by the Squirrel installer: the update is downloaded
@@ -34,7 +35,6 @@ import { developerSigned } from "./mac-signature";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { appImageAsset, CHECKSUMS, macFeedName, newerRelease, parseChecksums, releaseSource, type Release } from "./releases";
 
-const FIRST_CHECK_MS = 30_000;
 const EVERY_MS = 6 * 60 * 60_000;
 /** A checksums file is a line per installer; anything this large is not one. */
 const CHECKSUMS_MAX_BYTES = 64 * 1024;
@@ -74,9 +74,27 @@ async function fetchText(url: string, limit: number): Promise<string> {
     return text;
 }
 
-export function watchForUpdates(found: (update: Update) => void): void {
+/** What the first check of a start came to. */
+export interface FirstCheck {
+    /** True once it began installing a newer version, false when it will not. */
+    readonly installing: Promise<boolean>;
+    /** Whether that install finished, so the app can restart into it. */
+    readonly installed: Promise<boolean>;
+}
+
+export function watchForUpdates(found: (update: Update) => void): FirstCheck {
+    let began: (installing: boolean) => void = () => undefined;
+    let ended: (installed: boolean) => void = () => undefined;
+    const first: FirstCheck = {
+        installing: new Promise((resolve) => (began = resolve)),
+        installed: new Promise((resolve) => (ended = resolve))
+    };
     const source = releaseSource(repository);
-    if (!source) return;
+    if (!source) {
+        began(false);
+        ended(false);
+        return first;
+    }
     let announced: string | null = null;
     /** The version being downloaded or already installed, so it is fetched once. */
     let installing: string | null = null;
@@ -86,6 +104,7 @@ export function watchForUpdates(found: (update: Update) => void): void {
     const fallBack = () => {
         const failed = installing;
         installing = null;
+        ended(false);
         if (failed && failed !== announced) {
             announced = failed;
             found({ version: failed, page: source.page(`desktop-v${failed}`) });
@@ -94,6 +113,7 @@ export function watchForUpdates(found: (update: Update) => void): void {
     const installed = (version: string, restart: () => void) => {
         announced = version;
         found({ version, page: source.page(`desktop-v${version}`), restart });
+        ended(true);
     };
 
     const listenToSquirrel = () => {
@@ -149,6 +169,7 @@ export function watchForUpdates(found: (update: Update) => void): void {
                 return;
             }
             installing = release.version;
+            began(true);
             if (mode.kind === "appimage") {
                 void viaAppImage(release, mode.path).catch(fallBack);
                 return;
@@ -163,6 +184,10 @@ export function watchForUpdates(found: (update: Update) => void): void {
         }
     };
 
-    setTimeout(() => void check(), FIRST_CHECK_MS);
+    void check().finally(() => {
+        // Nothing began: settled here, and later rounds are nobody's start.
+        began(false);
+    });
     setInterval(() => void check(), EVERY_MS);
+    return first;
 }
