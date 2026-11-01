@@ -21,6 +21,7 @@ import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
 import { watchForUpdates } from "./updates";
+import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
@@ -30,7 +31,7 @@ import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
 import { listServers, normalizeServerName, renameServer, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
-import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
+import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, session, shell } from "electron";
@@ -82,6 +83,11 @@ const updates = new UpdateReadyState((state) => {
 
 /** Show the Polaris - at a path when one is given - in the main window. */
 function showPolaris(path?: string): void {
+    if (updating && !updating.isDestroyed()) {
+        updating.show();
+        updating.focus();
+        return;
+    }
     if (!current) {
         openConnect();
         return;
@@ -95,6 +101,20 @@ function showPolaris(path?: string): void {
         return;
     }
     openMain(url ?? `${current}${START}`);
+}
+
+/** The window shown while an update goes in before the app opens. */
+let updating: BrowserWindow | null = null;
+/** Show that an update is going in. Settles when the window is closed. */
+function showUpdating(): Promise<void> {
+    const window = openLocalWindow("updating", { title: "Polaris", width: 420, height: 320 });
+    updating = window;
+    return new Promise((resolve) => {
+        window.on("closed", () => {
+            if (updating === window) updating = null;
+            resolve();
+        });
+    });
 }
 
 function openMain(url: string): void {
@@ -194,6 +214,7 @@ async function connectSubmit(raw: unknown): Promise<Outcome> {
 function leaveServer(): void {
     for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
     main = null;
+    updating = null;
 }
 
 function servers() {
@@ -303,11 +324,13 @@ function start(): void {
         };
         menuActions = menu;
         refreshMenu();
-        watchForUpdates((update) => {
+        const first = watchForUpdates((update) => {
             const open = () => void shell.openExternal(update.page);
             menuUpdate = { version: update.version, open, ...(update.restart ? { restart: update.restart } : {}) };
             refreshMenu();
             updates.found(update);
+            // The app is about to restart into it: nothing to announce.
+            if (updating && update.restart) return;
             // The window in front draws the restart button itself: no notice
             // on top of it. A page that does not (an older Polaris, the address
             // form) gets the notice, as do the other windows' pages through the
@@ -335,12 +358,25 @@ function start(): void {
             );
         });
 
-        if (current) openMain(`${current}${START}`);
-        else openConnect();
-
-        app.on("activate", () => {
-            if (BrowserWindow.getAllWindows().length === 0) showPolaris();
-        });
+        void updateBeforeOpening(first, {
+            attempted: updateAttempted,
+            attempt: setUpdateAttempted,
+            opened: () => main !== null,
+            showUpdating,
+            restart: () => updates.install().ok
+        })
+            .catch((): Opening => "open")
+            .then((opening) => {
+                app.on("activate", () => {
+                    if (BrowserWindow.getAllWindows().length === 0) showPolaris();
+                });
+                if (opening !== "open") return;
+                // The app opens first: closing the last window would quit it.
+                const waited = updating;
+                updating = null;
+                showPolaris();
+                waited?.close();
+            });
     });
 
     app.on("second-instance", () => showPolaris());
