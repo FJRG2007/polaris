@@ -133,6 +133,8 @@ export interface HeadscaleClient {
         reusable: boolean;
         ephemeral: boolean;
         expiration: Date;
+        /** Tags the signed-in device takes instead of belonging to the user. */
+        tags?: readonly string[];
     }): Promise<PreAuthKey>;
     registerNode(user: string, authId: string): Promise<HeadscaleNode>;
     /** Replace the access policy (policy mode `database`). */
@@ -211,7 +213,8 @@ export function headscaleClient(
                     user: input.userId,
                     reusable: input.reusable,
                     ephemeral: input.ephemeral,
-                    expiration: input.expiration.toISOString()
+                    expiration: input.expiration.toISOString(),
+                    ...(input.tags ? { acl_tags: input.tags } : {})
                 })
             ).preAuthKey;
         },
