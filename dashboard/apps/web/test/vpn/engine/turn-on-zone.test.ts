@@ -1,7 +1,7 @@
 /**
- * Turning the VPN on takes the hostname the screen showed. Left alone, the picker
- * shows and checks the primary zone and sends no zone at all, so that is the one
- * the name has to land in: an empty label names a different zone.
+ * Turning the VPN on takes the hostname the screen showed. With no zone sent, the
+ * name lands where the picker defaults to: the primary zone, or the first one
+ * offered when none is primary. An empty label names a different zone.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,6 +59,14 @@ describe("turning the VPN on", () => {
     it("takes the primary zone when none was picked", async () => {
         await expect(service.turnOn("owner-1", { subdomain: "vpn" })).rejects.toBe(STOP);
         expect(zoneAsked()).toBe("plr");
+    });
+
+    it("takes the first zone offered when none is primary", async () => {
+        mocks.listDeployZones.mockResolvedValue([
+            { label: "~base", host: "example.test", primary: false }
+        ]);
+        await expect(service.turnOn("owner-1", { subdomain: "vpn" })).rejects.toBe(STOP);
+        expect(zoneAsked()).toBe("~base");
     });
 
     it("takes the zone that was picked, an empty label included", async () => {

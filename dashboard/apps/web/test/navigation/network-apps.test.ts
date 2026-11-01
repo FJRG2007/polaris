@@ -30,6 +30,11 @@ describe.each(APPS)("the %s app", (id, href, inner) => {
     });
 });
 
+it("finds the Network filter by what people call it", () => {
+    const overview = APP_SECTIONS["dns-blocker"]?.[0];
+    expect(overview?.keywords).toEqual(expect.arrayContaining(["pi-hole", "adguard", "adblock"]));
+});
+
 describe("who is offered them", () => {
     async function ids(isAdmin: boolean, installed: readonly string[]): Promise<string[]> {
         const apps = await reachableApps({
@@ -52,5 +57,23 @@ describe("who is offered them", () => {
         expect(offered).toContain("vpn");
         expect(offered).not.toContain("router");
         expect(offered).not.toContain("dns-blocker");
+    });
+
+    it("does not give an account holding nothing an app of its own", async () => {
+        const apps = await reachableApps({
+            isAdmin: false,
+            can: async () => false,
+            isInstalled: async () => true
+        });
+        expect(apps).toEqual([]);
+    });
+
+    it("keeps the VPN beside anything else an account holds", async () => {
+        const apps = await reachableApps({
+            isAdmin: false,
+            can: async (permission) => permission === "deploy.read",
+            isInstalled: async () => true
+        });
+        expect(apps.map((app) => app.id)).toContain("vpn");
     });
 });

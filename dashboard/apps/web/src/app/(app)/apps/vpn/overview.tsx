@@ -15,6 +15,7 @@ import Link from "next/link";
 import * as ui from "@polaris/ui";
 import * as actions from "./actions";
 import { Loader2 } from "lucide-react";
+import * as rules from "@/lib/vpn/settings";
 import { useVpnRead } from "./use-vpn-read";
 import { useEffect, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -42,6 +43,8 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
     const [check, setCheck] = useState<HostnameCheck | null>(null);
     const status = read.data?.status ?? null;
     const picking = isAdmin && status?.state === "off" && !status.hostname;
+    const zones = read.data?.zones ?? [];
+    const zoneLabel = choice.zoneLabel ?? rules.defaultZone(zones);
 
     // A server still starting is asked again until it answers.
     useEffect(() => {
@@ -110,7 +113,8 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                             ) : null}
                             {picking ? (
                                 <HostnamePicker
-                                    zones={read.data?.zones ?? []}
+                                    zones={zones}
+                                    zoneLabel={zoneLabel}
                                     choice={choice}
                                     onChoice={setChoice}
                                     check={check}
@@ -128,7 +132,11 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                     <ui.Button
                                         size="sm"
                                         disabled={pending || (picking && !check?.ok)}
-                                        onClick={() => run(() => actions.turnOnVpnAction(choice))}
+                                        onClick={() =>
+                                            run(() =>
+                                                actions.turnOnVpnAction({ ...choice, zoneLabel })
+                                            )
+                                        }
                                     >
                                         {pending ? <Loader2 className="animate-spin" /> : null}
                                         {status.state === "failed"
@@ -257,20 +265,20 @@ type HostnameCheck = { text: string; ok: boolean };
  */
 function HostnamePicker({
     zones,
+    zoneLabel,
     choice,
     onChoice,
     check,
     onCheck: setCheck
 }: {
     zones: Overview["zones"];
+    zoneLabel: string | undefined;
     choice: HostnameChoice;
     onChoice: (next: HostnameChoice) => void;
     check: HostnameCheck | null;
     onCheck: (next: HostnameCheck | null) => void;
 }) {
     const t = useTranslations("vpn");
-    const zoneLabel =
-        choice.zoneLabel ?? zones.find((zone) => zone.primary)?.label ?? zones[0]?.label;
 
     useEffect(() => {
         setCheck(null);

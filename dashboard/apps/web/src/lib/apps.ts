@@ -2571,7 +2571,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: LayoutDashboard,
-            keywords: ["dashboard", "pause", "status", "router"]
+            keywords: [...DNS_BLOCKER_KEYWORDS, "dashboard", "pause", "status", "router"]
         },
         {
             label: "Query log", // i18n-ignore

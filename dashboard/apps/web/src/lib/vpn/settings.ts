@@ -15,6 +15,16 @@ export const VPN_PORT = 8080;
 /** The subdomain the control server is offered under in a zone. */
 export const DEFAULT_SUBDOMAIN = "vpn";
 /**
+ * The zone a hostname lands in when nobody picked one: what the picker shows and
+ * checks, and what Turn on takes. The base domain alone is never primary, and it
+ * is the only zone offered until a wildcard is proven.
+ */
+export function defaultZone<Zone extends { label: string; primary: boolean }>(
+    zones: readonly Zone[]
+): string | undefined {
+    return (zones.find((zone) => zone.primary) ?? zones[0])?.label;
+}
+/**
  * The suffix every device's MagicDNS name ends in (`laptop.vpn.internal`).
  *
  * `.internal` is the top-level name ICANN reserved for private use, so it never
