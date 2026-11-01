@@ -90,8 +90,9 @@ export function reservationFits(
     );
 }
 
-/** One network of devices behind the router. */
-export const lanSchema = z
+/** One network as a stored plan may hold it: a row saved under older rules still has
+ *  to reach the screen, since that is the only way to correct or stop that router. */
+const storedLanSchema = z
     .object({
         id: z.string().uuid(),
         name: z.string().trim().min(1).max(40),
@@ -105,9 +106,15 @@ export const lanSchema = z
         reservations: z.array(reservationSchema).max(MAX_RESERVATIONS)
     })
     .refine((lan) => isHostOf(lan.cidr, lan.address), { path: ["address"] })
-    .refine((lan) => lan.reservations.every((one) => reservationFits(lan, lan.reservations, one)), {
+    .refine((lan) => lan.reservations.every(({ address }) => isHostOf(lan.cidr, address)), {
         path: ["reservations"]
     });
+
+/** One network of devices behind the router. */
+export const lanSchema = storedLanSchema.refine(
+    (lan) => lan.reservations.every((one) => reservationFits(lan, lan.reservations, one)),
+    { path: ["reservations"], message: "badReservation" }
+);
 export type RouterLan = z.infer<typeof lanSchema>;
 
 export const forwardSchema = z.object({
@@ -134,36 +141,57 @@ function sameValues(values: readonly string[]): boolean {
     return new Set(values).size !== values.length;
 }
 
+const wansSchema = z.array(wanSchema).min(1, "noLine").max(MAX_WANS);
+const forwardsSchema = z.array(forwardSchema).max(MAX_FORWARDS);
+
+/** What has to hold between the parts of a plan. */
+function checkPlan(
+    plan: {
+        wans: RouterWan[];
+        lans: z.infer<typeof storedLanSchema>[];
+        forwards: RouterForward[];
+    },
+    issue: z.RefinementCtx
+): void {
+    const devices = [...plan.wans, ...plan.lans].map(deviceOf);
+    if (sameValues(devices)) {
+        issue.addIssue({ code: "custom", path: ["lans"], message: "sharedPort" });
+    }
+    const overlapping = plan.lans.some((lan, at) =>
+        plan.lans.slice(at + 1).some((other) => cidrsOverlap(lan.cidr, other.cidr))
+    );
+    if (overlapping) issue.addIssue({ code: "custom", path: ["lans"], message: "overlap" });
+    const opened = plan.forwards.map(({ protocol, port: open }) => `${protocol}/${open}`);
+    if (sameValues(opened)) {
+        issue.addIssue({ code: "custom", path: ["forwards"], message: "samePort" });
+    }
+    const inside = plan.forwards.every(({ address }) =>
+        plan.lans.some((lan) => isHostOf(lan.cidr, address))
+    );
+    if (!inside) issue.addIssue({ code: "custom", path: ["forwards"], message: "outside" });
+}
+
 /** Everything the operator decides about one router. */
 export const routerPlanSchema = z
     .object({
-        wans: z.array(wanSchema).min(1, "noLine").max(MAX_WANS),
+        wans: wansSchema,
         lans: z.array(lanSchema).min(1, "noNetwork").max(MAX_LANS),
-        forwards: z.array(forwardSchema).max(MAX_FORWARDS)
+        forwards: forwardsSchema
     })
-    .superRefine((plan, issue) => {
-        const devices = [...plan.wans, ...plan.lans].map(deviceOf);
-        if (sameValues(devices)) {
-            issue.addIssue({ code: "custom", path: ["lans"], message: "sharedPort" });
-        }
-        const overlapping = plan.lans.some((lan, at) =>
-            plan.lans.slice(at + 1).some((other) => cidrsOverlap(lan.cidr, other.cidr))
-        );
-        if (overlapping) issue.addIssue({ code: "custom", path: ["lans"], message: "overlap" });
-        const opened = plan.forwards.map(({ protocol, port: open }) => `${protocol}/${open}`);
-        if (sameValues(opened)) {
-            issue.addIssue({ code: "custom", path: ["forwards"], message: "samePort" });
-        }
-        const inside = plan.forwards.every(({ address }) =>
-            plan.lans.some((lan) => isHostOf(lan.cidr, address))
-        );
-        if (!inside) issue.addIssue({ code: "custom", path: ["forwards"], message: "outside" });
-    });
+    .superRefine(checkPlan);
 export type RouterPlan = z.infer<typeof routerPlanSchema>;
+
+const storedPlanSchema = z
+    .object({
+        wans: wansSchema,
+        lans: z.array(storedLanSchema).min(1, "noNetwork").max(MAX_LANS),
+        forwards: forwardsSchema
+    })
+    .superRefine(checkPlan);
 
 /** A stored plan, or null: a row older than this code must not break the screen. */
 export function readPlan(stored: unknown): RouterPlan | null {
-    const parsed = routerPlanSchema.safeParse(stored);
+    const parsed = storedPlanSchema.safeParse(stored);
     return parsed.success ? parsed.data : null;
 }
 
@@ -321,6 +349,10 @@ function tagged(link: { interface: string; vlan: number | null }): string[] {
     ];
 }
 
+function lanAddress(lan: RouterLan): string {
+    return `${lan.address}/${lan.cidr.split("/")[1]}`;
+}
+
 /** Bring the networks up. Run again on every boot and every change, so each step
  *  has to hold when it is already done. */
 export function renderUp(plan: RouterPlan): string {
@@ -334,13 +366,12 @@ export function renderUp(plan: RouterPlan): string {
     ];
     for (const lan of plan.lans) {
         const device = deviceOf(lan);
-        const prefix = lan.cidr.split("/")[1];
         lines.push(`if ${present(lan.interface)}; then`, ...tagged(lan));
         lines.push(
             `    ${unmanaged(device)}`,
             `    ip link set ${device} up`,
             `    ip addr flush dev ${device}`,
-            `    ip addr add ${lan.address}/${prefix} dev ${device}`,
+            `    ip addr add ${lanAddress(lan)} dev ${device}`,
             "fi"
         );
     }
@@ -358,10 +389,24 @@ export function renderUp(plan: RouterPlan): string {
 /**
  * Bring up whichever lines are plugged in, and ask for an address on any that has
  * none: nothing else on the machine does that for a second port. Run on every round
- * of the watch too, so a USB line plugged in late joins without touching the rest.
+ * of the watch too, so a USB line or network plugged in late joins without touching
+ * the rest.
  */
 export function renderLines(plan: RouterPlan): string {
     const lines = ["#!/bin/sh"];
+    for (const lan of plan.lans) {
+        const device = deviceOf(lan);
+        lines.push(
+            `if ${present(lan.interface)}; then`,
+            ...tagged(lan),
+            `    if [ -z "$(ip -4 -o addr show dev ${device})" ]; then`,
+            `        ${unmanaged(device)}`,
+            `        ip link set ${device} up`,
+            `        ip addr add ${lanAddress(lan)} dev ${device}`,
+            "    fi",
+            "fi"
+        );
+    }
     for (const wan of plan.wans) {
         const device = deviceOf(wan);
         const pid = `/run/dhclient.${device}.pid`;
@@ -395,8 +440,15 @@ export function renderDown(plan: RouterPlan): string {
         "rm -f /run/polaris-router/wan"
     ];
     for (const wan of plan.wans) {
-        const pid = `/run/dhclient.${deviceOf(wan)}.pid`;
-        lines.push(`[ ! -f ${pid} ] || kill "$(cat ${pid})" 2>/dev/null`, `rm -f ${pid}`);
+        const device = deviceOf(wan);
+        const pid = `/run/dhclient.${device}.pid`;
+        lines.push(
+            `if [ -f ${pid} ]; then`,
+            `    kill "$(cat ${pid})" 2>/dev/null`,
+            `    ip -4 addr flush dev ${device} 2>/dev/null`,
+            `    rm -f ${pid}`,
+            "fi"
+        );
     }
     for (const lan of plan.lans) {
         lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
@@ -540,12 +592,14 @@ ConditionPathExists=${UNCONFIRMED}
 After=${SERVICE_LIST}
 
 [Service]
-Type=oneshot
 ExecStart=/bin/sh ${ROUTER_STATE_DIR}/rollback.sh
 
 [Install]
 WantedBy=multi-user.target
 `;
+
+/** Answers true while anything is taking a change back. */
+const GOING_BACK = `systemctl is-active --quiet polaris-router-rollback.service polaris-router-rollback-now.service ${UNDO_UNIT}`;
 
 /** The packages a router needs, installed before the network is touched. */
 function renderInstall(plan: RouterPlan): string {
@@ -664,7 +718,7 @@ echo rolled-back > ${LAST}
 /** Go back now rather than when the timer runs out. In a unit of its own, since going
  *  back can cut the connection asking for it; whoever asked reads `rolled-back` next. */
 const ROLL_BACK_NOW = `systemctl stop polaris-router-rollback.timer 2>/dev/null
-systemctl is-active --quiet polaris-router-rollback.service || systemd-run --quiet --unit=polaris-router-rollback-now /bin/sh ${ROUTER_STATE_DIR}/rollback.sh 2>/dev/null
+${GOING_BACK} || systemd-run --quiet --unit=polaris-router-rollback-now /bin/sh ${ROUTER_STATE_DIR}/rollback.sh 2>/dev/null
 echo waiting`;
 
 /** Keep the change: whoever runs this came back through the new network. Answers
@@ -681,7 +735,7 @@ fi
 systemctl is-active --quiet polaris-router.service || { echo waiting; exit 0; }
 systemctl is-active --quiet polaris-router-dns.service || { echo waiting; exit 0; }
 systemctl stop polaris-router-rollback.timer 2>/dev/null
-! systemctl is-active --quiet polaris-router-rollback.service || { echo waiting; exit 0; }
+! ${GOING_BACK} || { echo waiting; exit 0; }
 [ ! -f ${LAST} ] || { cat ${LAST}; exit 0; }
 rm -f ${UNCONFIRMED}
 echo confirmed

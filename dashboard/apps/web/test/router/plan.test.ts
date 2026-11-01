@@ -184,6 +184,13 @@ describe("what is refused before anything is sent", () => {
         expect(refusalOf(parsed({ ...PLAN, lans }), reading, "192.168.1.5")).toBe("missingPort");
     });
 
+    it("not a port the running plan holds, plugged in or not", () => {
+        const lans = [{ ...LAN, interface: "eth9" }];
+        const plan = parsed({ ...PLAN, lans });
+        expect(refusalOf(plan, reading, "192.168.1.5", plan)).toBeNull();
+        expect(refusalOf(plan, reading, "192.168.1.5", parsed(PLAN))).toBe("missingPort");
+    });
+
     it("a network on the subnet of a line", () => {
         const lans = [{ ...LAN, cidr: "192.168.1.0/24", address: "192.168.1.1" }];
         expect(refusalOf(parsed({ ...PLAN, lans }), reading, "192.168.1.5")).toBe("lineOverlap");
@@ -283,6 +290,19 @@ describe("a fixed address", () => {
     it("cannot be the router's own", () => {
         expect(fixed([{ ...one, address: LAN.address }])).toBe(false);
     });
+
+    it("saved under older rules still loads, and has to be corrected to apply", () => {
+        const reservations = [one, { mac: one.mac, address: LAN.address }];
+        const stored = { ...PLAN, lans: [{ ...LAN, reservations }] };
+        expect(router.readPlan(stored)?.lans[0]?.reservations).toEqual(reservations);
+        const issues = router.routerPlanSchema.safeParse(stored).error?.issues ?? [];
+        expect(issues.map(({ message }) => message)).toContain("badReservation");
+    });
+
+    it("saved outside its subnet is still not a plan", () => {
+        const reservations = [{ mac: one.mac, address: "10.99.0.5" }];
+        expect(router.readPlan({ ...PLAN, lans: [{ ...LAN, reservations }] })).toBeNull();
+    });
 });
 
 describe("a change a restart interrupted", () => {
@@ -293,6 +313,12 @@ describe("a change a restart interrupted", () => {
         expect(apply.indexOf("enable polaris-router-undo")).toBeLessThan(
             apply.indexOf("--unit=polaris-router-activate")
         );
+    });
+
+    it("reads as running while it runs, which a oneshot unit never does", () => {
+        const apply = router.renderApply(parsed(PLAN), ACCESS, "id");
+        const unit = apply.slice(apply.indexOf("Description=Polaris router undo"));
+        expect(unit.slice(0, unit.indexOf("POLARIS_ROUTER_EOF"))).not.toContain("Type=oneshot");
     });
 });
 

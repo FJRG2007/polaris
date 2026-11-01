@@ -64,6 +64,7 @@
         "outside": "That address is in none of these networks.",
         "noLine": "Add an internet line.",
         "noNetwork": "Add a network.",
+        "badReservation": "A network has a fixed address that cannot be used. Edit that network.",
         "badPort": "One of these ports cannot be used. Choose another.",
         "badVlan": "A VLAN is a number from 2 to 4094."
     },

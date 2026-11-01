@@ -26,20 +26,36 @@ import {
     MAX_LANS,
     MAX_WANS,
     type RouterLan,
-    type RouterPlan
+    type RouterPlan,
+    type RouterWan
 } from "@/lib/router/plan";
 
 const EMPTY_PLAN: RouterPlan = { wans: [], lans: [], forwards: [] };
 
-/** Why a line of a running router carries nothing, in what the screen can see. */
-function lineProblem(
-    wan: RouterPlan["wans"][number],
-    reading: { running: boolean; ports: readonly { name: string; hasGateway: boolean }[] } | null
+/** Why a line or network the machine is running does nothing, in what the screen can
+ *  see. A draft's own links have not been touched yet, so they have no problem to name. */
+function linkProblem(
+    link: RouterWan,
+    applied: readonly RouterWan[] | undefined,
+    reading: RouterReading | null,
+    isLine: boolean
 ): "lineMissing" | "lineNoWay" | null {
     if (!reading?.running) return null;
-    const port = reading.ports.find(({ name }) => name === deviceOf(wan));
+    if (!applied?.some((one) => deviceOf(one) === deviceOf(link))) return null;
+    const port = reading.ports.find(({ name }) => name === deviceOf(link));
     if (!port) return "lineMissing";
-    return port.hasGateway ? null : "lineNoWay";
+    return isLine && !port.hasGateway ? "lineNoWay" : null;
+}
+
+function LinkWarning({
+    t,
+    problem
+}: {
+    t: Translate;
+    problem: "lineMissing" | "lineNoWay" | null;
+}) {
+    if (problem === null) return null;
+    return <span className="w-full text-xs text-warning">{t(problem)}</span>;
 }
 /** How often a running router is read again while the page is open. */
 const STATUS_POLL_MS = 15_000;
@@ -50,6 +66,7 @@ const CLIENTS_SHOWN = 200;
 const PROBLEMS = [
     "noLine",
     "noNetwork",
+    "badReservation",
     "badPort",
     "badVlan",
     "sharedPort",
@@ -144,10 +161,12 @@ function RouterEditor({
     const saved = read.data?.plan ?? null;
     const reading = read.data?.reading ?? null;
     const plan = draft ?? saved ?? EMPTY_PLAN;
-    const ports = useMemo(
-        () => reading?.ports.map(({ name }) => name).filter(isPortName) ?? [],
-        [reading]
-    );
+    const ports = useMemo(() => {
+        if (!reading) return [];
+        const held = saved ? [...saved.wans, ...saved.lans].map((link) => link.interface) : [];
+        const present = reading.ports.map(({ name }) => name).filter(isPortName);
+        return [...new Set([...present, ...held])];
+    }, [reading, saved]);
     const portOptions = ports.map((name) => ({ value: name, label: name }));
     const changed = JSON.stringify(plan) !== JSON.stringify(saved ?? EMPTY_PLAN);
     const check = routerPlanSchema.safeParse(plan);
@@ -287,11 +306,10 @@ function RouterEditor({
                             >
                                 <Trash2 />
                             </IconButton>
-                            {lineProblem(wan, reading) ? (
-                                <span className="w-full text-xs text-warning">
-                                    {t(lineProblem(wan, reading) ?? "lineNoWay")}
-                                </span>
-                            ) : null}
+                            <LinkWarning
+                                t={t}
+                                problem={linkProblem(wan, saved?.wans, reading, true)}
+                            />
                         </li>
                     ))}
                 </ul>
@@ -343,6 +361,10 @@ function RouterEditor({
                             >
                                 <Trash2 />
                             </IconButton>
+                            <LinkWarning
+                                t={t}
+                                problem={linkProblem(lan, saved?.lans, reading, false)}
+                            />
                         </li>
                     ))}
                 </ul>

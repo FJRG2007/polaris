@@ -141,6 +141,35 @@ describe("RouterSection", () => {
         expect(await screen.findByText("Add a network.")).toBeTruthy();
     });
 
+    it("warns about what is running, and not about a line still in the draft", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        const ports = [{ ...PORT, name: "eth0", hasGateway: true }];
+        const plan = { ...SAVED, wans: [{ interface: "eth0", vlan: null }] };
+        readRouterAction.mockResolvedValue({
+            plan,
+            reading: { ...READING, running: true, ports }
+        });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        const missing = "This port is not on the machine. Check that it is plugged in.";
+        expect(await screen.findAllByText(missing)).toHaveLength(1);
+        fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+        await screen.findByRole("button", { name: "Discard" });
+        expect(screen.getAllByText(missing)).toHaveLength(1);
+        expect(screen.queryByText(/No internet from this port/)).toBeNull();
+    });
+
+    it("names a stored fixed address that blocks the next change", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        const taken = { mac: "aa:bb:cc:dd:ee:01", address: "10.77.0.1" };
+        const lans = SAVED.lans.map((lan) => ({ ...lan, reservations: [taken] }));
+        readRouterAction.mockResolvedValue({ plan: { ...SAVED, lans }, reading: READING });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        const down = await screen.findAllByRole("button", { name: "Move down" });
+        expect(screen.getByRole("button", { name: "Stop router" })).toBeTruthy();
+        fireEvent.click(down[0] as HTMLElement);
+        expect(await screen.findByText(/fixed address that cannot be used/)).toBeTruthy();
+    });
+
     it("stops the skeletons when the machine does not answer", async () => {
         listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
         readRouterAction.mockResolvedValue({ plan: null, reading: null });
