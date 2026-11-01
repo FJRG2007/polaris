@@ -38,7 +38,7 @@ import type { ComposeSpec } from "@polaris/deploy";
 import { getDomainZones } from "@/lib/domain-zones";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { probePublicIp } from "@/lib/network-service";
-import { readBorrowed, settleBorrowed } from "./borrowed-names";
+import { type BorrowedName, missBorrowed, readBorrowed, settleBorrowed } from "./borrowed-names";
 import * as notices from "@/lib/notification-service";
 import { PUBLISHED_KEY } from "@/lib/domain-address-sync";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -459,6 +459,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
 
     let conflicts: string[] = [];
     let moved: string | null = null;
+    let flipped = false;
     try {
         if (decision.move === "to-backup" && target) await toBackup(zones.baseDomain, target);
         // A path changed while on backup: the records follow it before the old one goes.
@@ -472,11 +473,11 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             await toBackup(zones.baseDomain, target);
         if (decision.move === "to-direct" || (decision.state.serving === "direct" && saved))
             conflicts = await toDirect();
-        await moveBorrowed(measured.lastIp);
         moved = decision.move;
         await setSetting(BACKUP_STATE_KEY, JSON.stringify(decision.state));
         forgetBackupAccess();
         if (decision.move) await announce(decision.state, zones.baseDomain);
+        flipped = true;
     } catch (caught) {
         problem = problem ?? "failed";
         detail = detail ?? message(caught);
@@ -490,6 +491,15 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
                 lastFlip: previous.lastFlip
             })
         );
+    }
+    // Its own step: one name that cannot move must not undo a flip that already happened.
+    if (flipped) {
+        try {
+            await moveBorrowed(measured.lastIp);
+        } catch (caught) {
+            problem = problem ?? (caught instanceof PathRefusal ? caught.code : "failed");
+            detail = detail ?? (caught instanceof PathRefusal ? caught.detail : message(caught));
+        }
     }
     if (uplink) {
         try {
@@ -663,16 +673,30 @@ async function moveBorrowed(line: string | null): Promise<void> {
     const relay = saved?.target.kind === "relay" ? saved.target.address : null;
     const address = relay ?? line;
     if (!address) return;
-    const token = await loadCloudflareToken();
-    if (!token) throw new PathRefusal("no-token");
-    for (const entry of names) {
-        if (entry.address === address) continue;
-        for (const record of await findDnsRecords(token, entry.zoneId, "A", entry.name)) {
-            if (record.content === entry.address)
-                await repointRecord(token, entry.zoneId, record.id, address);
+    const pending = names.filter((entry) => entry.address !== address);
+    const token = pending.length > 0 ? await loadCloudflareToken() : "";
+    // Connecting a token again fixes this one, so it costs an entry no tries.
+    if (token === null) throw new PathRefusal("no-token");
+    const missed: BorrowedName[] = [];
+    let failure: unknown = null;
+    for (const entry of pending) {
+        try {
+            for (const record of await findDnsRecords(token, entry.zoneId, "A", entry.name)) {
+                if (record.content === entry.address)
+                    await repointRecord(token, entry.zoneId, record.id, address);
+            }
+        } catch (caught) {
+            missed.push(entry);
+            failure = failure ?? caught;
         }
     }
-    await settleBorrowed(names, relay);
+    await settleBorrowed(
+        names.filter((entry) => !missed.includes(entry)),
+        relay
+    );
+    if (missed.length === 0) return;
+    await missBorrowed(missed);
+    throw failure;
 }
 
 /** Take down a path that is no longer chosen, once no record points at it. */

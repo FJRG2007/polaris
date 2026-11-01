@@ -42,6 +42,16 @@ vi.mock("../../src/lib/setting-store", () => ({
     }
 }));
 vi.mock("node:dns/promises", () => ({ resolve4 }));
+vi.mock("../../src/lib/domain-zones", async (actual) => {
+    const real = await actual<typeof import("../../src/lib/domain-zones")>();
+    return {
+        ...real,
+        getDomainZones: async () => ({
+            ...(await real.getDomainZones()),
+            baseDomain: "example.net"
+        })
+    };
+});
 vi.mock("../../src/lib/network-service", () => ({ detectPublicIp: async () => "5.6.7.8" }));
 vi.mock("../../src/lib/domain-service", () => ({ setDomainConfig: vi.fn() }));
 vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken }));
@@ -53,6 +63,7 @@ vi.mock("../../src/lib/integrations/cloudflare-api", () => ({
 }));
 
 const { provisionHostnameDns } = await import("../../src/lib/domain-dns");
+const { getDomainZones, zoneRecords } = await import("../../src/lib/domain-zones");
 
 describe("provisionHostnameDns", () => {
     describe("while backup access holds the records", () => {
@@ -82,7 +93,7 @@ describe("provisionHostnameDns", () => {
                 "9.9.9.9"
             );
             expect(JSON.parse(settings.get("backupAccess.borrowed") ?? "[]")).toEqual([
-                { zoneId: "z2", name: "shop.example.org", address: "9.9.9.9" }
+                { zoneId: "z2", name: "shop.example.org", address: "9.9.9.9", tries: 0 }
             ]);
         });
 
@@ -118,6 +129,30 @@ describe("provisionHostnameDns", () => {
                 noWayIn: true
             });
             expect(upsertARecord).not.toHaveBeenCalled();
+        });
+
+        it("reports a name the tunnel already answers for as served", async () => {
+            holding({ kind: "tunnel", tunnelId: "t" });
+            settings.set(
+                "network.inboundReach",
+                JSON.stringify({
+                    checkedAt: "2026-01-01T00:00:00.000Z",
+                    publicIp: "5.6.7.8",
+                    cgnat: true,
+                    certain: true,
+                    reason: null,
+                    inboundProven: false
+                })
+            );
+            const [first] = zoneRecords(await getDomainZones());
+            const under = first?.wildcard.replace("*", "shop") ?? "";
+            const deeper = first?.wildcard.replace("*", "a.b") ?? "";
+            expect(await provisionHostnameDns(under)).toEqual({ status: "unchanged", ip: null });
+            expect(await provisionHostnameDns(first?.host ?? "")).toEqual({
+                status: "unchanged",
+                ip: null
+            });
+            expect((await provisionHostnameDns(deeper)).noWayIn).toBe(true);
         });
     });
 

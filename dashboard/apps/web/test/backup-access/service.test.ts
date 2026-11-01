@@ -228,6 +228,7 @@ vi.mock("@/lib/integrations/cloudflare-account-service", () => ({
     loadCloudflareToken: async () => "token",
     requireCloudflareAccount: async () => ({ token: "token", accountId: "account" })
 }));
+let lostZone: string | null = null;
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     resolveZoneForHostname: async () => ({ id: "zone", name: "example.test" }),
     createTunnel: async () => ({ id: "tunnel-1" }),
@@ -236,10 +237,12 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
     deleteTunnel: async (_token: string, _account: string, id: string) => {
         deletedTunnels.push(id);
     },
-    findDnsRecords: async (_token: string, _zone: string, type: string, name: string) =>
-        [...zone.values()]
+    findDnsRecords: async (_token: string, zoneId: string, type: string, name: string) => {
+        if (zoneId === lostZone) throw new Error("zone not found");
+        return [...zone.values()]
             .filter((record) => record.name === name && record.type === type)
-            .map((record) => ({ ...record })),
+            .map((record) => ({ ...record }));
+    },
     repointRecord: async (_token: string, _zone: string, id: string, content: string) => {
         const record = zone.get(id);
         if (record) zone.set(id, { ...record, content });
@@ -433,6 +436,42 @@ describe("runBackupAccess", () => {
             lineUp = true;
             await passes(OK_TO_RETURN);
             expect(late()).toBe("198.51.100.9");
+            expect(settings.has("backupAccess.borrowed")).toBe(false);
+        });
+
+        it("comes back even when one late name's zone cannot be reached", async () => {
+            await onRelayWithLateName();
+            await borrowRelayName("gone-zone", "gone.example.org", RELAY);
+            lostZone = "gone-zone";
+            lineUp = true;
+            await passes(OK_TO_RETURN);
+            lostZone = null;
+            expect(serving()).toBe("direct");
+            expect(late()).toBe(HOME);
+            const left = JSON.parse(settings.get("backupAccess.borrowed") ?? "[]");
+            expect(left).toHaveLength(1);
+            expect(left[0].name).toBe("gone.example.org");
+            expect(left[0].tries).toBeGreaterThan(0);
+        });
+
+        it("gives up on a name after a day of passes", async () => {
+            await onRelayWithLateName();
+            zone.delete("late");
+            await borrowRelayName("gone-zone", "gone.example.org", RELAY);
+            const held = JSON.parse(settings.get("backupAccess.borrowed") ?? "[]");
+            settings.set(
+                "backupAccess.borrowed",
+                JSON.stringify(
+                    held.map((entry: { name: string }) => ({
+                        ...entry,
+                        tries: entry.name === "gone.example.org" ? 1439 : 0
+                    }))
+                )
+            );
+            lostZone = "gone-zone";
+            lineUp = true;
+            await passes(OK_TO_RETURN);
+            lostZone = null;
             expect(settings.has("backupAccess.borrowed")).toBe(false);
         });
 

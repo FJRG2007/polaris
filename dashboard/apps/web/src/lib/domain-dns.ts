@@ -551,6 +551,18 @@ export async function serviceDnsTarget(
     };
 }
 
+/** A name a flipped tunnel already answers for: one of its own, or one label under its
+ *  wildcard, as far as the zone's certificate reaches. */
+async function tunnelServes(name: string): Promise<boolean> {
+    const owned = await ownedZoneNames(await getDomainZones()).catch(() => []);
+    return owned.some((entry) => {
+        const held = entry.toLowerCase();
+        if (held === name) return true;
+        if (!held.startsWith("*.") || !name.endsWith(held.slice(1))) return false;
+        return /^[^.]+$/.test(name.slice(0, -(held.length - 1)));
+    });
+}
+
 /**
  * Point one hostname at the server that serves it through the connected Cloudflare account, so a
  * custom domain needs no visit to a DNS panel. This is what lets a service take any
@@ -567,8 +579,10 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
     const [token, target] = await Promise.all([loadCloudflareToken(), dnsTargetFor(name)]);
     const ip = target.ip;
     if (!ip) {
-        if (!target.server && (await backupRecordsTarget())?.kind === "tunnel")
+        if (!target.server && (await backupRecordsTarget())?.kind === "tunnel") {
+            if (await tunnelServes(name)) return { status: "unchanged", ip: null };
             return { status: "manual", ip: null, noWayIn: true };
+        }
         return {
             status: "manual",
             ip: null,
