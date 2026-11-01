@@ -2853,6 +2853,13 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 keywords: ["machines", "nodes", "exit node", "subnet routes", "rename"]
             },
             {
+                label: "Private networks", // i18n-ignore
+                href: "/apps/vpn/networks",
+                requiresApp: "vpn",
+                icon: Network,
+                keywords: ["subnet", "home automation", "iot", "router", "wifi", "openwrt"]
+            },
+            {
                 label: "Add a device", // i18n-ignore
                 href: "/apps/vpn/add",
                 requiresApp: "vpn",

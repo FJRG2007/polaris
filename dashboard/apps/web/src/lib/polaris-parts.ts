@@ -25,6 +25,8 @@ export const TUNNEL_PROJECT = "polaris-tunnel";
 export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
 /** Remote access through Tailscale, started only while it is turned on. */
 export const TAILSCALE_PROJECT = "polaris-tailscale";
+/** A server's way into the VPN's private networks, started with the first one. */
+export const GATEWAY_PROJECT = "polaris-network-gateway";
 
 /**
  * The compose projects that are Polaris rather than something it runs.
@@ -33,7 +35,13 @@ export const TAILSCALE_PROJECT = "polaris-tailscale";
  * Polaris, so what it costs is part of what Polaris costs. A tunnel a deployed app
  * was given belongs to that app.
  */
-const OWN_PROJECTS = ["polaris", TUNNEL_PROJECT, PUBLIC_TUNNEL_PROJECT, TAILSCALE_PROJECT];
+const OWN_PROJECTS = [
+    "polaris",
+    TUNNEL_PROJECT,
+    PUBLIC_TUNNEL_PROJECT,
+    TAILSCALE_PROJECT,
+    GATEWAY_PROJECT
+];
 
 /** What each part of the stack is called, and what it is for. Keyed by the compose
  *  service, which is the name in the file and survives the container being

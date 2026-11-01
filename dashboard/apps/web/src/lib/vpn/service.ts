@@ -25,6 +25,9 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { listDeployZones } from "@/lib/domain-zones";
 import { hostPortForApp } from "@/lib/deploy/host-port";
 import { dnsBlockerStatus } from "@/lib/dns-blocker/service";
+import { readNetworks, sharedCidrs, type PrivateNetwork } from "./networks";
+import type { RuntimePorts } from "@polaris/deploy";
+import { GATEWAY_PROJECT } from "@/lib/polaris-parts";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { openText, sealText } from "@/lib/tls/managed-certificates";
 import { resolveContainerName } from "@/lib/container-files-service";
@@ -51,7 +54,12 @@ export type VpnRefusalCode =
     | "notFound"
     | "badName"
     | "badAuthId"
-    | "notApplied";
+    | "notApplied"
+    | "limited"
+    | "tooMany"
+    | "subnetTaken"
+    | "noServer"
+    | "gatewayFailed";
 
 export class VpnRefusal extends Error {
     constructor(readonly code: VpnRefusalCode) {
@@ -259,7 +267,13 @@ async function applyPolicy(api: HeadscaleClient): Promise<void> {
         await api.createUser({ name, displayName: admin.name, email: admin.email });
         known.add(name);
     }
-    await api.setPolicy(rules.vpnPolicy(admins.map((admin) => rules.headscaleUserName(admin.id))));
+    const { settings } = await requireApp();
+    await api.setPolicy(
+        rules.vpnPolicy(
+            admins.map((admin) => rules.headscaleUserName(admin.id)),
+            sharedCidrs(readNetworks(settings.networks))
+        )
+    );
 }
 
 /**
@@ -421,15 +435,56 @@ export async function turnOff(): Promise<void> {
     await saveSettings(app.id, { ...app.settings, enabled: false });
 }
 
+/** Run `work` against a private network's server, closing the connection after. */
+export async function onNetworkServer<T>(
+    network: Pick<PrivateNetwork, "targetId" | "targetOwnerId">,
+    work: (ports: RuntimePorts) => Promise<T>
+): Promise<T> {
+    const target = await prisma.deployTarget.findFirst({
+        where: { id: network.targetId, ownerId: network.targetOwnerId },
+        select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
+    });
+    if (!target) throw new VpnRefusal("noServer");
+    const ports = await getPorts(target, network.targetOwnerId);
+    try {
+        return await work(ports);
+    } finally {
+        await ports.dispose();
+    }
+}
+
+/** Stop every server's gateway, as far as each can be reached: with the control
+ *  server gone they have nothing left to talk to. */
+async function stopGateways(networks: readonly PrivateNetwork[]): Promise<void> {
+    const servers = networks.filter(
+        (one, index) => networks.findIndex(({ targetId }) => targetId === one.targetId) === index
+    );
+    const stopped = await Promise.allSettled(
+        servers.map((server) =>
+            onNetworkServer(server, (ports) => ports.composeDown(GATEWAY_PROJECT))
+        )
+    );
+    for (const result of stopped) {
+        if (result.status === "rejected") {
+            console.error("polaris: a VPN gateway was not stopped:", result.reason);
+        }
+    }
+}
+
 /**
  * Delete the control server and everything on it: the container, its volume
  * and database, every device's sign-in, the hostname (whose domain row belonged
  * to the removed service) and the API key that named that database. The screen
  * asks first; afterwards every device has to be added again.
+ *
+ * The private networks stay on record, since their routers keep those subnets and
+ * Wi-Fi, but their gateways stop. After the VPN is set up again, Retry on a network
+ * signs its gateway in from empty state.
  */
 export async function removeVpn(): Promise<void> {
     const app = await requireApp();
     const engine = await engineRow();
+    await stopGateways(readNetworks(app.settings.networks));
     await publishEdge(null);
     if (engine) await uninstallApp(engine.ownerId, engine.id, { deleteData: true });
     await saveSettings(app.id, { ...app.settings, hostname: null, apiKey: null, enabled: false });
@@ -581,6 +636,61 @@ export async function createDeviceKey(
         expiration
     });
     return { key: key.key, expiresAt: expiration.toISOString() };
+}
+
+/** The private networks as stored. */
+export async function storedNetworks(): Promise<PrivateNetwork[]> {
+    return readNetworks((await requireApp()).settings.networks);
+}
+
+/** Replace the stored networks. Reads the row again, so a setting saved while the
+ *  caller worked is not overwritten. */
+export async function saveNetworks(networks: readonly PrivateNetwork[]): Promise<void> {
+    const app = await requireApp();
+    await saveSettings(app.id, { ...app.settings, networks: [...networks] });
+}
+
+/** Write the access policy again, after the networks it names changed. */
+export async function applyNetworkAccess(): Promise<void> {
+    await applyPolicy(await client());
+}
+
+/** The address gateways log in to, and a one-use key that signs one in as a tagged
+ *  device, which outlives the account of whoever pressed the button. */
+export async function gatewayKey(
+    account: Account
+): Promise<{ loginServer: string; authKey: string }> {
+    const api = await client();
+    const { settings } = await requireApp();
+    if (!settings.hostname) throw new VpnRefusal("noHostname");
+    const user = await ensureUser(api, account);
+    const key = await api.createPreAuthKey({
+        userId: user.id,
+        reusable: false,
+        ephemeral: false,
+        expiration: new Date(Date.now() + PREAUTH_TTL_MS),
+        tags: [rules.POLARIS_TAG]
+    });
+    return { loginServer: `https://${settings.hostname}`, authKey: key.key };
+}
+
+/** Every device on the VPN, as Headscale has it, for finding gateways. */
+export async function allNodes(): Promise<HeadscaleNode[]> {
+    return (await client()).listNodes();
+}
+
+/** Set exactly the routes a gateway offers, without the checks a person's request
+ *  goes through: these come from the networks an administrator created. */
+export async function approveGatewayRoutes(
+    nodeId: string,
+    routes: readonly string[]
+): Promise<void> {
+    await (await client()).approveRoutes(nodeId, [...routes]);
+}
+
+/** Take a gateway off the VPN. */
+export async function removeGatewayNode(nodeId: string): Promise<void> {
+    await (await client()).deleteNode(nodeId);
 }
 
 /** Add the device waiting at `authId` to `account`'s devices. */

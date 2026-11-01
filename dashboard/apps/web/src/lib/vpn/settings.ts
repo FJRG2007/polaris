@@ -38,7 +38,9 @@ export const vpnSettingsSchema = z.object({
     apiKey: z.string().min(1).nullable().catch(null),
     /** Whether the control server should be running. Off keeps its database,
      *  so the devices on it sign back in when it is turned on again. */
-    enabled: z.boolean().catch(false)
+    enabled: z.boolean().catch(false),
+    /** The private networks, read entry by entry (`readNetworks`). */
+    networks: z.array(z.unknown()).catch([])
 });
 export type VpnSettings = z.infer<typeof vpnSettingsSchema>;
 
@@ -46,7 +48,13 @@ export function readVpnSettings(stored: unknown): VpnSettings {
     const parsed = vpnSettingsSchema.safeParse(stored ?? {});
     return parsed.success
         ? parsed.data
-        : { hostname: null, baseDomain: DEFAULT_BASE_DOMAIN, apiKey: null, enabled: false };
+        : {
+              hostname: null,
+              baseDomain: DEFAULT_BASE_DOMAIN,
+              apiKey: null,
+              enabled: false,
+              networks: []
+          };
 }
 
 /**
@@ -130,10 +138,16 @@ export const POLARIS_TAG = "tag:polaris";
  * - an exit node an administrator approved is usable by everybody
  *   (`autogroup:internet`).
  *
+ * - a private network shared with everybody (`sharedCidrs`) is reachable by every
+ *   user; any other one only by administrators, through their rule above.
+ *
  * `adminUsers` are Headscale user names; with none, the administrators' rule is
  * left out rather than written with an empty group.
  */
-export function vpnPolicy(adminUsers: readonly string[]): string {
+export function vpnPolicy(
+    adminUsers: readonly string[],
+    sharedCidrs: readonly string[] = []
+): string {
     const admins = [...new Set(adminUsers)].sort();
     const everyone = ["autogroup:member"];
     const grants: { src: string[]; dst: string[]; ip: string[] }[] = [
@@ -141,6 +155,7 @@ export function vpnPolicy(adminUsers: readonly string[]): string {
         { src: everyone, dst: [POLARIS_TAG], ip: ["*"] },
         { src: everyone, dst: ["autogroup:internet"], ip: ["*"] }
     ];
+    if (sharedCidrs.length > 0) grants.push({ src: everyone, dst: [...sharedCidrs], ip: ["*"] });
     if (admins.length > 0) grants.push({ src: ["group:admins"], dst: ["*"], ip: ["*"] });
     const owners = admins.length > 0 ? ["group:admins"] : [];
     return JSON.stringify(
