@@ -632,11 +632,13 @@ describe("starting", () => {
     });
 
     it.each([
-        ["no-way-in", undefined],
-        ["no-address", "server-2"]
-    ])("closes as %s when the target has no address", async (failure, server) => {
+        ["no-way-in", undefined, { kind: "tunnel" }],
+        ["address-unknown", undefined, null],
+        ["no-address", "server-2", { kind: "tunnel" }]
+    ])("closes as %s when the target has no address", async (failure, server, holding) => {
         addressNow.value = null;
         addressNow.server = server;
+        addressNow.holding = holding;
         await service.startCutover({
             domainId: "domain-1",
             targetApplicationId: "app-new",

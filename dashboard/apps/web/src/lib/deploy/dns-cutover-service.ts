@@ -43,7 +43,6 @@ export class CutoverRefusedError extends Error {
     }
 }
 
-/** No address takes visitors at the moment of a switch. */
 type NoAddressFailure = "no-address" | "no-way-in" | "address-unknown";
 
 /** Why a target has no address: its server's, a tunnel holding this machine's records,
@@ -53,6 +52,7 @@ async function noAddressFailure(server: string | undefined): Promise<NoAddressFa
     return (await backupRecordsTarget())?.kind === "tunnel" ? "no-way-in" : "address-unknown";
 }
 
+/** No address takes visitors at the moment of a switch. */
 class NoAddressError extends Error {
     constructor(readonly failure: NoAddressFailure) {
         super(failure);
