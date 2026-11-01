@@ -202,9 +202,7 @@ export function isGatewayNode(
     tag: string
 ): boolean {
     if (!node.tags.includes(tag)) return false;
-    return (
-        node.name === name || node.givenName === name || node.givenName.startsWith(`${name}-`)
-    );
+    return node.name === name || node.givenName === name || node.givenName.startsWith(`${name}-`);
 }
 
 /** Empty the state for a generation not seen yet, then start as usual. One line:

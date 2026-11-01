@@ -169,15 +169,19 @@ describe("the gateway", () => {
     it("is found again under the suffix a taken name gets, and never by name alone", () => {
         const name = "polaris-gateway-target1";
         const tag = "tag:polaris";
-        expect(networks.isGatewayNode({ name, givenName: name, tags: [tag] }, name, tag)).toBe(true);
-        expect(
-            networks.isGatewayNode({ name, givenName: "renamed", tags: [tag] }, name, tag)
-        ).toBe(true);
-        expect(networks.isGatewayNode({ name, givenName: `${name}-ab12`, tags: [tag] }, name, tag)).toBe(
+        expect(networks.isGatewayNode({ name, givenName: name, tags: [tag] }, name, tag)).toBe(
             true
         );
+        expect(networks.isGatewayNode({ name, givenName: "renamed", tags: [tag] }, name, tag)).toBe(
+            true
+        );
+        expect(
+            networks.isGatewayNode({ name, givenName: `${name}-ab12`, tags: [tag] }, name, tag)
+        ).toBe(true);
         expect(networks.isGatewayNode({ name, givenName: name, tags: [] }, name, tag)).toBe(false);
-        expect(networks.isGatewayNode({ name: "laptop", givenName: "laptop", tags: [tag] }, name, tag)).toBe(false);
+        expect(
+            networks.isGatewayNode({ name: "laptop", givenName: "laptop", tags: [tag] }, name, tag)
+        ).toBe(false);
     });
 });
 
