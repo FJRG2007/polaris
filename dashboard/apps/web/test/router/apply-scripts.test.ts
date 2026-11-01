@@ -87,7 +87,7 @@ function stored(name: string): string {
 }
 
 /** Lay out a new configuration the way the apply script does, then activate it. */
-function activate(marker: string, applyId: string): void {
+function staged(marker: string, applyId: string): string {
     mkdirSync(join(root, "etc.next"), { recursive: true });
     writeFileSync(join(root, "etc.next", "marker"), marker);
     mkdirSync(join(root, "state"), { recursive: true });
@@ -97,7 +97,11 @@ function activate(marker: string, applyId: string): void {
         script
     );
     writeFileSync(join(root, "state", "rollback.sh"), local(rollback?.[1] ?? ""));
-    run(parts?.[1] ?? "");
+    return parts?.[1] ?? "";
+}
+
+function activate(marker: string, applyId: string): void {
+    run(staged(marker, applyId));
 }
 
 const live = () => readFileSync(join(root, "etc", "marker"), "utf8");
@@ -210,13 +214,24 @@ describe("a port on its own", () => {
     const withRun = (script: string) =>
         script
             .replaceAll("/run/", `${posix(root)}/run-`)
-            .replaceAll("/var/lib/dhcp", `${posix(root)}/dhcp`);
+            .replaceAll("/var/lib/dhcp", `${posix(root)}/dhcp`)
+            .replaceAll("/proc/", `${posix(root)}/proc/`);
     const stub = (name: string, content: string) => {
         const file = join(root, "bin", name);
         writeFileSync(file, content);
         chmodSync(file, 0o755);
     };
-    const ownPid = () => join(root, "run-polaris-router", "dhclient.eth0.pid");
+    const ownPid = () => join(root, "run-dhclient-polaris.eth0.pid");
+    /** A process, as far as the scripts can tell, and the file naming it. */
+    const liveAs = (name: string, pidFile: string) => {
+        mkdirSync(join(root, "proc", "4242"), { recursive: true });
+        writeFileSync(
+            join(root, "proc", "4242", "comm"),
+            `${name}
+`
+        );
+        writeFileSync(pidFile, "4242");
+    };
     const holdingAnAddress = () => {
         mkdirSync(join(root, "run-polaris-router"), { recursive: true });
         writeFileSync(join(root, "addresses"), "2: eth0 inet 192.0.2.10/24");
@@ -240,9 +255,82 @@ describe("a port on its own", () => {
 
     it("starts no second client while its own is alive", () => {
         holdingAnAddress();
-        run(`echo $$ > ${posix(ownPid())}
-${withRun(router.renderLines(plain))}`);
+        liveAs("dhclient", ownPid());
+        run(withRun(router.renderLines(plain)));
         expect(calls()).not.toContain("dhclient -4");
+    });
+
+    it("starts none beside the system's own when the line has no address", () => {
+        holdingAnAddress();
+        rmSync(join(root, "addresses"));
+        liveAs("dhclient", join(root, "run-dhclient.eth0.pid"));
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).not.toContain("dhclient -4");
+    });
+
+    it("renews when the number in its file is now somebody else's", () => {
+        holdingAnAddress();
+        liveAs("nginx", ownPid());
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).toContain("dhclient -4");
+    });
+
+    describe("a real process", () => {
+        const SIGNALLED = "143";
+        /** Runs a script beside a live child, prepared by `setup` with `$child` as its pid,
+         *  and answers how the child ended: 143 when signalled, 137 when it outlived it. */
+        const ending = (setup: string, script: string) =>
+            run(`sleep 30 >/dev/null 2>&1 &
+child=$!
+mkdir -p "${posix(root)}/proc/$child"
+${setup}
+(
+${script}
+)
+sleep 1
+kill -KILL "$child" 2>/dev/null
+wait "$child"
+echo "$?"`)
+                .split("\n")
+                .at(-1);
+        const named = (name: string) =>
+            `echo ${name} > "${posix(root)}/proc/$child/comm"
+echo "$child" > "${posix(ownPid())}"`;
+        const startedWith = (file: string) => {
+            const pid = withRun(`/run/polaris-router/dhclient.${file}`);
+            return `printf 'dhclient\\0-4\\0-nw\\0-pf\\0${pid}\\0-lf\\0leases\\0eth0.20\\0' > "${posix(root)}/proc/$child/cmdline"`;
+        };
+
+        it("stops its own client", () => {
+            expect(ending(named("dhclient"), withRun(router.renderDown(plain)))).toBe(SIGNALLED);
+        });
+
+        it("leaves whoever holds the number now", () => {
+            expect(ending(named("nginx"), withRun(router.renderDown(plain)))).not.toBe(SIGNALLED);
+        });
+
+        it("replaces a client started under the earlier file", () => {
+            holdingAnAddress();
+            const change = withRun(staged("next", "next-id"));
+            expect(ending(startedWith("eth0.20.pid"), change)).toBe(SIGNALLED);
+            run(withRun(router.renderLines(PLAN)));
+            expect(calls()).toContain("dhclient -4");
+            expect(calls()).toContain("run-dhclient-polaris.eth0.20.pid");
+        });
+
+        it("trusts no device name it could not have written", () => {
+            const change = withRun(staged("next", "next-id"));
+            expect(ending(startedWith("x/../y.pid"), change)).not.toBe(SIGNALLED);
+        });
+    });
+
+    it("renews a line whose client an earlier stop script ended", () => {
+        holdingAnAddress();
+        writeFileSync(join(root, "run-polaris-router", "dhclient.eth0.pid"), "999999");
+        run(withRun(staged("next", "next-id")));
+        expect(existsSync(join(root, "run-polaris-router", "dhclient.eth0.pid"))).toBe(false);
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).toContain("dhclient -4");
     });
 
     it("leaves an address it never asked for to the system", () => {

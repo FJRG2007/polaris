@@ -332,10 +332,15 @@ function renderDockerAllow(plan: RouterPlan): string[] {
     ];
 }
 
-/** Polaris's own, apart from the name the system's DHCP setup gives its client. */
+/** Polaris's own, apart from the name the system's DHCP setup gives its client. Beside
+ *  it in /run, since Ubuntu's confinement of the client allows no folder of ours. */
 function clientPid(device: string): string {
-    return `/run/polaris-router/dhclient.${device}.pid`;
+    return `/run/dhclient-polaris.${device}.pid`;
 }
+
+/** Whether a pid file names a live DHCP client. A file can outlive its process, and the
+ *  number can be somebody else's by then. */
+const CLIENT_RUNNING = `running() { [ "$(cat "/proc/$(cat "$1" 2>/dev/null)/comm" 2>/dev/null)" = dhclient ]; }`;
 
 function present(port: string): string {
     return `ip link show ${port} >/dev/null 2>&1`;
@@ -398,7 +403,7 @@ export function renderUp(plan: RouterPlan): string {
  * the rest.
  */
 export function renderLines(plan: RouterPlan): string {
-    const lines = ["#!/bin/sh"];
+    const lines = ["#!/bin/sh", CLIENT_RUNNING];
     for (const lan of plan.lans) {
         const device = deviceOf(lan);
         lines.push(
@@ -420,8 +425,8 @@ export function renderLines(plan: RouterPlan): string {
             ...tagged(wan),
             `    ip link set ${device} up`,
             `    sysctl -q -w net.ipv4.conf.${device.replace(".", "/")}.rp_filter=2`,
-            `    if { [ -z "$(ip -4 -o addr show dev ${device})" ] || [ -f ${pid} ]; } && ! kill -0 "$(cat ${pid} 2>/dev/null)" 2>/dev/null && command -v dhclient >/dev/null 2>&1; then`,
-            "        mkdir -p /var/lib/dhcp /run/polaris-router",
+            `    if { [ -z "$(ip -4 -o addr show dev ${device})" ] || [ -f ${pid} ]; } && ! running ${pid} && ! running /run/dhclient.${device}.pid && command -v dhclient >/dev/null 2>&1; then`,
+            "        mkdir -p /var/lib/dhcp",
             `        dhclient -4 -nw -e IF_METRIC=${LINE_METRIC} -pf ${pid} -lf /var/lib/dhcp/dhclient.${device}.leases ${device}`,
             "    fi",
             "fi"
@@ -435,6 +440,7 @@ export function renderLines(plan: RouterPlan): string {
 export function renderDown(plan: RouterPlan): string {
     const lines = [
         "#!/bin/sh",
+        CLIENT_RUNNING,
         "nft delete table inet polaris_router 2>/dev/null",
         `ip rule del priority ${ROUTE_TABLE} 2>/dev/null`,
         `ip rule del priority ${ROUTE_TABLE + 1} 2>/dev/null`,
@@ -448,7 +454,7 @@ export function renderDown(plan: RouterPlan): string {
         const pid = clientPid(deviceOf(wan));
         // The address stays, and so does this file: an address can be the system's own,
         // and taking it could cut the login. The next start renews through the file.
-        lines.push(`[ ! -f ${pid} ] || kill "$(cat ${pid})" 2>/dev/null`);
+        lines.push(`! running ${pid} || kill "$(cat ${pid})" 2>/dev/null`);
     }
     for (const lan of plan.lans) {
         lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
@@ -627,10 +633,30 @@ function heredoc(path: string, content: string): string {
     return `cat > '${path}' <<'POLARIS_ROUTER_EOF'\n${content}POLARIS_ROUTER_EOF`;
 }
 
+/** Where an earlier version kept the file, which a confined client could not write: it
+ *  is found by how it was started, and each line keeps a file so the next start renews. */
+const EARLIER_PID = "/run/polaris-router/dhclient.";
+const ADOPT_EARLIER_CLIENTS = `for held in ${EARLIER_PID}*.pid; do
+    [ ! -f "$held" ] || mv -f "$held" "/run/dhclient-polaris.\${held#${EARLIER_PID}}"
+done
+for proc in /proc/[0-9]*; do
+    args="$(tr '\\0' ' ' 2>/dev/null < "$proc/cmdline")"
+    case "$args" in
+        "dhclient "*" -pf ${EARLIER_PID}"*)
+            device="\${args##* -pf ${EARLIER_PID}}"
+            device="\${device%%.pid *}"
+            case "$device" in *[!A-Za-z0-9._-]*) continue ;; esac
+            kill "\${proc##*/}" 2>/dev/null
+            : >> "/run/dhclient-polaris.$device.pid"
+            ;;
+    esac
+done`;
+
 /** Stop what runs, leaving the machine reachable by whatever it had before. */
 const STOP_ALL = `[ ! -f ${ROUTER_DIR}/down.sh ] || sed -i '/^if \\[ -f .*dhclient\\./,/^fi$/d' ${ROUTER_DIR}/down.sh
 systemctl stop ${SERVICE_LIST} 2>/dev/null
-[ ! -f ${ROUTER_DIR}/down.sh ] || /bin/sh ${ROUTER_DIR}/down.sh`;
+[ ! -f ${ROUTER_DIR}/down.sh ] || /bin/sh ${ROUTER_DIR}/down.sh
+${ADOPT_EARLIER_CLIENTS}`;
 
 /** Turn on what is in the directory, or nothing when there is no directory. */
 const START_ALL = `systemctl daemon-reload
