@@ -34,8 +34,22 @@ describe("Select with a long list", () => {
         expect(chosen).toHaveBeenCalledWith("id-999");
     });
 
+    it("never shows a raw id for a value with no option", () => {
+        render(
+            <Select
+                aria-label="Server"
+                value="gone"
+                onValueChange={vi.fn()}
+                options={options(20)}
+            />
+        );
+        expect(screen.getByRole("button", { name: "Server" }).textContent).toBe("");
+    });
+
     it("stays a plain list when it is short", () => {
-        render(<Select aria-label="Server" value="" onValueChange={vi.fn()} options={options(3)} />);
+        render(
+            <Select aria-label="Server" value="" onValueChange={vi.fn()} options={options(3)} />
+        );
         expect(screen.getByRole("combobox")).toBeTruthy();
     });
 });

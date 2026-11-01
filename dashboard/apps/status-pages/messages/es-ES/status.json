@@ -218,6 +218,7 @@
         },
         "conflict": "Ahora apunta a {current}.",
         "noIp": "Polaris no ha podido detectar la dirección pública de este servidor. Apunta el nombre a la dirección que llega a este servidor.",
+        "noWayIn": "Sirve un túnel de reserva y esta línea no admite visitas, así que no se ha escrito el registro. Un administrador puede elegir Relé propio en Acceso de reserva.",
         "notRouted": "Aún no se ha podido escribir la ruta de este dominio. Polaris lo reintenta en menos de una hora."
     }
 }

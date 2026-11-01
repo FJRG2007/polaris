@@ -31,7 +31,7 @@ import { prisma } from "@polaris/db";
 import { isIpv4 } from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { grantedResourceIds } from "@polaris/auth";
-import { expectedPublicAddress } from "./serving-address";
+import { acceptedAddresses } from "./serving-address";
 import { authoritativeA, propagationLeft } from "./dns/authoritative";
 import { resolve4, resolveTxt } from "node:dns/promises";
 import { getSetting, setSetting } from "./setting-store";
@@ -404,18 +404,20 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
     if (!row) throw new OwnerDomainError("That domain is not one of yours");
 
     const wildcardProbe = `${randomLabel(8)}.${row.domain}`;
-    const [txt, wildcardAddresses, expectedIp] = await Promise.all([
+    const [txt, wildcardAddresses, accepted] = await Promise.all([
         txtOrEmpty(`${OWNER_DOMAIN_TXT_LABEL}.${row.domain}`),
         addressesOrEmpty(wildcardProbe),
-        expectedPublicAddress()
+        acceptedAddresses()
     ]);
+    const expectedIp = accepted[0] ?? null;
 
     const owns = row.verifiedAt !== null || txt.includes(row.verifyToken);
     // Without a known public IP the record can only be confirmed to exist, not
     // compared - which is still the useful half of the answer, and better than
     // refusing a domain because this box cannot work out its own address.
     const resolvedHere =
-        wildcardAddresses.length > 0 && (!expectedIp || wildcardAddresses.includes(expectedIp));
+        wildcardAddresses.length > 0 &&
+        (!expectedIp || wildcardAddresses.some((address) => accepted.includes(address)));
     // This box's resolver may still hold the old answer after a change. The verdict
     // is the zone's own nameservers': when they already answer here, the record is
     // right and only a cached copy lags behind.

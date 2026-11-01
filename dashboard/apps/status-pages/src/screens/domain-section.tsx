@@ -195,7 +195,9 @@ export function DomainSection({
                         </p>
                     ) : null}
                     {status.state === "manual" && !status.ip ? (
-                        <p className="text-xs text-muted-foreground">{t("domain.noIp")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t(status.noWayIn ? "domain.noWayIn" : "domain.noIp")}
+                        </p>
                     ) : null}
                     {!status.routed ? (
                         <p className="text-xs text-danger">{t("domain.notRouted")}</p>

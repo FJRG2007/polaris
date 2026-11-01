@@ -51,8 +51,8 @@ function newField(currency?: DisplayPreferences["currency"]) {
 }
 
 async function chooseKind(name: string) {
-    fireEvent.click(screen.getByRole("combobox", { name: "Type" }));
-    fireEvent.click(await screen.findByRole("option", { name }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Type" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name }));
 }
 
 describe("fields dialog, money field", () => {
@@ -60,11 +60,11 @@ describe("fields dialog, money field", () => {
         const onCreated = newField("USD");
         fireEvent.change(screen.getByPlaceholderText(/./), { target: { value: "Budget" } });
         await chooseKind("Amount");
-        const picker = await screen.findByRole("combobox", { name: "Currency" });
+        const picker = await screen.findByRole("button", { name: "Currency" });
         expect(picker.textContent).toContain("USD");
-        fireEvent.click(picker);
-        fireEvent.click(await screen.findByRole("option", { name: /^JPY - / }));
-        expect(screen.getByRole("combobox", { name: "Currency" }).textContent).toContain("JPY");
+        fireEvent.keyDown(picker, { key: "ArrowDown" });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /^JPY - / }));
+        expect(screen.getByRole("button", { name: "Currency" }).textContent).toContain("JPY");
         fireEvent.click(screen.getByRole("button", { name: "Add field" }));
         await waitFor(() => expect(onCreated).toHaveBeenCalled());
         expect(state.created).toEqual([
@@ -79,7 +79,7 @@ describe("fields dialog, money field", () => {
         // A preference saved before the currency list it is checked against.
         newField("ZZZ" as unknown as DisplayPreferences["currency"]);
         await chooseKind("Amount");
-        expect((await screen.findByRole("combobox", { name: "Currency" })).textContent).toContain(
+        expect((await screen.findByRole("button", { name: "Currency" })).textContent).toContain(
             "EUR"
         );
     });
@@ -99,7 +99,7 @@ describe("fields dialog, money field", () => {
             { wrapper: crmHost() }
         );
         fireEvent.click(screen.getByRole("button", { name: "Edit field" }));
-        expect(screen.queryByRole("combobox", { name: "Currency" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Currency" })).toBeNull();
         const fixed = screen.getByTitle("The currency cannot change once the field exists.");
         expect(fixed.textContent).toMatch(/^GBP - /);
     });

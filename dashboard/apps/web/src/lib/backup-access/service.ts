@@ -38,6 +38,7 @@ import type { ComposeSpec } from "@polaris/deploy";
 import { getDomainZones } from "@/lib/domain-zones";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { probePublicIp } from "@/lib/network-service";
+import { readBorrowed, settleBorrowed } from "./borrowed-names";
 import * as notices from "@/lib/notification-service";
 import { PUBLISHED_KEY } from "@/lib/domain-address-sync";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -59,9 +60,11 @@ import {
     createTunnel,
     deleteDnsRecord,
     deleteTunnel,
+    findDnsRecords,
     findNameRecords,
     getTunnelToken,
     putTunnelHosts,
+    repointRecord,
     resolveZoneForHostname,
     saveDnsRecord,
     setRecordTtl
@@ -469,6 +472,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             await toBackup(zones.baseDomain, target);
         if (decision.move === "to-direct" || (decision.state.serving === "direct" && saved))
             conflicts = await toDirect();
+        await moveBorrowed(measured.lastIp);
         moved = decision.move;
         await setSetting(BACKUP_STATE_KEY, JSON.stringify(decision.state));
         forgetBackupAccess();
@@ -645,6 +649,30 @@ async function toDirect(): Promise<string[]> {
     // The originals came back with whatever TTL they had when saved.
     await forgetArmed();
     return plan.conflicts;
+}
+
+/**
+ * Keep the names written on the relay with the records: on the relay that holds them,
+ * else on the line. Only a record still holding the relay is touched, and a pass with
+ * no address for the line leaves them for the next one.
+ */
+async function moveBorrowed(line: string | null): Promise<void> {
+    const names = await readBorrowed();
+    if (names.length === 0) return;
+    const saved = parse(recordsSchema, await getSetting(BACKUP_RECORDS_KEY));
+    const relay = saved?.target.kind === "relay" ? saved.target.address : null;
+    const address = relay ?? line;
+    if (!address) return;
+    const token = await loadCloudflareToken();
+    if (!token) throw new PathRefusal("no-token");
+    for (const entry of names) {
+        if (entry.address === address) continue;
+        for (const record of await findDnsRecords(token, entry.zoneId, "A", entry.name)) {
+            if (record.content === entry.address)
+                await repointRecord(token, entry.zoneId, record.id, address);
+        }
+    }
+    await settleBorrowed(names, relay);
 }
 
 /** Take down a path that is no longer chosen, once no record points at it. */

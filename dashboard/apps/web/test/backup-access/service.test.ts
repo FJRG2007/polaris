@@ -236,6 +236,14 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
     deleteTunnel: async (_token: string, _account: string, id: string) => {
         deletedTunnels.push(id);
     },
+    findDnsRecords: async (_token: string, _zone: string, type: string, name: string) =>
+        [...zone.values()]
+            .filter((record) => record.name === name && record.type === type)
+            .map((record) => ({ ...record })),
+    repointRecord: async (_token: string, _zone: string, id: string, content: string) => {
+        const record = zone.get(id);
+        if (record) zone.set(id, { ...record, content });
+    },
     findNameRecords: async (_token: string, _zone: string, name: string) =>
         [...zone.values()]
             .filter((record) => record.name === name)
@@ -260,6 +268,7 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
 }));
 
 const service = await import("../../src/lib/backup-access/service");
+const { borrowRelayName } = await import("../../src/lib/backup-access/borrowed-names");
 const { FAIL_TO_FLIP, OK_TO_RETURN } = await import("../../src/lib/backup-access/decision");
 
 let clock = Date.parse("2026-01-01T00:00:00Z");
@@ -376,6 +385,64 @@ describe("runBackupAccess", () => {
             [HOME, 3600],
             [HOME, 3600]
         ]);
+    });
+
+    describe("a name written while the relay holds the records", () => {
+        const LATE = "shop.other.test";
+        const relayConfig = {
+            mode: "automatic",
+            path: "relay",
+            relayTargetId: "11111111-1111-4111-8111-111111111111",
+            dataSaver: true,
+            manualOn: false
+        } as const;
+
+        async function onRelayWithLateName() {
+            await service.saveConfig(relayConfig);
+            await pass();
+            lineUp = false;
+            await passes(FAIL_TO_FLIP);
+            expect(serving()).toBe("backup");
+            await borrowRelayName("other-zone", LATE, RELAY);
+            zone.set("late", {
+                id: "late",
+                name: LATE,
+                type: "A",
+                content: RELAY,
+                proxied: false,
+                ttl: 300
+            });
+        }
+
+        const late = () => zone.get("late")?.content;
+
+        it("comes back to the line with the records", async () => {
+            await onRelayWithLateName();
+            await pass();
+            expect(late()).toBe(RELAY);
+            lineUp = true;
+            await passes(OK_TO_RETURN);
+            expect(serving()).toBe("direct");
+            expect(late()).toBe(HOME);
+            expect(settings.has("backupAccess.borrowed")).toBe(false);
+        });
+
+        it("leaves a record somebody changed in the meantime", async () => {
+            await onRelayWithLateName();
+            zone.set("late", { ...zone.get("late")!, content: "198.51.100.9" });
+            lineUp = true;
+            await passes(OK_TO_RETURN);
+            expect(late()).toBe("198.51.100.9");
+            expect(settings.has("backupAccess.borrowed")).toBe(false);
+        });
+
+        it("goes to the line when the records leave for a tunnel", async () => {
+            await onRelayWithLateName();
+            await service.saveConfig({ ...relayConfig, path: "tunnel", relayTargetId: null });
+            await pass();
+            expect(records().find((record) => record.name === NAMES[0])?.type).toBe("CNAME");
+            expect(late()).toBe(HOME);
+        });
     });
 
     it("words each flip by its reason", async () => {

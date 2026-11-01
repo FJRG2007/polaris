@@ -162,12 +162,13 @@ const SEARCH_FROM = 12;
 const DRAWN_ROWS = 200;
 
 /** A `Select` whose list grew: same props, with a search box and a drawn limit. */
-function LongSelect({ name, ...props }: SelectProps) {
+function LongSelect({ name, placeholder = "", ...props }: SelectProps) {
     const words = useUiStrings();
     return (
         <>
             <SearchableSelect
                 {...props}
+                placeholder={placeholder}
                 searchPlaceholder={words.selectSearch}
                 emptyText={words.selectEmpty}
                 limit={DRAWN_ROWS}

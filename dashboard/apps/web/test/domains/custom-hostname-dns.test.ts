@@ -10,7 +10,7 @@
  * itself was added either way.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
     resolve4,
@@ -30,8 +30,16 @@ const {
     pruneDnsRecords: vi.fn()
 }));
 
+const settings = new Map<string, string>();
 vi.mock("@polaris/db", () => ({
     prisma: { setting: { findUnique: async () => null }, domain: { findUnique: findDomain } }
+}));
+vi.mock("../../src/lib/setting-store", () => ({
+    getSetting: async (key: string) => settings.get(key) ?? null,
+    setSetting: async (key: string, value: string | null) => {
+        if (value === null) settings.delete(key);
+        else settings.set(key, value);
+    }
 }));
 vi.mock("node:dns/promises", () => ({ resolve4 }));
 vi.mock("../../src/lib/network-service", () => ({ detectPublicIp: async () => "5.6.7.8" }));
@@ -47,6 +55,72 @@ vi.mock("../../src/lib/integrations/cloudflare-api", () => ({
 const { provisionHostnameDns } = await import("../../src/lib/domain-dns");
 
 describe("provisionHostnameDns", () => {
+    describe("while backup access holds the records", () => {
+        const holding = (target: unknown) =>
+            settings.set("backupAccess.records", JSON.stringify({ zoneId: "z", target }));
+
+        beforeEach(() => {
+            settings.clear();
+            vi.clearAllMocks();
+            findDomain.mockResolvedValue(null);
+            loadCloudflareToken.mockResolvedValue("token");
+            resolveZoneForHostname.mockResolvedValue({ id: "z2", name: "example.org" });
+            resolve4.mockResolvedValue([]);
+            findDnsRecords.mockResolvedValue([]);
+            upsertARecord.mockResolvedValue("rec");
+        });
+
+        afterEach(() => settings.clear());
+
+        it("writes a new name on the relay and keeps it for the way back", async () => {
+            holding({ kind: "relay", address: "9.9.9.9" });
+            expect((await provisionHostnameDns("shop.example.org")).status).toBe("created");
+            expect(upsertARecord).toHaveBeenCalledWith(
+                "token",
+                "z2",
+                "shop.example.org",
+                "9.9.9.9"
+            );
+            expect(JSON.parse(settings.get("backupAccess.borrowed") ?? "[]")).toEqual([
+                { zoneId: "z2", name: "shop.example.org", address: "9.9.9.9" }
+            ]);
+        });
+
+        it("leaves a name that stayed on the line alone", async () => {
+            holding({ kind: "relay", address: "9.9.9.9" });
+            findDnsRecords.mockResolvedValue([{ id: "a", content: "5.6.7.8" }]);
+            expect((await provisionHostnameDns("shop.example.org")).status).toBe("unchanged");
+            expect(upsertARecord).not.toHaveBeenCalled();
+        });
+
+        it("names the line under a tunnel, and keeps nothing", async () => {
+            holding({ kind: "tunnel", tunnelId: "t" });
+            expect((await provisionHostnameDns("shop.example.org")).ip).toBe("5.6.7.8");
+            expect(settings.has("backupAccess.borrowed")).toBe(false);
+        });
+
+        it("writes nothing under a tunnel when the line takes no visitors", async () => {
+            holding({ kind: "tunnel", tunnelId: "t" });
+            settings.set(
+                "network.inboundReach",
+                JSON.stringify({
+                    checkedAt: "2026-01-01T00:00:00.000Z",
+                    publicIp: "5.6.7.8",
+                    cgnat: true,
+                    certain: true,
+                    reason: null,
+                    inboundProven: false
+                })
+            );
+            expect(await provisionHostnameDns("shop.example.org")).toEqual({
+                status: "manual",
+                ip: null,
+                noWayIn: true
+            });
+            expect(upsertARecord).not.toHaveBeenCalled();
+        });
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
         findDomain.mockResolvedValue(null);

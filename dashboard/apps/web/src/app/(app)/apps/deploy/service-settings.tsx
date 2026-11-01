@@ -482,6 +482,7 @@ function dnsAdvice(
     if (!dns || dns.status === "unchanged") return null;
     if (dns.status === "created")
         return { text: t("domains.dnsCreated", { hostname, ip: dns.ip ?? "" }) };
+    if (dns.noWayIn) return { text: t("domains.dnsNoWayIn", { hostname }) };
     const record = dns.ip
         ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" }
         : undefined;

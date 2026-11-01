@@ -243,6 +243,8 @@ export interface DomainStatus {
     readonly state: "ready" | "created" | "conflict" | "manual";
     readonly ip: string | null;
     readonly current: string | null;
+    /** No address takes visitors while a backup tunnel holds the domain's records. */
+    readonly noWayIn: boolean;
     /** Whether the edge file was written with this domain in it. */
     readonly routed: boolean;
 }
@@ -255,6 +257,7 @@ export async function domainStatus(domain: string, routed: boolean): Promise<Dom
         state: result.status === "unchanged" ? "ready" : result.status,
         ip: result.ip,
         current: result.content ?? null,
+        noWayIn: result.noWayIn === true,
         routed
     };
 }

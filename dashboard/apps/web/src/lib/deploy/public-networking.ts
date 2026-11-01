@@ -20,7 +20,7 @@ import { currentReleaseRef } from "./releases";
 import { getPublicIp } from "@/lib/domain-service";
 import { isPrivateIp, isWildcardHostname } from "@polaris/core";
 import { listDeployZones } from "@/lib/domain-zones";
-import { expectedPublicAddress, publishableAddress } from "@/lib/serving-address";
+import { acceptedAddresses, publishableAddress, publishedPortAddress } from "@/lib/serving-address";
 import { resolve4, resolve6, resolveCname, resolveSoa } from "node:dns/promises";
 import { checkZoneSubdomain, containerPortOf, syncAppRoutes } from "@/lib/deploy-service";
 import * as net from "./public-net";
@@ -441,12 +441,13 @@ export async function domainReadings(
 ): Promise<DomainReading[]> {
     const app = await ownedApp(applicationId, ownerId);
     const remote = app.target.kind !== "local" ? (app.target.host?.address?.trim() ?? null) : null;
-    const expectedIp =
-        remote && /^[\d.]+$|:/.test(remote)
-            ? remote
-            : remote
-              ? null
-              : await expectedPublicAddress().catch(() => null);
+    const remoteIp = remote && /^[\d.]+$|:/.test(remote) ? remote : null;
+    const [accepted, adviceIp] = remote
+        ? [remoteIp ? [remoteIp] : [], remoteIp]
+        : await Promise.all([
+              acceptedAddresses().catch(() => []),
+              publishableAddress().catch(() => null)
+          ]);
     const own = app.domains
         .filter((domain) => domain.kind === "auto" || domain.kind === "random")
         .map((domain) => domain.hostname)
@@ -486,15 +487,21 @@ export async function domainReadings(
                     const cnameTarget = own[0];
                     if (cnameTarget && !apex)
                         records.push({ type: "CNAME", name: domain.hostname, value: cnameTarget });
-                    if (expectedIp) {
+                    if (adviceIp) {
                         records.push({
-                            type: expectedIp.includes(":") ? "AAAA" : "A",
+                            type: adviceIp.includes(":") ? "AAAA" : "A",
                             name: domain.hostname,
-                            value: expectedIp
+                            value: adviceIp
                         });
                     }
                     dns = {
-                        verdict: net.dnsVerdict(reading, { ip: expectedIp, cnameTargets: own }),
+                        verdict: net.dnsVerdict(reading, {
+                            ip:
+                                accepted.find((ip) => reading.addresses.includes(ip)) ??
+                                accepted[0] ??
+                                null,
+                            cnameTargets: own
+                        }),
                         addresses: reading.addresses,
                         cnames: reading.cnames,
                         records,
@@ -581,7 +588,7 @@ async function hostsFor(
         return { publicHost: address, lanHost: null };
     }
     const [publicHost, lanHost] = await Promise.all([
-        publishableAddress().catch(() => null),
+        publishedPortAddress().catch(() => null),
         getPublicIp().catch(() => null)
     ]);
     return { publicHost, lanHost: lanHost && lanHost !== publicHost ? lanHost : null };

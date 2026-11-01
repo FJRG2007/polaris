@@ -177,6 +177,7 @@ export function BackupAccessCard() {
                                 className="w-64 max-w-full"
                                 aria-label={t("domains.backup.server")}
                                 value={view.config.relayTargetId ?? ""}
+                                placeholder={t("domains.backup.server")}
                                 disabled={busy}
                                 options={view.servers.map(({ id, name }) => ({
                                     value: id,

@@ -259,7 +259,8 @@
         "dnsPointAt": "Haz que {hostname} apunte a {ip} en tu proveedor de DNS.",
         "dnsPointAtDetail": "Haz que {hostname} apunte a {ip} en tu proveedor de DNS - {detail}",
         "dnsPoint": "Configura {hostname} en tu proveedor de DNS.",
-        "dnsPointDetail": "Configura {hostname} en tu proveedor de DNS - {detail}"
+        "dnsPointDetail": "Configura {hostname} en tu proveedor de DNS - {detail}",
+        "dnsNoWayIn": "Sirve un túnel de reserva y esta línea no admite visitas, así que no se ha escrito el registro de {hostname}. Un administrador puede elegir Relé propio en Acceso de reserva para darle una dirección."
     },
     "certificate": {
         "replaceOn": "Sustituir el certificado de {hostname}",
