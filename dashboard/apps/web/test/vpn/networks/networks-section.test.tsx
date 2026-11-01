@@ -209,7 +209,9 @@ describe("VpnNetworksSection", () => {
         fireEvent.click(within(dialog).getByRole("button", { name: "Remove network" }));
         expect((await screen.findAllByText("Fixture failure")).length).toBeGreaterThan(0);
 
-        fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+        const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+        await waitFor(() => expect((cancel as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(cancel);
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
         expect(screen.queryByText("Fixture failure")).toBeNull();
     });
