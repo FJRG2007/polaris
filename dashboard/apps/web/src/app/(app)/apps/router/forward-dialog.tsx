@@ -33,9 +33,10 @@ export function ForwardDialog({
         toPort: portOf(toPort || port)
     });
     const outside =
-        address.trim() !== "" &&
-        parsed.success &&
-        !lans.some((lan) => isHostOf(lan.cidr, address.trim()));
+        address.trim() !== "" && !lans.some((lan) => isHostOf(lan.cidr, address.trim()));
+    const portBad = [port, toPort].some(
+        (text) => text.trim() !== "" && !(portOf(text) >= 1 && portOf(text) <= 65535)
+    );
     const valid = parsed.success && !outside;
 
     return (
@@ -51,8 +52,8 @@ export function ForwardDialog({
                         value={protocol}
                         onValueChange={(value) => setProtocol(value === "udp" ? "udp" : "tcp")}
                         options={[
-                            { value: "tcp", label: "TCP" },
-                            { value: "udp", label: "UDP" }
+                            { value: "tcp", label: t("tcp") },
+                            { value: "udp", label: t("udp") }
                         ]}
                     />
                     <ui.Input
@@ -80,6 +81,11 @@ export function ForwardDialog({
                 {outside ? (
                     <p role="alert" className="text-xs text-danger">
                         {t("problems.outside")}
+                    </p>
+                ) : null}
+                {portBad ? (
+                    <p role="alert" className="text-xs text-danger">
+                        {t("badOpenPort")}
                     </p>
                 ) : null}
                 <ui.DialogFooter>

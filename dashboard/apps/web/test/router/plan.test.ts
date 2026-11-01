@@ -21,9 +21,30 @@ const LAN = {
 };
 const PLAN = { wans: [{ interface: "eth0", vlan: null }], lans: [LAN], forwards: [] };
 const ACCESS = { management: "192.0.2.9", sshPort: 22 };
+const ENGINE = '{ "docker0", "br-*", "tailscale0" }';
 const parsed = (plan: unknown) => router.routerPlanSchema.parse(plan);
 
 describe("a router plan", () => {
+    it("makes an id the schema takes without a secure context", () => {
+        const id = router.newLanId();
+        expect(router.lanSchema.safeParse({ ...LAN, id }).success).toBe(true);
+        expect(id).not.toBe(router.newLanId());
+    });
+
+    it("says what is wrong with each refused part", () => {
+        const issues = (plan: unknown) => {
+            const result = router.routerPlanSchema.safeParse(plan);
+            return result.success ? [] : result.error.issues.map(({ message }) => message);
+        };
+        expect(issues({ ...PLAN, wans: [] })).toContain("noLine");
+        expect(issues({ ...PLAN, lans: [] })).toContain("noNetwork");
+        expect(issues({ ...PLAN, wans: [{ interface: "eth0", vlan: 1 }] })).toContain("badVlan");
+        expect(issues({ ...PLAN, wans: [{ interface: "eth0.20", vlan: null }] })).toContain(
+            "badPort"
+        );
+        expect(router.isPortName("eth0.20")).toBe(false);
+    });
+
     it("refuses a name that could leave its place in a script", () => {
         const wans = [{ interface: "eth0; reboot", vlan: null }];
         expect(router.routerPlanSchema.safeParse({ ...PLAN, wans }).success).toBe(false);
@@ -62,13 +83,64 @@ describe("the firewall", () => {
         const lan = { ...LAN, internet: false, isolated: true };
         const rules = router.renderFirewall(parsed({ ...PLAN, lans: [lan] }), ACCESS);
         expect(rules).not.toContain('iifname { "eth1" } oifname { "eth0" } accept');
-        expect(rules).toContain('iifname { "eth1" } tcp dport 22 drop');
+        expect(rules).toContain('iifname { "eth1", "eth0" } tcp dport 22 drop');
+    });
+
+    it("cuts a confined network off from containers and the tailnet first", () => {
+        for (const change of [{ isolated: true }, { internet: false }]) {
+            const lans = [{ ...LAN, ...change }];
+            const rules = router.renderFirewall(parsed({ ...PLAN, lans }), ACCESS);
+            const forward = rules.slice(rules.indexOf("chain forward"));
+            const drop = forward.indexOf(`iifname { "eth1" } oifname ${ENGINE} drop`);
+            expect(drop).toBeGreaterThan(-1);
+            expect(drop).toBeLessThan(forward.indexOf("ct status dnat accept"));
+            expect(drop).toBeLessThan(forward.indexOf(`oifname ${ENGINE} accept`));
+        }
+        const open = router.renderFirewall(parsed(PLAN), ACCESS);
+        expect(open).not.toContain(`oifname ${ENGINE} drop`);
+    });
+
+    it("keeps the login shut from a line, even to a private source, and open to Polaris", () => {
+        const rules = router.renderFirewall(parsed(PLAN), ACCESS);
+        const shut = rules.indexOf('iifname { "eth0" } tcp dport 22 drop');
+        expect(shut).toBeGreaterThan(rules.indexOf("ip saddr 192.0.2.9 tcp dport 22 accept"));
+        expect(shut).toBeLessThan(rules.indexOf("ip saddr { 10.0.0.0/8"));
+    });
+});
+
+describe("a machine running Docker", () => {
+    it("lets through what the router joins, both ways, and takes it away again", () => {
+        const up = router.renderUp(parsed(PLAN));
+        expect(up).toContain("iptables -w -n -L DOCKER-USER");
+        expect(up).toContain("for from in eth1; do for to in eth1 eth0;");
+        expect(up).toContain("for from in eth0; do for to in eth1;");
+        expect(up.indexOf("DOCKER-USER")).toBeGreaterThan(up.indexOf("nft -f"));
+        const down = router.renderDown(parsed(PLAN));
+        expect(down).toContain("iptables -w -D DOCKER-USER -j POLARIS-ROUTER");
+        expect(down).toContain("iptables -w -X POLARIS-ROUTER");
+    });
+});
+
+describe("a line on a VLAN", () => {
+    const tagged = parsed({ ...PLAN, wans: [{ interface: "eth0", vlan: 20 }] });
+
+    it("asks for its own address, since nothing else on the machine will", () => {
+        const up = router.renderUp(tagged);
+        expect(up).toContain("name eth0.20 type vlan id 20");
+        expect(up.indexOf("dhclient -4 -nw")).toBeGreaterThan(up.indexOf("ip link set eth0.20 up"));
+        expect(up).toContain("/var/lib/dhcp/dhclient.eth0.20.leases eth0.20");
+        expect(router.renderApply(tagged, ACCESS, "id")).toContain("isc-dhcp-client");
+    });
+
+    it("installs nothing extra for a plain line", () => {
+        expect(router.renderUp(parsed(PLAN))).not.toContain("dhclient");
+        expect(router.renderApply(parsed(PLAN), ACCESS, "id")).not.toContain("isc-dhcp-client");
     });
 });
 
 describe("applying", () => {
     it("arms the way back before the network is touched", () => {
-        const script = router.renderApply(parsed(PLAN), ACCESS);
+        const script = router.renderApply(parsed(PLAN), ACCESS, "id");
         const armed = script.indexOf("--unit=polaris-router-rollback");
         expect(armed).toBeGreaterThan(-1);
         expect(armed).toBeLessThan(script.indexOf("--unit=polaris-router-activate"));
@@ -79,8 +151,24 @@ describe("applying", () => {
 describe("what is refused before anything is sent", () => {
     const reading = {
         ports: [
-            { name: "eth0", up: true, mac: null, addresses: ["192.168.1.5/24"], hasGateway: true, received: 0, sent: 0 },
-            { name: "eth1", up: true, mac: null, addresses: ["192.168.2.5/24"], hasGateway: false, received: 0, sent: 0 }
+            {
+                name: "eth0",
+                up: true,
+                mac: null,
+                addresses: ["192.168.1.5/24"],
+                hasGateway: true,
+                received: 0,
+                sent: 0
+            },
+            {
+                name: "eth1",
+                up: true,
+                mac: null,
+                addresses: ["192.168.2.5/24"],
+                hasGateway: false,
+                received: 0,
+                sent: 0
+            }
         ],
         activeWan: null,
         running: false,
@@ -105,6 +193,13 @@ describe("what is refused before anything is sent", () => {
 });
 
 describe("reading a machine", () => {
+    it("stops at the most leases a screen is sent", () => {
+        const lease = "1700000000 aa:bb:cc:00:00:01 10.77.0.100 plug *";
+        const leases = Array<string>(router.MAX_CLIENTS + 5).fill(lease);
+        const reading = readProbe(["---leases", ...leases, "---end"].join("\n"));
+        expect(reading.clients).toHaveLength(router.MAX_CLIENTS);
+    });
+
     it("takes what it can and leaves out what it cannot read", () => {
         const reading = readProbe(
             [

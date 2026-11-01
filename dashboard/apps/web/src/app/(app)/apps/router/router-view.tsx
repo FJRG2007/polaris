@@ -14,17 +14,37 @@ import { LanDialog } from "./lan-dialog";
 import { ForwardDialog } from "./forward-dialog";
 import { useVpnRead } from "../vpn/use-vpn-read";
 import type { RouterView } from "@/lib/router/service";
+import type { RouterReading } from "@/lib/router/read";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Loader2, Plus, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { routerPlanSchema, MAX_LANS, MAX_WANS, type RouterLan, type RouterPlan } from "@/lib/router/plan";
+import {
+    isPortName,
+    routerPlanSchema,
+    MAX_CLIENTS,
+    MAX_LANS,
+    MAX_WANS,
+    type RouterLan,
+    type RouterPlan
+} from "@/lib/router/plan";
 
 const EMPTY_PLAN: RouterPlan = { wans: [], lans: [], forwards: [] };
 /** How often a running router is read again while the page is open. */
 const STATUS_POLL_MS = 15_000;
 
-/** The plan-wide refusals the screen can word. */
-const PROBLEMS = ["sharedPort", "overlap", "samePort", "outside"] as const;
+/** How many connected devices are drawn at once: a search narrows the rest. */
+const CLIENTS_SHOWN = 200;
+/** Every refusal the schema words, most useful first. */
+const PROBLEMS = [
+    "noLine",
+    "noNetwork",
+    "badPort",
+    "badVlan",
+    "sharedPort",
+    "overlap",
+    "samePort",
+    "outside"
+] as const;
 
 type Translate = ReturnType<typeof useTranslations>;
 
@@ -112,13 +132,18 @@ function RouterEditor({
     const saved = read.data?.plan ?? null;
     const reading = read.data?.reading ?? null;
     const plan = draft ?? saved ?? EMPTY_PLAN;
-    const ports = useMemo(() => reading?.ports.map(({ name }) => name) ?? [], [reading]);
+    const ports = useMemo(
+        () => reading?.ports.map(({ name }) => name).filter(isPortName) ?? [],
+        [reading]
+    );
     const portOptions = ports.map((name) => ({ value: name, label: name }));
     const changed = JSON.stringify(plan) !== JSON.stringify(saved ?? EMPTY_PLAN);
     const check = routerPlanSchema.safeParse(plan);
     const problem = check.success
         ? undefined
-        : PROBLEMS.find((one) => check.error.issues.some(({ message }) => message === one));
+        : (PROBLEMS.find((one) => check.error.issues.some(({ message }) => message === one)) ??
+          "invalid");
+    const unanswered = read.data !== null || read.error !== null;
 
     const change = (next: Partial<RouterPlan>) => setDraft({ ...plan, ...next });
 
@@ -156,11 +181,11 @@ function RouterEditor({
     return (
         <div className="flex min-w-0 flex-col gap-4">
             {read.error ? <p className="text-sm text-danger">{read.error}</p> : null}
-            <Status t={t} view={read.data} onRefresh={read.reload} />
+            <Status t={t} view={read.data} unanswered={unanswered} onRefresh={read.reload} />
 
             <Part title={t("ports")} hint={t("portsHint")}>
                 {reading === null ? (
-                    <ui.Skeleton className="h-16 w-full" />
+                    <Unread t={t} unanswered={unanswered} height="h-16" />
                 ) : (
                     <ul className="flex flex-col gap-1">
                         {reading.ports.map((port) => (
@@ -273,14 +298,16 @@ function RouterEditor({
                 <ul className="flex flex-col gap-2">
                     {plan.lans.map((lan) => (
                         <li key={lan.id} className="flex min-w-0 flex-wrap items-center gap-2">
-                            <span className="min-w-0 truncate text-sm font-medium" title={lan.name}>{lan.name}</span>
+                            <span className="min-w-0 truncate text-sm font-medium" title={lan.name}>
+                                {lan.name}
+                            </span>
                             <span className="font-mono text-xs text-muted-foreground">
                                 {lan.cidr}
                             </span>
                             <span className="font-mono text-xs text-muted-foreground">
                                 {lan.vlan === null
                                     ? lan.interface
-                                    : `${lan.interface} / VLAN ${lan.vlan}`}
+                                    : t("onVlan", { port: lan.interface, vlan: lan.vlan })}
                             </span>
                             {lan.internet ? null : (
                                 <ui.Badge variant="neutral">{t("noInternet")}</ui.Badge>
@@ -343,30 +370,17 @@ function RouterEditor({
 
             <Part title={t("clients")} hint={t("clientsHint")}>
                 {reading === null ? (
-                    <ui.Skeleton className="h-10 w-full" />
-                ) : reading.clients.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("noClients")}</p>
+                    <Unread t={t} unanswered={unanswered} height="h-10" />
                 ) : (
-                    <ul className="flex flex-col gap-1">
-                        {reading.clients.map((client) => (
-                            <li
-                                key={client.mac}
-                                className="flex min-w-0 flex-wrap items-center gap-2 text-sm"
-                            >
-                                <span className="font-mono">{client.address}</span>
-                                <span className="min-w-0 truncate">
-                                    {client.name ?? t("unnamed")}
-                                </span>
-                                <span className="font-mono text-xs text-muted-foreground">
-                                    {client.mac}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
+                    <ClientList t={t} clients={reading.clients} />
                 )}
             </Part>
 
-            {problem ? <p className="text-sm text-danger">{t(`problems.${problem}`)}</p> : null}
+            {problem && changed ? (
+                <p className="text-sm text-danger">
+                    {problem === "invalid" ? t("errors.invalid") : t(`problems.${problem}`)}
+                </p>
+            ) : null}
             {error && !confirming && !removing ? (
                 <p role="alert" className="text-sm text-danger">
                     {error}
@@ -476,16 +490,75 @@ function RouterEditor({
     );
 }
 
+/** A region waiting on the machine: a skeleton while it may still answer, a sentence
+ *  once it has not. */
+function Unread({ t, unanswered, height }: { t: Translate; unanswered: boolean; height: string }) {
+    if (!unanswered) return <ui.Skeleton className={`${height} w-full`} />;
+    return <p className="text-sm text-muted-foreground">{t("cannotRead")}</p>;
+}
+
+function ClientList({ t, clients }: { t: Translate; clients: RouterReading["clients"] }) {
+    const [search, setSearch] = useState("");
+    if (clients.length === 0) {
+        return <p className="text-sm text-muted-foreground">{t("noClients")}</p>;
+    }
+    const wanted = search.trim().toLowerCase();
+    const found = wanted
+        ? clients.filter(({ address, mac, name }) =>
+              [address, mac, name ?? ""].some((text) => text.toLowerCase().includes(wanted))
+          )
+        : clients;
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            {clients.length > CLIENTS_SHOWN ? (
+                <ui.Input
+                    className="max-w-64"
+                    aria-label={t("searchClients")}
+                    placeholder={t("searchClients")}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                />
+            ) : null}
+            <ul className="flex flex-col gap-1">
+                {found.slice(0, CLIENTS_SHOWN).map((client) => (
+                    <li
+                        key={`${client.mac}-${client.address}`}
+                        className="flex min-w-0 flex-wrap items-center gap-2 text-sm"
+                    >
+                        <span className="font-mono">{client.address}</span>
+                        <span className="min-w-0 truncate">{client.name ?? t("unnamed")}</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                            {client.mac}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            {found.length > CLIENTS_SHOWN ? (
+                <p className="text-xs text-muted-foreground">
+                    {t("clientsLimited", { shown: CLIENTS_SHOWN, total: found.length })}
+                </p>
+            ) : null}
+            {clients.length >= MAX_CLIENTS ? (
+                <p className="text-xs text-muted-foreground">
+                    {t("clientsCapped", { max: MAX_CLIENTS })}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
 function Status({
     t,
     view,
+    unanswered,
     onRefresh
 }: {
     t: Translate;
     view: RouterView | null;
+    unanswered: boolean;
     onRefresh: () => void;
 }) {
-    if (view === null) return <ui.Skeleton className="h-8 w-full" />;
+    if (view === null) return unanswered ? null : <ui.Skeleton className="h-8 w-full" />;
     const { reading, plan } = view;
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
@@ -503,9 +576,7 @@ function Status({
                     {t("usingLine", { line: reading.activeWan })}
                 </span>
             ) : null}
-            {reading?.rolledBack ? (
-                <ui.Badge variant="warning">{t("wentBack")}</ui.Badge>
-            ) : null}
+            {reading?.rolledBack ? <ui.Badge variant="warning">{t("wentBack")}</ui.Badge> : null}
             <IconButton label={t("refresh")} onClick={onRefresh}>
                 <RefreshCw />
             </IconButton>

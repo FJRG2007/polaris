@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { MAX_CLIENTS } from "./plan";
 
 const linkSchema = z.object({
     ifname: z.string(),
@@ -123,12 +124,16 @@ export function readProbe(output: string): RouterReading {
     return {
         ports,
         activeWan: section("wan") || null,
-        running: section("services").split("\n").filter(Boolean).every((line) => line === "active")
+        running: section("services")
+            .split("\n")
+            .filter(Boolean)
+            .every((line) => line === "active")
             ? section("services") !== ""
             : false,
         clients: section("leases")
             .split("\n")
-            .flatMap((line) => clientOf(line) ?? []),
+            .flatMap((line) => clientOf(line) ?? [])
+            .slice(0, MAX_CLIENTS),
         rolledBack: section("last") === "rolled-back"
     };
 }

@@ -9,7 +9,7 @@ import { VlanInput } from "./router-view";
 import { Plus, Trash2 } from "lucide-react";
 import type { MachinesAnswer } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { lanSchema, reservationSchema, type RouterLan } from "@/lib/router/plan";
+import { lanSchema, newLanId, reservationSchema, type RouterLan } from "@/lib/router/plan";
 import {
     cidrsOverlap,
     firstHost,
@@ -35,6 +35,7 @@ export function LanDialog({
     onSave: (lan: RouterLan) => void;
 }) {
     const t = useTranslations("router");
+    const [id] = useState(() => lan?.id ?? newLanId());
     const others = taken.filter(({ id }) => id !== lan?.id).map(({ cidr }) => cidr);
     const suggested = lan?.cidr ?? suggestCidr(others);
     const [name, setName] = useState(lan?.name ?? "");
@@ -53,7 +54,7 @@ export function LanDialog({
     const addressBad =
         address.trim() !== "" && isUsableCidr(clean) && !isHostOf(clean, address.trim());
     const candidate = {
-        id: lan?.id ?? crypto.randomUUID(),
+        id,
         name,
         interface: port,
         vlan,
@@ -64,6 +65,7 @@ export function LanDialog({
         reservations
     };
     const parsed = lanSchema.safeParse(candidate);
+    const vlanBad = vlan !== null && (vlan < 2 || vlan > 4094);
     const valid = parsed.success && !subnetTaken;
 
     function changeCidr(next: string): void {
@@ -116,7 +118,12 @@ export function LanDialog({
                                 options={ports.map((one) => ({ value: one, label: one }))}
                             />
                         </Field>
-                        <Field id="lan-vlan" label={t("vlan")} hint={t("vlanHint")}>
+                        <Field
+                            id="lan-vlan"
+                            label={t("vlan")}
+                            hint={t("vlanHint")}
+                            error={vlanBad ? t("problems.badVlan") : null}
+                        >
                             <VlanInput t={t} value={vlan} onChange={setVlan} />
                         </Field>
                         <Field
@@ -190,41 +197,52 @@ export function LanDialog({
                             const bad =
                                 one.mac !== "" &&
                                 one.address !== "" &&
-                                !reservationSchema.safeParse(one).success;
+                                !(
+                                    reservationSchema.safeParse(one).success &&
+                                    isHostOf(clean, one.address.trim())
+                                );
                             return (
-                                <div key={at} className="flex min-w-0 items-center gap-2">
-                                    <ui.Input
-                                        className="min-w-0 flex-1 font-mono"
-                                        aria-label={t("mac")}
-                                        placeholder={t("mac")}
-                                        aria-invalid={bad}
-                                        value={one.mac}
-                                        onChange={(event) =>
-                                            update({ mac: event.target.value })
-                                        }
-                                    />
-                                    <ui.Input
-                                        className="min-w-0 flex-1 font-mono"
-                                        aria-label={t("reservedAddress")}
-                                        placeholder={t("reservedAddress")}
-                                        value={one.address}
-                                        onChange={(event) =>
-                                            update({ address: event.target.value })
-                                        }
-                                    />
-                                    <ui.Button
-                                        size="icon"
-                                        variant="ghost"
-                                        aria-label={t("remove")}
-                                        title={t("remove")}
-                                        onClick={() =>
-                                            setReservations(
-                                                reservations.filter((_, index) => index !== at)
-                                            )
-                                        }
-                                    >
-                                        <Trash2 />
-                                    </ui.Button>
+                                <div key={at} className="flex min-w-0 flex-col gap-1">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <ui.Input
+                                            className="min-w-0 flex-1 font-mono"
+                                            aria-label={t("mac")}
+                                            placeholder={`${t("mac")} *`}
+                                            aria-invalid={bad}
+                                            value={one.mac}
+                                            onChange={(event) =>
+                                                update({ mac: event.target.value })
+                                            }
+                                        />
+                                        <ui.Input
+                                            className="min-w-0 flex-1 font-mono"
+                                            aria-label={t("reservedAddress")}
+                                            placeholder={`${t("reservedAddress")} *`}
+                                            aria-invalid={bad}
+                                            value={one.address}
+                                            onChange={(event) =>
+                                                update({ address: event.target.value })
+                                            }
+                                        />
+                                        <ui.Button
+                                            size="icon"
+                                            variant="ghost"
+                                            aria-label={t("remove")}
+                                            title={t("remove")}
+                                            onClick={() =>
+                                                setReservations(
+                                                    reservations.filter((_, index) => index !== at)
+                                                )
+                                            }
+                                        >
+                                            <Trash2 />
+                                        </ui.Button>
+                                    </div>
+                                    {bad ? (
+                                        <p role="alert" className="text-xs text-danger">
+                                            {t("badReservation")}
+                                        </p>
+                                    ) : null}
                                 </div>
                             );
                         })}

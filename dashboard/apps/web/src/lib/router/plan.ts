@@ -20,18 +20,48 @@ export const MAX_LANS = 16;
 export const MAX_WANS = 4;
 export const MAX_FORWARDS = 64;
 export const MAX_RESERVATIONS = 256;
+/** The most leases read from a machine: a /16 can hold far more than a screen can use. */
+export const MAX_CLIENTS = 2000;
 /** The routing table that holds the line in use. */
 const ROUTE_TABLE = 7100;
+/** Marks a change the machine is still running on approval. */
+const UNCONFIRMED = `${ROUTER_STATE_DIR}/unconfirmed`;
+/** Names the change the machine finished starting. */
+const APPLIED = `${ROUTER_STATE_DIR}/applied`;
+/** The answer a machine leaves once it has gone back. */
+const LAST = `${ROUTER_STATE_DIR}/last`;
+/** Above an ordinary interface's default route, so a VLAN line's lease never collides. */
+const VLAN_LINE_METRIC = 300;
+/** Where a machine's own firewall has to be told about a router, when Docker runs. */
+const DOCKER_ALLOW_CHAIN = "POLARIS-ROUTER";
 
 /** Up to Linux's 15: a USB adapter is named after its MAC, as enx00e04c680001. */
 const INTERFACE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,14}$/;
 const MAC = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/;
 const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 
-const interfaceName = z.string().trim().regex(INTERFACE);
+const interfaceName = z.string().trim().regex(INTERFACE, "badPort");
 const ipv4 = z.string().trim().regex(IPV4);
-const vlan = z.number().int().min(2).max(4094).nullable();
+const vlan = z.number().int("badVlan").min(2, "badVlan").max(4094, "badVlan").nullable();
 const port = z.number().int().min(1).max(65535);
+
+/** Whether a machine's port can be used in a plan. */
+export function isPortName(name: string): boolean {
+    return INTERFACE.test(name);
+}
+
+/** A network's id, from a source a plain-http page has too: `crypto.randomUUID` needs
+ *  a secure context, and a router's own screen is often reached without one. */
+export function newLanId(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
+}
+
+/** The setting that holds a machine's plan. */
+export function routerPlanKey(hostId: string): string {
+    return `router.plan.${hostId}`;
+}
 
 /** One way out to the internet, tried in list order. */
 export const wanSchema = z.object({ interface: interfaceName, vlan });
@@ -89,8 +119,8 @@ function sameValues(values: readonly string[]): boolean {
 /** Everything the operator decides about one router. */
 export const routerPlanSchema = z
     .object({
-        wans: z.array(wanSchema).min(1).max(MAX_WANS),
-        lans: z.array(lanSchema).min(1).max(MAX_LANS),
+        wans: z.array(wanSchema).min(1, "noLine").max(MAX_WANS),
+        lans: z.array(lanSchema).min(1, "noNetwork").max(MAX_LANS),
         forwards: z.array(forwardSchema).max(MAX_FORWARDS)
     })
     .superRefine((plan, issue) => {
@@ -132,15 +162,16 @@ function quotedList(values: readonly string[]): string {
 
 /** The firewall: nothing enters from a line unless it was asked for, and the access
  *  Polaris is using stays open so a change cannot lock it out. Traffic of containers
- *  on the machine is left to the rules their engine writes. */
+ *  on the machine is left to the rules their engine writes, except that a network
+ *  cut off from the others is cut off from them and the tailnet too. */
 export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
     const wans = plan.wans.map(deviceOf);
     const lans = plan.lans.map(deviceOf);
     const open = plan.lans.filter((lan) => !lan.isolated).map(deviceOf);
     const online = plan.lans.filter((lan) => lan.internet).map(deviceOf);
     const closed = plan.lans.filter((lan) => lan.isolated).map(deviceOf);
-    const engine = 'iifname { "docker0", "br-*", "tailscale0" } accept';
-    const toEngine = 'oifname { "docker0", "br-*", "tailscale0" } accept';
+    const confined = plan.lans.filter((lan) => lan.isolated || !lan.internet).map(deviceOf);
+    const engineLinks = '{ "docker0", "br-*", "tailscale0" }';
     const managed = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"];
     return [
         "table inet polaris_router {}",
@@ -158,19 +189,20 @@ export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
         ...(access.management
             ? [`        ip saddr ${access.management} tcp dport ${access.sshPort} accept`]
             : []),
-        ...(closed.length > 0
-            ? [`        iifname ${quotedList(closed)} tcp dport ${access.sshPort} drop`]
-            : []),
+        `        iifname ${quotedList([...closed, ...wans])} tcp dport ${access.sshPort} drop`,
         `        ip saddr { ${managed.join(", ")} } tcp dport ${access.sshPort} accept`,
-        `        ${engine}`,
+        `        iifname ${engineLinks} accept`,
         "    }",
         "    chain forward {",
         "        type filter hook forward priority filter; policy drop;",
         "        ct state established,related accept",
         "        ct state invalid drop",
+        ...(confined.length > 0
+            ? [`        iifname ${quotedList(confined)} oifname ${engineLinks} drop`]
+            : []),
         "        ct status dnat accept",
-        `        ${engine}`,
-        `        ${toEngine}`,
+        `        iifname ${engineLinks} accept`,
+        `        oifname ${engineLinks} accept`,
         ...(online.length > 0
             ? [`        iifname ${quotedList(online)} oifname ${quotedList(wans)} accept`]
             : []),
@@ -229,6 +261,30 @@ function shellWords(values: readonly string[]): string {
     return values.join(" ");
 }
 
+/** Keep NetworkManager off a device Polaris configures itself. */
+function unmanaged(device: string): string {
+    return `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${device} managed no >/dev/null 2>&1 || true`;
+}
+
+/** Docker leaves iptables' FORWARD chain on a DROP policy, and a packet has to pass
+ *  every firewall on the machine, so what the router's own table accepts dies there.
+ *  Only the pairs the router joins are let through, in both directions; the router's
+ *  table still decides which of them pass. */
+function renderDockerAllow(plan: RouterPlan): string[] {
+    const lans = shellWords(plan.lans.map(deviceOf));
+    const wans = shellWords(plan.wans.map(deviceOf));
+    const allow = (from: string, to: string) =>
+        `    for from in ${from}; do for to in ${to}; do [ "$from" = "$to" ] || iptables -w -A ${DOCKER_ALLOW_CHAIN} -i "$from" -o "$to" -j ACCEPT; done; done`;
+    return [
+        "if iptables -w -n -L DOCKER-USER >/dev/null 2>&1; then",
+        `    iptables -w -N ${DOCKER_ALLOW_CHAIN} 2>/dev/null || iptables -w -F ${DOCKER_ALLOW_CHAIN}`,
+        `    iptables -w -C DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null || iptables -w -I DOCKER-USER -j ${DOCKER_ALLOW_CHAIN}`,
+        allow(lans, `${lans} ${wans}`),
+        allow(wans, lans),
+        "fi"
+    ];
+}
+
 /** Bring the networks up. Run again on every boot and every change, so each step
  *  has to hold when it is already done. */
 export function renderUp(plan: RouterPlan): string {
@@ -252,19 +308,27 @@ export function renderUp(plan: RouterPlan): string {
         const device = deviceOf(lan);
         const prefix = lan.cidr.split("/")[1];
         lines.push(
-            `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${device} managed no >/dev/null 2>&1 || true`,
+            unmanaged(device),
             `ip link set ${device} up`,
             `ip addr flush dev ${device}`,
             `ip addr add ${lan.address}/${prefix} dev ${device}`
         );
     }
     for (const wan of plan.wans) {
+        const device = deviceOf(wan);
+        if (wan.vlan !== null) lines.push(unmanaged(device));
         lines.push(
-            `ip link set ${deviceOf(wan)} up`,
-            `sysctl -q -w net.ipv4.conf.${deviceOf(wan).replace(".", "/")}.rp_filter=2`
+            `ip link set ${device} up`,
+            `sysctl -q -w net.ipv4.conf.${device.replace(".", "/")}.rp_filter=2`
         );
+        if (wan.vlan !== null) {
+            lines.push(
+                "mkdir -p /var/lib/dhcp",
+                `dhclient -4 -nw -e IF_METRIC=${VLAN_LINE_METRIC} -pf /run/dhclient.${device}.pid -lf /var/lib/dhcp/dhclient.${device}.leases ${device}`
+            );
+        }
     }
-    lines.push(`nft -f ${ROUTER_DIR}/rules.nft`, "");
+    lines.push(`nft -f ${ROUTER_DIR}/rules.nft`, ...renderDockerAllow(plan), "");
     return lines.join("\n");
 }
 
@@ -275,7 +339,10 @@ export function renderDown(plan: RouterPlan): string {
         "nft delete table inet polaris_router 2>/dev/null",
         `ip rule del priority ${ROUTE_TABLE} 2>/dev/null`,
         `ip rule del priority ${ROUTE_TABLE + 1} 2>/dev/null`,
-        `ip route flush table ${ROUTE_TABLE} 2>/dev/null`
+        `ip route flush table ${ROUTE_TABLE} 2>/dev/null`,
+        `iptables -w -D DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        `iptables -w -F ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        `iptables -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`
     ];
     for (const lan of plan.lans) {
         lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
@@ -365,7 +432,7 @@ const UNITS: Record<string, string> = {
     "polaris-router.service": `[Unit]
 Description=Polaris router networks
 Wants=network-online.target
-After=network-online.target
+After=network-online.target docker.service
 
 [Service]
 Type=oneshot
@@ -408,8 +475,12 @@ const SERVICES = Object.keys(UNITS);
 const SERVICE_LIST = SERVICES.join(" ");
 
 /** The packages a router needs, installed before the network is touched. */
-const INSTALL = `need=""
-command -v nft >/dev/null 2>&1 || need="$need nftables"
+function renderInstall(plan: RouterPlan): string {
+    const dhcpClient = plan.wans.some((wan) => wan.vlan !== null)
+        ? `command -v dhclient >/dev/null 2>&1 || need="$need isc-dhcp-client"\n`
+        : "";
+    return `need=""
+${dhcpClient}command -v nft >/dev/null 2>&1 || need="$need nftables"
 [ -x /usr/sbin/dnsmasq ] || need="$need dnsmasq-base"
 command -v ping >/dev/null 2>&1 || need="$need iputils-ping"
 command -v conntrack >/dev/null 2>&1 || need="$need conntrack"
@@ -418,6 +489,7 @@ if [ -n "$need" ]; then
     DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $need >/dev/null
 fi`;
+}
 
 function heredoc(path: string, content: string): string {
     return `cat > '${path}' <<'POLARIS_ROUTER_EOF'\n${content}POLARIS_ROUTER_EOF`;
@@ -443,8 +515,12 @@ fi`;
  * it cuts. A timer undoes the change unless Polaris comes back and confirms it, so a
  * wrong port leaves a working machine and not one somebody has to go and plug a
  * screen into.
+ *
+ * `applyId` names this change, so a confirmation cannot be answered by what ran
+ * before it. Only a confirmed configuration ever becomes the way back: a change
+ * replacing one nobody confirmed leaves the last good one where it is.
  */
-export function renderApply(plan: RouterPlan, access: RouterAccess): string {
+export function renderApply(plan: RouterPlan, access: RouterAccess, applyId: string): string {
     const next = `${ROUTER_DIR}.next`;
     const previous = `${ROUTER_DIR}.previous`;
     const files: Record<string, string> = {
@@ -456,22 +532,32 @@ export function renderApply(plan: RouterPlan, access: RouterAccess): string {
     };
     const activate = `#!/bin/sh
 ${STOP_ALL}
-rm -rf ${previous}
-[ ! -d ${ROUTER_DIR} ] || mv ${ROUTER_DIR} ${previous}
+if [ -f ${UNCONFIRMED} ]; then
+    rm -rf ${ROUTER_DIR}
+else
+    rm -rf ${previous}
+    [ ! -d ${ROUTER_DIR} ] || mv ${ROUTER_DIR} ${previous}
+fi
+: > ${UNCONFIRMED}
 mv ${next} ${ROUTER_DIR}
 ${START_ALL}
+echo ${applyId} > ${APPLIED}
 `;
     const rollback = `#!/bin/sh
+systemctl stop polaris-router-activate.timer polaris-router-activate.service 2>/dev/null
 ${STOP_ALL}
-rm -rf ${ROUTER_DIR}
-[ ! -d ${previous} ] || mv ${previous} ${ROUTER_DIR}
+if [ -f ${UNCONFIRMED} ]; then
+    rm -rf ${ROUTER_DIR}
+    [ ! -d ${previous} ] || mv ${previous} ${ROUTER_DIR}
+    rm -f ${UNCONFIRMED}
+fi
 ${START_ALL}
-echo rolled-back > ${ROUTER_STATE_DIR}/last
+echo rolled-back > ${LAST}
 `;
     return [
         "#!/bin/sh",
         "set -eu",
-        INSTALL,
+        renderInstall(plan),
         `mkdir -p ${ROUTER_STATE_DIR}`,
         `rm -rf ${next}`,
         `mkdir -p ${next}`,
@@ -483,9 +569,9 @@ echo rolled-back > ${ROUTER_STATE_DIR}/last
         heredoc(`${ROUTER_STATE_DIR}/rollback.sh`, rollback),
         `nft -c -f ${next}/rules.nft`,
         `/usr/sbin/dnsmasq --test --conf-file=${next}/dnsmasq.conf >/dev/null 2>&1`,
-        `rm -f ${ROUTER_STATE_DIR}/last`,
-        "systemctl stop polaris-router-rollback.timer polaris-router-rollback.service polaris-router-activate.timer polaris-router-activate.service 2>/dev/null || true",
-        "systemctl reset-failed polaris-router-rollback.service polaris-router-activate.service 2>/dev/null || true",
+        `rm -f ${LAST} ${APPLIED}`,
+        "systemctl stop polaris-router-rollback.timer polaris-router-rollback.service polaris-router-rollback-now.service polaris-router-activate.timer polaris-router-activate.service 2>/dev/null || true",
+        "systemctl reset-failed polaris-router-rollback.service polaris-router-rollback-now.service polaris-router-activate.service 2>/dev/null || true",
         `systemd-run --quiet --unit=polaris-router-rollback --timer-property=AccuracySec=1s --on-active=${ROLLBACK_SECONDS} /bin/sh ${ROUTER_STATE_DIR}/rollback.sh`,
         `systemd-run --quiet --unit=polaris-router-activate --timer-property=AccuracySec=1s --on-active=2 /bin/sh ${ROUTER_STATE_DIR}/activate.sh`,
         "echo accepted",
@@ -493,29 +579,53 @@ echo rolled-back > ${ROUTER_STATE_DIR}/last
     ].join("\n");
 }
 
+/** Go back now rather than when the timer runs out. In a unit of its own, since going
+ *  back can cut the connection asking for it; whoever asked reads `rolled-back` next. */
+const ROLL_BACK_NOW = `systemctl stop polaris-router-rollback.timer 2>/dev/null
+systemctl is-active --quiet polaris-router-rollback.service || systemd-run --quiet --unit=polaris-router-rollback-now /bin/sh ${ROUTER_STATE_DIR}/rollback.sh 2>/dev/null
+echo waiting`;
+
 /** Keep the change: whoever runs this came back through the new network. Answers
- *  `confirmed` only when the router is really up, and a change that failed to start
- *  is undone now rather than when the timer runs out. */
-export const CONFIRM_SCRIPT = `#!/bin/sh
-[ ! -f ${ROUTER_STATE_DIR}/last ] || { cat ${ROUTER_STATE_DIR}/last; exit 0; }
+ *  `confirmed` only when this very change is up, and one that failed to start is
+ *  undone now rather than when the timer runs out. */
+export function renderConfirm(applyId: string): string {
+    return `#!/bin/sh
+[ ! -f ${LAST} ] || { cat ${LAST}; exit 0; }
+[ "$(cat ${APPLIED} 2>/dev/null)" = "${applyId}" ] || { echo waiting; exit 0; }
 if systemctl is-failed --quiet polaris-router.service; then
-    systemctl stop polaris-router-rollback.timer 2>/dev/null
-    /bin/sh ${ROUTER_STATE_DIR}/rollback.sh >/dev/null 2>&1
-    cat ${ROUTER_STATE_DIR}/last
+    ${ROLL_BACK_NOW}
     exit 0
 fi
 systemctl is-active --quiet polaris-router.service || { echo waiting; exit 0; }
 systemctl is-active --quiet polaris-router-dns.service || { echo waiting; exit 0; }
 systemctl stop polaris-router-rollback.timer 2>/dev/null
+! systemctl is-active --quiet polaris-router-rollback.service || { echo waiting; exit 0; }
+[ ! -f ${LAST} ] || { cat ${LAST}; exit 0; }
+rm -f ${UNCONFIRMED}
 echo confirmed
 `;
+}
+
+/** Give up on a change that never confirmed, unless it did and the answer was lost.
+ *  Asked again until it says how it ended. */
+export function renderRollback(applyId: string): string {
+    return `#!/bin/sh
+[ ! -f ${LAST} ] || { cat ${LAST}; exit 0; }
+if [ "$(cat ${APPLIED} 2>/dev/null)" = "${applyId}" ] && [ ! -f ${UNCONFIRMED} ]; then
+    echo confirmed
+    exit 0
+fi
+${ROLL_BACK_NOW}
+`;
+}
 
 /** Make the machine an ordinary one again. */
 export const REMOVE_SCRIPT = `#!/bin/sh
-systemctl stop polaris-router-rollback.timer 2>/dev/null
+systemctl stop polaris-router-rollback.timer polaris-router-activate.timer 2>/dev/null
 ${STOP_ALL}
 systemctl disable ${SERVICE_LIST} >/dev/null 2>&1
 rm -rf ${ROUTER_DIR} ${ROUTER_DIR}.next ${ROUTER_DIR}.previous
+rm -f ${UNCONFIRMED} ${APPLIED}
 rm -f ${SERVICES.map((name) => `/etc/systemd/system/${name}`).join(" ")}
 systemctl daemon-reload
 echo removed
@@ -536,10 +646,10 @@ cat /run/polaris-router/wan 2>/dev/null
 echo "---services"
 for unit in ${SERVICE_LIST}; do systemctl is-active "$unit" 2>/dev/null; done
 echo "---leases"
-cat ${ROUTER_STATE_DIR}/leases 2>/dev/null
+head -n ${MAX_CLIENTS} ${ROUTER_STATE_DIR}/leases 2>/dev/null
 echo "---counters"
 ip -j -s link show 2>/dev/null || echo '[]'
 echo "---last"
-cat ${ROUTER_STATE_DIR}/last 2>/dev/null
+cat ${LAST} 2>/dev/null
 echo "---end"
 `;

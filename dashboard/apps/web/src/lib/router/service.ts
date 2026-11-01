@@ -11,6 +11,7 @@
 import * as plans from "./plan";
 import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
+import { randomUUID } from "node:crypto";
 import { readProbe, type RouterReading } from "./read";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { execCommand, openSshClient } from "@polaris/ssh";
@@ -23,6 +24,9 @@ const MACHINE_CHOICES = 1000;
 /** How long Polaris keeps trying to come back, inside the machine's own timer. */
 const CONFIRM_MS = 100_000;
 const CONFIRM_POLL_MS = 3_000;
+/** How long after sending a change Polaris waits to hear how it ended: past the
+ *  machine's own timer, with room for going back to finish. */
+const SETTLE_MS = (plans.ROLLBACK_SECONDS + 60) * 1000;
 
 export type RouterRefusalCode =
     | "noRoot"
@@ -32,6 +36,7 @@ export type RouterRefusalCode =
     | "lineOverlap"
     | "lockout"
     | "rolledBack"
+    | "unconfirmed"
     | "invalid";
 
 /** A reason the screen can say in the reader's words. */
@@ -55,12 +60,8 @@ export interface RouterView {
     readonly reading: RouterReading | null;
 }
 
-function planKey(hostId: string): string {
-    return `router.plan.${hostId}`;
-}
-
 async function storedPlan(hostId: string): Promise<plans.RouterPlan | null> {
-    const raw = await getSetting(planKey(hostId));
+    const raw = await getSetting(plans.routerPlanKey(hostId));
     if (!raw) return null;
     try {
         return plans.readPlan(JSON.parse(raw));
@@ -198,28 +199,43 @@ export function refusalOf(
     return lockedOut ? "lockout" : null;
 }
 
-/** Wait for the machine to say the change holds, keeping it when it does. */
-async function confirmed(connection: HostConnection): Promise<boolean> {
-    const deadline = Date.now() + CONFIRM_MS;
+type ApplyEnding = "confirmed" | "rolledBack";
+
+/** Run a script until the machine says how the change ended, or the time is up. */
+async function endingOf(
+    connection: HostConnection,
+    script: string,
+    deadline: number
+): Promise<ApplyEnding | null> {
     while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, CONFIRM_POLL_MS));
-        const answer = await runScript(connection, plans.CONFIRM_SCRIPT).catch(() => "");
-        if (answer.includes("confirmed")) return true;
-        if (answer.includes("rolled-back")) return false;
+        const answer = await runScript(connection, script).catch(() => "");
+        if (answer.includes("confirmed")) return "confirmed";
+        if (answer.includes("rolled-back")) return "rolledBack";
     }
-    return false;
+    return null;
+}
+
+/** Wait for the change to hold. A machine still answering when the time is up is told
+ *  to go back and waited for, so nobody is told it went back before it has: a retry
+ *  meanwhile would land on the change that failed. Null when it never answered. */
+async function applyEnding(
+    connection: HostConnection,
+    applyId: string
+): Promise<ApplyEnding | null> {
+    const sent = Date.now();
+    return (
+        (await endingOf(connection, plans.renderConfirm(applyId), sent + CONFIRM_MS)) ??
+        (await endingOf(connection, plans.renderRollback(applyId), sent + SETTLE_MS))
+    );
 }
 
 /** Make the machine run this plan, keeping the plan only once it really does. */
-export async function applyRouter(
-    hostId: string,
-    ownerId: string,
-    input: unknown
-): Promise<RouterReading> {
+export async function applyRouter(hostId: string, ownerId: string, input: unknown): Promise<void> {
     const parsed = plans.routerPlanSchema.safeParse(input);
     if (!parsed.success) throw new RouterRefusal("invalid");
     const plan = parsed.data;
-    return serialized(hostId, async () => {
+    await serialized(hostId, async () => {
         const connection = await connectionFor(hostId, ownerId);
         const reading = await probe(connection).catch(() => {
             throw new RouterRefusal("unreachable");
@@ -227,13 +243,15 @@ export async function applyRouter(
         const refusal = refusalOf(plan, reading, connection.address);
         if (refusal) throw new RouterRefusal(refusal);
         const management = await managementAddress(connection).catch(() => null);
+        const applyId = randomUUID();
         await runScript(
             connection,
-            plans.renderApply(plan, { management, sshPort: connection.port })
+            plans.renderApply(plan, { management, sshPort: connection.port }, applyId)
         );
-        if (!(await confirmed(connection))) throw new RouterRefusal("rolledBack");
-        await setSetting(planKey(hostId), JSON.stringify(plan));
-        return probe(connection);
+        const ending = await applyEnding(connection, applyId);
+        if (ending === null) throw new RouterRefusal("unconfirmed");
+        if (ending === "rolledBack") throw new RouterRefusal("rolledBack");
+        await setSetting(plans.routerPlanKey(hostId), JSON.stringify(plan));
     });
 }
 
@@ -242,6 +260,6 @@ export async function removeRouter(hostId: string, ownerId: string): Promise<voi
     await serialized(hostId, async () => {
         const connection = await connectionFor(hostId, ownerId);
         await runScript(connection, plans.REMOVE_SCRIPT);
-        await setSetting(planKey(hostId), null);
+        await setSetting(plans.routerPlanKey(hostId), null);
     });
 }

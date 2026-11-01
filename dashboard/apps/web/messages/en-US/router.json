@@ -48,6 +48,8 @@
     "addForward": "Open a port",
     "forwardBody": "Only works on a line that takes visitors.",
     "protocol": "Protocol",
+    "tcp": "TCP",
+    "udp": "UDP",
     "openPort": "Port",
     "toAddress": "Device address",
     "toPort": "Device port",
@@ -59,8 +61,19 @@
         "sharedPort": "Two lines or networks use the same port. Give one a VLAN.",
         "overlap": "Another network already uses this subnet.",
         "samePort": "That port is already open.",
-        "outside": "That address is in none of these networks."
+        "outside": "That address is in none of these networks.",
+        "noLine": "Add an internet line.",
+        "noNetwork": "Add a network.",
+        "badPort": "One of these ports cannot be used. Choose another.",
+        "badVlan": "A VLAN is a number from 2 to 4094."
     },
+    "onVlan": "{port} / VLAN {vlan}",
+    "cannotRead": "Polaris cannot read this machine right now.",
+    "searchClients": "Search devices",
+    "clientsLimited": "Showing {shown} of {total}. Search to narrow them down.",
+    "clientsCapped": "Only the first {max} devices are read from the machine.",
+    "badReservation": "Use a MAC like aa:bb:cc:dd:ee:ff and an address inside the subnet.",
+    "badOpenPort": "A port is a number from 1 to 65535.",
     "stopRouter": "Stop router",
     "discard": "Discard",
     "apply": "Apply",
@@ -88,6 +101,7 @@
         "missingPort": "One of those ports is not on this machine any more. Choose it again.",
         "lineOverlap": "A network uses the same subnet as a line. Choose another subnet.",
         "lockout": "Polaris reaches this machine through that port, so it would lose it. Choose another port, or use a VLAN.",
-        "rolledBack": "The change did not hold, so the machine went back. Nothing changed."
+        "rolledBack": "The change did not hold, so the machine went back. Nothing changed.",
+        "unconfirmed": "Polaris lost this machine during the change. If it does not come back, it undoes the change by itself within 2 minutes."
     }
 }

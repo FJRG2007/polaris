@@ -48,6 +48,8 @@
     "addForward": "Abrir puerto",
     "forwardBody": "Solo funciona en una línea que acepte visitas.",
     "protocol": "Protocolo",
+    "tcp": "TCP",
+    "udp": "UDP",
     "openPort": "Puerto",
     "toAddress": "Dirección",
     "toPort": "Puerto destino",
@@ -59,8 +61,19 @@
         "sharedPort": "Dos líneas o redes usan el mismo puerto. Dale una VLAN a una.",
         "overlap": "Otra red ya usa esta subred.",
         "samePort": "Ese puerto ya está abierto.",
-        "outside": "Esa dirección no está en ninguna de estas redes."
+        "outside": "Esa dirección no está en ninguna de estas redes.",
+        "noLine": "Añade una línea de internet.",
+        "noNetwork": "Añade una red.",
+        "badPort": "Uno de estos puertos no se puede usar. Elige otro.",
+        "badVlan": "Una VLAN es un número del 2 al 4094."
     },
+    "onVlan": "{port} / VLAN {vlan}",
+    "cannotRead": "Polaris no puede leer esta máquina ahora.",
+    "searchClients": "Buscar",
+    "clientsLimited": "Se muestran {shown} de {total}. Busca para acotar.",
+    "clientsCapped": "Solo se leen de la máquina los primeros {max} dispositivos.",
+    "badReservation": "Usa una MAC como aa:bb:cc:dd:ee:ff y una dirección de la subred.",
+    "badOpenPort": "Un puerto es un número del 1 al 65535.",
     "stopRouter": "Parar router",
     "discard": "Descartar",
     "apply": "Aplicar",
@@ -88,6 +101,7 @@
         "missingPort": "Uno de esos puertos ya no está en esta máquina. Vuelve a elegirlo.",
         "lineOverlap": "Una red usa la misma subred que una línea. Elige otra subred.",
         "lockout": "Polaris llega a la máquina por ese puerto y la perdería. Elige otro o usa VLAN.",
-        "rolledBack": "El cambio no aguantó y la máquina volvió atrás. Nada cambió."
+        "rolledBack": "El cambio no aguantó y la máquina volvió atrás. Nada cambió.",
+        "unconfirmed": "Polaris perdió la máquina durante el cambio. Si no vuelve, lo deshace sola en 2 minutos."
     }
 }
