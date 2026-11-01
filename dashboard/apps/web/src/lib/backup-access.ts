@@ -16,6 +16,7 @@ import { getSetting } from "@/lib/setting-store";
 export const BACKUP_STATE_KEY = "backupAccess.state";
 export const BACKUP_CONFIG_KEY = "backupAccess.config";
 export const BACKUP_RECORDS_KEY = "backupAccess.records";
+export const BACKUP_TUNNEL_KEY = "backupAccess.tunnel";
 
 const CACHE_MS = 10_000;
 let cached: { at: number; active: boolean; saver: boolean } | null = null;
@@ -52,6 +53,12 @@ export async function backupRecordsTarget(): Promise<
     const { kind, address } = target as { kind?: unknown; address?: unknown };
     if (kind === "relay" && typeof address === "string") return { kind, address };
     return kind === "tunnel" ? { kind } : null;
+}
+
+/** The hostnames the backup tunnel was last given, as Cloudflare routes them. */
+export async function backupTunnelHosts(): Promise<string[]> {
+    const hosts = field(await getSetting(BACKUP_TUNNEL_KEY).catch(() => null), "hosts");
+    return Array.isArray(hosts) ? hosts.filter((host) => typeof host === "string") : [];
 }
 
 /** Forget the cached answer: the service calls it right after a flip. */

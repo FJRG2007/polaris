@@ -82,13 +82,20 @@ export function settleBorrowed(
     );
 }
 
-/** Count a pass that could not move these names, and give up on the ones out of tries:
- *  the zone is gone or out of the token's reach, and nothing here can clear them. */
-export function missBorrowed(missed: readonly BorrowedName[]): Promise<void> {
+/** Count a pass that could not move these names, and give up on the ones out of tries.
+ *  Answers those, for the caller to tell an administrator: their records stay where
+ *  they are, and nothing here looks at them again. */
+export async function missBorrowed(missed: readonly BorrowedName[]): Promise<string[]> {
     const names = new Set(missed.map((entry) => entry.name));
-    return changeBorrowed((all) =>
-        all
-            .map((entry) => (names.has(entry.name) ? { ...entry, tries: entry.tries + 1 } : entry))
-            .filter((entry) => entry.tries < MOST_TRIES)
-    );
+    let abandoned: string[] = [];
+    await changeBorrowed((all) => {
+        const counted = all.map((entry) =>
+            names.has(entry.name) ? { ...entry, tries: entry.tries + 1 } : entry
+        );
+        abandoned = counted
+            .filter((entry) => entry.tries >= MOST_TRIES)
+            .map((entry) => entry.name);
+        return counted.filter((entry) => entry.tries < MOST_TRIES);
+    });
+    return abandoned;
 }

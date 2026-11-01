@@ -27,7 +27,7 @@ import { randomLabel } from "@polaris/deploy";
 import { installedGames } from "./apps/game-zones";
 import { setDomainConfig } from "./domain-service";
 import { getLocalEnvironment } from "./network-service";
-import { backupRecordsTarget } from "./backup-access";
+import { backupRecordsTarget, backupTunnelHosts } from "./backup-access";
 import { borrowRelayName } from "./backup-access/borrowed-names";
 import { acceptedAddresses, expectedPublicAddress, publishableAddress } from "./serving-address";
 import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
@@ -554,8 +554,7 @@ export async function serviceDnsTarget(
 /** A name a flipped tunnel already answers for: one of its own, or one label under its
  *  wildcard, as far as the zone's certificate reaches. */
 async function tunnelServes(name: string): Promise<boolean> {
-    const owned = await ownedZoneNames(await getDomainZones()).catch(() => []);
-    return owned.some((entry) => {
+    return (await backupTunnelHosts()).some((entry) => {
         const held = entry.toLowerCase();
         if (held === name) return true;
         if (!held.startsWith("*.") || !name.endsWith(held.slice(1))) return false;

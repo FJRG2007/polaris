@@ -488,7 +488,9 @@
         "onAlwaysBody": "El acceso de respaldo está siempre activo, así que las visitas llegan a Polaris por la ruta de respaldo.",
         "onManualBody": "Se cambió a mano a la ruta de respaldo. Sigue ahí hasta que se vuelva a cambiar.",
         "offManualBody": "Se volvió a mano a la ruta directa y los registros DNS originales están de vuelta.",
-        "offUnconfiguredBody": "Se apagó la ruta de respaldo, así que los registros DNS originales están de vuelta."
+        "offUnconfiguredBody": "Se apagó la ruta de respaldo, así que los registros DNS originales están de vuelta.",
+        "namesLeftTitle": "Nombres DNS sin mover",
+        "namesLeftBody": "Cloudflare rechazó cambios en {names} durante un día, así que Polaris dejó de moverlos. Apúntalos a {address} en tu proveedor de DNS."
     },
     "lanAddress": {
         "movedTitle": "Polaris está ahora en {to}",

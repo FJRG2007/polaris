@@ -42,6 +42,9 @@ export class CutoverRefusedError extends Error {
     }
 }
 
+/** No address takes visitors at the moment of a switch. */
+class NoAddressError extends Error {}
+
 /** A record as it stood before the cutover touched it. */
 interface KeptRecord {
     readonly id: string;
@@ -430,7 +433,7 @@ async function addressNow(row: { domainId: string; targetApplicationId: string }
         { kind: target.target.kind, host: target.target.host },
         domain.servedBy
     );
-    if (!ip) throw new Error("no-address");
+    if (!ip) throw new NoAddressError("no-address");
     return ip;
 }
 
@@ -594,7 +597,19 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
                 const [first, ...rest] = written.records;
                 if (first && present.has(first.id)) {
                     await rewrite(zone, row.hostname, first, { content: address, ttl });
-                } else if (!written.created || !present.has(written.created)) {
+                } else if (written.created && present.has(written.created)) {
+                    await rewrite(
+                        zone,
+                        row.hostname,
+                        {
+                            id: written.created,
+                            content: address,
+                            ttl: machine.LOWERED_TTL,
+                            proxied: false
+                        },
+                        {}
+                    );
+                } else {
                     const created = (
                         await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
                             type: "A",
@@ -616,14 +631,16 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
                 await syncAppRoutes();
             }
         }
-    } catch {
+    } catch (caught) {
+        const failure: machine.CutoverFailure =
+            caught instanceof NoAddressError
+                ? "no-address"
+                : mode === "edge"
+                  ? "route-move-failed"
+                  : "record-write-failed";
         await prisma.dnsCutover.update({
             where: { id },
-            data: {
-                phase: row.phase,
-                switchedAt: null,
-                failure: mode === "edge" ? "route-move-failed" : "record-write-failed"
-            }
+            data: { phase: row.phase, switchedAt: null, failure }
         });
         return;
     }

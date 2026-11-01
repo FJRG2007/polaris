@@ -149,7 +149,10 @@ vi.mock("@/lib/chat/call-address-watch", () => ({
 vi.mock("@/lib/tailscale/tailscale-service", () => ({ getTailscaleHost: async () => null }));
 vi.mock("@/lib/offline/outbound-lookup", () => ({ internetOffline: () => offline }));
 vi.mock("@/lib/app-extensions/registry", () => ({ forwardedPorts: async () => games }));
-vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
+vi.mock("@/lib/notifications/notice-words", () => ({
+    wordsFor: async () => (key: string, values?: object) =>
+        values ? `${key} ${JSON.stringify(values)}` : key
+}));
 vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
     sealKey: (value: string) => value,
     openKey: (value: string) => value,
@@ -229,11 +232,19 @@ vi.mock("@/lib/integrations/cloudflare-account-service", () => ({
     requireCloudflareAccount: async () => ({ token: "token", accountId: "account" })
 }));
 let lostZone: string | null = null;
+const tunnelHosts: string[][] = [];
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     resolveZoneForHostname: async () => ({ id: "zone", name: "example.test" }),
     createTunnel: async () => ({ id: "tunnel-1" }),
     getTunnelToken: async () => "connector",
-    putTunnelHosts: async () => undefined,
+    putTunnelHosts: async (
+        _token: string,
+        _account: string,
+        _tunnel: string,
+        hostnames: readonly string[]
+    ) => {
+        tunnelHosts.push([...hostnames]);
+    },
     deleteTunnel: async (_token: string, _account: string, id: string) => {
         deletedTunnels.push(id);
     },
@@ -338,6 +349,43 @@ afterEach(() => {
 });
 
 describe("runBackupAccess", () => {
+    it("gives a tunnel the names added after it was made, once", async () => {
+        await service.saveConfig({
+            mode: "automatic",
+            path: "tunnel",
+            relayTargetId: null,
+            dataSaver: true,
+            manualOn: false
+        });
+        await pass();
+        tunnelHosts.length = 0;
+        wildcards = ["*.plr.example.test"];
+        await pass();
+        await pass();
+        expect(tunnelHosts).toEqual([[...NAMES, "*.plr.example.test"]]);
+        expect(JSON.parse(settings.get("backupAccess.tunnel") ?? "{}").hosts).toEqual([
+            ...NAMES,
+            "*.plr.example.test"
+        ]);
+    });
+
+    it("gives a tunnel from before the list its names on the next pass", async () => {
+        await service.saveConfig({
+            mode: "automatic",
+            path: "tunnel",
+            relayTargetId: null,
+            dataSaver: true,
+            manualOn: false
+        });
+        await pass();
+        const older = JSON.parse(settings.get("backupAccess.tunnel") ?? "{}");
+        delete older.hosts;
+        settings.set("backupAccess.tunnel", JSON.stringify(older));
+        tunnelHosts.length = 0;
+        await pass();
+        expect(tunnelHosts).toEqual([NAMES]);
+    });
+
     it("keeps the short TTL armed through a round trip and into the next outage", async () => {
         await service.saveConfig({
             mode: "automatic",
@@ -473,6 +521,10 @@ describe("runBackupAccess", () => {
             await passes(OK_TO_RETURN);
             lostZone = null;
             expect(settings.has("backupAccess.borrowed")).toBe(false);
+            const left = notified.filter((notice) => notice.type === "domain.backup-names-left");
+            expect(left).toHaveLength(1);
+            expect(left[0]?.body).toContain("gone.example.org");
+            expect(left[0]?.body).toContain(HOME);
         });
 
         it("goes to the line when the records leave for a tunnel", async () => {

@@ -432,7 +432,7 @@ describe("switching", () => {
         expect(state.saved).toEqual([]);
         expect(state.rows.get("c1")).toMatchObject({
             phase: "ready",
-            failure: "record-write-failed"
+            failure: "no-address"
         });
     });
 
@@ -493,6 +493,22 @@ describe("a switch cut short", () => {
         await service.switchCutover("c1", "user-1");
         expect(state.rows.get("c1")).toMatchObject({ phase: "propagating", failure: null });
         expect(zoneContents()).toEqual(["record-1=203.0.113.7"]);
+    });
+
+    it("moves a record it created to the address of the retry", async () => {
+        seedTwo("c1");
+        state.zone.delete("record-1");
+        state.deleteFails = 1;
+        await service.switchCutover("c1", "user-1");
+        expect(zoneContents()).toEqual(["record-2=198.51.100.5", "record-new-1=203.0.113.7"]);
+        addressNow.value = "192.0.2.50";
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({
+            phase: "propagating",
+            failure: null,
+            newValue: "192.0.2.50"
+        });
+        expect(zoneContents()).toEqual(["record-new-1=192.0.2.50"]);
     });
 
     it("behind a shared edge, says the route did not move and moves it back on rollback", async () => {

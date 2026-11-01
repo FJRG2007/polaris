@@ -145,6 +145,10 @@ describe("provisionHostnameDns", () => {
                 })
             );
             const [first] = zoneRecords(await getDomainZones());
+            settings.set(
+                "backupAccess.tunnel",
+                JSON.stringify({ hosts: [first?.host, first?.wildcard] })
+            );
             const under = first?.wildcard.replace("*", "shop") ?? "";
             const deeper = first?.wildcard.replace("*", "a.b") ?? "";
             expect(await provisionHostnameDns(under)).toEqual({ status: "unchanged", ip: null });
@@ -153,6 +157,7 @@ describe("provisionHostnameDns", () => {
                 ip: null
             });
             expect((await provisionHostnameDns(deeper)).noWayIn).toBe(true);
+            expect((await provisionHostnameDns("shop.added.example.org")).noWayIn).toBe(true);
         });
     });
 
