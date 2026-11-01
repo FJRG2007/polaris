@@ -325,7 +325,7 @@ describe("a change a restart interrupted", () => {
 describe("stopping the router", () => {
     it("leaves nothing for the screen to keep reporting", () => {
         expect(router.REMOVE_SCRIPT).toContain("/var/lib/polaris-router/last");
-        expect(router.REMOVE_SCRIPT).toContain("rm -rf /run/polaris-router");
+        expect(router.REMOVE_SCRIPT).toContain("/run/polaris-router/wan");
         expect(router.REMOVE_SCRIPT).toContain("polaris-router-undo.service");
         expect(router.renderDown(parsed(PLAN))).toContain("rm -f /run/polaris-router/wan");
     });

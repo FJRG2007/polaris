@@ -628,7 +628,8 @@ function heredoc(path: string, content: string): string {
 }
 
 /** Stop what runs, leaving the machine reachable by whatever it had before. */
-const STOP_ALL = `systemctl stop ${SERVICE_LIST} 2>/dev/null
+const STOP_ALL = `[ ! -f ${ROUTER_DIR}/down.sh ] || sed -i '/^if \\[ -f .*dhclient\\./,/^fi$/d' ${ROUTER_DIR}/down.sh
+systemctl stop ${SERVICE_LIST} 2>/dev/null
 [ ! -f ${ROUTER_DIR}/down.sh ] || /bin/sh ${ROUTER_DIR}/down.sh`;
 
 /** Turn on what is in the directory, or nothing when there is no directory. */
@@ -761,8 +762,7 @@ systemctl stop polaris-router-rollback.timer polaris-router-activate.timer 2>/de
 ${STOP_ALL}
 systemctl disable ${SERVICE_LIST} ${UNDO_UNIT} >/dev/null 2>&1
 rm -rf ${ROUTER_DIR} ${ROUTER_DIR}.next ${ROUTER_DIR}.previous
-rm -f ${UNCONFIRMED} ${APPLIED} ${LAST}
-rm -rf /run/polaris-router
+rm -f ${UNCONFIRMED} ${APPLIED} ${LAST} /run/polaris-router/wan
 rm -f ${[...SERVICES, UNDO_UNIT].map((name) => `/etc/systemd/system/${name}`).join(" ")}
 systemctl daemon-reload
 echo removed
