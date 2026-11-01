@@ -86,6 +86,18 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
         });
     }
 
+    function openDialog(show: () => void): void {
+        setError(null);
+        show();
+    }
+
+    function cancelDialog(): void {
+        setError(null);
+        setCreating(false);
+        setEditing(null);
+        setRemoving(null);
+    }
+
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -96,10 +108,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     <ui.Button
                         size="sm"
                         disabled={read.data === null}
-                        onClick={() => {
-                            setError(null);
-                            setCreating(true);
-                        }}
+                        onClick={() => openDialog(() => setCreating(true))}
                     >
                         <Plus />
                         {t("networks.new")}
@@ -142,7 +151,10 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     }
                     action={
                         isAdmin && !limited ? (
-                            <ui.Button size="sm" onClick={() => setCreating(true)}>
+                            <ui.Button
+                                size="sm"
+                                onClick={() => openDialog(() => setCreating(true))}
+                            >
                                 {t("networks.new")}
                             </ui.Button>
                         ) : undefined
@@ -161,14 +173,8 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                                 onRetry={() =>
                                     run(() => actions.retryGatewayAction({ id: network.id }))
                                 }
-                                onEdit={() => {
-                                    setError(null);
-                                    setEditing(network);
-                                }}
-                                onRemove={() => {
-                                    setError(null);
-                                    setRemoving(network);
-                                }}
+                                onEdit={() => openDialog(() => setEditing(network))}
+                                onRemove={() => openDialog(() => setRemoving(network))}
                             />
                         </li>
                     ))}
@@ -181,7 +187,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     servers={read.data?.servers ?? []}
                     busy={pending}
                     error={error}
-                    onClose={() => setCreating(false)}
+                    onClose={cancelDialog}
                     onCreate={(input) =>
                         run(
                             () => actions.createNetworkAction(input),
@@ -196,7 +202,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     network={editing}
                     busy={pending}
                     error={error}
-                    onClose={() => setEditing(null)}
+                    onClose={cancelDialog}
                     onSave={(change) =>
                         run(
                             () => actions.updateNetworkAction(change),
@@ -207,7 +213,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
             ) : null}
             <ui.ConfirmDeleteDialog
                 open={removing !== null}
-                onOpenChange={(open) => !open && setRemoving(null)}
+                onOpenChange={(open) => !open && cancelDialog()}
                 kind={t("networks.kind")}
                 name={removing?.name ?? ""}
                 title={t("networks.removeTitle")}
