@@ -210,13 +210,21 @@ describe("a port on its own", () => {
     const withRun = (script: string) =>
         script
             .replaceAll("/run/", `${posix(root)}/run-`)
-            .replaceAll("/var/lib/dhcp", `${posix(root)}/dhcp`);
+            .replaceAll("/var/lib/dhcp", `${posix(root)}/dhcp`)
+            .replaceAll("/proc/", `${posix(root)}/proc/`);
     const stub = (name: string, content: string) => {
         const file = join(root, "bin", name);
         writeFileSync(file, content);
         chmodSync(file, 0o755);
     };
-    const ownPid = () => join(root, "run-polaris-router", "dhclient.eth0.pid");
+    const ownPid = () => join(root, "run-dhclient-polaris.eth0.pid");
+    /** A process, as far as the scripts can tell, and the file naming it. */
+    const liveAs = (name: string, pidFile: string) => {
+        mkdirSync(join(root, "proc", "4242"), { recursive: true });
+        writeFileSync(join(root, "proc", "4242", "comm"), `${name}
+`);
+        writeFileSync(pidFile, "4242");
+    };
     const holdingAnAddress = () => {
         mkdirSync(join(root, "run-polaris-router"), { recursive: true });
         writeFileSync(join(root, "addresses"), "2: eth0 inet 192.0.2.10/24");
@@ -240,9 +248,29 @@ describe("a port on its own", () => {
 
     it("starts no second client while its own is alive", () => {
         holdingAnAddress();
-        run(`echo $$ > ${posix(ownPid())}
-${withRun(router.renderLines(plain))}`);
+        liveAs("dhclient", ownPid());
+        run(withRun(router.renderLines(plain)));
         expect(calls()).not.toContain("dhclient -4");
+    });
+
+    it("starts none beside the system's own when the line has no address", () => {
+        holdingAnAddress();
+        rmSync(join(root, "addresses"));
+        liveAs("dhclient", join(root, "run-dhclient.eth0.pid"));
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).not.toContain("dhclient -4");
+    });
+
+    it("renews when the number in its file is now somebody else's", () => {
+        holdingAnAddress();
+        liveAs("nginx", ownPid());
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).toContain("dhclient -4");
+    });
+
+    it("signals only what it checked is its client", () => {
+        const down = router.renderDown(plain);
+        expect(down).toContain('! running /run/dhclient-polaris.eth0.pid || kill "$(cat');
     });
 
     it("leaves an address it never asked for to the system", () => {
