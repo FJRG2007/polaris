@@ -243,6 +243,9 @@ function parse<S extends z.ZodTypeAny>(schema: S, raw: string | null): z.output<
     }
 }
 
+/** The most servers offered as the relay: the picker searches within these. */
+const RELAY_CHOICES = 1000;
+
 export async function readConfig(): Promise<BackupConfig> {
     return parse(configSchema, await getSetting(BACKUP_CONFIG_KEY)) ?? DEFAULT_CONFIG;
 }
@@ -310,7 +313,7 @@ export async function backupView(): Promise<BackupView> {
                     where: { status: "active", kind: { not: "local" }, owner: { isAdmin: true } },
                     select: { id: true, name: true },
                     orderBy: { name: "asc" },
-                    take: 100
+                    take: RELAY_CHOICES
                 })
                 .catch(() => []),
             readInboundReach().catch(() => null),

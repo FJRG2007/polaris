@@ -26,7 +26,8 @@ import { resolve4 } from "node:dns/promises";
 import { randomLabel } from "@polaris/deploy";
 import { installedGames } from "./apps/game-zones";
 import { setDomainConfig } from "./domain-service";
-import { detectPublicIp, getLocalEnvironment } from "./network-service";
+import { getLocalEnvironment } from "./network-service";
+import { expectedPublicAddress, publishableAddress } from "./serving-address";
 import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
 import { authoritativeA, propagationLeft } from "./dns/authoritative";
@@ -127,7 +128,7 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
     // ones that run as a side effect of something else keep the cheap answer.
     const [config, expectedIp] = await Promise.all([
         getDomainZones(),
-        detectPublicIp(options.fresh === true)
+        expectedPublicAddress(options.fresh === true)
     ]);
     const records = zoneRecords(config);
     const gameZones = await checkGameZoneDns(config, expectedIp);
@@ -396,7 +397,7 @@ export async function provisionZoneDns(
     const [config, token, ip] = await Promise.all([
         getDomainZones(),
         loadCloudflareToken(),
-        detectPublicIp()
+        publishableAddress()
     ]);
     if (!config.baseDomain) throw new Error("Set a base domain first");
     if (!token) throw new Error("Connect a Cloudflare API token under Integrations first");
@@ -509,7 +510,7 @@ async function dnsTargetFor(hostname: string): Promise<{ ip: string | null; serv
             }
         })
         .catch(() => null);
-    if (!domain) return { ip: await detectPublicIp() };
+    if (!domain) return { ip: await publishableAddress() };
     return serviceDnsTarget(domain.application.target, domain.servedBy);
 }
 
@@ -524,7 +525,7 @@ export async function serviceDnsTarget(
     servedBy: string
 ): Promise<{ ip: string | null; server?: string }> {
     const host = target.kind !== "local" ? target.host : null;
-    if (!host || servedBy === "polaris") return { ip: await detectPublicIp() };
+    if (!host || servedBy === "polaris") return { ip: await publishableAddress() };
     const address = host.address.trim();
     // An address is used as it is; a name is looked up, the way a visitor would.
     const addresses = isIP(address) !== 0 ? [address] : await resolveOrEmpty(address);

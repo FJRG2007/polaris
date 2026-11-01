@@ -40,6 +40,10 @@ export interface UiStrings {
     readonly hexOf: (label: string) => string;
     /** The unit picker beside a size. */
     readonly unit: string;
+    /** A long list's search box, its empty result, and the line under a cut list. */
+    readonly selectSearch: string;
+    readonly selectEmpty: string;
+    readonly selectMore: (hidden: number) => string;
     /** A notification's reply box and buttons, and what it says when they fail. */
     readonly reply: string;
     readonly send: string;
@@ -84,6 +88,9 @@ export const ENGLISH_UI_STRINGS: UiStrings = {
     hexColour: "Hex color",
     hexOf: (label) => `${label}: hex`,
     unit: "Unit",
+    selectSearch: "Search",
+    selectEmpty: "No matches",
+    selectMore: (hidden) => `${hidden} more: keep typing to find them`,
     reply: "Reply",
     send: "Send",
     sent: "Sent",

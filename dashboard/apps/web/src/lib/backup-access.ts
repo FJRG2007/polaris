@@ -42,6 +42,18 @@ function field(raw: string | null, key: string): unknown {
     }
 }
 
+/** Where backup access has the domain's records now, or null while it does not.
+ *  Read fresh: a check right after a flip must not compare with the old path. */
+export async function backupRecordsTarget(): Promise<
+    { readonly kind: "relay"; readonly address: string } | { readonly kind: "tunnel" } | null
+> {
+    const target = field(await getSetting(BACKUP_RECORDS_KEY).catch(() => null), "target");
+    if (typeof target !== "object" || target === null) return null;
+    const { kind, address } = target as { kind?: unknown; address?: unknown };
+    if (kind === "relay" && typeof address === "string") return { kind, address };
+    return kind === "tunnel" ? { kind } : null;
+}
+
 /** Forget the cached answer: the service calls it right after a flip. */
 export function forgetBackupAccess(): void {
     cached = null;

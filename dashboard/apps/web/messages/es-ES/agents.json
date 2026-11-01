@@ -358,6 +358,7 @@
         "add": "Añadir regla",
         "none": "Aún no hay reglas, así que estos repositorios solo responden cuando se menciona la app. Una regla es lo que hace que actúe por su cuenta: responder a una issue nueva, revisar una pull request nueva.",
         "addUsual": "Añadir las reglas habituales a {name}",
+        "addUsualPick": "Añadir reglas habituales a un repo",
         "unknownRepo": "repositorio desconocido",
         "remove": "Quitar esta regla",
         "edit": "Editar regla",

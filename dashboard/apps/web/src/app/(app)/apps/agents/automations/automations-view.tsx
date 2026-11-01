@@ -28,6 +28,9 @@ import {
     isDirty
 } from "@polaris/ui";
 
+/** Past this many repositories, a button each stops being a choice. */
+const MOST_REPO_BUTTONS = 6;
+
 interface Rule {
     id: string;
     repoId: string;
@@ -111,19 +114,34 @@ export function AutomationsView({
                             {/* Repositories added from now on get these already. This is
                                 for the ones added before, and for anybody who cleared
                                 them and wants them back. */}
-                            <div className="flex flex-wrap gap-2">
-                                {repos.map((repo) => (
-                                    <Button
-                                        key={repo.id}
-                                        variant="secondary"
-                                        size="sm"
-                                        disabled={pending}
-                                        onClick={() => addDefaults(repo.id)}
-                                    >
-                                        {t("rules.addUsual", { name: repo.name })}
-                                    </Button>
-                                ))}
-                            </div>
+                            {repos.length > MOST_REPO_BUTTONS ? (
+                                <Select
+                                    className="max-w-sm"
+                                    value=""
+                                    disabled={pending}
+                                    placeholder={t("rules.addUsualPick")}
+                                    aria-label={t("rules.addUsualPick")}
+                                    onValueChange={addDefaults}
+                                    options={repos.map((repo) => ({
+                                        value: repo.id,
+                                        label: repo.name
+                                    }))}
+                                />
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {repos.map((repo) => (
+                                        <Button
+                                            key={repo.id}
+                                            variant="secondary"
+                                            size="sm"
+                                            disabled={pending}
+                                            onClick={() => addDefaults(repo.id)}
+                                        >
+                                            {t("rules.addUsual", { name: repo.name })}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <ul className="divide-y divide-white/5">

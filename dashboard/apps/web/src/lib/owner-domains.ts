@@ -31,7 +31,7 @@ import { prisma } from "@polaris/db";
 import { isIpv4 } from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { grantedResourceIds } from "@polaris/auth";
-import { detectPublicIp } from "./network-service";
+import { expectedPublicAddress } from "./serving-address";
 import { authoritativeA, propagationLeft } from "./dns/authoritative";
 import { resolve4, resolveTxt } from "node:dns/promises";
 import { getSetting, setSetting } from "./setting-store";
@@ -407,7 +407,7 @@ export async function checkOwnerDomain(owner: DomainOwner, id: string): Promise<
     const [txt, wildcardAddresses, expectedIp] = await Promise.all([
         txtOrEmpty(`${OWNER_DOMAIN_TXT_LABEL}.${row.domain}`),
         addressesOrEmpty(wildcardProbe),
-        detectPublicIp()
+        expectedPublicAddress()
     ]);
 
     const owns = row.verifiedAt !== null || txt.includes(row.verifyToken);

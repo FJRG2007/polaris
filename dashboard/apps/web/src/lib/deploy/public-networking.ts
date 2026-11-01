@@ -20,7 +20,7 @@ import { currentReleaseRef } from "./releases";
 import { getPublicIp } from "@/lib/domain-service";
 import { isPrivateIp, isWildcardHostname } from "@polaris/core";
 import { listDeployZones } from "@/lib/domain-zones";
-import { detectPublicIp } from "@/lib/network-service";
+import { expectedPublicAddress, publishableAddress } from "@/lib/serving-address";
 import { resolve4, resolve6, resolveCname, resolveSoa } from "node:dns/promises";
 import { checkZoneSubdomain, containerPortOf, syncAppRoutes } from "@/lib/deploy-service";
 import * as net from "./public-net";
@@ -446,7 +446,7 @@ export async function domainReadings(
             ? remote
             : remote
               ? null
-              : await detectPublicIp().catch(() => null);
+              : await expectedPublicAddress().catch(() => null);
     const own = app.domains
         .filter((domain) => domain.kind === "auto" || domain.kind === "random")
         .map((domain) => domain.hostname)
@@ -581,7 +581,7 @@ async function hostsFor(
         return { publicHost: address, lanHost: null };
     }
     const [publicHost, lanHost] = await Promise.all([
-        detectPublicIp().catch(() => null),
+        publishableAddress().catch(() => null),
         getPublicIp().catch(() => null)
     ]);
     return { publicHost, lanHost: lanHost && lanHost !== publicHost ? lanHost : null };

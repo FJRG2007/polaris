@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Skeleton, Checkbox } from "@polaris/ui";
+import { Button, Checkbox, Select, Skeleton } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { holdersCanBeFreed, UNKNOWN_HOLDER } from "@/lib/backup-access/port-holders";
 import {
@@ -173,17 +173,17 @@ export function BackupAccessCard() {
 
                     {view.config.path === "relay" && view.servers.length > 0 ? (
                         <Choice label={t("domains.backup.server")}>
-                            {view.servers.map((server) => (
-                                <Pick
-                                    key={server.id}
-                                    on={view.config.relayTargetId === server.id}
-                                    disabled={busy}
-                                    title={server.name}
-                                    onClick={() => void save({ relayTargetId: server.id })}
-                                >
-                                    <span className="max-w-48 truncate">{server.name}</span>
-                                </Pick>
-                            ))}
+                            <Select
+                                className="w-64 max-w-full"
+                                aria-label={t("domains.backup.server")}
+                                value={view.config.relayTargetId ?? ""}
+                                disabled={busy}
+                                options={view.servers.map(({ id, name }) => ({
+                                    value: id,
+                                    label: name
+                                }))}
+                                onValueChange={(id) => void save({ relayTargetId: id })}
+                            />
                         </Choice>
                     ) : null}
 
