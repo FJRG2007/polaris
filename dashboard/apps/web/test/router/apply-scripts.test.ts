@@ -43,13 +43,20 @@ const STUBS: Record<string, string> = {
 echo "systemctl $*" >> "$FAKE/calls"
 case "$*" in
     *is-failed*) [ -f "$FAKE/failed" ] ;;
-    *is-active*polaris-router-rollback*) exit 1 ;;
+    *is-active*polaris-router-rollback*) [ -f "$FAKE/undoing" ] ;;
     *is-active*) [ ! -f "$FAKE/down" ] ;;
     *) exit 0 ;;
 esac
 `,
     "systemd-run": `#!/bin/sh
 echo "systemd-run $*" >> "$FAKE/calls"
+`,
+    ip: `#!/bin/sh
+echo "ip $*" >> "$FAKE/calls"
+case "$*" in
+    *"addr show"*) cat "$FAKE/addresses" 2>/dev/null ;;
+esac
+exit 0
 `
 };
 
@@ -116,6 +123,7 @@ describe("what a change leaves on the machine", () => {
             router.renderRollback("one"),
             router.renderUp(PLAN),
             router.renderDown(PLAN),
+            router.renderLines(PLAN),
             router.renderWanWatch(PLAN),
             router.REMOVE_SCRIPT,
             router.PROBE_SCRIPT
@@ -173,10 +181,52 @@ describe("what a change leaves on the machine", () => {
         );
     });
 
+    it("neither confirms nor starts a second undo while one is running", () => {
+        activate("new", "new-id");
+        writeFileSync(join(root, "undoing"), "");
+        expect(run(router.renderConfirm("new-id"))).toBe("waiting");
+        expect(existsSync(join(root, "state", "unconfirmed"))).toBe(true);
+        expect(run(router.renderRollback("new-id"))).toBe("waiting");
+        expect(readFileSync(join(root, "calls"), "utf8")).not.toContain("systemd-run");
+    });
+
     it("waits while a service is still coming up", () => {
         activate("new", "new-id");
         writeFileSync(join(root, "down"), "");
         expect(run(router.renderConfirm("new-id"))).toBe("waiting");
         expect(run(router.renderRollback("new-id"))).toBe("waiting");
+    });
+});
+
+describe("a port on its own", () => {
+    const plain = router.routerPlanSchema.parse({
+        ...PLAN,
+        wans: [{ interface: "eth0", vlan: null }]
+    });
+    const calls = () => {
+        const path = join(root, "calls");
+        return existsSync(path) ? readFileSync(path, "utf8") : "";
+    };
+    const withRun = (script: string) => script.replaceAll("/run/", `${posix(root)}/run-`);
+
+    it("gives back the address of a client Polaris started, so the next start asks again", () => {
+        writeFileSync(join(root, "run-dhclient.eth0.pid"), "999999");
+        run(withRun(router.renderDown(plain)));
+        expect(calls()).toContain("ip -4 addr flush dev eth0");
+        expect(existsSync(join(root, "run-dhclient.eth0.pid"))).toBe(false);
+    });
+
+    it("keeps an address the machine got by itself", () => {
+        run(withRun(router.renderDown(plain)));
+        expect(calls()).not.toContain("flush dev eth0");
+    });
+
+    it("gives a network plugged in late its address, once", () => {
+        run(router.renderLines(plain));
+        expect(calls()).toContain("ip addr add 10.77.0.1/24 dev eth1");
+        rmSync(join(root, "calls"));
+        writeFileSync(join(root, "addresses"), "3: eth1 inet 10.77.0.1/24");
+        run(router.renderLines(plain));
+        expect(calls()).not.toContain("ip addr add");
     });
 });

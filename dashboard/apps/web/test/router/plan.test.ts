@@ -125,16 +125,19 @@ describe("a line on a VLAN", () => {
     const tagged = parsed({ ...PLAN, wans: [{ interface: "eth0", vlan: 20 }] });
 
     it("asks for its own address, since nothing else on the machine will", () => {
-        const up = router.renderUp(tagged);
-        expect(up).toContain("name eth0.20 type vlan id 20");
-        expect(up.indexOf("dhclient -4 -nw")).toBeGreaterThan(up.indexOf("ip link set eth0.20 up"));
-        expect(up).toContain("/var/lib/dhcp/dhclient.eth0.20.leases eth0.20");
-        expect(router.renderApply(tagged, ACCESS, "id")).toContain("isc-dhcp-client");
+        const lines = router.renderLines(tagged);
+        expect(lines).toContain("name eth0.20 type vlan id 20");
+        expect(lines.indexOf("dhclient -4 -nw")).toBeGreaterThan(
+            lines.indexOf("ip link set eth0.20 up")
+        );
+        expect(lines).toContain("/var/lib/dhcp/dhclient.eth0.20.leases eth0.20");
+        expect(router.renderApply(tagged, ACCESS, "id")).toContain('need="$need isc-dhcp-client"');
     });
 
-    it("installs nothing extra for a plain line", () => {
-        expect(router.renderUp(parsed(PLAN))).not.toContain("dhclient");
-        expect(router.renderApply(parsed(PLAN), ACCESS, "id")).not.toContain("isc-dhcp-client");
+    it("does not fail a plain line's change over the address client", () => {
+        const apply = router.renderApply(parsed(PLAN), ACCESS, "id");
+        expect(apply).not.toContain('need="$need isc-dhcp-client"');
+        expect(apply).toContain("install -y -qq isc-dhcp-client; } >/dev/null 2>&1 || true");
     });
 });
 
@@ -179,6 +182,13 @@ describe("what is refused before anything is sent", () => {
     it("a port the machine does not have", () => {
         const lans = [{ ...LAN, interface: "eth9" }];
         expect(refusalOf(parsed({ ...PLAN, lans }), reading, "192.168.1.5")).toBe("missingPort");
+    });
+
+    it("not a port the running plan holds, plugged in or not", () => {
+        const lans = [{ ...LAN, interface: "eth9" }];
+        const plan = parsed({ ...PLAN, lans });
+        expect(refusalOf(plan, reading, "192.168.1.5", plan)).toBeNull();
+        expect(refusalOf(plan, reading, "192.168.1.5", parsed(PLAN))).toBe("missingPort");
     });
 
     it("a network on the subnet of a line", () => {
@@ -231,5 +241,92 @@ describe("reading a machine", () => {
         expect(reading.clients).toEqual([
             { address: "10.77.0.100", mac: "aa:bb:cc:00:00:01", name: "plug", expires: 1700000000 }
         ]);
+    });
+});
+
+describe("a port that is not there", () => {
+    const backup = parsed({
+        ...PLAN,
+        wans: [
+            { interface: "eth0", vlan: null },
+            { interface: "enx00e04c680001", vlan: null }
+        ]
+    });
+
+    it("stops no other part of the router", () => {
+        const up = router.renderUp(backup);
+        const lines = router.renderLines(backup);
+        expect(lines).toContain("if ip link show enx00e04c680001 >/dev/null 2>&1; then");
+        expect(lines).not.toContain("set -e");
+        expect(up).toContain("if ip link show eth1 >/dev/null 2>&1; then");
+        expect(router.renderDnsmasq(backup)).toContain("bind-dynamic");
+        expect(router.renderDnsmasq(backup)).not.toContain("bind-interfaces");
+    });
+
+    it("forwards only once the firewall is in place", () => {
+        const up = router.renderUp(backup);
+        expect(up.indexOf("net.ipv4.ip_forward=1")).toBeGreaterThan(up.indexOf("nft -f"));
+    });
+
+    it("joins when plugged in, and a port with no address asks for one", () => {
+        expect(router.renderWanWatch(backup)).toContain("/etc/polaris-router/lines.sh");
+        expect(router.renderLines(backup)).toContain(
+            'if [ -z "$(ip -4 -o addr show dev enx00e04c680001)" ]'
+        );
+    });
+});
+
+describe("a fixed address", () => {
+    const fixed = (reservations: unknown[]) =>
+        router.lanSchema.safeParse({ ...LAN, reservations }).success;
+    const one = { mac: "aa:bb:cc:dd:ee:01", address: "10.77.0.10" };
+
+    it("takes one address per device", () => {
+        expect(fixed([one])).toBe(true);
+        expect(fixed([one, { mac: "aa:bb:cc:dd:ee:02", address: one.address }])).toBe(false);
+        expect(fixed([one, { mac: one.mac, address: "10.77.0.11" }])).toBe(false);
+    });
+
+    it("cannot be the router's own", () => {
+        expect(fixed([{ ...one, address: LAN.address }])).toBe(false);
+    });
+
+    it("saved under older rules still loads, and has to be corrected to apply", () => {
+        const reservations = [one, { mac: one.mac, address: LAN.address }];
+        const stored = { ...PLAN, lans: [{ ...LAN, reservations }] };
+        expect(router.readPlan(stored)?.lans[0]?.reservations).toEqual(reservations);
+        const issues = router.routerPlanSchema.safeParse(stored).error?.issues ?? [];
+        expect(issues.map(({ message }) => message)).toContain("badReservation");
+    });
+
+    it("saved outside its subnet is still not a plan", () => {
+        const reservations = [{ mac: one.mac, address: "10.99.0.5" }];
+        expect(router.readPlan({ ...PLAN, lans: [{ ...LAN, reservations }] })).toBeNull();
+    });
+});
+
+describe("a change a restart interrupted", () => {
+    it("is undone at boot, by a unit that outlives the timer", () => {
+        const apply = router.renderApply(parsed(PLAN), ACCESS, "id");
+        expect(apply).toContain("ConditionPathExists=/var/lib/polaris-router/unconfirmed");
+        expect(apply).toContain("systemctl enable polaris-router-undo.service");
+        expect(apply.indexOf("enable polaris-router-undo")).toBeLessThan(
+            apply.indexOf("--unit=polaris-router-activate")
+        );
+    });
+
+    it("reads as running while it runs, which a oneshot unit never does", () => {
+        const apply = router.renderApply(parsed(PLAN), ACCESS, "id");
+        const unit = apply.slice(apply.indexOf("Description=Polaris router undo"));
+        expect(unit.slice(0, unit.indexOf("POLARIS_ROUTER_EOF"))).not.toContain("Type=oneshot");
+    });
+});
+
+describe("stopping the router", () => {
+    it("leaves nothing for the screen to keep reporting", () => {
+        expect(router.REMOVE_SCRIPT).toContain("/var/lib/polaris-router/last");
+        expect(router.REMOVE_SCRIPT).toContain("/run/polaris-router/wan");
+        expect(router.REMOVE_SCRIPT).toContain("polaris-router-undo.service");
+        expect(router.renderDown(parsed(PLAN))).toContain("rm -f /run/polaris-router/wan");
     });
 });

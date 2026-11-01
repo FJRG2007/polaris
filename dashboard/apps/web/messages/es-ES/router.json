@@ -64,6 +64,7 @@
         "outside": "Esa dirección no está en ninguna de estas redes.",
         "noLine": "Añade una línea de internet.",
         "noNetwork": "Añade una red.",
+        "badReservation": "Una red tiene una dirección fija no válida. Edita esa red.",
         "badPort": "Uno de estos puertos no se puede usar. Elige otro.",
         "badVlan": "Una VLAN es un número del 2 al 4094."
     },
@@ -72,7 +73,7 @@
     "searchClients": "Buscar",
     "clientsLimited": "Se muestran {shown} de {total}. Busca para acotar.",
     "clientsCapped": "Solo se leen de la máquina los primeros {max} dispositivos.",
-    "badReservation": "Usa una MAC como aa:bb:cc:dd:ee:ff y una dirección de la subred.",
+    "badReservation": "Usa una MAC como aa:bb:cc:dd:ee:ff y una dirección libre de la subred, una vez cada una.",
     "badOpenPort": "Un puerto es un número del 1 al 65535.",
     "stopRouter": "Parar router",
     "discard": "Descartar",
@@ -90,6 +91,8 @@
     "notRouter": "Aún no es router",
     "running": "Activo",
     "stopped": "Parado",
+    "lineMissing": "Este puerto no está en la máquina. Comprueba que esté conectado.",
+    "lineNoWay": "Aún no hay internet por este puerto. Revisa el cable y que la línea dé una dirección.",
     "usingLine": "Usando {line}",
     "wentBack": "El último cambio no aguantó y se deshizo",
     "errors": {
@@ -102,6 +105,6 @@
         "lineOverlap": "Una red usa la misma subred que una línea. Elige otra subred.",
         "lockout": "Polaris llega a la máquina por ese puerto y la perdería. Elige otro o usa VLAN.",
         "rolledBack": "El cambio no aguantó y la máquina volvió atrás. Nada cambió.",
-        "unconfirmed": "Polaris perdió la máquina durante el cambio. Si no vuelve, lo deshace sola en 2 minutos."
+        "unconfirmed": "Polaris perdió la máquina durante el cambio. Ya debería estar en la configuración anterior."
     }
 }

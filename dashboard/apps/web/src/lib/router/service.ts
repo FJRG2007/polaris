@@ -173,13 +173,17 @@ export async function readRouter(hostId: string, ownerId: string): Promise<Route
     return { plan, reading };
 }
 
-/** Refuse what would fail or cut the machine off, before anything is sent. */
+/** Refuse what would fail or cut the machine off, before anything is sent. A port the
+ *  running plan already holds may be unplugged right now: the router works without it
+ *  and takes it back when it returns. */
 export function refusalOf(
     plan: plans.RouterPlan,
     reading: RouterReading,
-    connectedTo: string
+    connectedTo: string,
+    saved: plans.RouterPlan | null = null
 ): RouterRefusalCode | null {
-    const known = new Set(reading.ports.map(({ name }) => name));
+    const held = saved ? [...saved.wans, ...saved.lans].map((link) => link.interface) : [];
+    const known = new Set([...reading.ports.map(({ name }) => name), ...held]);
     const used = [...plan.wans, ...plan.lans].map((link) => link.interface);
     if (used.some((name) => !known.has(name))) return "missingPort";
     const lines = reading.ports.filter(({ name }) =>
@@ -240,7 +244,8 @@ export async function applyRouter(hostId: string, ownerId: string, input: unknow
         const reading = await probe(connection).catch(() => {
             throw new RouterRefusal("unreachable");
         });
-        const refusal = refusalOf(plan, reading, connection.address);
+        const saved = await storedPlan(hostId);
+        const refusal = refusalOf(plan, reading, connection.address, saved);
         if (refusal) throw new RouterRefusal(refusal);
         const management = await managementAddress(connection).catch(() => null);
         const applyId = randomUUID();
