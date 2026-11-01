@@ -723,6 +723,7 @@
             "notRouted": "The server {target} runs on did not pick up the route for {hostname}. Wait a minute and try again; if it repeats, redeploy {target}.",
             "down": "{target} answered {hostname} with an error (HTTP {code}). Fix it, then try again.",
             "noAddress": "The server {target} runs on has no public address. Give it one in its server settings, then try again.",
+            "noWayIn": "Visitors cannot reach this machine directly right now. Try again once its line is back.",
             "recordWrite": "Cloudflare refused the record change. Check that the DNS connection can still edit this zone, then switch again.",
             "routeMove": "The route could not be moved to {target}. Switch again; if it repeats, redeploy {target}.",
             "rollbackWrite": "Cloudflare refused to put the record back, so the move is still open. Check that the DNS connection can still edit this zone, then roll back again.",

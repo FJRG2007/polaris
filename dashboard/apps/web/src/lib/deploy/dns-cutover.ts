@@ -73,6 +73,7 @@ export type CutoverFailure =
     | "target-not-routed"
     | "target-down"
     | "no-address"
+    | "no-way-in"
     | "record-write-failed"
     | "route-move-failed"
     | "rollback-write-failed"
@@ -360,6 +361,7 @@ const FAILURES: readonly CutoverFailure[] = [
     "target-not-routed",
     "target-down",
     "no-address",
+    "no-way-in",
     "record-write-failed",
     "route-move-failed",
     "rollback-write-failed",

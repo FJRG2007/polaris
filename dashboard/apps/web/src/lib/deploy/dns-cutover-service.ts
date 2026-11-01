@@ -43,7 +43,11 @@ export class CutoverRefusedError extends Error {
 }
 
 /** No address takes visitors at the moment of a switch. */
-class NoAddressError extends Error {}
+class NoAddressError extends Error {
+    constructor(readonly failure: "no-address" | "no-way-in") {
+        super(failure);
+    }
+}
 
 /** A record as it stood before the cutover touched it. */
 interface KeptRecord {
@@ -429,11 +433,12 @@ async function addressNow(row: { domainId: string; targetApplicationId: string }
         })
     ]);
     if (!domain || !target) throw new CutoverRefusedError("not-found");
-    const { ip } = await serviceDnsTarget(
+    const { ip, server } = await serviceDnsTarget(
         { kind: target.target.kind, host: target.target.host },
         domain.servedBy
     );
-    if (!ip) throw new NoAddressError("no-address");
+    // A server of its own can be given an address; this machine's own line can only return.
+    if (!ip) throw new NoAddressError(server ? "no-address" : "no-way-in");
     return ip;
 }
 
@@ -634,7 +639,7 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
     } catch (caught) {
         const failure: machine.CutoverFailure =
             caught instanceof NoAddressError
-                ? "no-address"
+                ? caught.failure
                 : mode === "edge"
                   ? "route-move-failed"
                   : "record-write-failed";

@@ -150,6 +150,9 @@ describe("provisionHostnameDns", () => {
                 JSON.stringify({ hosts: [first?.host, first?.wildcard] })
             );
             const under = first?.wildcard.replace("*", "shop") ?? "";
+            resolve4.mockResolvedValueOnce([]);
+            expect((await provisionHostnameDns(under)).noWayIn).toBe(true);
+            resolve4.mockResolvedValue(["104.16.0.1"]);
             const deeper = first?.wildcard.replace("*", "a.b") ?? "";
             expect(await provisionHostnameDns(under)).toEqual({ status: "unchanged", ip: null });
             expect(await provisionHostnameDns(first?.host ?? "")).toEqual({

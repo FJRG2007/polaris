@@ -10,7 +10,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { addressNow, borrowRelayName } = vi.hoisted(() => ({
-    addressNow: { value: "203.0.113.7" as string | null },
+    addressNow: {
+        value: "203.0.113.7" as string | null,
+        server: "server-2" as string | undefined
+    },
     borrowRelayName: vi.fn(async () => undefined)
 }));
 
@@ -249,7 +252,9 @@ vi.mock("@/lib/dns/propagation", () => ({
 vi.mock("@/lib/dns/public-resolver", () => ({
     publicResolver: () => ({ resolve4: async () => [] })
 }));
-vi.mock("@/lib/domain-dns", () => ({ serviceDnsTarget: async () => ({ ip: addressNow.value }) }));
+vi.mock("@/lib/domain-dns", () => ({
+    serviceDnsTarget: async () => ({ ip: addressNow.value, server: addressNow.server })
+}));
 vi.mock("@/lib/backup-access/borrowed-names", () => ({ borrowRelayName }));
 vi.mock("@/lib/dns/zone-records", () => ({ provenDomainOf: async () => null }));
 vi.mock("@/lib/tls/managed-certificates", () => ({ openText: () => null }));
@@ -331,6 +336,7 @@ function seed(id: string, overrides: Partial<Row> = {}): Row {
 
 beforeEach(() => {
     addressNow.value = "203.0.113.7";
+    addressNow.server = "server-2";
     borrowRelayName.mockClear();
     state.rows.clear();
     state.domainApp = "app-old";
@@ -434,6 +440,14 @@ describe("switching", () => {
             phase: "ready",
             failure: "no-address"
         });
+    });
+
+    it("blames the line, not a server setting, for this machine's own service", async () => {
+        seed("c1");
+        addressNow.value = null;
+        addressNow.server = undefined;
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")?.failure).toBe("no-way-in");
     });
 
     it("stays where it was when Cloudflare refuses, and switches when tried again", async () => {
