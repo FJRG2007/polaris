@@ -416,7 +416,7 @@ function RouterSetup({
                             value={setup.openWrt}
                             language="bash"
                             label={t("networks.scriptLabel")}
-                            className="max-h-72 min-w-0 overflow-auto"
+                            className="max-h-72 min-w-0"
                         />
                     </div>
                 ) : null}
