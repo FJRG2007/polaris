@@ -92,9 +92,7 @@ export async function missBorrowed(missed: readonly BorrowedName[]): Promise<str
         const counted = all.map((entry) =>
             names.has(entry.name) ? { ...entry, tries: entry.tries + 1 } : entry
         );
-        abandoned = counted
-            .filter((entry) => entry.tries >= MOST_TRIES)
-            .map((entry) => entry.name);
+        abandoned = counted.filter((entry) => entry.tries >= MOST_TRIES).map((entry) => entry.name);
         return counted.filter((entry) => entry.tries < MOST_TRIES);
     });
     return abandoned;
