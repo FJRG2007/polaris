@@ -371,6 +371,19 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // The router: a box with two antennas and its lights on.
+    router: {
+        palette: ["#6EE7B7", "#059669", "#065F46"],
+        draw: ({ base, face }) => (
+            <>
+                <path d="M10 18L7.5 6M22 18l2.5-12" {...LINE} stroke={base} strokeWidth={2.6} />
+                <rect x="4" y="16" width="24" height="11" rx="3" fill={base} />
+                <circle cx="10" cy="21.5" r="1.8" fill={face} />
+                <circle cx="16" cy="21.5" r="1.8" fill={face} />
+                <circle cx="22" cy="21.5" r="1.8" fill={face} />
+            </>
+        )
+    },
     // The VPN: three devices joined through one point.
     vpn: {
         palette: ["#7DD3FC", "#0284C7", "#075985"],

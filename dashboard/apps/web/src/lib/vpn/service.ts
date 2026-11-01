@@ -388,7 +388,12 @@ export async function turnOn(
         const hostname = await deploy.addApplicationDomain(engine.applicationId, engine.ownerId, {
             targetPort: rules.VPN_PORT,
             cert: "le",
-            zoneLabel: choice.zoneLabel ?? "",
+            // Nothing picked is the primary zone, the one the screen shows and
+            // checked. An empty label would name a zone on the base domain.
+            zoneLabel:
+                choice.zoneLabel ??
+                (await hostnameZones()).find((zone) => zone.primary)?.label ??
+                "",
             subdomain: choice.subdomain || rules.DEFAULT_SUBDOMAIN
         });
         settings = { ...settings, hostname };

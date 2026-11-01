@@ -320,6 +320,39 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         /**
+         * The network's own services: apps of their own, beside Game servers,
+         * rather than screens in Apps. Their paths stay under /apps because the
+         * devices signed in to the VPN and people's bookmarks already use them.
+         */
+        id: "vpn",
+        category: "infrastructure",
+        label: "VPN", // i18n-ignore
+        description: "Reach your own devices from anywhere", // i18n-ignore
+        icon: Waypoints,
+        href: "/apps/vpn",
+        requiresApp: "vpn"
+    },
+    {
+        id: "router",
+        category: "infrastructure",
+        label: "Router", // i18n-ignore
+        description: "Run a Linux machine as your network's router", // i18n-ignore
+        icon: Router,
+        href: "/apps/router",
+        adminOnly: true
+    },
+    {
+        id: "dns-blocker",
+        category: "infrastructure",
+        label: "Network filter", // i18n-ignore
+        description: "Block ads, trackers and unwanted sites across your network", // i18n-ignore
+        icon: ShieldBan,
+        href: "/apps/network-filter",
+        adminOnly: true,
+        requiresApp: "dns-blocker"
+    },
+    {
+        /**
          * Games people play in the browser, on their own or together from a
          * call. Not Game servers: nothing runs anywhere but the reader's tab.
          *
@@ -1460,36 +1493,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: NETWORK_GROUP
         },
         {
-            // With the tunnels and the firewall: a service the operator runs for
-            // their network. Only here once it is installed, and only for an
-            // administrator - it answers every device's lookups.
-            label: "Network filter", // i18n-ignore
-            href: "/apps/network-filter",
-            adminOnly: true,
-            requiresApp: "dns-blocker",
-            icon: ShieldBan,
-            keywords: [...DNS_BLOCKER_KEYWORDS],
-            group: NETWORK_GROUP
-        },
-        {
-            label: "Router", // i18n-ignore
-            href: "/apps/router",
-            adminOnly: true,
-            icon: Router,
-            keywords: ["router", "wan", "lan", "vlan", "dhcp", "firewall", "failover"],
-            group: NETWORK_GROUP
-        },
-        {
-            // Everybody's once installed: each person manages their own devices
-            // in it, like the VPN rail it leads to.
-            label: "VPN", // i18n-ignore
-            href: "/apps/vpn",
-            requiresApp: "vpn",
-            icon: Waypoints,
-            keywords: [...VPN_KEYWORDS],
-            group: NETWORK_GROUP
-        },
-        {
             label: "Databases", // i18n-ignore
             href: "/apps/databases",
             icon: Database,
@@ -2560,6 +2563,115 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                   ]
                 : [areaEntry(area)]
         )
+    ],
+    "dns-blocker": [
+        {
+            label: "Overview", // i18n-ignore
+            href: "/apps/network-filter",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: LayoutDashboard,
+            keywords: ["dashboard", "pause", "status", "router"]
+        },
+        {
+            label: "Query log", // i18n-ignore
+            href: "/apps/network-filter/log",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: ScrollText,
+            keywords: ["queries", "lookups", "live", "tail", "blocked domains"]
+        },
+        {
+            label: "Lists", // i18n-ignore
+            href: "/apps/network-filter/lists",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: ShieldBan,
+            keywords: [
+                "blocklists",
+                "adlists",
+                "allowlist",
+                "denylist",
+                "services",
+                "schedules"
+            ]
+        },
+        {
+            label: "Devices", // i18n-ignore
+            href: "/apps/network-filter/devices",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: MonitorSmartphone,
+            keywords: ["clients", "network", "groups", "names"]
+        },
+        {
+            label: "Local DNS", // i18n-ignore
+            href: "/apps/network-filter/local-dns",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: Network,
+            keywords: ["records", "cname", "aliases", "conditional forwarding"]
+        },
+        {
+            label: "Settings", // i18n-ignore
+            href: "/apps/network-filter/settings",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: SlidersHorizontal,
+            keywords: ["upstream", "safe search", "cache", "export", "import", "backup"]
+        }
+    ],
+    router: [
+        {
+            // Out of the rail: the app is this one screen. Kept so search finds it.
+            label: "Router setup", // i18n-ignore
+            href: "/apps/router",
+            adminOnly: true,
+            icon: Router,
+            hidden: true,
+            keywords: [
+                "router",
+                "wan",
+                "lan",
+                "vlan",
+                "dhcp",
+                "firewall",
+                "failover",
+                "raspberry pi",
+                "starlink",
+                "port forward"
+            ]
+        }
+    ],
+    vpn: [
+        {
+            label: "Overview", // i18n-ignore
+            href: "/apps/vpn",
+            requiresApp: "vpn",
+            icon: LayoutDashboard,
+            keywords: [...VPN_KEYWORDS, "turn on", "hostname", "status"]
+        },
+        {
+            label: "Devices", // i18n-ignore
+            href: "/apps/vpn/devices",
+            requiresApp: "vpn",
+            icon: MonitorSmartphone,
+            keywords: ["machines", "nodes", "exit node", "subnet routes", "rename"]
+        },
+        {
+            label: "Private networks", // i18n-ignore
+            href: "/apps/vpn/networks",
+            requiresApp: "vpn",
+            icon: Network,
+            keywords: ["subnet", "home automation", "iot", "router", "wifi", "openwrt"]
+        },
+        {
+            label: "Add a device", // i18n-ignore
+            href: "/apps/vpn/add",
+            requiresApp: "vpn",
+            icon: Plus,
+            keywords: ["install", "login server", "key", "phone", "tv", "router"]
+        }
     ]
 };
 
@@ -2767,140 +2879,6 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 needs: "system.manage",
                 icon: BookOpen,
                 keywords: ["help", "setup", "runs-on", "getting started", "guide", "docs"]
-            }
-        ]
-    },
-    {
-        // Laid out the way Pi-hole's own sidebar is, which is where somebody who
-        // has run one looks for each of these. Every screen is the installed
-        // app's and an administrator's, like the Apps entry that leads here.
-        id: "dns-blocker",
-        label: "Network filter", // i18n-ignore
-        icon: ShieldBan,
-        base: "/apps/network-filter",
-        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
-        sections: [
-            {
-                label: "Overview", // i18n-ignore
-                href: "/apps/network-filter",
-                adminOnly: true,
-                requiresApp: "dns-blocker",
-                icon: LayoutDashboard,
-                keywords: ["dashboard", "pause", "status", "router"]
-            },
-            {
-                label: "Query log", // i18n-ignore
-                href: "/apps/network-filter/log",
-                adminOnly: true,
-                requiresApp: "dns-blocker",
-                icon: ScrollText,
-                keywords: ["queries", "lookups", "live", "tail", "blocked domains"]
-            },
-            {
-                label: "Lists", // i18n-ignore
-                href: "/apps/network-filter/lists",
-                adminOnly: true,
-                requiresApp: "dns-blocker",
-                icon: ShieldBan,
-                keywords: [
-                    "blocklists",
-                    "adlists",
-                    "allowlist",
-                    "denylist",
-                    "services",
-                    "schedules"
-                ]
-            },
-            {
-                label: "Devices", // i18n-ignore
-                href: "/apps/network-filter/devices",
-                adminOnly: true,
-                requiresApp: "dns-blocker",
-                icon: MonitorSmartphone,
-                keywords: ["clients", "network", "groups", "names"]
-            },
-            {
-                label: "Local DNS", // i18n-ignore
-                href: "/apps/network-filter/local-dns",
-                adminOnly: true,
-                requiresApp: "dns-blocker",
-                icon: Network,
-                keywords: ["records", "cname", "aliases", "conditional forwarding"]
-            },
-            {
-                label: "Settings", // i18n-ignore
-                href: "/apps/network-filter/settings",
-                adminOnly: true,
-                requiresApp: "dns-blocker",
-                icon: SlidersHorizontal,
-                keywords: ["upstream", "safe search", "cache", "export", "import", "backup"]
-            }
-        ]
-    },
-    {
-        id: "router",
-        label: "Router", // i18n-ignore
-        icon: Router,
-        base: "/apps/router",
-        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
-        sections: [
-            {
-                label: "Router setup", // i18n-ignore
-                href: "/apps/router",
-                adminOnly: true,
-                icon: Router,
-                keywords: [
-                    "router",
-                    "wan",
-                    "lan",
-                    "vlan",
-                    "dhcp",
-                    "firewall",
-                    "failover",
-                    "raspberry pi",
-                    "starlink",
-                    "port forward"
-                ]
-            }
-        ]
-    },
-    {
-        // Everybody's, not only an administrator's: each person adds and manages
-        // their own devices here. What only an administrator may do (turning it
-        // on, approving exit nodes) is hidden on the screens themselves.
-        id: "vpn",
-        label: "VPN", // i18n-ignore
-        icon: Waypoints,
-        base: "/apps/vpn",
-        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
-        sections: [
-            {
-                label: "Overview", // i18n-ignore
-                href: "/apps/vpn",
-                requiresApp: "vpn",
-                icon: LayoutDashboard,
-                keywords: [...VPN_KEYWORDS, "turn on", "hostname", "status"]
-            },
-            {
-                label: "Devices", // i18n-ignore
-                href: "/apps/vpn/devices",
-                requiresApp: "vpn",
-                icon: MonitorSmartphone,
-                keywords: ["machines", "nodes", "exit node", "subnet routes", "rename"]
-            },
-            {
-                label: "Private networks", // i18n-ignore
-                href: "/apps/vpn/networks",
-                requiresApp: "vpn",
-                icon: Network,
-                keywords: ["subnet", "home automation", "iot", "router", "wifi", "openwrt"]
-            },
-            {
-                label: "Add a device", // i18n-ignore
-                href: "/apps/vpn/add",
-                requiresApp: "vpn",
-                icon: Plus,
-                keywords: ["install", "login server", "key", "phone", "tv", "router"]
             }
         ]
     }

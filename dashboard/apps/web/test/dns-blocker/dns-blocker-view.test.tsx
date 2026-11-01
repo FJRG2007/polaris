@@ -459,9 +459,10 @@ describe("Network filter sections", () => {
 describe("Network filter rail", () => {
     it("gives every section its own screen in the rail", async () => {
         const nav = await import("@/lib/apps");
-        const subapp = nav.resolveSubapp("/apps/network-filter/lists");
-        expect(subapp?.id).toBe("dns-blocker");
-        expect(subapp?.sections.map((section) => section.href)).toEqual([
+        const sections = nav.APP_SECTIONS["dns-blocker"] ?? [];
+        expect(nav.resolveActiveApp("/apps/network-filter/lists").id).toBe("dns-blocker");
+        expect(nav.resolveSubapp("/apps/network-filter/lists")).toBeNull();
+        expect(sections.map((section) => section.href)).toEqual([
             "/apps/network-filter",
             "/apps/network-filter/log",
             "/apps/network-filter/lists",
@@ -469,8 +470,6 @@ describe("Network filter rail", () => {
             "/apps/network-filter/local-dns",
             "/apps/network-filter/settings"
         ]);
-        expect(subapp?.sections.every((section) => section.requiresApp === "dns-blocker")).toBe(
-            true
-        );
+        expect(sections.every((section) => section.requiresApp === "dns-blocker")).toBe(true);
     });
 });
