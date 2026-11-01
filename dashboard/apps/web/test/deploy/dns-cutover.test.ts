@@ -43,6 +43,9 @@ describe("the pre-flight", () => {
         expect(cutover.preflightProblem("manual", { ...HEALTHY, newValue: null })).toBe(
             "no-address"
         );
+        expect(
+            cutover.preflightProblem("manual", { ...HEALTHY, newValue: null, ownLine: true })
+        ).toBe("no-way-in");
         expect(cutover.preflightProblem("manual", { ...HEALTHY, answers: "not-routed" })).toBe(
             "target-not-routed"
         );

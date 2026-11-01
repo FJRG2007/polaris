@@ -552,14 +552,22 @@ export async function serviceDnsTarget(
 }
 
 /** A name a flipped tunnel already answers for: one of its own, or one label under its
- *  wildcard, as far as the zone's certificate reaches. */
+ *  wildcard, as far as the zone's certificate reaches, and that DNS leads off the line.
+ *  A zone added during a flip is on the tunnel's list with no record pointing at it,
+ *  and a zone the flip did not move still names the line nobody can enter by. */
 async function tunnelServes(name: string): Promise<boolean> {
-    return (await backupTunnelHosts()).some((entry) => {
-        const held = entry.toLowerCase();
-        if (held === name) return true;
-        if (!held.startsWith("*.") || !name.endsWith(held.slice(1))) return false;
-        return /^[^.]+$/.test(name.slice(0, -(held.length - 1)));
+    const held = (await backupTunnelHosts()).some((entry) => {
+        const host = entry.toLowerCase();
+        if (host === name) return true;
+        if (!host.startsWith("*.") || !name.endsWith(host.slice(1))) return false;
+        return /^[^.]+$/.test(name.slice(0, -(host.length - 1)));
     });
+    if (!held) return false;
+    const [answers, line] = await Promise.all([
+        resolveOrEmpty(name),
+        acceptedAddresses().catch((): string[] => [])
+    ]);
+    return answers.some((address) => !line.includes(address));
 }
 
 /**
