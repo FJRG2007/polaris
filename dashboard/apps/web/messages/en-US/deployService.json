@@ -724,6 +724,7 @@
             "down": "{target} answered {hostname} with an error (HTTP {code}). Fix it, then try again.",
             "noAddress": "The server {target} runs on has no public address. Give it one in its server settings, then try again.",
             "noWayIn": "Visitors cannot reach this machine directly right now. An administrator can choose a relay in Backup access to give it an address.",
+            "addressUnknown": "Polaris could not find this machine's public address. Try again in a moment.",
             "recordWrite": "Cloudflare refused the record change. Check that the DNS connection can still edit this zone, then switch again.",
             "routeMove": "The route could not be moved to {target}. Switch again; if it repeats, redeploy {target}.",
             "rollbackWrite": "Cloudflare refused to put the record back, so the move is still open. Check that the DNS connection can still edit this zone, then roll back again.",

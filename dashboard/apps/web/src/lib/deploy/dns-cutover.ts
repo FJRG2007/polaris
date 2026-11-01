@@ -74,6 +74,7 @@ export type CutoverFailure =
     | "target-down"
     | "no-address"
     | "no-way-in"
+    | "address-unknown"
     | "record-write-failed"
     | "route-move-failed"
     | "rollback-write-failed"
@@ -96,6 +97,8 @@ export interface PreflightChecks {
     /** The address would be this machine's own line, not a server of its own that can
      *  be given one. Absent on rows stored before it was recorded. */
     readonly ownLine?: boolean;
+    /** This machine, with no backup path to blame: the lookup failed, so a retry can do. */
+    readonly addressUnknown?: boolean;
     /** `ready` - a certificate already covers the name where it will be served.
      *  `on-switch` - one is issued by the target once the record points at it. */
     readonly tls: "ready" | "on-switch";
@@ -108,6 +111,7 @@ export const preflightChecksSchema = z.object({
     code: z.number().int().nullable(),
     newValue: z.string().nullable(),
     ownLine: z.boolean().optional(),
+    addressUnknown: z.boolean().optional(),
     tls: z.enum(["ready", "on-switch"])
 });
 
@@ -118,8 +122,10 @@ export function preflightProblem(
 ): CutoverFailure | null {
     if (!checks.deployed) return "target-not-deployed";
     if (!checks.running) return "target-not-running";
-    if (mode !== "edge" && checks.newValue === null)
-        return checks.ownLine ? "no-way-in" : "no-address";
+    if (mode !== "edge" && checks.newValue === null) {
+        if (checks.ownLine) return "no-way-in";
+        return checks.addressUnknown ? "address-unknown" : "no-address";
+    }
     if (checks.answers === "not-routed") return "target-not-routed";
     if (checks.answers === "down") return "target-down";
     return null;
@@ -367,6 +373,7 @@ const FAILURES: readonly CutoverFailure[] = [
     "target-down",
     "no-address",
     "no-way-in",
+    "address-unknown",
     "record-write-failed",
     "route-move-failed",
     "rollback-write-failed",

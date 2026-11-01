@@ -13,6 +13,7 @@
 import { prisma } from "@polaris/db";
 import * as machine from "./dns-cutover";
 import { serviceDnsTarget } from "@/lib/domain-dns";
+import { backupRecordsTarget } from "@/lib/backup-access";
 import { borrowRelayName } from "@/lib/backup-access/borrowed-names";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as cf from "@/lib/integrations/cloudflare-api";
@@ -43,8 +44,17 @@ export class CutoverRefusedError extends Error {
 }
 
 /** No address takes visitors at the moment of a switch. */
+type NoAddressFailure = "no-address" | "no-way-in" | "address-unknown";
+
+/** Why a target has no address: its server's, a tunnel holding this machine's records,
+ *  or a lookup that failed and can simply be tried again. */
+async function noAddressFailure(server: string | undefined): Promise<NoAddressFailure> {
+    if (server) return "no-address";
+    return (await backupRecordsTarget())?.kind === "tunnel" ? "no-way-in" : "address-unknown";
+}
+
 class NoAddressError extends Error {
-    constructor(readonly failure: "no-address" | "no-way-in") {
+    constructor(readonly failure: NoAddressFailure) {
         super(failure);
     }
 }
@@ -360,13 +370,15 @@ export async function startCutover(input: {
     if (mode !== "edge") await syncAppRoutes().catch(() => undefined);
     const health =
         mode === "edge" || !newValue ? null : await probeTarget(domain.hostname, newValue);
+    const missing = address && !newValue ? await noAddressFailure(address.server) : null;
     const preflight: machine.PreflightChecks = {
         deployed: deployment !== null,
         running: deployment?.status === "running",
         answers: health ? answersOf(health) : mode === "edge" ? "skipped" : "unknown",
         code: health?.code ?? null,
         newValue,
-        ownLine: address !== null && !address.server,
+        ownLine: missing === "no-way-in",
+        addressUnknown: missing === "address-unknown",
         tls: await tlsReadiness(mode, domain)
     };
     const now = new Date();
@@ -437,7 +449,7 @@ async function addressNow(row: { domainId: string; targetApplicationId: string }
         { kind: target.target.kind, host: target.target.host },
         domain.servedBy
     );
-    if (!ip) throw new NoAddressError(server ? "no-address" : "no-way-in");
+    if (!ip) throw new NoAddressError(await noAddressFailure(server));
     return ip;
 }
 

@@ -76,6 +76,7 @@ const FAILURE_KEYS = {
     "target-down": "cutover.failure.down",
     "no-address": "cutover.failure.noAddress",
     "no-way-in": "cutover.failure.noWayIn",
+    "address-unknown": "cutover.failure.addressUnknown",
     "record-write-failed": "cutover.failure.recordWrite",
     "route-move-failed": "cutover.failure.routeMove",
     "rollback-write-failed": "cutover.failure.rollbackWrite",
