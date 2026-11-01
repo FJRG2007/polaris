@@ -633,10 +633,30 @@ function heredoc(path: string, content: string): string {
     return `cat > '${path}' <<'POLARIS_ROUTER_EOF'\n${content}POLARIS_ROUTER_EOF`;
 }
 
+/** Where an earlier version kept the file, which a confined client could not write: it
+ *  is found by how it was started, and each line keeps a file so the next start renews. */
+const EARLIER_PID = "/run/polaris-router/dhclient.";
+const ADOPT_EARLIER_CLIENTS = `for held in ${EARLIER_PID}*.pid; do
+    [ ! -f "$held" ] || mv -f "$held" "/run/dhclient-polaris.\${held#${EARLIER_PID}}"
+done
+for proc in /proc/[0-9]*; do
+    args="$(tr '\\0' ' ' 2>/dev/null < "$proc/cmdline")"
+    case "$args" in
+        "dhclient "*" -pf ${EARLIER_PID}"*)
+            device="\${args##* -pf ${EARLIER_PID}}"
+            device="\${device%%.pid *}"
+            case "$device" in *[!A-Za-z0-9._-]*) continue ;; esac
+            kill "\${proc##*/}" 2>/dev/null
+            : >> "/run/dhclient-polaris.$device.pid"
+            ;;
+    esac
+done`;
+
 /** Stop what runs, leaving the machine reachable by whatever it had before. */
 const STOP_ALL = `[ ! -f ${ROUTER_DIR}/down.sh ] || sed -i '/^if \\[ -f .*dhclient\\./,/^fi$/d' ${ROUTER_DIR}/down.sh
 systemctl stop ${SERVICE_LIST} 2>/dev/null
-[ ! -f ${ROUTER_DIR}/down.sh ] || /bin/sh ${ROUTER_DIR}/down.sh`;
+[ ! -f ${ROUTER_DIR}/down.sh ] || /bin/sh ${ROUTER_DIR}/down.sh
+${ADOPT_EARLIER_CLIENTS}`;
 
 /** Turn on what is in the directory, or nothing when there is no directory. */
 const START_ALL = `systemctl daemon-reload
