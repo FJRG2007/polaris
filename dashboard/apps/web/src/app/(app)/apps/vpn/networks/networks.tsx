@@ -19,7 +19,9 @@ import { Loader2, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-reac
 import {
     firstHost,
     isHostOf,
+    cidrsOverlap,
     isUsableCidr,
+    ssidFrom,
     networkInputSchema,
     normalizeCidr,
     suggestCidr
@@ -94,7 +96,10 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     <ui.Button
                         size="sm"
                         disabled={read.data === null}
-                        onClick={() => setCreating(true)}
+                        onClick={() => {
+                            setError(null);
+                            setCreating(true);
+                        }}
                     >
                         <Plus />
                         {t("networks.new")}
@@ -156,8 +161,14 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                                 onRetry={() =>
                                     run(() => actions.retryGatewayAction({ id: network.id }))
                                 }
-                                onEdit={() => setEditing(network)}
-                                onRemove={() => setRemoving(network)}
+                                onEdit={() => {
+                                    setError(null);
+                                    setEditing(network);
+                                }}
+                                onRemove={() => {
+                                    setError(null);
+                                    setRemoving(network);
+                                }}
                             />
                         </li>
                     ))}
@@ -531,12 +542,14 @@ function CreateDialog({
 
     const normalized = normalizeCidr(cidr);
     const subnetBad = cidr.trim() !== "" && !isUsableCidr(normalized);
+    const subnetTaken = !subnetBad && taken.some((other) => cidrsOverlap(normalized, other));
     const routerBad =
         routerAddress.trim() !== "" &&
         isUsableCidr(normalized) &&
         !isHostOf(normalized, routerAddress.trim());
     const input = { name, cidr, routerAddress, targetId, ssid, access, internet };
-    const valid = networkInputSchema.safeParse(input).success;
+    const valid = !subnetTaken && networkInputSchema.safeParse(input).success;
+    const ssidBad = ssid.trim() !== "" && ssidFrom(ssid.trim()) !== ssid.trim();
 
     function changeCidr(next: string): void {
         setCidr(next);
@@ -560,8 +573,8 @@ function CreateDialog({
                             placeholder={t("networks.namePlaceholder")}
                             onChange={(event) => {
                                 const next = event.target.value;
-                                if (ssid === "" || ssid === name.slice(0, 32)) {
-                                    setSsid(next.slice(0, 32));
+                                if (ssid === "" || ssid === ssidFrom(name)) {
+                                    setSsid(ssidFrom(next));
                                 }
                                 setName(next);
                             }}
@@ -571,7 +584,13 @@ function CreateDialog({
                         <Field
                             id="network-subnet"
                             label={`${t("networks.subnet")} *`}
-                            error={subnetBad ? t("networks.badSubnet") : null}
+                            error={
+                                subnetBad
+                                    ? t("networks.badSubnet")
+                                    : subnetTaken
+                                      ? t("networks.subnetTaken")
+                                      : null
+                            }
                         >
                             <ui.Input
                                 id="network-subnet"
@@ -596,7 +615,7 @@ function CreateDialog({
                             />
                         </Field>
                     </div>
-                    {!subnetBad ? (
+                    {!subnetBad && !subnetTaken ? (
                         <p className="text-xs text-muted-foreground">{t("networks.subnetHint")}</p>
                     ) : null}
                     <Field
@@ -615,7 +634,11 @@ function CreateDialog({
                             }))}
                         />
                     </Field>
-                    <Field id="network-ssid" label={`${t("networks.ssid")} *`}>
+                    <Field
+                        id="network-ssid"
+                        label={`${t("networks.ssid")} *`}
+                        error={ssidBad ? t("networks.ssidLong") : null}
+                    >
                         <ui.Input
                             id="network-ssid"
                             value={ssid}

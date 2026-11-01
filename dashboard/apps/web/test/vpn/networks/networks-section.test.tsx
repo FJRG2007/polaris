@@ -81,6 +81,21 @@ describe("VpnNetworksSection", () => {
         expect(screen.queryByText("Router setup")).toBeNull();
     });
 
+    it("refuses a subnet another network uses before anything is sent", async () => {
+        listNetworksAction.mockResolvedValue({
+            networks: [NETWORK],
+            servers: [{ id: "target-1", name: "fixture-server" }]
+        });
+        render(<VpnNetworksSection isAdmin />);
+        fireEvent.click((await screen.findAllByText("New network"))[0] as HTMLElement);
+        const subnet = await screen.findByLabelText("Subnet *");
+        fireEvent.change(subnet, { target: { value: "10.77.0.128/25" } });
+        expect(await screen.findByText("Another network already uses this subnet.")).toBeTruthy();
+        fireEvent.change(screen.getByLabelText("Name *"), { target: { value: "Home" } });
+        fireEvent.click(screen.getByRole("button", { name: "Create network" }));
+        expect(createNetworkAction).not.toHaveBeenCalled();
+    });
+
     it("says what is wrong with a subnet as it is typed, and sends what is typed", async () => {
         listNetworksAction.mockResolvedValue({
             networks: [],

@@ -195,6 +195,8 @@
         "badSubnet": "Use a 10.x.x.x or 192.168.x.x subnet between /16 and /29.",
         "routerAddress": "Router address",
         "badRouter": "It must be an address inside the subnet.",
+        "subnetTaken": "Another network already uses this subnet.",
+        "ssidLong": "Too long for a Wi-Fi name: accents and symbols count double.",
         "server": "Server",
         "pickServer": "Choose a server",
         "noServers": "Add a server first: a gateway needs one to run on.",
