@@ -289,14 +289,13 @@ export async function startCutover(input: {
         ? null
         : await zoneFor(domain.hostname, domain.application.environment.project);
     const mode: machine.CutoverMode = sameEdge ? "edge" : zone ? "cloudflare" : "manual";
-    const newValue = sameEdge
+    const address = sameEdge
         ? null
-        : (
-              await serviceDnsTarget(
-                  { kind: target.target.kind, host: target.target.host },
-                  domain.servedBy
-              )
-          ).ip;
+        : await serviceDnsTarget(
+              { kind: target.target.kind, host: target.target.host },
+              domain.servedBy
+          );
+    const newValue = address?.ip ?? null;
 
     let records: KeptRecord[] = [];
     let oldValues: string[];
@@ -367,6 +366,7 @@ export async function startCutover(input: {
         answers: health ? answersOf(health) : mode === "edge" ? "skipped" : "unknown",
         code: health?.code ?? null,
         newValue,
+        ownLine: address !== null && !address.server,
         tls: await tlsReadiness(mode, domain)
     };
     const now = new Date();
@@ -437,7 +437,6 @@ async function addressNow(row: { domainId: string; targetApplicationId: string }
         { kind: target.target.kind, host: target.target.host },
         domain.servedBy
     );
-    // A server of its own can be given an address; this machine's own line can only return.
     if (!ip) throw new NoAddressError(server ? "no-address" : "no-way-in");
     return ip;
 }

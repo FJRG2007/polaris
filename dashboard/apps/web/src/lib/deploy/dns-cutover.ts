@@ -93,6 +93,9 @@ export interface PreflightChecks {
     readonly code: number | null;
     /** The address the record has to name once switched, or null when there is none. */
     readonly newValue: string | null;
+    /** The address would be this machine's own line, not a server of its own that can
+     *  be given one. Absent on rows stored before it was recorded. */
+    readonly ownLine?: boolean;
     /** `ready` - a certificate already covers the name where it will be served.
      *  `on-switch` - one is issued by the target once the record points at it. */
     readonly tls: "ready" | "on-switch";
@@ -104,6 +107,7 @@ export const preflightChecksSchema = z.object({
     answers: z.enum(["up", "down", "not-routed", "skipped", "unknown"]),
     code: z.number().int().nullable(),
     newValue: z.string().nullable(),
+    ownLine: z.boolean().optional(),
     tls: z.enum(["ready", "on-switch"])
 });
 
@@ -114,7 +118,8 @@ export function preflightProblem(
 ): CutoverFailure | null {
     if (!checks.deployed) return "target-not-deployed";
     if (!checks.running) return "target-not-running";
-    if (mode !== "edge" && checks.newValue === null) return "no-address";
+    if (mode !== "edge" && checks.newValue === null)
+        return checks.ownLine ? "no-way-in" : "no-address";
     if (checks.answers === "not-routed") return "target-not-routed";
     if (checks.answers === "down") return "target-down";
     return null;

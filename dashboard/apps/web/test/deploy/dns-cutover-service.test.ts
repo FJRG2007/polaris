@@ -618,6 +618,21 @@ describe("starting", () => {
         });
         expect(state.rows.get("started")?.phase).toBe("ready");
     });
+
+    it.each([
+        ["no-way-in", undefined],
+        ["no-address", "server-2"]
+    ])("closes as %s when the target has no address", async (failure, server) => {
+        addressNow.value = null;
+        addressNow.server = server;
+        await service.startCutover({
+            domainId: "domain-1",
+            targetApplicationId: "app-new",
+            actorId: "user-1",
+            environmentIds: null
+        });
+        expect(state.rows.get("started")).toMatchObject({ phase: "preflight-failed", failure });
+    });
 });
 
 describe("rolling back", () => {

@@ -723,7 +723,7 @@
             "notRouted": "El servidor de {target} no recogió la ruta de {hostname}. Espera un minuto y reinténtalo; si se repite, despliega {target} de nuevo.",
             "down": "{target} respondió a {hostname} con un error (HTTP {code}). Corrígelo y vuelve a intentarlo.",
             "noAddress": "El servidor de {target} no tiene dirección pública. Ponle una en sus ajustes y vuelve a intentarlo.",
-            "noWayIn": "Las visitas no llegan directamente a esta máquina ahora. Reintenta cuando vuelva su línea.",
+            "noWayIn": "Las visitas no llegan directamente a esta máquina ahora. Un administrador puede elegir Relé propio en Acceso de reserva para darle una dirección.",
             "recordWrite": "Cloudflare rechazó el cambio del registro. Comprueba que la conexión DNS aún puede editar esta zona y vuelve a cambiar.",
             "routeMove": "No se pudo mover la ruta a {target}. Vuelve a cambiar; si se repite, vuelve a desplegar {target}.",
             "rollbackWrite": "Cloudflare rechazó restaurar el registro, así que el cambio sigue abierto. Comprueba que la conexión DNS aún puede editar esta zona y vuelve a revertir.",
