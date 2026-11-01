@@ -3,7 +3,7 @@
  * whether it finished, so the app can update before it opens.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const electron = vi.hoisted(() => ({
     fetch: vi.fn(),
@@ -31,10 +31,20 @@ const { watchForUpdates } = await import("../../src/main/updates");
 const release = (tag: string) => ({ tag_name: tag, draft: false, prerelease: false, assets: [] });
 const answers = (body: unknown) => electron.fetch.mockResolvedValue({ ok: true, json: async () => body });
 
+const platform = process.platform;
+const argv = process.argv;
+
 beforeEach(() => {
     electron.fetch.mockReset();
     electron.listeners.clear();
     vi.clearAllMocks();
+    Object.defineProperty(process, "platform", { value: "win32" });
+});
+
+afterEach(() => {
+    Object.defineProperty(process, "platform", { value: platform });
+    process.argv = argv;
+    vi.useRealTimers();
 });
 
 describe("the first check of a start", () => {
@@ -42,21 +52,38 @@ describe("the first check of a start", () => {
         answers([release("desktop-v0.1.3")]);
         const found = vi.fn();
         const first = watchForUpdates(found);
-        expect(await first.installing).toBe(true);
+        expect(await first.installing).toBe("0.1.3");
         expect(electron.checkForUpdates).toHaveBeenCalled();
         electron.listeners.get("update-downloaded")?.();
         expect(await first.installed).toBe(true);
         expect(found.mock.calls[0]?.[0]).toMatchObject({ version: "0.1.3" });
     });
 
-    it("opens the app as it is when nothing is newer", async () => {
+    it("says nothing is going in when nothing is newer", async () => {
         answers([release("desktop-v0.1.1")]);
-        expect(await watchForUpdates(vi.fn()).installing).toBe(false);
+        expect(await watchForUpdates(vi.fn()).installing).toBeNull();
     });
 
-    it("opens the app as it is with no network", async () => {
+    it("says nothing is going in with no network", async () => {
         electron.fetch.mockRejectedValue(new Error("offline"));
-        expect(await watchForUpdates(vi.fn()).installing).toBe(false);
+        expect(await watchForUpdates(vi.fn()).installing).toBeNull();
+    });
+
+    it("waits out Squirrel's lock on the first launch after an install", async () => {
+        vi.useFakeTimers();
+        process.argv = [...argv, "--squirrel-firstrun"];
+        answers([release("desktop-v0.1.3")]);
+        const first = watchForUpdates(vi.fn());
+        expect(await first.installing).toBeNull();
+        expect(electron.fetch).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(electron.fetch).toHaveBeenCalledTimes(1);
+        expect(electron.checkForUpdates).toHaveBeenCalled();
+    });
+
+    it("says it has asked before the answer comes", async () => {
+        electron.fetch.mockReturnValue(new Promise(() => undefined));
+        await expect(watchForUpdates(vi.fn()).asked).resolves.toBeUndefined();
     });
 
     it("says so when the install fails", async () => {

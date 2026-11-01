@@ -31,12 +31,13 @@ export type PushChoice = z.infer<typeof pushSchema>;
 const settingsSchema = z.object({
     server: z.unknown().transform(readServerAddress).catch(null),
     servers: z.unknown().transform(readServers).catch([]),
-    pushes: z.record(z.string().uuid(), pushSchema).catch({})
+    pushes: z.record(z.string().uuid(), pushSchema).catch({}),
+    updateAttempted: z.string().max(64).nullable().catch(null)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
 
-const EMPTY: Settings = { server: null, servers: [], pushes: {} };
+const EMPTY: Settings = { server: null, servers: [], pushes: {}, updateAttempted: null };
 
 function file(): string {
     return join(app.getPath("userData"), "settings.json");
@@ -87,6 +88,15 @@ function knownServers(settings: Settings): SavedServer[] {
 export function setSavedServers(servers: readonly SavedServer[]): void {
     const settings = load();
     save({ ...settings, servers: knownServers({ ...settings, servers: [...servers] }) });
+}
+
+/** The version a start last restarted into, whether or not it took. */
+export function updateAttempted(): string | null {
+    return load().updateAttempted;
+}
+
+export function setUpdateAttempted(version: string): void {
+    save({ ...load(), updateAttempted: version });
 }
 
 /** What was used the last time this service was pushed from here. */

@@ -20,7 +20,8 @@ import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
-import { watchForUpdates, type FirstCheck } from "./updates";
+import { watchForUpdates } from "./updates";
+import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
@@ -30,7 +31,7 @@ import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
 import { listServers, normalizeServerName, renameServer, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
-import { savedServers, serverAddress, setSavedServers, setServerAddress } from "./settings";
+import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, session, shell } from "electron";
@@ -104,33 +105,16 @@ function showPolaris(path?: string): void {
 
 /** The window shown while an update goes in before the app opens. */
 let updating: BrowserWindow | null = null;
-/** How long the first check may hold the app back: a slow answer updates in the
- *  background instead, and no network costs a start no more than this. */
-const CHECK_BEFORE_OPENING_MS = 1_500;
-/** The most a start waits for an update before opening the version it has. */
-const UPDATE_BEFORE_OPENING_MS = 3 * 60_000;
-
-function after<T>(ms: number, value: T): Promise<T> {
-    return new Promise((resolve) => setTimeout(() => resolve(value), ms));
-}
-
-/** Update before opening when a newer version is found at once. True when the app
- *  is restarting into it, so there is nothing more to open. */
-async function updatedBeforeOpening(first: FirstCheck): Promise<boolean> {
-    if (!(await Promise.race([first.installing, after(CHECK_BEFORE_OPENING_MS, false)]))) return false;
+/** Show that an update is going in. Settles when the window is closed. */
+function showUpdating(): Promise<void> {
     const window = openLocalWindow("updating", { title: "Polaris", width: 420, height: 320 });
     updating = window;
-    window.on("closed", () => {
-        if (updating === window) updating = null;
+    return new Promise((resolve) => {
+        window.on("closed", () => {
+            if (updating === window) updating = null;
+            resolve();
+        });
     });
-    const installed = await Promise.race([first.installed, after(UPDATE_BEFORE_OPENING_MS, false)]);
-    if (installed) {
-        updates.install();
-        return true;
-    }
-    // The caller opens the app first: closing the last window would quit it.
-    updating = null;
-    return false;
 }
 
 function openMain(url: string): void {
@@ -230,6 +214,7 @@ async function connectSubmit(raw: unknown): Promise<Outcome> {
 function leaveServer(): void {
     for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
     main = null;
+    updating = null;
 }
 
 function servers() {
@@ -373,17 +358,25 @@ function start(): void {
             );
         });
 
-        void updatedBeforeOpening(first).then((restarting) => {
-            if (restarting) return;
-            const waited = BrowserWindow.getAllWindows();
-            if (current) openMain(`${current}${START}`);
-            else openConnect();
-            for (const window of waited) if (window !== main && window !== connect) window.close();
-        });
-
-        app.on("activate", () => {
-            if (BrowserWindow.getAllWindows().length === 0) showPolaris();
-        });
+        void updateBeforeOpening(first, {
+            attempted: updateAttempted,
+            attempt: setUpdateAttempted,
+            opened: () => main !== null,
+            showUpdating,
+            restart: () => updates.install().ok
+        })
+            .catch((): Opening => "open")
+            .then((opening) => {
+                app.on("activate", () => {
+                    if (BrowserWindow.getAllWindows().length === 0) showPolaris();
+                });
+                if (opening !== "open") return;
+                // The app opens first: closing the last window would quit it.
+                const waited = updating;
+                updating = null;
+                showPolaris();
+                waited?.close();
+            });
     });
 
     app.on("second-instance", () => showPolaris());

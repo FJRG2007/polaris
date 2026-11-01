@@ -36,6 +36,9 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { appImageAsset, CHECKSUMS, macFeedName, newerRelease, parseChecksums, releaseSource, type Release } from "./releases";
 
 const EVERY_MS = 6 * 60 * 60_000;
+/** Squirrel.Windows holds a lock on the first launch after an install, and asks
+ *  made during it fail. */
+const AFTER_FIRST_RUN_MS = 30_000;
 /** A checksums file is a line per installer; anything this large is not one. */
 const CHECKSUMS_MAX_BYTES = 64 * 1024;
 
@@ -76,22 +79,27 @@ async function fetchText(url: string, limit: number): Promise<string> {
 
 /** What the first check of a start came to. */
 export interface FirstCheck {
-    /** True once it began installing a newer version, false when it will not. */
-    readonly installing: Promise<boolean>;
+    /** Settled once this copy knows how it updates and the question goes out. */
+    readonly asked: Promise<void>;
+    /** The newer version it began installing, null when it will not. */
+    readonly installing: Promise<string | null>;
     /** Whether that install finished, so the app can restart into it. */
     readonly installed: Promise<boolean>;
 }
 
 export function watchForUpdates(found: (update: Update) => void): FirstCheck {
-    let began: (installing: boolean) => void = () => undefined;
+    let ready: () => void = () => undefined;
+    let began: (version: string | null) => void = () => undefined;
     let ended: (installed: boolean) => void = () => undefined;
     const first: FirstCheck = {
+        asked: new Promise((resolve) => (ready = resolve)),
         installing: new Promise((resolve) => (began = resolve)),
         installed: new Promise((resolve) => (ended = resolve))
     };
     const source = releaseSource(repository);
     if (!source) {
-        began(false);
+        ready();
+        began(null);
         ended(false);
         return first;
     }
@@ -154,6 +162,7 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
                 if ((await how).kind === "squirrel") listenToSquirrel();
             }
             const mode = await how;
+            ready();
             const response = await net.fetch(source.api, {
                 headers: { accept: "application/vnd.github+json" },
                 credentials: "omit",
@@ -169,7 +178,7 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
                 return;
             }
             installing = release.version;
-            began(true);
+            began(release.version);
             if (mode.kind === "appimage") {
                 void viaAppImage(release, mode.path).catch(fallBack);
                 return;
@@ -184,10 +193,17 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
         }
     };
 
-    void check().finally(() => {
-        // Nothing began: settled here, and later rounds are nobody's start.
-        began(false);
-    });
+    // Nothing began: settled here, and later rounds are nobody's start.
+    const settle = () => {
+        ready();
+        began(null);
+    };
+    if (process.platform === "win32" && process.argv.includes("--squirrel-firstrun")) {
+        settle();
+        setTimeout(() => void check(), AFTER_FIRST_RUN_MS);
+    } else {
+        void check().finally(settle);
+    }
     setInterval(() => void check(), EVERY_MS);
     return first;
 }
