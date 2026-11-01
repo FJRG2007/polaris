@@ -30,8 +30,8 @@ const UNCONFIRMED = `${ROUTER_STATE_DIR}/unconfirmed`;
 const APPLIED = `${ROUTER_STATE_DIR}/applied`;
 /** The answer a machine leaves once it has gone back. */
 const LAST = `${ROUTER_STATE_DIR}/last`;
-/** Above an ordinary interface's default route, so a VLAN line's lease never collides. */
-const VLAN_LINE_METRIC = 300;
+/** Above an ordinary interface's default route, so a line's lease never collides. */
+const LINE_METRIC = 300;
 /** Where a machine's own firewall has to be told about a router, when Docker runs. */
 const DOCKER_ALLOW_CHAIN = "POLARIS-ROUTER";
 
@@ -72,6 +72,24 @@ export const reservationSchema = z.object({
     address: ipv4
 });
 
+/** Whether a fixed address can be handed out: inside the subnet, not the router's own,
+ *  and the only claim on its address and device. The DHCP server refuses to start on
+ *  a repeated one, and no retry would ever get past that. */
+export function reservationFits(
+    lan: { cidr: string; address: string },
+    all: readonly { mac: string; address: string }[],
+    one: { mac: string; address: string }
+): boolean {
+    const mac = one.mac.trim().toLowerCase();
+    const address = one.address.trim();
+    return (
+        isHostOf(lan.cidr, address) &&
+        address !== lan.address.trim() &&
+        all.filter((other) => other.address.trim() === address).length === 1 &&
+        all.filter((other) => other.mac.trim().toLowerCase() === mac).length === 1
+    );
+}
+
 /** One network of devices behind the router. */
 export const lanSchema = z
     .object({
@@ -87,7 +105,7 @@ export const lanSchema = z
         reservations: z.array(reservationSchema).max(MAX_RESERVATIONS)
     })
     .refine((lan) => isHostOf(lan.cidr, lan.address), { path: ["address"] })
-    .refine((lan) => lan.reservations.every(({ address }) => isHostOf(lan.cidr, address)), {
+    .refine((lan) => lan.reservations.every((one) => reservationFits(lan, lan.reservations, one)), {
         path: ["reservations"]
     });
 export type RouterLan = z.infer<typeof lanSchema>;
@@ -231,7 +249,8 @@ export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
 export function renderDnsmasq(plan: RouterPlan): string {
     const lines = [
         "port=53",
-        "bind-interfaces",
+        // A port can be absent at boot, and this mode starts without it.
+        "bind-dynamic",
         "except-interface=lo",
         "no-hosts",
         "dhcp-authoritative",
@@ -285,50 +304,80 @@ function renderDockerAllow(plan: RouterPlan): string[] {
     ];
 }
 
+function present(port: string): string {
+    return `ip link show ${port} >/dev/null 2>&1`;
+}
+
+/** Make a link's VLAN device when it has one, inside a check that its port exists. */
+function tagged(link: { interface: string; vlan: number | null }): string[] {
+    if (link.vlan === null) return [];
+    const device = deviceOf(link);
+    return [
+        `    ip link set ${link.interface} up`,
+        `    if ! ${present(device)}; then`,
+        `        ip link add link ${link.interface} name ${device} type vlan id ${link.vlan}`,
+        `        ${unmanaged(device)}`,
+        "    fi"
+    ];
+}
+
 /** Bring the networks up. Run again on every boot and every change, so each step
  *  has to hold when it is already done. */
 export function renderUp(plan: RouterPlan): string {
     const lines = [
         "#!/bin/sh",
         "set -eu",
-        "sysctl -q -w net.ipv4.ip_forward=1",
         `ip rule del priority ${ROUTE_TABLE} 2>/dev/null || true`,
         `ip rule del priority ${ROUTE_TABLE + 1} 2>/dev/null || true`,
         `ip rule add priority ${ROUTE_TABLE} lookup main suppress_prefixlength 0`,
         `ip rule add priority ${ROUTE_TABLE + 1} lookup ${ROUTE_TABLE}`
     ];
-    const vlans = [...plan.wans, ...plan.lans].filter((link) => link.vlan !== null);
-    for (const link of vlans) {
-        lines.push(
-            `ip link set ${link.interface} up`,
-            `ip link show ${deviceOf(link)} >/dev/null 2>&1 || ip link add link ${link.interface} name ${deviceOf(link)} type vlan id ${link.vlan}`
-        );
-    }
     for (const lan of plan.lans) {
         const device = deviceOf(lan);
         const prefix = lan.cidr.split("/")[1];
+        lines.push(`if ${present(lan.interface)}; then`, ...tagged(lan));
         lines.push(
-            unmanaged(device),
-            `ip link set ${device} up`,
-            `ip addr flush dev ${device}`,
-            `ip addr add ${lan.address}/${prefix} dev ${device}`
+            `    ${unmanaged(device)}`,
+            `    ip link set ${device} up`,
+            `    ip addr flush dev ${device}`,
+            `    ip addr add ${lan.address}/${prefix} dev ${device}`,
+            "fi"
         );
     }
+    lines.push(
+        `/bin/sh ${ROUTER_DIR}/lines.sh`,
+        `nft -f ${ROUTER_DIR}/rules.nft`,
+        ...renderDockerAllow(plan),
+        // Last: a machine that forwards has its firewall in place first.
+        "sysctl -q -w net.ipv4.ip_forward=1",
+        ""
+    );
+    return lines.join("\n");
+}
+
+/**
+ * Bring up whichever lines are plugged in, and ask for an address on any that has
+ * none: nothing else on the machine does that for a second port. Run on every round
+ * of the watch too, so a USB line plugged in late joins without touching the rest.
+ */
+export function renderLines(plan: RouterPlan): string {
+    const lines = ["#!/bin/sh"];
     for (const wan of plan.wans) {
         const device = deviceOf(wan);
-        if (wan.vlan !== null) lines.push(unmanaged(device));
+        const pid = `/run/dhclient.${device}.pid`;
         lines.push(
-            `ip link set ${device} up`,
-            `sysctl -q -w net.ipv4.conf.${device.replace(".", "/")}.rp_filter=2`
+            `if ${present(wan.interface)}; then`,
+            ...tagged(wan),
+            `    ip link set ${device} up`,
+            `    sysctl -q -w net.ipv4.conf.${device.replace(".", "/")}.rp_filter=2`,
+            `    if [ -z "$(ip -4 -o addr show dev ${device})" ] && ! kill -0 "$(cat ${pid} 2>/dev/null)" 2>/dev/null && command -v dhclient >/dev/null 2>&1; then`,
+            "        mkdir -p /var/lib/dhcp",
+            `        dhclient -4 -nw -e IF_METRIC=${LINE_METRIC} -pf ${pid} -lf /var/lib/dhcp/dhclient.${device}.leases ${device}`,
+            "    fi",
+            "fi"
         );
-        if (wan.vlan !== null) {
-            lines.push(
-                "mkdir -p /var/lib/dhcp",
-                `dhclient -4 -nw -e IF_METRIC=${VLAN_LINE_METRIC} -pf /run/dhclient.${device}.pid -lf /var/lib/dhcp/dhclient.${device}.leases ${device}`
-            );
-        }
     }
-    lines.push(`nft -f ${ROUTER_DIR}/rules.nft`, ...renderDockerAllow(plan), "");
+    lines.push("exit 0", "");
     return lines.join("\n");
 }
 
@@ -342,8 +391,13 @@ export function renderDown(plan: RouterPlan): string {
         `ip route flush table ${ROUTE_TABLE} 2>/dev/null`,
         `iptables -w -D DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
         `iptables -w -F ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
-        `iptables -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`
+        `iptables -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        "rm -f /run/polaris-router/wan"
     ];
+    for (const wan of plan.wans) {
+        const pid = `/run/dhclient.${deviceOf(wan)}.pid`;
+        lines.push(`[ ! -f ${pid} ] || kill "$(cat ${pid})" 2>/dev/null`, `rm -f ${pid}`);
+    }
     for (const lan of plan.lans) {
         lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
         lines.push(
@@ -376,12 +430,13 @@ alive() {
     return 1
 }
 gateway() {
-    ip -4 route show default dev "$1" | awk '/via/ { print $3; exit }'
+    ip -4 route show default dev "$1" 2>/dev/null | awk '/via/ { print $3; exit }'
 }
 current=""
 bad=0
 good=0
 while :; do
+    /bin/sh ${ROUTER_DIR}/lines.sh >/dev/null 2>&1
     best=""
     for wan in $WANS; do
         if [ -n "$(gateway "$wan")" ] && alive "$wan"; then best=$wan; break; fi
@@ -437,6 +492,7 @@ After=network-online.target docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+KillMode=process
 ExecStart=/bin/sh ${ROUTER_DIR}/up.sh
 ExecStop=/bin/sh ${ROUTER_DIR}/down.sh
 
@@ -463,6 +519,7 @@ After=polaris-router.service
 
 [Service]
 ExecStart=/bin/sh ${ROUTER_DIR}/wan-watch.sh
+KillMode=process
 Restart=always
 RestartSec=3
 
@@ -474,11 +531,32 @@ WantedBy=multi-user.target
 const SERVICES = Object.keys(UNITS);
 const SERVICE_LIST = SERVICES.join(" ");
 
+/** The timer that undoes a change dies with the machine, so a restart inside its window
+ *  would start the unconfirmed change for good. This finishes the timer's job at boot. */
+const UNDO_UNIT = "polaris-router-undo.service";
+const UNDO_UNIT_FILE = `[Unit]
+Description=Polaris router undo after an interrupted change
+ConditionPathExists=${UNCONFIRMED}
+After=${SERVICE_LIST}
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh ${ROUTER_STATE_DIR}/rollback.sh
+
+[Install]
+WantedBy=multi-user.target
+`;
+
 /** The packages a router needs, installed before the network is touched. */
 function renderInstall(plan: RouterPlan): string {
+    // Without it a VLAN line can never come up; a plain line usually has its address
+    // from the machine already, so failing to get it stops nothing.
     const dhcpClient = plan.wans.some((wan) => wan.vlan !== null)
         ? `command -v dhclient >/dev/null 2>&1 || need="$need isc-dhcp-client"\n`
         : "";
+    const optional = dhcpClient
+        ? ""
+        : `\ncommand -v dhclient >/dev/null 2>&1 || { DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq isc-dhcp-client; } >/dev/null 2>&1 || true`;
     return `need=""
 ${dhcpClient}command -v nft >/dev/null 2>&1 || need="$need nftables"
 [ -x /usr/sbin/dnsmasq ] || need="$need dnsmasq-base"
@@ -488,7 +566,7 @@ if [ -n "$need" ]; then
     command -v apt-get >/dev/null 2>&1 || { echo unsupported-system; exit 3; }
     DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $need >/dev/null
-fi`;
+fi${optional}`;
 }
 
 function heredoc(path: string, content: string): string {
@@ -528,6 +606,7 @@ export function renderApply(plan: RouterPlan, access: RouterAccess, applyId: str
         "dnsmasq.conf": renderDnsmasq(plan),
         "up.sh": renderUp(plan),
         "down.sh": renderDown(plan),
+        "lines.sh": renderLines(plan),
         "wan-watch.sh": renderWanWatch(plan)
     };
     const activate = `#!/bin/sh
@@ -565,11 +644,14 @@ echo rolled-back > ${LAST}
         ...Object.entries(UNITS).map(([name, content]) =>
             heredoc(`/etc/systemd/system/${name}`, content)
         ),
+        heredoc(`/etc/systemd/system/${UNDO_UNIT}`, UNDO_UNIT_FILE),
         heredoc(`${ROUTER_STATE_DIR}/activate.sh`, activate),
         heredoc(`${ROUTER_STATE_DIR}/rollback.sh`, rollback),
         `nft -c -f ${next}/rules.nft`,
         `/usr/sbin/dnsmasq --test --conf-file=${next}/dnsmasq.conf >/dev/null 2>&1`,
         `rm -f ${LAST} ${APPLIED}`,
+        "systemctl daemon-reload",
+        `systemctl enable ${UNDO_UNIT} >/dev/null 2>&1`,
         "systemctl stop polaris-router-rollback.timer polaris-router-rollback.service polaris-router-rollback-now.service polaris-router-activate.timer polaris-router-activate.service 2>/dev/null || true",
         "systemctl reset-failed polaris-router-rollback.service polaris-router-rollback-now.service polaris-router-activate.service 2>/dev/null || true",
         `systemd-run --quiet --unit=polaris-router-rollback --timer-property=AccuracySec=1s --on-active=${ROLLBACK_SECONDS} /bin/sh ${ROUTER_STATE_DIR}/rollback.sh`,
@@ -623,10 +705,10 @@ ${ROLL_BACK_NOW}
 export const REMOVE_SCRIPT = `#!/bin/sh
 systemctl stop polaris-router-rollback.timer polaris-router-activate.timer 2>/dev/null
 ${STOP_ALL}
-systemctl disable ${SERVICE_LIST} >/dev/null 2>&1
+systemctl disable ${SERVICE_LIST} ${UNDO_UNIT} >/dev/null 2>&1
 rm -rf ${ROUTER_DIR} ${ROUTER_DIR}.next ${ROUTER_DIR}.previous
-rm -f ${UNCONFIRMED} ${APPLIED}
-rm -f ${SERVICES.map((name) => `/etc/systemd/system/${name}`).join(" ")}
+rm -f ${UNCONFIRMED} ${APPLIED} ${LAST} /run/polaris-router/wan
+rm -f ${[...SERVICES, UNDO_UNIT].map((name) => `/etc/systemd/system/${name}`).join(" ")}
 systemctl daemon-reload
 echo removed
 `;

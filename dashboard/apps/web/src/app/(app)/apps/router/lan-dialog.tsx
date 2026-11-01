@@ -9,7 +9,13 @@ import { VlanInput } from "./router-view";
 import { Plus, Trash2 } from "lucide-react";
 import type { MachinesAnswer } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { lanSchema, newLanId, reservationSchema, type RouterLan } from "@/lib/router/plan";
+import {
+    lanSchema,
+    newLanId,
+    reservationFits,
+    reservationSchema,
+    type RouterLan
+} from "@/lib/router/plan";
 import {
     cidrsOverlap,
     firstHost,
@@ -199,7 +205,7 @@ export function LanDialog({
                                 one.address !== "" &&
                                 !(
                                     reservationSchema.safeParse(one).success &&
-                                    isHostOf(clean, one.address.trim())
+                                    reservationFits({ cidr: clean, address }, reservations, one)
                                 );
                             return (
                                 <div key={at} className="flex min-w-0 flex-col gap-1">

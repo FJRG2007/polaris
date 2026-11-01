@@ -19,6 +19,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Loader2, Plus, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import {
+    deviceOf,
     isPortName,
     routerPlanSchema,
     MAX_CLIENTS,
@@ -29,6 +30,17 @@ import {
 } from "@/lib/router/plan";
 
 const EMPTY_PLAN: RouterPlan = { wans: [], lans: [], forwards: [] };
+
+/** Why a line of a running router carries nothing, in what the screen can see. */
+function lineProblem(
+    wan: RouterPlan["wans"][number],
+    reading: { running: boolean; ports: readonly { name: string; hasGateway: boolean }[] } | null
+): "lineMissing" | "lineNoWay" | null {
+    if (!reading?.running) return null;
+    const port = reading.ports.find(({ name }) => name === deviceOf(wan));
+    if (!port) return "lineMissing";
+    return port.hasGateway ? null : "lineNoWay";
+}
 /** How often a running router is read again while the page is open. */
 const STATUS_POLL_MS = 15_000;
 
@@ -275,6 +287,11 @@ function RouterEditor({
                             >
                                 <Trash2 />
                             </IconButton>
+                            {lineProblem(wan, reading) ? (
+                                <span className="w-full text-xs text-warning">
+                                    {t(lineProblem(wan, reading) ?? "lineNoWay")}
+                                </span>
+                            ) : null}
                         </li>
                     ))}
                 </ul>

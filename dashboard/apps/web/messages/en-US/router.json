@@ -72,7 +72,7 @@
     "searchClients": "Search devices",
     "clientsLimited": "Showing {shown} of {total}. Search to narrow them down.",
     "clientsCapped": "Only the first {max} devices are read from the machine.",
-    "badReservation": "Use a MAC like aa:bb:cc:dd:ee:ff and an address inside the subnet.",
+    "badReservation": "Use a MAC like aa:bb:cc:dd:ee:ff and a free address inside the subnet, each used once.",
     "badOpenPort": "A port is a number from 1 to 65535.",
     "stopRouter": "Stop router",
     "discard": "Discard",
@@ -90,6 +90,8 @@
     "notRouter": "Not a router yet",
     "running": "Running",
     "stopped": "Stopped",
+    "lineMissing": "This port is not on the machine. Check that it is plugged in.",
+    "lineNoWay": "No internet from this port yet. Check the cable and that the line gives out an address.",
     "usingLine": "Using {line}",
     "wentBack": "The last change did not hold and was undone",
     "errors": {
@@ -102,6 +104,6 @@
         "lineOverlap": "A network uses the same subnet as a line. Choose another subnet.",
         "lockout": "Polaris reaches this machine through that port, so it would lose it. Choose another port, or use a VLAN.",
         "rolledBack": "The change did not hold, so the machine went back. Nothing changed.",
-        "unconfirmed": "Polaris lost this machine during the change. If it does not come back, it undoes the change by itself within 2 minutes."
+        "unconfirmed": "Polaris lost this machine during the change. It should already be back on its previous setup."
     }
 }
