@@ -207,18 +207,122 @@ describe("a port on its own", () => {
         const path = join(root, "calls");
         return existsSync(path) ? readFileSync(path, "utf8") : "";
     };
-    const withRun = (script: string) => script.replaceAll("/run/", `${posix(root)}/run-`);
+    const withRun = (script: string) =>
+        script
+            .replaceAll("/run/", `${posix(root)}/run-`)
+            .replaceAll("/var/lib/dhcp", `${posix(root)}/dhcp`);
+    const stub = (name: string, content: string) => {
+        const file = join(root, "bin", name);
+        writeFileSync(file, content);
+        chmodSync(file, 0o755);
+    };
+    const ownPid = () => join(root, "run-polaris-router", "dhclient.eth0.pid");
+    const holdingAnAddress = () => {
+        mkdirSync(join(root, "run-polaris-router"), { recursive: true });
+        writeFileSync(join(root, "addresses"), "2: eth0 inet 192.0.2.10/24");
+        stub("dhclient", `#!/bin/sh\necho "dhclient $*" >> "$FAKE/calls"\n`);
+    };
 
-    it("gives back the address of a client Polaris started, so the next start asks again", () => {
-        writeFileSync(join(root, "run-dhclient.eth0.pid"), "999999");
-        run(withRun(router.renderDown(plain)));
-        expect(calls()).toContain("ip -4 addr flush dev eth0");
-        expect(existsSync(join(root, "run-dhclient.eth0.pid"))).toBe(false);
-    });
-
-    it("keeps an address the machine got by itself", () => {
+    it("stops its own client and keeps the address and the file", () => {
+        mkdirSync(join(root, "run-polaris-router"), { recursive: true });
+        writeFileSync(ownPid(), "999999");
         run(withRun(router.renderDown(plain)));
         expect(calls()).not.toContain("flush dev eth0");
+        expect(existsSync(ownPid())).toBe(true);
+    });
+
+    it("renews on the next start when its client is gone", () => {
+        holdingAnAddress();
+        writeFileSync(ownPid(), "999999");
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).toContain("dhclient -4");
+    });
+
+    it("starts no second client while its own is alive", () => {
+        holdingAnAddress();
+        run(`echo $$ > ${posix(ownPid())}
+${withRun(router.renderLines(plain))}`);
+        expect(calls()).not.toContain("dhclient -4");
+    });
+
+    it("leaves an address it never asked for to the system", () => {
+        holdingAnAddress();
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).not.toContain("dhclient -4");
+    });
+
+    it("can still renew after the router is removed and set up again", () => {
+        holdingAnAddress();
+        writeFileSync(ownPid(), "999999");
+        writeFileSync(join(root, "run-polaris-router", "wan"), "eth0");
+        run(withRun(router.REMOVE_SCRIPT));
+        expect(existsSync(join(root, "run-polaris-router", "wan"))).toBe(false);
+        run(withRun(router.renderLines(plain)));
+        expect(calls()).toContain("dhclient -4");
+    });
+
+    describe("a machine still holding the stop script of an earlier version", () => {
+        const systemPid = () => join(root, "run-dhclient.eth0.pid");
+        const systemPidInShell = () => posix(systemPid());
+        const earlierStop = () => {
+            writeFileSync(systemPid(), "999999");
+            mkdirSync(join(root, "etc"), { recursive: true });
+            writeFileSync(
+                join(root, "etc", "down.sh"),
+                [
+                    "#!/bin/sh",
+                    `if [ -f ${systemPidInShell()} ]; then`,
+                    `    kill "$(cat ${systemPidInShell()})" 2>/dev/null`,
+                    "    ip -4 addr flush dev eth0 2>/dev/null",
+                    `    rm -f ${systemPidInShell()}`,
+                    "fi",
+                    "ip addr flush dev eth1 2>/dev/null",
+                    "exit 0",
+                    ""
+                ].join("\n")
+            );
+        };
+
+        beforeEach(() => {
+            earlierStop();
+            stub(
+                "systemctl",
+                `${STUBS.systemctl?.replace(
+                    'case "$*" in',
+                    'case "$*" in\n    stop*polaris-router.service*) /bin/sh "$FAKE/etc/down.sh" ;;'
+                )}`
+            );
+        });
+
+        const untouched = () => {
+            expect(calls()).not.toContain("flush dev eth0");
+            expect(calls()).toContain("ip addr flush dev eth1");
+            expect(existsSync(systemPid())).toBe(true);
+        };
+
+        it("keeps the line's address through a change", () => {
+            activate("next", "next-id");
+            untouched();
+        });
+
+        it("keeps the line's address through going back", () => {
+            activate("next", "next-id");
+            earlierStop();
+            rmSync(join(root, "calls"));
+            rollBack();
+            untouched();
+        });
+
+        it("keeps the line's address through removal", () => {
+            run(router.REMOVE_SCRIPT);
+            untouched();
+        });
+    });
+
+    it("never touches a client the system started for the same port", () => {
+        const down = router.renderDown(plain);
+        expect(down).not.toContain("/run/dhclient.eth0.pid");
+        expect(down).not.toContain("flush dev eth0");
     });
 
     it("gives a network plugged in late its address, once", () => {

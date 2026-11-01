@@ -332,6 +332,11 @@ function renderDockerAllow(plan: RouterPlan): string[] {
     ];
 }
 
+/** Polaris's own, apart from the name the system's DHCP setup gives its client. */
+function clientPid(device: string): string {
+    return `/run/polaris-router/dhclient.${device}.pid`;
+}
+
 function present(port: string): string {
     return `ip link show ${port} >/dev/null 2>&1`;
 }
@@ -409,14 +414,14 @@ export function renderLines(plan: RouterPlan): string {
     }
     for (const wan of plan.wans) {
         const device = deviceOf(wan);
-        const pid = `/run/dhclient.${device}.pid`;
+        const pid = clientPid(device);
         lines.push(
             `if ${present(wan.interface)}; then`,
             ...tagged(wan),
             `    ip link set ${device} up`,
             `    sysctl -q -w net.ipv4.conf.${device.replace(".", "/")}.rp_filter=2`,
-            `    if [ -z "$(ip -4 -o addr show dev ${device})" ] && ! kill -0 "$(cat ${pid} 2>/dev/null)" 2>/dev/null && command -v dhclient >/dev/null 2>&1; then`,
-            "        mkdir -p /var/lib/dhcp",
+            `    if { [ -z "$(ip -4 -o addr show dev ${device})" ] || [ -f ${pid} ]; } && ! kill -0 "$(cat ${pid} 2>/dev/null)" 2>/dev/null && command -v dhclient >/dev/null 2>&1; then`,
+            "        mkdir -p /var/lib/dhcp /run/polaris-router",
             `        dhclient -4 -nw -e IF_METRIC=${LINE_METRIC} -pf ${pid} -lf /var/lib/dhcp/dhclient.${device}.leases ${device}`,
             "    fi",
             "fi"
@@ -440,15 +445,10 @@ export function renderDown(plan: RouterPlan): string {
         "rm -f /run/polaris-router/wan"
     ];
     for (const wan of plan.wans) {
-        const device = deviceOf(wan);
-        const pid = `/run/dhclient.${device}.pid`;
-        lines.push(
-            `if [ -f ${pid} ]; then`,
-            `    kill "$(cat ${pid})" 2>/dev/null`,
-            `    ip -4 addr flush dev ${device} 2>/dev/null`,
-            `    rm -f ${pid}`,
-            "fi"
-        );
+        const pid = clientPid(deviceOf(wan));
+        // The address stays, and so does this file: an address can be the system's own,
+        // and taking it could cut the login. The next start renews through the file.
+        lines.push(`[ ! -f ${pid} ] || kill "$(cat ${pid})" 2>/dev/null`);
     }
     for (const lan of plan.lans) {
         lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
@@ -628,7 +628,8 @@ function heredoc(path: string, content: string): string {
 }
 
 /** Stop what runs, leaving the machine reachable by whatever it had before. */
-const STOP_ALL = `systemctl stop ${SERVICE_LIST} 2>/dev/null
+const STOP_ALL = `[ ! -f ${ROUTER_DIR}/down.sh ] || sed -i '/^if \\[ -f .*dhclient\\./,/^fi$/d' ${ROUTER_DIR}/down.sh
+systemctl stop ${SERVICE_LIST} 2>/dev/null
 [ ! -f ${ROUTER_DIR}/down.sh ] || /bin/sh ${ROUTER_DIR}/down.sh`;
 
 /** Turn on what is in the directory, or nothing when there is no directory. */
