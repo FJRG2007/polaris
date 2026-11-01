@@ -381,6 +381,8 @@
         "Ranks": "Rangos",
         "VPN": "VPN",
         "Private networks": "Redes privadas",
+        "Router": "Router",
+        "Router setup": "Router",
         "Add a device": "Añadir equipo"
     },
     "errors": {
