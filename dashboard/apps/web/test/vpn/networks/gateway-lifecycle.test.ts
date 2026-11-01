@@ -47,6 +47,7 @@ const { gatewayName } = await import("@/lib/vpn/networks");
 const ACTOR = { id: "owner-1", name: "Fixture", email: "fixture@example.test" };
 const NODE = {
     id: "node-1",
+    name: gatewayName("target-1"),
     givenName: gatewayName("target-1"),
     tags: ["tag:polaris"],
     online: true,

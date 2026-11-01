@@ -862,6 +862,10 @@
             "tailscale": {
                 "label": "Remote access",
                 "summary": "Reaches Polaris from your Tailscale devices."
+            },
+            "vpnGateway": {
+                "label": "VPN gateway",
+                "summary": "Connects this server's private networks to the VPN."
             }
         }
     },

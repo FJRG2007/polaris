@@ -195,6 +195,8 @@
         "badSubnet": "Usa una subred 10.x.x.x o 192.168.x.x entre /16 y /29.",
         "routerAddress": "IP del router",
         "badRouter": "Debe ser una dirección dentro de la subred.",
+        "subnetTaken": "Otra red ya usa esta subred.",
+        "ssidLong": "Largo para Wi-Fi: acentos y símbolos cuentan doble.",
         "server": "Servidor",
         "pickServer": "Elige un servidor",
         "noServers": "Añade antes un servidor: la pasarela necesita uno.",

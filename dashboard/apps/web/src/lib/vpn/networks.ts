@@ -104,6 +104,23 @@ export function suggestCidr(taken: readonly string[]): string {
     return "";
 }
 
+/** The most a Wi-Fi name can hold, in bytes rather than characters. */
+const SSID_MAX_BYTES = 32;
+
+function byteLength(text: string): number {
+    return new TextEncoder().encode(text).length;
+}
+
+/** The longest start of `name` a Wi-Fi name can hold, never cutting a character. */
+export function ssidFrom(name: string): string {
+    let fitted = "";
+    for (const character of name) {
+        if (byteLength(fitted + character) > SSID_MAX_BYTES) break;
+        fitted += character;
+    }
+    return fitted;
+}
+
 /** The fields a person types, shared by the form and the action. */
 export const networkInputSchema = z
     .object({
@@ -111,7 +128,11 @@ export const networkInputSchema = z
         cidr: z.string().transform(normalizeCidr).pipe(z.string().refine(isUsableCidr)),
         routerAddress: z.string().trim(),
         targetId: z.string().trim().min(1).max(64),
-        ssid: z.string().trim().min(1).max(32),
+        ssid: z
+            .string()
+            .trim()
+            .min(1)
+            .refine((ssid) => byteLength(ssid) <= SSID_MAX_BYTES),
         access: z.enum(["admins", "everyone"]),
         internet: z.boolean()
     })
@@ -168,15 +189,20 @@ export function gatewayName(targetId: string): string {
     return `polaris-gateway-${short}`;
 }
 
-/** Whether a VPN device is the gateway of `name`. Headscale adds a suffix when a
- *  name is taken, as it is after a state volume is lost. */
+/** Whether a VPN device is the gateway of `name`. Its hostname is what the gateway
+ *  reports and survives a rename on the Devices screen; the given name is what
+ *  Headscale suffixes when a name is taken, as it is after a state volume is lost. */
 export function isGatewayNode(
-    node: { readonly givenName: string; readonly tags: readonly string[] },
+    node: {
+        readonly name: string;
+        readonly givenName: string;
+        readonly tags: readonly string[];
+    },
     name: string,
     tag: string
 ): boolean {
     if (!node.tags.includes(tag)) return false;
-    return node.givenName === name || node.givenName.startsWith(`${name}-`);
+    return node.name === name || node.givenName === name || node.givenName.startsWith(`${name}-`);
 }
 
 /** Empty the state for a generation not seen yet, then start as usual. One line:

@@ -10,16 +10,24 @@ import type { ReactElement } from "react";
 import { MessagesWrapper } from "../../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NetworkView } from "@/lib/vpn/network-service";
-import { cleanup, fireEvent, render as draw, screen, waitFor } from "@testing-library/react";
+import {
+    cleanup,
+    fireEvent,
+    render as draw,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 
 const listNetworksAction = vi.fn();
 const createNetworkAction = vi.fn();
+const removeNetworkAction = vi.fn();
 vi.mock("@/app/(app)/apps/vpn/networks/actions", () => ({
     listNetworksAction,
     createNetworkAction,
     updateNetworkAction: vi.fn(),
     retryGatewayAction: vi.fn(),
-    removeNetworkAction: vi.fn()
+    removeNetworkAction
 }));
 
 const { VpnNetworksSection } = await import("@/app/(app)/apps/vpn/networks/networks");
@@ -49,6 +57,7 @@ afterEach(() => {
     cleanup();
     listNetworksAction.mockReset();
     createNetworkAction.mockReset();
+    removeNetworkAction.mockReset();
 });
 
 describe("VpnNetworksSection", () => {
@@ -79,6 +88,21 @@ describe("VpnNetworksSection", () => {
         expect(await screen.findByText("Fixture home")).toBeTruthy();
         expect(screen.queryByText("New network")).toBeNull();
         expect(screen.queryByText("Router setup")).toBeNull();
+    });
+
+    it("refuses a subnet another network uses before anything is sent", async () => {
+        listNetworksAction.mockResolvedValue({
+            networks: [NETWORK],
+            servers: [{ id: "target-1", name: "fixture-server" }]
+        });
+        render(<VpnNetworksSection isAdmin />);
+        fireEvent.click((await screen.findAllByText("New network"))[0] as HTMLElement);
+        const subnet = await screen.findByLabelText("Subnet *");
+        fireEvent.change(subnet, { target: { value: "10.77.0.128/25" } });
+        expect(await screen.findByText("Another network already uses this subnet.")).toBeTruthy();
+        fireEvent.change(screen.getByLabelText("Name *"), { target: { value: "Home" } });
+        fireEvent.click(screen.getByRole("button", { name: "Create network" }));
+        expect(createNetworkAction).not.toHaveBeenCalled();
     });
 
     it("says what is wrong with a subnet as it is typed, and sends what is typed", async () => {
@@ -148,5 +172,45 @@ describe("VpnNetworksSection", () => {
         fireEvent.click(screen.getByRole("button", { name: "Create network" }));
         expect(await screen.findByText("Fixture notice")).toBeTruthy();
         await waitFor(() => expect(screen.queryByLabelText("Name *")).toBeNull());
+    });
+
+    it("forgets a failed create on cancel and reopens clean from the empty state", async () => {
+        listNetworksAction.mockResolvedValue({
+            networks: [],
+            servers: [{ id: "target-1", name: "fixture-server" }]
+        });
+        createNetworkAction.mockResolvedValue({ error: "Fixture failure" });
+        render(<VpnNetworksSection isAdmin />);
+        await screen.findByText("No private networks");
+        fireEvent.click(screen.getAllByText("New network")[1] as HTMLElement);
+        fireEvent.change(await screen.findByLabelText("Name *"), { target: { value: "Home" } });
+        fireEvent.click(screen.getByRole("button", { name: "Create network" }));
+        expect((await screen.findAllByText("Fixture failure")).length).toBeGreaterThan(0);
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await waitFor(() => expect(screen.queryByLabelText("Name *")).toBeNull());
+        expect(screen.queryByText("Fixture failure")).toBeNull();
+
+        fireEvent.click(screen.getAllByText("New network")[1] as HTMLElement);
+        await screen.findByLabelText("Name *");
+        expect(screen.queryByText("Fixture failure")).toBeNull();
+    });
+
+    it("forgets a failed removal on cancel", async () => {
+        listNetworksAction.mockResolvedValue({ networks: [NETWORK], servers: [] });
+        removeNetworkAction.mockResolvedValue({ error: "Fixture failure" });
+        render(<VpnNetworksSection isAdmin />);
+        await screen.findByText("Fixture home");
+        fireEvent.click(screen.getByRole("button", { name: "Remove network" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(within(dialog).getByRole("textbox"), {
+            target: { value: "Fixture home" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Remove network" }));
+        expect((await screen.findAllByText("Fixture failure")).length).toBeGreaterThan(0);
+
+        fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(screen.queryByText("Fixture failure")).toBeNull();
     });
 });

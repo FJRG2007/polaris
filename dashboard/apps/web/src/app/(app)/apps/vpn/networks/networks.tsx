@@ -19,7 +19,9 @@ import { Loader2, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-reac
 import {
     firstHost,
     isHostOf,
+    cidrsOverlap,
     isUsableCidr,
+    ssidFrom,
     networkInputSchema,
     normalizeCidr,
     suggestCidr
@@ -84,6 +86,18 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
         });
     }
 
+    function openDialog(show: () => void): void {
+        setError(null);
+        show();
+    }
+
+    function cancelDialog(): void {
+        setError(null);
+        setCreating(false);
+        setEditing(null);
+        setRemoving(null);
+    }
+
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -94,7 +108,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     <ui.Button
                         size="sm"
                         disabled={read.data === null}
-                        onClick={() => setCreating(true)}
+                        onClick={() => openDialog(() => setCreating(true))}
                     >
                         <Plus />
                         {t("networks.new")}
@@ -137,7 +151,10 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     }
                     action={
                         isAdmin && !limited ? (
-                            <ui.Button size="sm" onClick={() => setCreating(true)}>
+                            <ui.Button
+                                size="sm"
+                                onClick={() => openDialog(() => setCreating(true))}
+                            >
                                 {t("networks.new")}
                             </ui.Button>
                         ) : undefined
@@ -156,8 +173,8 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                                 onRetry={() =>
                                     run(() => actions.retryGatewayAction({ id: network.id }))
                                 }
-                                onEdit={() => setEditing(network)}
-                                onRemove={() => setRemoving(network)}
+                                onEdit={() => openDialog(() => setEditing(network))}
+                                onRemove={() => openDialog(() => setRemoving(network))}
                             />
                         </li>
                     ))}
@@ -170,7 +187,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     servers={read.data?.servers ?? []}
                     busy={pending}
                     error={error}
-                    onClose={() => setCreating(false)}
+                    onClose={cancelDialog}
                     onCreate={(input) =>
                         run(
                             () => actions.createNetworkAction(input),
@@ -185,7 +202,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                     network={editing}
                     busy={pending}
                     error={error}
-                    onClose={() => setEditing(null)}
+                    onClose={cancelDialog}
                     onSave={(change) =>
                         run(
                             () => actions.updateNetworkAction(change),
@@ -196,7 +213,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
             ) : null}
             <ui.ConfirmDeleteDialog
                 open={removing !== null}
-                onOpenChange={(open) => !open && setRemoving(null)}
+                onOpenChange={(open) => !open && cancelDialog()}
                 kind={t("networks.kind")}
                 name={removing?.name ?? ""}
                 title={t("networks.removeTitle")}
@@ -531,12 +548,14 @@ function CreateDialog({
 
     const normalized = normalizeCidr(cidr);
     const subnetBad = cidr.trim() !== "" && !isUsableCidr(normalized);
+    const subnetTaken = !subnetBad && taken.some((other) => cidrsOverlap(normalized, other));
     const routerBad =
         routerAddress.trim() !== "" &&
         isUsableCidr(normalized) &&
         !isHostOf(normalized, routerAddress.trim());
     const input = { name, cidr, routerAddress, targetId, ssid, access, internet };
-    const valid = networkInputSchema.safeParse(input).success;
+    const valid = !subnetTaken && networkInputSchema.safeParse(input).success;
+    const ssidBad = ssid.trim() !== "" && ssidFrom(ssid.trim()) !== ssid.trim();
 
     function changeCidr(next: string): void {
         setCidr(next);
@@ -560,8 +579,8 @@ function CreateDialog({
                             placeholder={t("networks.namePlaceholder")}
                             onChange={(event) => {
                                 const next = event.target.value;
-                                if (ssid === "" || ssid === name.slice(0, 32)) {
-                                    setSsid(next.slice(0, 32));
+                                if (ssid === "" || ssid === ssidFrom(name)) {
+                                    setSsid(ssidFrom(next));
                                 }
                                 setName(next);
                             }}
@@ -571,7 +590,13 @@ function CreateDialog({
                         <Field
                             id="network-subnet"
                             label={`${t("networks.subnet")} *`}
-                            error={subnetBad ? t("networks.badSubnet") : null}
+                            error={
+                                subnetBad
+                                    ? t("networks.badSubnet")
+                                    : subnetTaken
+                                      ? t("networks.subnetTaken")
+                                      : null
+                            }
                         >
                             <ui.Input
                                 id="network-subnet"
@@ -596,7 +621,7 @@ function CreateDialog({
                             />
                         </Field>
                     </div>
-                    {!subnetBad ? (
+                    {!subnetBad && !subnetTaken ? (
                         <p className="text-xs text-muted-foreground">{t("networks.subnetHint")}</p>
                     ) : null}
                     <Field
@@ -615,7 +640,11 @@ function CreateDialog({
                             }))}
                         />
                     </Field>
-                    <Field id="network-ssid" label={`${t("networks.ssid")} *`}>
+                    <Field
+                        id="network-ssid"
+                        label={`${t("networks.ssid")} *`}
+                        error={ssidBad ? t("networks.ssidLong") : null}
+                    >
                         <ui.Input
                             id="network-ssid"
                             value={ssid}

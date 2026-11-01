@@ -78,6 +78,11 @@ const PARTS: Record<string, { label: string; summary: string }> = {
         label: "Remote access",
         summary: "Reaches Polaris from your Tailscale devices."
     },
+    [GATEWAY_PROJECT]: {
+        // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
+        label: "VPN gateway",
+        summary: "Connects this server's private networks to the VPN."
+    },
     "polaris-tunnel": {
         // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
         label: "Public tunnel",
