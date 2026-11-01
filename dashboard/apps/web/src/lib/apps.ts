@@ -113,6 +113,7 @@ import {
     Music,
     TrendingUp,
     Stethoscope,
+    Router,
     Waypoints,
     Plus,
     EthernetPort,
@@ -1471,6 +1472,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: NETWORK_GROUP
         },
         {
+            label: "Router", // i18n-ignore
+            href: "/apps/router",
+            adminOnly: true,
+            icon: Router,
+            keywords: ["router", "wan", "lan", "vlan", "dhcp", "firewall", "failover"],
+            group: NETWORK_GROUP
+        },
+        {
             // Everybody's once installed: each person manages their own devices
             // in it, like the VPN rail it leads to.
             label: "VPN", // i18n-ignore
@@ -2825,6 +2834,22 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 requiresApp: "dns-blocker",
                 icon: SlidersHorizontal,
                 keywords: ["upstream", "safe search", "cache", "export", "import", "backup"]
+            }
+        ]
+    },
+    {
+        id: "router",
+        label: "Router", // i18n-ignore
+        icon: Router,
+        base: "/apps/router",
+        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
+        sections: [
+            {
+                label: "Router setup", // i18n-ignore
+                href: "/apps/router",
+                adminOnly: true,
+                icon: Router,
+                keywords: ["router", "wan", "lan", "vlan", "dhcp", "firewall", "failover", "raspberry pi", "starlink", "port forward"]
             }
         ]
     },
