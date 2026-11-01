@@ -19,7 +19,9 @@
 
 import { cn } from "../lib/cn";
 import { FLOATING_MOTION } from "../lib/motion";
+import { useUiStrings } from "../lib/ui-strings";
 import { Check, ChevronDown } from "lucide-react";
+import { SearchableSelect } from "./searchable-select";
 import * as RadixSelect from "@radix-ui/react-select";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
 
@@ -154,12 +156,41 @@ export interface SelectProps {
     "aria-label"?: string;
 }
 
+/** From this many options a list is searched rather than scrolled. */
+const SEARCH_FROM = 12;
+/** The most rows drawn at once: the rest are reached by typing. */
+const DRAWN_ROWS = 200;
+
+/** A `Select` whose list grew: same props, with a search box and a drawn limit. */
+function LongSelect({ name, placeholder = "", ...props }: SelectProps) {
+    const words = useUiStrings();
+    return (
+        <>
+            <SearchableSelect
+                {...props}
+                placeholder={placeholder}
+                searchPlaceholder={words.selectSearch}
+                emptyText={words.selectEmpty}
+                limit={DRAWN_ROWS}
+                moreText={words.selectMore}
+            />
+            {name ? <input type="hidden" name={name} value={props.value} /> : null}
+        </>
+    );
+}
+
 /**
  * Ergonomic Select: pass a flat `options` list and get a fully styled dropdown.
  * The selected option's icon is mirrored in the trigger so the closed state reads
- * the same as the open one.
+ * the same as the open one. A list that can grow is safe here: from `SEARCH_FROM`
+ * options it searches, on every screen, with nothing to change at the call site.
  */
-export function Select({
+export function Select(props: SelectProps) {
+    if (props.options.length >= SEARCH_FROM) return <LongSelect {...props} />;
+    return <ShortSelect {...props} />;
+}
+
+function ShortSelect({
     value,
     onValueChange,
     options,

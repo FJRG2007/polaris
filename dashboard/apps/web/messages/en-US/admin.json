@@ -1250,6 +1250,7 @@
             "domainMissing": "Enter the domain you want to use",
             "saveFailed": "Could not save the domain setup",
             "createFailed": "Could not create the DNS records",
+            "noWayIn": "A backup tunnel is serving and this line takes no visitors, so there is no address to write. Choose a relay in Backup access.",
             "readFailed": "Could not read your setup",
             "rereadFailed": "Could not re-read your setup",
             "checkFailed": "Could not check the DNS records",

@@ -307,7 +307,7 @@ describe("the Philips Air+ app step", () => {
 describe("the Philips account's country", () => {
     it("is asked first, and starts on where the reader probably is", async () => {
         drawn();
-        const picker = screen.getByRole("combobox", { name: "Country or region" });
+        const picker = screen.getByRole("button", { name: "Country or region" });
         expect(screen.getByText(/Philips keeps each country's devices in one region/)).toBeTruthy();
         const expected = philipsCountryGuess({
             timeZones: [null, Intl.DateTimeFormat().resolvedOptions().timeZone],

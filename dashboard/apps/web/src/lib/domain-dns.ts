@@ -26,7 +26,10 @@ import { resolve4 } from "node:dns/promises";
 import { randomLabel } from "@polaris/deploy";
 import { installedGames } from "./apps/game-zones";
 import { setDomainConfig } from "./domain-service";
-import { detectPublicIp, getLocalEnvironment } from "./network-service";
+import { getLocalEnvironment } from "./network-service";
+import { backupRecordsTarget } from "./backup-access";
+import { borrowRelayName } from "./backup-access/borrowed-names";
+import { acceptedAddresses, expectedPublicAddress, publishableAddress } from "./serving-address";
 import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
 import { authoritativeA, propagationLeft } from "./dns/authoritative";
@@ -127,7 +130,7 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
     // ones that run as a side effect of something else keep the cheap answer.
     const [config, expectedIp] = await Promise.all([
         getDomainZones(),
-        detectPublicIp(options.fresh === true)
+        expectedPublicAddress(options.fresh === true)
     ]);
     const records = zoneRecords(config);
     const gameZones = await checkGameZoneDns(config, expectedIp);
@@ -349,6 +352,14 @@ async function applyDashboardZone(): Promise<void> {
     await setDashboardZoneIntent(false);
 }
 
+/** A backup tunnel holds the records and the line takes no visitors, so a new record
+ *  has no address to name. */
+export class NoPublishableAddressError extends Error {
+    constructor() {
+        super("No address takes visitors while the backup tunnel serves this domain");
+    }
+}
+
 export interface ZoneDnsProvisionResult {
     created: string[];
     /** Records that already existed and were repointed at this server. */
@@ -396,10 +407,12 @@ export async function provisionZoneDns(
     const [config, token, ip] = await Promise.all([
         getDomainZones(),
         loadCloudflareToken(),
-        detectPublicIp()
+        publishableAddress()
     ]);
     if (!config.baseDomain) throw new Error("Set a base domain first");
     if (!token) throw new Error("Connect a Cloudflare API token under Integrations first");
+    if (!ip && (await backupRecordsTarget())?.kind === "tunnel")
+        throw new NoPublishableAddressError();
     if (!ip)
         throw new Error(
             "Polaris could not detect this server's public IP, so it does not know what to point DNS at"
@@ -434,6 +447,7 @@ export async function provisionZoneDns(
                 });
                 continue;
             }
+            await borrowRelayName(zone.id, name, ip);
             const recordId = await upsertARecord(token, zone.id, name, ip);
             await pruneDnsRecords(token, zone.id, recordId, existing);
             (existing.length > 0 ? result.replaced : result.created).push(name);
@@ -463,6 +477,9 @@ export interface HostnameDnsResult {
     content?: string;
     /** Why nothing was written, for `manual`. */
     detail?: string;
+    /** Nothing was written because no address takes visitors right now: a backup
+     *  tunnel holds the records and the line is behind a carrier. */
+    noWayIn?: boolean;
 }
 
 /** What a served-by-its-own-server domain sits on, as the decision below reads it. */
@@ -509,7 +526,7 @@ async function dnsTargetFor(hostname: string): Promise<{ ip: string | null; serv
             }
         })
         .catch(() => null);
-    if (!domain) return { ip: await detectPublicIp() };
+    if (!domain) return { ip: await publishableAddress() };
     return serviceDnsTarget(domain.application.target, domain.servedBy);
 }
 
@@ -524,7 +541,7 @@ export async function serviceDnsTarget(
     servedBy: string
 ): Promise<{ ip: string | null; server?: string }> {
     const host = target.kind !== "local" ? target.host : null;
-    if (!host || servedBy === "polaris") return { ip: await detectPublicIp() };
+    if (!host || servedBy === "polaris") return { ip: await publishableAddress() };
     const address = host.address.trim();
     // An address is used as it is; a name is looked up, the way a visitor would.
     const addresses = isIP(address) !== 0 ? [address] : await resolveOrEmpty(address);
@@ -550,6 +567,8 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
     const [token, target] = await Promise.all([loadCloudflareToken(), dnsTargetFor(name)]);
     const ip = target.ip;
     if (!ip) {
+        if (!target.server && (await backupRecordsTarget())?.kind === "tunnel")
+            return { status: "manual", ip: null, noWayIn: true };
         return {
             status: "manual",
             ip: null,
@@ -560,7 +579,11 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
     }
     // Asked of DNS before Cloudflare: a name a wildcard already covers needs no record
     // of its own, and one lookup is cheaper than a round trip to the API.
-    if ((await resolveOrEmpty(name)).includes(ip)) return { status: "unchanged", ip };
+    const here = new Set(
+        target.server ? [ip] : [ip, ...(await acceptedAddresses().catch(() => []))]
+    );
+    if ((await resolveOrEmpty(name)).some((address) => here.has(address)))
+        return { status: "unchanged", ip };
     if (!token) {
         return {
             status: "manual",
@@ -571,7 +594,7 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
     try {
         const zone = await resolveZoneForHostname(token, name);
         const existing = await findDnsRecords(token, zone.id, "A", name);
-        const elsewhere = existing.filter((entry) => entry.content !== ip);
+        const elsewhere = existing.filter((entry) => !here.has(entry.content));
         if (existing.length > 0 && elsewhere.length === 0) return { status: "unchanged", ip };
         if (elsewhere.length > 0) {
             return {
@@ -580,6 +603,7 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
                 content: elsewhere.map((entry) => entry.content).join(", ")
             };
         }
+        await borrowRelayName(zone.id, name, ip);
         const recordId = await upsertARecord(token, zone.id, name, ip);
         await pruneDnsRecords(token, zone.id, recordId, existing);
         return { status: "created", ip };

@@ -13,6 +13,7 @@
 import { prisma } from "@polaris/db";
 import * as machine from "./dns-cutover";
 import { serviceDnsTarget } from "@/lib/domain-dns";
+import { borrowRelayName } from "@/lib/backup-access/borrowed-names";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as cf from "@/lib/integrations/cloudflare-api";
 import { checkPropagation } from "@/lib/dns/propagation";
@@ -294,6 +295,7 @@ export async function startCutover(input: {
     let oldValues: string[];
     let oldTtl: number | null;
     if (zone) {
+        if (newValue) await borrowRelayName(zone.zoneId, domain.hostname, newValue);
         records = (await cf.findDnsRecords(zone.token, zone.zoneId, "A", domain.hostname)).map(
             (record) => ({
                 id: record.id,

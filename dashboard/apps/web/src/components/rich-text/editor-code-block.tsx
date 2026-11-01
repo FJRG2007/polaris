@@ -181,7 +181,7 @@ function CodeBlockShell({ node, updateAttributes, editor }: NodeViewProps) {
                     aria-label={t("editor.codeLanguage")}
                     onValueChange={(next) => updateAttributes({ language: next || null })}
                     className="h-6 w-40 border-none bg-transparent px-1 text-[0.625rem] uppercase tracking-[0.06em]"
-                    contentClassName="max-h-72"
+                    contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
                     options={[{ value: "", label: t("editor.plainText") }, ...LANGUAGES]}
                 />
             </div>

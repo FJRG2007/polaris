@@ -259,7 +259,8 @@
         "dnsPointAt": "Point {hostname} at {ip} in your DNS provider.",
         "dnsPointAtDetail": "Point {hostname} at {ip} in your DNS provider - {detail}",
         "dnsPoint": "Point {hostname} in your DNS provider.",
-        "dnsPointDetail": "Point {hostname} in your DNS provider - {detail}"
+        "dnsPointDetail": "Point {hostname} in your DNS provider - {detail}",
+        "dnsNoWayIn": "A backup tunnel is serving and this line takes no visitors, so no record was written for {hostname}. An administrator can choose a relay in Backup access to give it an address."
     },
     "certificate": {
         "replaceOn": "Replace the certificate on {hostname}",

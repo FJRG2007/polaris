@@ -39,6 +39,7 @@ import {
 } from "@/lib/domain-service";
 import {
     checkZoneDns,
+    NoPublishableAddressError,
     provisionZoneDns,
     type ZoneDnsProvisionResult,
     type ZoneDnsReport
@@ -229,7 +230,10 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
     const current = await domainSetupState();
     const parsed = setupSchema.safeParse(input);
     if (!parsed.success) {
-        return { state: current, error: parsed.error.issues[0]?.message ?? t("domainsSetup.errors.invalid") };
+        return {
+            state: current,
+            error: parsed.error.issues[0]?.message ?? t("domainsSetup.errors.invalid")
+        };
     }
     const { strategy, environment, useForDashboard } = parsed.data;
     const meta = STRATEGY_META[strategy];
@@ -400,9 +404,11 @@ export async function provisionZoneDnsAction(
             conflicts: [],
             failed: [],
             error:
-                caught instanceof Error
-                    ? caught.message
-                    : (await getTranslations("admin"))("domainsSetup.errors.createFailed")
+                caught instanceof NoPublishableAddressError
+                    ? (await getTranslations("admin"))("domainsSetup.errors.noWayIn")
+                    : caught instanceof Error
+                      ? caught.message
+                      : (await getTranslations("admin"))("domainsSetup.errors.createFailed")
         };
     }
 }

@@ -4,7 +4,8 @@
  * `max-h-*` replaces that cap rather than adding to it - Polar's model list,
  * opened from a composer low on the screen, ran past the bottom edge and its
  * last models could not be scrolled to. A caller that wants a shorter menu
- * writes the smaller of its height and the measured one.
+ * writes the smaller of its height and the measured one. So does a `Select`,
+ * which becomes a menu once its list is long and hands it `contentClassName`.
  */
 
 import { join } from "node:path";
@@ -28,7 +29,9 @@ function sources(dir: string): string[] {
 
 /** The `className` given to each menu surface, wherever it sits among the props. */
 function menuClasses(text: string): string[] {
-    const classes: string[] = [];
+    const classes = [...text.matchAll(/contentClassName="([^"]*)"/g)].map(
+        (match) => match[1] ?? ""
+    );
     const opening = /<(DropdownMenuContent|DropdownMenuSubContent|ContextMenuContent)\b/g;
     for (let match = opening.exec(text); match; match = opening.exec(text)) {
         const rest = text.slice(match.index, match.index + 2000);

@@ -218,6 +218,7 @@
         },
         "conflict": "It currently points to {current}.",
         "noIp": "Polaris could not detect this server's public address. Point the name at the address that reaches this server.",
+        "noWayIn": "A backup tunnel is serving and this line takes no visitors, so no record was written. An administrator can choose a relay in Backup access.",
         "notRouted": "The route for this domain could not be written yet. Polaris retries within the hour."
     }
 }

@@ -161,6 +161,14 @@ builder's disk layout - account name included.
   above knew to handle it - never silence or narrow this check to make a build
   pass.
 
+## Lists grow
+
+Anything drawn from data - servers, repositories, accounts, members - can be
+thousands. Never lay such a list out as buttons, chips or tabs: use `Select` from
+`@polaris/ui`, which turns into a search from 12 options and draws at most 200
+rows. Query it with a `take`. A set with no sane upper bound needs a search on the
+server, because a picker only searches what it was sent.
+
 ## Agent session environment
 
 The host daemon refuses to start a container if any environment value contains

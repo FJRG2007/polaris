@@ -124,9 +124,9 @@ describe("the forward guides on the Domains page", () => {
     it("sends an app-only mesh system to its app, with no admin page to open or turn off", async () => {
         Element.prototype.scrollIntoView ??= vi.fn();
         render(<RouterSteps server={null} lanIp="10.0.0.5" />, { wrapper: MessagesWrapper });
-        const picker = screen.getByRole("combobox");
-        fireEvent.click(picker);
-        fireEvent.click(await screen.findByRole("option", { name: "eero" }));
+        const picker = screen.getByRole("button", { name: /^Router brand/ });
+        fireEvent.keyDown(picker, { key: "ArrowDown" });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "eero" }));
         fireEvent.click(screen.getByRole("button", { name: /exactly what to do/i }));
         expect(await screen.findByText(/Open the eero app/)).toBeTruthy();
         expect(screen.queryByRole("link", { name: /Open the router/ })).toBeNull();

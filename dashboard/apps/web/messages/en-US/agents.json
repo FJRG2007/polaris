@@ -358,6 +358,7 @@
         "add": "Add a rule",
         "none": "No rules yet, so these repositories only answer when the app is mentioned. A rule is what makes one act on its own - reply to a new issue, review a new pull request.",
         "addUsual": "Add the usual rules to {name}",
+        "addUsualPick": "Add the usual rules to a repository",
         "unknownRepo": "unknown repository",
         "remove": "Remove this rule",
         "edit": "Edit rule",

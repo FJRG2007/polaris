@@ -1250,6 +1250,7 @@
             "domainMissing": "Escribe el dominio que quieres usar",
             "saveFailed": "No se guardó la configuración",
             "createFailed": "No se han podido crear los registros DNS",
+            "noWayIn": "Sirve un túnel de reserva y esta línea no admite visitas, así que no hay dirección que escribir. Elige Relé propio en Acceso de reserva.",
             "readFailed": "No se leyó tu configuración",
             "rereadFailed": "No se releyó tu configuración",
             "checkFailed": "No se comprobaron los registros DNS",
