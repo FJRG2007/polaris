@@ -42,6 +42,9 @@ export class CutoverRefusedError extends Error {
     }
 }
 
+/** No address takes visitors at the moment of a switch. */
+class NoAddressError extends Error {}
+
 /** A record as it stood before the cutover touched it. */
 interface KeptRecord {
     readonly id: string;
@@ -295,7 +298,6 @@ export async function startCutover(input: {
     let oldValues: string[];
     let oldTtl: number | null;
     if (zone) {
-        if (newValue) await borrowRelayName(zone.zoneId, domain.hostname, newValue);
         records = (await cf.findDnsRecords(zone.token, zone.zoneId, "A", domain.hostname)).map(
             (record) => ({
                 id: record.id,
@@ -414,6 +416,25 @@ async function zoneOf(row: { hostname: string; zoneId: string | null; domainId: 
     const zone = await zoneFor(row.hostname, domain.application.environment.project);
     if (!zone || zone.zoneId !== row.zoneId) throw new Error("zone-unreachable");
     return zone;
+}
+
+/** What the name must answer with now: a backup path can have come or gone since the
+ *  cutover opened, so the address it stored may no longer take visitors. */
+async function addressNow(row: { domainId: string; targetApplicationId: string }): Promise<string> {
+    const [domain, target] = await Promise.all([
+        loadDomain(row.domainId),
+        prisma.application.findUnique({
+            where: { id: row.targetApplicationId },
+            select: APP_SELECT
+        })
+    ]);
+    if (!domain || !target) throw new CutoverRefusedError("not-found");
+    const { ip } = await serviceDnsTarget(
+        { kind: target.target.kind, host: target.target.host },
+        domain.servedBy
+    );
+    if (!ip) throw new NoAddressError("no-address");
+    return ip;
 }
 
 /** Put the name's A records back the way the cutover found them, from what the zone
@@ -550,6 +571,7 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
     });
     if (claimed.count === 0) return;
     let written = readWritten(row.recordIds);
+    let value = row.newValue;
     const save = async (next: Written) => {
         written = next;
         await prisma.dnsCutover.update({
@@ -562,6 +584,10 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
         for (const effect of effects) {
             if (effect === "write-record") {
                 const zone = await zoneOf(row);
+                const address = await addressNow(row);
+                value = address;
+                await borrowRelayName(zone.zoneId, row.hostname, address);
+                await prisma.dnsCutover.update({ where: { id }, data: { newValue: address } });
                 const present = new Set(
                     (await cf.findDnsRecords(zone.token, zone.zoneId, "A", row.hostname)).map(
                         (entry) => entry.id
@@ -570,13 +596,25 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
                 const ttl = machine.lowersTtl(mode, row.oldTtl) ? machine.LOWERED_TTL : undefined;
                 const [first, ...rest] = written.records;
                 if (first && present.has(first.id)) {
-                    await rewrite(zone, row.hostname, first, { content: row.newValue ?? "", ttl });
-                } else if (!written.created || !present.has(written.created)) {
+                    await rewrite(zone, row.hostname, first, { content: address, ttl });
+                } else if (written.created && present.has(written.created)) {
+                    await rewrite(
+                        zone,
+                        row.hostname,
+                        {
+                            id: written.created,
+                            content: address,
+                            ttl: machine.LOWERED_TTL,
+                            proxied: false
+                        },
+                        {}
+                    );
+                } else {
                     const created = (
                         await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
                             type: "A",
                             name: row.hostname,
-                            content: row.newValue ?? "",
+                            content: address,
                             ttl: machine.LOWERED_TTL,
                             proxied: false
                         })
@@ -593,14 +631,16 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
                 await syncAppRoutes();
             }
         }
-    } catch {
+    } catch (caught) {
+        const failure: machine.CutoverFailure =
+            caught instanceof NoAddressError
+                ? "no-address"
+                : mode === "edge"
+                  ? "route-move-failed"
+                  : "record-write-failed";
         await prisma.dnsCutover.update({
             where: { id },
-            data: {
-                phase: row.phase,
-                switchedAt: null,
-                failure: mode === "edge" ? "route-move-failed" : "record-write-failed"
-            }
+            data: { phase: row.phase, switchedAt: null, failure }
         });
         return;
     }
@@ -609,7 +649,7 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
         action: "deploy.domain.cutover.switch",
         targetType: "domain",
         targetId: row.domainId,
-        metadata: { hostname: row.hostname, mode, to: row.newValue }
+        metadata: { hostname: row.hostname, mode, to: value }
     });
 }
 

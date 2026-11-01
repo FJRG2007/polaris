@@ -38,10 +38,11 @@ import type { ComposeSpec } from "@polaris/deploy";
 import { getDomainZones } from "@/lib/domain-zones";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { probePublicIp } from "@/lib/network-service";
-import { readBorrowed, settleBorrowed } from "./borrowed-names";
+import { type BorrowedName, missBorrowed, readBorrowed, settleBorrowed } from "./borrowed-names";
 import * as notices from "@/lib/notification-service";
 import { PUBLISHED_KEY } from "@/lib/domain-address-sync";
 import { wordsFor } from "@/lib/notifications/notice-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { internetOffline } from "@/lib/offline/outbound-lookup";
 import { forwardedPorts } from "@/lib/app-extensions/registry";
@@ -73,6 +74,7 @@ import {
     BACKUP_CONFIG_KEY,
     BACKUP_RECORDS_KEY,
     BACKUP_STATE_KEY,
+    BACKUP_TUNNEL_KEY,
     forgetBackupAccess
 } from "@/lib/backup-access";
 import {
@@ -128,7 +130,6 @@ import {
 import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 
 const TTL_KEY = "backupAccess.ttl";
-const TUNNEL_KEY = "backupAccess.tunnel";
 const RELAY_KEY = "backupAccess.relay";
 const PROBE_KEY = "backupAccess.probe";
 
@@ -174,7 +175,13 @@ const recordsSchema = z.object({
     originals: z.array(savedRecordSchema)
 });
 
-const tunnelSchema = z.object({ tunnelId: z.string(), accountId: z.string(), token: z.string() });
+const tunnelSchema = z.object({
+    tunnelId: z.string(),
+    accountId: z.string(),
+    token: z.string(),
+    /** The hostnames last given to the tunnel's ingress. */
+    hosts: z.array(z.string()).default([])
+});
 
 const relaySchema = z.object({
     targetId: z.string(),
@@ -308,7 +315,7 @@ export async function backupView(): Promise<BackupView> {
             readConfig(),
             getSetting(BACKUP_STATE_KEY).then(readState),
             getSetting(PROBE_KEY).then((raw) => parse(probeSchema, raw)),
-            getSetting(TUNNEL_KEY).then((raw) => parse(tunnelSchema, raw)),
+            getSetting(BACKUP_TUNNEL_KEY).then((raw) => parse(tunnelSchema, raw)),
             getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw)),
             loadCloudflareToken().catch(() => null),
             prisma.deployTarget
@@ -459,6 +466,7 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
 
     let conflicts: string[] = [];
     let moved: string | null = null;
+    let flipped = false;
     try {
         if (decision.move === "to-backup" && target) await toBackup(zones.baseDomain, target);
         // A path changed while on backup: the records follow it before the old one goes.
@@ -472,11 +480,11 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
             await toBackup(zones.baseDomain, target);
         if (decision.move === "to-direct" || (decision.state.serving === "direct" && saved))
             conflicts = await toDirect();
-        await moveBorrowed(measured.lastIp);
         moved = decision.move;
         await setSetting(BACKUP_STATE_KEY, JSON.stringify(decision.state));
         forgetBackupAccess();
         if (decision.move) await announce(decision.state, zones.baseDomain);
+        flipped = true;
     } catch (caught) {
         problem = problem ?? "failed";
         detail = detail ?? message(caught);
@@ -490,6 +498,15 @@ export async function runBackupAccess(): Promise<{ verdict: Verdict; move: strin
                 lastFlip: previous.lastFlip
             })
         );
+    }
+    // Its own step: one name that cannot move must not undo a flip that already happened.
+    if (flipped) {
+        try {
+            await moveBorrowed(measured.lastIp);
+        } catch (caught) {
+            problem = problem ?? (caught instanceof PathRefusal ? caught.code : "failed");
+            detail = detail ?? (caught instanceof PathRefusal ? caught.detail : message(caught));
+        }
     }
     if (uplink) {
         try {
@@ -663,16 +680,31 @@ async function moveBorrowed(line: string | null): Promise<void> {
     const relay = saved?.target.kind === "relay" ? saved.target.address : null;
     const address = relay ?? line;
     if (!address) return;
-    const token = await loadCloudflareToken();
-    if (!token) throw new PathRefusal("no-token");
-    for (const entry of names) {
-        if (entry.address === address) continue;
-        for (const record of await findDnsRecords(token, entry.zoneId, "A", entry.name)) {
-            if (record.content === entry.address)
-                await repointRecord(token, entry.zoneId, record.id, address);
+    const pending = names.filter((entry) => entry.address !== address);
+    const token = pending.length > 0 ? await loadCloudflareToken() : "";
+    // Connecting a token again fixes this one, so it costs an entry no tries.
+    if (token === null) throw new PathRefusal("no-token");
+    const missed: BorrowedName[] = [];
+    let failure: unknown = null;
+    for (const entry of pending) {
+        try {
+            for (const record of await findDnsRecords(token, entry.zoneId, "A", entry.name)) {
+                if (record.content === entry.address)
+                    await repointRecord(token, entry.zoneId, record.id, address);
+            }
+        } catch (caught) {
+            missed.push(entry);
+            failure = failure ?? caught;
         }
     }
-    await settleBorrowed(names, relay);
+    await settleBorrowed(
+        names.filter((entry) => !missed.includes(entry)),
+        relay
+    );
+    if (missed.length === 0) return;
+    const abandoned = await missBorrowed(missed);
+    if (abandoned.length > 0) await announceAbandoned(abandoned, address);
+    throw failure;
 }
 
 /** Take down a path that is no longer chosen, once no record points at it. */
@@ -681,7 +713,7 @@ async function retireUnused(config: BackupConfig): Promise<void> {
         getSetting(BACKUP_RECORDS_KEY).then(
             (raw) => parse(recordsSchema, raw)?.target.kind ?? null
         ),
-        getSetting(TUNNEL_KEY),
+        getSetting(BACKUP_TUNNEL_KEY),
         getSetting(RELAY_KEY)
     ]);
     if (tunnel && config.path !== "tunnel" && serving !== "tunnel") await retireTunnel();
@@ -690,7 +722,7 @@ async function retireUnused(config: BackupConfig): Promise<void> {
 
 /** The named tunnel, created once, its connector kept running with no DNS on it. */
 async function warmTunnel(baseDomain: string): Promise<BackupTarget> {
-    let stored = parse(tunnelSchema, await getSetting(TUNNEL_KEY));
+    let stored = parse(tunnelSchema, await getSetting(BACKUP_TUNNEL_KEY));
     const names = await ownedZoneNames(await getDomainZones());
     if (names.length === 0) throw new PathRefusal("no-domain");
     if (!stored) {
@@ -701,11 +733,24 @@ async function warmTunnel(baseDomain: string): Promise<BackupTarget> {
         const tunnel = await createTunnel(account.token, account.accountId, "polaris-backup");
         const connector = await getTunnelToken(account.token, account.accountId, tunnel.id);
         await putTunnelHosts(account.token, account.accountId, tunnel.id, names, EDGE_ORIGIN);
-        stored = { tunnelId: tunnel.id, accountId: account.accountId, token: sealKey(connector) };
-        await setSetting(TUNNEL_KEY, JSON.stringify(stored));
+        stored = {
+            tunnelId: tunnel.id,
+            accountId: account.accountId,
+            token: sealKey(connector),
+            hosts: names
+        };
+        await setSetting(BACKUP_TUNNEL_KEY, JSON.stringify(stored));
     }
-    await keepUp(new HostdPorts(), TUNNEL_PROJECT, () => tunnelSpec(openKey(stored.token)));
-    return { kind: "tunnel", tunnelId: stored.tunnelId };
+    const { tunnelId, accountId, token: sealed, hosts } = stored;
+    await keepUp(new HostdPorts(), TUNNEL_PROJECT, () => tunnelSpec(openKey(sealed)));
+    // A zone or game added since: a record flipped onto the tunnel needs a route on it.
+    if (hosts.join(",") !== names.join(",")) {
+        const token = await loadCloudflareToken();
+        if (!token) throw new PathRefusal("no-token");
+        await putTunnelHosts(token, accountId, tunnelId, names, EDGE_ORIGIN);
+        await setSetting(BACKUP_TUNNEL_KEY, JSON.stringify({ ...stored, hosts: names }));
+    }
+    return { kind: "tunnel", tunnelId };
 }
 
 function tunnelSpec(token: string): ComposeSpec {
@@ -731,7 +776,7 @@ function tunnelSpec(token: string): ComposeSpec {
 }
 
 async function retireTunnel(): Promise<void> {
-    const stored = parse(tunnelSchema, await getSetting(TUNNEL_KEY));
+    const stored = parse(tunnelSchema, await getSetting(BACKUP_TUNNEL_KEY));
     const ports = new HostdPorts();
     try {
         await ports.composeDown(TUNNEL_PROJECT);
@@ -743,7 +788,7 @@ async function retireTunnel(): Promise<void> {
         if (token)
             await deleteTunnel(token, stored.accountId, stored.tunnelId).catch(() => undefined);
     }
-    await setSetting(TUNNEL_KEY, null);
+    await setSetting(BACKUP_TUNNEL_KEY, null);
 }
 
 /** A target row as `getPorts` takes it, with the address the house dials. */
@@ -1128,7 +1173,7 @@ async function measure(
 ): Promise<Measured> {
     const [published, tunnel, relay] = await Promise.all([
         getSetting(PUBLISHED_KEY),
-        getSetting(TUNNEL_KEY),
+        getSetting(BACKUP_TUNNEL_KEY),
         getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw))
     ]);
     const calibrated = before?.calibrated ?? false;
@@ -1258,27 +1303,49 @@ async function checkFromOutside(
     }
 }
 
-/** One bell per flip, to every administrator. */
-async function announce(state: FlipState, domain: string): Promise<void> {
+/** A bell for every administrator, worded in each one's language. */
+async function bellAdmins(
+    compose: (t: NamespaceTranslator<"notices">) => {
+        type: string;
+        level: "warning" | "success";
+        title: string;
+        body: string;
+    }
+): Promise<void> {
     const rows = await prisma.user
         .findMany({ where: { isAdmin: true }, select: { id: true } })
         .catch(() => []);
-    const on = state.serving === "backup";
     for (const { id: userId } of rows) {
         const t = await wordsFor(userId, "notices");
         await notices
             .createNotification({
                 userId,
                 href: "/admin/domains/remote-access#backup-access",
-                type: on ? "domain.backup-on" : "domain.backup-off",
-                level: on ? "warning" : "success",
-                title: on
-                    ? t("backupAccess.onTitle", { domain })
-                    : t("backupAccess.offTitle", { domain }),
-                body: t(noticeBody(state.lastFlip?.reason ?? null, on))
+                ...compose(t)
             })
             .catch(() => undefined);
     }
+}
+
+/** One bell per flip. */
+async function announce(state: FlipState, domain: string): Promise<void> {
+    const on = state.serving === "backup";
+    await bellAdmins((t) => ({
+        type: on ? "domain.backup-on" : "domain.backup-off",
+        level: on ? "warning" : "success",
+        title: on ? t("backupAccess.onTitle", { domain }) : t("backupAccess.offTitle", { domain }),
+        body: t(noticeBody(state.lastFlip?.reason ?? null, on))
+    }));
+}
+
+/** Names no pass will move again: their records stay behind unless someone repoints them. */
+async function announceAbandoned(names: readonly string[], address: string): Promise<void> {
+    await bellAdmins((t) => ({
+        type: "domain.backup-names-left",
+        level: "warning",
+        title: t("backupAccess.namesLeftTitle"),
+        body: t("backupAccess.namesLeftBody", { names: names.join(", "), address })
+    }));
 }
 
 /** Why the domain moved, as the bell words it: each reason says something different. */

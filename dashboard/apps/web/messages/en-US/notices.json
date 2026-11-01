@@ -488,7 +488,9 @@
         "onAlwaysBody": "Backup access is set to always on, so visitors now reach Polaris through the backup path.",
         "onManualBody": "Switched to the backup path by hand. It stays there until it is switched back.",
         "offManualBody": "Switched back to the direct path by hand, and the original DNS records are back.",
-        "offUnconfiguredBody": "The backup path was turned off, so the original DNS records are back."
+        "offUnconfiguredBody": "The backup path was turned off, so the original DNS records are back.",
+        "namesLeftTitle": "DNS names left behind",
+        "namesLeftBody": "Cloudflare refused changes to {names} for a day, so Polaris stopped moving them. Point them at {address} at your DNS provider."
     },
     "lanAddress": {
         "movedTitle": "Polaris is now at {to}",

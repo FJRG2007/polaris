@@ -9,6 +9,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { addressNow, borrowRelayName } = vi.hoisted(() => ({
+    addressNow: { value: "203.0.113.7" as string | null },
+    borrowRelayName: vi.fn(async () => undefined)
+}));
+
 interface ZoneRecord {
     id: string;
     content: string;
@@ -244,7 +249,8 @@ vi.mock("@/lib/dns/propagation", () => ({
 vi.mock("@/lib/dns/public-resolver", () => ({
     publicResolver: () => ({ resolve4: async () => [] })
 }));
-vi.mock("@/lib/domain-dns", () => ({ serviceDnsTarget: async () => ({ ip: "203.0.113.7" }) }));
+vi.mock("@/lib/domain-dns", () => ({ serviceDnsTarget: async () => ({ ip: addressNow.value }) }));
+vi.mock("@/lib/backup-access/borrowed-names", () => ({ borrowRelayName }));
 vi.mock("@/lib/dns/zone-records", () => ({ provenDomainOf: async () => null }));
 vi.mock("@/lib/tls/managed-certificates", () => ({ openText: () => null }));
 vi.mock("@/lib/integrations/cloudflare-account-service", () => ({
@@ -324,6 +330,8 @@ function seed(id: string, overrides: Partial<Row> = {}): Row {
 }
 
 beforeEach(() => {
+    addressNow.value = "203.0.113.7";
+    borrowRelayName.mockClear();
     state.rows.clear();
     state.domainApp = "app-old";
     state.passQueries = [];
@@ -408,6 +416,26 @@ describe("switching", () => {
         expect(state.audits).toEqual(["deploy.domain.cutover.switch"]);
     });
 
+    it("writes the address of the moment, not the one stored when it opened", async () => {
+        seed("c1");
+        addressNow.value = "192.0.2.50";
+        await service.switchCutover("c1", "user-1");
+        expect(state.saved).toEqual([{ id: "record-1", content: "192.0.2.50", ttl: 60 }]);
+        expect(state.rows.get("c1")?.newValue).toBe("192.0.2.50");
+        expect(borrowRelayName).toHaveBeenCalledWith("zone-1", "shop.example.com", "192.0.2.50");
+    });
+
+    it("writes nothing while no address takes visitors, and can be tried again", async () => {
+        seed("c1");
+        addressNow.value = null;
+        await service.switchCutover("c1", "user-1");
+        expect(state.saved).toEqual([]);
+        expect(state.rows.get("c1")).toMatchObject({
+            phase: "ready",
+            failure: "no-address"
+        });
+    });
+
     it("stays where it was when Cloudflare refuses, and switches when tried again", async () => {
         seed("c1");
         state.saveFails = 1;
@@ -465,6 +493,22 @@ describe("a switch cut short", () => {
         await service.switchCutover("c1", "user-1");
         expect(state.rows.get("c1")).toMatchObject({ phase: "propagating", failure: null });
         expect(zoneContents()).toEqual(["record-1=203.0.113.7"]);
+    });
+
+    it("moves a record it created to the address of the retry", async () => {
+        seedTwo("c1");
+        state.zone.delete("record-1");
+        state.deleteFails = 1;
+        await service.switchCutover("c1", "user-1");
+        expect(zoneContents()).toEqual(["record-2=198.51.100.5", "record-new-1=203.0.113.7"]);
+        addressNow.value = "192.0.2.50";
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({
+            phase: "propagating",
+            failure: null,
+            newValue: "192.0.2.50"
+        });
+        expect(zoneContents()).toEqual(["record-new-1=192.0.2.50"]);
     });
 
     it("behind a shared edge, says the route did not move and moves it back on rollback", async () => {
