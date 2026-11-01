@@ -12,7 +12,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { addressNow, borrowRelayName } = vi.hoisted(() => ({
     addressNow: {
         value: "203.0.113.7" as string | null,
-        server: "server-2" as string | undefined
+        server: "server-2" as string | undefined,
+        holding: { kind: "tunnel" } as { kind: string } | null
     },
     borrowRelayName: vi.fn(async () => undefined)
 }));
@@ -256,6 +257,7 @@ vi.mock("@/lib/domain-dns", () => ({
     serviceDnsTarget: async () => ({ ip: addressNow.value, server: addressNow.server })
 }));
 vi.mock("@/lib/backup-access/borrowed-names", () => ({ borrowRelayName }));
+vi.mock("@/lib/backup-access", () => ({ backupRecordsTarget: async () => addressNow.holding }));
 vi.mock("@/lib/dns/zone-records", () => ({ provenDomainOf: async () => null }));
 vi.mock("@/lib/tls/managed-certificates", () => ({ openText: () => null }));
 vi.mock("@/lib/integrations/cloudflare-account-service", () => ({
@@ -337,6 +339,7 @@ function seed(id: string, overrides: Partial<Row> = {}): Row {
 beforeEach(() => {
     addressNow.value = "203.0.113.7";
     addressNow.server = "server-2";
+    addressNow.holding = { kind: "tunnel" };
     borrowRelayName.mockClear();
     state.rows.clear();
     state.domainApp = "app-old";
@@ -448,6 +451,15 @@ describe("switching", () => {
         addressNow.server = undefined;
         await service.switchCutover("c1", "user-1");
         expect(state.rows.get("c1")?.failure).toBe("no-way-in");
+    });
+
+    it("asks for a retry when no backup path explains the missing address", async () => {
+        seed("c1");
+        addressNow.value = null;
+        addressNow.server = undefined;
+        addressNow.holding = null;
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")?.failure).toBe("address-unknown");
     });
 
     it("stays where it was when Cloudflare refuses, and switches when tried again", async () => {
