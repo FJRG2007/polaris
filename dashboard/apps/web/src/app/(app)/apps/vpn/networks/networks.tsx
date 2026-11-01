@@ -70,7 +70,9 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
     ): void {
         setError(null);
         startTransition(async () => {
-            const result = await action().catch(() => ({ error: t("errors.generic") }));
+            const result = await action().catch((): { error?: string; notice?: string } => ({
+                error: t("errors.generic")
+            }));
             read.reload();
             setChanges((count) => count + 1);
             if (result.error !== undefined) {

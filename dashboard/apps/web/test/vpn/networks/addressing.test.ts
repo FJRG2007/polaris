@@ -96,12 +96,12 @@ describe("what is typed", () => {
     });
 
     it("refuses a router outside the subnet and an unusable subnet", () => {
-        expect(networks.networkInputSchema.safeParse({ ...input, routerAddress: "10.78.0.1" }).success).toBe(
-            false
-        );
-        expect(networks.networkInputSchema.safeParse({ ...input, cidr: "172.17.0.0/24" }).success).toBe(
-            false
-        );
+        expect(
+            networks.networkInputSchema.safeParse({ ...input, routerAddress: "10.78.0.1" }).success
+        ).toBe(false);
+        expect(
+            networks.networkInputSchema.safeParse({ ...input, cidr: "172.17.0.0/24" }).success
+        ).toBe(false);
     });
 });
 
@@ -170,7 +170,9 @@ describe("the gateway", () => {
         const name = "polaris-gateway-target1";
         const tag = "tag:polaris";
         expect(networks.isGatewayNode({ givenName: name, tags: [tag] }, name, tag)).toBe(true);
-        expect(networks.isGatewayNode({ givenName: `${name}-ab12`, tags: [tag] }, name, tag)).toBe(true);
+        expect(networks.isGatewayNode({ givenName: `${name}-ab12`, tags: [tag] }, name, tag)).toBe(
+            true
+        );
         expect(networks.isGatewayNode({ givenName: name, tags: [] }, name, tag)).toBe(false);
         expect(networks.isGatewayNode({ givenName: "laptop", tags: [tag] }, name, tag)).toBe(false);
     });
@@ -191,7 +193,9 @@ describe("the OpenWrt setup", () => {
 
     it("gives devices the internet only when the network allows it", () => {
         const id = "pn0190f1";
-        expect(networks.renderOpenWrtSetup(NETWORK, "fixture")).not.toContain(`${id}_wan=forwarding`);
+        expect(networks.renderOpenWrtSetup(NETWORK, "fixture")).not.toContain(
+            `${id}_wan=forwarding`
+        );
         expect(networks.renderOpenWrtSetup({ ...NETWORK, internet: true }, "fixture")).toContain(
             `${id}_wan=forwarding`
         );
