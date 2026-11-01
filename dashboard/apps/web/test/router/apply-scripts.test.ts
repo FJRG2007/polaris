@@ -209,16 +209,22 @@ describe("a port on its own", () => {
     };
     const withRun = (script: string) => script.replaceAll("/run/", `${posix(root)}/run-`);
 
-    it("gives back the address of a client Polaris started, so the next start asks again", () => {
-        writeFileSync(join(root, "run-dhclient.eth0.pid"), "999999");
-        run(withRun(router.renderDown(plain)));
-        expect(calls()).toContain("ip -4 addr flush dev eth0");
-        expect(existsSync(join(root, "run-dhclient.eth0.pid"))).toBe(false);
-    });
-
-    it("keeps an address the machine got by itself", () => {
+    it("stops its own client, keeps the address, and renews on the next start", () => {
+        const state = join(root, "run-polaris-router");
+        mkdirSync(state, { recursive: true });
+        writeFileSync(join(state, "dhclient.eth0.pid"), "999999");
         run(withRun(router.renderDown(plain)));
         expect(calls()).not.toContain("flush dev eth0");
+        expect(existsSync(join(state, "dhclient.eth0.pid"))).toBe(true);
+        expect(withRun(router.renderLines(plain))).toContain(
+            `[ -f ${posix(state)}/dhclient.eth0.pid ]`
+        );
+    });
+
+    it("never touches a client the system started for the same port", () => {
+        const down = router.renderDown(plain);
+        expect(down).not.toContain("/run/dhclient.eth0.pid");
+        expect(down).not.toContain("flush dev eth0");
     });
 
     it("gives a network plugged in late its address, once", () => {
