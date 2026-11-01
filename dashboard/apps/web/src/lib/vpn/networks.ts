@@ -255,6 +255,22 @@ export function dhcpPool(cidr: string): { start: number; limit: number } {
     return { start, limit: Math.min(150, hosts - start) };
 }
 
+/** The addresses of `dhcpPool`, for typing into a router that asks for them. */
+export function dhcpRange(cidr: string): { first: string; last: string } {
+    const base = rangeOf(cidr)?.base ?? 0;
+    const { start, limit } = dhcpPool(cidr);
+    return { first: numberToIpv4(base + start), last: numberToIpv4(base + start + limit - 1) };
+}
+
+function sectionId(networkId: string): string {
+    return `pn${networkId.replace(/-/g, "").slice(0, 6)}`;
+}
+
+/** The bridge the OpenWrt setup creates for a network. */
+export function bridgeName(networkId: string): string {
+    return `br-${sectionId(networkId)}`;
+}
+
 function netmaskOf(prefix: number): string {
     return numberToIpv4(2 ** 32 - 2 ** (32 - prefix));
 }
@@ -265,9 +281,15 @@ function netmaskOf(prefix: number): string {
  * (where the Polaris server sits) may enter; the devices start nothing outward
  * unless the network is allowed internet. Safe to run again: it replaces its own
  * sections, so it is also how a replacement router gets the same network.
+ *
+ * The bridge stays up with nothing on it, so the router's address exists on a router
+ * with no radio. Which cable port to give it is the router owner's choice: the
+ * screen names the bridge. A radio that was off is turned on with its other Wi-Fi
+ * networks turned off, because a factory image's default network is open.
  */
 export function renderOpenWrtSetup(network: PrivateNetwork, wifiPassword: string): string {
-    const id = `pn${network.id.replace(/-/g, "").slice(0, 6)}`;
+    const id = sectionId(network.id);
+    const bridge = bridgeName(network.id);
     const pool = dhcpPool(network.cidr);
     const sections = ["", "_dev"].map((end) => `network.${id}${end}`);
     const firewall = ["", "_dhcp", "_dns", "_lan", "_wan"].map((end) => `firewall.${id}${end}`);
@@ -280,10 +302,11 @@ export function renderOpenWrtSetup(network: PrivateNetwork, wifiPassword: string
         ),
         `uci set network.${id}_dev=device`,
         `uci set network.${id}_dev.type='bridge'`,
-        `uci set network.${id}_dev.name='br-${id}'`,
+        `uci set network.${id}_dev.name='${bridge}'`,
+        `uci set network.${id}_dev.bridge_empty='1'`,
         `uci set network.${id}=interface`,
         `uci set network.${id}.proto='static'`,
-        `uci set network.${id}.device='br-${id}'`,
+        `uci set network.${id}.device='${bridge}'`,
         `uci set network.${id}.ipaddr=${shellQuoted(network.routerAddress)}`,
         `uci set network.${id}.netmask=${shellQuoted(netmaskOf(rangeOf(network.cidr)?.prefix ?? 24))}`,
         `uci set dhcp.${id}=dhcp`,
@@ -320,12 +343,17 @@ export function renderOpenWrtSetup(network: PrivateNetwork, wifiPassword: string
                   `uci set firewall.${id}_wan.dest='wan'`
               ]
             : []),
-        // A router with no radio (a Raspberry Pi on a cable, say) has no file to
-        // edit, and an access point on that subnet takes the Wi-Fi instead.
+        // A router with no radio (a Raspberry Pi on a cable, say) has no file to edit.
         "if [ -f /etc/config/wireless ]; then",
         `    for radio in $(uci show wireless | sed -n "s/^wireless\\.\\([^.=]*\\)=wifi-device$/\\1/p"); do`,
         `        section="${id}_$radio"`,
         '        uci -q delete "wireless.$section" || true',
+        '        if [ "$(uci -q get "wireless.$radio.disabled")" = "1" ]; then',
+        `            for iface in $(uci show wireless | sed -n "s/^wireless\\.\\([^.=]*\\)\\.device='$radio'$/\\1/p"); do`,
+        '                uci set "wireless.$iface.disabled=1"',
+        "            done",
+        '            uci delete "wireless.$radio.disabled"',
+        "        fi",
         '        uci set "wireless.$section=wifi-iface"',
         '        uci set "wireless.$section.device=$radio"',
         `        uci set "wireless.$section.network=${id}"`,

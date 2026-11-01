@@ -32,6 +32,8 @@ export interface NetworksAnswer {
     readonly networks: service.NetworkView[];
     /** Where a gateway can run; empty for anybody but an administrator. */
     readonly servers: service.NetworkServer[];
+    /** This edition cannot run a gateway, so no network can be created here. */
+    readonly limited: boolean;
 }
 
 /** The networks the reader may see, asked after the first paint. */
@@ -42,16 +44,20 @@ export async function listNetworksAction(): Promise<Result<NetworksAnswer>> {
             service.listNetworks({ id: user.id, isAdmin: user.isAdmin }),
             user.isAdmin ? service.networkServers(user.id) : Promise.resolve([])
         ]);
-        return { networks, servers };
+        return { networks, servers, limited: !service.canRunGateways() };
     } catch (error) {
         return failed(error);
     }
 }
 
-export async function createNetworkAction(input: unknown): Promise<Result> {
+/** `notice` is set when the network was saved but is not on the VPN yet. */
+export async function createNetworkAction(input: unknown): Promise<Result<{ notice?: string }>> {
     const user = await requireAdmin();
     try {
-        const network = await service.createNetwork(user, networkInputSchema.parse(input));
+        const { network, problem } = await service.createNetwork(
+            user,
+            networkInputSchema.parse(input)
+        );
         await recordAudit({
             actorId: user.id,
             action: "vpn.network.create",
@@ -59,7 +65,7 @@ export async function createNetworkAction(input: unknown): Promise<Result> {
             targetId: network.id
         });
         revalidatePath("/apps/vpn/networks");
-        return {};
+        return problem ? { notice: (await failed(problem)).error } : {};
     } catch (error) {
         return failed(error);
     }

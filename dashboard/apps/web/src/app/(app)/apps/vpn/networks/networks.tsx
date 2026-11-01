@@ -3,8 +3,8 @@
 /**
  * The private networks: each with where its gateway stands, whether the router
  * answers, and what to enter on a router to build it. The heading paints first;
- * only the list waits on the control server, and it is asked again while a gateway
- * is still coming up.
+ * only the list waits on the control server, and it is asked again for a while
+ * when a gateway is still coming up.
  */
 
 import * as ui from "@polaris/ui";
@@ -27,6 +27,8 @@ import {
 
 /** How often the list is asked again while a gateway has not arrived. */
 const SETTLING_POLL_MS = 5_000;
+/** How many times, so a server that stays off is not asked about for good. */
+const SETTLING_POLLS = 24;
 
 type Translate = ReturnType<typeof useTranslations>;
 
@@ -42,24 +44,40 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
     const [removing, setRemoving] = useState<NetworkView | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const [changes, setChanges] = useState(0);
     const networks = read.data?.networks ?? null;
-    const settling = networks?.some(({ gateway }) => gateway !== "online") ?? false;
+    const limited = read.data?.limited ?? false;
+    const settling =
+        networks
+            ?.filter(({ gateway }) => gateway !== "online")
+            .map(({ id, gateway }) => `${id}:${gateway}`)
+            .join() ?? "";
 
     useEffect(() => {
-        if (!settling) return;
-        const timer = setInterval(read.reload, SETTLING_POLL_MS);
+        if (settling === "") return;
+        let left = SETTLING_POLLS;
+        const timer = setInterval(() => {
+            read.poll();
+            left -= 1;
+            if (left === 0) clearInterval(timer);
+        }, SETTLING_POLL_MS);
         return () => clearInterval(timer);
-    }, [settling, read.reload]);
+    }, [settling, changes, read.poll]);
 
-    function run(action: () => Promise<{ error?: string }>, done?: () => void): void {
+    function run(
+        action: () => Promise<{ error?: string; notice?: string }>,
+        done?: () => void
+    ): void {
         setError(null);
         startTransition(async () => {
             const result = await action().catch(() => ({ error: t("errors.generic") }));
             read.reload();
+            setChanges((count) => count + 1);
             if (result.error !== undefined) {
                 setError(result.error);
                 return;
             }
+            if (result.notice !== undefined) setError(result.notice);
             done?.();
         });
     }
@@ -70,8 +88,12 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                 <p className="min-w-0 text-sm text-muted-foreground">
                     {isAdmin ? t("networks.intro") : t("networks.memberIntro")}
                 </p>
-                {isAdmin ? (
-                    <ui.Button size="sm" onClick={() => setCreating(true)}>
+                {isAdmin && !limited ? (
+                    <ui.Button
+                        size="sm"
+                        disabled={read.data === null}
+                        onClick={() => setCreating(true)}
+                    >
                         <Plus />
                         {t("networks.new")}
                     </ui.Button>
@@ -104,9 +126,15 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
             ) : networks.length === 0 ? (
                 <ui.EmptyState
                     title={t("networks.emptyTitle")}
-                    description={isAdmin ? t("networks.emptyBody") : t("networks.memberEmptyBody")}
+                    description={
+                        !isAdmin
+                            ? t("networks.memberEmptyBody")
+                            : limited
+                              ? t("errors.limited")
+                              : t("networks.emptyBody")
+                    }
                     action={
-                        isAdmin ? (
+                        isAdmin && !limited ? (
                             <ui.Button size="sm" onClick={() => setCreating(true)}>
                                 {t("networks.new")}
                             </ui.Button>
@@ -299,15 +327,7 @@ function Fact({ term, value }: { term: string; value: string }) {
     );
 }
 
-function CopyRow({
-    label,
-    value,
-    copyLabel
-}: {
-    label: string;
-    value: string;
-    copyLabel: string;
-}) {
+function CopyRow({ label, value, copyLabel }: { label: string; value: string; copyLabel: string }) {
     return (
         <div className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-muted px-3 py-2">
             <div className="min-w-0">
@@ -332,10 +352,6 @@ function RouterSetup({
     setup: NonNullable<NetworkView["setup"]>;
     server: string;
 }) {
-    const { start, limit } = setup.dhcp;
-    const [base] = network.cidr.split("/");
-    const prefix = (base ?? "").split(".").slice(0, 3).join(".");
-    const singleBlock = network.cidr.endsWith("/24");
     return (
         <details className="min-w-0 rounded-md border border-border">
             <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
@@ -369,14 +385,12 @@ function RouterSetup({
                         copyLabel={t("networks.copyRouter")}
                     />
                 </div>
-                {singleBlock ? (
-                    <p className="text-sm">
-                        {t("networks.dhcpRange")}:{" "}
-                        <code className="font-mono text-xs">
-                            {`${prefix}.${start} - ${prefix}.${start + limit - 1}`}
-                        </code>
-                    </p>
-                ) : null}
+                <p className="text-sm">
+                    {t("networks.dhcpRange")}:{" "}
+                    <code className="font-mono text-xs">
+                        {`${setup.dhcp.first} - ${setup.dhcp.last}`}
+                    </code>
+                </p>
                 <div className="min-w-0">
                     <h4 className="text-sm font-medium">{t("networks.ruleTitle")}</h4>
                     <ul className="mt-1 list-disc pl-5 text-sm text-muted-foreground">
@@ -392,8 +406,9 @@ function RouterSetup({
                 {setup.openWrt ? (
                     <div className="flex min-w-0 flex-col gap-1">
                         <h4 className="text-sm font-medium">{t("networks.openWrtTitle")}</h4>
+                        <p className="text-sm text-muted-foreground">{t("networks.openWrtBody")}</p>
                         <p className="text-sm text-muted-foreground">
-                            {t("networks.openWrtBody")}
+                            {t("networks.openWrtNoRadio", { bridge: setup.bridge })}
                         </p>
                         <CodeView
                             value={setup.openWrt}

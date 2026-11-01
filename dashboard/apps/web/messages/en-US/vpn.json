@@ -246,6 +246,7 @@
         "ruleInternetOff": "Block {cidr} from reaching the internet.",
         "openWrtTitle": "OpenWrt setup",
         "openWrtBody": "Run this once on the router, and again on a replacement router.",
+        "openWrtNoRadio": "On a router with no Wi-Fi, add a free port to the bridge {bridge} and connect an access point there.",
         "scriptLabel": "the OpenWrt setup",
         "linesTitle": "Backup internet lines",
         "linesBody": "Connect each line to the router and let the router choose. On OpenWrt, use the mwan3 package. Polaris keeps reaching this network either way."

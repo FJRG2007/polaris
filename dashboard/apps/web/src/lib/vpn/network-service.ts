@@ -18,7 +18,6 @@ import { getCapabilities } from "@polaris/config";
 import type { RuntimePorts } from "@polaris/deploy";
 import { GATEWAY_PROJECT } from "@/lib/polaris-parts";
 import { randomBytes, randomUUID } from "node:crypto";
-import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { openText, sealText } from "@/lib/tls/managed-certificates";
 
 /** Who pressed the button, for the key a gateway signs in with. */
@@ -47,7 +46,8 @@ export interface NetworkView {
     readonly setup: {
         readonly ssid: string;
         readonly wifiPassword: string | null;
-        readonly dhcp: { readonly start: number; readonly limit: number };
+        readonly dhcp: { readonly first: string; readonly last: string };
+        readonly bridge: string;
         readonly openWrt: string | null;
     } | null;
 }
@@ -57,8 +57,13 @@ export interface NetworkServer {
     readonly name: string;
 }
 
+/** Whether this edition can start a gateway at all. */
+export function canRunGateways(): boolean {
+    return getCapabilities().deploy;
+}
+
 function requireFull(): void {
-    if (!getCapabilities().deploy) throw new vpn.VpnRefusal("limited");
+    if (!canRunGateways()) throw new vpn.VpnRefusal("limited");
 }
 
 /** Refuse while the control server is off, before anything is stored that the
@@ -75,33 +80,9 @@ function serialized<T>(work: () => Promise<T>): Promise<T> {
     return run;
 }
 
-async function targetOf(network: {
-    readonly targetId: string;
-    readonly targetOwnerId: string;
-}): Promise<TargetRow | null> {
-    return prisma.deployTarget.findFirst({
-        where: { id: network.targetId, ownerId: network.targetOwnerId },
-        select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
-    });
-}
-
-/** Run `work` against a network's server, closing the connection after. */
-async function onServer<T>(
-    network: networks.PrivateNetwork,
-    work: (ports: RuntimePorts) => Promise<T>
-): Promise<T> {
-    const target = await targetOf(network);
-    if (!target) throw new vpn.VpnRefusal("noServer");
-    const ports = await getPorts(target, network.targetOwnerId);
-    try {
-        return await work(ports);
-    } finally {
-        await ports.dispose();
-    }
-}
-
 /** Bring one server's gateway in line with the networks it serves; with none left,
- *  take it down and off the VPN. */
+ *  take it down and off the VPN. What the VPN side decides goes first, so a server
+ *  that cannot be reached still loses the access it should lose. */
 async function syncGateway(
     actor: Actor,
     network: networks.PrivateNetwork,
@@ -113,17 +94,36 @@ async function syncGateway(
         networks.isGatewayNode(node, name, rules.POLARIS_TAG)
     );
     if (routes.length > 0) {
+        for (const node of known) {
+            const kept = node.approvedRoutes.filter((route) => routes.includes(route));
+            if (kept.length < node.approvedRoutes.length) {
+                await vpn.approveGatewayRoutes(node.id, kept);
+            }
+        }
         const { loginServer, authKey } = await vpn.gatewayKey(actor);
         const generation = known.length > 0 ? null : randomUUID();
-        await onServer(network, (ports) =>
+        await vpn.onNetworkServer(network, (ports) =>
             ports.composeUp(
                 networks.gatewaySpec({ name, loginServer, routes, authKey, generation })
             )
         );
         return;
     }
-    await onServer(network, (ports) => ports.composeDown(GATEWAY_PROJECT));
-    for (const node of known) await vpn.removeGatewayNode(node.id);
+    try {
+        for (const node of known) await vpn.removeGatewayNode(node.id);
+    } finally {
+        await vpn.onNetworkServer(network, (ports) => ports.composeDown(GATEWAY_PROJECT));
+    }
+}
+
+/** Carry the stored networks to the VPN: the access policy, then the gateway. */
+async function applyNetworks(
+    actor: Actor,
+    network: networks.PrivateNetwork,
+    all: readonly networks.PrivateNetwork[]
+): Promise<void> {
+    await vpn.applyNetworkAccess();
+    await syncGateway(actor, network, all);
 }
 
 function wifiPassword(): string {
@@ -132,12 +132,18 @@ function wifiPassword(): string {
     return [...randomBytes(20)].map((byte) => alphabet[byte % alphabet.length]).join("");
 }
 
+/** A saved network, and why it is not carried to the VPN yet, if it is not. */
+export interface CreatedNetwork {
+    readonly network: networks.PrivateNetwork;
+    readonly problem: vpn.VpnRefusal | null;
+}
+
 /** Add a network. It is kept even when its server cannot be reached, so the screen
  *  can say so and offer Retry rather than losing what was typed. */
 export async function createNetwork(
     actor: Actor,
     input: networks.NetworkInput
-): Promise<networks.PrivateNetwork> {
+): Promise<CreatedNetwork> {
     requireFull();
     return serialized(async () => {
         await requireRunning();
@@ -160,16 +166,15 @@ export async function createNetwork(
         };
         const next = [...stored, network];
         await vpn.saveNetworks(next);
-        await vpn.applyNetworkAccess();
-        await syncGateway(actor, network, next).catch(gatewayFailure);
-        return network;
+        const problem = await applyNetworks(actor, network, next).then(() => null, gatewayRefusal);
+        return { network, problem };
     });
 }
 
-function gatewayFailure(error: unknown): never {
-    if (error instanceof vpn.VpnRefusal) throw error;
+function gatewayRefusal(error: unknown): vpn.VpnRefusal {
+    if (error instanceof vpn.VpnRefusal) return error;
     console.error("polaris: a VPN gateway was not brought up to date:", error);
-    throw new vpn.VpnRefusal("gatewayFailed");
+    return new vpn.VpnRefusal("gatewayFailed");
 }
 
 /** Change what a network is called and who it is for. */
@@ -185,14 +190,16 @@ export async function updateNetwork(change: networks.NetworkChange): Promise<voi
     });
 }
 
-/** Start a network's gateway again, after its server came back. */
+/** Carry a network to the VPN again, after its server came back. */
 export async function retryGateway(actor: Actor, id: string): Promise<void> {
     requireFull();
     await serialized(async () => {
         const stored = await vpn.storedNetworks();
         const network = stored.find((one) => one.id === id);
         if (!network) throw new vpn.VpnRefusal("notFound");
-        await syncGateway(actor, network, stored).catch(gatewayFailure);
+        await applyNetworks(actor, network, stored).catch((error: unknown) => {
+            throw gatewayRefusal(error);
+        });
     });
 }
 
@@ -209,10 +216,10 @@ export async function removeNetwork(actor: Actor, id: string): Promise<void> {
         if (!network) throw new vpn.VpnRefusal("notFound");
         const next = stored.filter((one) => one.id !== id);
         await vpn.saveNetworks(next);
-        await vpn.applyNetworkAccess();
-        await syncGateway(actor, network, next).catch((error: unknown) =>
-            console.error("polaris: a removed network's gateway was not updated:", error)
-        );
+        const logged = (error: unknown) =>
+            console.error("polaris: a removed network was not cleared from the VPN:", error);
+        await vpn.applyNetworkAccess().catch(logged);
+        await syncGateway(actor, network, next).catch(logged);
     });
 }
 
@@ -222,6 +229,29 @@ async function reaches(ports: RuntimePorts, address: string): Promise<boolean> {
         .runIn(networks.GATEWAY_SERVICE, ["ping", "-c", "1", "-W", "2", address])
         .catch(() => null);
     return result?.code === 0;
+}
+
+/** The ids of the networks whose router answers, over one connection per server.
+ *  One at a time: a server limits how many commands a connection runs at once. */
+async function answeringRouters(list: readonly networks.PrivateNetwork[]): Promise<Set<string>> {
+    const servers = list.filter(
+        (one, index) => list.findIndex(({ targetId }) => targetId === one.targetId) === index
+    );
+    const answers = await Promise.all(
+        servers.map((server) =>
+            vpn
+                .onNetworkServer(server, async (ports) => {
+                    const answering: string[] = [];
+                    for (const network of list) {
+                        if (network.targetId !== server.targetId) continue;
+                        if (await reaches(ports, network.routerAddress)) answering.push(network.id);
+                    }
+                    return answering;
+                })
+                .catch(() => [])
+        )
+    );
+    return new Set(answers.flat());
 }
 
 function stateOf(
@@ -272,44 +302,41 @@ export async function listNetworks(viewer: rules.VpnViewer): Promise<NetworkView
         select: { id: true, name: true }
     });
     const names = new Map(servers.map((server) => [server.id, server.name]));
-    return Promise.all(
-        visible.map(async (network) => {
-            const gateway = stateOf(gateways.get(network.targetId), network.cidr);
-            const routerReachable =
-                viewer.isAdmin && gateway === "online"
-                    ? await onServer(network, (ports) =>
-                          reaches(ports, network.routerAddress)
-                      ).catch(() => false)
-                    : null;
-            const password = viewer.isAdmin ? openText(network.wifiPassword) : null;
-            return {
-                id: network.id,
-                name: network.name,
-                cidr: network.cidr,
-                routerAddress: network.routerAddress,
-                access: network.access,
-                internet: network.internet,
-                serverName: names.get(network.targetId) ?? null,
-                gateway,
-                routerReachable,
-                setup: viewer.isAdmin
-                    ? {
-                          ssid: network.ssid,
-                          wifiPassword: password,
-                          dhcp: networks.dhcpPool(network.cidr),
-                          openWrt: password
-                              ? networks.renderOpenWrtSetup(network, password)
-                              : null
-                      }
-                    : null
-            };
-        })
+    const stateFor = (network: networks.PrivateNetwork) =>
+        stateOf(gateways.get(network.targetId), network.cidr);
+    const answering = await answeringRouters(
+        viewer.isAdmin ? visible.filter((one) => stateFor(one) === "online") : []
     );
+    return visible.map((network) => {
+        const gateway = stateFor(network);
+        const password = viewer.isAdmin ? openText(network.wifiPassword) : null;
+        return {
+            id: network.id,
+            name: network.name,
+            cidr: network.cidr,
+            routerAddress: network.routerAddress,
+            access: network.access,
+            internet: network.internet,
+            serverName: names.get(network.targetId) ?? null,
+            gateway,
+            routerReachable:
+                viewer.isAdmin && gateway === "online" ? answering.has(network.id) : null,
+            setup: viewer.isAdmin
+                ? {
+                      ssid: network.ssid,
+                      wifiPassword: password,
+                      dhcp: networks.dhcpRange(network.cidr),
+                      bridge: networks.bridgeName(network.id),
+                      openWrt: password ? networks.renderOpenWrtSetup(network, password) : null
+                  }
+                : null
+        };
+    });
 }
 
 /** The servers a gateway can run on: an administrator's own, active ones. */
 export async function networkServers(ownerId: string): Promise<NetworkServer[]> {
-    if (!getCapabilities().deploy) return [];
+    if (!canRunGateways()) return [];
     return prisma.deployTarget.findMany({
         where: { ownerId, status: "active" },
         select: { id: true, name: true },

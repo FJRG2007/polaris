@@ -246,6 +246,7 @@
         "ruleInternetOff": "Bloquea el paso de {cidr} a internet.",
         "openWrtTitle": "Ajuste OpenWrt",
         "openWrtBody": "Ejecútalo una vez en el router, y otra en uno de repuesto.",
+        "openWrtNoRadio": "En un router sin Wi-Fi, añade un puerto libre al puente {bridge} y conecta ahí un punto de acceso.",
         "scriptLabel": "el ajuste de OpenWrt",
         "linesTitle": "Líneas de respaldo",
         "linesBody": "Conecta cada línea al router y deja que elija él. En OpenWrt, usa el paquete mwan3. Polaris sigue llegando a la red."

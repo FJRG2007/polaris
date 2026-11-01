@@ -18,6 +18,8 @@ export interface VpnRead<T> {
     readonly data: T | null;
     readonly error: string | null;
     readonly reload: () => void;
+    /** `reload`, skipped while an answer is still on its way, for timers. */
+    readonly poll: () => void;
     /** Replace the shown answer, for an optimistic change or its rollback. */
     readonly set: (next: T) => void;
 }
@@ -32,6 +34,7 @@ export function useVpnRead<T>(
     const [error, setError] = useState<string | null>(null);
     const loader = useRef(load);
     loader.current = load;
+    const asking = useRef(0);
 
     const set = useCallback(
         (next: T) => {
@@ -43,6 +46,7 @@ export function useVpnRead<T>(
 
     const reload = useCallback(() => {
         let live = true;
+        asking.current += 1;
         loader
             .current()
             .then((answer) => {
@@ -55,13 +59,20 @@ export function useVpnRead<T>(
                 const before = JSON.stringify(last.get(key) ?? null);
                 if (JSON.stringify(answer) !== before) set(answer as T);
             })
-            .catch(() => live && setError(failure));
+            .catch(() => live && setError(failure))
+            .finally(() => {
+                asking.current -= 1;
+            });
         return () => {
             live = false;
         };
     }, [key, set, failure]);
 
+    const poll = useCallback(() => {
+        if (asking.current === 0) reload();
+    }, [reload]);
+
     useEffect(() => reload(), [reload]);
 
-    return { data, error, reload, set };
+    return { data, error, reload, poll, set };
 }

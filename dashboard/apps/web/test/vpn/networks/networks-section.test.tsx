@@ -39,7 +39,8 @@ const NETWORK: NetworkView = {
     setup: {
         ssid: "Fixture wifi",
         wifiPassword: "fixture-password",
-        dhcp: { start: 100, limit: 150 },
+        dhcp: { first: "10.77.0.100", last: "10.77.0.249" },
+        bridge: "br-pn0190f1",
         openWrt: "#!/bin/sh\n"
     }
 };
@@ -51,6 +52,14 @@ afterEach(() => {
 });
 
 describe("VpnNetworksSection", () => {
+    // First: a read is remembered for the tab, so only this one starts with no answer.
+    it("offers no new network before it knows the servers", async () => {
+        listNetworksAction.mockReturnValue(new Promise(() => undefined));
+        render(<VpnNetworksSection isAdmin />);
+        const button = screen.getByRole("button", { name: "New network" }) as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+    });
+
     it("shows an administrator the state, the router and its values", async () => {
         listNetworksAction.mockResolvedValue({ networks: [NETWORK], servers: [] });
         render(<VpnNetworksSection isAdmin />);
@@ -79,7 +88,8 @@ describe("VpnNetworksSection", () => {
         });
         createNetworkAction.mockResolvedValue({});
         render(<VpnNetworksSection isAdmin />);
-        fireEvent.click((await screen.findAllByText("New network"))[0] as HTMLElement);
+        await screen.findByText("No private networks");
+        fireEvent.click(screen.getAllByText("New network")[0] as HTMLElement);
         const subnet = (await screen.findByLabelText("Subnet *")) as HTMLInputElement;
         expect(subnet.value).toBe("10.77.0.0/24");
 
@@ -106,5 +116,37 @@ describe("VpnNetworksSection", () => {
             access: "admins",
             internet: false
         });
+    });
+
+    it("says what the limited edition lacks instead of offering a network", async () => {
+        listNetworksAction.mockResolvedValue({ networks: [], servers: [], limited: true });
+        render(<VpnNetworksSection isAdmin />);
+        expect(await screen.findByText(/need the full edition/)).toBeTruthy();
+        expect(screen.queryByText("New network")).toBeNull();
+    });
+
+    it("gives every subnet size its DHCP range", async () => {
+        const setup = { ...NETWORK.setup, dhcp: { first: "10.77.2.100", last: "10.77.2.249" } };
+        listNetworksAction.mockResolvedValue({
+            networks: [{ ...NETWORK, cidr: "10.77.2.0/23", setup }],
+            servers: []
+        });
+        render(<VpnNetworksSection isAdmin />);
+        expect(await screen.findByText("10.77.2.100 - 10.77.2.249")).toBeTruthy();
+    });
+
+    it("closes the dialog on a network that was saved, and keeps the notice", async () => {
+        listNetworksAction.mockResolvedValue({
+            networks: [],
+            servers: [{ id: "target-1", name: "fixture-server" }]
+        });
+        createNetworkAction.mockResolvedValue({ notice: "Fixture notice" });
+        render(<VpnNetworksSection isAdmin />);
+        await screen.findByText("No private networks");
+        fireEvent.click(screen.getAllByText("New network")[0] as HTMLElement);
+        fireEvent.change(await screen.findByLabelText("Name *"), { target: { value: "Home" } });
+        fireEvent.click(screen.getByRole("button", { name: "Create network" }));
+        expect(await screen.findByText("Fixture notice")).toBeTruthy();
+        await waitFor(() => expect(screen.queryByLabelText("Name *")).toBeNull());
     });
 });
