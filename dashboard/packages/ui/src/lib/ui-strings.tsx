@@ -116,7 +116,13 @@ export const ENGLISH_UI_STRINGS: UiStrings = {
 
 const UiStringsContext = createContext<UiStrings>(ENGLISH_UI_STRINGS);
 
-export function UiStringsProvider({ strings, children }: { strings: UiStrings; children: ReactNode }) {
+export function UiStringsProvider({
+    strings,
+    children
+}: {
+    strings: UiStrings;
+    children: ReactNode;
+}) {
     return <UiStringsContext.Provider value={strings}>{children}</UiStringsContext.Provider>;
 }
 
