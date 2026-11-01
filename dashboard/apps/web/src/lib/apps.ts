@@ -2849,7 +2849,18 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 href: "/apps/router",
                 adminOnly: true,
                 icon: Router,
-                keywords: ["router", "wan", "lan", "vlan", "dhcp", "firewall", "failover", "raspberry pi", "starlink", "port forward"]
+                keywords: [
+                    "router",
+                    "wan",
+                    "lan",
+                    "vlan",
+                    "dhcp",
+                    "firewall",
+                    "failover",
+                    "raspberry pi",
+                    "starlink",
+                    "port forward"
+                ]
             }
         ]
     },
