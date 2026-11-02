@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { POLARIS_TAG, readVpnSettings, vpnPolicy } from "@/lib/vpn/settings";
+import { POLARIS_TAG, defaultZone, readVpnSettings, vpnPolicy } from "@/lib/vpn/settings";
+
+describe("the zone a hostname lands in", () => {
+    const base = { label: "base", host: "example.test", primary: false };
+    const app = { label: "app", host: "app.example.test", primary: true };
+
+    it("prefers the domain the primary zone sits under", () => {
+        expect(defaultZone([app, base])).toBe("base");
+    });
+
+    it("keeps the primary zone when nothing sits above it", () => {
+        expect(defaultZone([{ ...base, host: "other.test" }, app])).toBe("app");
+    });
+
+    it("takes the only zone there is, and none when there are none", () => {
+        expect(defaultZone([base])).toBe("base");
+        expect(defaultZone([])).toBeUndefined();
+    });
+});
 
 interface Grant {
     src: string[];

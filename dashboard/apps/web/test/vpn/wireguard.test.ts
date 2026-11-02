@@ -1,0 +1,119 @@
+import { execFileSync } from "node:child_process";
+import * as wg from "@/lib/vpn/wireguard";
+import { describe, expect, it } from "vitest";
+
+const access = {
+    nodes: [],
+    deviceLimit: 5,
+    dataLimitGb: null,
+    expiresAt: null,
+    suspended: false,
+    usedBytes: 0n
+};
+const NOW = new Date("2026-11-02T00:00:00Z");
+
+describe("device configuration", () => {
+    const config = wg.renderDeviceConfig({
+        privateKey: "private",
+        address: "10.128.0.2",
+        nodePublicKey: "public",
+        endpoint: "vpn.example.test",
+        port: 51820
+    });
+
+    it("sends everything through the tunnel, IPv6 included", () => {
+        expect(config).toContain("AllowedIPs = 0.0.0.0/0, ::/0");
+        expect(config).toContain("Endpoint = vpn.example.test:51820");
+    });
+
+    it("names no node-only resolver, so a node can change exit", () => {
+        expect(config).not.toContain("DNS = 10.");
+    });
+});
+
+describe("node addresses", () => {
+    it("gives every node its own range", () => {
+        expect(wg.nodeSubnet(0).cidr).not.toBe(wg.nodeSubnet(1).cidr);
+    });
+
+    it("reuses the lowest free address and stops when full", () => {
+        const first = wg.freeHost([]);
+        expect(first).not.toBeNull();
+        expect(wg.freeHost([first as number])).not.toBe(first);
+        const all = Array.from({ length: wg.MAX_DEVICES_ON_NODE + 2 }, (_, index) => index);
+        expect(wg.freeHost(all)).toBeNull();
+    });
+});
+
+describe("standing", () => {
+    it("reads active with nothing against it", () => {
+        expect(wg.accessStanding(access, NOW)).toBe("active");
+    });
+
+    it("puts suspension first, then expiry, then traffic", () => {
+        const expired = { ...access, expiresAt: new Date("2026-01-01T00:00:00Z") };
+        expect(wg.accessStanding({ ...expired, suspended: true }, NOW)).toBe("suspended");
+        expect(wg.accessStanding(expired, NOW)).toBe("expired");
+        const spent = { ...access, dataLimitGb: 1, usedBytes: 2n * 1024n ** 3n };
+        expect(wg.accessStanding(spent, NOW)).toBe("overLimit");
+    });
+
+    it("treats an empty node list as every node", () => {
+        expect(wg.mayUseNode(access, "a")).toBe(true);
+        expect(wg.mayUseNode({ ...access, nodes: ["b"] }, "a")).toBe(false);
+    });
+});
+
+describe("node rules", () => {
+    const direct = wg.renderNodeRules({ index: 0, port: 51820, exit: "direct" });
+    const tor = wg.renderNodeRules({ index: 0, port: 51820, exit: "tor" });
+
+    it("keeps devices apart and away from private networks", () => {
+        expect(direct).toContain("192.168.0.0/16");
+        expect(direct).toContain("masquerade");
+    });
+
+    it("lets nothing leave a Tor node except through Tor", () => {
+        expect(tor).not.toContain("masquerade");
+        expect(tor).toContain("redirect to");
+    });
+});
+
+describe("counters", () => {
+    it("adds growth, and a restarted interface counts from zero", () => {
+        expect(wg.counterGrowth(150n, 100n)).toBe(50n);
+        expect(wg.counterGrowth(20n, 100n)).toBe(20n);
+    });
+});
+
+describe("endpoints", () => {
+    it("tells a public address from a private one", () => {
+        expect(wg.isPublicEndpoint("192.168.1.10")).toBe(false);
+        expect(wg.isPublicEndpoint("10.0.0.1")).toBe(false);
+        expect(wg.isPublicEndpoint("vpn.example.test")).toBe(true);
+    });
+});
+
+describe("the scripts sent to a node", () => {
+    const peer = { publicKey: `${"A".repeat(43)}=`, host: 2 };
+    const direct = { index: 0, port: 51820, exit: "direct" as const };
+
+    it.each([
+        ["direct", wg.renderNodeApply(direct, [peer])],
+        ["tor", wg.renderNodeApply({ ...direct, exit: "tor" }, [peer])],
+        ["no devices", wg.renderNodeApply(direct, [])],
+        ["peer sync", wg.renderPeerSync(direct, [peer])]
+    ])("parse as shell: %s", (_name, script) => {
+        expect(() => execFileSync("sh", ["-n"], { input: script, stdio: "pipe" })).not.toThrow();
+    });
+
+    it("keep the peers where a confined wg can read them", () => {
+        const peers = wg.renderPeers(direct, [peer]);
+        expect(peers).toContain("wg syncconf polaris-vpn /etc/wireguard/polaris-vpn.conf");
+        expect(wg.NODE_REMOVE).toContain("/etc/wireguard/polaris-vpn.conf");
+    });
+
+    it("do not let the package manager choose a kernel", () => {
+        expect(wg.renderNodeApply(direct, [])).toContain("--no-install-recommends");
+    });
+});

@@ -1,7 +1,7 @@
 {
     "page": {
         "title": "VPN",
-        "description": "Accede a tus dispositivos desde cualquier sitio, con las apps de Tailscale."
+        "description": "Conéctate por tus propios servidores con las apps oficiales de WireGuard."
     },
     "install": {
         "title": "Instala la VPN",
@@ -252,5 +252,107 @@
         "scriptLabel": "el ajuste de OpenWrt",
         "linesTitle": "Líneas de respaldo",
         "linesBody": "Conecta cada línea al router y deja que elija él. En OpenWrt, usa el paquete mwan3. Polaris sigue llegando a la red."
+    },
+    "connect": {
+        "intro": "Añade un dispositivo y escanea su código o importa su archivo en WireGuard.",
+        "devices": "Tus equipos",
+        "add": "Añadir equipo",
+        "addBody": "Cada dispositivo tiene su propia configuración.",
+        "name": "Nombre",
+        "location": "Servidor",
+        "create": "Crear",
+        "cancel": "Cancelar",
+        "empty": "Aún no hay dispositivos.",
+        "noNodes": "Aún no tienes servidores disponibles.",
+        "setUp": "Añadir nodos",
+        "full": "Has llegado a tu límite de {count} dispositivos.",
+        "usage": "{used} de {limit} GB usados este mes.",
+        "online": "Conectado",
+        "offline": "Sin conexión",
+        "remove": "Quitar equipo",
+        "torHint": "Tor es gratis y más privado, pero mucho más lento. Algunas webs lo bloquean y las llamadas o juegos no funcionan.",
+        "madeTitle": "Tu dispositivo está listo",
+        "madeBody": "Instala WireGuard desde tu tienda de apps o wireguard.com/install, añade un túnel y escanea el código o importa el archivo.",
+        "once": "Solo se muestra una vez. Si lo pierdes, quita el dispositivo y añádelo de nuevo.",
+        "download": "Descargar archivo",
+        "done": "Hecho",
+        "standing": {
+            "none": "No tienes acceso a la VPN. Pídeselo a un administrador.",
+            "suspended": "Tu acceso a la VPN está suspendido. Pregunta a un administrador.",
+            "expired": "Tu acceso a la VPN ha caducado. Pregunta a un administrador.",
+            "overLimit": "Has gastado el tráfico de este mes. Se renueva el mes que viene."
+        },
+        "errors": {
+            "noRoot": "Polaris necesita root en esa máquina. Edita su conexión en Servidores.",
+            "unreachable": "Esa máquina no responde. Comprueba que esté encendida y reinténtalo.",
+            "unsupported": "El sistema de esa máquina no es compatible. Usa Debian o Ubuntu.",
+            "noAccess": "No tienes acceso a ese servidor.",
+            "deviceLimit": "Has llegado a tu límite de dispositivos.",
+            "nodeFull": "Ese servidor está lleno. Elige otro.",
+            "nodeNotReady": "Ese servidor aún se está preparando. Reinténtalo en un minuto.",
+            "notFound": "Eso ya no está aquí.",
+            "noSuchPerson": "Nadie tiene ese correo aquí.",
+            "tooManyNodes": "Este Polaris ha llegado a su límite de servidores.",
+            "invalid": "Revisa los campos y reinténtalo."
+        }
+    },
+    "nodes": {
+        "title": "Servidores",
+        "hint": "Máquinas por las que se conecta la gente. Añade las que quieras.",
+        "add": "Nuevo servidor",
+        "addBody": "Polaris lo prepara con la conexión que ya tiene.",
+        "edit": "Editar",
+        "editBody": "Los dispositivos siguen. Si cambia la dirección o el puerto, hay que añadirlos de nuevo.",
+        "save": "Guardar",
+        "saving": "Guardando...",
+        "adding": "Preparando...",
+        "empty": "Aún no hay servidores. Nadie puede conectarse hasta que añadas uno.",
+        "noMachines": "Todas las máquinas con root ya son servidores. Añade otra en Servidores.",
+        "machine": "Máquina",
+        "name": "Nombre",
+        "endpoint": "Dirección pública",
+        "port": "Puerto UDP",
+        "exit": "El tráfico sale por",
+        "exits": {
+            "direct": "Este servidor",
+            "tor": "Red Tor"
+        },
+        "torHint": "Gratis y más privado, pero mucho más lento. Solo pasa tráfico tipo web.",
+        "portHint": "El puerto UDP {port} debe estar abierto hacia esta máquina.",
+        "privateEndpoint": "Es una dirección privada. Usa una pública o no conectarán desde fuera, y redirige el UDP {port} en tu router.",
+        "devices": "{count} dispositivos",
+        "editLabel": "Editar",
+        "remove": "Quitar servidor",
+        "removeKind": "servidor",
+        "removeBody": "Sus dispositivos dejan de funcionar y se eliminan.",
+        "removeAnyway": "Quitar igualmente",
+        "unreachableBody": "Esa máquina no responde, así que puede seguir con la VPN y dejando entrar a sus dispositivos hasta reinstalarla."
+    },
+    "people": {
+        "title": "Personas",
+        "hint": "Quién puede conectarse, por qué servidores y cuánto.",
+        "add": "Dar acceso",
+        "addBody": "Necesita una cuenta en este Polaris.",
+        "edit": "Editar acceso",
+        "editBody": "Los cambios llegan a los servidores al momento.",
+        "email": "Correo",
+        "deviceLimit": "Equipos",
+        "dataLimit": "GB al mes",
+        "until": "Hasta",
+        "nodes": "Servidores",
+        "allNodes": "Todos",
+        "suspend": "Suspendido",
+        "suspended": "Suspendido",
+        "open": "Abierta a todos aquí",
+        "openHint": "Cualquiera con cuenta puede conectarse, con {count} dispositivos. Las personas de abajo mantienen sus límites.",
+        "gb": "{used} de {count} GB",
+        "used": "{used} GB este mes",
+        "editLabel": "Editar",
+        "remove": "Quitar acceso",
+        "empty": "Aún no has dado acceso a nadie. Los administradores siempre pueden conectarse."
+    },
+    "mesh": {
+        "title": "Redes privadas",
+        "hint": "Opcional: permite que los dispositivos se vean entre sí y lleguen a una red de casa. Para el uso normal no hace falta."
     }
 }

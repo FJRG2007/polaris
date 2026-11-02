@@ -138,7 +138,8 @@
         "needsStorage": "Almacenamiento para: {volumes}.",
         "needsSettings": "Ajustes que rellenas: {fields}.",
         "needsOnce": "Una instalación sirve a todos en este Polaris.",
-        "needsPermission": "Instalarla requiere permiso para gestionar apps."
+        "needsPermission": "Instalarla requiere permiso para gestionar apps.",
+        "settings": "Ajustes"
     },
     "templateDeploy": {
         "title": "Desplegar {name}",

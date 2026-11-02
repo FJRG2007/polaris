@@ -2646,14 +2646,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     vpn: [
         {
-            label: "Overview", // i18n-ignore
+            label: "Connect", // i18n-ignore
             href: "/vpn",
             requiresApp: "vpn",
             icon: LayoutDashboard,
-            keywords: [...VPN_KEYWORDS, "turn on", "hostname", "status"]
+            keywords: [...VPN_KEYWORDS, "wireguard", "qr", "location", "tor"]
         },
         {
-            label: "Devices", // i18n-ignore
+            label: "Network devices", // i18n-ignore
             href: "/vpn/devices",
             requiresApp: "vpn",
             icon: MonitorSmartphone,
@@ -2667,7 +2667,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["subnet", "home automation", "iot", "router", "wifi", "openwrt"]
         },
         {
-            label: "Add a device", // i18n-ignore
+            label: "Join a network", // i18n-ignore
             href: "/vpn/add",
             requiresApp: "vpn",
             icon: Plus,

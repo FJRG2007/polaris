@@ -78,8 +78,9 @@ async function gridRows(): Promise<Row[]> {
 async function detailRows(): Promise<Row[]> {
     const page = (await MarketplaceAppPage({
         params: Promise.resolve({ appId: "calendar" })
-    })) as ReactElement<{ children: ReactElement<{ children: ReactElement }> }>;
-    const state = page.props.children.props.children;
+    })) as ReactElement<{ children: ReactElement<{ children: ReactElement }>[] }>;
+    const panel = page.props.children.at(-1) as ReactElement<{ children: ReactElement }>;
+    const state = panel.props.children;
     const render = state.type as (props: unknown) => Promise<ReactElement<{ installs: Row[] }>>;
     return (await render(state.props)).props.installs;
 }

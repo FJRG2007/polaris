@@ -1,0 +1,208 @@
+"use server";
+
+/** What the VPN's own screen asks for: anybody's devices, and an administrator's nodes
+ *  and who may use them. Every limit is decided in the service, never on the screen. */
+
+import { z } from "zod";
+import { prisma } from "@polaris/db";
+import * as wg from "@/lib/vpn/wireguard";
+import { recordAudit } from "@/lib/audit-service";
+import { getTranslations } from "@/lib/i18n/request";
+import * as service from "@/lib/vpn/wireguard-service";
+import { requireAdmin, requireUser } from "@/lib/session";
+
+type Result<T = object> = { error: string } | ({ error?: undefined } & T);
+
+async function failed(error: unknown): Promise<{ error: string }> {
+    const t = await getTranslations("vpn");
+    if (error instanceof service.WireGuardRefusal) return { error: t(`connect.errors.${error.code}`) };
+    if (error instanceof z.ZodError) return { error: t("connect.errors.invalid") };
+    console.error("polaris: a VPN action failed:", error);
+    return { error: t("errors.generic") };
+}
+
+export interface ConnectAnswer {
+    readonly nodes: Awaited<ReturnType<typeof service.nodesFor>>;
+    readonly devices: Awaited<ReturnType<typeof service.devicesOf>>;
+    readonly standing: wg.AccessStanding | "none";
+    readonly deviceLimit: number;
+    readonly usedBytes: string;
+    readonly dataLimitGb: number | null;
+}
+
+export async function connectAction(): Promise<Result<ConnectAnswer>> {
+    const user = await requireUser();
+    try {
+        const [nodes, devices, access] = await Promise.all([
+            service.nodesFor(user),
+            service.devicesOf(user.id),
+            service.accessOf(user)
+        ]);
+        return {
+            nodes,
+            devices,
+            standing: access ? wg.accessStanding(access, new Date()) : "none",
+            deviceLimit: access?.deviceLimit ?? 0,
+            usedBytes: (access?.usedBytes ?? 0n).toString(),
+            dataLimitGb: access?.dataLimitGb ?? null
+        };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const newDeviceSchema = z.object({ nodeId: z.string().uuid(), name: wg.deviceNameSchema });
+
+export async function addVpnDeviceAction(
+    input: unknown
+): Promise<Result<{ config: string; fileName: string }>> {
+    const user = await requireUser();
+    try {
+        return await service.addDevice(user, newDeviceSchema.parse(input));
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
+    const user = await requireUser();
+    try {
+        await service.removeDevice(user, z.string().uuid().parse(input));
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export interface NodesAnswer {
+    readonly nodes: Awaited<ReturnType<typeof service.listNodes>>;
+    readonly machines: { id: string; name: string; address: string; root: boolean }[];
+    readonly access: Awaited<ReturnType<typeof service.listAccess>>;
+    readonly open: boolean;
+}
+
+export async function vpnAdminAction(): Promise<Result<NodesAnswer>> {
+    const user = await requireAdmin();
+    try {
+        const [nodes, hosts, access, open] = await Promise.all([
+            service.listNodes(),
+            prisma.host.findMany({
+                where: { ownerId: user.id },
+                select: { id: true, name: true, address: true, username: true, sudo: true },
+                orderBy: { name: "asc" },
+                take: 1000
+            }),
+            service.listAccess(),
+            service.openAccess()
+        ]);
+        return {
+            nodes,
+            access,
+            open,
+            machines: hosts.map(({ id, name, address, username, sudo }) => ({
+                id,
+                name,
+                address,
+                root: sudo || username === "root"
+            }))
+        };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+async function audited(
+    actorId: string,
+    action: string,
+    targetId: string,
+    work: () => Promise<void>
+): Promise<Result> {
+    try {
+        await work();
+        await recordAudit({ actorId, action, targetType: "vpn", targetId });
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function addVpnNodeAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = wg.nodeInputSchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    const host = await prisma.host.findUnique({
+        where: { id: parsed.data.hostId },
+        select: { ownerId: true }
+    });
+    if (host?.ownerId !== user.id) return failed(new service.WireGuardRefusal("notFound"));
+    return audited(user.id, "vpn.node.add", parsed.data.hostId, () => service.addNode(parsed.data));
+}
+
+const nodeChangeSchema = wg.nodeInputSchema
+    .pick({ name: true, endpoint: true, port: true, exit: true })
+    .extend({ id: z.string().uuid() });
+
+export async function updateVpnNodeAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = nodeChangeSchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    const { id, ...change } = parsed.data;
+    return audited(user.id, "vpn.node.update", id, () => service.updateNode(id, change));
+}
+
+const nodeRemovalSchema = z.object({ id: z.string().uuid(), anyway: z.boolean() });
+
+/** `unreachable` lets the screen offer to remove a machine that is gone for good. */
+export async function removeVpnNodeAction(
+    input: unknown
+): Promise<Result<{ unreachable?: undefined }> | { error: string; unreachable: true }> {
+    const user = await requireAdmin();
+    const parsed = nodeRemovalSchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    const { id, anyway } = parsed.data;
+    try {
+        await service.removeNode(id, anyway);
+        await recordAudit({
+            actorId: user.id,
+            action: "vpn.node.remove",
+            targetType: "vpn",
+            targetId: id
+        });
+        return {};
+    } catch (error) {
+        const answer = await failed(error);
+        const cut = error instanceof service.WireGuardRefusal && error.code === "unreachable";
+        return cut ? { ...answer, unreachable: true } : answer;
+    }
+}
+
+export async function setVpnOpenAccessAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const open = z.boolean().safeParse(input);
+    if (!open.success) return failed(open.error);
+    return audited(user.id, "vpn.access.open", "instance", () => service.setOpenAccess(open.data));
+}
+
+const grantSchema = wg.accessInputSchema
+    .omit({ userId: true })
+    .extend({ email: z.string().trim().toLowerCase().email() });
+
+/** Find somebody by the email they signed up with, and set what they may do. */
+export async function grantVpnAccessAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = grantSchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    const { email, ...access } = parsed.data;
+    const person = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (!person) return failed(new service.WireGuardRefusal("noSuchPerson"));
+    return audited(user.id, "vpn.access.grant", person.id, () =>
+        service.grantAccess({ ...access, userId: person.id })
+    );
+}
+
+export async function revokeVpnAccessAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const id = z.string().uuid().safeParse(input);
+    if (!id.success) return failed(id.error);
+    return audited(user.id, "vpn.access.revoke", id.data, () => service.revokeAccess(id.data));
+}

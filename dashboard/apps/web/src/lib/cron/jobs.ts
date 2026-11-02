@@ -47,6 +47,7 @@ import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { runMailServerPass } from "@/lib/mail-server/scheduled";
+import { runVpnPass } from "@/lib/vpn/wireguard-service";
 import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
@@ -433,6 +434,14 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // nothing on a Polaris that has not installed the Mail server app.
         leaseMs: 20 * MINUTE,
         run: runMailServerPass
+    },
+    {
+        key: "vpn-nodes",
+        // What each device used, and whoever ran out of allowance or time leaves
+        // the node's peer list. Does nothing until a node exists.
+        everyMs: 5 * MINUTE,
+        leaseMs: 10 * MINUTE,
+        run: runVpnPass
     },
     {
         key: "mail-categories",

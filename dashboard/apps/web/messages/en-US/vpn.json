@@ -1,7 +1,7 @@
 {
     "page": {
         "title": "VPN",
-        "description": "Reach your own devices from anywhere, through the Tailscale apps."
+        "description": "Connect through your own servers with the official WireGuard apps."
     },
     "install": {
         "title": "Install the VPN",
@@ -252,5 +252,107 @@
         "scriptLabel": "the OpenWrt setup",
         "linesTitle": "Backup internet lines",
         "linesBody": "Connect each line to the router and let the router choose. On OpenWrt, use the mwan3 package. Polaris keeps reaching this network either way."
+    },
+    "connect": {
+        "intro": "Add a device, then scan its code or import its file in the WireGuard app.",
+        "devices": "Your devices",
+        "add": "Add a device",
+        "addBody": "Each device gets its own configuration.",
+        "name": "Device name",
+        "location": "Server",
+        "create": "Create",
+        "cancel": "Cancel",
+        "empty": "No devices yet.",
+        "noNodes": "No servers are available to you yet.",
+        "setUp": "Add servers",
+        "full": "You have reached your limit of {count} devices.",
+        "usage": "{used} of {limit} GB used this month.",
+        "online": "Connected",
+        "offline": "Not connected",
+        "remove": "Remove device",
+        "torHint": "Tor is free and more private, but much slower. Some sites block it, and calls or games will not work.",
+        "madeTitle": "Your device is ready",
+        "madeBody": "Install WireGuard from your app store or wireguard.com/install, add a tunnel, and scan this code or import the file.",
+        "once": "This appears only once. If you lose it, remove the device and add it again.",
+        "download": "Download file",
+        "done": "Done",
+        "standing": {
+            "none": "You do not have VPN access. Ask an administrator for it.",
+            "suspended": "Your VPN access is suspended. Ask an administrator.",
+            "expired": "Your VPN access has expired. Ask an administrator.",
+            "overLimit": "You have used this month's traffic. It renews next month."
+        },
+        "errors": {
+            "noRoot": "Polaris needs root on that machine. Edit its connection in Servers.",
+            "unreachable": "That machine did not answer. Check it is on and try again.",
+            "unsupported": "That machine's system is not supported. Use Debian or Ubuntu.",
+            "noAccess": "You do not have access to that server.",
+            "deviceLimit": "You have reached your device limit.",
+            "nodeFull": "That server is full. Pick another one.",
+            "nodeNotReady": "That server is still being set up. Try again in a minute.",
+            "notFound": "That is no longer here.",
+            "noSuchPerson": "Nobody here has that email.",
+            "tooManyNodes": "This Polaris has reached its limit of servers.",
+            "invalid": "Check the fields and try again."
+        }
+    },
+    "nodes": {
+        "title": "Servers",
+        "hint": "Machines people connect through. Add as many as you like.",
+        "add": "Add new server",
+        "addBody": "Polaris sets it up over the connection it already has.",
+        "edit": "Edit server",
+        "editBody": "Devices keep working. A new address or port needs each device added again.",
+        "save": "Save",
+        "saving": "Saving...",
+        "adding": "Setting up...",
+        "empty": "No servers yet. People cannot connect until you add one.",
+        "noMachines": "Every machine with root is already a server. Add another in Servers.",
+        "machine": "Machine",
+        "name": "Name",
+        "endpoint": "Public address",
+        "port": "UDP port",
+        "exit": "Traffic leaves through",
+        "exits": {
+            "direct": "This server",
+            "tor": "Tor network"
+        },
+        "torHint": "Free and more private, but much slower. Only web-style traffic passes.",
+        "portHint": "UDP {port} has to be open towards this machine.",
+        "privateEndpoint": "That is a private address. Use a public one, or devices outside can't connect, and forward UDP {port} on your router.",
+        "devices": "{count} devices",
+        "editLabel": "Edit",
+        "remove": "Remove server",
+        "removeKind": "server",
+        "removeBody": "Its devices stop working and are removed.",
+        "removeAnyway": "Remove anyway",
+        "unreachableBody": "That machine did not answer, so it may keep running the VPN and letting its devices in until it is reinstalled."
+    },
+    "people": {
+        "title": "People",
+        "hint": "Who may connect, through which servers, and how much.",
+        "add": "Give access",
+        "addBody": "They need an account on this Polaris.",
+        "edit": "Edit access",
+        "editBody": "Changes reach the servers right away.",
+        "email": "Email",
+        "deviceLimit": "Devices",
+        "dataLimit": "GB per month",
+        "until": "Until",
+        "nodes": "Servers",
+        "allNodes": "All servers",
+        "suspend": "Suspended",
+        "suspended": "Suspended",
+        "open": "Open to everyone here",
+        "openHint": "Anyone with an account may connect, with {count} devices. Limits below still apply to the people listed.",
+        "gb": "{used} of {count} GB",
+        "used": "{used} GB this month",
+        "editLabel": "Edit",
+        "remove": "Remove access",
+        "empty": "Nobody has been given access yet. Administrators can always connect."
+    },
+    "mesh": {
+        "title": "Private networks",
+        "hint": "Optional: lets devices reach each other and a home network. Normal VPN use does not need it."
     }
 }

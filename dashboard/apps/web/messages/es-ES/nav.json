@@ -400,7 +400,9 @@
         "Private networks": "Redes privadas",
         "Router": "Router",
         "Router setup": "Router",
-        "Add a device": "Añadir equipo"
+        "Connect": "Conectar",
+        "Join a network": "Unirse a una red",
+        "Network devices": "Dispositivos de red"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

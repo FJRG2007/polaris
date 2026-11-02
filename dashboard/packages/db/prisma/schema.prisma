@@ -292,6 +292,8 @@ model User {
     accountRecoveries   AccountRecovery[]
     accessGroups        AccessGroup[]
     accessGroupBindings UserAccessGroup[]
+    vpnPeers            VpnPeer[]
+    vpnAccess           VpnAccess?
     apiKeys             ApiKey[]
     oauthGrants         OAuthGrant[]
     twoFactors          TwoFactor[]
@@ -16058,4 +16060,61 @@ model AnnouncementDismissal {
 
     @@id([announcementId, userId])
     @@index([userId])
+}
+
+/// A machine people's VPN traffic leaves from. Its private key stays on the machine.
+model VpnNode {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    hostId      String    @unique @db.Uuid
+    name        String
+    /// Where devices reach it: a public address or name.
+    endpoint    String
+    port        Int       @default(51820)
+    /// "direct" or "tor".
+    exit        String    @default("direct")
+    /// Null until the machine answered with it.
+    publicKey   String?
+    /// Which address block this node has; see nodeSubnet.
+    subnetIndex Int       @unique
+    createdAt   DateTime  @default(now())
+    peers       VpnPeer[]
+}
+
+/// One person's device on a node. Its private key was handed over once and not kept.
+model VpnPeer {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    nodeId        String    @db.Uuid
+    node          VpnNode   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+    userId        String    @db.Uuid
+    user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    name          String
+    publicKey     String    @unique
+    hostIndex     Int
+    /// Totals, kept across a restart of the node.
+    received      BigInt    @default(0)
+    sent          BigInt    @default(0)
+    /// The node's own counters when last read, which restart from zero with it.
+    seenReceived  BigInt    @default(0)
+    seenSent      BigInt    @default(0)
+    lastHandshake DateTime?
+    createdAt     DateTime  @default(now())
+
+    @@unique([nodeId, hostIndex])
+    @@index([userId, createdAt])
+}
+
+/// What one person may do on the VPN, granted by an administrator.
+model VpnAccess {
+    userId      String    @id @db.Uuid
+    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    /// Node ids; empty means every node.
+    nodes       String[]  @db.Uuid
+    deviceLimit Int       @default(5)
+    /// A month's traffic in GiB; null means no limit.
+    dataLimitGb Int?
+    expiresAt   DateTime?
+    suspended   Boolean   @default(false)
+    usedBytes   BigInt    @default(0)
+    periodStart DateTime  @default(now())
+    createdAt   DateTime  @default(now())
 }
