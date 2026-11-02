@@ -273,6 +273,10 @@
             "streamdeck": {
                 "badge": "Stream Deck",
                 "title": "Creada al conectar el plugin de Polaris en un Stream Deck. Descargas muestra los decks conectados y puede desconectarlos."
+            },
+            "tv": {
+                "badge": "TV",
+                "title": "Creada al conectar Polaris TV. Muestra tu nombre y el número de notificaciones en esa TV, nada más."
             }
         },
         "form": {
@@ -1400,6 +1404,14 @@
                     "use": "Abre Polaris e inicia sesión en tu servidor."
                 }
             }
+        },
+        "tv": {
+            "title": "Polaris TV",
+            "description": "Una pantalla de inicio limpia para tu TV. Funciona por sí sola, y muestra tu cuenta si la conectas.",
+            "install": "Instalar en una TV",
+            "needsApp": "Para instalarla hace falta la app de escritorio de Polaris en un equipo de la misma red que la TV.",
+            "updateApp": "Actualiza esta app para instalar en una TV.",
+            "supported": "Solo Android TV y Google TV. Las TV Samsung, LG, Roku, Vizio y VIDAA no pueden usarla."
         }
     },
     "cli": {
@@ -1585,6 +1597,40 @@
             "nothingWaiting": "No hay nada esperando con ese código. Pulsa Conectar en el plugin para obtener uno nuevo.",
             "cannotAnswer": "No se puede responder a esa solicitud.",
             "noScopes": "Tu cuenta no puede usar nada de lo que ofrece un Stream Deck. Pide acceso a un administrador."
+        }
+    },
+    "tv": {
+        "page": {
+            "title": "Conectar una TV",
+            "intro": "Escribe el código que muestra tu TV. No se conecta nada hasta que lo apruebes."
+        },
+        "title": "Conectar {device}",
+        "code": "Código {code}",
+        "system": "Sistema",
+        "version": "Versión",
+        "askedFrom": "Pedido desde",
+        "on": "En",
+        "unknown": "Sin datos",
+        "asksTo": "Verá",
+        "seesName": "Tu nombre",
+        "seesCounts": "Cuántas notificaciones tienes pendientes",
+        "consent": "Si aceptas, esta TV mostrará tu nombre y cuántas notificaciones tienes pendientes durante un año. No puede leerlas ni hacer nada más.",
+        "working": "Trabajando",
+        "approve": "Conectarla",
+        "deny": "Rechazarla",
+        "signedIn": "Conectada.",
+        "signedInHint": "Vuelve a la TV; sigue sola. Puedes terminar la conexión en <link>Claves de API</link>.",
+        "turnedAway": "Rechazada.",
+        "turnedAwayHint": "No se entregó nada. La TV lo indica y se detiene.",
+        "codeLabel": "El código que muestra tu TV",
+        "looking": "Buscando",
+        "find": "Buscar",
+        "errors": {
+            "tooMany": "Demasiados códigos probados. Espera unos minutos.",
+            "notACode": "Ese código no es de Polaris TV.",
+            "nothingWaiting": "No hay nada pendiente con ese código. Pulsa Conectar en la TV para obtener otro.",
+            "cannotAnswer": "No se puede responder a esa solicitud.",
+            "noScopes": "Tu cuenta no puede conectar una TV."
         }
     }
 }

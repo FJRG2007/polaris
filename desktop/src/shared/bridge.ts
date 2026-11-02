@@ -94,6 +94,8 @@ export interface PolarisDesktop {
     /** Install a tool on this computer, after the app has asked in a dialog of
      *  its own. A cancelled confirmation is a failure with no sentence. */
     installTool(input: InstallRequest): Promise<InstallResult>;
+    /** Opens the window that installs Polaris TV on a set on this network. */
+    openTvInstall(): Promise<boolean>;
     /** The system's default browser, by a name of ours, or null. */
     defaultBrowser(): Promise<string | null>;
     /** Open the app's window for adding and switching servers. */
@@ -233,9 +235,61 @@ export interface PolarisLocal {
         openService(): Promise<void>;
         onEvent(listener: (event: PushEvent) => void): () => void;
     };
+    readonly tv: {
+        state(): Promise<TvInstallState>;
+        find(): Promise<TvInstallState>;
+        start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
+        onState(listener: (state: TvInstallState) => void): () => void;
+    };
     readonly overlay: {
         onStroke(listener: (stroke: StrokeInput) => void): () => void;
     };
+}
+
+/** Where installing on a TV has got to. */
+export type TvPhase =
+    | "ready"
+    | "searching"
+    | "connecting"
+    | "allow"
+    | "checking"
+    | "backup"
+    | "download"
+    | "install"
+    | "home"
+    | "closing"
+    | "done"
+    | "failed";
+
+/** How it ended. */
+export type TvOutcome =
+    | "installed"
+    | "installed-home"
+    | "installed-home-refused"
+    | "installed-home-unknown"
+    | "adb-off"
+    | "not-allowed"
+    | "unreachable"
+    | "not-android-tv"
+    | "too-old"
+    | "not-released"
+    | "download-failed"
+    | "key-failed"
+    | "connection-lost"
+    | "backup-failed"
+    | "sideload-refused"
+    | "install-failed"
+    | "install-interrupted";
+
+export interface TvInstallState {
+    readonly phase: TvPhase;
+    /** Addresses on this network that answer on the ADB port. */
+    readonly found: readonly string[];
+    readonly outcome: TvOutcome | null;
+    /** The folder the TV's backup was written to. */
+    readonly backup: string | null;
+    /** Whether the port refused afterwards; null until that was checked. */
+    readonly closed: boolean | null;
 }
 
 /** A button on a notice. */
@@ -305,7 +359,12 @@ export const CHANNELS = {
     pushStart: "local:push-start",
     pushCancel: "local:push-cancel",
     pushOpenService: "local:push-open-service",
-    pushEvent: "local:push-event"
+    pushEvent: "local:push-event",
+    tvOpen: "desktop:tv-open",
+    tvState: "local:tv-state",
+    tvFind: "local:tv-find",
+    tvStart: "local:tv-start",
+    tvEvent: "local:tv-event"
 } as const;
 
 /** The argument that carries this app's version into the dashboard's preload. */

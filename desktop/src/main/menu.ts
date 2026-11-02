@@ -24,6 +24,7 @@ export interface MenuActions {
     readonly reload: () => void;
     readonly forgetApiKey: () => void;
     readonly openApiKeys: () => void;
+    readonly installOnTv: () => void;
     readonly openInBrowser: () => void;
 }
 
@@ -86,6 +87,7 @@ export function appItems(
         ...switchTo(actions, servers),
         { type: "separator" },
         { label: "API keys", click: actions.openApiKeys },
+        { label: "Install on a TV...", click: actions.installOnTv },
         { label: "Forget the saved API key", click: actions.forgetApiKey },
         { label: "Open this Polaris in the browser", click: actions.openInBrowser }
     ];
@@ -127,6 +129,7 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: 
                 { label: "Reload", accelerator: "CmdOrCtrl+R", click: actions.reload },
                 { type: "separator" },
                 { label: "API keys", click: actions.openApiKeys },
+                { label: "Install on a TV...", click: actions.installOnTv },
                 { label: "Forget the saved API key", click: actions.forgetApiKey },
                 { type: "separator" },
                 isMac ? { role: "close" } : { role: "quit" }

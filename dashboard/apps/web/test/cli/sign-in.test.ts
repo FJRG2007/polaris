@@ -124,6 +124,47 @@ beforeEach(() => {
     revoked.length = 0;
 });
 
+describe("a TV's request", () => {
+    const TV = { ...REQUEST, deviceName: "Sample TV", scopes: [], kind: "tv" as const };
+
+    it("mints a key of its own kind that carries no scope", async () => {
+        const opened = await openCliSignIn(TV, fixedRandom);
+        await answerCliSignIn({
+            userId: ADA,
+            userCode: opened!.userCode,
+            approve: true,
+            kind: "tv"
+        });
+        const claimed = await claimCliSignIn(opened!.deviceCode);
+        expect(claimed).toMatchObject({ status: "approved", scopes: [] });
+        expect(minted).toHaveLength(1);
+        expect(minted[0]).toMatchObject({ userId: ADA, kind: "tv" });
+        expect(minted[0]?.input["scopes"]).toEqual([]);
+        expect(minted[0]?.input["name"]).toBe("TV - Sample TV");
+    });
+
+    it("drops any scope stored on the row", async () => {
+        const opened = await openCliSignIn({ ...TV, scopes: ["deploy.read"] }, fixedRandom);
+        await answerCliSignIn({
+            userId: ADA,
+            userCode: opened!.userCode,
+            approve: true,
+            kind: "tv"
+        });
+        expect(await claimCliSignIn(opened!.deviceCode)).toMatchObject({ scopes: [] });
+        expect(minted[0]?.input["scopes"]).toEqual([]);
+    });
+
+    it("is not found on another kind's screen", async () => {
+        const opened = await openCliSignIn(TV, fixedRandom);
+        expect(await describeCliSignIn(opened!.userCode)).toBeNull();
+        expect(await describeCliSignIn(opened!.userCode, new Date(), "tv")).toMatchObject({
+            kind: "tv",
+            scopes: []
+        });
+    });
+});
+
 describe("opening a request", () => {
     it("keeps only the hash of the CLI's secret and hands back a short code", async () => {
         const opened = await openCliSignIn(REQUEST, fixedRandom);

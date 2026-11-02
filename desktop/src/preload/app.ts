@@ -57,6 +57,7 @@ const bridge: PolarisDesktop = {
     setCustomGames: (games) => ipcRenderer.invoke(CHANNELS.gameCustom, games),
     runningPrograms: () => ipcRenderer.invoke(CHANNELS.gamePrograms),
     installTool: (input) => ipcRenderer.invoke(CHANNELS.installTool, input),
+    openTvInstall: () => ipcRenderer.invoke(CHANNELS.tvOpen),
     defaultBrowser: () => ipcRenderer.invoke(CHANNELS.defaultBrowser),
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),
     shareSources: (input) => ipcRenderer.invoke(CHANNELS.shareSources, input),

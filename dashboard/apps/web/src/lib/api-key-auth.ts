@@ -42,13 +42,19 @@ function bearerToken(request: Request): string | null {
 /**
  * Resolve the caller from an API key, or null when there is no usable one. The
  * usage stamp is written on success and never blocks the request.
+ *
+ * A TV's key is no key here unless the caller is one of Polaris TV's own routes
+ * and says so: it promises its owner it opens nothing else.
  */
-export async function authenticateApiKey(request: Request): Promise<ApiKeyPrincipal | null> {
+export async function authenticateApiKey(
+    request: Request,
+    { tv = false }: { tv?: boolean } = {}
+): Promise<ApiKeyPrincipal | null> {
     const token = bearerToken(request);
     if (!token) return null;
 
     const verified = await verifyApiKey(token);
-    if (!verified) return null;
+    if (!verified || (verified.kind === "tv" && !tv)) return null;
 
     const [ip, userAgent] = await Promise.all([clientIp(), clientUserAgent()]);
     // The key's own allowlist, and whatever an administrator imposed on the

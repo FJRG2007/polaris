@@ -95,7 +95,8 @@
         "fileOpenFailed": "That file could not be opened.",
         "rangeBackwards": "The start of the range is after its end.",
         "fileLargerThan": "That file is larger than {megabytes} MB.",
-        "deckSignInAsk": "A device name is required, and only the scopes a Stream Deck uses can be asked for."
+        "deckSignInAsk": "A device name is required, and only the scopes a Stream Deck uses can be asked for.",
+        "tvSignInAsk": "A device name is required."
     },
     "refusals": {
         "session": {

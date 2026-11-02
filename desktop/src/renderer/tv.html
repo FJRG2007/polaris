@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+        />
+        <title>Install on a TV - Polaris</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="stack">
+            <div>
+                <h1 id="title">Install on a TV</h1>
+                <p class="hint">
+                    For Android TV and Google TV on this network. Network debugging must be on: on the TV,
+                    open Settings, About, press Build 7 times, then turn on USB debugging and Network
+                    debugging in Developer options.
+                </p>
+            </div>
+
+            <label>
+                TV address
+                <input id="address" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" />
+            </label>
+            <p id="address-error" class="hint" role="alert" hidden></p>
+
+            <div class="row">
+                <button id="find" type="button">Find TVs</button>
+                <div id="found" class="row"></div>
+            </div>
+
+            <label class="row">
+                <input id="home" type="checkbox" checked />
+                Make it the Home screen. The TV's own stays installed and enabled.
+            </label>
+
+            <p class="hint">
+                A backup of the TV's settings is saved here first. Nothing is uninstalled or disabled, and
+                network debugging is turned off when it finishes.
+            </p>
+
+            <p id="step" class="hint" hidden></p>
+            <p id="result" role="status" hidden></p>
+            <p id="closed" class="hint" hidden></p>
+            <p id="backup" class="hint path" hidden></p>
+
+            <div class="row">
+                <button id="start" type="button">Install</button>
+            </div>
+        </div>
+        <script src="tv.js"></script>
+    </body>
+</html>

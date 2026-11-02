@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="polaris_title">Polaris</string>
+    <string name="polaris_settings_row">Polaris account</string>
+    <string name="polaris_intro">Optional. Connect this TV to your Polaris to see your account and alerts here. The TV works the same without it.</string>
+    <string name="polaris_address_hint">polaris.example.com</string>
+    <string name="polaris_connect">Connect</string>
+    <string name="polaris_connecting">Connecting...</string>
+    <string name="polaris_bad_address">That is not an address. Type the one you open Polaris at.</string>
+    <string name="polaris_no_answer">%1$s did not answer as a Polaris. Check the address, and that this Polaris is up to date.</string>
+    <string name="polaris_qr">Code to scan with your phone</string>
+    <string name="polaris_pair_hint">Scan the code with your phone, or open this address and type the code:</string>
+    <string name="polaris_denied">The connection was turned away. Nothing was saved.</string>
+    <string name="polaris_expired">The code expired. Connect again for a new one.</string>
+    <string name="polaris_sign_in_lost">This TV is no longer connected. Connect it again.</string>
+    <string name="polaris_loading">Loading...</string>
+    <string name="polaris_unreachable">Your Polaris is not answering right now.</string>
+    <string name="polaris_on_local">Using your local network address: %1$s</string>
+    <string name="polaris_refused">%1$s answers as a different Polaris, so your sign-in was not sent there.</string>
+    <string name="polaris_untrusted">%1$s uses a certificate this TV does not trust, so it cannot be used.</string>
+    <string name="polaris_plain_http">%1$s uses plain http, so your sign-in travels unencrypted. Use it only on a network you trust.</string>
+    <string name="polaris_disconnect">Disconnect this TV</string>
+    <plurals name="polaris_unread">
+        <item quantity="one">%d unread notification</item>
+        <item quantity="other">%d unread notifications</item>
+    </plurals>
+    <plurals name="polaris_alerts">
+        <item quantity="one">%d alert</item>
+        <item quantity="other">%d alerts</item>
+    </plurals>
+</resources>

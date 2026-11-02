@@ -30,7 +30,7 @@ import {
     type WebPreferences
 } from "electron";
 
-export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "overlay" | "updating";
+export type WindowKind = "polaris" | "connect" | "api-key" | "push" | "tv" | "overlay" | "updating";
 
 const kinds = new Map<number, WindowKind>();
 

@@ -28,7 +28,8 @@ export function DownloadsPage({
     webApp,
     extensionFiles,
     deck,
-    desktopFiles
+    desktopFiles,
+    tv
 }: {
     repo: string;
     /** The address the CLI signs in to, or null for the one the page is on. */
@@ -39,6 +40,8 @@ export function DownloadsPage({
     /** The Stream Deck card. */
     deck: ReactNode;
     desktopFiles: ReactNode;
+    /** The TV card, where this page can offer it. */
+    tv?: ReactNode;
 }) {
     const t = useTranslations("account");
     const tc = useTranslations("components");
@@ -65,6 +68,8 @@ export function DownloadsPage({
                 >
                     {desktopFiles}
                 </DownloadCard>
+
+                {tv}
 
                 <ExtensionCard repo={repo} files={extensionFiles} />
 

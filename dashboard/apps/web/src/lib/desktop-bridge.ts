@@ -31,6 +31,8 @@ export interface DesktopVpnStatus {
 
 export interface PolarisDesktop {
     readonly version: string;
+    /** Absent on an app older than Polaris TV. */
+    openTvInstall?(): Promise<boolean>;
     readonly platform: string;
     /** This computer's VPN. Absent from an app older than the feature. */
     readonly vpn?: {

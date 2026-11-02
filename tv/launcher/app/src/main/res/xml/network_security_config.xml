@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home Polaris answers on plain http at a LAN address nobody can list here. The screen warns about it,
+     and nothing goes out at all until somebody connects a Polaris. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

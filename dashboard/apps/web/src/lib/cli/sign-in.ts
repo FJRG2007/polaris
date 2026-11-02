@@ -23,6 +23,7 @@
 import { prisma } from "@polaris/db";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { CLI_TOKEN_DAYS, isCliScope, type CliScope } from "./scopes";
+import { TV_TOKEN_DAYS } from "@/lib/tv/scopes";
 import { DECK_TOKEN_DAYS, isDeckScope, type DeckScope } from "@/lib/deck/scopes";
 import { createApiKey, scopesAvailableTo } from "@polaris/auth";
 import { revokeCliSession } from "./sessions";
@@ -35,7 +36,7 @@ import { createApiKeySchema, describeClient, parseStringList, stringifyList } fr
  * closed list of scopes and its own approval screen. A request only ever turns
  * up on the screen of its own kind.
  */
-export type SignInKind = "cli" | "streamdeck";
+export type SignInKind = "cli" | "streamdeck" | "tv";
 
 /** A scope either kind of client may ask for. */
 export type SignInScope = CliScope | DeckScope;
@@ -105,12 +106,13 @@ function isUniqueViolation(caught: unknown): boolean {
  *  as data. */
 function storedScopes(raw: string, kind: SignInKind = "cli"): SignInScope[] {
     const list = parseStringList(raw);
+    if (kind === "tv") return [];
     return kind === "streamdeck" ? list.filter(isDeckScope) : list.filter(isCliScope);
 }
 
 /** The kind a stored row names. A row from before the column read as "cli". */
 function storedKind(raw: unknown): SignInKind {
-    return raw === "streamdeck" ? "streamdeck" : "cli";
+    return raw === "streamdeck" || raw === "tv" ? raw : "cli";
 }
 
 /**
@@ -271,7 +273,8 @@ export async function claimCliSignIn(
     const held = new Set<string>(await scopesAvailableTo(account.id, account.isAdmin));
     const kind = storedKind(row.kind);
     const scopes = storedScopes(row.scopes, kind).filter((scope) => held.has(scope));
-    if (scopes.length === 0) return { status: "denied" };
+    // A TV's key carries no scope at all: it reaches /api/tv and nothing else.
+    if (scopes.length === 0 && kind !== "tv") return { status: "denied" };
 
     // The schema supplies every default a key needs; the scopes are then put
     // back to exactly the ones the approval screen listed. The schema would
@@ -281,20 +284,32 @@ export async function claimCliSignIn(
     const input = {
         ...createApiKeySchema.parse({
             name:
-                kind === "streamdeck"
+                kind === "tv"
                     ? // i18n-ignore the name of a key, in the list its owner reads
-                      `Stream Deck - ${row.deviceName}`.slice(0, 60)
-                    : // i18n-ignore the name of a key, in the list its owner reads
-                      `CLI - ${row.deviceName}`.slice(0, 60),
+                      `TV - ${row.deviceName}`.slice(0, 60)
+                    : kind === "streamdeck"
+                      ? // i18n-ignore the name of a key, in the list its owner reads
+                        `Stream Deck - ${row.deviceName}`.slice(0, 60)
+                      : // i18n-ignore the name of a key, in the list its owner reads
+                        `CLI - ${row.deviceName}`.slice(0, 60),
             description:
-                kind === "streamdeck"
+                kind === "tv"
                     ? // i18n-ignore stored with the key; the list shows it as written
-                      "Connected from the Stream Deck plugin."
-                    : // i18n-ignore stored with the key; the list shows it as written
-                      "Signed in with plr login.",
-            environment: kind === "streamdeck" ? "production" : "development",
-            scopes,
-            expiresInDays: kind === "streamdeck" ? DECK_TOKEN_DAYS : CLI_TOKEN_DAYS
+                      "Connected from Polaris TV."
+                    : kind === "streamdeck"
+                      ? // i18n-ignore stored with the key; the list shows it as written
+                        "Connected from the Stream Deck plugin."
+                      : // i18n-ignore stored with the key; the list shows it as written
+                        "Signed in with plr login.",
+            environment: kind === "cli" ? "development" : "production",
+            // Only to pass the form's own rule; the line after this puts back the real list.
+            scopes: kind === "tv" ? ["deploy.read"] : scopes,
+            expiresInDays:
+                kind === "tv"
+                    ? TV_TOKEN_DAYS
+                    : kind === "streamdeck"
+                      ? DECK_TOKEN_DAYS
+                      : CLI_TOKEN_DAYS
         }),
         scopes
     };
