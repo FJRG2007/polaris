@@ -4,7 +4,12 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 describe("the PDF export", () => {
     it("is a file a PDF reader opens, with every page", async () => {
-        const page = { jpeg: new Uint8Array([255, 216, 255, 217]), width: 2, height: 2, drawn: 100 };
+        const page = {
+            jpeg: new Uint8Array([255, 216, 255, 217]),
+            width: 2,
+            height: 2,
+            drawn: 100
+        };
         const blob = pdfOfJpegs([page, page, page]);
         const data = new Uint8Array(await blob.arrayBuffer());
         const document = await getDocument({ data, isEvalSupported: false }).promise;

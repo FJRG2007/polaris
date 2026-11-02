@@ -15,7 +15,11 @@ const row = vi.hoisted(() => ({
     lastOkAt: new Date("2026-11-01T08:00:00Z"),
     createdAt: new Date("2026-01-01T08:00:00Z")
 }));
-const seen = vi.hoisted(() => ({ refusals: [] as string[], attempts: [] as string[], states: [] as string[] }));
+const seen = vi.hoisted(() => ({
+    refusals: [] as string[],
+    attempts: [] as string[],
+    states: [] as string[]
+}));
 
 vi.mock("imapflow", () => ({ ImapFlow: class {} }));
 vi.mock("@/lib/audit-service", () => ({ audit: async () => undefined }));

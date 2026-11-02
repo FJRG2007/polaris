@@ -67,7 +67,7 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-    cn,
+    cn
 } from "@polaris/ui";
 
 /** How the shared mute list draws itself inside a dropdown. */

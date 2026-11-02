@@ -24,7 +24,11 @@ function mailbox(id: string, lastOkAt: string | null, since: number, last = sinc
 
 describe("why a mailbox is refused", () => {
     it("blames the server when several went within minutes", () => {
-        const all = [mailbox("a", ago(90), 30), mailbox("b", ago(90), 28), mailbox("c", ago(90), 25)];
+        const all = [
+            mailbox("a", ago(90), 30),
+            mailbox("b", ago(90), 28),
+            mailbox("c", ago(90), 25)
+        ];
         expect(refusalCause(all[0], all, NOW)).toBe("server");
     });
 
@@ -51,7 +55,10 @@ describe("why a mailbox is refused", () => {
     });
 
     it("stops blaming the server after a day: a shared password can change", () => {
-        const all = [mailbox("a", ago(26 * 60), 25 * 60, 5), mailbox("b", ago(26 * 60), 25 * 60, 5)];
+        const all = [
+            mailbox("a", ago(26 * 60), 25 * 60, 5),
+            mailbox("b", ago(26 * 60), 25 * 60, 5)
+        ];
         expect(refusalCause(all[0], all, NOW)).toBe("password");
     });
 
@@ -66,10 +73,12 @@ describe("why a mailbox is refused", () => {
 describe("notices", () => {
     it("says one thing about a server, however many mailboxes it refused", () => {
         const notices = refusedNotices(
-            [mailbox("a", ago(90), 30), mailbox("b", ago(90), 28), mailbox("c", ago(90), 25)].map((row) => ({
-                ...row,
-                auth: "password" as const
-            })),
+            [mailbox("a", ago(90), 30), mailbox("b", ago(90), 28), mailbox("c", ago(90), 25)].map(
+                (row) => ({
+                    ...row,
+                    auth: "password" as const
+                })
+            ),
             NOW
         );
         expect(notices).toHaveLength(1);

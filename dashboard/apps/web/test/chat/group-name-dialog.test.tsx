@@ -40,7 +40,9 @@ describe("naming a group", () => {
         const onOpenChange = vi.fn();
         const field = open(onOpenChange);
         fireEvent.keyDown(field, { key: "Enter" });
-        expect(await screen.findByText("The request could not be completed. Try again.")).toBeTruthy();
+        expect(
+            await screen.findByText("The request could not be completed. Try again.")
+        ).toBeTruthy();
         expect(onOpenChange).not.toHaveBeenCalled();
     });
 

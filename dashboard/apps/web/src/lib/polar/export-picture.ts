@@ -206,7 +206,9 @@ export function pdfOfJpegs(
             put(page.jpeg);
             put("\nendstream");
         });
-        object(contentId, () => put(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+        object(contentId, () =>
+            put(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`)
+        );
     });
     const count = 3 + pages.length * 3;
     const table = at;

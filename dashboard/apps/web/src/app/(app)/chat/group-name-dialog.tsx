@@ -79,7 +79,11 @@ export function GroupNameDialog({
                         {t("channelHeader.cancel")}
                     </Button>
                     {/* The name it already has is nothing to save. */}
-                    <Button size="sm" disabled={saving || !isDirty(channel.name, name)} onClick={() => void save()}>
+                    <Button
+                        size="sm"
+                        disabled={saving || !isDirty(channel.name, name)}
+                        onClick={() => void save()}
+                    >
                         {t("channelHeader.save")}
                     </Button>
                 </DialogFooter>

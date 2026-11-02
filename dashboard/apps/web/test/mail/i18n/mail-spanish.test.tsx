@@ -29,7 +29,9 @@ describe("the notice for a mailbox that stopped signing in", () => {
     function notice(auth: "password" | "oauth"): string {
         return renderToStaticMarkup(
             withMessages(
-                <RefusedMailboxes accounts={[{ id: "m1", address: "ana@example.com", auth, state: "auth" }]} />,
+                <RefusedMailboxes
+                    accounts={[{ id: "m1", address: "ana@example.com", auth, state: "auth" }]}
+                />,
                 "es-ES"
             )
         );
@@ -53,7 +55,9 @@ describe("a refusal from the mailbox layer", () => {
     });
 
     it("keeps the value it carries", () => {
-        expect(mailRefusalText(t, "You already have a label called Facturas.")).toContain("Facturas");
+        expect(mailRefusalText(t, "You already have a label called Facturas.")).toContain(
+            "Facturas"
+        );
         expect(mailRefusalText(t, "This mailbox has no trash folder.")).toContain("Papelera");
     });
 
@@ -62,7 +66,9 @@ describe("a refusal from the mailbox layer", () => {
             t,
             "That message could not be sent. Polaris has stopped trying after 5 attempts."
         );
-        expect(said).toBe("No se pudo enviar ese mensaje. Polaris ha dejado de intentarlo tras 5 intentos.");
+        expect(said).toBe(
+            "No se pudo enviar ese mensaje. Polaris ha dejado de intentarlo tras 5 intentos."
+        );
     });
 
     it("passes a mail server's own words through untouched", () => {
@@ -86,9 +92,9 @@ describe("why a message went to spam", () => {
     });
 
     it("keeps what the filter found", () => {
-        expect(spamReasonText(t, "Replies would go to x@evil.example, not to ana@example.com")).toBe(
-            "Las respuestas irían a x@evil.example, no a ana@example.com"
-        );
+        expect(
+            spamReasonText(t, "Replies would go to x@evil.example, not to ana@example.com")
+        ).toBe("Las respuestas irían a x@evil.example, no a ana@example.com");
     });
 });
 

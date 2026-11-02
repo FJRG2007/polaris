@@ -1157,7 +1157,10 @@ function RowMenuItems({
                 <SubContent>
                     {EXPORT_FILES.map(({ format, label, Icon }) => (
                         <Item key={format} asChild>
-                            <a href={`/api/polar/threads/${row.id}/export?format=${format}`} download>
+                            <a
+                                href={`/api/polar/threads/${row.id}/export?format=${format}`}
+                                download
+                            >
                                 <Icon />
                                 {label ?? t("export.text")}
                             </a>

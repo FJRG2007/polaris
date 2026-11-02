@@ -113,7 +113,9 @@ function Notice({ notice, onNavigate }: { notice: RefusedNotice; onNavigate?: ()
                     aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">{t(`refused.${notice.cause}Title`)}</p>
+                    <p className="font-medium text-foreground">
+                        {t(`refused.${notice.cause}Title`)}
+                    </p>
                     <p className="truncate text-muted-foreground" title={notice.subject}>
                         {notice.subject}
                     </p>

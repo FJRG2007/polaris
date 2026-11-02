@@ -620,10 +620,10 @@ function stateSentence(
             : refusalCause(account, accounts) !== "password"
               ? tm("rail.serverMayBeFailing")
               : t("accounts.state.passwordRefused", {
-                  detail: account.stateDetail
-                      ? mailRefusalText(tm, account.stateDetail)
-                      : t("accounts.state.passwordDefault")
-              });
+                    detail: account.stateDetail
+                        ? mailRefusalText(tm, account.stateDetail)
+                        : t("accounts.state.passwordDefault")
+                });
     }
     if (account.state === "unreachable") return tm("rail.unreachable");
     if (account.state === "never") return t("accounts.state.never");
