@@ -104,12 +104,10 @@ vi.mock("next/navigation", () => ({
 
 const { DnsBlockerProvider } =
     await import("../../src/app/(app)/network-filter/dns-blocker-context");
-const { DnsOverviewSection } =
-    await import("../../src/app/(app)/network-filter/overview-section");
+const { DnsOverviewSection } = await import("../../src/app/(app)/network-filter/overview-section");
 const { DnsLogSection } = await import("../../src/app/(app)/network-filter/log-section");
 const { DnsListsSection } = await import("../../src/app/(app)/network-filter/lists-section");
-const { DnsDevicesSection } =
-    await import("../../src/app/(app)/network-filter/devices-section");
+const { DnsDevicesSection } = await import("../../src/app/(app)/network-filter/devices-section");
 
 /** One section of the screen, inside the provider its layout gives it. */
 function mount(

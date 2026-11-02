@@ -64,7 +64,10 @@ function generatedPassword(): string {
  */
 function usePasswordRefusal(password: string, address: string): string | null {
     const [breached, setBreached] = useState<string | null>(null);
-    const identity = password && passwordMatchesIdentity(password, [address]) ? MAILBOX_IDENTITY_PASSWORD_MESSAGE : null;
+    const identity =
+        password && passwordMatchesIdentity(password, [address])
+            ? MAILBOX_IDENTITY_PASSWORD_MESSAGE
+            : null;
 
     useEffect(() => {
         setBreached(null);
@@ -72,7 +75,8 @@ function usePasswordRefusal(password: string, address: string): string | null {
         const controller = new AbortController();
         const timer = setTimeout(() => {
             void passwordIsBreached(password, controller.signal).then((found) => {
-                if (!controller.signal.aborted) setBreached(found ? BREACHED_PASSWORD_MESSAGE : null);
+                if (!controller.signal.aborted)
+                    setBreached(found ? BREACHED_PASSWORD_MESSAGE : null);
             });
         }, 400);
         return () => {
@@ -128,13 +132,19 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-40 w-full" />
                 )
             ) : mailboxes.length === 0 ? (
-                <EmptyState icon={<Inbox />} title={t("boxes.none")} description={t("boxes.noneBody")} />
+                <EmptyState
+                    icon={<Inbox />}
+                    title={t("boxes.none")}
+                    description={t("boxes.noneBody")}
+                />
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-[0.8125rem]">
                         <thead>
                             <tr className="text-left">
-                                <th className="w-full max-w-0 py-1.5 pr-3">{t("boxes.columns.address")}</th>
+                                <th className="w-full max-w-0 py-1.5 pr-3">
+                                    {t("boxes.columns.address")}
+                                </th>
                                 <th className="py-1.5 pr-3">{t("boxes.columns.quota")}</th>
                                 <th className="py-1.5 pr-3">{t("boxes.columns.aliases")}</th>
                                 <th className="py-1.5" />
@@ -145,29 +155,51 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                 <tr key={mailbox.id}>
                                     <td className="w-full max-w-0 py-2 pr-3">
                                         <div className="flex min-w-0 items-center gap-2">
-                                            <span className="truncate text-foreground" title={mailbox.address}>
+                                            <span
+                                                className="truncate text-foreground"
+                                                title={mailbox.address}
+                                            >
                                                 {mailbox.address}
                                             </span>
-                                            {mailbox.polaris ? <Badge>{t("boxes.polaris")}</Badge> : null}
+                                            {mailbox.polaris ? (
+                                                <Badge>{t("boxes.polaris")}</Badge>
+                                            ) : null}
                                         </div>
                                         {mailbox.description ? (
-                                            <p className="truncate text-xs text-muted-foreground" title={mailNoteText(t, mailbox.description) ?? undefined}>
+                                            <p
+                                                className="truncate text-xs text-muted-foreground"
+                                                title={
+                                                    mailNoteText(t, mailbox.description) ??
+                                                    undefined
+                                                }
+                                            >
                                                 {mailNoteText(t, mailbox.description)}
                                             </p>
                                         ) : null}
                                     </td>
-                                    <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">{quotaLabel(mailbox.quotaMb, t)}</td>
+                                    <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
+                                        {quotaLabel(mailbox.quotaMb, t)}
+                                    </td>
                                     <td className="py-2 pr-3 text-xs text-muted-foreground">
                                         {mailbox.aliases.length === 0
                                             ? "-"
-                                            : mailbox.aliases.map((alias) => `${alias.name}@${domainName.get(alias.domainId) ?? "?"}`).join(", ")}
+                                            : mailbox.aliases
+                                                  .map(
+                                                      (alias) =>
+                                                          `${alias.name}@${domainName.get(alias.domainId) ?? "?"}`
+                                                  )
+                                                  .join(", ")}
                                     </td>
                                     <td className="whitespace-nowrap py-2 text-right">
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            aria-label={t("boxes.editNamed", { address: mailbox.address })}
-                                            title={t("boxes.editNamed", { address: mailbox.address })}
+                                            aria-label={t("boxes.editNamed", {
+                                                address: mailbox.address
+                                            })}
+                                            title={t("boxes.editNamed", {
+                                                address: mailbox.address
+                                            })}
                                             onClick={() => setEditing(mailbox)}
                                         >
                                             <Pencil />
@@ -176,8 +208,12 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                aria-label={t("boxes.deleteNamed", { address: mailbox.address })}
-                                                title={t("boxes.deleteNamed", { address: mailbox.address })}
+                                                aria-label={t("boxes.deleteNamed", {
+                                                    address: mailbox.address
+                                                })}
+                                                title={t("boxes.deleteNamed", {
+                                                    address: mailbox.address
+                                                })}
                                                 onClick={() => setDeleting(mailbox)}
                                             >
                                                 <Trash2 />
@@ -200,7 +236,13 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                     void panel.reload();
                 }}
             />
-            <EditDialog serverId={serverId} mailbox={editing} domains={domains} onClose={() => setEditing(null)} onSaved={() => void panel.reload()} />
+            <EditDialog
+                serverId={serverId}
+                mailbox={editing}
+                domains={domains}
+                onClose={() => setEditing(null)}
+                onSaved={() => void panel.reload()}
+            />
             <ConfirmDeleteDialog
                 open={deleting !== null}
                 onOpenChange={(open) => (open ? undefined : setDeleting(null))}
@@ -240,14 +282,25 @@ function CreateDialog({
     const [done, setDone] = useState<{ address: string; warning: string | null } | null>(null);
 
     const chosenDomain = domainId || domains[0]?.id || "";
-    const input = { serverId, domainId: chosenDomain, localPart, password, quotaMb: quotaMb || "0", description, addToMyMail };
+    const input = {
+        serverId,
+        domainId: chosenDomain,
+        localPart,
+        password,
+        quotaMb: quotaMb || "0",
+        description,
+        addToMyMail
+    };
     const parsed = mailboxCreateSchema.safeParse(input);
     const address = `${localPart.trim().toLowerCase()}@${domains.find((domain) => domain.id === chosenDomain)?.name ?? ""}`;
     const refusal = usePasswordRefusal(password, address);
     const issue = (path: string, value: string): string | null =>
         parsed.success || !value.trim()
             ? null
-            : mailSchemaText(t, parsed.error.issues.find((entry) => entry.path[0] === path)?.message);
+            : mailSchemaText(
+                  t,
+                  parsed.error.issues.find((entry) => entry.path[0] === path)?.message
+              );
 
     function close(): void {
         setLocalPart("");
@@ -277,7 +330,9 @@ function CreateDialog({
             <DialogContent className="w-[min(32rem,95vw)] max-w-[min(32rem,95vw)]">
                 <DialogHeader>
                     <DialogTitle>{done ? t("boxes.created") : t("boxes.new")}</DialogTitle>
-                    <DialogDescription>{done ? done.address : t("boxes.createIntro")}</DialogDescription>
+                    <DialogDescription>
+                        {done ? done.address : t("boxes.createIntro")}
+                    </DialogDescription>
                 </DialogHeader>
                 {done ? (
                     <div className="flex flex-col gap-3 text-[0.8125rem]">
@@ -301,8 +356,19 @@ function CreateDialog({
                         }}
                     >
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field label={t("boxes.name")} required error={issue("localPart", localPart)}>
-                                {(id) => <Input id={id} value={localPart} onChange={(event) => setLocalPart(event.target.value)} placeholder="alice" />}
+                            <Field
+                                label={t("boxes.name")}
+                                required
+                                error={issue("localPart", localPart)}
+                            >
+                                {(id) => (
+                                    <Input
+                                        id={id}
+                                        value={localPart}
+                                        onChange={(event) => setLocalPart(event.target.value)}
+                                        placeholder="alice"
+                                    />
+                                )}
                             </Field>
                             <Field label={t("dns.domain")} required>
                                 {(id) => (
@@ -310,7 +376,10 @@ function CreateDialog({
                                         id={id}
                                         value={chosenDomain}
                                         onValueChange={setDomainId}
-                                        options={domains.map((domain) => ({ value: domain.id, label: `@${domain.name}` }))}
+                                        options={domains.map((domain) => ({
+                                            value: domain.id,
+                                            label: `@${domain.name}`
+                                        }))}
                                     />
                                 )}
                             </Field>
@@ -318,7 +387,10 @@ function CreateDialog({
                         <Field
                             label={t("boxes.password")}
                             required
-                            error={issue("password", password) ?? mailSchemaText(t, refusal ?? undefined)}
+                            error={
+                                issue("password", password) ??
+                                mailSchemaText(t, refusal ?? undefined)
+                            }
                             hint={t("boxes.passwordHint")}
                         >
                             {(id) => (
@@ -330,16 +402,31 @@ function CreateDialog({
                                         onChange={(event) => setPassword(event.target.value)}
                                         autoComplete="new-password"
                                     />
-                                    <Button type="button" variant="outline" onClick={() => setPassword(generatedPassword())}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setPassword(generatedPassword())}
+                                    >
                                         {t("boxes.generate")}
                                     </Button>
                                 </div>
                             )}
                         </Field>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field label={t("boxes.quota")} error={issue("quotaMb", quotaMb)} hint={t("boxes.quotaHint")}>
+                            <Field
+                                label={t("boxes.quota")}
+                                error={issue("quotaMb", quotaMb)}
+                                hint={t("boxes.quotaHint")}
+                            >
                                 {(id) => (
-                                    <Input id={id} inputMode="numeric" value={quotaMb} onChange={(event) => setQuotaMb(event.target.value.replace(/[^\d]/g, ""))} />
+                                    <Input
+                                        id={id}
+                                        inputMode="numeric"
+                                        value={quotaMb}
+                                        onChange={(event) =>
+                                            setQuotaMb(event.target.value.replace(/[^\d]/g, ""))
+                                        }
+                                    />
                                 )}
                             </Field>
                             <Field label={t("boxes.description")}>
@@ -354,7 +441,10 @@ function CreateDialog({
                             </Field>
                         </div>
                         <label className="flex items-center gap-2 text-[0.8125rem] text-foreground">
-                            <Checkbox checked={addToMyMail} onChange={(event) => setAddToMyMail(event.target.checked)} />
+                            <Checkbox
+                                checked={addToMyMail}
+                                onChange={(event) => setAddToMyMail(event.target.checked)}
+                            />
                             {t("boxes.addToMyMail")}
                         </label>
                         {error ? <p className="text-xs text-danger">{error}</p> : null}
@@ -362,7 +452,10 @@ function CreateDialog({
                             <Button type="button" variant="ghost" onClick={close}>
                                 {tcommon("actions.cancel")}
                             </Button>
-                            <Button type="submit" disabled={!parsed.success || Boolean(refusal) || pending}>
+                            <Button
+                                type="submit"
+                                disabled={!parsed.success || Boolean(refusal) || pending}
+                            >
                                 {pending ? t("boxes.creating") : t("boxes.create")}
                             </Button>
                         </DialogFooter>
@@ -400,7 +493,9 @@ function EditDialog({
         setSeen(mailbox.id);
         setPassword("");
         setQuotaMb(String(mailbox.quotaMb));
-        setAliases(mailbox.aliases.map((alias) => ({ localPart: alias.name, domainId: alias.domainId })));
+        setAliases(
+            mailbox.aliases.map((alias) => ({ localPart: alias.name, domainId: alias.domainId }))
+        );
         setMessage(null);
     }
 
@@ -419,7 +514,10 @@ function EditDialog({
 
     if (!mailbox) return null;
     const aliasesChanged =
-        JSON.stringify(aliases) !== JSON.stringify(mailbox.aliases.map((alias) => ({ localPart: alias.name, domainId: alias.domainId })));
+        JSON.stringify(aliases) !==
+        JSON.stringify(
+            mailbox.aliases.map((alias) => ({ localPart: alias.name, domainId: alias.domainId }))
+        );
     const quotaChanged = quotaMb !== String(mailbox.quotaMb) && quotaMb !== "";
     return (
         <Dialog
@@ -444,16 +542,33 @@ function EditDialog({
                         >
                             {(id) => (
                                 <div className="flex gap-2">
-                                    <Input id={id} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
-                                    <Button type="button" variant="outline" onClick={() => setPassword(generatedPassword())}>
+                                    <Input
+                                        id={id}
+                                        type="password"
+                                        value={password}
+                                        onChange={(event) => setPassword(event.target.value)}
+                                        autoComplete="new-password"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setPassword(generatedPassword())}
+                                    >
                                         {t("boxes.generate")}
                                     </Button>
                                     <Button
                                         type="button"
-                                        disabled={pending || password.length < 12 || Boolean(refusal)}
+                                        disabled={
+                                            pending || password.length < 12 || Boolean(refusal)
+                                        }
                                         onClick={() =>
                                             void run(
-                                                () => setMailboxPasswordAction({ serverId, accountId: mailbox.id, password }),
+                                                () =>
+                                                    setMailboxPasswordAction({
+                                                        serverId,
+                                                        accountId: mailbox.id,
+                                                        password
+                                                    }),
                                                 t("boxes.passwordChanged")
                                             )
                                         }
@@ -467,13 +582,25 @@ function EditDialog({
                     <Field label={t("boxes.quota")} hint={t("boxes.quotaHint")}>
                         {(id) => (
                             <div className="flex gap-2">
-                                <Input id={id} inputMode="numeric" value={quotaMb} onChange={(event) => setQuotaMb(event.target.value.replace(/[^\d]/g, ""))} />
+                                <Input
+                                    id={id}
+                                    inputMode="numeric"
+                                    value={quotaMb}
+                                    onChange={(event) =>
+                                        setQuotaMb(event.target.value.replace(/[^\d]/g, ""))
+                                    }
+                                />
                                 <Button
                                     type="button"
                                     disabled={pending || !quotaChanged}
                                     onClick={() =>
                                         void run(
-                                            () => setMailboxQuotaAction({ serverId, accountId: mailbox.id, quotaMb }),
+                                            () =>
+                                                setMailboxQuotaAction({
+                                                    serverId,
+                                                    accountId: mailbox.id,
+                                                    quotaMb
+                                                }),
                                             t("boxes.quotaSaved")
                                         )
                                     }
@@ -484,14 +611,22 @@ function EditDialog({
                         )}
                     </Field>
                     <div className="flex flex-col gap-2">
-                        <span className="text-[0.8125rem] font-medium text-foreground">{t("boxes.aliases")}</span>
+                        <span className="text-[0.8125rem] font-medium text-foreground">
+                            {t("boxes.aliases")}
+                        </span>
                         {aliases.map((alias, index) => (
                             <div key={index} className="flex items-center gap-2">
                                 <Input
                                     aria-label={t("boxes.aliasName")}
                                     value={alias.localPart}
                                     onChange={(event) =>
-                                        setAliases(aliases.map((entry, at) => (at === index ? { ...entry, localPart: event.target.value } : entry)))
+                                        setAliases(
+                                            aliases.map((entry, at) =>
+                                                at === index
+                                                    ? { ...entry, localPart: event.target.value }
+                                                    : entry
+                                            )
+                                        )
                                     }
                                 />
                                 <div className="w-48 shrink-0">
@@ -499,9 +634,18 @@ function EditDialog({
                                         aria-label={t("boxes.aliasDomain")}
                                         value={alias.domainId}
                                         onValueChange={(value) =>
-                                            setAliases(aliases.map((entry, at) => (at === index ? { ...entry, domainId: value } : entry)))
+                                            setAliases(
+                                                aliases.map((entry, at) =>
+                                                    at === index
+                                                        ? { ...entry, domainId: value }
+                                                        : entry
+                                                )
+                                            )
                                         }
-                                        options={domains.map((domain) => ({ value: domain.id, label: `@${domain.name}` }))}
+                                        options={domains.map((domain) => ({
+                                            value: domain.id,
+                                            label: `@${domain.name}`
+                                        }))}
                                     />
                                 </div>
                                 <Button
@@ -510,7 +654,9 @@ function EditDialog({
                                     variant="ghost"
                                     aria-label={t("boxes.removeAlias")}
                                     title={t("boxes.removeAlias")}
-                                    onClick={() => setAliases(aliases.filter((_, at) => at !== index))}
+                                    onClick={() =>
+                                        setAliases(aliases.filter((_, at) => at !== index))
+                                    }
                                 >
                                     <Trash2 />
                                 </Button>
@@ -521,7 +667,12 @@ function EditDialog({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setAliases([...aliases, { localPart: "", domainId: mailbox.domainId }])}
+                                onClick={() =>
+                                    setAliases([
+                                        ...aliases,
+                                        { localPart: "", domainId: mailbox.domainId }
+                                    ])
+                                }
                             >
                                 <Plus />
                                 {t("boxes.addAlias")}
@@ -529,14 +680,21 @@ function EditDialog({
                             <Button
                                 type="button"
                                 size="sm"
-                                disabled={pending || !aliasesChanged || aliases.some((alias) => !alias.localPart.trim())}
+                                disabled={
+                                    pending ||
+                                    !aliasesChanged ||
+                                    aliases.some((alias) => !alias.localPart.trim())
+                                }
                                 onClick={() =>
                                     void run(
                                         () =>
                                             setMailboxAliasesAction({
                                                 serverId,
                                                 accountId: mailbox.id,
-                                                aliases: aliases.map((alias) => ({ localPart: alias.localPart.trim(), domainId: alias.domainId }))
+                                                aliases: aliases.map((alias) => ({
+                                                    localPart: alias.localPart.trim(),
+                                                    domainId: alias.domainId
+                                                }))
                                             }),
                                         t("boxes.aliasesSaved")
                                     )
@@ -546,7 +704,17 @@ function EditDialog({
                             </Button>
                         </div>
                     </div>
-                    {message ? <p className={message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"}>{message.text}</p> : null}
+                    {message ? (
+                        <p
+                            className={
+                                message.tone === "error"
+                                    ? "text-xs text-danger"
+                                    : "text-xs text-success"
+                            }
+                        >
+                            {message.text}
+                        </p>
+                    ) : null}
                 </div>
             </DialogContent>
         </Dialog>

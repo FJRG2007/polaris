@@ -30,7 +30,10 @@ import {
     Switch
 } from "@polaris/ui";
 
-type Rule = Extract<Awaited<ReturnType<typeof listRulesAction>>, { rules: unknown }>["rules"][number];
+type Rule = Extract<
+    Awaited<ReturnType<typeof listRulesAction>>,
+    { rules: unknown }
+>["rules"][number];
 
 export function RulesTab({ serverId }: { serverId: string }) {
     const t = useTranslations("mailServer");
@@ -84,9 +87,15 @@ export function RulesTab({ serverId }: { serverId: string }) {
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                     {rules.map((rule) => (
                         <li key={rule.id} className="flex items-center gap-3 px-3 py-2">
-                            <Switch checked={rule.enabled} onChange={(value) => void toggle(rule, value)} aria-label={t("rules.onLabel", { name: rule.name })} />
+                            <Switch
+                                checked={rule.enabled}
+                                onChange={(value) => void toggle(rule, value)}
+                                aria-label={t("rules.onLabel", { name: rule.name })}
+                            />
                             <div className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate text-[0.8125rem] text-foreground">{rule.name}</span>
+                                <span className="truncate text-[0.8125rem] text-foreground">
+                                    {rule.name}
+                                </span>
                                 <span className="truncate text-xs text-muted-foreground">
                                     {t("rules.summary", {
                                         to: rule.recipient || t("rules.anyAddress"),
@@ -97,7 +106,8 @@ export function RulesTab({ serverId }: { serverId: string }) {
                             </div>
                             {rule.lastFiredAt ? (
                                 <span className="hidden text-xs text-foreground-subtle sm:inline">
-                                    {t("rules.lastNotified")} <RelativeTime iso={rule.lastFiredAt} />
+                                    {t("rules.lastNotified")}{" "}
+                                    <RelativeTime iso={rule.lastFiredAt} />
                                 </span>
                             ) : null}
                             <Button
@@ -162,7 +172,14 @@ function RuleDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const parsed = mailInboundRuleSchema.safeParse({ serverId, name, recipient, sender, includeSpam, enabled: rule?.enabled ?? true });
+    const parsed = mailInboundRuleSchema.safeParse({
+        serverId,
+        name,
+        recipient,
+        sender,
+        includeSpam,
+        enabled: rule?.enabled ?? true
+    });
     const unchanged =
         rule !== null &&
         name.trim() === rule.name &&
@@ -174,7 +191,9 @@ function RuleDialog({
         if (!parsed.success || pending || unchanged) return;
         setPending(true);
         setError(null);
-        const answer = rule ? await updateRuleAction({ ...parsed.data, ruleId: rule.id }) : await createRuleAction(parsed.data);
+        const answer = rule
+            ? await updateRuleAction({ ...parsed.data, ruleId: rule.id })
+            : await createRuleAction(parsed.data);
         setPending(false);
         if (answer.error) {
             setError(answer.error);
@@ -209,13 +228,30 @@ function RuleDialog({
                         )}
                     </Field>
                     <Field label={t("rules.sentTo")}>
-                        {(id) => <Input id={id} value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="billing@*" />}
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={recipient}
+                                onChange={(event) => setRecipient(event.target.value)}
+                                placeholder="billing@*"
+                            />
+                        )}
                     </Field>
                     <Field label={t("rules.sentFrom")}>
-                        {(id) => <Input id={id} value={sender} onChange={(event) => setSender(event.target.value)} placeholder="*@bank.example" />}
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={sender}
+                                onChange={(event) => setSender(event.target.value)}
+                                placeholder="*@bank.example"
+                            />
+                        )}
                     </Field>
                     <label className="flex items-center gap-2 text-[0.8125rem] text-foreground">
-                        <Checkbox checked={includeSpam} onChange={(event) => setIncludeSpam(event.target.checked)} />
+                        <Checkbox
+                            checked={includeSpam}
+                            onChange={(event) => setIncludeSpam(event.target.checked)}
+                        />
                         {t("rules.includeSpam")}
                     </label>
                     {error ? <p className="text-xs text-danger">{error}</p> : null}

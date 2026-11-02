@@ -62,7 +62,9 @@ export function usePanelData<T extends object>(
 
     const fetchNow = useCallback(async () => {
         setLoading(true);
-        const answer = await loader.current().catch(() => ({ error: t("common.unreachable") }) as Answer<T>);
+        const answer = await loader
+            .current()
+            .catch(() => ({ error: t("common.unreachable") }) as Answer<T>);
         if ("error" in answer && answer.error) {
             setError(answer.error);
         } else {
@@ -120,7 +122,14 @@ export type Verdict = "pass" | "warn" | "fail" | "unverified";
 
 export function VerdictBadge({ verdict, label }: { verdict: Verdict; label?: string }) {
     const t = useTranslations("mailServer");
-    const variant = verdict === "pass" ? "success" : verdict === "warn" ? "warning" : verdict === "fail" ? "danger" : "neutral";
+    const variant =
+        verdict === "pass"
+            ? "success"
+            : verdict === "warn"
+              ? "warning"
+              : verdict === "fail"
+                ? "danger"
+                : "neutral";
     return <Badge variant={variant}>{label ?? t(`verdicts.${verdict}`)}</Badge>;
 }
 
@@ -130,10 +139,29 @@ export function VerdictBadge({ verdict, label }: { verdict: Verdict; label?: str
 export function StatusBadge({ status }: { status: string }) {
     const t = useTranslations("mailServer");
     const fixed = "shrink-0 whitespace-nowrap";
-    if (status === "ready") return <Badge variant="success" className={fixed}>{t("status.ready")}</Badge>;
-    if (status === "down") return <Badge variant="danger" className={fixed}>{t("status.down")}</Badge>;
-    if (status === "failed") return <Badge variant="danger" className={fixed}>{t("status.failed")}</Badge>;
-    return <Badge variant="primary" className={fixed}>{t("status.settingUp")}</Badge>;
+    if (status === "ready")
+        return (
+            <Badge variant="success" className={fixed}>
+                {t("status.ready")}
+            </Badge>
+        );
+    if (status === "down")
+        return (
+            <Badge variant="danger" className={fixed}>
+                {t("status.down")}
+            </Badge>
+        );
+    if (status === "failed")
+        return (
+            <Badge variant="danger" className={fixed}>
+                {t("status.failed")}
+            </Badge>
+        );
+    return (
+        <Badge variant="primary" className={fixed}>
+            {t("status.settingUp")}
+        </Badge>
+    );
 }
 
 /** A sentence a panel could not load past. */
@@ -143,7 +171,11 @@ export function PanelError({ message, onRetry }: { message: string; onRetry?: ()
         <div className="flex items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-[0.8125rem] text-danger-ink">
             <span>{message}</span>
             {onRetry ? (
-                <button type="button" className="shrink-0 text-xs font-medium underline" onClick={onRetry}>
+                <button
+                    type="button"
+                    className="shrink-0 text-xs font-medium underline"
+                    onClick={onRetry}
+                >
                     {tcommon("pages.error.tryAgain")}
                 </button>
             ) : null}
@@ -153,5 +185,9 @@ export function PanelError({ message, onRetry }: { message: string; onRetry?: ()
 
 /** A value meant to be copied into somebody else's control panel. */
 export function Mono({ children, className }: { children: ReactNode; className?: string }) {
-    return <code className={cn("break-all font-mono text-xs text-foreground", className)}>{children}</code>;
+    return (
+        <code className={cn("break-all font-mono text-xs text-foreground", className)}>
+            {children}
+        </code>
+    );
 }

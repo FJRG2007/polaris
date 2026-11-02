@@ -67,12 +67,10 @@ vi.mock("@polaris/app-host/client", () => ({
     }
 }));
 
-const { MinecraftChatLink } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-chat-link"
-);
-const { MinecraftSidebar } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-sidebar"
-);
+const { MinecraftChatLink } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-chat-link");
+const { MinecraftSidebar } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-sidebar");
 
 beforeEach(() => {
     fake.saved = [];

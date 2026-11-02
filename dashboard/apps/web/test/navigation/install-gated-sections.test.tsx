@@ -20,22 +20,30 @@ const { AppSidebar } = await import("@/components/app-sidebar");
 
 const MAIL = "/mail-server";
 const ALL_APPS = POLARIS_APPS.map((app) => app.id).filter((id) => id !== "mail-server");
-const mailSection = APP_SECTIONS["mail-server"]?.find((section) => section.href === MAIL) as AppSection;
+const mailSection = APP_SECTIONS["mail-server"]?.find(
+    (section) => section.href === MAIL
+) as AppSection;
 
 describe("whether a section is offered", () => {
     it("leaves an app nobody installed out, for an administrator too", () => {
         expect(sectionOffered(mailSection, { isAdmin: true, held: [], installed: [] })).toBe(false);
-        expect(sectionOffered(mailSection, { isAdmin: true, held: [], installed: ["mail-server"] })).toBe(true);
+        expect(
+            sectionOffered(mailSection, { isAdmin: true, held: [], installed: ["mail-server"] })
+        ).toBe(true);
     });
 
     it("still asks the permission once it is installed", () => {
         const installed = ["mail-server"];
         expect(sectionOffered(mailSection, { isAdmin: false, held: [], installed })).toBe(false);
-        expect(sectionOffered(mailSection, { isAdmin: false, held: ["mailserver.manage"], installed })).toBe(true);
+        expect(
+            sectionOffered(mailSection, { isAdmin: false, held: ["mailserver.manage"], installed })
+        ).toBe(true);
     });
 
     it("changes nothing for a section that needs no app", () => {
-        const deploy = APP_SECTIONS.apps?.find((section) => section.href === "/apps/deploy") as AppSection;
+        const deploy = APP_SECTIONS.apps?.find(
+            (section) => section.href === "/apps/deploy"
+        ) as AppSection;
         expect(sectionOffered(deploy, { isAdmin: false, held: [], installed: [] })).toBe(true);
     });
 });
@@ -54,18 +62,26 @@ describe("which apps the rails can name", () => {
         expect(asked).toContain("mail-server");
         expect(installed).toEqual([]);
         expect(
-            await installedSectionApps({ isAdmin: true, can: async () => true, isInstalled: async () => true })
+            await installedSectionApps({
+                isAdmin: true,
+                can: async () => true,
+                isInstalled: async () => true
+            })
         ).toContain("mail-server");
     });
 
     it("treats every one as present for a role preview, which has no probe", async () => {
-        expect(await installedSectionApps({ isAdmin: false, can: async () => true })).toContain("mail-server");
+        expect(await installedSectionApps({ isAdmin: false, can: async () => true })).toContain(
+            "mail-server"
+        );
     });
 });
 
 describe("the rail", () => {
     it("no longer draws Mail server in the Apps rail", () => {
-        const html = renderToStaticMarkup(<AppSidebar appIds={ALL_APPS} isAdmin installed={["mail-server"]} />);
+        const html = renderToStaticMarkup(
+            <AppSidebar appIds={ALL_APPS} isAdmin installed={["mail-server"]} />
+        );
         expect(html).not.toContain(`href="${MAIL}"`);
         expect(html).toContain('href="/apps/deploy"');
     });
@@ -74,9 +90,13 @@ describe("the rail", () => {
 describe("the search", () => {
     // What reachableApps hands search: the app itself is out for anybody it
     // would turn away, so this mirrors its permission and its install.
-    const reachable = (gate: { held: string[]; installed: string[] } | undefined, isAdmin: boolean) =>
+    const reachable = (
+        gate: { held: string[]; installed: string[] } | undefined,
+        isAdmin: boolean
+    ) =>
         !gate ||
-        (gate.installed.includes("mail-server") && (isAdmin || gate.held.includes("mailserver.manage")));
+        (gate.installed.includes("mail-server") &&
+            (isAdmin || gate.held.includes("mailserver.manage")));
     const hrefs = (gate?: { held: string[]; installed: string[] }, isAdmin = true) =>
         navigationEntries(
             isAdmin,
@@ -91,7 +111,9 @@ describe("the search", () => {
 
     it("does not find it for somebody who cannot manage mail servers", () => {
         expect(hrefs({ held: [], installed: ["mail-server"] }, false)).not.toContain(MAIL);
-        expect(hrefs({ held: ["mailserver.manage"], installed: ["mail-server"] }, false)).toContain(MAIL);
+        expect(hrefs({ held: ["mailserver.manage"], installed: ["mail-server"] }, false)).toContain(
+            MAIL
+        );
     });
 
     it("lists every section when nothing narrows it", () => {

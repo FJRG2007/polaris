@@ -53,9 +53,7 @@ describe("renderVpnEdge", () => {
         });
         expect(file).toContain('rule: "Host(`vpn.example.test`) && PathPrefix(`/register/`)"');
         expect(file).toContain("priority: 60");
-        expect(file).toContain(
-            'replacement: "https://polaris.example.test/vpn/register/${1}"'
-        );
+        expect(file).toContain('replacement: "https://polaris.example.test/vpn/register/${1}"');
         expect(file).toContain("hskey-authreq-[A-Za-z0-9_-]{24}");
     });
 

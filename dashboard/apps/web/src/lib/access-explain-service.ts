@@ -63,10 +63,22 @@ async function resourceLabels(
     const ids = (kind: core.ResourceKind) =>
         grants.filter((grant) => grant.kind === kind).map((grant) => grant.resourceId);
     const [installs, projects, spaces, domains] = await Promise.all([
-        prisma.installedApp.findMany({ where: { id: { in: ids("install") } }, select: { id: true, name: true, catalogId: true } }),
-        prisma.project.findMany({ where: { id: { in: ids("project") } }, select: { id: true, name: true } }),
-        prisma.taskSpace.findMany({ where: { id: { in: ids("space") } }, select: { id: true, name: true } }),
-        prisma.ownerDomain.findMany({ where: { id: { in: ids("domain") } }, select: { id: true, domain: true } })
+        prisma.installedApp.findMany({
+            where: { id: { in: ids("install") } },
+            select: { id: true, name: true, catalogId: true }
+        }),
+        prisma.project.findMany({
+            where: { id: { in: ids("project") } },
+            select: { id: true, name: true }
+        }),
+        prisma.taskSpace.findMany({
+            where: { id: { in: ids("space") } },
+            select: { id: true, name: true }
+        }),
+        prisma.ownerDomain.findMany({
+            where: { id: { in: ids("domain") } },
+            select: { id: true, domain: true }
+        })
     ]);
     const labels = new Map<string, { label: string; href: string | null }>();
     for (const row of installs) {
@@ -88,12 +100,26 @@ async function principalLabels(
     const ids = (type: string) =>
         grants.filter((grant) => grant.principalType === type).map((grant) => grant.principalId);
     const [groups, roles] = await Promise.all([
-        prisma.group.findMany({ where: { id: { in: ids("group") } }, select: { id: true, name: true } }),
-        prisma.role.findMany({ where: { id: { in: ids("role") } }, select: { id: true, name: true } })
+        prisma.group.findMany({
+            where: { id: { in: ids("group") } },
+            select: { id: true, name: true }
+        }),
+        prisma.role.findMany({
+            where: { id: { in: ids("role") } },
+            select: { id: true, name: true }
+        })
     ]);
     const labels = new Map<string, string>();
-    for (const row of groups) labels.set(`group:${row.id}`, t("usersDetail.accessView.resources.theirGroup", { name: row.name }));
-    for (const row of roles) labels.set(`role:${row.id}`, t("usersDetail.accessView.resources.theirRole", { name: row.name }));
+    for (const row of groups)
+        labels.set(
+            `group:${row.id}`,
+            t("usersDetail.accessView.resources.theirGroup", { name: row.name })
+        );
+    for (const row of roles)
+        labels.set(
+            `role:${row.id}`,
+            t("usersDetail.accessView.resources.theirRole", { name: row.name })
+        );
     return labels;
 }
 
@@ -111,13 +137,13 @@ function describe(source: auth.StatementSource): { label: string; href: string }
     }
     const via =
         source.principalType === "user"
-            // i18n-ignore not rendered on any screen (see above)
-            ? "attached to them"
+            ? // i18n-ignore not rendered on any screen (see above)
+              "attached to them"
             : source.principalType === "group"
-              // i18n-ignore not rendered on any screen (see above)
-              ? "through a group they are in"
-              // i18n-ignore not rendered on any screen (see above)
-              : "through a role they hold";
+              ? // i18n-ignore not rendered on any screen (see above)
+                "through a group they are in"
+              : // i18n-ignore not rendered on any screen (see above)
+                "through a role they hold";
     // i18n-ignore not rendered on any screen (see above)
     return { label: `the ${source.name} policy, ${via}`, href: "/admin/policies" };
 }
@@ -157,7 +183,10 @@ export async function explainUserAccess(userId: string): Promise<AccessExplanati
     });
 
     const t = await readerWords("admin");
-    const [things, principals] = await Promise.all([resourceLabels(grants), principalLabels(t, grants)]);
+    const [things, principals] = await Promise.all([
+        resourceLabels(grants),
+        principalLabels(t, grants)
+    ]);
     const now = Date.now();
     const resources: ResourceGrantView[] = grants.map((grant) => {
         const key = `${grant.kind}:${grant.resourceId}`;
@@ -173,7 +202,8 @@ export async function explainUserAccess(userId: string): Promise<AccessExplanati
                     : (thing?.label ?? t("usersDetail.accessView.resources.gone")),
             principalType: grant.principalType,
             principalLabel:
-                principals.get(`${grant.principalType}:${grant.principalId}`) ?? t("usersDetail.accessView.resources.them"),
+                principals.get(`${grant.principalType}:${grant.principalId}`) ??
+                t("usersDetail.accessView.resources.them"),
             actions: grant.actions,
             effect: grant.effect,
             canShare: grant.canShare,

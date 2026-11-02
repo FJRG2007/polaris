@@ -234,8 +234,7 @@ describe("the rules editor", () => {
     async function draw(settings: Partial<dns.DnsSettings>) {
         const { DnsBlockerProvider } =
             await import("../../src/app/(app)/network-filter/dns-blocker-context");
-        const { DnsRulesEditor } =
-            await import("../../src/app/(app)/network-filter/rules-editor");
+        const { DnsRulesEditor } = await import("../../src/app/(app)/network-filter/rules-editor");
         render(
             <MessagesWrapper>
                 <DnsBlockerProvider initial={{ ...dns.DEFAULT_DNS_SETTINGS, ...settings }}>

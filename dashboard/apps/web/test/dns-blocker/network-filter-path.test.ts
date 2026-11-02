@@ -32,9 +32,7 @@ describe("the old Network filter address", () => {
     it("sends every screen to the same one under the new path", async () => {
         const rules = (await config.redirects()) as Redirect[];
         for (const screen of SCREENS)
-            expect(follow(rules, `/apps/dns-blocker${screen}`)).toBe(
-                `/network-filter${screen}`
-            );
+            expect(follow(rules, `/apps/dns-blocker${screen}`)).toBe(`/network-filter${screen}`);
         expect(follow(rules, "/apps/dns-blocker/log/extra")).toBe("/network-filter/log/extra");
     });
 

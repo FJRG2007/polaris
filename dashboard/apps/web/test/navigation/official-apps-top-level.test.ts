@@ -37,7 +37,9 @@ function follow(rules: Rule[], path: string): Rule | undefined {
 
 /** The page file that answers an address, the way the file tree spells it. */
 function pageFor(dir: string, segments: readonly string[]): string | null {
-    const entries = readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+    const entries = readdirSync(dir, { withFileTypes: true }).filter((entry) =>
+        entry.isDirectory()
+    );
     const [head, ...rest] = segments;
     if (head === undefined && existsSync(join(dir, "page.tsx"))) return join(dir, "page.tsx");
     const exact = entries.find(({ name }) => name === head);
@@ -55,12 +57,22 @@ function bundlePage(page: string): string | null {
     const call = /renderAppPage\("([^"]+)", "([^"]+)"/.exec(readFileSync(page, "utf8"));
     if (!call) return null;
     const [, surface, app] = call as unknown as [string, string, string];
-    return join(WEB, "..", BUNDLE_DIR[app] ?? app, "src", "routes", ...surface.split("/"), "page.tsx");
+    return join(
+        WEB,
+        "..",
+        BUNDLE_DIR[app] ?? app,
+        "src",
+        "routes",
+        ...surface.split("/"),
+        "page.tsx"
+    );
 }
 
 describe("official apps", () => {
     it("have no /apps prefix, except Apps itself", () => {
-        const under = POLARIS_APPS.filter(({ id, href }) => id !== "apps" && href.startsWith("/apps"));
+        const under = POLARIS_APPS.filter(
+            ({ id, href }) => id !== "apps" && href.startsWith("/apps")
+        );
         expect(under).toEqual([]);
     });
 

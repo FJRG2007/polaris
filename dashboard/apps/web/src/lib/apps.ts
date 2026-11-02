@@ -3170,7 +3170,9 @@ export function installedAppSubapp(id: string, nav: InstalledAppNav): AppSubapp 
 
 /** The installed app id in a path, or null when the path is not inside one. */
 export function installedAppIdForPath(pathname: string): string | null {
-    const base = [INSTALLED_BASE, GAME_SERVERS_BASE].find((path) => pathname.startsWith(`${path}/`));
+    const base = [INSTALLED_BASE, GAME_SERVERS_BASE].find((path) =>
+        pathname.startsWith(`${path}/`)
+    );
     if (!base) return null;
     const id = pathname.slice(base.length + 1).split("/")[0] ?? "";
     return id ? decodeURIComponent(id) : null;

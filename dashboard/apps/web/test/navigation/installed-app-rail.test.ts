@@ -9,10 +9,27 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GAME_SERVERS_BASE, INSTALLED_BASE, installedAppIdForPath, installedAppSubapp, isSectionActive } from "@/lib/apps";
+import {
+    GAME_SERVERS_BASE,
+    INSTALLED_BASE,
+    installedAppIdForPath,
+    installedAppSubapp,
+    isSectionActive
+} from "@/lib/apps";
 
 const ID = "6f2d1c34-2b6b-4a4b-9f0e-1c2d3e4f5a6b";
-const GAME_TABS = ["", "console", "players", "world", "rules", "mods", "usage", "security", "access", "settings"];
+const GAME_TABS = [
+    "",
+    "console",
+    "players",
+    "world",
+    "rules",
+    "mods",
+    "usage",
+    "security",
+    "access",
+    "settings"
+];
 
 describe("installedAppIdForPath", () => {
     it("reads the id out of a path inside one", () => {
@@ -65,8 +82,15 @@ describe("installedAppSubapp", () => {
     it("shows only the screens this viewer was told they may open", () => {
         // Somebody invited to moderate holds neither the console nor the settings,
         // and a rail that offered them would be offering two locked doors.
-        const subapp = installedAppSubapp(ID, { name: "Survival", tabs: ["", "players", "access"] });
-        expect(subapp?.sections.map((section) => section.label)).toEqual(["Overview", "Players", "Access"]);
+        const subapp = installedAppSubapp(ID, {
+            name: "Survival",
+            tabs: ["", "players", "access"]
+        });
+        expect(subapp?.sections.map((section) => section.label)).toEqual([
+            "Overview",
+            "Players",
+            "Access"
+        ]);
     });
 
     it("is nothing for an install that has no screens of its own", () => {

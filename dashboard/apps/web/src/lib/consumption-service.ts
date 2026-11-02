@@ -26,7 +26,13 @@ import { findApp, installedAppHref } from "@/lib/apps/catalog";
 import { visibleProjectIds } from "@/lib/deploy-service";
 import type { Consumption } from "@/app/(app)/admin/consumption/types";
 import { localDockerDriver, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
-import { attribute, subjectHash, type Claim, type ClaimBucket, type ClaimIndex } from "@/lib/consumption";
+import {
+    attribute,
+    subjectHash,
+    type Claim,
+    type ClaimBucket,
+    type ClaimIndex
+} from "@/lib/consumption";
 import {
     cachedSamples,
     oldestSampleAt,
