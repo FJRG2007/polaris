@@ -231,8 +231,16 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
 }
 
 export function ChatSidebar() {
-    const { channels, spaces, categories, activeSpaceId, setActiveSpaceId, refresh, loaded } =
-        useChat();
+    const {
+        channels,
+        spaces,
+        categories,
+        activeSpaceId,
+        setActiveSpaceId,
+        refresh,
+        loaded,
+        loadFailed
+    } = useChat();
     const params = useParams<{ channelId?: string; spaceId?: string }>();
     const open = params.channelId ?? null;
     const spacePage = params.spaceId ?? null;
@@ -577,7 +585,18 @@ export function ChatSidebar() {
                     </p>
                 )}
 
-                {!loaded ? (
+                {!loaded && loadFailed ? (
+                    <div role="alert" className="flex flex-col items-start gap-1 px-2 py-1 text-xs">
+                        <p className="text-foreground-subtle">{t("sidebar.listLoadFailed")}</p>
+                        <button
+                            type="button"
+                            onClick={refresh}
+                            className="text-foreground underline"
+                        >
+                            {t("sidebar.listRetry")}
+                        </button>
+                    </div>
+                ) : !loaded ? (
                     <SidebarSkeleton />
                 ) : space === null ? (
                     <Section

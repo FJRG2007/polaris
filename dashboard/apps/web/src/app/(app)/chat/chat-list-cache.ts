@@ -1,8 +1,6 @@
 /**
  * The chat rail as it last looked in this tab, so a reload draws it at once.
  *
- * The rail waits on one server action, and a browser runs those one at a time, so
- * anything slow ahead of it left the rail as a skeleton for as long as that took.
  * Per tab and per account: the names in it are nobody else's to read on a shared
  * computer, and it goes with the tab.
  */

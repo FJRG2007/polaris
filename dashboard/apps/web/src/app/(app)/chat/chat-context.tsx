@@ -15,9 +15,10 @@
  * already brings.
  */
 
+import type { ChatLists } from "@/lib/chat/chat-lists";
 import { readChatLists, writeChatLists } from "./chat-list-cache";
 import * as core from "@polaris/core";
-import { chatListsAction, listChannelsAction } from "./actions";
+import { listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
     createContext,
@@ -88,6 +89,8 @@ interface ChatContextValue {
     /** False until the first answer arrives, so a rail can tell "nothing yet"
      *  from "nothing at all" and skeleton the first rather than empty-state it. */
     readonly loaded: boolean;
+    /** The first read has failed and is still being tried. */
+    readonly loadFailed: boolean;
     /** Everything above asked for again: the conversations, the spaces, their
      *  headings and who is blocked. What a screen calls after a write that
      *  changes the shape of the list. */
@@ -138,6 +141,33 @@ const CALLS_OUTSIDE_RECHECK_MS = 60_000;
  *  for again. Short enough that a new message moves the list while somebody is
  *  still looking at where it landed; long enough that a room talking quickly is
  *  one request rather than one per message. */
+/** One read of the lists. Anything but a whole answer throws, to be tried again. */
+async function fetchChatLists(signal: AbortSignal): Promise<ChatLists> {
+    const response = await fetch("/api/chat/lists", {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(LISTS_TIMEOUT_MS)])
+    });
+    if (!response.ok) throw new Error(`chat lists answered ${response.status}`);
+    const lists = (await response.json()) as ChatLists;
+    // Without the conversations there is no rail to draw, however far the rest got.
+    if (!lists.channels) throw new Error("chat lists came back without conversations");
+    return lists;
+}
+
+/** Sooner at first, then every LISTS_RETRY_CEILING_MS for as long as the tab is open. */
+function waitToRetry(failures: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+        const timer = setTimeout(resolve, Math.min(2000 * 2 ** failures, LISTS_RETRY_CEILING_MS));
+        const stop = () => {
+            clearTimeout(timer);
+            resolve();
+        };
+        signal.addEventListener("abort", stop, { once: true });
+    });
+}
+
+const LISTS_TIMEOUT_MS = 20_000;
+const LISTS_RETRY_CEILING_MS = 30_000;
+
 export const CHANNELS_SETTLE_MS = 300;
 
 export function ChatProvider({
@@ -157,6 +187,7 @@ export function ChatProvider({
 }) {
     const [channels, setChannels] = useState<readonly ChatChannelView[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [rules, setRules] = useState<Record<core.ChatRuleScope, core.ChatRules> | null>(null);
     const [spaces, setSpaces] = useState<readonly ChatSpaceView[]>([]);
     const [categories, setCategories] = useState<readonly ChatCategoryView[]>([]);
@@ -164,34 +195,51 @@ export function ChatProvider({
     const [friends, setFriends] = useState<ReadonlySet<string>>(() => new Set());
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
+    const attempt = useRef<AbortController | null>(null);
     const refresh = useCallback(() => {
-        // One request for the four, because a browser runs server actions one
-        // at a time: four of them were four places in the queue that anything
-        // else - a message being sent - had to wait behind. The spaces and
-        // their headings move far less often than the channels, but they move
-        // for the same reasons - one made, one left - and blocking somebody
-        // changes what the roster offers and what the list draws, so all of
-        // them ride this one signal rather than needing their own.
-        void chatListsAction()
-            .then((result) => {
-                // A part that could not be read comes back null and leaves the
-                // previous one on screen, which is more use than an empty rail
-                // and a red line.
-                if (result.channels) setChannels(result.channels);
-                if (result.spaces) setSpaces(result.spaces);
-                if (result.categories) setCategories(result.categories);
-                if (result.blocked) setBlocked(new Set(result.blocked));
-                if (result.friends) setFriends(new Set(result.friends));
-                if (result.channels && result.spaces && result.categories) {
-                    writeChatLists(viewerId, {
-                        channels: result.channels,
-                        spaces: result.spaces,
-                        categories: result.categories
-                    });
+        // One request for all of them. The spaces and their headings move far
+        // less often than the channels, but they move for the same reasons - one
+        // made, one left - and blocking somebody changes what the roster offers
+        // and what the list draws, so all of them ride this one signal rather
+        // than needing their own.
+        //
+        // A plain request rather than a server action, timed out and tried again:
+        // the router's action queue has no timeout, so one action that never
+        // settled kept this list a skeleton until the page was reloaded.
+        attempt.current?.abort();
+        const current = new AbortController();
+        attempt.current = current;
+        const apply = (result: ChatLists) => {
+            // A part that could not be read comes back null and leaves the
+            // previous one on screen, which is more use than an empty rail
+            // and a red line.
+            if (result.channels) setChannels(result.channels);
+            if (result.spaces) setSpaces(result.spaces);
+            if (result.categories) setCategories(result.categories);
+            if (result.blocked) setBlocked(new Set(result.blocked));
+            if (result.friends) setFriends(new Set(result.friends));
+            if (result.channels && result.spaces && result.categories) {
+                writeChatLists(viewerId, {
+                    channels: result.channels,
+                    spaces: result.spaces,
+                    categories: result.categories
+                });
+            }
+            setLoaded(true);
+            setLoadFailed(false);
+        };
+        void (async () => {
+            for (let failures = 0; !current.signal.aborted; failures += 1) {
+                try {
+                    apply(await fetchChatLists(current.signal));
+                    return;
+                } catch {
+                    if (current.signal.aborted) return;
+                    setLoadFailed(true);
+                    await waitToRetry(failures, current.signal);
                 }
-            })
-            .catch(() => undefined)
-            .finally(() => setLoaded(true));
+            }
+        })();
     }, [viewerId]);
 
     const channelsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,7 +272,10 @@ export function ChatProvider({
         setCategories(kept.categories);
         setLoaded(true);
     }, [viewerId]);
-    useEffect(refresh, [refresh]);
+    useEffect(() => {
+        refresh();
+        return () => attempt.current?.abort();
+    }, [refresh]);
 
     // Once, when the app opens. The rules are an instance setting: they do not
     // change while somebody is typing, and re-reading them per conversation
@@ -325,6 +376,7 @@ export function ChatProvider({
             activeSpaceId,
             setActiveSpaceId,
             loaded,
+            loadFailed,
             refresh,
             refreshChannels,
             rulesFor,
@@ -344,6 +396,7 @@ export function ChatProvider({
             friends,
             activeSpaceId,
             loaded,
+            loadFailed,
             refresh,
             refreshChannels,
             rulesFor,
