@@ -119,6 +119,18 @@ export function addressesFor(player: string, allowed: readonly PlayerAccess[]): 
 }
 
 /**
+ * Whether this is the container network's own gateway rather than a player.
+ *
+ * A connection that comes through a relay, or through the engine's port proxy,
+ * reaches the server from that gateway, whoever is at the other end. It says
+ * nothing about where they are, so it is treated as an address that cannot be
+ * read: judged on the name, never refused as somebody on the wrong network.
+ */
+export function isContainerGateway(address: string): boolean {
+    return /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.1$/.test(address.trim());
+}
+
+/**
  * Why a connected player is not allowed to be, or null when they are.
  *
  * Any one of their addresses is enough. Matching only the first rule found was
@@ -132,7 +144,7 @@ export function accessRefusal(
 ): string | null {
     const addresses = addressesFor(player, allowed);
     if (addresses.length === 0) return "You are not on this server's player list.";
-    if (address === null) return null;
+    if (address === null || isContainerGateway(address)) return null;
     return addresses.some((rule) => addressMatches(rule, address))
         ? null
         : "Your account is registered to a different network. Ask the server's owner to add this one.";

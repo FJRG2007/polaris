@@ -115,6 +115,7 @@ const load = {
     appsInstallPresence: once(() => import("@/lib/apps/install-presence")),
     appsInstallSecret: once(() => import("@/lib/apps/install-secret")),
     appsInstallService: once(() => import("@/lib/apps/install-service")),
+    callAddressWatch: once(() => import("@/lib/chat/call-address-watch")),
     appsInstallSharing: once(() => import("@/lib/apps/install-sharing")),
     appsPortBlockStore: once(() => import("@/lib/apps/port-block-store")),
     appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
@@ -259,7 +260,8 @@ export const serverHost = {
         describeBlocksFor: appsPortAdvice.describeBlocksFor,
         describePorts: appsPortAdvice.describePorts,
         gameReachAdvice: appsPortAdvice.gameReachAdvice,
-        gameStoppedAdvice: appsPortAdvice.gameStoppedAdvice
+        gameStoppedAdvice: appsPortAdvice.gameStoppedAdvice,
+        relayAddress: later(load.callAddressWatch, "relayAddress")
     },
     appsPortBlock: {
         describeBlock: appsPortBlock.describeBlock,

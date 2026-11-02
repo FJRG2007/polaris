@@ -56,6 +56,7 @@ import { signInAddresses } from "../game-sign-in-addresses";
 import {
     ANY_ADDRESS,
     accessRefusal,
+    isContainerGateway,
     isAddressRule,
     isPlayerName,
     missingWhitelistNames,
@@ -1162,7 +1163,7 @@ export async function enforcePlayerAddresses(
         // With the address half off, only a linked player is held to one: the
         // link is the operator asking for exactly that.
         if (!install.bindAddresses && !isLinked) continue;
-        if (address === null) unknown.push(player);
+        if (address === null || isContainerGateway(address)) unknown.push(player);
         const refusal = accessRefusal(player, address, rules);
         if (!refusal) continue;
         const said = isLinked ? LINKED_REFUSAL : refusal;

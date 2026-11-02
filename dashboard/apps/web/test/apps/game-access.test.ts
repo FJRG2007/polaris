@@ -80,6 +80,13 @@ describe("isPlayerName", () => {
 });
 
 describe("accessRefusal", () => {
+    it("does not refuse the container gateway a relayed player arrives from", () => {
+        const allowed = [{ username: "Steve", address: "203.0.113.9" }];
+        expect(accessRefusal("Steve", "172.22.0.1", allowed)).toBeNull();
+        expect(accessRefusal("Mallory", "172.22.0.1", allowed)).not.toBeNull();
+        expect(accessRefusal("Steve", "172.22.0.7", allowed)).not.toBeNull();
+    });
+
     const allowed = [{ username: "Steve", address: "203.0.113.9" }];
 
     it("lets in a registered player from their own address", () => {

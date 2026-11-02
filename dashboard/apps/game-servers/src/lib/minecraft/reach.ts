@@ -273,6 +273,9 @@ export async function reachAdviceFor(
     if (!running) return gameStoppedAdvice(ports);
     // Only asked when it would change what is said: a local connect on every
     // render would be a page waiting on a socket for nothing.
-    const listening = await probeListening(ports, lanIp).catch(() => null);
-    return gameReachAdvice(environment, ports, false, lanIp, policy, blocks, listening);
+    const [listening, relay] = await Promise.all([
+        probeListening(ports, lanIp).catch(() => null),
+        host.appsPortAdvice.relayAddress().catch(() => null)
+    ]);
+    return gameReachAdvice(environment, ports, false, lanIp, policy, blocks, listening, relay);
 }
