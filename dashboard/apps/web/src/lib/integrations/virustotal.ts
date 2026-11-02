@@ -9,7 +9,7 @@
  */
 
 import { readerWords } from "@/lib/i18n/reader-words";
-import { ProviderPaused, whileServing } from "@/lib/integrations/provider-pause";
+import { pauseReasonFor, ProviderPaused, whileServing } from "@/lib/integrations/provider-pause";
 import { takeLookup } from "@/lib/reputation-budget";
 
 const BASE = "https://www.virustotal.com/api/v3";
@@ -33,18 +33,23 @@ function failed(detail: string, status: number): Error {
 
 /** The verdict for a request that was not answered or never sent. */
 function noOpinion(caught: unknown, fallback: string): VtVerdict {
-    if (caught instanceof ProviderPaused && caught.reason === "budget") {
+    if (caught instanceof ProviderPaused) {
         return {
             kind: "error",
             malicious: 0,
             suspicious: 0,
-            detail: "VirusTotal used up today's requests"
+            detail:
+                caught.reason === "budget"
+                    ? "VirusTotal used up today's requests"
+                    : "VirusTotal is not taking requests right now",
+            deferred: true
         };
     }
     const status = (caught as { status?: unknown } | null)?.status;
     const detail =
         typeof status === "number" && caught instanceof Error ? caught.message : fallback;
-    return { kind: "error", malicious: 0, suspicious: 0, detail };
+    const verdict: VtVerdict = { kind: "error", malicious: 0, suspicious: 0, detail };
+    return pauseReasonFor(caught) === null ? verdict : { ...verdict, deferred: true };
 }
 /** Public API file-upload ceiling. Larger files can only be looked up by hash. */
 export const VT_MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
@@ -57,6 +62,10 @@ export interface VtVerdict {
     suspicious: number;
     permalink?: string;
     detail?: string;
+    /** Requests ran out or the service failed before there was an answer, so this says
+     *  nothing about the file. Asked again later: a stranger must not be able to spend
+     *  the budget and have the next file kept unread. */
+    deferred?: boolean;
 }
 
 interface AnalysisStats {
@@ -176,9 +185,13 @@ async function submitAndPoll(
     if (!analysisId)
         return { kind: "error", malicious: 0, suspicious: 0, detail: "No analysis id returned" };
 
+    let skipped = false;
     for (let attempt = 0; attempt < POLLS; attempt++) {
         await sleep(POLL_EVERY_MS);
-        if (!takeLookup(PROVIDER, SCAN_SHARE)) continue;
+        if (!takeLookup(PROVIDER, SCAN_SHARE)) {
+            skipped = true;
+            continue;
+        }
         const attributes = await whileServing(PROVIDER, NAME, async () => {
             const poll = await fetch(`${BASE}/analyses/${analysisId}`, {
                 headers: { "x-apikey": apiKey },
@@ -199,7 +212,8 @@ async function submitAndPoll(
         malicious: 0,
         suspicious: 0,
         detail: "Scan did not complete in time",
-        permalink: fileLink(sha256)
+        permalink: fileLink(sha256),
+        deferred: skipped
     };
 }
 

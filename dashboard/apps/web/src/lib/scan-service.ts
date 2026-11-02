@@ -6,8 +6,9 @@
  * storage to hash it; a hash lookup is tried first and only an unknown file under
  * the Public API limit is uploaded. The drop point's owner is always alerted with
  * the verdict through the notification system. Scanning never throws to the upload
- * path: a scanner failure fails open (the file is kept) with an alert, so an
- * unreachable VirusTotal cannot silently reject legitimate uploads.
+ * path: a scanner failure fails open (the file is kept), so an unreachable
+ * VirusTotal cannot silently reject legitimate uploads. The file stays owed its scan
+ * and a sweep finishes it, or tells the owner when it never could.
  */
 
 import { createHash } from "node:crypto";
@@ -15,6 +16,10 @@ import { baseName, normalizeRelPath } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import type { StorageDriver } from "@polaris/storage";
 import { getIntegrationState, getIntegrationSecret } from "@/lib/integration-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { recordItemCreator } from "@/lib/drive-meta-service";
+import { setSubmissionPath } from "@/lib/file-request-service";
+import { getDriverForConnection } from "@/lib/storage-service";
 import { readVirusTotalConfig, type ScanAction } from "@/lib/integrations/registry";
 import {
     lookupBySha256,
@@ -29,6 +34,7 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { NotificationLevel } from "@/lib/notification-service";
 import { QUARANTINE_DIR } from "@/lib/system-paths";
+import { replaceWithStaged } from "@/lib/upload-naming";
 
 export interface ScanOutcome {
     /** Whether a scan actually ran (false when the integration is off/misconfigured). */
@@ -38,23 +44,35 @@ export interface ScanOutcome {
     verdict: "clean" | "suspicious" | "malicious" | "unknown" | "error" | "skipped";
     action: "none" | "blocked" | "quarantined" | "notified";
     detail?: string;
+    /** No answer yet: the file is owed a scan and has not been cleared of anything. */
+    deferred?: boolean;
 }
 
 const SKIPPED: ScanOutcome = { scanned: false, blocked: false, verdict: "skipped", action: "none" };
 
-/** Paused, or past the part of the budget scans may use. The file is kept. */
+/** Paused, or past the part of the budget scans may use. The file is kept and
+ *  scanned once there are requests again. */
 const NOT_ASKED: VtVerdict = {
     kind: "unknown",
     malicious: 0,
     suspicious: 0,
-    detail: "VirusTotal is not taking requests right now"
+    detail: "VirusTotal is not taking requests right now",
+    deferred: true
 };
+
+/** Scans waiting for requests, taken a few at a time from the oldest attempt. */
+const PENDING_BATCH = 3;
+const PENDING_EVERY_MS = 60 * 1000;
+/** A longer wait than any outage worth waiting for, so the owner is told in the end. */
+const PENDING_GIVE_UP_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface ScanRequest {
     driver: StorageDriver;
     connectionId: string;
     /** Where the file was stored (its final path in the destination). */
     storedPath: string;
+    /** Where it goes once cleared, when that is not where it was stored. */
+    destination?: string;
     /** The uploader's original file name, for the alert. */
     fileName: string;
     /** The drop point owner who gets alerted. */
@@ -64,11 +82,12 @@ export interface ScanRequest {
     size: number;
 }
 
-/** Read a stream to its SHA-256, optionally collecting the bytes for upload. */
+/** Read a stream to its SHA-256, optionally collecting the bytes for upload (empty
+ *  otherwise). */
 async function hashStream(
     stream: ReadableStream<Uint8Array>,
     collect: boolean
-): Promise<{ sha256: string; bytes: Uint8Array | null }> {
+): Promise<{ sha256: string; bytes: Uint8Array }> {
     const hash = createHash("sha256");
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
@@ -86,7 +105,6 @@ async function hashStream(
     } finally {
         reader.releaseLock();
     }
-    if (!collect) return { sha256: hash.digest("hex"), bytes: null };
     const bytes = new Uint8Array(total);
     let offset = 0;
     for (const chunk of chunks) {
@@ -96,16 +114,18 @@ async function hashStream(
     return { sha256: hash.digest("hex"), bytes };
 }
 
-/** The hash lookup, then an upload if the file is unknown and small enough. */
+/** The hash lookup, then an upload if the file is unknown and small enough. The bytes
+ *  are only asked for once they are going to be sent. */
 async function askVirusTotal(
     apiKey: string,
     sha256: string,
-    bytes: Uint8Array | null
+    size: number,
+    read: () => Promise<Uint8Array>
 ): Promise<VtVerdict> {
     if (!(await takeServedLookup("virustotal", SCAN_SHARE))) return NOT_ASKED;
     const known = await lookupBySha256(apiKey, sha256);
     if (known) return known;
-    if (!bytes)
+    if (size > VT_MAX_UPLOAD_BYTES)
         return {
             kind: "unknown",
             malicious: 0,
@@ -113,7 +133,7 @@ async function askVirusTotal(
             detail: "File exceeds the 32 MB scan limit"
         };
     if (!(await takeServedLookup("virustotal", SCAN_SHARE))) return NOT_ASKED;
-    return uploadAndScan(apiKey, bytes, sha256);
+    return uploadAndScan(apiKey, await read(), sha256);
 }
 
 /** Move a flagged file into the connection's quarantine folder; returns its new path. */
@@ -167,22 +187,29 @@ function buildAlert(
     };
 }
 
+/** The key and the action, or null when drop points are not being scanned. */
+async function scanSettings(): Promise<{ apiKey: string; onDetection: ScanAction } | null> {
+    let state;
+    try {
+        state = await getIntegrationState("virustotal");
+    } catch {
+        return null;
+    }
+    if (!state?.enabled) return null;
+    const config = readVirusTotalConfig(state.config);
+    if (!config.scanDropPoints) return null;
+    const apiKey = await getIntegrationSecret("virustotal");
+    return apiKey ? { apiKey, onDetection: config.onDetection } : null;
+}
+
 /**
  * Scan one stored drop-point upload and enforce the configured action. Returns
  * whether the upload must be rejected. Any failure fails open (keeps the file).
  */
 export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOutcome> {
-    let state;
-    try {
-        state = await getIntegrationState("virustotal");
-    } catch {
-        return SKIPPED;
-    }
-    if (!state?.enabled) return SKIPPED;
-    const config = readVirusTotalConfig(state.config);
-    if (!config.scanDropPoints) return SKIPPED;
-    const apiKey = await getIntegrationSecret("virustotal");
-    if (!apiKey) return SKIPPED;
+    const settings = await scanSettings();
+    if (!settings) return SKIPPED;
+    const { apiKey, onDetection } = settings;
 
     try {
         const collect = request.size <= VT_MAX_UPLOAD_BYTES;
@@ -190,8 +217,29 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
             await request.driver.readStream(request.storedPath),
             collect
         );
-        const verdict = await askVirusTotal(apiKey, sha256, bytes);
-        return await enforce(request, verdict, config.onDetection, sha256);
+        const verdict = await askVirusTotal(apiKey, sha256, request.size, async () => bytes);
+        if (verdict.deferred) {
+            await prisma.fileScan.create({
+                data: {
+                    provider: "virustotal",
+                    submissionId: request.submissionId,
+                    connectionId: request.connectionId,
+                    path: request.destination ?? request.storedPath,
+                    sha256,
+                    verdict: "pending",
+                    detail: verdict.detail ?? null
+                }
+            });
+            return {
+                scanned: true,
+                blocked: false,
+                verdict: "unknown",
+                action: "none",
+                detail: verdict.detail,
+                deferred: true
+            };
+        }
+        return await enforce(request, verdict, onDetection, sha256);
     } catch (caught) {
         // Scanner failure: fail open, but still tell the owner it did not complete.
         const detail = caught instanceof Error ? caught.message : "scan failed";
@@ -223,7 +271,7 @@ async function enforce(
     request: ScanRequest,
     verdict: VtVerdict,
     onDetection: ScanAction,
-    sha256: string
+    sha256: string | null
 ): Promise<ScanOutcome> {
     const detected = verdict.kind === "malicious" || verdict.kind === "suspicious";
     let action: ScanOutcome["action"] = detected ? "notified" : "none";
@@ -286,6 +334,172 @@ async function enforce(
 
     const kind = verdict.kind === "error" ? "error" : verdict.kind;
     return { scanned: true, blocked, verdict: kind, action, detail: verdict.detail };
+}
+
+interface PendingScan {
+    id: string;
+    submissionId: string | null;
+    connectionId: string | null;
+    path: string | null;
+    sha256: string | null;
+    createdAt: Date;
+}
+
+/** Finish what the upload held back: a file that waited for its scan on a name of its
+ *  own takes the place of the one it replaces. If that fails, as it does once the old
+ *  file is gone, it stays where it is, which loses nothing. */
+async function moveIntoPlace(
+    request: ScanRequest,
+    target: string,
+    creatorId: string | null
+): Promise<void> {
+    try {
+        await replaceWithStaged(request.driver, request.storedPath, target);
+    } catch (caught) {
+        console.error("polaris: a scanned file stayed put:", (caught as Error | null)?.name);
+        return;
+    }
+    await setSubmissionPath(request.submissionId, target);
+    await recordItemCreator(request.connectionId, target, creatorId ?? request.ownerId);
+    await invalidateFolderSizes(request.connectionId, target);
+}
+
+/** Try one waiting scan. False when VirusTotal still has no requests to give, which
+ *  goes for every other waiting file too. */
+async function finishPendingScan(
+    pending: PendingScan,
+    settings: { apiKey: string; onDetection: ScanAction }
+): Promise<boolean> {
+    const submission = pending.submissionId
+        ? await prisma.fileRequestSubmission.findUnique({
+              where: { id: pending.submissionId },
+              select: {
+                  fileName: true,
+                  storedPath: true,
+                  size: true,
+                  status: true,
+                  submittedByUserId: true,
+                  request: { select: { ownerId: true, title: true } }
+              }
+          })
+        : null;
+    const sha256 = pending.sha256;
+    if (
+        !submission ||
+        submission.status !== "stored" ||
+        !pending.submissionId ||
+        !pending.connectionId ||
+        !sha256
+    ) {
+        await prisma.fileScan.deleteMany({ where: { id: pending.id } });
+        return true;
+    }
+    const again = () =>
+        prisma.fileScan.update({ where: { id: pending.id }, data: { updatedAt: new Date() } });
+
+    const settled = () => prisma.fileScan.deleteMany({ where: { id: pending.id } });
+
+    let driver: StorageDriver | undefined;
+    try {
+        const opened = await getDriverForConnection(pending.connectionId);
+        driver = opened;
+        const request: ScanRequest = {
+            driver: opened,
+            connectionId: pending.connectionId,
+            storedPath: submission.storedPath,
+            fileName: submission.fileName,
+            ownerId: submission.request.ownerId,
+            dropPointTitle: submission.request.title,
+            submissionId: pending.submissionId,
+            size: Number(submission.size)
+        };
+        const gaveUp = Date.now() - pending.createdAt.getTime() > PENDING_GIVE_UP_MS;
+        if (gaveUp) {
+            const t = await wordsFor(request.ownerId, "notices");
+            await enforce(
+                request,
+                {
+                    kind: "unknown",
+                    malicious: 0,
+                    suspicious: 0,
+                    detail: t("scan.waitedTooLong")
+                },
+                settings.onDetection,
+                sha256
+            );
+            await settled();
+            return true;
+        }
+        await opened.stat(submission.storedPath);
+        const verdict = await askVirusTotal(settings.apiKey, sha256, request.size, async () => {
+            const stream = await opened.readStream(submission.storedPath);
+            return (await hashStream(stream, true)).bytes;
+        });
+        if (verdict.deferred) {
+            await again();
+            return false;
+        }
+        const outcome = await enforce(request, verdict, settings.onDetection, sha256);
+        const target = pending.path;
+        if (
+            target &&
+            target !== submission.storedPath &&
+            !outcome.blocked &&
+            outcome.action !== "quarantined"
+        ) {
+            await moveIntoPlace(request, target, submission.submittedByUserId);
+        }
+        await settled();
+        return true;
+    } catch (caught) {
+        // Its storage may simply be away. The next pass tries the others first.
+        console.error("polaris: a waiting scan failed:", (caught as Error | null)?.name);
+        await again();
+        return true;
+    } finally {
+        await driver?.dispose();
+    }
+}
+
+/** Scan the files that arrived while VirusTotal had no requests left. */
+export async function finishPendingScans(): Promise<void> {
+    const settings = await scanSettings();
+    if (!settings) return;
+    const pending = await prisma.fileScan.findMany({
+        where: {
+            verdict: "pending",
+            updatedAt: { lt: new Date(Date.now() - PENDING_EVERY_MS) }
+        },
+        orderBy: { updatedAt: "asc" },
+        take: PENDING_BATCH,
+        select: {
+            id: true,
+            submissionId: true,
+            connectionId: true,
+            path: true,
+            sha256: true,
+            createdAt: true
+        }
+    });
+    for (const scan of pending) {
+        if (!(await finishPendingScan(scan, settings))) return;
+    }
+}
+
+/** Keep trying, one pass at a time: a pass can outlast the interval. */
+export function startPendingScans(): void {
+    let running = false;
+    setInterval(() => {
+        if (running) return;
+        running = true;
+        void finishPendingScans()
+            .catch((caught: unknown) => {
+                console.error("polaris: waiting scans failed:", (caught as Error | null)?.name);
+            })
+            .finally(() => {
+                running = false;
+            });
+    }, PENDING_EVERY_MS).unref?.();
 }
 
 /** Persist a scan result for the owner's audit trail. */

@@ -139,6 +139,12 @@ export async function register(): Promise<void> {
         }
     }).catch((error) => console.error("polaris: could not close direct host ports:", error));
 
+    // A file that arrived while VirusTotal had no requests left is still owed its scan.
+    void whenAlone(async () => {
+        const { startPendingScans } = await import("./lib/scan-service");
+        startPendingScans();
+    }).catch((error) => console.error("polaris: could not start waiting scans:", error));
+
     // The key the media server signs with, minted here rather than by the
     // installer: .env is only ever written by a script and an installed Polaris
     // is only ever updated from a button, so a key that had to appear there is a

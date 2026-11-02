@@ -174,6 +174,7 @@ export async function PUT(
             driver,
             connectionId: fileRequest.destinationConnectionId,
             storedPath: staged,
+            destination,
             fileName: storedName,
             ownerId: fileRequest.ownerId,
             dropPointTitle: fileRequest.title,
@@ -183,20 +184,23 @@ export async function PUT(
         if (scan.blocked) return new Response("file_rejected", { status: 422 });
 
         // Only a file the scan left where it put it can be moved into place; a
-        // quarantined one has already been taken somewhere else on purpose.
+        // quarantined one has already been taken somewhere else on purpose, and one
+        // still owed its scan keeps its own name until the sweep clears it: unread
+        // bytes never stand in for the file they would replace.
         if (scan.action !== "quarantined") {
-            await replaceWithStaged(driver, staged, destination);
-            if (destination !== staged) {
-                await fileRequests.setSubmissionPath(submission.id, destination);
+            const place = scan.deferred ? staged : destination;
+            await replaceWithStaged(driver, staged, place);
+            if (place !== staged) {
+                await fileRequests.setSubmissionPath(submission.id, place);
             }
             // Owner of record: the signed-in uploader, or the drop point's owner who
             // collected it when the upload was anonymous.
             await recordItemCreator(
                 fileRequest.destinationConnectionId,
-                destination,
+                place,
                 userId ?? fileRequest.ownerId
             );
-            await invalidateFolderSizes(fileRequest.destinationConnectionId, destination);
+            await invalidateFolderSizes(fileRequest.destinationConnectionId, place);
         }
 
         // Fold this upload into the browser's visitor session (the "uploaded?"

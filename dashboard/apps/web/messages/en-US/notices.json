@@ -152,7 +152,8 @@
         "partialTitle": "Upload could not be fully scanned",
         "failedTitle": "Upload could not be scanned",
         "notScanned": "\"{file}\" uploaded to \"{dropPoint}\" could not be scanned ({detail}). It was kept.",
-        "unavailable": "scanner unavailable"
+        "unavailable": "scanner unavailable",
+        "waitedTooLong": "VirusTotal took no requests for a week"
     },
     "connections": {
         "stoppedTitle": "{name} has stopped working",
