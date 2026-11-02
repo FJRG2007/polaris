@@ -78,7 +78,11 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
           ? t(`lobby.refused.${entry.reason}`)
           : room.status === "failed"
             ? t("lobby.refused.server")
-            : null;
+            : activity.answer?.ok === false && !activity.playing
+              ? t(
+                    `lobby.refused.${activity.answer.reason === "seat" ? "access" : activity.answer.reason}`
+                )
+              : null;
 
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4">

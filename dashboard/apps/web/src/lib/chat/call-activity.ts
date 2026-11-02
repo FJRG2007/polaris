@@ -171,6 +171,17 @@ export function readActivityMessage(payload: unknown): ActivityMessage | null {
     return parsed.success ? parsed.data : null;
 }
 
+let poseFailureSeen = false;
+
+/** A position that could not be sent. They go out ten times a second, so this
+ *  says it once: swallowed, a room that refuses them looks like nobody else
+ *  being in the game. */
+export function reportPoseFailure(cause: unknown): void {
+    if (poseFailureSeen) return;
+    poseFailureSeen = true;
+    console.warn("polaris: a game position could not be sent:", cause);
+}
+
 /** The reader's own position as the game's frame reports it
  *  (`polaris-game:state`, see `apps/arcade/game/<game>/engine/embed.js`), or
  *  null for anything that does not fit. The heading is wrapped first. */

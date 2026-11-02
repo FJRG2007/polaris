@@ -85,6 +85,11 @@ export type ActivityApi = Pick<
     "callGames" | "claimCallGame" | "renewCallGame" | "leaveCallGame" | "vouchCallGames"
 >;
 
+/** How long a claim the server did not vouch for waits to be asked about
+ *  again, and how many times: one that is really forged is not asked forever. */
+const VOUCH_RETRY_MS = 3000;
+const VOUCH_RETRIES = 5;
+
 /** How far the server's clock is ahead of this browser's, read off a pass it
  *  has just minted. */
 function skewFrom(claim: callGame.ActivityClaim): number {
@@ -135,6 +140,29 @@ export function useCallActivity(
     // mint counts for nothing.
     const checked = useRef(new Map<string, boolean>());
     const claimKey = (seat: string, claim: callGame.ActivityClaim) => `${seat}|${claim.pass}`;
+    // The room's state changes while an answer is on its way - a seat's own
+    // attribute coming back is enough - so an answer is settled against the
+    // claims as they are when it lands, never dropped with the render that
+    // asked: nothing would ask again, and the two players would not see each
+    // other.
+    const latestClaims = useRef(claims);
+    latestClaims.current = claims;
+    // A claim seen a moment before the server can answer for it (the reader's
+    // own seat not admitted yet, a request that failed) is asked about again.
+    const tries = useRef(new Map<string, number>());
+    const [vouchRound, setVouchRound] = useState(0);
+    const askAgain = useCallback((keys: readonly string[]) => {
+        const due = keys.filter((key) => {
+            const used = (tries.current.get(key) ?? 0) + 1;
+            tries.current.set(key, used);
+            return used <= VOUCH_RETRIES;
+        });
+        if (due.length === 0) return;
+        window.setTimeout(() => {
+            for (const key of due) checked.current.delete(key);
+            setVouchRound((round) => round + 1);
+        }, VOUCH_RETRY_MS);
+    }, []);
     useEffect(() => {
         const unasked = [...claims].filter(
             ([seat, claim]) => !checked.current.has(claimKey(seat, claim))
@@ -144,7 +172,7 @@ export function useCallActivity(
             return;
         }
         for (const [seat, claim] of unasked) checked.current.set(claimKey(seat, claim), false);
-        let live = true;
+        const keys = unasked.map(([seat, claim]) => claimKey(seat, claim));
         void api
             .vouchCallGames(
                 meetingId,
@@ -153,18 +181,12 @@ export function useCallActivity(
             .then(({ seats, now }) => {
                 for (const [seat, claim] of unasked)
                     checked.current.set(claimKey(seat, claim), seats.includes(seat));
-                if (!live) return;
                 setSkew(now - Date.now());
-                setVouched((was) => settleVouched(was, claims, checked.current));
+                setVouched((was) => settleVouched(was, latestClaims.current, checked.current));
+                askAgain(keys.filter((key) => !checked.current.get(key)));
             })
-            .catch(() => {
-                // Asked again the next time anything changes, rather than never.
-                for (const [seat, claim] of unasked) checked.current.delete(claimKey(seat, claim));
-            });
-        return () => {
-            live = false;
-        };
-    }, [claims, meetingId, api]);
+            .catch(() => askAgain(keys));
+    }, [claims, meetingId, api, askAgain, vouchRound]);
 
     const session = useMemo(() => {
         const people = [...claims].map(([seat, claim]) => ({ seat, claim }));

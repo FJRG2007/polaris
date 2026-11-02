@@ -5,6 +5,7 @@
 // of jumping.
 import * as THREE from 'three/webgpu';
 import { onPlayers } from './embed.js';
+import { colorFor, cssColor } from './player-markers.js';
 import {
   BODY_SPECS,
   buildCarGeometry,
@@ -15,15 +16,8 @@ import {
   createLoftedHelicopterMaterial
 } from './actor-models.js';
 
-const COLORS = [0xf05a4f, 0x3fa7f5, 0x4fc97a, 0xf5b83f, 0xb57cf2, 0x2fd0c8, 0xf27cc0, 0x9aa5b1];
 // How far above where a player is their name is drawn.
 const LABEL_HEIGHT = { person: 2.2, cyclist: 2.6, car: 2.2, helicopter: 3.6 };
-
-function colorFor(id) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  return COLORS[Math.abs(hash) % COLORS.length];
-}
 
 // Built the first time somebody needs them, and shared by every player.
 let shared = null;
@@ -103,20 +97,28 @@ export function createRemotePlayers(scene) {
   const projected = new THREE.Vector3();
 
   function dress(marker, mode) {
+    // A model that cannot be built must not take the game's loop with it: they stay on the map and keep their name
+    let model;
+    try {
+      model = buildModel(mode, marker.paint);
+    } catch (e) {
+      console.warn('[players]', e);
+      return;
+    }
     if (marker.model) {
       marker.root.remove(marker.model.root);
       marker.model.owned?.dispose();
     }
-    marker.model = buildModel(mode, marker.paint);
+    marker.model = model;
     marker.mode = mode;
-    marker.root.add(marker.model.root);
+    marker.root.add(model.root);
   }
 
   function remove(id) {
     const marker = markers.get(id);
     if (!marker) return;
     scene.remove(marker.root);
-    marker.model.owned?.dispose();
+    marker.model?.owned?.dispose();
     marker.label.remove();
     markers.delete(id);
   }
@@ -134,18 +136,29 @@ export function createRemotePlayers(scene) {
         const label = document.createElement('div');
         label.className = 'remote-label';
         labels.appendChild(label);
-        marker = { root, label, paint: colorFor(player.id), model: null, mode: null, target: new THREE.Vector3(), heading: player.heading };
+        marker = { root, label, name: '', paint: colorFor(player.id), model: null, mode: null, target: new THREE.Vector3(), heading: player.heading };
         markers.set(player.id, marker);
       }
       if (marker.mode !== player.mode) dress(marker, player.mode);
       marker.target.set(player.x, player.y, player.z);
       marker.heading = player.heading;
+      marker.name = player.name;
       marker.label.textContent = player.name;
     }
     for (const id of [...markers.keys()]) if (!seen.has(id)) remove(id);
   });
 
   return {
+    /** Everyone drawn right now, for the map. */
+    list() {
+      return [...markers.values()].map((marker) => ({
+        name: marker.name,
+        x: marker.root.position.x,
+        z: marker.root.position.z,
+        heading: marker.root.rotation.y,
+        color: cssColor(marker.paint)
+      }));
+    },
     update(dt, camera) {
       if (markers.size === 0) return;
       const ease = 1 - Math.exp(-dt * 10);
@@ -155,9 +168,9 @@ export function createRemotePlayers(scene) {
         marker.root.position.lerp(marker.target, ease);
         const turn = marker.heading - marker.root.rotation.y;
         marker.root.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * ease;
-        for (const rotor of marker.model.rotors) rotor.mesh.rotation[rotor.axis] += rotor.speed * dt;
+        for (const rotor of marker.model?.rotors ?? []) rotor.mesh.rotation[rotor.axis] += rotor.speed * dt;
         projected.copy(marker.root.position);
-        projected.y += LABEL_HEIGHT[marker.mode];
+        projected.y += LABEL_HEIGHT[marker.mode] ?? LABEL_HEIGHT.car;
         projected.project(camera);
         const visible = projected.z > -1 && projected.z < 1 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1;
         marker.label.hidden = !visible;

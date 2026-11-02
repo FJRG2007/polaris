@@ -265,6 +265,9 @@ class ThirdPersonControllerManager {
       this._blendInput(action);
     };
 
+    // Keys only reach the frame that has the focus, and the camera's drag cancels its pointerdown: any press in the
+    // game hands it the keyboard, not just a press on one of its buttons
+    window.addEventListener('pointerdown', () => window.focus(), { capture: true });
     window.addEventListener('keydown', (e) => onKey(e, true));
     window.addEventListener('keyup', (e) => onKey(e, false));
     window.addEventListener('blur', () => this.resetInput());

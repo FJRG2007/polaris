@@ -103,7 +103,7 @@ import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from
 import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
 import { retuneScreenEncoding, swapScreen, type EncodedTrack } from "./call-share-menu";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
-import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC } from "@/lib/chat/call-activity";
+import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC, reportPoseFailure } from "@/lib/chat/call-activity";
 import { ANNOTATE_TOPIC, ANNOTATORS } from "@/lib/chat/call-annotate";
 import {
     cameraBackground,
@@ -2516,7 +2516,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 topic: ACTIVITY_TOPIC,
                 destinationIdentities: [...to]
             })
-            .catch(() => undefined);
+            .catch(reportPoseFailure);
     }, []);
 
     const setAnnotators = useCallback(

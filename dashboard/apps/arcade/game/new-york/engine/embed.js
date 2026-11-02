@@ -23,6 +23,7 @@ const MAX_PLAYERS = 32;
 const SETUP_WAIT_MS = 2000;
 
 let finished = false;
+let announced = false;
 let joined = null;
 let canExit = false;
 const listeners = new Set();
@@ -60,8 +61,10 @@ export function exitGame() {
   if (canExit) tellHost({ type: 'polaris-game:exit' });
 }
 
+// Called only with the city on screen, so a stray error during the load that reported a failure is taken back
 export function reportReady() {
-  if (finished) return;
+  if (announced) return;
+  announced = true;
   finished = true;
   tellHost({ type: 'polaris-game:ready' });
 }
