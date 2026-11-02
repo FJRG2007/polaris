@@ -81,6 +81,14 @@ ruled out the other background caller.
 - The SDK's retries are off.
 - The repository's `CLAUDE.md` carries the rule for the next provider.
 
+## What a limit must not do
+
+A drop point's link is public, so a budget is something a stranger can spend. A file
+that arrives after that is kept but owed a scan: it is recorded as `pending`, a sweep
+asks again once a minute, and the configured action still applies when the answer
+comes. After a week the owner is told it could not be scanned.
+
+
 ## What this does not cover
 
 The list of providers is by hand. A new one that is never added to the gate is

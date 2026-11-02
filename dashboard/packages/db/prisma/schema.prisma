@@ -4132,6 +4132,7 @@ model FileScan {
 
     @@index([submissionId])
     @@index([sha256])
+    @@index([verdict, updatedAt])
 }
 
 // An installed marketplace app. The catalog of apps lives in code
