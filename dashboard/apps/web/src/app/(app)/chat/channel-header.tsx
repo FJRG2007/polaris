@@ -15,9 +15,9 @@
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
-import * as core from "@polaris/core";
+import { GroupNameDialog } from "./group-name-dialog";
 import { useChat } from "./chat-context";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
@@ -58,13 +58,7 @@ import {
     Video
 } from "lucide-react";
 import {
-    Button,
     ConfirmDeleteDialog,
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -73,9 +67,7 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-    Input,
-    cn,
-    isDirty
+    cn
 } from "@polaris/ui";
 
 /** How the shared mute list draws itself inside a dropdown. */
@@ -134,7 +126,6 @@ export function ChannelHeader({
     const [picturing, setPicturing] = useState(false);
     const [settings, setSettings] = useState(false);
     const [naming, setNaming] = useState(false);
-    const [name, setName] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [error, setError] = useState("");
@@ -177,9 +168,6 @@ export function ChannelHeader({
             }
           : null;
 
-    useEffect(() => {
-        if (renaming) setName(channel.name);
-    }, [renaming, channel.name]);
     const Icon = channel.private ? Lock : named ? Hash : Users;
 
     /**
@@ -689,49 +677,12 @@ export function ChannelHeader({
                 onAdded={onChanged}
             />
 
-            <Dialog open={renaming} onOpenChange={setRenaming}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t("channelHeader.nameThisGroup")}</DialogTitle>
-                    </DialogHeader>
-                    <Input
-                        value={name}
-                        autoFocus
-                        maxLength={core.MAX_CHAT_CHANNEL_NAME}
-                        placeholder={t("channelHeader.leaveItEmptyToGo")}
-                        aria-label={t("channelHeader.whatThisGroupIsCalled")}
-                        onChange={(event) => setName(event.target.value)}
-                    />
-                    {/* Inside the dialog, not only in the banner behind it: the
-                        banner is covered by this while it is open, which is how a
-                        refusal used to reach nobody. */}
-                    {error && <p className="text-sm text-danger">{error}</p>}
-                    <DialogFooter>
-                        <Button variant="ghost" size="sm" onClick={() => setRenaming(false)}>
-                            {t("channelHeader.cancel")}
-                        </Button>
-                        <Button
-                            size="sm"
-                            // The name it already has is nothing to save.
-                            disabled={!isDirty(channel.name, name)}
-                            onClick={async () => {
-                                // Closed only once it worked. A dialog that closes
-                                // on a refusal takes the typed name with it and
-                                // leaves the reader looking at an unchanged group.
-                                const done = await act(() =>
-                                    actions.renameGroupAction({
-                                        channelId: channel.id,
-                                        name
-                                    })
-                                );
-                                if (done) setRenaming(false);
-                            }}
-                        >
-                            {t("channelHeader.save")}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <GroupNameDialog
+                channel={channel}
+                open={renaming}
+                onOpenChange={setRenaming}
+                onSaved={onChanged}
+            />
 
             <ConfirmDeleteDialog
                 open={confirmDelete}

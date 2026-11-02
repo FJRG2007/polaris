@@ -471,7 +471,11 @@
         "off": "Salir del chat temporal",
         "title": "Chat temporal",
         "body": "No se guarda en tus chats ni se usa para la memoria. Se borra al salir.",
-        "banner": "Chat temporal: fuera del historial y la memoria, se borra al salir."
+        "banner": "Chat temporal: fuera del historial y la memoria, se borra al salir.",
+        "keep": "Guardar chat",
+        "kept": "Guardado",
+        "keepFailed": "No se pudo guardar el chat. Reinténtalo.",
+        "shareChat": "Compartir"
     },
     "export": {
         "markdown": "Exportar en Markdown",
@@ -481,7 +485,14 @@
         "file": "Archivo: {name}",
         "attachment": "adjunto",
         "used": "Usó {name}",
-        "truncated": "Solo se incluyen los {most} mensajes más recientes de este chat."
+        "truncated": "Solo se incluyen los {most} mensajes más recientes de este chat.",
+        "title": "Exportar",
+        "text": "Texto",
+        "columnTime": "hora",
+        "columnAuthor": "autor",
+        "columnMessage": "mensaje",
+        "tooTall": "Este chat es demasiado largo para una imagen. Expórtalo en PDF.",
+        "failed": "No se pudo exportar el chat. Reinténtalo."
     },
     "orb": {
         "working": "Trabajando",

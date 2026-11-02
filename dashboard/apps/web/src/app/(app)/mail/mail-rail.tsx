@@ -28,6 +28,7 @@ import { MAIL_PALETTE, swatchName } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
 import { RefusedMailboxes } from "./refused-notice";
+import { refusalCause } from "@/lib/mailbox/refusals";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useMemo, useState } from "react";
@@ -710,7 +711,7 @@ function AccountLink({
     count: number;
     onNavigate?: () => void;
 }) {
-    const { accountColor } = useMail();
+    const { accountColor, accounts } = useMail();
     const t = useTranslations("mail");
     const pathname = usePathname();
     const inbox = `/mail/a/${account.id}`;
@@ -735,7 +736,7 @@ function AccountLink({
                     ? "bg-card font-medium text-foreground"
                     : "text-muted-foreground hover:bg-card hover:text-foreground"
             )}
-            title={broken ? whyBroken(t, account) : account.address}
+            title={broken ? whyBroken(t, account, accounts) : account.address}
         >
             <span
                 className="size-2 shrink-0 rounded-full"
@@ -748,7 +749,7 @@ function AccountLink({
             {broken ? (
                 <AlertTriangle
                     className="size-3.5 shrink-0 text-danger"
-                    aria-label={whyBroken(t, account)}
+                    aria-label={whyBroken(t, account, accounts)}
                 />
             ) : count > 0 ? (
                 <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">
@@ -761,8 +762,11 @@ function AccountLink({
 
 function whyBroken(
     t: NamespaceTranslator<"mail">,
-    account: { state: string; auth: string }
+    account: ReturnType<typeof useMail>["accounts"][number],
+    accounts: ReturnType<typeof useMail>["accounts"]
 ): string {
     if (account.state !== "auth") return t("rail.unreachable");
-    return account.auth === "oauth" ? t("rail.needsConnecting") : t("rail.passwordRefused");
+    const cause = refusalCause(account, accounts);
+    if (cause === "authorization") return t("rail.needsConnecting");
+    return cause === "password" ? t("rail.passwordRefused") : t("rail.serverMayBeFailing");
 }

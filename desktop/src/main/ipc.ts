@@ -42,6 +42,8 @@ export interface IpcHost extends PushHost {
     readonly isReporter: (sender: WebContents) => boolean;
     readonly setCustomGames: (games: readonly CustomGameInput[]) => void;
     /** The address form's state: the address in use and why it failed to open. */
+    readonly preferences: () => { openAtLogin: boolean; version: string };
+    readonly setOpenAtLogin: (open: boolean) => boolean;
     readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
     readonly connectSubmit: (raw: unknown) => Promise<Outcome>;
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
@@ -353,6 +355,11 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectRename, (event, raw: unknown) => {
         const input = z.object({ origin: listedSchema, name: z.string().max(200) }).safeParse(raw);
         return from(event, "connect") && input.success ? host.nameServer(input.data.origin, input.data.name) : REFUSED;
+    });
+    ipcMain.handle(CHANNELS.connectPreferences, (event) => (from(event, "connect") ? host.preferences() : null));
+    ipcMain.handle(CHANNELS.connectOpenAtLogin, (event, raw: unknown): boolean => {
+        const open = z.boolean().safeParse(raw);
+        return from(event, "connect") && open.success && host.setOpenAtLogin(open.data);
     });
     ipcMain.handle(CHANNELS.connectRemove, (event, raw: unknown) => {
         const origin = listedSchema.safeParse(raw);

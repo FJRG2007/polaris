@@ -67,6 +67,7 @@ import {
     Phone,
     Plus,
     Reply,
+    Bookmark,
     Share2,
     Square,
     SquarePen,
@@ -878,6 +879,7 @@ export function PolarChat({
     const [marks, setMarks] = useState<Record<string, PolarMark>>({});
     /** The answer a share is being made from. */
     const [sharingFrom, setSharingFrom] = useState<string | null>(null);
+    const [sharingChat, setSharingChat] = useState(false);
     const wide = useWide();
     // Chat or Code: Code is Agents sessions, drawn over the chat (which keeps its draft).
     const code = usePolarCode();
@@ -1294,6 +1296,20 @@ export function PolarChat({
             keepalive: true
         }).catch(() => undefined);
     }, []);
+    /** Once a chat has begun it can no longer become temporary or stop being it: the
+     *  header offers what can still be done with it. Both need the saved thread, which
+     *  exists by the time an answer does. */
+    const chatStarted = chat.messages.length > 0;
+    const chatAnswered = chat.messages.some((message) => message.role === "assistant") && !busy;
+    const keepTemporary = useCallback(async () => {
+        const response = await fetch(`/api/polar/threads/${live.current.threadId}/keep`, {
+            method: "POST"
+        }).catch(() => null);
+        if (!response?.ok) return void toast.show({ title: t("temporary.keepFailed") });
+        setTemporary(false);
+        toast.show({ title: t("temporary.kept") });
+        if (showHistory) sidebar.refresh(true);
+    }, [showHistory, sidebar.refresh, t, toast]);
     useEffect(() => {
         window.addEventListener("pagehide", discardTemporary);
         return () => {
@@ -2431,17 +2447,32 @@ export function PolarChat({
                     {chatMode ? (
                         <>
                             <span className="polar-head-wide flex items-center gap-2">
-                                <MessageAction
-                                    label={temporary ? t("temporary.off") : t("temporary.on")}
-                                    aria-pressed={temporary}
-                                    className={cn(temporary && "bg-muted text-foreground")}
-                                    onClick={() => {
-                                        startNew();
-                                        setTemporary(!temporary);
-                                    }}
-                                >
-                                    <Ghost />
-                                </MessageAction>
+                                {!chatStarted ? (
+                                    <MessageAction
+                                        label={temporary ? t("temporary.off") : t("temporary.on")}
+                                        aria-pressed={temporary}
+                                        className={cn(temporary && "bg-muted text-foreground")}
+                                        onClick={() => setTemporary(!temporary)}
+                                    >
+                                        <Ghost />
+                                    </MessageAction>
+                                ) : temporary ? (
+                                    <MessageAction
+                                        label={t("temporary.keep")}
+                                        disabled={!chatAnswered}
+                                        onClick={() => void keepTemporary()}
+                                    >
+                                        <Bookmark />
+                                    </MessageAction>
+                                ) : (
+                                    <MessageAction
+                                        label={t("temporary.shareChat")}
+                                        disabled={!chatAnswered}
+                                        onClick={() => setSharingChat(true)}
+                                    >
+                                        <Share2 />
+                                    </MessageAction>
+                                )}
                                 <MessageAction
                                     label={t("commands.manage")}
                                     onClick={() => setManaging(true)}
@@ -2478,15 +2509,28 @@ export function PolarChat({
                                     </MessageAction>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="min-w-48">
-                                    <DropdownMenuItem
-                                        onSelect={() => {
-                                            startNew();
-                                            setTemporary(!temporary);
-                                        }}
-                                    >
-                                        <Ghost />
-                                        {temporary ? t("temporary.off") : t("temporary.on")}
-                                    </DropdownMenuItem>
+                                    {!chatStarted ? (
+                                        <DropdownMenuItem onSelect={() => setTemporary(!temporary)}>
+                                            <Ghost />
+                                            {temporary ? t("temporary.off") : t("temporary.on")}
+                                        </DropdownMenuItem>
+                                    ) : temporary ? (
+                                        <DropdownMenuItem
+                                            disabled={!chatAnswered}
+                                            onSelect={() => void keepTemporary()}
+                                        >
+                                            <Bookmark />
+                                            {t("temporary.keep")}
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem
+                                            disabled={!chatAnswered}
+                                            onSelect={() => setSharingChat(true)}
+                                        >
+                                            <Share2 />
+                                            {t("temporary.shareChat")}
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem onSelect={() => setManaging(true)}>
                                         <SquareSlash />
                                         {t("commands.manage")}
@@ -2788,6 +2832,9 @@ export function PolarChat({
                     onClose={() => setManaging(false)}
                     onEdit={setCommandDraft}
                 />
+            ) : null}
+            {sharingChat ? (
+                <PolarShareDialog row={{ id: threadId }} onClose={() => setSharingChat(false)} />
             ) : null}
             {sharingFrom ? (
                 <PolarShareDialog

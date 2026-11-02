@@ -12434,6 +12434,12 @@ model MailAccount {
     stateDetail  String    @default("")
     lastSyncAt   DateTime?
     lastOkAt     DateTime?
+    /// When the owner was told it is refused; empty again once it works.
+    refusalAnnouncedAt DateTime?
+    /// The first refusal of the one running now; empty once it works.
+    refusedSince DateTime?
+    /// The server's latest refusal. A failed connection does not move it.
+    lastRefusedAt DateTime?
     // How often the server is asked when it will not push. Seconds.
     pollSeconds  Int       @default(300)
     notify       Boolean   @default(true)

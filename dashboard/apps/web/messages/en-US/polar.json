@@ -471,7 +471,11 @@
         "off": "Leave temporary chat",
         "title": "Temporary chat",
         "body": "Not saved in your chats or used for memory. It's deleted when you leave it.",
-        "banner": "Temporary chat: not in your history or memory, deleted when you leave it."
+        "banner": "Temporary chat: not in your history or memory, deleted when you leave it.",
+        "keep": "Keep this chat",
+        "kept": "Chat kept",
+        "keepFailed": "Couldn't keep the chat. Try again.",
+        "shareChat": "Share chat"
     },
     "export": {
         "markdown": "Export as Markdown",
@@ -481,7 +485,14 @@
         "file": "File: {name}",
         "attachment": "attachment",
         "used": "Used {name}",
-        "truncated": "Only the newest {most} messages of this chat are included."
+        "truncated": "Only the newest {most} messages of this chat are included.",
+        "title": "Export",
+        "text": "Text",
+        "columnTime": "time",
+        "columnAuthor": "author",
+        "columnMessage": "message",
+        "tooTall": "This chat is too long for one image. Export it as PDF.",
+        "failed": "Couldn't export the chat. Try again."
     },
     "orb": {
         "working": "Working",

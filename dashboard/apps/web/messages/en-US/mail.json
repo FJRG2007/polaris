@@ -351,10 +351,18 @@
     },
     "refused": {
         "label": "Mailboxes that need attention",
-        "authorization": "{address} stopped accepting its authorization",
-        "password": "{address} stopped accepting its password",
         "reconnect": "Reconnect",
-        "updatePassword": "Update password"
+        "updatePassword": "Update password",
+        "passwordTitle": "Password refused",
+        "passwordBody": "The server is not accepting it. Update it to start again.",
+        "authorizationTitle": "Needs reconnecting",
+        "authorizationBody": "Its authorization stopped working.",
+        "serverTitle": "Mail server problem",
+        "serverBody": "{count} mailboxes were refused at once, so it is probably the server and not your passwords. Polaris keeps trying.",
+        "recentTitle": "Sign-in refused",
+        "recentBody": "This is new, so it may be the server. Polaris tries again by itself.",
+        "retry": "Try now",
+        "stillRefused": "Try again"
     },
     "delivery": {
         "accepted": "Your outgoing server accepted it at {time}, and nothing has come back since. That is as much as Polaris can know about a message once it is handed over.",
@@ -617,7 +625,8 @@
         "renameHint": "It is renamed on the mail server, so every client you read this mailbox in follows.",
         "unreachable": "Polaris cannot reach this mail server.",
         "needsConnecting": "This mailbox needs connecting again.",
-        "passwordRefused": "This mailbox stopped accepting its password."
+        "passwordRefused": "This mailbox stopped accepting its password.",
+        "serverMayBeFailing": "The server refused it, probably a problem of its own. Polaris keeps trying."
     },
     "palette": {
         "indigo": "Indigo",

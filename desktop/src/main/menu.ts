@@ -82,7 +82,7 @@ export function appItems(
 ): MenuItemConstructorOptions[] {
     return [
         ...updateItems(update),
-        { label: "Servers...", click: actions.changeServer },
+        { label: "Settings...", click: actions.changeServer },
         ...switchTo(actions, servers),
         { type: "separator" },
         { label: "API keys", click: actions.openApiKeys },
@@ -121,7 +121,7 @@ export function installMenu(actions: MenuActions, update?: MenuUpdate, servers: 
         {
             label: "File",
             submenu: [
-                { label: "Servers...", click: actions.changeServer },
+                { label: "Settings...", click: actions.changeServer },
                 ...switchTo(actions, servers),
                 { label: "Back", accelerator: isMac ? "Cmd+[" : "Alt+Left", click: actions.back },
                 { label: "Reload", accelerator: "CmdOrCtrl+R", click: actions.reload },

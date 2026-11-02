@@ -123,8 +123,11 @@ import {
     Input,
     isDirty,
     Skeleton,
-    useToast
+    useToast,
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
+import { GroupNameDialog } from "./group-name-dialog";
 
 /** How the shared mute list draws itself inside a right-click menu. */
 const CONTEXT_PARTS: MenuParts = {
@@ -1444,8 +1447,10 @@ function Row({
     );
 
     return channel ? (
-        <RowMenu channel={channel} onManage={onManage} move={moveTo}>
-            {body}
+        <RowMenu channel={channel} active={active} onManage={onManage} move={moveTo}>
+            <div data-chat-row={channel.id} className="min-w-0">
+                {body}
+            </div>
         </RowMenu>
     ) : (
         body
@@ -1475,13 +1480,27 @@ function PhoneSized({ small, large }: { small: React.ReactNode; large: React.Rea
  * it. Muting is here because it is the other thing anybody does to a row without
  * wanting to read it first.
  */
+/**
+ * Which row the rename key means: the one with focus, then the one under the pointer,
+ * then the open conversation. A list row rarely holds focus, since opening a
+ * conversation moves it to the composer.
+ */
+function renameKeyMeans(channelId: string, active: boolean): boolean {
+    const row = (selector: string) =>
+        document.querySelector<HTMLElement>(selector)?.dataset.chatRow ?? null;
+    const named = row("[data-chat-row]:focus-within") ?? row("[data-chat-row]:hover");
+    return named === null ? active : named === channelId;
+}
+
 function RowMenu({
     channel,
+    active,
     onManage,
     move: moveTo,
     children
 }: {
     channel: ChatChannelView;
+    active: boolean;
     onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
     move?: RowMove;
     children: React.ReactNode;
@@ -1496,6 +1515,7 @@ function RowMenu({
         toast.show({ title: message })
     );
     const [naming, setNaming] = useState(false);
+    const [renamingGroup, setRenamingGroup] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [inviting, setInviting] = useState(false);
     // The space a channel lives in, and whether this reader may bring people
@@ -1514,6 +1534,25 @@ function RowMenu({
     // Only the conversation on screen can be closed; any other row is already
     // closed.
     const showing = here === `/chat/c/${channel.id}` || here.startsWith(`/chat/c/${channel.id}/`);
+    const mayNameGroup = group && channel.mayPicture;
+    const mayEdit = onManage !== undefined && channel.spaceId !== null;
+
+    // What renaming is depends on the row: a group's name, a channel's settings, or
+    // what you call the person on the other end. A row with none of them does nothing.
+    useEffect(() => {
+        if (!person && !mayNameGroup && !mayEdit) return;
+        function onKey(event: KeyboardEvent): void {
+            if (!shortcutPressed(event, "general.rename")) return;
+            if (document.querySelector('[role="dialog"]')) return;
+            if (!renameKeyMeans(channel.id, active)) return;
+            event.preventDefault();
+            if (person) setNaming(true);
+            else if (mayNameGroup) setRenamingGroup(true);
+            else onManage?.(channel, "edit");
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [active, channel, mayEdit, mayNameGroup, onManage, person]);
 
     return (
         <>
@@ -1653,6 +1692,14 @@ function RowMenu({
                                     <ContextMenuItem onSelect={() => setNaming(true)}>
                                         <Pencil className="size-3.5" />
                                         {t("sidebar.nickname")}
+                                        <ShortcutHint id="general.rename" />
+                                    </ContextMenuItem>
+                                ),
+                                mayNameGroup && (
+                                    <ContextMenuItem onSelect={() => setRenamingGroup(true)}>
+                                        <Pencil className="size-3.5" />
+                                        {t("channelHeader.nameThisGroup")}
+                                        <ShortcutHint id="general.rename" />
                                     </ContextMenuItem>
                                 ),
                                 person && friends.has(person.id) && (
@@ -1748,6 +1795,14 @@ function RowMenu({
             {/* Outside the menu, which closes on the item that opens this: a dialog
             mounted inside one is unmounted the moment it is asked for. */}
             {removeFriendDialog}
+            {renamingGroup ? (
+                <GroupNameDialog
+                    channel={channel}
+                    open
+                    onOpenChange={setRenamingGroup}
+                    onSaved={refresh}
+                />
+            ) : null}
             <NicknameDialog
                 open={naming}
                 onOpenChange={setNaming}

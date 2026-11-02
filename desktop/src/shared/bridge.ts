@@ -185,6 +185,10 @@ export interface PolarisLocal {
         switchTo(origin: string): Promise<Outcome>;
         rename(origin: string, name: string): Promise<Outcome>;
         remove(origin: string): Promise<Outcome>;
+        /** The program's own settings, kept with the servers. */
+        preferences(): Promise<{ readonly openAtLogin: boolean; readonly version: string; } | null>;
+        /** Whether it took: the switch goes back when it did not. */
+        setOpenAtLogin(open: boolean): Promise<boolean>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -252,6 +256,8 @@ export const CHANNELS = {
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
+    connectPreferences: "local:connect-preferences",
+    connectOpenAtLogin: "local:connect-open-at-login",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
     connectRemove: "local:connect-remove",

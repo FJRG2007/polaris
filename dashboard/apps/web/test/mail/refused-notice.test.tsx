@@ -88,6 +88,9 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
         state: "auth",
         stateDetail: "The mail server refused this account's credentials.",
         lastSyncAt: null,
+        lastOkAt: null,
+        refusedSince: null,
+        lastRefusedAt: null,
         notify: true,
         unified: true,
         appendToSent: true,
@@ -110,7 +113,8 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
 describe("the notice", () => {
     it("names the mailbox and offers the fix", () => {
         render(<RefusedMailboxes accounts={[account()]} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("ana@example.com stopped accepting its password")).toBeTruthy();
+        expect(screen.getByText("Password refused")).toBeTruthy();
+        expect(screen.getByText("ana@example.com")).toBeTruthy();
         const button = screen.getByRole("link", { name: "Update password" });
         expect(button.getAttribute("href")).toBe(
             "/mail/settings/accounts?edit=0190c1d2-0000-7000-8000-000000000001"
@@ -118,14 +122,18 @@ describe("the notice", () => {
     });
 
     it("says reconnect for an authorized mailbox", () => {
-        render(<RefusedMailboxes accounts={[account({ auth: "oauth" })]} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("ana@example.com stopped accepting its authorization")).toBeTruthy();
+        render(<RefusedMailboxes accounts={[account({ auth: "oauth" })]} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(screen.getByText("Needs reconnecting")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Reconnect" })).toBeTruthy();
     });
 
     it("draws nothing while every mailbox works", () => {
         const { container } = render(
-            <RefusedMailboxes accounts={[account({ state: "ok" }), account({ state: "unreachable" })]} />,
+            <RefusedMailboxes
+                accounts={[account({ state: "ok" }), account({ state: "unreachable" })]}
+            />,
             { wrapper: MessagesWrapper }
         );
         expect(container.innerHTML).toBe("");
@@ -173,7 +181,11 @@ describe("the edit form it opens", () => {
         expect(
             await screen.findByText("The mail server refused this account's credentials.")
         ).toBeTruthy();
-        expect(updates[0]).toMatchObject({ auth: "password", password: "new-secret", label: "Work" });
+        expect(updates[0]).toMatchObject({
+            auth: "password",
+            password: "new-secret",
+            label: "Work"
+        });
         expect(updates[0]).not.toHaveProperty("address");
     });
 
@@ -196,7 +208,9 @@ describe("the edit form it opens", () => {
         });
         const save = screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement;
         expect(screen.queryByPlaceholderText("Leave blank to keep the current one")).toBeNull();
-        expect(screen.getByText("The servers or login changed, so enter the password again.")).toBeTruthy();
+        expect(
+            screen.getByText("The servers or login changed, so enter the password again.")
+        ).toBeTruthy();
         expect(save.disabled).toBe(true);
 
         fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "new-secret" } });
@@ -204,7 +218,9 @@ describe("the edit form it opens", () => {
 
         // Put back, the saved password is the one kept again.
         fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "" } });
-        fireEvent.change(screen.getByLabelText("Login, if it is not the address"), { target: { value: "" } });
+        fireEvent.change(screen.getByLabelText("Login, if it is not the address"), {
+            target: { value: "" }
+        });
         expect(screen.getByPlaceholderText("Leave blank to keep the current one")).toBeTruthy();
     });
 
@@ -268,7 +284,9 @@ describe("the mailboxes screen the notice lands on", () => {
     it("puts the row back when the servers refuse the change", async () => {
         screenFor(account());
         fireEvent.click(screen.getByRole("button", { name: "Edit this mailbox" }));
-        const labelBox = screen.getAllByDisplayValue("Work").find((node) => node.tagName === "INPUT");
+        const labelBox = screen
+            .getAllByDisplayValue("Work")
+            .find((node) => node.tagName === "INPUT");
         fireEvent.change(labelBox as HTMLInputElement, { target: { value: "Home" } });
         fireEvent.change(screen.getByPlaceholderText("Leave blank to keep the current one"), {
             target: { value: "new-secret" }

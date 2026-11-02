@@ -36,6 +36,7 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
+import { refusalCause } from "@/lib/mailbox/refusals";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
@@ -220,6 +221,7 @@ export function AccountsView({
                         <AccountRow
                             key={account.id}
                             account={account}
+                            accounts={accounts}
                             onEdit={(focusPassword) =>
                                 setEditing({ id: account.id, focusPassword })
                             }
@@ -279,10 +281,13 @@ export function AccountsView({
 
 function AccountRow({
     account,
+    accounts,
     onEdit,
     onRemoved
 }: {
     account: MailAccountView;
+    /** Every mailbox, since several refused together say something one does not. */
+    accounts: readonly MailAccountView[];
     /** Open the edit form, on the password box when that is what is wrong. */
     onEdit: (focusPassword: boolean) => void;
     /** Taken off the list now, and put back when the server refuses: removing a
@@ -352,7 +357,7 @@ function AccountRow({
                         ) : (
                             <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />
                         )}
-                        {stateSentence(t, tm, account)}
+                        {stateSentence(t, tm, account, accounts)}
                     </p>
                 </div>
 
@@ -598,7 +603,8 @@ function AccountRow({
 function stateSentence(
     t: NamespaceTranslator<"mailSettings">,
     tm: NamespaceTranslator<"mail">,
-    account: MailAccountView
+    account: MailAccountView,
+    accounts: readonly MailAccountView[]
 ): string {
     if (account.state === "checking") return t("accounts.state.checking");
     if (account.state === "auth") {
@@ -611,11 +617,13 @@ function stateSentence(
                       ? mailRefusalText(tm, account.stateDetail)
                       : t("accounts.state.oauthDefault")
               })
-            : t("accounts.state.passwordRefused", {
-                  detail: account.stateDetail
-                      ? mailRefusalText(tm, account.stateDetail)
-                      : t("accounts.state.passwordDefault")
-              });
+            : refusalCause(account, accounts) !== "password"
+              ? tm("rail.serverMayBeFailing")
+              : t("accounts.state.passwordRefused", {
+                    detail: account.stateDetail
+                        ? mailRefusalText(tm, account.stateDetail)
+                        : t("accounts.state.passwordDefault")
+                });
     }
     if (account.state === "unreachable") return tm("rail.unreachable");
     if (account.state === "never") return t("accounts.state.never");

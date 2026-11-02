@@ -13,6 +13,7 @@ import { z } from "zod";
 import { app } from "electron";
 import { join } from "node:path";
 import { readServerAddress } from "@/shared/server-address";
+import type { WindowPlace } from "@/shared/window-place";
 import { readServers, withServer, type SavedServer } from "@/shared/servers";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
@@ -28,16 +29,34 @@ const pushSchema = z.object({
 
 export type PushChoice = z.infer<typeof pushSchema>;
 
+const placeSchema = z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    maximized: z.boolean()
+});
+
 const settingsSchema = z.object({
     server: z.unknown().transform(readServerAddress).catch(null),
     servers: z.unknown().transform(readServers).catch([]),
     pushes: z.record(z.string().uuid(), pushSchema).catch({}),
-    updateAttempted: z.string().max(64).nullable().catch(null)
+    updateAttempted: z.string().max(64).nullable().catch(null),
+    windowPlace: placeSchema.nullable().catch(null),
+    // On unless somebody turned it off, which reaches installs from before it existed.
+    openAtLogin: z.boolean().catch(true)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
 
-const EMPTY: Settings = { server: null, servers: [], pushes: {}, updateAttempted: null };
+const EMPTY: Settings = {
+    server: null,
+    servers: [],
+    pushes: {},
+    updateAttempted: null,
+    windowPlace: null,
+    openAtLogin: true
+};
 
 function file(): string {
     return join(app.getPath("userData"), "settings.json");
@@ -97,6 +116,23 @@ export function updateAttempted(): string | null {
 
 export function setUpdateAttempted(version: string): void {
     save({ ...load(), updateAttempted: version });
+}
+
+/** Where the main window was when it last moved. */
+export function windowPlace(): WindowPlace | null {
+    return load().windowPlace;
+}
+
+export function setWindowPlace(place: WindowPlace): void {
+    save({ ...load(), windowPlace: place });
+}
+
+export function openAtLogin(): boolean {
+    return load().openAtLogin;
+}
+
+export function rememberOpenAtLogin(open: boolean): void {
+    save({ ...load(), openAtLogin: open });
 }
 
 /** What was used the last time this service was pushed from here. */

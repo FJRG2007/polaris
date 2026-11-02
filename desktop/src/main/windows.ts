@@ -166,7 +166,14 @@ function contain(contents: WebContents, server: () => string | null): void {
 export function openPolarisWindow(
     url: string,
     server: () => string | null,
-    options: { readonly title?: string; readonly width?: number; readonly height?: number; } = {}
+    options: {
+        readonly title?: string;
+        readonly width?: number;
+        readonly height?: number;
+        readonly x?: number;
+        readonly y?: number;
+        readonly maximized?: boolean;
+    } = {}
 ): BrowserWindow {
     const window = new BrowserWindow(
         windowOptions({
@@ -174,6 +181,7 @@ export function openPolarisWindow(
             title: options.title ?? "Polaris",
             width: options.width ?? 1280,
             height: options.height ?? 820,
+            ...(options.x === undefined ? {} : { x: options.x, y: options.y }),
             minWidth: 360,
             minHeight: 480,
             webPreferences: polarisPreferences()
@@ -184,7 +192,16 @@ export function openPolarisWindow(
     // The page's own <title> is kept for the main window; a window opened for one
     // job keeps the name it was given, so two log windows can be told apart.
     if (options.title) window.on("page-title-updated", (event) => event.preventDefault());
-    window.once("ready-to-show", () => window.show());
+    const { x, y, width, height, maximized } = options;
+    window.once("ready-to-show", () => {
+        // Asked again now it exists: a window made on a monitor of another scale
+        // takes its size from the one it was made on. It is not on screen yet.
+        if (x !== undefined && y !== undefined && width && height) {
+            window.setBounds({ x, y, width, height });
+        }
+        if (maximized) window.maximize();
+        window.show();
+    });
     void window.loadURL(url);
     return window;
 }

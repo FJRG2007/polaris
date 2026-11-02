@@ -10,35 +10,59 @@
         <link rel="stylesheet" href="styles.css" />
     </head>
     <body>
-        <img class="mark" src="mark.svg" alt="" />
-        <h1>Open your Polaris</h1>
-        <p class="lead">The address you open Polaris at in the browser. This app opens it in a window of its own.</p>
+        <header class="brand">
+            <img class="mark" src="mark.svg" alt="" />
+            <h1 id="title">Open your Polaris</h1>
+        </header>
+        <nav id="tabs" class="tabs" role="tablist" aria-label="Settings" hidden>
+            <button id="tab-servers" type="button" role="tab" aria-selected="true" aria-controls="servers-page">Servers</button>
+            <button id="tab-general" type="button" role="tab" aria-selected="false" aria-controls="general-page">General</button>
+        </nav>
         <p id="failure" class="banner bad" role="alert" hidden></p>
-        <section id="saved" class="servers" aria-labelledby="saved-title" hidden>
-            <h2 id="saved-title">Your servers</h2>
-            <ul id="server-list" class="server-list"></ul>
+        <section id="servers-page" role="tabpanel">
+            <ul id="server-list" class="server-list" aria-label="Your servers" hidden></ul>
+            <button id="show-add" class="ghost" type="button" hidden>Add a server</button>
+            <form id="form" novalidate>
+                <label class="field-label">
+                    <span id="address-label">The address you open Polaris at *</span>
+                    <input
+                        id="address"
+                        name="address"
+                        type="url"
+                        inputmode="url"
+                        autocomplete="url"
+                        spellcheck="false"
+                        placeholder="https://polaris.example.com"
+                        aria-describedby="address-note"
+                        autofocus
+                    />
+                    <span id="address-note" class="hint" aria-live="polite">https://, or http:// for an address on your own network.</span>
+                </label>
+                <div class="row end">
+                    <button id="hide-add" class="ghost" type="button" hidden>Cancel</button>
+                    <button id="submit" class="primary" type="submit" aria-disabled="true">Open</button>
+                </div>
+            </form>
         </section>
-        <form id="form" novalidate>
-            <h2 id="add-title" hidden>Add another</h2>
-            <label>
-                Address *
-                <input
-                    id="address"
-                    name="address"
-                    type="url"
-                    inputmode="url"
-                    autocomplete="url"
-                    spellcheck="false"
-                    placeholder="https://polaris.example.com"
-                    aria-describedby="address-note"
-                    autofocus
-                />
-                <span id="address-note" class="hint" aria-live="polite">https://, or http:// for an address on your own network.</span>
+        <section id="general-page" role="tabpanel" hidden>
+            <label class="setting">
+                <span class="setting-text">
+                    <span class="name">Open with the computer</span>
+                    <span class="hint">Polaris opens when you sign in.</span>
+                </span>
+                <input id="open-at-login" class="switch" type="checkbox" role="switch" />
             </label>
+            <p id="version" class="hint version"></p>
+        </section>
+        <dialog id="confirm-remove" aria-labelledby="remove-title" aria-describedby="remove-body">
+            <p id="remove-title" class="name"></p>
+            <p id="remove-body" class="hint">It only leaves this list. The server and your account stay as they are.</p>
             <div class="row end">
-                <button id="submit" class="primary" type="submit" aria-disabled="true">Open</button>
+                <button id="remove-cancel" class="ghost" type="button">Cancel</button>
+                <!-- enigma: a confirmation button, whose whole job is to be read. -->
+                <button id="remove-confirm" class="danger" type="button">Remove</button>
             </div>
-        </form>
+        </dialog>
         <script src="connect.js"></script>
     </body>
 </html>

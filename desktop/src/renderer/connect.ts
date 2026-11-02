@@ -1,5 +1,5 @@
 /**
- * The servers window: the first run, File > Servers, and where a window that
+ * The settings window: the first run, File > Settings, and where a window that
  * could not load comes back to with the reason.
  *
  * Every server this app has opened is a row: pressing Open puts it in front,
@@ -20,12 +20,22 @@ const input = byId<HTMLInputElement>("address");
 const submit = byId<HTMLButtonElement>("submit");
 const failure = byId<HTMLParagraphElement>("failure");
 const note = byId<HTMLSpanElement>("address-note");
-const saved = byId<HTMLElement>("saved");
 const list = byId<HTMLUListElement>("server-list");
-const addTitle = byId<HTMLHeadingElement>("add-title");
+const title = byId<HTMLHeadingElement>("title");
+const tabs = byId<HTMLElement>("tabs");
+const serversPage = byId<HTMLElement>("servers-page");
+const generalPage = byId<HTMLElement>("general-page");
+const showAdd = byId<HTMLButtonElement>("show-add");
+const hideAdd = byId<HTMLButtonElement>("hide-add");
+const removeDialog = byId<HTMLDialogElement>("confirm-remove");
+const removeTitle = byId<HTMLParagraphElement>("remove-title");
+const openAtLogin = byId<HTMLInputElement>("open-at-login");
 const hint = note.textContent ?? "";
 
 let busy = false;
+/** How many servers are listed; null until the first answer. */
+let known: number | null = null;
+let removing: ServerRow | null = null;
 
 /** How long the field waits after the last keystroke before it asks. */
 const ASK_AFTER_MS = 400;
@@ -139,38 +149,39 @@ async function act(run: () => Promise<{ ok: boolean; error?: string; }>): Promis
 
 function viewRow(server: ServerRow, row: HTMLLIElement): void {
     const label = describeServer(server);
-    const names = document.createElement("div");
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "server-open";
+    open.title = server.active ? server.origin : `Open ${label}`;
+    if (server.active) open.setAttribute("aria-current", "true");
+    const names = document.createElement("span");
     names.className = "names";
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = label;
-    name.title = label;
-    names.append(name);
-    if (server.name) {
-        const host = document.createElement("span");
-        host.className = "host";
-        host.textContent = server.host;
-        host.title = server.origin;
-        names.append(host);
-    }
-    row.replaceChildren(names);
+    const where = document.createElement("span");
+    where.className = "host";
+    where.textContent = server.name ? server.host : "";
+    names.append(name, where);
+    open.append(names);
     if (server.active) {
         const badge = document.createElement("span");
         badge.className = "badge";
         badge.textContent = "In use";
-        row.append(badge);
-    } else {
-        const open = textButton("Open", () => {
-            open.textContent = "Checking...";
-            void act(() => window.polarisLocal.connect.switchTo(server.origin));
-        });
-        open.setAttribute("aria-label", `Open ${label}`);
-        row.append(open);
+        open.append(badge);
     }
-    row.append(
+    open.addEventListener("click", () => {
+        if (server.active) return;
+        where.textContent = "Checking...";
+        void act(() => window.polarisLocal.connect.switchTo(server.origin));
+    });
+    const acts = document.createElement("div");
+    acts.className = "acts";
+    acts.append(
         iconButton(`Rename ${label}`, PENCIL, () => editRow(server, row)),
-        iconButton(`Remove ${label}`, BIN, () => void act(() => window.polarisLocal.connect.remove(server.origin)))
+        iconButton(`Remove ${label}`, BIN, () => askRemove(server))
     );
+    row.replaceChildren(open, acts);
 }
 
 /** The row as a name field: Enter or Save keeps it, Escape or Cancel leaves it. */
@@ -194,9 +205,36 @@ function editRow(server: ServerRow, row: HTMLLIElement): void {
     field.select();
 }
 
+/** Asked first and named, as in the extension. Cancel has the focus. */
+function askRemove(server: ServerRow): void {
+    removing = server;
+    removeTitle.textContent = `Remove ${describeServer(server)}?`;
+    removeDialog.showModal();
+    byId<HTMLButtonElement>("remove-cancel").focus();
+}
+
+/** With a list the field is one press away; with none, it is the whole screen. */
+function showForm(shown: boolean): void {
+    form.hidden = !shown;
+    showAdd.hidden = shown || known === 0;
+    hideAdd.hidden = known === 0;
+    if (shown) input.focus();
+}
+
+function showPage(general: boolean): void {
+    serversPage.hidden = general;
+    generalPage.hidden = !general;
+    byId("tab-servers").setAttribute("aria-selected", String(!general));
+    byId("tab-general").setAttribute("aria-selected", String(general));
+}
+
 function draw(servers: readonly ServerRow[]): void {
-    saved.hidden = servers.length === 0;
-    addTitle.hidden = servers.length === 0;
+    const first = known === null;
+    known = servers.length;
+    list.hidden = servers.length === 0;
+    tabs.hidden = servers.length === 0;
+    title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
+    if (first || servers.length === 0) showForm(servers.length === 0);
     list.replaceChildren(
         ...servers.map((server) => {
             const row = document.createElement("li");
@@ -213,6 +251,34 @@ async function refresh(): Promise<void> {
     draw(state?.servers ?? []);
 }
 
+showAdd.addEventListener("click", () => showForm(true));
+hideAdd.addEventListener("click", () => showForm(false));
+byId("tab-servers").addEventListener("click", () => showPage(false));
+byId("tab-general").addEventListener("click", () => showPage(true));
+byId("remove-cancel").addEventListener("click", () => removeDialog.close());
+byId("remove-confirm").addEventListener("click", () => {
+    const server = removing;
+    removeDialog.close();
+    if (server) void act(() => window.polarisLocal.connect.remove(server.origin));
+});
+openAtLogin.addEventListener("change", () => {
+    const wanted = openAtLogin.checked;
+    say(failure, null);
+    void window.polarisLocal.connect
+        .setOpenAtLogin(wanted)
+        .catch(() => false)
+        .then((applied) => {
+            if (applied) return;
+            openAtLogin.checked = !wanted;
+            say(failure, "Polaris could not change this on this computer.");
+        });
+});
+void window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
+    if (!preferences) return;
+    openAtLogin.checked = preferences.openAtLogin;
+    byId("version").textContent = `Polaris ${preferences.version}`;
+});
+
 input.addEventListener("input", () => {
     say(failure, null);
     check();
@@ -226,17 +292,20 @@ form.addEventListener("submit", (event) => {
     busy = true;
     submit.textContent = "Checking...";
     check();
+    let added = false;
     void window.polarisLocal.connect
         .submit(input.value)
         .then((result) => {
+            added = result.ok;
             if (!result.ok) say(failure, result.error);
         })
         .catch(() => say(failure, "Something went wrong. Try again."))
-        .finally(() => {
+        .finally(async () => {
             busy = false;
             submit.textContent = "Open";
             check();
-            void refresh();
+            await refresh();
+            if (added && known) showForm(false);
         });
 });
 

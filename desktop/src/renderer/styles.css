@@ -282,38 +282,90 @@ h2 {
     color: var(--muted);
 }
 
-.servers {
-    margin-bottom: 20px;
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.brand .mark {
+    margin: 0;
+}
+
+.brand h1 {
+    margin: 0;
+}
+
+.tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    color: var(--muted);
+    padding: 6px 10px;
+}
+
+.tabs button[aria-selected="true"] {
+    border-bottom-color: var(--accent);
+    color: var(--text);
 }
 
 .server-list {
     list-style: none;
-    margin: 0;
+    margin: 0 0 12px;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
 .server {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 8px 8px 12px;
+    gap: 4px;
+    min-width: 0;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--surface);
+    padding: 4px;
 }
 
-.server[data-active="true"] {
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-}
-
-.server .names {
+.server-open {
     flex: 1;
     min-width: 0;
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    background: none;
+    color: inherit;
+    padding: 5px 8px;
+    text-align: left;
+}
+
+.server-open[aria-current="true"] {
+    cursor: default;
+}
+
+.server .acts {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+.server .names {
+    display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .server .name,
@@ -323,25 +375,118 @@ h2 {
     white-space: nowrap;
 }
 
-.server .name {
-    font-weight: 500;
+.name {
+    color: var(--text);
+    font-weight: 600;
 }
 
 .server .host {
-    font-size: 0.8rem;
     color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.server .host:empty {
+    display: none;
 }
 
 .server .badge {
     flex-shrink: 0;
-    font-size: 0.75rem;
-    color: var(--accent);
+    color: var(--muted);
+    font-size: 0.8rem;
 }
 
 .server input {
     flex: 1;
     min-width: 0;
-    padding: 6px 9px;
+}
+
+.field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+button.ghost {
+    background: none;
+}
+
+button.danger {
+    border-color: transparent;
+    background: var(--danger);
+    color: var(--accent-text);
+}
+
+label.setting {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 10px 12px;
+}
+
+.setting-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.switch {
+    appearance: none;
+    flex-shrink: 0;
+    position: relative;
+    width: 34px;
+    height: 20px;
+    margin: 0;
+    border-radius: 10px;
+    background: var(--line);
+    transition: background-color 120ms;
+}
+
+.switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 120ms;
+}
+
+.switch:checked {
+    background: var(--accent);
+}
+
+.switch:checked::after {
+    transform: translateX(14px);
+}
+
+.version {
+    margin-top: 12px;
+}
+
+dialog {
+    width: min(340px, calc(100vw - 32px));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 16px;
+}
+
+dialog::backdrop {
+    background: rgb(0 0 0 / 50%);
+}
+
+dialog .hint {
+    display: block;
+    margin: 4px 0 14px;
 }
 
 button.icon {
