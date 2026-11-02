@@ -624,10 +624,11 @@ export async function saveVirusTotalAction(input: {
 
     await upsertIntegration(provider, {
         enabled: input.enabled,
-        config: { scanDropPoints: input.scanDropPoints, onDetection },
+        config: { ...existing?.config, scanDropPoints: input.scanDropPoints, onDetection },
         secret: newKey,
         installedById: user.id
     });
+    await clearProviderPause(provider);
     await recordAudit({
         actorId: user.id,
         action: "integration.configure",

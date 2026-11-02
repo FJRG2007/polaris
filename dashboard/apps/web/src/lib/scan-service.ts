@@ -16,7 +16,8 @@ import { prisma } from "@polaris/db";
 import type { StorageDriver } from "@polaris/storage";
 import { getIntegrationState, getIntegrationSecret } from "@/lib/integration-service";
 import { readVirusTotalConfig, type ScanAction } from "@/lib/integrations/registry";
-import { lookupBySha256, uploadAndScan, VT_MAX_UPLOAD_BYTES, type VtVerdict } from "@/lib/integrations/virustotal";
+import { lookupBySha256, SCAN_SHARE, uploadAndScan, VT_MAX_UPLOAD_BYTES, type VtVerdict } from "@/lib/integrations/virustotal";
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -34,6 +35,14 @@ export interface ScanOutcome {
 }
 
 const SKIPPED: ScanOutcome = { scanned: false, blocked: false, verdict: "skipped", action: "none" };
+
+/** Paused, or past the part of the budget scans may use. The file is kept. */
+const NOT_ASKED: VtVerdict = {
+    kind: "unknown",
+    malicious: 0,
+    suspicious: 0,
+    detail: "VirusTotal is not taking requests right now"
+};
 
 export interface ScanRequest {
     driver: StorageDriver;
@@ -79,6 +88,16 @@ async function hashStream(
         offset += chunk.byteLength;
     }
     return { sha256: hash.digest("hex"), bytes };
+}
+
+/** The hash lookup, then an upload if the file is unknown and small enough. */
+async function askVirusTotal(apiKey: string, sha256: string, bytes: Uint8Array | null): Promise<VtVerdict> {
+    if (!(await takeServedLookup("virustotal", SCAN_SHARE))) return NOT_ASKED;
+    const known = await lookupBySha256(apiKey, sha256);
+    if (known) return known;
+    if (!bytes) return { kind: "unknown", malicious: 0, suspicious: 0, detail: "File exceeds the 32 MB scan limit" };
+    if (!(await takeServedLookup("virustotal", SCAN_SHARE))) return NOT_ASKED;
+    return uploadAndScan(apiKey, bytes, sha256);
 }
 
 /** Move a flagged file into the connection's quarantine folder; returns its new path. */
@@ -148,14 +167,10 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
     const apiKey = await getIntegrationSecret("virustotal");
     if (!apiKey) return SKIPPED;
 
-    let verdict: VtVerdict;
     try {
         const collect = request.size <= VT_MAX_UPLOAD_BYTES;
         const { sha256, bytes } = await hashStream(await request.driver.readStream(request.storedPath), collect);
-        const known = await lookupBySha256(apiKey, sha256);
-        if (known) verdict = known;
-        else if (bytes) verdict = await uploadAndScan(apiKey, bytes, sha256);
-        else verdict = { kind: "unknown", malicious: 0, suspicious: 0, detail: "File exceeds the 32 MB scan limit" };
+        const verdict = await askVirusTotal(apiKey, sha256, bytes);
         return await enforce(request, verdict, config.onDetection, sha256);
     } catch (caught) {
         // Scanner failure: fail open, but still tell the owner it did not complete.

@@ -64,8 +64,13 @@ ruled out the other background caller.
   pauses that provider for every caller: an hour for credits or a key, five minutes
   otherwise, then a single request to see if it is back. The pause is in the
   database, so an update does not restart the loop.
-- It also holds a daily ceiling counted in the database, which a process restarting
-  in a loop cannot reset.
+- It also holds a daily ceiling counted in the database, per request sent, with a
+  conditional write so concurrent callers cannot lose a count. A process restarting
+  in a loop cannot reset it, and reaching it stops the provider until midnight UTC
+  and tells the operator.
+- A VirusTotal scan polls three times instead of fifteen, each poll through the gate,
+  and scans take at most three quarters of the budget, so uploads to a drop point
+  cannot spend what the mail filter and chat need.
 - `metered-gate.test.ts` calls every function each provider module exports against
   a service refusing with `402`, and fails if more than one request goes out. It
   also fails if the SDK or a provider's address appears in any other module.

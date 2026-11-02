@@ -158,6 +158,7 @@
         "stoppedTitle": "{name} has stopped working",
         "stoppedCredits": "{name} is out of credits, so Polaris stopped asking it. Its checks are off until it has credits again.",
         "stoppedKey": "{name} refused the key, so Polaris stopped asking it. Its checks are off until the key works.",
+        "stoppedBudget": "{name} used up today's requests, so Polaris stopped asking it. Its checks come back at midnight UTC.",
         "expiredTitle": "Your GitHub account {label} stopped working",
         "expiredToken": "The token you pasted has run out or been withdrawn. Until it is replaced, deploys from your private repositories will be refused.",
         "expiredLink": "GitHub no longer accepts that link. Until it is connected again, deploys from your private repositories will be refused.",

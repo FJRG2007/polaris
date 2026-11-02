@@ -42,7 +42,7 @@ vi.mock("@/lib/integration-service", async (original) => ({
     }
 }));
 
-const { dismissConnectionFailureAction, saveDymoAction } =
+const { dismissConnectionFailureAction, saveDymoAction, saveVirusTotalAction } =
     await import("@/app/(app)/admin/integrations/actions");
 
 beforeEach(() => {
@@ -81,5 +81,19 @@ describe("saving Dymo", () => {
             deny: ["FRAUD"]
         });
         expect(cleared).toEqual(["dymo"]);
+    });
+});
+
+describe("saving VirusTotal", () => {
+    it("keeps the held failure for the clear that follows to answer", async () => {
+        const lastFailure = { kind: "out-of-service", reason: "key" };
+        stored.config = { lastFailure, scanDropPoints: false };
+        await saveVirusTotalAction({ enabled: true, scanDropPoints: true, onDetection: "block" });
+        expect(saved[0]?.config).toEqual({
+            lastFailure,
+            scanDropPoints: true,
+            onDetection: "block"
+        });
+        expect(cleared).toEqual(["virustotal"]);
     });
 });

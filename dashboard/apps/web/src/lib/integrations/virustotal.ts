@@ -9,11 +9,21 @@
  */
 
 import { readerWords } from "@/lib/i18n/reader-words";
-import { whileServing } from "@/lib/integrations/provider-pause";
+import { ProviderPaused, whileServing } from "@/lib/integrations/provider-pause";
+import { takeLookup } from "@/lib/reputation-budget";
 
 const BASE = "https://www.virustotal.com/api/v3";
 const PROVIDER = "virustotal";
 const NAME = "VirusTotal";
+
+/** What a file scan may use of the key's budget. Anybody with a drop point's link can
+ *  start one, so the rest stays for the mail filter and chat. */
+export const SCAN_SHARE = 0.75;
+
+/** Polling an analysis, spaced to fit the free key's four requests a minute alongside
+ *  the lookup and the upload that came before. */
+const POLLS = 3;
+const POLL_EVERY_MS = 20_000;
 
 /** A failed answer the gate can read the status of. Every lookup below reports it
  *  to its caller as an `error` verdict, as it always did. */
@@ -23,6 +33,9 @@ function failed(detail: string, status: number): Error {
 
 /** The verdict for a request that was not answered or never sent. */
 function noOpinion(caught: unknown, fallback: string): VtVerdict {
+    if (caught instanceof ProviderPaused && caught.reason === "budget") {
+        return { kind: "error", malicious: 0, suspicious: 0, detail: "VirusTotal used up today's requests" };
+    }
     const status = (caught as { status?: unknown } | null)?.status;
     const detail = typeof status === "number" && caught instanceof Error ? caught.message : fallback;
     return { kind: "error", malicious: 0, suspicious: 0, detail };
@@ -120,8 +133,8 @@ export function uploadAndScan(
     bytes: Uint8Array,
     sha256: string
 ): Promise<VtVerdict> {
-    return whileServing(PROVIDER, NAME, () => submitAndPoll(apiKey, bytes, sha256)).catch(
-        (caught: unknown) => noOpinion(caught, "VirusTotal was unreachable")
+    return submitAndPoll(apiKey, bytes, sha256).catch((caught: unknown) =>
+        noOpinion(caught, "VirusTotal was unreachable")
     );
 }
 
@@ -130,32 +143,36 @@ async function submitAndPoll(
     bytes: Uint8Array,
     sha256: string
 ): Promise<VtVerdict> {
-    const form = new FormData();
-    form.append("file", new Blob([bytes]), "upload.bin");
-    const submit = await fetch(`${BASE}/files`, {
-        method: "POST",
-        headers: { "x-apikey": apiKey },
-        body: form,
-        signal: AbortSignal.timeout(60000)
+    const analysisId = await whileServing(PROVIDER, NAME, async () => {
+        const form = new FormData();
+        form.append("file", new Blob([bytes]), "upload.bin");
+        const submit = await fetch(`${BASE}/files`, {
+            method: "POST",
+            headers: { "x-apikey": apiKey },
+            body: form,
+            signal: AbortSignal.timeout(60000)
+        });
+        if (!submit.ok) throw failed(`VirusTotal upload failed (${submit.status})`, submit.status);
+        const body = (await submit.json()) as { data?: { id?: string } };
+        return body.data?.id;
     });
-    if (!submit.ok) throw failed(`VirusTotal upload failed (${submit.status})`, submit.status);
-    const submitBody = (await submit.json()) as { data?: { id?: string } };
-    const analysisId = submitBody.data?.id;
     if (!analysisId)
         return { kind: "error", malicious: 0, suspicious: 0, detail: "No analysis id returned" };
 
-    // Poll the analysis. Public API is rate-limited, so keep the cadence modest.
-    for (let attempt = 0; attempt < 15; attempt++) {
-        await sleep(attempt === 0 ? 3000 : 4000);
-        const poll = await fetch(`${BASE}/analyses/${analysisId}`, {
-            headers: { "x-apikey": apiKey },
-            signal: AbortSignal.timeout(15000)
+    for (let attempt = 0; attempt < POLLS; attempt++) {
+        await sleep(POLL_EVERY_MS);
+        if (!takeLookup(PROVIDER, SCAN_SHARE)) continue;
+        const attributes = await whileServing(PROVIDER, NAME, async () => {
+            const poll = await fetch(`${BASE}/analyses/${analysisId}`, {
+                headers: { "x-apikey": apiKey },
+                signal: AbortSignal.timeout(15000)
+            });
+            if (!poll.ok) throw failed(`VirusTotal answered ${poll.status}`, poll.status);
+            const body = (await poll.json()) as {
+                data?: { attributes?: { status?: string; stats?: AnalysisStats } };
+            };
+            return body.data?.attributes;
         });
-        if (!poll.ok) continue;
-        const pollBody = (await poll.json()) as {
-            data?: { attributes?: { status?: string; stats?: AnalysisStats } };
-        };
-        const attributes = pollBody.data?.attributes;
         if (attributes?.status === "completed") {
             return verdictFromStats(attributes.stats ?? {}, fileLink(sha256));
         }

@@ -19,6 +19,11 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async (key: string, value: string | null) => {
         if (value === null) settings.delete(key);
         else settings.set(key, value);
+    },
+    swapSetting: async (key: string, expected: string | null, value: string) => {
+        if ((settings.get(key) ?? null) !== expected) return false;
+        settings.set(key, value);
+        return true;
     }
 }));
 vi.mock("@/lib/connections/attention", () => ({
@@ -86,6 +91,62 @@ describe.each(Object.keys(MODULES) as (keyof typeof MODULES)[])("%s", (provider)
             }
             expect(sent, name).toBe(1);
         }
+    });
+});
+
+describe("a VirusTotal scan", () => {
+    const answers = (poll: () => Response) =>
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string) => {
+                sent += 1;
+                return String(url).endsWith("/files")
+                    ? Response.json({ data: { id: "analysis" } })
+                    : poll();
+            })
+        );
+
+    const scan = async () => {
+        const { uploadAndScan } = await import("@/lib/integrations/virustotal");
+        vi.useFakeTimers();
+        const verdict = uploadAndScan("key", new Uint8Array(1), "sha");
+        await vi.runAllTimersAsync();
+        vi.useRealTimers();
+        return verdict;
+    };
+
+    beforeEach(async () => {
+        const { resetLookupBudget } = await import("@/lib/reputation-budget");
+        resetLookupBudget();
+    });
+
+    it("stops polling and pauses when a poll is refused", async () => {
+        answers(() => new Response("{}", { status: 402 }));
+        const verdict = await scan();
+        expect(verdict.kind).toBe("error");
+        expect(sent).toBe(2);
+        expect(settings.get("integration.pause.virustotal")).toContain("credits");
+    });
+
+    it("counts every poll against the day", async () => {
+        answers(() => Response.json({ data: { attributes: { status: "queued" } } }));
+        const verdict = await scan();
+        expect(verdict.kind).toBe("unknown");
+        const spent = JSON.parse(settings.get("integration.spent.virustotal") ?? "{}") as {
+            count: number;
+        };
+        expect(spent.count).toBe(sent);
+        expect(sent).toBeLessThanOrEqual(4);
+    });
+
+    it("says the day's requests are gone instead of calling it unreachable", async () => {
+        settings.set(
+            "integration.spent.virustotal",
+            JSON.stringify({ day: new Date().toISOString().slice(0, 10), count: 500 })
+        );
+        const verdict = await scan();
+        expect(verdict.detail).toBe("VirusTotal used up today's requests");
+        expect(sent).toBe(0);
     });
 });
 
