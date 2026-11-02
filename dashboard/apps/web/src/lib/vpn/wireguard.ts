@@ -23,7 +23,8 @@ export const MAX_NODES = 64;
 export const MAX_DEVICES_ON_NODE = 4093;
 /** Devices a person may add unless their access says otherwise. */
 export const DEFAULT_DEVICE_LIMIT = 5;
-const PUBLIC_RESOLVERS = "1.1.1.1, 9.9.9.9";
+export const PUBLIC_DNS = ["1.1.1.1", "9.9.9.9"] as const;
+const PUBLIC_RESOLVERS = PUBLIC_DNS.join(", ");
 const GIB = 1024 ** 3;
 
 /** A WireGuard key: 32 bytes of base64. */

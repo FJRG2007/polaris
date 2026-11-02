@@ -359,6 +359,64 @@ export async function addDevice(
     };
 }
 
+/** What an app of ours needs to bring the tunnel up. Its private key never leaves it. */
+export interface ClientConnection {
+    readonly deviceId: string;
+    readonly address: string;
+    readonly dns: readonly string[];
+    readonly nodePublicKey: string;
+    readonly endpoint: string;
+    readonly port: number;
+}
+
+/**
+ * A Polaris app connecting: it made its own key and sends only the public half. Asked
+ * again with the same key it gets the same device, so reconnecting never uses up
+ * the limit.
+ */
+export async function connectClient(
+    user: { id: string; isAdmin: boolean },
+    input: { nodeId: string; name: string; publicKey: string }
+): Promise<ClientConnection> {
+    if (!wg.isWireGuardKey(input.publicKey)) throw new WireGuardRefusal("notFound");
+    const access = await accessOf(user);
+    if (!access || wg.accessStanding(access, new Date()) !== "active") {
+        throw new WireGuardRefusal("noAccess");
+    }
+    if (!wg.mayUseNode(access, input.nodeId)) throw new WireGuardRefusal("noAccess");
+    const node = await nodeRow(input.nodeId);
+    if (!node?.publicKey) throw new WireGuardRefusal("nodeNotReady");
+    const answer = (id: string, hostIndex: number): ClientConnection => ({
+        deviceId: id,
+        address: wg.deviceAddress(node.subnetIndex, hostIndex),
+        dns: wg.PUBLIC_DNS,
+        nodePublicKey: node.publicKey as string,
+        endpoint: node.endpoint,
+        port: node.port
+    });
+    const known = await prisma.vpnPeer.findUnique({
+        where: { publicKey: input.publicKey },
+        select: { id: true, userId: true, hostIndex: true, nodeId: true }
+    });
+    if (known && known.userId !== user.id) throw new WireGuardRefusal("notFound");
+    if (known?.nodeId === node.id) return answer(known.id, known.hostIndex);
+    if (known) {
+        // Moving to another node: the old one lets go before this one takes the key.
+        await prisma.vpnPeer.delete({ where: { id: known.id } });
+        const previous = await nodeRow(known.nodeId);
+        if (previous) await syncNode(previous).catch(() => undefined);
+    }
+    const owned = await prisma.vpnPeer.count({ where: { userId: user.id } });
+    if (owned >= access.deviceLimit) throw new WireGuardRefusal("deviceLimit");
+    const peer = await claimAddress(node.id, user.id, input.name, input.publicKey);
+    await syncNode(node).catch(async (error: unknown) => {
+        await prisma.vpnPeer.delete({ where: { id: peer.id } });
+        console.error("polaris: a VPN device could not be added:", error);
+        throw new WireGuardRefusal("unreachable");
+    });
+    return answer(peer.id, peer.hostIndex);
+}
+
 export async function removeDevice(
     user: { id: string; isAdmin: boolean },
     id: string
