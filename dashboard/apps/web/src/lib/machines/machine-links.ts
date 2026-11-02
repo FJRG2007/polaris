@@ -3,7 +3,7 @@
  * a screen and a test can use it without the readers behind it.
  */
 
-import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
+import { hostRouteId, LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import type { WatchCard } from "@/lib/watch-overview-service";
 
 export type MachineKind = "server" | "container" | "domain";
@@ -13,14 +13,11 @@ export function machineHref(kind: MachineKind, id: string): string {
     return `/places/machines/${kind}/${encodeURIComponent(id)}`;
 }
 
-/** A Watch card, opened in Places instead. A server keeps the route id Watch
- *  links it with, so the local machine keeps its address. */
+/** A Watch card, opened in Places instead. Places addresses a server by its route
+ *  id, not by the name Watch reads as. */
 export function inPlaces(card: WatchCard): WatchCard {
     if (card.kind === "server") {
-        return {
-            ...card,
-            href: card.href.replace(/^\/watch\/server\//, "/places/machines/server/")
-        };
+        return { ...card, href: machineHref("server", hostRouteId(card.id)) };
     }
     return card.kind === "container" ? { ...card, href: machineHref("container", card.id) } : card;
 }

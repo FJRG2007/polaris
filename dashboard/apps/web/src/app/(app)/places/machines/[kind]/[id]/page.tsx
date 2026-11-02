@@ -1,4 +1,5 @@
 import { listHosts } from "@/lib/host-service";
+import { localServerName } from "@/lib/local-server";
 import { LOCAL_SERVER_ID } from "@polaris/core";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
@@ -69,8 +70,7 @@ export default async function MachinePage({
             <MachineDetailView
                 kind="server"
                 id={id}
-                // i18n-ignore the same word in both languages
-                name={host?.name ?? "Local"}
+                name={host?.name ?? (await localServerName())}
                 detail={host ? `${host.username}@${host.address}` : null}
                 owned
                 shareable={id !== LOCAL_SERVER_ID}

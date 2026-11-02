@@ -35,7 +35,12 @@ export const BREAKDOWN_METRICS = ["cpu", "mem", "disk", "net"] as const;
 export type BreakdownMetric = (typeof BREAKDOWN_METRICS)[number];
 
 /** What a row is, which is what decides its icon and whether it says so. */
-export type BreakdownKind = "container" | "volume" | "store" | "rest";
+export type BreakdownKind = "container" | "volume" | "store" | "process" | "rest";
+
+/** Whose it is, where the list can tell. Free memory is nobody's. */
+export const BREAKDOWN_GROUPS = ["polaris", "apps", "other", "machine", "free"] as const;
+
+export type BreakdownGroup = (typeof BREAKDOWN_GROUPS)[number];
 
 /** One thing using the metric, and what a reader can do about it. */
 export interface BreakdownRow {
@@ -51,6 +56,7 @@ export interface BreakdownRow {
     readonly share: number | null;
     /** Where this thing lives, when it has a page of its own. */
     readonly href: string | null;
+    readonly group?: BreakdownGroup;
 }
 
 /** A row before it knows how big a part of the whole it is. */
@@ -105,7 +111,8 @@ export function ranked(parts: readonly BreakdownPart[], total: number | null): B
  */
 export function wholeOf(measured: number | null, parts: readonly BreakdownPart[]): number | null {
     const sum = parts.reduce((total, part) => total + Math.max(0, part.value), 0);
-    if (measured === null || !Number.isFinite(measured) || measured <= 0) return sum > 0 ? sum : null;
+    if (measured === null || !Number.isFinite(measured) || measured <= 0)
+        return sum > 0 ? sum : null;
     return measured >= sum ? measured : sum;
 }
 

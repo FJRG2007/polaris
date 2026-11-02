@@ -93,3 +93,44 @@ describe("adding a connector", () => {
         expect(screen.getByText("https://mcp.linear.app/mcp")).toBeTruthy();
     });
 });
+
+describe("searching the connectors", () => {
+    const row = (name: string) => ({
+        id: name,
+        name,
+        url: `https://${name}.example/mcp`,
+        auth: "none" as const,
+        transport: "http" as const,
+        enabled: true,
+        signedIn: false,
+        status: "ok",
+        lastError: null,
+        tools: []
+    });
+    const seven = ["one", "two", "three", "four", "five", "six", "seven"].map(row);
+    const list = () =>
+        render(<PolarConnectors initial={seven as never} returned={null} />, {
+            wrapper: MessagesWrapper
+        });
+
+    it("says so when nothing matches", () => {
+        list();
+        fireEvent.change(screen.getByRole("searchbox"), { target: { value: "nothing" } });
+        expect(screen.getByText("No connector matches.")).toBeTruthy();
+    });
+
+    it("drops the filter along with the box", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => Response.json({}))
+        );
+        list();
+        fireEvent.change(screen.getByRole("searchbox"), { target: { value: "one" } });
+        fireEvent.click(screen.getByRole("button", { name: /^Remove/ }));
+        fireEvent.change(await screen.findByRole("textbox"), { target: { value: "one" } });
+        fireEvent.click(screen.getByRole("button", { name: /^(Delete|Remove)/ }));
+        expect(await screen.findByText("two")).toBeTruthy();
+        expect(screen.queryByRole("searchbox")).toBeNull();
+        expect(screen.queryByText("No connector matches.")).toBeNull();
+    });
+});

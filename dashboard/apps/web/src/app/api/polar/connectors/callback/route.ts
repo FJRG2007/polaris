@@ -23,7 +23,7 @@ const querySchema = z.object({
 
 export async function GET(request: Request): Promise<Response> {
     const back = new URL(POLAR_SETTINGS_PATH, await appBaseUrl());
-    back.hash = "connectors";
+    back.searchParams.set("section", "connectors");
     const user = await polarCaller();
     const refused = user instanceof NextResponse ? user : await connectorGate(user, 20);
     if (user instanceof NextResponse || refused) {

@@ -15,6 +15,9 @@
  * server reads stream in behind skeletons shaped like them.
  */
 
+import Link from "next/link";
+import { SectionFromHash } from "./section-from-hash";
+import { settingsSection } from "@/lib/polar/settings-path";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -81,26 +84,35 @@ function ListSkeleton() {
     );
 }
 
+function one(value: string | string[] | undefined): string | undefined {
+    return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function PolarSettingsPage({
     searchParams
 }: {
-    searchParams: Promise<{ connector?: string | string[] }>;
+    searchParams: Promise<{ connector?: string | string[]; section?: string | string[] }>;
 }) {
     const user = await requireUser();
     const access = await polarAccessFor(user.id);
     if (!access.use) redirect(await homePathForUser(user));
-    const raw = (await searchParams).connector;
+    const params = await searchParams;
+    const raw = one(params.connector);
     const returned = raw === "signed_in" || raw === "failed" ? raw : null;
     const [t, account] = await Promise.all([getTranslations("polar"), getTranslations("account")]);
+    const connectorsListed = access.connectors && !user.viewingAs;
     const sections = [
         { id: "memory", label: t("settings.memory.title") },
         { id: "tools", label: t("settings.tools.title") },
+        ...(connectorsListed ? [{ id: "connectors", label: t("settings.nav.connectors") }] : []),
         { id: "permissions", label: t("settings.nav.permissions") },
         { id: "browser", label: t("settings.browserSites.title") },
         { id: "display", label: t("settings.display.title") },
         { id: "extras", label: t("settings.helper.title") },
         { id: "data", label: t("settings.data.title") }
     ];
+    const asked = one(params.section) ?? (returned ? "connectors" : null);
+    const section = sections.find(({ id }) => id === asked)?.id ?? "memory";
     return (
         <div className={cn(PAGE_BLEED, "flex")}>
             <SettingsWithSidebar>
@@ -115,74 +127,73 @@ export default async function PolarSettingsPage({
                             aria-label={t("settings.title")}
                             className="mt-2 flex flex-wrap gap-1 border-b border-border pb-2"
                         >
-                            {sections.map((section) => (
-                                <a
-                                    key={section.id}
-                                    href={`#${section.id}`}
-                                    className="whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] text-muted-foreground hover:bg-card hover:text-foreground"
+                            {sections.map((entry) => (
+                                <Link
+                                    key={entry.id}
+                                    href={settingsSection(entry.id)}
+                                    aria-current={entry.id === section ? "page" : undefined}
+                                    className={cn(
+                                        "whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] hover:bg-card hover:text-foreground",
+                                        entry.id === section
+                                            ? "bg-card text-foreground"
+                                            : "text-muted-foreground"
+                                    )}
                                 >
-                                    {section.label}
-                                </a>
+                                    {entry.label}
+                                </Link>
                             ))}
                         </nav>
                     </div>
-                    <div id="memory" className="scroll-mt-4">
-                        <MemorySettings />
-                    </div>
-                    <div id="tools" className="scroll-mt-4">
-                        <PolarToolSettings
-                            connectorsListed={access.connectors && !user.viewingAs}
-                        />
-                    </div>
-                    <section id="permissions" className="flex scroll-mt-4 flex-col gap-2">
-                        <div className="min-w-0">
-                            <h2 className="text-sm font-medium text-foreground">
-                                {account("polarTools.title")}
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                                {account("polarTools.intro")}
-                            </p>
-                            <p className="text-xs text-foreground-subtle">
-                                {account("polarTools.stillChecked")}
-                            </p>
-                        </div>
-                        {/* The two lists moved here from the account pages and still
-                            read their words from there. */}
-                        <Messages namespaces={["account"]}>
-                            <Suspense fallback={<ListSkeleton />}>
-                                <GrantsSection userId={user.id} />
-                            </Suspense>
-                        </Messages>
-                    </section>
-                    <section id="browser" className="flex scroll-mt-4 flex-col gap-2">
-                        <div className="min-w-0">
-                            <h2 className="text-sm font-medium text-foreground">
-                                {t("settings.browserSites.title")}
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                                {t("settings.browserSites.intro")}
-                            </p>
-                        </div>
-                        <PolarBrowserSites />
-                    </section>
-                    {access.connectors && !user.viewingAs ? (
-                        <div id="connectors" className="scroll-mt-4">
+                    <SectionFromHash ids={sections.map(({ id }) => id)} />
+                    {section === "memory" ? <MemorySettings /> : null}
+                    {section === "tools" ? (
+                        <PolarToolSettings connectorsListed={connectorsListed} />
+                    ) : null}
+                    {section === "permissions" ? (
+                        <section className="flex flex-col gap-2">
+                            <div className="min-w-0">
+                                <h2 className="text-sm font-medium text-foreground">
+                                    {account("polarTools.title")}
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    {account("polarTools.intro")}
+                                </p>
+                                <p className="text-xs text-foreground-subtle">
+                                    {account("polarTools.stillChecked")}
+                                </p>
+                            </div>
+                            {/* The two lists moved here from the account pages and still
+                                read their words from there. */}
                             <Messages namespaces={["account"]}>
                                 <Suspense fallback={<ListSkeleton />}>
-                                    <ConnectorsSection userId={user.id} returned={returned} />
+                                    <GrantsSection userId={user.id} />
                                 </Suspense>
                             </Messages>
-                        </div>
+                        </section>
                     ) : null}
-                    <div id="display" className="scroll-mt-4">
-                        <DisplaySettings />
-                    </div>
-                    <div id="extras" className="scroll-mt-4">
-                        <PolarHelperSettings />
-                    </div>
-                    <div id="data" className="scroll-mt-4">
-                        <DataSettings />
-                    </div>
+                    {section === "browser" ? (
+                        <section className="flex flex-col gap-2">
+                            <div className="min-w-0">
+                                <h2 className="text-sm font-medium text-foreground">
+                                    {t("settings.browserSites.title")}
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("settings.browserSites.intro")}
+                                </p>
+                            </div>
+                            <PolarBrowserSites />
+                        </section>
+                    ) : null}
+                    {section === "connectors" ? (
+                        <Messages namespaces={["account"]}>
+                            <Suspense fallback={<ListSkeleton />}>
+                                <ConnectorsSection userId={user.id} returned={returned} />
+                            </Suspense>
+                        </Messages>
+                    ) : null}
+                    {section === "display" ? <DisplaySettings /> : null}
+                    {section === "extras" ? <PolarHelperSettings /> : null}
+                    {section === "data" ? <DataSettings /> : null}
                 </div>
             </SettingsWithSidebar>
         </div>

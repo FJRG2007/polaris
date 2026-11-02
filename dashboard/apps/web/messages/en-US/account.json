@@ -1542,7 +1542,9 @@
             "refused": "That server is on a private address your administrator doesn't allow.",
             "unreachable": "The server didn't answer. Check the address or try again later.",
             "signInFailed": "Sign-in didn't finish. Try Sign in again."
-        }
+        },
+        "search": "Search connectors",
+        "noMatch": "No connector matches."
     },
     "streamdeck": {
         "page": {

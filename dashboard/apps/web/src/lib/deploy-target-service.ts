@@ -10,10 +10,16 @@
 import { prisma } from "@polaris/db";
 import { getHostConnection } from "./host-service";
 
-/** Stable display name of every owner's single local target. */
+/** What every owner's single local target is stored as. Never shown: see `targetLabel`. */
 const LOCAL_TARGET_NAME = "Local";
 
 export type DeployRuntime = "compose" | "swarm";
+
+/** A target's name on a screen. The local row holds one word for every install, so
+ *  it reads as the machine's name, which the caller has from `localServerName`. */
+export function targetLabel(target: { kind: string; name: string }, machine: string): string {
+    return target.kind === "local" ? machine : target.name;
+}
 
 /**
  * The owner's local target, created on first use. Local runs default to compose

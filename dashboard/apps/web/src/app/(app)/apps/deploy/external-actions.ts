@@ -21,7 +21,8 @@ import type { ProjectCapability } from "@polaris/core";
 import { listConnections } from "@/lib/connections/store";
 import * as external from "@/lib/deploy/external-services";
 import { githubRepoChoiceRefusal } from "@/lib/github-access";
-import { listDeployTargets } from "@/lib/deploy-target-service";
+import { listDeployTargets, targetLabel } from "@/lib/deploy-target-service";
+import { localServerName } from "@/lib/local-server";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import {
     accessCan,
@@ -370,14 +371,18 @@ export async function moveHomePlanAction(
     if (!parsed.success) return { error: await reply("common.unknownService") };
     try {
         const access = await requireServiceAccess(projectId, parsed.data, user.id, "project.read");
-        const [plan, targets] = await Promise.all([
+        const [plan, targets, machine] = await Promise.all([
             migrate.moveHomePlan(projectId, parsed.data),
-            listDeployTargets(access.ownerId)
+            listDeployTargets(access.ownerId),
+            localServerName()
         ]);
         return {
             plan: accessCan(access, COPY_OUT) ? plan : { ...plan, variableKeys: [] },
             canCopyVariables: accessCan(access, COPY_HOME),
-            targets: targets.map((target) => ({ id: target.id, name: target.name }))
+            targets: targets.map((target) => ({
+                id: target.id,
+                name: targetLabel(target, machine)
+            }))
         };
     } catch (caught) {
         return { error: await refusal(caught) };

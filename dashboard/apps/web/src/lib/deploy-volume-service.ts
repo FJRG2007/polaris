@@ -11,6 +11,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { targetLabel } from "./deploy-target-service";
+import { localServerName } from "./local-server";
 import { slugify } from "@polaris/deploy";
 import { getDriver } from "./storage-service";
 import { currentReleaseRef } from "./deploy/releases";
@@ -512,7 +514,7 @@ export async function getVolume(id: string, ownerId: string): Promise<VolumeDeta
         sizeLimit: row.sizeLimit,
         applicationId: row.application?.id ?? null,
         applicationName: row.application?.name ?? null,
-        serverName: row.target.name,
+        serverName: targetLabel(row.target, await localServerName()),
         serverKind: row.target.kind,
         serviceRunning: Boolean(row.application?.currentDeploymentId)
     };

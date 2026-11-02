@@ -8,6 +8,7 @@
 
 import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { z } from "zod";
+import { localServerName } from "@/lib/local-server";
 import { domainPrivateInputSchema } from "@/lib/deploy/private-domain";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -387,7 +388,7 @@ export async function listDeployServersAction(
         : user.id;
     const hosts = await listHosts(owner);
     return [
-        { id: "local", name: await reply("servers.local"), kind: "local" },
+        { id: "local", name: await localServerName(), kind: "local" },
         ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
     ];
 }

@@ -1542,7 +1542,9 @@
             "refused": "Ese servidor está en una dirección privada que tu administrador no permite.",
             "unreachable": "El servidor no respondió. Revisa la dirección o reinténtalo más tarde.",
             "signInFailed": "No se completó el acceso. Pulsa Entrar otra vez."
-        }
+        },
+        "search": "Buscar conectores",
+        "noMatch": "Ningún conector coincide."
     },
     "streamdeck": {
         "page": {

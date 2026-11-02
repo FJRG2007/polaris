@@ -172,7 +172,11 @@
         "deploying": "Deploying",
         "notDeployed": "Not deployed",
         "thisMachine": "The machine Polaris runs on",
-        "thisMachineAt": "{address} - the machine Polaris runs on"
+        "thisMachineAt": "{address} - the machine Polaris runs on",
+        "restOfMachine": "Everything else on the machine",
+        "freeMemory": "Free",
+        "runningOnMachine": "Running directly on the machine.",
+        "memoryNote": "Containers and programs as they use memory now. Programs share some of it, so their figures can overlap."
     },
     "cards": {
         "noHistory": "Not enough history yet",
@@ -199,7 +203,15 @@
         "readAgo": "Read {age} ago.",
         "heaviestFirst": "Heaviest first.",
         "shareOfMachine": "Share of the whole machine, heaviest first.",
-        "inTotal": "{total} in total, heaviest first."
+        "inTotal": "{total} in total, heaviest first.",
+        "whose": "Whose it is",
+        "group": {
+            "polaris": "Polaris",
+            "apps": "Your apps",
+            "other": "Other containers",
+            "machine": "The machine",
+            "free": "Free"
+        }
     },
     "subject": {
         "metrics": "Metrics",

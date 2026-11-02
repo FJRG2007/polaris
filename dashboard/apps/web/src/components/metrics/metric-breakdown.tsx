@@ -29,8 +29,14 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { formatRate, percent } from "@/components/metrics-history";
-import { Box, HardDrive, Layers, MoreHorizontal, SearchX } from "lucide-react";
-import type { Breakdown, BreakdownMetric, BreakdownRow } from "@/lib/watch/breakdown-shape";
+import { Box, ChevronRight, Cpu, HardDrive, Layers, MoreHorizontal, SearchX } from "lucide-react";
+import { BREAKDOWN_GROUPS } from "@/lib/watch/breakdown-shape";
+import type {
+    Breakdown,
+    BreakdownGroup,
+    BreakdownMetric,
+    BreakdownRow
+} from "@/lib/watch/breakdown-shape";
 import {
     Dialog,
     DialogContent,
@@ -68,7 +74,13 @@ export function breakdownTitle(t: NamespaceTranslator<"watch">, metric: Breakdow
     return t(`breakdown.title.${metric}`);
 }
 
-const ICONS = { container: Box, volume: HardDrive, store: Layers, rest: MoreHorizontal };
+const ICONS = {
+    container: Box,
+    volume: HardDrive,
+    store: Layers,
+    process: Cpu,
+    rest: MoreHorizontal
+};
 
 /** Past this, the figures are old enough that showing them without saying so
  *  would pass a minute-old reading off as this instant's. */
@@ -146,11 +158,7 @@ export function MetricBreakdownDialog({
                         description={t("breakdown.allZero")}
                     />
                 ) : (
-                    <ul className="flex flex-col">
-                        {result.rows.map((row) => (
-                            <Row key={row.key} row={row} format={format ?? formatBytes} />
-                        ))}
-                    </ul>
+                    <Rows rows={result.rows} format={format ?? formatBytes} />
                 )}
 
                 {result && (result.note || age !== null) ? (
@@ -183,24 +191,71 @@ function summarize(
     return t("breakdown.inTotal", { total: BREAKDOWN_FORMAT[open.metric](result.total) });
 }
 
+/** The list, with whose-is-it filters when it knows. Totals are of the whole list. */
+function Rows({
+    rows,
+    format
+}: {
+    rows: readonly BreakdownRow[];
+    format: (value: number) => string;
+}) {
+    const t = useTranslations("watch");
+    const [group, setGroup] = useState<BreakdownGroup | null>(null);
+    const groups = BREAKDOWN_GROUPS.filter((name) => rows.some((row) => row.group === name));
+    const sum = (name: BreakdownGroup) =>
+        rows.reduce((total, row) => total + (row.group === name ? row.value : 0), 0);
+    const shown = group ? rows.filter((row) => row.group === group) : rows;
+    return (
+        <>
+            {groups.length > 1 ? (
+                <div
+                    role="group"
+                    aria-label={t("breakdown.whose")}
+                    className="flex flex-wrap gap-1"
+                >
+                    {groups.map((name) => (
+                        <button
+                            key={name}
+                            type="button"
+                            aria-pressed={group === name}
+                            onClick={() => setGroup(group === name ? null : name)}
+                            className={`flex items-baseline gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                                group === name
+                                    ? "border-primary bg-muted text-foreground"
+                                    : "border-border text-muted-foreground hover:bg-muted/60"
+                            }`}
+                        >
+                            <span className="whitespace-nowrap">
+                                {t(`breakdown.group.${name}`)}
+                            </span>
+                            <span className="whitespace-nowrap tabular-nums">
+                                {format(sum(name))}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+            <ul className="flex max-h-[55vh] flex-col overflow-y-auto overscroll-contain">
+                {shown.map((row) => (
+                    <Row key={row.key} row={row} format={format} />
+                ))}
+            </ul>
+        </>
+    );
+}
+
 function Row({ row, format }: { row: BreakdownRow; format: (value: number) => string }) {
     const Icon = ICONS[row.kind];
     // The leftover is not a thing anybody can go and look at, so it is drawn as
     // the background it is rather than competing with the rows that are.
     const rest = row.kind === "rest";
-    return (
-        <li className="flex items-start gap-2 border-b border-border/40 py-2 last:border-0">
+    const body = (
+        <>
             <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
                     <span className="w-full max-w-0 flex-1 truncate text-sm" title={row.label}>
-                        {row.href ? (
-                            <Link href={row.href} className="hover:underline">
-                                {row.label}
-                            </Link>
-                        ) : (
-                            row.label
-                        )}
+                        {row.label}
                     </span>
                     <span className="shrink-0 tabular-nums text-sm">{format(row.value)}</span>
                     <span className="w-11 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
@@ -223,6 +278,26 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
                     </div>
                 )}
             </div>
+            {row.href ? (
+                <ChevronRight
+                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                />
+            ) : null}
+        </>
+    );
+    return (
+        <li className="border-b border-border/40 last:border-0">
+            {row.href ? (
+                <Link
+                    href={row.href}
+                    className="flex items-start gap-2 rounded-md px-1 py-2 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    {body}
+                </Link>
+            ) : (
+                <div className="flex items-start gap-2 px-1 py-2">{body}</div>
+            )}
         </li>
     );
 }

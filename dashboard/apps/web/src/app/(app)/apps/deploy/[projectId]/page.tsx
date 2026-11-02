@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { localServerName } from "@/lib/local-server";
+import { targetLabel } from "@/lib/deploy-target-service";
 import { parsePrivateAccess } from "@/lib/deploy/private-domain";
 import type { AppDomain } from "../domain-rank";
 import { ProjectDetail } from "../project-detail";
@@ -116,7 +118,10 @@ export default async function DeployProjectPage({
         ]);
     const localReady = Boolean(caps?.deploy);
     // Whether each service is up, apart from how its last deploy went.
-    const runStates = await serviceRunStates(allApps, statuses);
+    const [runStates, machine] = await Promise.all([
+        serviceRunStates(allApps, statuses),
+        localServerName()
+    ]);
 
     const summary: ProjectSummary = {
         id: project.id,
@@ -143,7 +148,7 @@ export default async function DeployProjectPage({
                 targetId: app.targetId,
                 serverId:
                     app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
-                serverName: app.target.name,
+                serverName: targetLabel(app.target, machine),
                 containerRef: serving.get(app.id)?.name ?? "",
                 autoDeploy: app.autoDeploy,
                 waitForCi: app.waitForCi,

@@ -41,6 +41,8 @@ import { localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace } from "@/lib/deploy/host-space";
 import { cachedSamples } from "@/lib/container-stats-cache";
 import { describePart, isPolarisPart } from "@/lib/polaris-parts";
+import { getLocalHostId } from "@/lib/local-server";
+import { machineProcesses } from "./machine-processes";
 import { baseProject, hostVolumes } from "@/lib/deploy/host-volumes";
 import { LOCAL_SERVER_ID, serverIdSchema, type Permission } from "@polaris/core";
 import { counterAdvance, hostSubject, RAW_MAX_SPAN_MS } from "@/lib/metrics-shared";
@@ -59,6 +61,7 @@ import {
     remainder,
     wholeOf,
     type Breakdown,
+    type BreakdownGroup,
     type BreakdownMetric,
     type BreakdownPart
 } from "./breakdown-shape";
@@ -149,7 +152,10 @@ export async function offeredBreakdowns(
     }
     const deployed = await prisma.application
         .count({
-            where: { environment: { project: { ownerId: viewer.id } }, target: targetOn(subject.id) }
+            where: {
+                environment: { project: { ownerId: viewer.id } },
+                target: targetOn(subject.id)
+            }
         })
         .catch(() => 0);
     // Upload is broken down per service. With no service on this machine there is
@@ -245,14 +251,26 @@ async function machineLoad(
         const machine =
             metric === "cpu" ? 100 : ((await driver.info().catch(() => null))?.memTotal ?? null);
         const total = wholeOf(machine, parts);
+        if (metric === "mem") {
+            const split = await memoryOutside(serverId, total, parts);
+            if (split) {
+                return {
+                    rows: ranked([...parts, ...split], total),
+                    total,
+                    note: "Containers and programs as they use memory now. Programs share some of it, so their figures can overlap.",
+                    unavailable: null,
+                    at
+                };
+            }
+        }
         const rest = remainder(total, parts, {
             key: "rest",
             label:
                 metric === "cpu"
-                    // i18n-ignore said in the reader's words by lib/watch/words.ts
-                    ? "Idle, and anything outside a container"
-                    // i18n-ignore said in the reader's words by lib/watch/words.ts
-                    : "Free, and anything outside a container",
+                    ? // i18n-ignore said in the reader's words by lib/watch/words.ts
+                      "Idle, and anything outside a container"
+                    : // i18n-ignore said in the reader's words by lib/watch/words.ts
+                      "Free, and anything outside a container",
             detail: "The machine itself, and whatever is installed on it directly."
         });
         return {
@@ -269,6 +287,73 @@ async function machineLoad(
     } finally {
         if (driver) await driver.dispose().catch(() => undefined);
     }
+}
+
+const FRESH_SAMPLE_MS = 5 * 60_000;
+
+/**
+ * Memory outside the containers: the programs on the machine, what else it is
+ * holding, and what is free. Worked out from the machine's own reading, so free
+ * memory stops being mixed into what the system uses. Null without a recent reading.
+ */
+async function memoryOutside(
+    serverId: string,
+    total: number | null,
+    parts: readonly BreakdownPart[]
+): Promise<BreakdownPart[] | null> {
+    const sample = await prisma.metricSample.findFirst({
+        where: {
+            subjectType: "host",
+            subjectId: hostSubject(serverId),
+            ts: { gte: new Date(Date.now() - FRESH_SAMPLE_MS) },
+            memUsedBytes: { not: null }
+        },
+        orderBy: { ts: "desc" },
+        select: { memUsedBytes: true }
+    });
+    if (total === null || sample?.memUsedBytes == null) return null;
+    const used = Number(sample.memUsedBytes);
+    const inContainers = parts.reduce((sum, part) => sum + part.value, 0);
+    const outside = Math.max(0, used - inContainers);
+    const href = `/apps/servers/${serverId}`;
+    const hostId = serverId === LOCAL_SERVER_ID ? await getLocalHostId() : serverId;
+    const programs: BreakdownPart[] = [];
+    let named = 0;
+    for (const { name, bytes } of hostId ? await machineProcesses(hostId) : []) {
+        if (named + bytes > outside) break;
+        named += bytes;
+        programs.push({
+            key: `process:${name}`,
+            label: name,
+            kind: "process",
+            detail: "Running directly on the machine.",
+            value: bytes,
+            href,
+            group: "machine"
+        });
+    }
+    const fixed = (
+        key: string,
+        label: string,
+        value: number,
+        group: BreakdownGroup,
+        link: string | null
+    ) => ({
+        key,
+        label,
+        kind: "rest" as const,
+        detail: null,
+        value,
+        href: link,
+        group
+    });
+    return [
+        ...programs,
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
+        fixed("system", "Everything else on the machine", outside - named, "machine", href),
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
+        fixed("free", "Free", total - Math.max(used, inContainers), "free", null)
+    ];
 }
 
 /**
@@ -321,7 +406,13 @@ function describeContainer(
     container: ContainerSummary,
     connectionId: string,
     owners: Map<string, DeployedApp>
-): { key: string; label: string; detail: string | null; href: string | null } {
+): {
+    key: string;
+    label: string;
+    detail: string | null;
+    href: string | null;
+    group: BreakdownGroup;
+} {
     const containerHref = `/apps/containers/${encodeURIComponent(container.name)}?c=${encodeURIComponent(connectionId)}`;
     if (isPolarisPart(container)) {
         const part = describePart(container);
@@ -330,7 +421,8 @@ function describeContainer(
             // i18n-ignore said in the reader's words by lib/watch/words.ts
             label: `Polaris - ${part.label}`,
             detail: part.summary || null,
-            href: containerHref
+            href: containerHref,
+            group: "polaris"
         };
     }
     const app = owners.get(baseProject(container.composeProject) ?? "");
@@ -339,10 +431,17 @@ function describeContainer(
             key: container.id,
             label: app.name,
             detail: app.where,
-            href: `/apps/deploy/${app.projectId}?service=${app.id}`
+            href: `/apps/deploy/${app.projectId}?service=${app.id}`,
+            group: "apps"
         };
     }
-    return { key: container.id, label: container.name, detail: null, href: containerHref };
+    return {
+        key: container.id,
+        label: container.name,
+        detail: null,
+        href: containerHref,
+        group: "other"
+    };
 }
 
 /** A service Polaris deployed, in the terms a row needs it. */
@@ -407,14 +506,19 @@ function targetOn(serverId: string): Prisma.DeployTargetWhereInput {
  *  back. Every storage row leads here when it leads nowhere better. */
 const STORAGE_SCREEN = `/apps/servers/${LOCAL_SERVER_ID}?tab=storage`;
 
-const STORE_ROWS: { key: "images" | "buildCache" | "containers"; label: string; detail: string }[] = [
-    // i18n-ignore said in the reader's words by lib/watch/words.ts
-    { key: "images", label: "Images", detail: "What every deployed service runs from." },
-    // i18n-ignore said in the reader's words by lib/watch/words.ts
-    { key: "buildCache", label: "Build cache", detail: "Comes back on the next build." },
-    // i18n-ignore said in the reader's words by lib/watch/words.ts
-    { key: "containers", label: "Containers", detail: "What running services wrote outside a volume." }
-];
+const STORE_ROWS: { key: "images" | "buildCache" | "containers"; label: string; detail: string }[] =
+    [
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
+        { key: "images", label: "Images", detail: "What every deployed service runs from." },
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
+        { key: "buildCache", label: "Build cache", detail: "Comes back on the next build." },
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
+        {
+            key: "containers",
+            label: "Containers",
+            detail: "What running services wrote outside a volume."
+        }
+    ];
 
 /**
  * Where the disk of the machine Polaris runs on went.
@@ -503,7 +607,11 @@ async function machineStorage(): Promise<Breakdown> {
  * than now, so a chart of last week is broken down by what was on the volumes last
  * week.
  */
-async function serviceStorage(viewerId: string, applicationId: string, to: Date): Promise<Breakdown> {
+async function serviceStorage(
+    viewerId: string,
+    applicationId: string,
+    to: Date
+): Promise<Breakdown> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId: viewerId } } },
         select: { id: true, volumes: { select: { id: true, name: true, mountPath: true } } }
@@ -560,7 +668,11 @@ async function serviceStorage(viewerId: string, applicationId: string, to: Date)
 async function volumeSizesAt(subjectIds: string[], to: Date): Promise<Map<string, number>> {
     const since = new Date(to.getTime() - 24 * 3_600_000);
     const rows = await prisma.metricSample.findMany({
-        where: { subjectType: "volume", subjectId: { in: subjectIds }, ts: { gte: since, lte: to } },
+        where: {
+            subjectType: "volume",
+            subjectId: { in: subjectIds },
+            ts: { gte: since, lte: to }
+        },
         orderBy: { ts: "asc" },
         select: { subjectId: true, diskUsedBytes: true }
     });
@@ -621,7 +733,9 @@ async function machineTraffic(viewerId: string, request: BreakdownRequest): Prom
         select: {
             id: true,
             name: true,
-            environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+            environment: {
+                select: { name: true, projectId: true, project: { select: { name: true } } }
+            }
         }
     });
     // Nothing of the reader's runs here, so there is nothing to attribute the
@@ -633,7 +747,13 @@ async function machineTraffic(viewerId: string, request: BreakdownRequest): Prom
     const from = new Date(request.from);
     const to = new Date(request.to);
     const [moved, machine] = await Promise.all([
-        sentBySubject("app", apps.map((app) => app.id), from, to, spanMs),
+        sentBySubject(
+            "app",
+            apps.map((app) => app.id),
+            from,
+            to,
+            spanMs
+        ),
         sentBySubject("host", [hostSubject(request.id)], from, to, spanMs)
     ]);
 

@@ -7,7 +7,8 @@
  * change shows at once and is put back if the server refuses it.
  */
 
-import { Check, ChevronRight, Download, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Download, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { settingsSection } from "@/lib/polar/settings-path";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
     Button,
@@ -451,19 +452,28 @@ function ServerMark({ group }: { group: ToolServerGroup }) {
 /** One MCP server: its switch, and its tools behind a disclosure. */
 function ServerRow({
     group,
+    shown,
     on,
     off,
+    searching,
     onServer,
     onTool
 }: {
     group: ToolServerGroup;
+    /** The tools listed: all of them, or the ones a search found. */
+    shown: ToolServerGroup["tools"];
+    /** Results are shown open: finding a tool and then hunting for it would be no use. */
+    searching: boolean;
     on: boolean;
     off: readonly string[];
     onServer: (on: boolean) => void;
     onTool: (name: string, on: boolean) => void;
 }) {
     const t = useTranslations("polar");
-    const [open, setOpen] = useState(false);
+    const [opened, setOpen] = useState(false);
+    const [folded, setFolded] = useState(false);
+    if (folded && !searching) setFolded(false);
+    const open = searching ? !folded : opened;
     const listId = useId();
     const name = group.kind === "polaris" ? t("settings.tools.polaris") : group.name;
     const total = group.tools.length;
@@ -475,7 +485,7 @@ function ServerRow({
                     type="button"
                     aria-expanded={open}
                     aria-controls={listId}
-                    onClick={() => setOpen(!open)}
+                    onClick={() => (searching ? setFolded(!folded) : setOpen(!opened))}
                     className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChevronRight
@@ -514,7 +524,7 @@ function ServerRow({
                         </p>
                     ) : null}
                     <ul className="flex flex-col divide-y divide-border">
-                        {group.tools.map((tool) => (
+                        {shown.map((tool) => (
                             <ToolRow
                                 key={tool.name}
                                 label={tool.title}
@@ -563,42 +573,79 @@ export function ToolSettings({
 }) {
     const t = useTranslations("polar");
     const serversOff = serversOffOf(prefs, tools);
+    const [query, setQuery] = useState("");
+    const wanted = query.trim().toLowerCase();
+    const matches = (text: string) => text.toLowerCase().includes(wanted);
     const groups = groupToolsByServer(tools).filter(
         (group) => group.kind === "polaris" || connectorsAllowed
     );
+    const found = groups.flatMap((group) => {
+        const name = group.kind === "polaris" ? t("settings.tools.polaris") : group.name;
+        if (!wanted || matches(name)) return [{ group, shown: group.tools }];
+        const hits = group.tools.filter((tool) => matches(tool.title) || matches(tool.name));
+        return hits.length > 0 ? [{ group, shown: hits }] : [];
+    });
+    const showWeb = matches(t("web.toggle"));
+    const showPage = matches(t("settings.tools.sharePage"));
     return (
         <Section title={t("settings.tools.title")} description={t("settings.tools.intro")}>
-            <ul className="flex flex-col divide-y divide-border">
-                <ToolRow
-                    label={t("web.toggle")}
-                    checked={webAllowed && prefs.webOn}
-                    disabled={!webAllowed}
-                    onChange={onWeb}
+            <div className="relative min-w-0">
+                <Search
+                    aria-hidden
+                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
                 />
-                {!webAllowed ? (
+                <Input
+                    type="search"
+                    value={query}
+                    aria-label={t("settings.tools.search")}
+                    placeholder={t("settings.tools.search")}
+                    className="pl-8"
+                    onChange={(event) => setQuery(event.target.value)}
+                />
+            </div>
+            <ul className="flex flex-col divide-y divide-border">
+                {showWeb ? (
+                    <ToolRow
+                        label={t("web.toggle")}
+                        checked={webAllowed && prefs.webOn}
+                        disabled={!webAllowed}
+                        onChange={onWeb}
+                    />
+                ) : null}
+                {showWeb && !webAllowed ? (
                     <li className="pb-1.5 text-xs text-muted-foreground">
                         {t("settings.tools.webOff")}
                     </li>
                 ) : null}
-                <ToolRow
-                    label={t("settings.tools.sharePage")}
-                    checked={prefs.pageOn}
-                    onChange={onPage}
-                />
-                {groups.map((group) => (
+                {showPage ? (
+                    <ToolRow
+                        label={t("settings.tools.sharePage")}
+                        checked={prefs.pageOn}
+                        onChange={onPage}
+                    />
+                ) : null}
+                {found.map(({ group, shown }) => (
                     <ServerRow
                         key={group.id}
                         group={group}
+                        shown={shown}
                         on={!serversOff.includes(group.id)}
                         off={prefs.toolsOff}
+                        searching={wanted !== ""}
                         onServer={(on) => onServer(group.id, on)}
                         onTool={onTool}
                     />
                 ))}
             </ul>
+            {found.length === 0 && !showWeb && !showPage ? (
+                <p className="text-sm text-muted-foreground">{t("settings.tools.noMatch")}</p>
+            ) : null}
             {connectorsAllowed && connectorsListed ? (
                 <p className="text-xs">
-                    <a href="#connectors" className="text-primary hover:underline">
+                    <a
+                        href={settingsSection("connectors")}
+                        className="text-primary hover:underline"
+                    >
                         {t("settings.tools.manageConnectors")}
                     </a>
                 </p>

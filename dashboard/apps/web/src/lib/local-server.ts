@@ -33,6 +33,12 @@ export async function getLocalServerName(): Promise<string | null> {
     return getSetting(NAME_KEY);
 }
 
+/** What the box is called on a screen: the row it was enrolled as, the name given
+ *  here, or what the machine calls itself. Never the word for the reserved id. */
+export async function localServerName(enrolled?: string | null): Promise<string> {
+    return enrolled || (await getLocalServerName()) || localMachineName();
+}
+
 /** Name the local box. Blank forgets the name, so it reads as the default again. */
 export async function setLocalServerName(name: string): Promise<void> {
     await setSetting(NAME_KEY, name.trim() || null);
