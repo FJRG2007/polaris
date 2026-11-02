@@ -4,7 +4,7 @@
 //
 // Out: polaris-game:hello                                      (once, as the page starts: asks for setup)
 //      polaris-game:progress { stage: 'data' | 'build' | 'compile', done: 0..1 }
-//      polaris-game:ready
+//      polaris-game:ready                                      (once; takes back a failed sent before it)
 //      polaris-game:failed { reason: 'graphics' | 'data' | 'error' }
 //      polaris-game:state { x, y, z, heading, mode, speed }   (10 a second, while joined)
 //      polaris-game:exit                                       (the reader chose Exit game in the menu)
@@ -23,6 +23,7 @@ const MAX_PLAYERS = 32;
 const SETUP_WAIT_MS = 2000;
 
 let finished = false;
+let announced = false;
 let joined = null;
 let canExit = false;
 const listeners = new Set();
@@ -60,8 +61,10 @@ export function exitGame() {
   if (canExit) tellHost({ type: 'polaris-game:exit' });
 }
 
+// Called only with the city on screen, so a stray error during the load that reported a failure is taken back
 export function reportReady() {
-  if (finished) return;
+  if (announced) return;
+  announced = true;
   finished = true;
   tellHost({ type: 'polaris-game:ready' });
 }
@@ -72,8 +75,9 @@ export function reportFailure(reason) {
   tellHost({ type: 'polaris-game:failed', reason });
 }
 
-// Anything that throws before the city is on screen ends the load; after that a
-// stray error is the game's own business and is left to the console.
+// Anything that throws before the city is on screen reports the load as failed,
+// until a late ready takes that back; after ready a stray error is the game's own
+// business and is left to the console.
 window.addEventListener('error', () => reportFailure('error'));
 window.addEventListener('unhandledrejection', () => reportFailure('error'));
 

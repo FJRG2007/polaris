@@ -4,19 +4,16 @@
  * Every string the game shows is a key of its catalog
  * (`apps/arcade/messages/<locale>/new-york.json`): the page marks them with
  * `data-t*` attributes and the code reads them with `t("...")`. A key missing
- * from the catalog would be drawn as the key itself. And the frame has to take
- * the keyboard once the city is up - without it the car ignored WASD until
- * something in the game was clicked.
+ * from the catalog would be drawn as the key itself.
  */
 
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
-import { flattenCatalog, type Catalog } from "@polaris/core";
-import { mayTakeFocus } from "../../../arcade/src/screens/frame-focus";
 import { gameMessages } from "../../../arcade/messages";
-// @ts-expect-error - plain browser module without types
+import { flattenCatalog, type Catalog } from "@polaris/core";
 import { fill, readCatalog } from "../../../arcade/game/new-york/engine/i18n.js";
+import * as markers from "../../../arcade/game/new-york/engine/player-markers.js";
 
 const GAME = resolve(__dirname, "../../../arcade/game/new-york");
 const english = flattenCatalog(
@@ -79,32 +76,20 @@ describe("the game's catalog reader", () => {
     });
 });
 
-describe("the game frame and the keyboard", () => {
-    const element = (tag: string, matches = false, inside = true) => {
-        const doc = { body: {}, documentElement: {} };
-        return {
-            tagName: tag,
-            ownerDocument: doc,
-            matches: () => matches,
-            inside
-        } as unknown as Element & { inside: boolean };
-    };
-    const screen = { contains: (el: { inside: boolean }) => el.inside } as unknown as Element;
-
-    it("takes it when nothing on the page has it", () => {
-        expect(mayTakeFocus(null, screen)).toBe(true);
-        const body = element("BODY");
-        Object.assign(body.ownerDocument as object, { body });
-        expect(mayTakeFocus(body, screen)).toBe(true);
+describe("the other players on the map", () => {
+    it("gives each player one colour, as the map draws it", () => {
+        expect(markers.colorFor("seat-1")).toBe(markers.colorFor("seat-1"));
+        expect(markers.cssColor(0xf05a4f)).toBe("#f05a4f");
+        expect(markers.cssColor(0x0000ff)).toBe("#0000ff");
     });
 
-    it("takes it from the frame and from the game screen's own controls", () => {
-        expect(mayTakeFocus(element("IFRAME"), screen)).toBe(true);
-        expect(mayTakeFocus(element("A"), screen)).toBe(true);
+    it("leaves somebody on the radar where they are", () => {
+        expect(markers.pinToRadar(30, -40, 80)).toEqual({ x: 30, y: -40 });
     });
 
-    it("never takes it from a field, or from elsewhere on the page", () => {
-        expect(mayTakeFocus(element("INPUT", true), screen)).toBe(false);
-        expect(mayTakeFocus(element("BUTTON", false, false), screen)).toBe(false);
+    it("keeps somebody off the radar on its rim, on the same bearing", () => {
+        const pin = markers.pinToRadar(300, -400, 80);
+        expect(Math.hypot(pin.x, pin.y)).toBeCloseTo(80);
+        expect(pin.x / pin.y).toBeCloseTo(300 / -400);
     });
 });

@@ -12,7 +12,7 @@ import type { Room } from "livekit-client";
 import { callServerUrl } from "./call-address";
 import type { ActivityTransport } from "./call-activity-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC } from "@/lib/chat/call-activity";
+import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC, reportPoseFailure } from "@/lib/chat/call-activity";
 
 export interface LobbyTicket {
     readonly url: string;
@@ -113,7 +113,7 @@ export function useLobbyRoom(ticket: LobbyTicket | null): LobbyRoom {
                 topic: ACTIVITY_TOPIC,
                 destinationIdentities: [...to]
             })
-            .catch(() => undefined);
+            .catch(reportPoseFailure);
     }, []);
 
     const listenActivity = useCallback((listener: (from: string, raw: unknown) => void) => {

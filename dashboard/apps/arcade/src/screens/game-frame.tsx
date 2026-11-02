@@ -10,7 +10,8 @@
  * The game asks for its words (`polaris-game:hello`) and is sent the reader's
  * language and catalog (`polaris-game:setup`), again whenever the language
  * changes. Once the city is up the frame takes the keyboard, unless the reader
- * has moved on to a field of the page meanwhile.
+ * has moved on to a field of the page meanwhile, and takes it back at the first
+ * driving key pressed outside it.
  *
  * The frame and its page talk over `postMessage`, same origin only; the
  * messages are listed in the app's README ("Embed contract"). Inside a call,
@@ -22,7 +23,7 @@ import { z } from "zod";
 import { useArcadeT } from "./i18n";
 import { hostUi } from "@polaris/app-host/client";
 import { gameMessages } from "../../messages";
-import { mayTakeFocus } from "./frame-focus";
+import { isDrivingKey, mayTakeFocus } from "./frame-focus";
 import { Button } from "@polaris/ui";
 import { gameFrameSrc } from "../games/registry";
 import { useEffect, useRef, useState } from "react";
@@ -73,7 +74,6 @@ export function GameFrame({
 }) {
     const t = useArcadeT();
     const locale = hostUi.i18nProvider.useLocale();
-    const root = useRef<HTMLDivElement>(null);
     const frame = useRef<HTMLIFrameElement>(null);
     const [attempt, setAttempt] = useState(0);
     const [load, setLoad] = useState<Load>(STARTING);
@@ -113,7 +113,7 @@ export function GameFrame({
                 setLoad({ phase: "ready" });
                 // Keys go to the frame that has the focus: without this they stayed with the page
                 // and the car ignored them until something in the game was clicked
-                if (mayTakeFocus(document.activeElement, root.current)) frame.current?.focus();
+                if (mayTakeFocus(document.activeElement)) frame.current?.focus();
             } else if (data.type === "polaris-game:failed")
                 setLoad({ phase: "failed", reason: data.reason });
             else setLoad((now) => (now.phase === "starting" ? { phase: "loading" } : now));
@@ -134,6 +134,19 @@ export function GameFrame({
     // call says they are.
     const ready = load.phase === "ready";
     const seat = call?.self.id;
+
+    // The keyboard can stay with the page however the game started, or go back
+    // to it with a click: the first driving key hands it over, and holding the
+    // key repeats into the frame.
+    useEffect(() => {
+        if (!ready) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (isDrivingKey(event) && mayTakeFocus(document.activeElement)) frame.current?.focus();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [ready]);
+
     useEffect(() => {
         const session = host.current;
         if (!ready || !seat || !session) return;
@@ -167,7 +180,7 @@ export function GameFrame({
     };
 
     return (
-        <div ref={root} className="relative h-full w-full overflow-hidden bg-black">
+        <div className="relative h-full w-full overflow-hidden bg-black">
             <iframe
                 key={attempt}
                 ref={frame}

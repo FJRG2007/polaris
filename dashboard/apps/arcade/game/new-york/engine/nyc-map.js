@@ -1,5 +1,6 @@
 import { GEO } from './nyc-geodata.js';
 import { formatNumber, onLocaleChange, t } from './i18n.js';
+import { pinToRadar } from './player-markers.js';
 import {
   ROADS,
   BLOCKS,
@@ -384,8 +385,8 @@ class MapView {
   }
 }
 
-// Player heading arrow at the (already rotated) origin: white, on a dark halo
-function drawPlayerArrow(ctx, tipY, halfWidth, tailY) {
+// Player heading arrow at the (already rotated) origin: white for the reader, on a dark halo
+function drawPlayerArrow(ctx, tipY, halfWidth, tailY, fill = '#ffffff') {
   ctx.beginPath();
   ctx.moveTo(0, tipY);
   ctx.lineTo(halfWidth, tailY);
@@ -396,8 +397,17 @@ function drawPlayerArrow(ctx, tipY, halfWidth, tailY) {
   ctx.strokeStyle = MAP.halo;
   ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = fill;
   ctx.fill();
+}
+
+// Another player's arrow, in their colour, at a point of the map
+function drawOtherPlayer(ctx, x, y, player, tipY, halfWidth, tailY) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-player.heading + Math.PI);
+  drawPlayerArrow(ctx, tipY, halfWidth, tailY, player.color);
+  ctx.restore();
 }
 
 // GPS route from the player to the waypoint, along the grid (x first, then z): taxi yellow on a dark casing
@@ -435,8 +445,9 @@ function drawWaypoint(ctx, x, y, r) {
 const overlaps = (boxes, b) => boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
 
 class NYCMapSystem {
-  constructor({ controllerManager, cameraSystem, trafficSystem, allBlocks = [], onTeleport, onToggle }) {
+  constructor({ controllerManager, cameraSystem, trafficSystem, remotePlayers, allBlocks = [], onTeleport, onToggle }) {
     this.controllerManager = controllerManager;
+    this.remotePlayers = remotePlayers;
     this.cameraSystem = cameraSystem;
     this.trafficSystem = trafficSystem;
     this.allBlocks = allBlocks;
@@ -1076,6 +1087,12 @@ class NYCMapSystem {
       }
     }
 
+    // The other players
+    for (const other of this.remotePlayers?.list() ?? []) {
+      const pin = pinToRadar(toX(other.x), toY(other.z), Math.min(w, h) * 0.46);
+      drawOtherPlayer(ctx, pin.x, pin.y, other, -7, 5, 5.5);
+    }
+
     // Camera FOV Cone & Player Arrow at center (0, 0)
     const camDir = this.cameraSystem.currentLookAt.clone().sub(this.cameraSystem.currentPos);
     const camAngle = Math.atan2(camDir.x, camDir.z);
@@ -1148,6 +1165,21 @@ class NYCMapSystem {
       const wy = toY(this.waypoint.z);
       drawRoute(ctx, toX(ent.position.x), toY(ent.position.z), wx, wy, 4);
       drawWaypoint(ctx, wx, wy, 7);
+    }
+
+    // The other players, with their names
+    ctx.font = '600 12px "IBM Plex Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineJoin = 'round';
+    for (const other of this.remotePlayers?.list() ?? []) {
+      const ox = toX(other.x);
+      const oy = toY(other.z);
+      drawOtherPlayer(ctx, ox, oy, other, -9, 6.5, 7);
+      ctx.strokeStyle = MAP.halo;
+      ctx.lineWidth = 3;
+      ctx.strokeText(other.name, ox, oy - 14);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(other.name, ox, oy - 14);
     }
 
     // Live Player Blip & Heading Arrow, with a slow pulse to find it at a glance

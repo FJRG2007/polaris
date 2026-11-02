@@ -547,6 +547,7 @@ async function initApp() {
     controllerManager,
     cameraSystem,
     trafficSystem,
+    remotePlayers,
     allBlocks: cityBlocks.allBlocks,
     onToggle: (open) => {
       controllerManager.resetInput();
@@ -774,7 +775,6 @@ async function initApp() {
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     updateSceneCulling(cameraSystem.camera.position);
     remotePlayers.update(dt, cameraSystem.camera);
-    shareState(now, controllerManager.getActiveEntity(), controllerManager.activeMode);
   }
 
   renderer.setAnimationLoop((now) => {
@@ -787,6 +787,8 @@ async function initApp() {
     // Behind the menu the city holds still: only the gamepad (which drives the menu) is read, and the frame is drawn.
     gamepadControls.update(dt);
     if (!paused) simulate(dt, now);
+    // Behind the menu too: somebody who opens it right after joining is standing there, not gone
+    shareState(now, controllerManager.getActiveEntity(), controllerManager.activeMode);
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)
     viewPosition.copy(cameraSystem.camera.position);

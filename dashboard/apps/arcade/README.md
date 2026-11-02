@@ -29,7 +29,7 @@ From the game to the host:
 | `polaris-game:hello`    |                                                                      | Once, as the page starts: asks for `setup` |
 | `polaris-game:progress` | `stage`: `"data"`, `"build"` or `"compile"`; `done`: 0 to 1          | While loading, in stage order              |
 | `polaris-game:ready`    |                                                                      | Once, when the first frame is on screen    |
-| `polaris-game:failed`   | `reason`: `"graphics"` (no WebGPU or WebGL2), `"data"`, `"error"`    | Once, instead of `ready`                   |
+| `polaris-game:failed`   | `reason`: `"graphics"` (no WebGPU or WebGL2), `"data"`, `"error"`    | Before `ready`, which takes it back        |
 | `polaris-game:state`    | `x`, `y`, `z`, `heading` (radians, -pi to pi), `mode`, `speed` (m/s) | Up to ten times a second, while joined     |
 | `polaris-game:exit`     |                                                                      | The reader chose Exit game in the menu     |
 
@@ -48,8 +48,9 @@ any entry that does not fit these rules, and skips its own `id`.
 
 `GameFrame` (`src/screens/game-frame.tsx`) draws the frame, a loading line until
 the first `progress` (from then on the game's own loading screen is the one on
-screen), and the failure from `failed`. On `ready` it moves the keyboard focus
-into the frame, unless the reader is in a field elsewhere on the page. A game's
+screen), and the failure from `failed` until a `ready` replaces it. On `ready` it
+moves the keyboard focus into the frame, unless the reader is in a field, dialog,
+menu or list elsewhere on the page; the first driving key does the same later. A game's
 catalog is the namespace named by its id in `messages/<locale>/`. A call screen that runs a game inside a
 call draws the app's `call-activity` slot (`{ gameId }`), then relays `join`,
 `players` and `state` between that frame and the call.
