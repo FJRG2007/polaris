@@ -110,8 +110,14 @@ function surfaceOf(file: string): string {
 
 describe("the catch-alls that serve apps", () => {
     const surfaces = walk(join(WEB_SRC, "app"))
-        .filter((file) => /lib\/app-bundles\/serve-(page|route)"/.test(readFileSync(file, "utf8")))
-        .map((file) => ({ kind: file.endsWith("page.tsx") ? "page" : "route", prefix: surfaceOf(file) }));
+        .map((file) => ({ file, text: readFileSync(file, "utf8") }))
+        .filter(({ text }) => /lib\/app-bundles\/serve-(page|route)"/.test(text))
+        .map(({ file, text }) => ({
+            kind: file.endsWith("page.tsx") ? "page" : "route",
+            // A page names the surface it asks the bundle for, which is not its
+            // own address when an app's page moved and its bundle did not.
+            prefix: /renderAppPage\(\s*"([^"]+)"/.exec(text)?.[1] ?? surfaceOf(file)
+        }));
 
     it("are found at all, so this cannot pass by reading nothing", () => {
         expect(surfaces.length).toBeGreaterThan(3);

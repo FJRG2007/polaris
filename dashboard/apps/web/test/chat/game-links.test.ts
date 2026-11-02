@@ -162,7 +162,7 @@ describe("the badge", () => {
         ]);
         fake.opens = new Set(["survival"]);
         views = await links.gameLinksFor({ id: "ada" }, ["c1"]);
-        expect(views.get("c1")?.[0]?.href).toBe("/apps/installed/survival");
+        expect(views.get("c1")?.[0]?.href).toBe("/game-servers/survival");
     });
 
     it("draws only a mark this dashboard serves itself", async () => {
