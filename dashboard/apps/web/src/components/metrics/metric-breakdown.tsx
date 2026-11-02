@@ -235,7 +235,7 @@ function Rows({
                     ))}
                 </div>
             ) : null}
-            <ul className="flex max-h-[55vh] flex-col overflow-y-auto">
+            <ul className="flex max-h-[55vh] flex-col overflow-y-auto overscroll-contain">
                 {shown.map((row) => (
                     <Row key={row.key} row={row} format={format} />
                 ))}
