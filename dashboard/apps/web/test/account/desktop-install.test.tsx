@@ -9,7 +9,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-vi.mock("../../../../packages/ui/src/i18n", () => ({ useTranslations: () => (key: string) => key }));
+vi.mock("../../../../packages/ui/src/i18n", () => ({
+    useTranslations: () => (key: string) => key
+}));
 
 const { DesktopInstall } = await import("@polaris/ui/account-downloads/desktop-install");
 
@@ -50,7 +52,9 @@ describe("the Install button", () => {
         bridge(async () => ({ ok: false, reason: "cancelled" }));
         const { container } = line();
         fireEvent.click(await screen.findByRole("button"));
-        await waitFor(() => expect(screen.getByRole("button").hasAttribute("disabled")).toBe(false));
+        await waitFor(() =>
+            expect(screen.getByRole("button").hasAttribute("disabled")).toBe(false)
+        );
         expect(container.querySelector("p")).toBeNull();
     });
 

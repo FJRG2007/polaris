@@ -81,12 +81,10 @@ export function DesktopInstall({
 
     return (
         <div className="flex flex-col gap-2">
-            <Button
-                className="w-fit"
-                disabled={state === "running"}
-                onClick={() => void install()}
-            >
-                {state === "running" ? t("downloads.install.running") : t("downloads.install.action")}
+            <Button className="w-fit" disabled={state === "running"} onClick={() => void install()}>
+                {state === "running"
+                    ? t("downloads.install.running")
+                    : t("downloads.install.action")}
             </Button>
             {state === "done" ? <p className="text-xs text-foreground">{done}</p> : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
