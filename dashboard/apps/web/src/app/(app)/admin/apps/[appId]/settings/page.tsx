@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@polaris/ui";
-import { VpnAdminSettings } from "@/app/(app)/apps/vpn/vpn-admin-settings";
+import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
