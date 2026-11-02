@@ -20,7 +20,7 @@ import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
-import { watchForUpdates } from "./updates";
+import { watchForUpdates, type Update } from "./updates";
 import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
@@ -324,13 +324,8 @@ function start(): void {
         };
         menuActions = menu;
         refreshMenu();
-        const first = watchForUpdates((update) => {
+        const announce = (update: Update) => {
             const open = () => void shell.openExternal(update.page);
-            menuUpdate = { version: update.version, open, ...(update.restart ? { restart: update.restart } : {}) };
-            refreshMenu();
-            updates.found(update);
-            // The app is about to restart into it: nothing to announce.
-            if (updating && update.restart) return;
             // The window in front draws the restart button itself: no notice
             // on top of it. A page that does not (an older Polaris, the address
             // form) gets the notice, as do the other windows' pages through the
@@ -356,6 +351,23 @@ function start(): void {
                           onClick: open
                       }
             );
+        };
+        /** The update the app was about to restart into, unannounced until it opens. */
+        let heldBack: Update | null = null;
+        const first = watchForUpdates((update) => {
+            menuUpdate = {
+                version: update.version,
+                open: () => void shell.openExternal(update.page),
+                ...(update.restart ? { restart: update.restart } : {})
+            };
+            refreshMenu();
+            updates.found(update);
+            // The app is about to restart into it: nothing to announce.
+            if (updating && update.restart) {
+                heldBack = update;
+                return;
+            }
+            announce(update);
         });
 
         void updateBeforeOpening(first, {
@@ -376,6 +388,7 @@ function start(): void {
                 updating = null;
                 showPolaris();
                 waited?.close();
+                if (heldBack) announce(heldBack);
             });
     });
 

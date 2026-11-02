@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { RESTART_BEFORE_OPENING_MS } from "@/main/update-first";
 import { UpdateReadyState } from "@/main/update-ready";
 import { readUpdateReady, updateReadySchema } from "@/shared/update-ready";
 
@@ -73,6 +74,21 @@ describe("UpdateReadyState", () => {
         state.install();
         expect(restart).toHaveBeenCalledTimes(2);
         error.mockRestore();
+    });
+
+    it("lets a restart that returned and left the app running be asked for again", () => {
+        vi.useFakeTimers();
+        const restart = vi.fn();
+        const state = new UpdateReadyState(vi.fn());
+        state.found({ version: "0.1.3", restart });
+        state.install();
+        vi.advanceTimersByTime(RESTART_BEFORE_OPENING_MS - 1);
+        state.install();
+        expect(restart).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(1);
+        expect(state.install()).toEqual({ ok: true });
+        expect(restart).toHaveBeenCalledTimes(2);
+        vi.useRealTimers();
     });
 
     it("never holds a version that is not one", () => {

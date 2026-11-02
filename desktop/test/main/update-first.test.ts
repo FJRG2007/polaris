@@ -7,6 +7,7 @@ import type { FirstCheck } from "@/main/updates";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     CHECK_BEFORE_OPENING_MS,
+    RESTART_BEFORE_OPENING_MS,
     SETTLE_BEFORE_ASKING_MS,
     UPDATE_BEFORE_OPENING_MS,
     updateBeforeOpening,
@@ -30,6 +31,13 @@ function steps(overrides: Partial<OpeningSteps> = {}) {
     };
 }
 
+/** Let the start run up to the restart, which a working restart never returns from. */
+async function untilRestart(first: FirstCheck, step: OpeningSteps): Promise<void> {
+    void updateBeforeOpening(first, step);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(step.restart).toHaveBeenCalledTimes(1);
+}
+
 beforeEach(() => void vi.useFakeTimers());
 afterEach(() => void vi.useRealTimers());
 
@@ -40,7 +48,7 @@ describe("updating before opening", () => {
             attempt: vi.fn((version: string) => void order.push(`attempt ${version}`)),
             restart: vi.fn(() => order.push("restart") > 0)
         });
-        expect(await updateBeforeOpening(check(), step)).toBe("restarting");
+        await untilRestart(check(), step);
         expect(step.showUpdating).toHaveBeenCalledTimes(1);
         expect(order).toEqual(["attempt 0.1.3", "restart"]);
     });
@@ -62,15 +70,17 @@ describe("updating before opening", () => {
     it("gives the answer its full time after a slow signature check", async () => {
         let asked: () => void = () => undefined;
         let answer: (version: string) => void = () => undefined;
-        const opening = updateBeforeOpening(
+        const step = steps();
+        void updateBeforeOpening(
             check({ asked: new Promise((resolve) => (asked = resolve)), installing: new Promise((resolve) => (answer = resolve)) }),
-            steps()
+            step
         );
         await vi.advanceTimersByTimeAsync(4_000);
         asked();
         await vi.advanceTimersByTimeAsync(CHECK_BEFORE_OPENING_MS - 1);
         answer("0.1.3");
-        expect(await opening).toBe("restarting");
+        await vi.advanceTimersByTimeAsync(0);
+        expect(step.restart).toHaveBeenCalledTimes(1);
     });
 
     it("does not wait for ever on a signature check", async () => {
@@ -88,13 +98,38 @@ describe("updating before opening", () => {
 
     it("tries a newer version than the one that did not take", async () => {
         const step = steps({ attempted: vi.fn(() => "0.1.2") });
-        expect(await updateBeforeOpening(check(), step)).toBe("restarting");
+        await untilRestart(check(), step);
     });
 
     it("leaves an app already opened alone", async () => {
         const step = steps({ opened: vi.fn(() => true) });
         expect(await updateBeforeOpening(check(), step)).toBe("open");
         expect(step.showUpdating).not.toHaveBeenCalled();
+    });
+
+    it("does not hold the next start for a version whose install failed", async () => {
+        const step = steps();
+        expect(await updateBeforeOpening(check({ installed: Promise.resolve(false) }), step)).toBe("open");
+        expect(step.attempt).toHaveBeenCalledWith("0.1.3");
+    });
+
+    it("does not hold the next start for a version that took too long", async () => {
+        const step = steps();
+        const opening = updateBeforeOpening(check({ installed: never() }), step);
+        await vi.advanceTimersByTimeAsync(UPDATE_BEFORE_OPENING_MS);
+        expect(await opening).toBe("open");
+        expect(step.attempt).toHaveBeenCalledWith("0.1.3");
+    });
+
+    it("opens the app when a restart returned and left it running", async () => {
+        const step = steps();
+        let opened: unknown = null;
+        void updateBeforeOpening(check(), step).then((value) => (opened = value));
+        await vi.advanceTimersByTimeAsync(RESTART_BEFORE_OPENING_MS - 1);
+        expect(step.restart).toHaveBeenCalledTimes(1);
+        expect(opened).toBeNull();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(opened).toBe("open");
     });
 
     it("opens the app when the install fails", async () => {
