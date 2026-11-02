@@ -4,14 +4,18 @@
         <meta charset="utf-8" />
         <meta
             http-equiv="Content-Security-Policy"
-            content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+            content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
         />
         <title>Polaris</title>
         <link rel="stylesheet" href="styles.css" />
     </head>
-    <body>
-        <img class="mark" src="mark.svg" alt="" />
-        <h1 role="status">Updating Polaris</h1>
-        <p class="lead">It opens by itself when the update is in. This takes about a minute.</p>
+    <body class="splash">
+        <main>
+            <img class="splash-mark" src="mark.svg" alt="" />
+            <h1 id="title" role="status">Updating Polaris</h1>
+            <p id="detail">It opens by itself when it is done.</p>
+            <div class="splash-line" aria-hidden="true"><span></span></div>
+        </main>
+        <script src="updating.js"></script>
     </body>
 </html>
