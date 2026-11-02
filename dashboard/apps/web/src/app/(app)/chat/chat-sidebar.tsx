@@ -239,6 +239,7 @@ export function ChatSidebar() {
         setActiveSpaceId,
         refresh,
         loaded,
+        kept,
         loadFailed
     } = useChat();
     const params = useParams<{ channelId?: string; spaceId?: string }>();
@@ -588,16 +589,15 @@ export function ChatSidebar() {
                 {!loaded && loadFailed ? (
                     <div role="alert" className="flex flex-col items-start gap-1 px-2 py-1 text-xs">
                         <p className="text-foreground-subtle">{t("sidebar.listLoadFailed")}</p>
-                        <button
-                            type="button"
-                            onClick={refresh}
-                            className="text-foreground underline"
-                        >
+                        <Button variant="ghost" size="sm" onClick={refresh} className="max-md:h-11">
                             {t("sidebar.listRetry")}
-                        </button>
+                        </Button>
                     </div>
-                ) : !loaded ? (
-                    <SidebarSkeleton />
+                ) : null}
+                {!loaded && !kept ? (
+                    loadFailed ? null : (
+                        <SidebarSkeleton />
+                    )
                 ) : space === null ? (
                     <Section
                         label={t("sidebar.directMessages")}

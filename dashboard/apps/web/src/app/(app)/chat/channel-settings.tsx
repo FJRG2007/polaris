@@ -120,7 +120,10 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
     const router = useRouter();
     const pathname = usePathname();
     const { channels, loaded, refresh } = useChat();
-    const channel = channels.find((entry) => entry.id === channelId) ?? null;
+    const listed = channels.find((entry) => entry.id === channelId) ?? null;
+    // The tab's kept list may be out of date, so it only ever opens the page: a
+    // refusal waits for the server's answer.
+    const channel = loaded || (listed?.spaceId && listed.mayAdminister) ? listed : null;
     const section = sectionOf(pathname);
     const base = `/chat/c/${channelId}/settings`;
     const back = `/chat/c/${channelId}`;

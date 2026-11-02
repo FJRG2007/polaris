@@ -16,7 +16,7 @@
  */
 
 import type { ChatLists } from "@/lib/chat/chat-lists";
-import { readChatLists, writeChatLists } from "./chat-list-cache";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import * as core from "@polaris/core";
 import { listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
@@ -31,6 +31,7 @@ import {
     useState,
     type ReactNode
 } from "react";
+import { useRouter } from "next/navigation";
 import * as polls from "./chat-reads";
 
 /**
@@ -89,6 +90,10 @@ interface ChatContextValue {
     /** False until the first answer arrives, so a rail can tell "nothing yet"
      *  from "nothing at all" and skeleton the first rather than empty-state it. */
     readonly loaded: boolean;
+    /** The lists on screen are the copy this tab kept, so the rail can draw them
+     *  while `loaded` is still false. Only a drawing decision: anything that
+     *  decides what the reader may do or see waits for `loaded`. */
+    readonly kept: boolean;
     /** The first read has failed and is still being tried. */
     readonly loadFailed: boolean;
     /** Everything above asked for again: the conversations, the spaces, their
@@ -137,15 +142,28 @@ const CALLS_RECHECK_MS = 8000;
  *  scale of minutes (a relay coming up, a backup flip), never per second. */
 const CALLS_OUTSIDE_RECHECK_MS = 60_000;
 
-/** How long a burst of arrivals is gathered before the conversations are asked
- *  for again. Short enough that a new message moves the list while somebody is
- *  still looking at where it landed; long enough that a room talking quickly is
- *  one request rather than one per message. */
-/** One read of the lists. Anything but a whole answer throws, to be tried again. */
-async function fetchChatLists(signal: AbortSignal): Promise<ChatLists> {
+const LISTS_TIMEOUT_MS = 20_000;
+const LISTS_RETRY_CEILING_MS = 30_000;
+const KEPT_LISTS_MAX_AGE_MS = 24 * 3_600_000;
+
+interface KeptLists {
+    readonly channels: readonly ChatChannelView[];
+    readonly spaces: readonly ChatSpaceView[];
+    readonly categories: readonly ChatCategoryView[];
+}
+
+const keptListsKey = (viewerId: string): string => `chat.lists.${viewerId}`;
+
+/**
+ * One read of the lists, or null when the session may not read them, which
+ * asking again cannot change. Anything else but a whole answer throws, to be
+ * tried again.
+ */
+async function fetchChatLists(signal: AbortSignal): Promise<ChatLists | null> {
     const response = await fetch("/api/chat/lists", {
         signal: AbortSignal.any([signal, AbortSignal.timeout(LISTS_TIMEOUT_MS)])
     });
+    if (response.status === 401 || response.status === 403) return null;
     if (!response.ok) throw new Error(`chat lists answered ${response.status}`);
     const lists = (await response.json()) as ChatLists;
     // Without the conversations there is no rail to draw, however far the rest got.
@@ -165,9 +183,10 @@ function waitToRetry(failures: number, signal: AbortSignal): Promise<void> {
     });
 }
 
-const LISTS_TIMEOUT_MS = 20_000;
-const LISTS_RETRY_CEILING_MS = 30_000;
-
+/** How long a burst of arrivals is gathered before the conversations are asked
+ *  for again. Short enough that a new message moves the list while somebody is
+ *  still looking at where it landed; long enough that a room talking quickly is
+ *  one request rather than one per message. */
 export const CHANNELS_SETTLE_MS = 300;
 
 export function ChatProvider({
@@ -185,8 +204,10 @@ export function ChatProvider({
     may: ChatAllowances;
     children: ReactNode;
 }) {
+    const router = useRouter();
     const [channels, setChannels] = useState<readonly ChatChannelView[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [kept, setKept] = useState(false);
     const [loadFailed, setLoadFailed] = useState(false);
     const [rules, setRules] = useState<Record<core.ChatRuleScope, core.ChatRules> | null>(null);
     const [spaces, setSpaces] = useState<readonly ChatSpaceView[]>([]);
@@ -195,7 +216,18 @@ export function ChatProvider({
     const [friends, setFriends] = useState<ReadonlySet<string>>(() => new Set());
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
+    const keptLists = useRef<KeptLists | null>(null);
+    const keepLists = useCallback(
+        (lists: KeptLists) => {
+            keptLists.current = lists;
+            writeSnapshot(keptListsKey(viewerId), lists);
+        },
+        [viewerId]
+    );
+
     const attempt = useRef<AbortController | null>(null);
+    const backoff = useRef<AbortController | null>(null);
+    const askAgain = useRef(false);
     const refresh = useCallback(() => {
         // One request for all of them. The spaces and their headings move far
         // less often than the channels, but they move for the same reasons - one
@@ -206,7 +238,15 @@ export function ChatProvider({
         // A plain request rather than a server action, timed out and tried again:
         // the router's action queue has no timeout, so one action that never
         // settled kept this list a skeleton until the page was reloaded.
-        attempt.current?.abort();
+        //
+        // A read already running is left to finish and followed by one more:
+        // these calls arrive once per stream frame, and cancelling it for each
+        // would let a busy moment stop every read from ever landing.
+        if (attempt.current) {
+            askAgain.current = true;
+            backoff.current?.abort();
+            return;
+        }
         const current = new AbortController();
         attempt.current = current;
         const apply = (result: ChatLists) => {
@@ -219,7 +259,7 @@ export function ChatProvider({
             if (result.blocked) setBlocked(new Set(result.blocked));
             if (result.friends) setFriends(new Set(result.friends));
             if (result.channels && result.spaces && result.categories) {
-                writeChatLists(viewerId, {
+                keepLists({
                     channels: result.channels,
                     spaces: result.spaces,
                     categories: result.categories
@@ -229,18 +269,37 @@ export function ChatProvider({
             setLoadFailed(false);
         };
         void (async () => {
-            for (let failures = 0; !current.signal.aborted; failures += 1) {
+            let failures = 0;
+            while (!current.signal.aborted) {
+                askAgain.current = false;
                 try {
-                    apply(await fetchChatLists(current.signal));
-                    return;
+                    const lists = await fetchChatLists(current.signal);
+                    if (current.signal.aborted) return;
+                    if (!lists) {
+                        // The server's own gates decide where this session goes.
+                        setLoadFailed(true);
+                        router.refresh();
+                        break;
+                    }
+                    apply(lists);
+                    failures = 0;
+                    if (!askAgain.current) break;
                 } catch {
                     if (current.signal.aborted) return;
                     setLoadFailed(true);
-                    await waitToRetry(failures, current.signal);
+                    if (!askAgain.current) {
+                        backoff.current = new AbortController();
+                        await waitToRetry(
+                            failures,
+                            AbortSignal.any([current.signal, backoff.current.signal])
+                        );
+                    }
+                    failures += 1;
                 }
             }
+            if (attempt.current === current) attempt.current = null;
         })();
-    }, [viewerId]);
+    }, [keepLists, router]);
 
     const channelsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const refreshChannels = useCallback(() => {
@@ -248,12 +307,17 @@ export function ChatProvider({
         channelsTimer.current = setTimeout(() => {
             channelsTimer.current = null;
             void listChannelsAction()
-                .then((result) => setChannels(result.channels))
+                .then((result) => {
+                    setChannels(result.channels);
+                    if (keptLists.current) {
+                        keepLists({ ...keptLists.current, channels: result.channels });
+                    }
+                })
                 .catch(() => {
                     // The previous list stays, as it does for a full refresh.
                 });
         }, CHANNELS_SETTLE_MS);
-    }, []);
+    }, [keepLists]);
 
     useEffect(
         () => () => {
@@ -265,16 +329,21 @@ export function ChatProvider({
 
     // Before the paint, so a reload never flashes the skeleton over a rail it has.
     useLayoutEffect(() => {
-        const kept = readChatLists<ChatChannelView, ChatSpaceView, ChatCategoryView>(viewerId);
-        if (!kept) return;
-        setChannels(kept.channels);
-        setSpaces(kept.spaces);
-        setCategories(kept.categories);
-        setLoaded(true);
+        const lists =
+            readSnapshot<KeptLists>(keptListsKey(viewerId), KEPT_LISTS_MAX_AGE_MS)?.value ?? null;
+        keptLists.current = lists;
+        if (!lists) return;
+        setChannels(lists.channels);
+        setSpaces(lists.spaces);
+        setCategories(lists.categories);
+        setKept(true);
     }, [viewerId]);
     useEffect(() => {
         refresh();
-        return () => attempt.current?.abort();
+        return () => {
+            attempt.current?.abort();
+            attempt.current = null;
+        };
     }, [refresh]);
 
     // Once, when the app opens. The rules are an instance setting: they do not
@@ -376,6 +445,7 @@ export function ChatProvider({
             activeSpaceId,
             setActiveSpaceId,
             loaded,
+            kept,
             loadFailed,
             refresh,
             refreshChannels,
@@ -396,6 +466,7 @@ export function ChatProvider({
             friends,
             activeSpaceId,
             loaded,
+            kept,
             loadFailed,
             refresh,
             refreshChannels,

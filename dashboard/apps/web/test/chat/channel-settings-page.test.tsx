@@ -128,6 +128,14 @@ describe("the page", () => {
         expect(screen.getByText("Text channel")).toBeTruthy();
     });
 
+    it("does not refuse on the tab's kept list, nor open a channel it says is not theirs", () => {
+        mayAdminister = false;
+        chatState = { ...chatState, channels: [channel()], loaded: false, kept: true };
+        show();
+        expect(screen.queryByText("You cannot change this channel")).toBeNull();
+        expect(screen.queryByRole("textbox")).toBeNull();
+    });
+
     it("shows nothing but a refusal to somebody who may not change it", () => {
         mayAdminister = false;
         chatState = { ...chatState, channels: [channel()] };

@@ -5,8 +5,10 @@
  *
  * What is pinned: a full refresh is one request for the lists; a part that could
  * not be read leaves what was on screen; a read that fails is tried again rather
- * than leaving a skeleton or an empty rail; and the conversations alone - what a
- * message arriving needs - are asked for once for a burst, a moment later.
+ * than leaving a skeleton or an empty rail; a session refused stops asking; a burst
+ * of refreshes never cancels the read that is running; the conversations alone -
+ * what a message arriving needs - are asked for once for a burst, a moment later;
+ * and the copy this tab keeps draws the rail without passing for an answer.
  */
 
 import { act, cleanup, render } from "@testing-library/react";
@@ -22,6 +24,9 @@ let lists: {
     blocked: string[] | null;
 };
 
+const routerRefresh = vi.fn();
+const router = { refresh: routerRefresh };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/app/(app)/chat/actions", () => ({
     listChannelsAction: async () => {
         channelsOnly += 1;
@@ -32,6 +37,7 @@ vi.mock("@/app/(app)/chat/actions", () => ({
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ callsUnavailableAction: async () => null }));
 
 const { CHANNELS_SETTLE_MS, ChatProvider, useChat } = await import("@/app/(app)/chat/chat-context");
+const { dropAllSnapshots, readSnapshot, writeSnapshot } = await import("@/lib/snapshot-cache");
 
 type Chat = ReturnType<typeof useChat>;
 let chat: Chat | null = null;
@@ -58,6 +64,7 @@ beforeEach(() => {
     channelsOnly = 0;
     chat = null;
     failing = false;
+    routerRefresh.mockClear();
     sessionStorage.clear();
     vi.stubGlobal("fetch", async (_url: string) => {
         full += 1;
@@ -152,5 +159,109 @@ describe("the conversation list, asked for again", () => {
         // asked for again.
         expect(full).toBe(1);
         expect(chat?.channels.map((entry) => entry.id)).toEqual(["fresh"]);
+    });
+
+    it.each([401, 403])("stops asking and lets the server decide on a %i", async (status) => {
+        vi.stubGlobal("fetch", async () => {
+            full += 1;
+            return new Response("{}", { status });
+        });
+        await mount();
+        expect(full).toBe(1);
+        expect(routerRefresh).toHaveBeenCalledOnce();
+        expect(chat?.loaded).toBe(false);
+        expect(chat?.loadFailed).toBe(true);
+        await act(() => wait(2050));
+        expect(full).toBe(1);
+    });
+
+    it("lets a running read land and asks once more for a burst of changes", async () => {
+        const answers: ((response: Response) => void)[] = [];
+        vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+            full += 1;
+            return new Promise<Response>((resolve, reject) => {
+                answers.push(resolve);
+                init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+            });
+        });
+        await mount();
+        await act(async () => {
+            chat?.refresh();
+            chat?.refresh();
+            chat?.refresh();
+            await wait(10);
+        });
+        expect(full).toBe(1);
+        await act(async () => {
+            answers[0]?.(new Response(JSON.stringify(lists)));
+            await wait(10);
+        });
+        expect(chat?.loaded).toBe(true);
+        expect(full).toBe(2);
+        await act(async () => {
+            answers[1]?.(new Response(JSON.stringify(lists)));
+            await wait(10);
+        });
+        expect(full).toBe(2);
+        await act(async () => {
+            chat?.refresh();
+            await wait(10);
+        });
+        expect(full).toBe(3);
+    });
+
+    it("tries at once when asked during the wait after a failure", async () => {
+        failing = true;
+        await mount();
+        failing = false;
+        await act(async () => {
+            chat?.refresh();
+            await wait(10);
+        });
+        expect(full).toBe(2);
+        expect(chat?.loaded).toBe(true);
+    });
+});
+
+describe("the list this tab kept", () => {
+    const key = "chat.lists.ada";
+    const kept = { channels: [{ id: "old" }], spaces: [{ id: "s0" }], categories: [] };
+    const maxAge = 3_600_000;
+
+    it("draws at once, without passing for the server's answer", async () => {
+        writeSnapshot(key, kept);
+        vi.stubGlobal("fetch", () => new Promise(() => undefined));
+        await mount();
+        expect(chat?.kept).toBe(true);
+        expect(chat?.loaded).toBe(false);
+        expect(chat?.channels.map((entry) => entry.id)).toEqual(["old"]);
+    });
+
+    it("is another account's to not see", async () => {
+        writeSnapshot("chat.lists.grace", kept);
+        vi.stubGlobal("fetch", () => new Promise(() => undefined));
+        await mount();
+        expect(chat?.kept).toBe(false);
+        expect(chat?.channels).toEqual([]);
+    });
+
+    it("is replaced by the answer and goes with a sign-out", async () => {
+        await mount();
+        expect(
+            readSnapshot<typeof kept>(key, maxAge)?.value.channels.map((entry) => entry.id)
+        ).toEqual(["c1"]);
+        dropAllSnapshots();
+        expect(readSnapshot(key, maxAge)).toBeNull();
+    });
+
+    it("follows the conversations when only they are asked for", async () => {
+        await mount();
+        await act(async () => {
+            chat?.refreshChannels();
+            await wait(CHANNELS_SETTLE_MS + 20);
+        });
+        const value = readSnapshot<typeof kept>(key, maxAge)?.value;
+        expect(value?.channels.map((entry) => entry.id)).toEqual(["fresh"]);
+        expect(value?.spaces.map((entry) => entry.id)).toEqual(["s1"]);
     });
 });

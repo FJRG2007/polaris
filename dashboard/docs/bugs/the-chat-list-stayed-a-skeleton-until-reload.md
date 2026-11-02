@@ -21,7 +21,10 @@ from the framework's source.
 The list is read from `/api/chat/lists`, outside that queue. Each read is timed out
 after 20 seconds and tried again, at most 30 seconds apart. While the first read has
 failed, the rail says so and offers to try now, rather than showing a skeleton or an
-empty list. A reload in the same tab draws the last list it had at once.
+empty list. A session that may no longer read the list stops asking and goes where
+the server's gates send it. A reload in the same tab draws the last list it had at
+once, through the shared snapshot cache, so a sign-out or an update clears it. That
+copy only draws the rail: a refusal still waits for the server's answer.
 
 ## What this does not cover
 
