@@ -523,7 +523,7 @@ button.icon svg {
     overflow: hidden;
     user-select: none;
     app-region: drag;
-    background: radial-gradient(circle at 50% 38%, rgb(118 50 236 / 0.2), transparent 62%), var(--ground);
+    background: radial-gradient(circle 112px at 50% 38%, rgb(118 50 236 / 0.2), transparent), var(--ground);
 }
 
 .splash-mark {
