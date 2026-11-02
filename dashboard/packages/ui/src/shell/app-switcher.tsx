@@ -433,23 +433,24 @@ export function AppSwitcher({
                 <div data-launcher-grid="" className="grid grid-cols-3 gap-1">
                     {drawn.map((app) => {
                         const tile = (
-                        <AppTile
-                            app={app}
-                            active={app.id === currentAppId}
-                            Anchor={Anchor}
-                            action={tileAction?.(app) ?? null}
-                            drag={
-                                arrangeable
-                                    ? {
-                                          start: (event) => onDragStart(event, app.id),
-                                          over: (event) => onDragOver(event, app.id),
-                                          drop: onDrop,
-                                          end: onDragEnd,
-                                          lifted: dragOrder !== null && dragging.current === app.id
-                                      }
-                                    : undefined
-                            }
-                        />
+                            <AppTile
+                                app={app}
+                                active={app.id === currentAppId}
+                                Anchor={Anchor}
+                                action={tileAction?.(app) ?? null}
+                                drag={
+                                    arrangeable
+                                        ? {
+                                              start: (event) => onDragStart(event, app.id),
+                                              over: (event) => onDragOver(event, app.id),
+                                              drop: onDrop,
+                                              end: onDragEnd,
+                                              lifted:
+                                                  dragOrder !== null && dragging.current === app.id
+                                          }
+                                        : undefined
+                                }
+                            />
                         );
                         return <Fragment key={app.id}>{wrapTile?.(app, tile) ?? tile}</Fragment>;
                     })}

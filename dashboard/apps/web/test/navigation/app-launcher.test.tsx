@@ -282,7 +282,9 @@ describe("stored favorites", () => {
 
     it("stores the old list until the menu is arranged, and both lists after", () => {
         expect(serializeLauncherPrefs({ favorites: [], order: [], home: null })).toBeNull();
-        expect(serializeLauncherPrefs({ favorites: ["mail"], order: [], home: null })).toBe('["mail"]');
+        expect(serializeLauncherPrefs({ favorites: ["mail"], order: [], home: null })).toBe(
+            '["mail"]'
+        );
         const both = serializeLauncherPrefs({
             favorites: ["mail"],
             order: ["chat", "mail"],

@@ -88,7 +88,8 @@ export function ArrangeAppsDialog({
                                         <Star
                                             className={cn(
                                                 "size-4",
-                                                favorites.includes(app.id) && "fill-current text-primary"
+                                                favorites.includes(app.id) &&
+                                                    "fill-current text-primary"
                                             )}
                                             aria-hidden="true"
                                         />
@@ -100,7 +101,10 @@ export function ArrangeAppsDialog({
                                     onClick={() => setHome(home === app.id ? null : app.id)}
                                 >
                                     <House
-                                        className={cn("size-4", home === app.id && "fill-current text-primary")}
+                                        className={cn(
+                                            "size-4",
+                                            home === app.id && "fill-current text-primary"
+                                        )}
                                         aria-hidden="true"
                                     />
                                 </IconButton>

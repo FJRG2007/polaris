@@ -166,7 +166,9 @@ describe("a card taken off the Overview", () => {
         await act(async () => fireEvent.click(undo[undo.length - 1]!));
         await act(async () => fireEvent.click(undo[0]!));
         await act(async () => vi.runOnlyPendingTimers());
-        const saved = saveLayout.mock.lastCall![0] as { widgets: { id: string; hidden: boolean }[] };
+        const saved = saveLayout.mock.lastCall![0] as {
+            widgets: { id: string; hidden: boolean }[];
+        };
         const hidden = saved.widgets.filter((widget) => widget.hidden).map((widget) => widget.id);
         expect(new Set(drawn(container))).toEqual(new Set(["shortcuts", "apps", "app:card0001"]));
         expect(hidden).toEqual([]);

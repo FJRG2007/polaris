@@ -991,80 +991,80 @@ function WidgetMenu({
     const t = useTranslations("home");
     return (
         <>
-        {/* Faint until the card is hovered, like the grip; a touch screen has
+            {/* Faint until the card is hovered, like the grip; a touch screen has
             the same thing in the menu. */}
-        <button
-            type="button"
-            onClick={onDismiss}
-            title={t("card.remove", { name: label })}
-            aria-label={t("card.remove", { name: label })}
-            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-colors hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100 [@media(hover:none)]:hidden"
-        >
-            <X className="size-4" aria-hidden="true" />
-        </button>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button
-                    type="button"
-                    title={t("card.arrange", { name: label })}
-                    aria-label={t("card.arrange", { name: label })}
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <MoreVertical className="size-4" aria-hidden="true" />
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-                {onConfigure ? (
-                    <>
-                        <DropdownMenuItem onSelect={onConfigure}>
-                            <Settings2 className="size-4" aria-hidden="true" />
-                            {t("appCards.change")}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                    </>
-                ) : null}
-                <DropdownMenuItem disabled={first} onSelect={() => onMove(-1)}>
-                    <ArrowUp className="size-4" aria-hidden="true" />
-                    {t("card.moveUp")}
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled={last} onSelect={() => onMove(1)}>
-                    <ArrowDown className="size-4" aria-hidden="true" />
-                    {t("card.moveDown")}
-                </DropdownMenuItem>
-                {sizes.length > 1 ? (
-                    <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>{t("card.width")}</DropdownMenuLabel>
-                        {sizes.map((option) => (
-                            <DropdownMenuItem
-                                key={option}
-                                onSelect={() => onResize(option)}
-                                className={cn(option === size && "text-primary")}
-                            >
-                                {sizeLabel(t, option)}
+            <button
+                type="button"
+                onClick={onDismiss}
+                title={t("card.remove", { name: label })}
+                aria-label={t("card.remove", { name: label })}
+                className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-colors hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100 [@media(hover:none)]:hidden"
+            >
+                <X className="size-4" aria-hidden="true" />
+            </button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        title={t("card.arrange", { name: label })}
+                        aria-label={t("card.arrange", { name: label })}
+                        className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <MoreVertical className="size-4" aria-hidden="true" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                    {onConfigure ? (
+                        <>
+                            <DropdownMenuItem onSelect={onConfigure}>
+                                <Settings2 className="size-4" aria-hidden="true" />
+                                {t("appCards.change")}
                             </DropdownMenuItem>
-                        ))}
-                    </>
-                ) : null}
-                <DropdownMenuSeparator />
-                {onClear ? (
-                    <DropdownMenuItem variant="danger" onSelect={onClear}>
+                            <DropdownMenuSeparator />
+                        </>
+                    ) : null}
+                    <DropdownMenuItem disabled={first} onSelect={() => onMove(-1)}>
+                        <ArrowUp className="size-4" aria-hidden="true" />
+                        {t("card.moveUp")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={last} onSelect={() => onMove(1)}>
+                        <ArrowDown className="size-4" aria-hidden="true" />
+                        {t("card.moveDown")}
+                    </DropdownMenuItem>
+                    {sizes.length > 1 ? (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>{t("card.width")}</DropdownMenuLabel>
+                            {sizes.map((option) => (
+                                <DropdownMenuItem
+                                    key={option}
+                                    onSelect={() => onResize(option)}
+                                    className={cn(option === size && "text-primary")}
+                                >
+                                    {sizeLabel(t, option)}
+                                </DropdownMenuItem>
+                            ))}
+                        </>
+                    ) : null}
+                    <DropdownMenuSeparator />
+                    {onClear ? (
+                        <DropdownMenuItem variant="danger" onSelect={onClear}>
+                            <Trash2 className="size-4" aria-hidden="true" />
+                            {t("card.clearHistory")}
+                        </DropdownMenuItem>
+                    ) : null}
+                    {onHide ? (
+                        <DropdownMenuItem onSelect={onHide}>
+                            <EyeOff className="size-4" aria-hidden="true" />
+                            {t("card.hide")}
+                        </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem variant="danger" onSelect={onRemove ?? onDismiss}>
                         <Trash2 className="size-4" aria-hidden="true" />
-                        {t("card.clearHistory")}
+                        {t(onRemove ? "appCards.remove" : "card.removeCard")}
                     </DropdownMenuItem>
-                ) : null}
-                {onHide ? (
-                    <DropdownMenuItem onSelect={onHide}>
-                        <EyeOff className="size-4" aria-hidden="true" />
-                        {t("card.hide")}
-                    </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuItem variant="danger" onSelect={onRemove ?? onDismiss}>
-                    <Trash2 className="size-4" aria-hidden="true" />
-                    {t(onRemove ? "appCards.remove" : "card.removeCard")}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </>
     );
 }
