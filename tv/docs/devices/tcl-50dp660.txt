@@ -36,7 +36,7 @@
 # ---- Launcher --------------------------------------------------------------------------------
 # com.google.android.tvlauncher holds HOME with priority 2 on this firmware and must be disabled
 # before "cmd package set-home-activity" takes effect; the command prints Success either way.
-# Launcher config: /sdcard/Android/data/com.gathin.tvhome/files/config.json (no rebuild needed).
+# Launcher config: /sdcard/Android/data/app.polaris.tv/files/config.json (no rebuild needed).
 #
 # ---- RAM -------------------------------------------------------------------------------------
 # Kernel 3.10 exposes MemTotal, MemFree, Buffers and Cached but no MemAvailable, so any stats line

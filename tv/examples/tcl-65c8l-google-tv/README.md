@@ -62,7 +62,7 @@ setupwraith can then be disabled. Its HOME components could not be disabled on t
 2. Switch the screensaver to the launcher's clock (dreamx is in the list):
 
    ```
-   TV_HOST=<tv ip> tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+   TV_HOST=<tv ip> tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
    ```
 
 3. Build the launcher and make it Home (JDK 17, Android SDK 34). This disables launcherx with its
@@ -135,7 +135,7 @@ Private DNS to an ad-blocking resolver works on this TV (it does not block YouTu
 ## After a firmware update
 
 ```
-TV_HOST=<tv ip> tools/venv/bin/python -I tools/check.py examples/tcl-65c8l-google-tv/debloat.txt com.gathin.tvhome
+TV_HOST=<tv ip> tools/venv/bin/python -I tools/check.py examples/tcl-65c8l-google-tv/debloat.txt app.polaris.tv
 ```
 
 Add `--fix` after `check.py` to re-disable whatever came back and put the launcher back on Home.
@@ -149,7 +149,7 @@ TV_HOST=<tv ip> tools/tv.py 'settings delete secure screensaver_components'
 
 The first line turns every disabled app back on and makes the Google TV home Home again. The second puts
 Google's screensaver back. To remove the new launcher as well, run
-`tools/tv.py 'pm uninstall com.gathin.tvhome'`.
+`tools/tv.py 'pm uninstall app.polaris.tv'`.
 
 ## When you're done
 

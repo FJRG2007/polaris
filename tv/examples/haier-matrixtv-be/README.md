@@ -63,7 +63,7 @@ two buttons have the same Android scancode but different Android keycodes.
 
 Do **not** map Android scan 240 to Settings or Live TV: both gear and
 three-line buttons use it. The working configuration maps keycode 83 to
-`com.gathin.tvhome/.QuickSettingsActivity` and Linux scan 225 to Live TV in
+`app.polaris.tv/.QuickSettingsActivity` and Linux scan 225 to Live TV in
 `app_keys`. `settings_key_panel: true` is also set. A mapping to the
 `settings` action opened full TV Settings instead of the quick panel while
 InputKeyService was the active helper.

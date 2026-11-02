@@ -28,7 +28,7 @@
 #   While HomeKeyService filters keys, a key release that lands in that freeze makes Android auto-repeat, so
 #   the D-pad "keeps moving". Disabling it (already in this list) made the freezes rare.
 # - The firmware puts the screensaver back to Google Backdrop at boot (ScreenSaverSetDefTimeReceiver). To keep
-#   the launcher's clock, set both `settings put secure screensaver_components com.gathin.tvhome/.ClockDream`
+#   the launcher's clock, set both `settings put secure screensaver_components app.polaris.tv/.ClockDream`
 #   and `screensaver_default_component` to the same value.
 # - With HomeKeyService filtering keys, a held volume key steps only once: Android 10 applies the step before
 #   the helper sees the key. key_filter false brings hold-to-ramp back, at the cost of the remote buttons.

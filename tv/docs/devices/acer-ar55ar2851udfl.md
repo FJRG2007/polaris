@@ -34,7 +34,7 @@ Prime Video, and JioHotstar.
 
 ## Home and functional checks
 
-The reference launcher `com.gathin.tvhome` remained the focused Home after
+The reference launcher `app.polaris.tv` remained the focused Home after
 `com.google.android.tvlauncher` was disabled and after two **warm ADB reboots**. The owner
 checked the physical Home button, the four dock apps, HDMI, voice search, and casting.
 The owner subsequently reported a full power-off and restart with the clean Home screen and

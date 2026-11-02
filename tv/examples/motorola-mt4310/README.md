@@ -11,7 +11,7 @@ on Windows; replace `<tv ip>` with your TV's address.
 - **Not in the list:** voice search `com.google.android.katniss` and `com.google.android.tvrecommendations`.
   The TV's factory manager turns them back on at every boot, so disabling them doesn't stick (see the notes
   below).
-- **New Home:** the launcher in `launcher/` (`com.gathin.tvhome`), with this TV's dock in
+- **New Home:** the launcher in `launcher/` (`app.polaris.tv`), with this TV's dock in
   [theme/config.json](theme/config.json): Netflix, YouTube, Disney+, Magis TV.
 - **Left alone:** Netflix, Prime Video, YouTube, YouTube Music, Chromecast built-in, BrowseHere, the
   ambient screensaver, your own apps, and everything the TV needs (Live TV, HDMI, remote keys, Bluetooth,

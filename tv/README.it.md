@@ -201,7 +201,7 @@ app e impostazioni, fallo tu prima di disattivare: `tools/disable.sh` non lo cre
 
 ### 3. Compilare e installare il launcher
 
-Il launcher è scritto in Java con AndroidX RecyclerView, nome del pacchetto `com.gathin.tvhome`. Servono un JDK
+Il launcher è scritto in Java con AndroidX RecyclerView, nome del pacchetto `app.polaris.tv`. Servono un JDK
 da 17 a 22 (completo, con `jlink`; dal JDK 23 in poi Gradle 8.9 si ferma), Android SDK Platform 34 e Build Tools 34.0.0 o una
 34.x più recente. Se preferisci non installare nulla a parte Docker, [`tools/docker-build.sh`](tools/docker-build.sh)
 compila il launcher in un contenitore: poi lo installi con `SKIP_BUILD=1` (guida in inglese:
@@ -306,9 +306,9 @@ I comandi ADB qui sotto usano il percorso del venv di macOS/Linux; su Windows so
 
 - **Lingua**: segue la lingua di sistema della TV, e l'italiano è incluso. Da Android 13 si può impostare una lingua
   solo per il launcher:
-  `tools/venv/bin/python -I tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales it-IT'`.
+  `tools/venv/bin/python -I tools/tv.py 'cmd locale set-app-locales app.polaris.tv --locales it-IT'`.
 - **Salvaschermo con l'orologio**: scegli Orologio nelle impostazioni del salvaschermo della TV, oppure lancia
-  `tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'`.
+  `tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream; settings put secure screensaver_enabled 1'`.
 - **Tasto Ingressi del telecomando**: installando su macOS/Linux aggiungi `INPUT_KEY_SERVICE=1` per attivare il
   servizio di accessibilità che fa funzionare il tasto degli ingressi sui telecomandi Google TV; su Windows usa
   `-InputKeyService`.

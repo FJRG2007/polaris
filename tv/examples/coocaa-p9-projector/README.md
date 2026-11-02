@@ -53,8 +53,8 @@ The reference launcher works smoothly when built with application ID `com.coocaa
 3. Switch default homepage properties and Home activity:
    ```bash
    tools/tv.py 'setprop persist.service.homepage.pkg com.coocaa.tvhome'
-   tools/tv.py 'setprop persist.service.homepage.cls com.gathin.tvhome.MainActivity'
-   tools/tv.py 'cmd package set-home-activity com.coocaa.tvhome/com.gathin.tvhome.MainActivity'
+   tools/tv.py 'setprop persist.service.homepage.cls app.polaris.tv.MainActivity'
+   tools/tv.py 'cmd package set-home-activity com.coocaa.tvhome/app.polaris.tv.MainActivity'
    ```
 4. Remote Home key will now cleanly open CleanYourTV launcher.
 

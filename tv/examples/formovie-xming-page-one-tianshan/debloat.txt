@@ -12,7 +12,7 @@
 # so setupwraith and the stock launcher stay enabled: disabling setupwraith deletes that network.
 # setupwraith/.RecoveryActivity (HOME priority 1) outranks a third-party launcher, so the launcher cannot become Home by
 # disabling launcherx alone; that needs setupwraith off too, which also costs the saved Wi-Fi (and risks Chromecast).
-# Instead the reference launcher (com.gathin.tvhome) was installed with launcherx left enabled, HOME_KEY_SERVICE=1 and
+# Instead the reference launcher (app.polaris.tv) was installed with launcherx left enabled, HOME_KEY_SERVICE=1 and
 # "stock_home_redirect": "com.google.android.apps.tv.launcherx" (config.json in this folder). Home, the app buttons,
 # Input and the launcher's Inputs pill (HDMI) work. Trade-off measured on this set: with the helper on, holding Volume Up
 # gives one step per press instead of a ramp. Sideloading the launcher works (no verification failure).

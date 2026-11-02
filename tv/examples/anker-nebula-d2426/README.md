@@ -19,7 +19,7 @@ export TV_HOST=192.168.1.50
 | **Back after every boot** | The firmware turns `com.cltv.fast` (Free TV) and `com.google.android.katniss` (Assistant/voice) back on each boot. Nothing shows them without the stock home, so they are left that way |
 | **Kept** | YouTube, Prime Video, YouTube Music, Nebula Play, Chromecast built-in, AirPin (AirPlay), all apps you installed, and everything the projector needs (HDMI, remote, Bluetooth pairing, picture, keyboard, Play Store, Play Services). The setup wizard stays: it owns the saved Wi-Fi |
 | **Screensaver** | Switched from Ambient to the built-in "Colors" screensaver before Ambient was disabled |
-| **Home** | `com.gathin.tvhome`, configured by [`config.json`](config.json): dock YouTube, Netflix, Disney+, Prime Video; greeting "Sedir"; the Wi-Fi pill opens NordVPN |
+| **Home** | `app.polaris.tv`, configured by [`config.json`](config.json): dock YouTube, Netflix, Disney+, Prime Video; greeting "Sedir"; the Wi-Fi pill opens NordVPN |
 
 A backup of the state before any change (package lists, getprop, all settings, Home, display size) is in
 `backup/nebula-laser-3-20261022-0140/` (not committed: it holds the serial number and device names).
@@ -29,7 +29,7 @@ A backup of the state before any change (package lists, getprop, all settings, H
 ```bash
 tools/restore.sh examples/anker-nebula-d2426/debloat.txt com.google.android.tvlauncher   # re-enable all 17, stock Home back
 tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.google.android.backdrop/.Backdrop'   # Ambient back
-tools/venv/bin/python -I tools/tv.py 'pm uninstall com.gathin.tvhome'   # only to remove the new launcher too
+tools/venv/bin/python -I tools/tv.py 'pm uninstall app.polaris.tv'   # only to remove the new launcher too
 ```
 
 ## Re-enable one app
@@ -83,7 +83,7 @@ Delete `wallpaper.jpg` and push again for the plain black background. `themes/` 
 ```bash
 STOCK_LAUNCHER=none launcher/build-and-install.sh
 tools/disable.sh examples/anker-nebula-d2426/debloat.txt
-tools/venv/bin/python -I tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+tools/venv/bin/python -I tools/tv.py 'cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity'
 tools/theme.sh examples/anker-nebula-d2426
 ```
 

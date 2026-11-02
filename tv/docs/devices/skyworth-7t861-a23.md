@@ -114,7 +114,7 @@ Coocaa OS uses a dual-track home dispatch mechanism governed by `/system/etc/boo
       <prop name="persist.service.model.cls" type="exists"></prop>
   </home>
   ```
-  Pointing `persist.service.model.*` directly to CleanYourTV (`com.coocaa.tvhome/com.gathin.tvhome.MainActivity`) allows `system_server` to launch CleanYourTV directly upon boot without flashing OEM desktop layouts or triggering intermediate "正在准备..." loading screens.
+  Pointing `persist.service.model.*` directly to CleanYourTV (`com.coocaa.tvhome/app.polaris.tv.MainActivity`) allows `system_server` to launch CleanYourTV directly upon boot without flashing OEM desktop layouts or triggering intermediate "正在准备..." loading screens.
 - **Physical Remote Home key dispatch (`persist.service.homepage.*`)**: When third-party apps are running, remote Home button presses are routed to `persist.service.homepage.*`. Pointing these to `com.ccos.tv.homepage` allows `coocaa-home-shim` to instantly return focus to CleanYourTV.
 
 Apply the properties using `tools/tv.py`:
@@ -122,7 +122,7 @@ Apply the properties using `tools/tv.py`:
 ```bash
 # 1. Cold boot: launch CleanYourTV directly via modelhome
 TV_HOST=<tv ip> tools/tv.py 'setprop persist.service.model.pkg com.coocaa.tvhome'
-TV_HOST=<tv ip> tools/tv.py 'setprop persist.service.model.cls com.gathin.tvhome.MainActivity'
+TV_HOST=<tv ip> tools/tv.py 'setprop persist.service.model.cls app.polaris.tv.MainActivity'
 TV_HOST=<tv ip> tools/tv.py 'setprop persist.service.model.name CleanYourTV'
 
 # 2. Remote Home key: dispatch through shim
@@ -142,7 +142,7 @@ After a cold boot (power unplugged and restored):
 - Boots into CleanYourTV seamlessly with zero intermediate loading screens ("正在准备...") and zero desktop flash.
 - `dumpsys window | grep mCurrentFocus` settles directly on:
   ```text
-  mCurrentFocus=Window{... u0 com.coocaa.tvhome/com.gathin.tvhome.MainActivity}
+  mCurrentFocus=Window{... u0 com.coocaa.tvhome/app.polaris.tv.MainActivity}
   ```
 - Physical remote Home button presses immediately return to CleanYourTV without latency or flickering.
 - ADB port 5555 reconnects cleanly over Wi-Fi.

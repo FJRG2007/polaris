@@ -27,7 +27,7 @@
 #
 # Applied in one session and reboot-checked: all 16 below stayed disabled after a reboot on EU,
 # and the tracking/ad/demo subset plus com.google.android.tv.bugreportsender and the reference
-# launcher (com.gathin.tvhome) stayed disabled/default across a reboot on the Taiwan KD-55X8000H
+# launcher (app.polaris.tv) stayed disabled/default across a reboot on the Taiwan KD-55X8000H
 # (with voice assistant, Chromecast, AirPlay/HomeKit, Miracast and streaming apps kept by choice).
 # KD-65A8 (#2717): all 18 below were present and disabled cleanly, applied in batches on 2026-10-30
 # and reboot-checked twice; used for one evening so far. The reference launcher took Home through

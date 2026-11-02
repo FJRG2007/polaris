@@ -26,7 +26,7 @@ class AnsweringTV:
         self.answers = answers
 
     def home_component(self):
-        return "com.gathin.tvhome/.MainActivity"
+        return "app.polaris.tv/.MainActivity"
 
     def package_of(self, component):
         return component.split("/", 1)[0]
@@ -44,7 +44,7 @@ class DefaultOtherAppTest(unittest.TestCase):
     def test_never_the_chooser_or_the_launcher(self):
         tv = AnsweringTV({"android.settings.SETTINGS": "android/com.android.internal.app.ResolverActivity\n",
                           "category.LAUNCHER": "android/com.android.internal.app.ResolverActivity\n",
-                          "LEANBACK_LAUNCHER": "com.gathin.tvhome/.MainActivity\norg.videolan.vlc/.StartActivity\n"})
+                          "LEANBACK_LAUNCHER": "app.polaris.tv/.MainActivity\norg.videolan.vlc/.StartActivity\n"})
         self.assertEqual(bench.other_app(tv), "org.videolan.vlc/.StartActivity")
 
 
@@ -70,7 +70,7 @@ class AppOptionTest(unittest.TestCase):
                  "--keys", "1", "--series", "1", "--cold", "1", "--returns", "1", "--idle", "1"])
         self.assertEqual(status, 0, err)
         started = {m.group(1) for c in made[0].commands for m in [re.search(r"^am start.* -n (\S+)", c)] if m}
-        self.assertEqual(started, {"org.videolan.vlc/.StartActivity", "com.gathin.tvhome/.MainActivity"})
+        self.assertEqual(started, {"org.videolan.vlc/.StartActivity", "app.polaris.tv/.MainActivity"})
 
     def test_a_component_without_a_slash_is_refused_before_the_tv(self):
         with tempfile.TemporaryDirectory() as tmp:

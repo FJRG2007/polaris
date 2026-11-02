@@ -13,11 +13,11 @@
 #   com.mitv.download.service (firmware updates), com.google.android.tungsten.setupwraith (it owned one of the
 #   saved Wi-Fi networks), com.xiaomi.android.tvsetup.partnercustomizer, mitv.service, com.droidlogic*.
 # - USB debugging alone opens network ADB on port 5555 (service.adb.tcp.port=5555).
-# - cmd package set-home-activity needs the component on Android 9 (com.gathin.tvhome/.MainActivity), and
+# - cmd package set-home-activity needs the component on Android 9 (app.polaris.tv/.MainActivity), and
 #   dumpsys activity activities shows mResumedActivity, not mFocusedApp.
 # - Re-enabled at every boot: com.google.android.backdrop (Ambient screensaver). Harmless once the screensaver
 #   points at the launcher's clock, so it is commented out below:
-#     tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#     tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 #   (stock value here: com.android.dreams.basic/com.android.dreams.basic.Colors)
 # - Remote: Home and Back work with the new launcher without any key service.
 # - Everything else stayed disabled after a reboot, and the launcher stayed Home.

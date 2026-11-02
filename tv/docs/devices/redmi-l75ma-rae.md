@@ -13,7 +13,7 @@ actual Home screen on this 2026 firmware. The debloat half alone works exactly l
 
 ## What failed and why
 
-- `cmd package set-home-activity --user 0 com.ts.launcher/com.gathin.tvhome.MainActivity` prints
+- `cmd package set-home-activity --user 0 com.ts.launcher/app.polaris.tv.MainActivity` prints
   `Success`, but HOME still resolves to `com.mitv.tvhome`. Unlike MiTV-AETP0 and MiTV-MFTP0
   (where the `com.ts.launcher` application-ID build became Home and survived a reboot), this
   2026-03 build no longer accepts that ID: resolving HOME to it lands in
@@ -51,7 +51,7 @@ shows `prot=signature`), and the denial fires for explicit and implicit intents 
 foreground caller too. Shell `am start` bypasses it (uid 2000), an app cannot.
 
 The working path: a tiny bridge app (installed as its own package, icon and label free) starts
-`com.ts.launcher/com.gathin.tvhome.GlobalHomeActivity`, a `Theme.NoDisplay` activity that calls
+`com.ts.launcher/app.polaris.tv.GlobalHomeActivity`, a `Theme.NoDisplay` activity that calls
 `performGlobalAction(GLOBAL_ACTION_HOME)` on the accessibility service instance. The framework's
 global Home action runs HOME resolution itself - it needs no HOME_STATE permission and lands on
 the stock launcher, which the system still prefers. From PatchWall, Home comes back through the

@@ -17,7 +17,7 @@
 # Notes from this firmware:
 # - The stock launcher's HOME filter has priority 2, so `cmd package set-home-activity` reports Success
 #   but Home keeps opening it until com.google.android.tvlauncher is disabled (build-and-install.sh
-#   does this last). Launch com.gathin.tvhome/.MainActivity with `am start -n` to check it first.
+#   does this last). Launch app.polaris.tv/.MainActivity with `am start -n` to check it first.
 # - Inputs works: com.sony.dtv.tvx handles the passthrough channel URIs, HDMI 1-4 and Video 1/2 listed.
 #   Hide com.sony.dtv.tvx and com.sony.dtv.tvxlauncher.programguide in config.xml; set
 #   live_tv_package to com.sony.dtv.tvx if you use an antenna.

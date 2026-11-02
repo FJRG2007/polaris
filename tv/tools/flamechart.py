@@ -231,7 +231,7 @@ def parse(argv):
     p.add_argument("--labels", default="Before,After", help="panel labels, comma-separated")
     p.add_argument("--title", default="Launcher: start to first frame", help="the chart's title")
     p.add_argument("--subtitle", default="", help="a line under the title: the TV, the build, what magenta means")
-    p.add_argument("--package", default="com.gathin.tvhome")
+    p.add_argument("--package", default="app.polaris.tv")
     p.add_argument("--engine", metavar="PATH", help="a trace_processor_shell to use instead of downloading one")
     p.add_argument("--width", type=int, default=1600)
     args = p.parse_args(argv)

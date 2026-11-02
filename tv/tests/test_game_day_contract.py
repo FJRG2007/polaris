@@ -1,6 +1,6 @@
 """The game_day contract in docs/modules.md is read on every side that implements it.
 
-docs/modules.md hands an app one contract: a `meta-data` named `com.gathin.tvhome.games` whose value is
+docs/modules.md hands an app one contract: a `meta-data` named `app.polaris.tv.games` whose value is
 the authority of a read-only provider, a query on `content://<authority>/turns`, and seven columns
 answered by name - the launcher passes them as the projection, so a column renamed on one side comes
 back as a null column on the TV rather than as an error anywhere. Three files carry that contract in
@@ -230,7 +230,7 @@ class ReaderTest(unittest.TestCase):
 1. Name a read-only content provider in a `meta-data` on your `<application>`:
 
    ```xml
-   <meta-data android:name="com.gathin.tvhome.games" android:value="com.example.games" />
+   <meta-data android:name="app.polaris.tv.games" android:value="com.example.games" />
    ```
 
 2. Answer a query on `content://<authority>/turns` with these columns:
@@ -275,10 +275,10 @@ class ReaderTest(unittest.TestCase):
 
     def test_the_declaration_is_read_in_order(self):
         self.assertEqual(["top_line", "word"], columns_of('private static final String[] COLUMNS = {"top_line", "word"};'))
-        self.assertIsNone(columns_of('static final String META = "com.gathin.tvhome.games";'))
+        self.assertIsNone(columns_of('static final String META = "app.polaris.tv.games";'))
 
     def test_the_provider_tag_is_found_by_authority(self):
-        manifest = ('<meta-data android:name="com.gathin.tvhome.games" android:value="com.example.games" />\n'
+        manifest = ('<meta-data android:name="app.polaris.tv.games" android:value="com.example.games" />\n'
                     '<provider android:name=".FilesProvider" android:authorities="com.example.files" android:exported="true" />\n'
                     '<provider android:name=".GamesProvider" android:authorities="com.example.games" android:exported="true" />')
         self.assertEqual({"name": ".GamesProvider", "authorities": "com.example.games", "exported": "true"},

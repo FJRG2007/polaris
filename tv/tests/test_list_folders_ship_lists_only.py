@@ -8,7 +8,7 @@ scripts, inside a list folder") and `docs/DOS-AND-DONTS.md`'s Don't column say t
 
 `examples/epson-ls800` was the one folder that did not keep to it. Its `restore.sh` re-enabled the list,
 reset the theme and rewrote the Inputs labels in one command, and it also ran
-`pm uninstall com.gathin.tvhome` behind `--uninstall-launcher` - an uninstall, in a script, in a list
+`pm uninstall app.polaris.tv` behind `--uninstall-launcher` - an uninstall, in a script, in a list
 folder. The folder's own `debloat.txt` already named `tools/restore.sh examples/epson-ls800/debloat.txt
 com.google.android.tvlauncher` as its undo, so the script was a second, drifting answer to a question the
 shared tool answers, and the only executable file in `examples/` (`git ls-files -s examples` has it as

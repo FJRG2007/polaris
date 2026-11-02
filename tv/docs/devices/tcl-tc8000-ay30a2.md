@@ -39,10 +39,10 @@ Failure [INSTALL_FAILED_VERIFICATION_FAILURE]
 The system log names the gate — it is the stock launcher's signature, not a parse error:
 
 ```
-D OverseasAppConfig: pkgName = com.gathin.tvhome
+D OverseasAppConfig: pkgName = app.polaris.tv
 I ActivityManager: Start proc ... com.android.packageinstaller/.verifier.VerifierReciver
 W verifier: fetch signature info from: com.tcl.cyberui
-W verifier: signature does not match for tcl com.gathin.tvhome, will not be installed!
+W verifier: signature does not match for tcl app.polaris.tv, will not be installed!
 ```
 
 `content query --uri content://com.tcl.providers.config/all` shows the same row as the older build
@@ -88,8 +88,8 @@ Two TCL app ops have to allow the process to start. Without them `TclAppBootMana
 and the set stays on cyberui:
 
 ```
-adb shell appops set com.gathin.tvhome APP_AUTO_START allow
-adb shell appops set com.gathin.tvhome APP_ASSOC_START allow
+adb shell appops set app.polaris.tv APP_AUTO_START allow
+adb shell appops set app.polaris.tv APP_ASSOC_START allow
 ```
 
 `config.json` sets `stock_home_redirect` to `com.tcl.cyberui`. Enable `HomeKeyService`
@@ -98,7 +98,7 @@ whatever else is already in the list (小T, `com.tcl.walleve`, if you did not di
 
 ```
 adb shell settings put secure enabled_accessibility_services \
-  '<existing>:com.gathin.tvhome/com.gathin.tvhome.HomeKeyService'
+  '<existing>:app.polaris.tv/app.polaris.tv.HomeKeyService'
 adb shell settings put secure accessibility_enabled 1
 ```
 

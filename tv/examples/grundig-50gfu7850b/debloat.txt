@@ -21,7 +21,7 @@
 #
 # Launcher works: installed with launcher/build-and-install.sh, owns Home (mFocusedApp) also after reboot;
 # every remote button (Home, Input, Settings, app keys) works without extra key services. Screensaver set to
-# com.gathin.tvhome/.ClockDream before backdrop goes.
+# app.polaris.tv/.ClockDream before backdrop goes.
 #
 # Inputs & HDMI-CEC:
 # Android TV Settings > Device Preferences > Inputs pre-assigns generic labels ("Game console", "Blu-ray")

@@ -21,7 +21,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
-DEVICE_DIR = "/sdcard/Android/data/com.gathin.tvhome/files"
+DEVICE_DIR = "/sdcard/Android/data/app.polaris.tv/files"
 STAGE = "/data/local/tmp/cyt-theme"
 
 # --push copies like tv.py does; shell commands run on this machine after the device paths are rewritten.
@@ -34,7 +34,7 @@ import sys
 LOG = os.environ["FAKE_LOG"]
 DIR = os.environ["FAKE_DIR"]
 TMP = os.environ["FAKE_STAGE"]
-DEVICE_DIR = "/sdcard/Android/data/com.gathin.tvhome/files"
+DEVICE_DIR = "/sdcard/Android/data/app.polaris.tv/files"
 
 
 def local(command):
@@ -76,7 +76,7 @@ else:
     Device().shell(" ".join(args))
 '''
 
-# Stands in for `content write/delete` against content://com.gathin.tvhome.theme, which on a TV runs inside
+# Stands in for `content write/delete` against content://app.polaris.tv.theme, which on a TV runs inside
 # the launcher's process and so creates files owned by the launcher. FAKE_NO_PROVIDER models firmware or a
 # launcher version without the provider. A real `content` reports an exception from the provider as text ("Error
 # while accessing provider" and a stack trace): FAKE_PROVIDER_ERROR is a provider that is not there, and a write
@@ -98,15 +98,15 @@ if os.environ.get("FAKE_NO_CONTENT_WRITE") and args[0] == "write":
     print("[ERROR] Unsupported operation: write")
     sys.exit(0)
 if os.environ.get("FAKE_PROVIDER_ERROR"):
-    print("Error while accessing provider:com.gathin.tvhome.theme")
-    print("java.lang.IllegalStateException: Could not find provider: com.gathin.tvhome.theme")
+    print("Error while accessing provider:app.polaris.tv.theme")
+    print("java.lang.IllegalStateException: Could not find provider: app.polaris.tv.theme")
     sys.exit(0)
 action, uri = args[0], args[args.index("--uri") + 1]
-path = os.path.join(os.environ["FAKE_DIR"], uri.split("com.gathin.tvhome.theme/", 1)[1])
+path = os.path.join(os.environ["FAKE_DIR"], uri.split("app.polaris.tv.theme/", 1)[1])
 if action == "write":
     shell_dirs = os.environ["FAKE_SHELL_DIRS"]
     if os.path.exists(shell_dirs) and os.path.dirname(path) in open(shell_dirs).read().splitlines():
-        print("Error while accessing provider:com.gathin.tvhome.theme")
+        print("Error while accessing provider:app.polaris.tv.theme")
         print("java.io.FileNotFoundException: open failed: EACCES (Permission denied)")
         sys.exit(0)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -153,7 +153,7 @@ class ThemePushTest(unittest.TestCase):
         for name, body in {
             "am": 'if [ "$FAKE_RESTART_FAIL" = 1 ]; then exit 1; fi; if [ "$1" = get-current-user ]; then echo 0; fi',
             "settings": 'if [ "$3" = get ]; then echo null; fi',
-            "cmd": 'echo com.gathin.tvhome/.MainActivity',
+            "cmd": 'echo app.polaris.tv/.MainActivity',
         }.items():
             command = self.bin / name
             command.write_text('#!/bin/sh\n' + body + '\n')
@@ -211,7 +211,7 @@ class ThemePushTest(unittest.TestCase):
                         f"a file the shell owns stops the provider truncating it: {put}")
         self.assertLess(put.index("content write"), put.index("cp "),
                         f"cp creates a shell-owned file on Android 14: {put}")
-        self.assertIn(["write", "--uri", "content://com.gathin.tvhome.theme/config.json"],
+        self.assertIn(["write", "--uri", "content://app.polaris.tv.theme/config.json"],
                       self.provider_calls())
         self.assertNotIn(f"cp {self.stage}-config.json {DEVICE_DIR}/config.json", " | ".join(self.shell_commands()),
                          "the provider is available, so cp must not run")
@@ -243,7 +243,7 @@ class ThemePushTest(unittest.TestCase):
                          "the provider creates wallpapers/ as the launcher; mkdir leaves it to the shell")
         self.assertEqual((self.device / "wallpapers" / "dusk.jpg").read_bytes(), b"\xff\xd8dusk",
                          "the picture has to land on the TV, not only be reported as applied")
-        self.assertIn(["write", "--uri", "content://com.gathin.tvhome.theme/wallpapers/dusk.jpg"],
+        self.assertIn(["write", "--uri", "content://app.polaris.tv.theme/wallpapers/dusk.jpg"],
                       self.provider_calls())
 
     def test_a_reset_does_not_leave_a_shell_owned_wallpapers_folder_behind(self):
@@ -312,7 +312,7 @@ class ThemePushTest(unittest.TestCase):
         for name, data in images.items():
             with self.subTest(name=name):
                 self.assertEqual((previous / name).read_bytes(), data)
-                self.assertIn(["write", "--uri", f"content://com.gathin.tvhome.theme/wallpapers/{name}"],
+                self.assertIn(["write", "--uri", f"content://app.polaris.tv.theme/wallpapers/{name}"],
                               self.provider_calls())
 
     def test_mixed_case_image_extension_still_checks_the_filename(self):
@@ -410,7 +410,7 @@ class ThemePushTest(unittest.TestCase):
         reset_commands = self.shell_commands()
 
         clear = [c for c in push_commands
-                 if "content delete --uri content://com.gathin.tvhome.theme/wallpapers 2>/dev/null" in c]
+                 if "content delete --uri content://app.polaris.tv.theme/wallpapers 2>/dev/null" in c]
         self.assertEqual(len(clear), 1, f"a push empties the collection first: {push_commands}")
         self.assertIn(f"{DEVICE_DIR}/wallpapers/*.[jJ][pP][gG]", clear[0])
         self.assertIn(f"{DEVICE_DIR}/wallpapers/*.[wW][eE][bB][pP]", clear[0],
@@ -418,7 +418,7 @@ class ThemePushTest(unittest.TestCase):
         joined = " | ".join(reset_commands)
         self.assertIn(clear[0], joined,
                       "the reset has to run the very same clear, or the two paths drift apart again")
-        self.assertIn(f"content delete --uri content://com.gathin.tvhome.theme/wallpapers/captions.txt", joined)
+        self.assertIn(f"content delete --uri content://app.polaris.tv.theme/wallpapers/captions.txt", joined)
 
     def test_the_windows_script_clears_the_collection_on_reset(self):
         """theme.ps1 cannot run here, so the -Reset branch is pinned as text against theme.sh."""

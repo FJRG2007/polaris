@@ -11,7 +11,7 @@
 # - Home: the framework only accepts system apps or allowlisted package names as HOME, like the
 #   MiTV-AETP0. The opt-in build -PlauncherApplicationId=com.ts.launcher (docs/devices/xiaomi-mitv-aetp0-dofus.md)
 #   was accepted here: HOME resolved to it, also after a reboot and after a force-stop like the one
-#   standby does. With the standard com.gathin.tvhome ID, disabling com.mitv.tvhome leaves
+#   standby does. With the standard app.polaris.tv ID, disabling com.mitv.tvhome leaves
 #   FallbackHome (a black screen).
 # - Network ADB closes at every boot: com.xiaomi.mitv.settings writes adb_enabled=0 a few seconds after
 #   boot. Re-enable it under Settings > Account & Security > ADB debugging.

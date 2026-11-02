@@ -32,7 +32,7 @@ const LOOKUP_WINDOW_MS = 10 * 60 * 1000;
 
 /** Which screen is asking: the CLI's or the Stream Deck's. Each finds only its
  *  own kind of request. */
-const kindSchema = z.enum(["cli", "streamdeck"]).default("cli");
+const kindSchema = z.enum(["cli", "streamdeck", "tv"]).default("cli");
 
 const answerSchema = z.object({
     userCode: z.string().min(1).max(32),
@@ -75,6 +75,7 @@ export async function describeCliSignInAction(
     const kind = kindSchema.catch("cli").parse(askedKind);
     const found = await lookup(user.id, typed, kind);
     if (found.error || !found.pending) return { error: found.error };
+    if (kind === "tv") return { pending: found.pending };
     const held = new Set<string>(await scopesAvailableTo(user.id, user.isAdmin));
     const scopes = found.pending.scopes.filter((scope) => held.has(scope));
     if (scopes.length === 0)

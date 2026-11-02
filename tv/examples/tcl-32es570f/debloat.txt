@@ -24,7 +24,7 @@
 # - Wi-Fi is 2.4 GHz only, which is the usual cause of slow or failing streaming apps here.
 # - The saved Wi-Fi was not touched: com.google.android.tungsten.setupwraith is left enabled.
 # - The photo screensaver is swapped before it is disabled:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 #   (stock: com.google.android.backdrop/com.google.android.backdrop.Backdrop)
 #
 # DO NOT DISABLE on this TV: com.tcl.tv, com.tcl.tvinput, com.tcl.ttvs (firmware updater),

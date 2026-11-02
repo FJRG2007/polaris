@@ -30,7 +30,7 @@ Tested on **Xiaomi TV A Pro 32-inch** (model `MiTV-AXFU0`, codename `arctictale`
 Google TV on Android 14 handles `android.intent.category.HOME` differently from older Android TV releases:
 - Stock launcher (`com.google.android.apps.tv.launcherx`): priority `2`
 - Setup wizard recovery activity (`com.google.android.tungsten.setupwraith/.RecoveryActivity`): priority `1`
-- Sideloaded / user launchers (`com.gathin.tvhome`): priority `0`
+- Sideloaded / user launchers (`app.polaris.tv`): priority `0`
 
 If `launcherx` is disabled while `setupwraith` remains active, pressing the **Home** button resolves to `RecoveryActivity`. This activity attempts to launch the initial setup flow, fails because the TV is already provisioned, and triggers a `system_server` crash loop (soft reboots every ~60 seconds with dropping Wi-Fi).
 

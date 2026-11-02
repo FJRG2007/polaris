@@ -47,7 +47,7 @@ One minute after boot, about 335 MB was available before the stock Home was disa
 
 - Screensaver: `screensaver_components` names the Yandex video screensaver, so after the list there is none
   until another is set, for example the launcher's clock:
-  `settings put secure screensaver_components com.gathin.tvhome/.ClockDream`.
+  `settings put secure screensaver_components app.polaris.tv/.ClockDream`.
 - Power: a short press of the power key is MStar suspend-to-RAM standby, not power off; a long press opens a
   menu with a real power off. `tools/tv.py --reboot` leaves the set in standby: press power on the remote.
 - The time zone shipped as `Asia/Oral` (the same UTC+5 as Uzbekistan's `Asia/Tashkent`), with automatic time zone on.

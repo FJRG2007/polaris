@@ -95,7 +95,7 @@ about 100 ms later, over the chooser, so the button seems to do nothing.
 If the launcher is force-stopped while launcherx is on screen, Home stays on launcherx until another app
 opens: with `key_filter` false the helper never sees the Home key. Put the helper back by writing
 `enabled_accessibility_services` again, as the Remote buttons command above does but with
-`com.gathin.tvhome/.HomeKeyService`.
+`app.polaris.tv/.HomeKeyService`.
 
 ## Holding Power shows an empty grey circle
 
@@ -117,7 +117,7 @@ TV_HOST=<projector-ip> tools/restore.sh examples/benq-gv32/debloat.txt com.googl
 TV_HOST=<projector-ip> tools/theme.sh --reset
 ```
 
-Switch the key helper off as shown under Remote buttons, and `tools/tv.py 'pm uninstall com.gathin.tvhome'`
+Switch the key helper off as shown under Remote buttons, and `tools/tv.py 'pm uninstall app.polaris.tv'`
 removes the launcher itself.
 
 ## Change the dock or the wallpaper

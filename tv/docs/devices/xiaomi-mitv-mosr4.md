@@ -63,7 +63,7 @@ TV_HOST=<tv ip> tools/theme.sh examples/xiaomi-mitv-mosr4
 
 `config.json` maps 190/193/194. A mapped button whose app is disabled is swallowed. Checked with
 the real remote (no `GLOBAL_BUTTON` lines, no crashes), using an equivalent key filter in a
-stand-alone launcher; not yet with `com.gathin.tvhome`. The Netflix button went to this receiver,
+stand-alone launcher; not yet with `app.polaris.tv`. The Netflix button went to this receiver,
 not to overseaservice. The mic button keeps working.
 
 Both helpers cost the remote's live key repeat on this set: holding volume up or down moves one step

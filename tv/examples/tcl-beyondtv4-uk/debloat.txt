@@ -19,7 +19,7 @@
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
 #
 # Stock launcher: com.google.android.tvlauncher (HOME priority 2). Not listed here:
-#   launcher/build-and-install.sh installs com.gathin.tvhome and disables it afterwards. The only other HOME
+#   launcher/build-and-install.sh installs app.polaris.tv and disables it afterwards. The only other HOME
 #   claimant on this build is com.android.tv.settings/.system.FallbackHome.
 # Live TV app: com.tcl.tv, inputs: com.tcl.tvinput (both kept; set live_tv_package to com.tcl.tv).
 #   TvInputManager exposes 4 hardware ports; the launcher's Inputs menu lists HDMI 1-3, AV and Live TV.

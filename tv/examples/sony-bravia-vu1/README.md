@@ -19,14 +19,14 @@ from a phone still worked with setupwraith kept.
 `set-home-activity` alone does nothing here, because `com.google.android.tvlauncher` outranks any other HOME app.
 `launcher/build-and-install.sh` handles that: it starts the new launcher, then disables the stock one with
 `pm disable-user --user 0` and confirms Home. After a reboot the TV started straight into
-`com.gathin.tvhome/.MainActivity` (`wm_set_resumed_activity` went from `com.realtek.tv.settings/.FallbackHome` to it).
+`app.polaris.tv/.MainActivity` (`wm_set_resumed_activity` went from `com.realtek.tv.settings/.FallbackHome` to it).
 It did not start Live TV, so neither `power_on_home` nor `boot_to_live_tv` is needed.
 
 ## Keeping casting: setupwraith can stay
 
 On the first unit, setupwraith's `.MainActivity` answered HOME while it was enabled. On the second unit it was
 left enabled, and once tvlauncher was disabled it did not claim HOME. `cmd package query-activities -a
-android.intent.action.MAIN -c android.intent.category.HOME` listed only `com.gathin.tvhome/.MainActivity`,
+android.intent.action.MAIN -c android.intent.category.HOME` listed only `app.polaris.tv/.MainActivity`,
 `com.realtek.tv.settings/.FallbackHome` and `com.android.tv.settings/.system.FallbackHome`. The Cast receiver
 reads its credentials from setupwraith, and on the second unit phone casting kept working two days later. So if
 you cast from a phone:

@@ -20,7 +20,7 @@ Tested on RockTek GX1 (`UHD Google TV STB`), Google TV 14, firmware `UTT1.250214
 
 The stock Google TV launcher is `com.google.android.apps.tv.launcherx`.
 The first-run setup wizard is `com.google.android.tungsten.setupwraith`.
-Both were disabled only after `com.gathin.tvhome` was installed and confirmed active as default Home across a reboot.
+Both were disabled only after `app.polaris.tv` was installed and confirmed active as default Home across a reboot.
 
 Before applying `setupwraith`, check which package owns the saved Wi-Fi network with `dumpsys wifi | grep -o 'cname=[^ ]*'`. `tools/disable.sh` and `disable.ps1` refuse to disable it while it owns that network; forget and rejoin Wi-Fi in TV Settings first.
 

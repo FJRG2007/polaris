@@ -155,10 +155,10 @@ class WrongHandlerRestoreTest(unittest.TestCase):
         # launcher Home, disabling the stock launcher outside any list. Then the one-app list goes on.
         # The record notes the stock launcher as disabled, so undo leaves it off and Home where it
         # was (#1714); it used to turn the stock launcher on and hand it Home.
-        custom = "com.gathin.tvhome/.MainActivity"
+        custom = "app.polaris.tv/.MainActivity"
         stock = "com.google.android.tvlauncher"
         self.write_list([ES])
-        self.tv(installed=[ES, stock, "com.gathin.tvhome"], disabled=[stock], home=custom)
+        self.tv(installed=[ES, stock, "app.polaris.tv"], disabled=[stock], home=custom)
         with mock.patch.dict(os.environ, {"HANDLERS_ALLOW": "1"}):
             result = self.run_script("disable.sh", str(self.list_path))
         self.assertEqual(result.returncode, 0, result.stderr)

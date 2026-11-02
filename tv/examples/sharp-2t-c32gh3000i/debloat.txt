@@ -63,7 +63,7 @@ com.google.android.apps.tv.launcherx         # stock Google TV launcher
 
 # --- Memory pass: the set has ~1 GB RAM and was swapping ---
 # dreamx: set the screensaver to the launcher's Clock first:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 # Back to Google's: settings put secure screensaver_components com.google.android.apps.tv.dreamx/.service.Backdrop
 com.google.android.apps.tv.dreamx            # ambient-mode screensaver, ~70 MB resident
 com.android.settings.intelligence            # suggestions in Settings

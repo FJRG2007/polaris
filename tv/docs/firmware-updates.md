@@ -84,7 +84,7 @@ its home screen on to this launcher. On the Chromecast with Google TV 4K that se
 folder's `debloat-keep-cast.txt`, not its `debloat.txt`, which disables setupwraith and the
 screensaver pair the redirect setup keeps. On the Acer AR55AR2851UDPRO it is the folder's
 `debloat.txt`. Check those lists with the stock launcher as the second argument. Without it the
-check expects `com.gathin.tvhome` on Home, so every run reports Home as drift, and `--fix` tries to
+check expects `app.polaris.tv` on Home, so every run reports Home as drift, and `--fix` tries to
 move Home to it, which those TVs do not keep:
 
 ```bash

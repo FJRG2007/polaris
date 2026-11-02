@@ -20,7 +20,7 @@
 #   and it has no LEANBACK_LAUNCHER entry.
 # - setupwraith does not claim HOME here, so it stays: build-and-install.sh took Home from tvlauncher directly.
 # - Disabling backdrop leaves screensaver_components pointing at it. Point it at the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 
 # Content, ads and promos
 android.autoinstalls.config.Inspur.benq.S905Y2   # silently installs partner apps

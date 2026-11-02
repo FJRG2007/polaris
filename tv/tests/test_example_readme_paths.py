@@ -13,7 +13,7 @@ file that keeps Home and the remote buttons working on that set was a name `bash
 A path counts when it starts at the repository root, with one of the folders this repo ships: that is
 what makes it a claim about this tree rather than a file the owner has (`wallpaper.jpg` beside their
 config.json), a Windows twin written with backslashes, a placeholder (`examples/<your tv>/debloat.txt`,
-`$TV_HOST`), or an Android component (`com.gathin.tvhome/.MainActivity`). Backticks inside a fenced block
+`$TV_HOST`), or an Android component (`app.polaris.tv/.MainActivity`). Backticks inside a fenced block
 are read too, since a path written that way is a command either way; the fence's own lines are not walked
 as commands, because one there can name a folder the reader makes (`themes/mine`), which is not a claim
 about this tree. Folders `.gitignore` names are skipped the way `tests/test_agents_md.py` skips them, so
@@ -113,7 +113,7 @@ class TheReaderTest(unittest.TestCase):
                 self.assertEqual([], named_paths(body))
 
     def test_an_android_component_is_not_a_path(self):
-        self.assertEqual([], named_paths("`com.gathin.tvhome/.MainActivity` and `setupwraith/.RecoveryActivity`"))
+        self.assertEqual([], named_paths("`app.polaris.tv/.MainActivity` and `setupwraith/.RecoveryActivity`"))
 
     def test_a_path_this_repo_does_not_anchor_is_left_alone(self):
         # The owner's own files, a URL and a plain word: none of them is a claim about this checkout.

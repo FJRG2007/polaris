@@ -11,7 +11,7 @@
 # Notes from this firmware:
 # - Sideloading works (pm install over the shell), and third-party HOME app is accepted.
 # - setupwraith does not own the saved Wi-Fi network (cname is system uid 1000).
-# - Disabling com.google.android.apps.tv.launcherx and setupwraith hands HOME to com.gathin.tvhome. Disabling
+# - Disabling com.google.android.apps.tv.launcherx and setupwraith hands HOME to app.polaris.tv. Disabling
 #   setupwraith gives Home back but can cost casting.
 # - PatchWall (com.mitv.tvhome.atv) and related OEM tabs are safe to disable.
 # - The remote's YouTube button sends 190 (KEYCODE_BUTTON_3) which routes to launcherx;
@@ -63,6 +63,6 @@ com.google.android.youtube.tvmusic
 # com.graymatrix.did
 # com.esaba.downloader
 
-# Setup wizard and stock launcher (disabled to make com.gathin.tvhome default Home)
+# Setup wizard and stock launcher (disabled to make app.polaris.tv default Home)
 com.google.android.tungsten.setupwraith
 com.google.android.apps.tv.launcherx

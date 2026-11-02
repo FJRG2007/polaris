@@ -15,7 +15,7 @@
 # - USB debugging alone opens port 5555; there is no network debugging toggle.
 # - Default IME is already Gboard and every package below exists on this build.
 # - The stock screensaver is com.mitv.dream/com.mitv.dream.MiDream, disabled below; point it elsewhere:
-#     settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#     settings put secure screensaver_components app.polaris.tv/.ClockDream
 # - The voice assistant (katniss) does not stay disabled: at every boot the package manager rescans it
 #   as an updated system app ("Expecting better updated system app for com.google.android.katniss"
 #   in logcat -b events) and it comes back enabled, bound as voice_interaction_service. Disabling it is

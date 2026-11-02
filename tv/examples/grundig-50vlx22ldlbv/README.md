@@ -22,7 +22,7 @@ The same platform as [`beko-b43b880b`](../beko-b43b880b/), on an older build (`R
 - **The Inputs pill** lists HDMI 1–3 and Live TV.
 - **Remote buttons:** Home, Input, Settings and the app buttons all work with the stock launcher disabled, with no
   `HOME_KEY_SERVICE` or `INPUT_KEY_SERVICE`. The real buttons were pressed on the remote, not injected.
-- **Screensaver:** set it to `com.gathin.tvhome/.ClockDream` before disabling `com.google.android.backdrop`.
+- **Screensaver:** set it to `app.polaris.tv/.ClockDream` before disabling `com.google.android.backdrop`.
 - **Themes** push with `tools/theme.sh`; `nature-calm` with `tile_menu` and `app_library` was checked on the set.
 
 ## Keep

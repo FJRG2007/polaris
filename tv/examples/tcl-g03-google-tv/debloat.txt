@@ -258,7 +258,7 @@ com.google.android.tungsten.setupwraith
 
 # ---- 7. Google ambient screensaver (promos); also hosts the Google Home panel (see header) ----
 # Switch the screensaver first, e.g. to the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 # Back to Google's: settings put secure screensaver_components com.google.android.apps.tv.dreamx/.service.Backdrop
 com.google.android.apps.tv.dreamx
 

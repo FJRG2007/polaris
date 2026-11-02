@@ -53,7 +53,7 @@ the MoGo 4) and stops with "launcherx owns Home again" before it enables the hel
 installed at that point; switch the helper on by hand:
 
 ```bash
-TV_HOST=<projector-ip> tools/tv.py "settings put secure enabled_accessibility_services com.gathin.tvhome/.HomeKeyService; settings put secure accessibility_enabled 1"
+TV_HOST=<projector-ip> tools/tv.py "settings put secure enabled_accessibility_services app.polaris.tv/.HomeKeyService; settings put secure accessibility_enabled 1"
 ```
 
 Then press the **real** Home button: an injected `input keyevent HOME` landed on the stock launcher

@@ -8,7 +8,7 @@
 # Stock launcher: com.cvte.tv.launcher (AppActivity). Pass it to restore.sh or set-home-activity if reverting.
 # Live TV & Inputs: keep com.cvte.tvservice, com.cvte.tv.androidsetting, and com.mediatek.tv.agent (needed for HDMI and TV tuners).
 #
-# Tested on Challenger 32T22 BT: freed up crucial RAM for third-party launcher (com.gathin.tvhome) and streaming apps.
+# Tested on Challenger 32T22 BT: freed up crucial RAM for third-party launcher (app.polaris.tv) and streaming apps.
 
 # Factory test and diagnostic tools (CVTE & TCL ODM)
 cn.cvte.tv.factory.autotest

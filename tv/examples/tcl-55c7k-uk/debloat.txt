@@ -92,6 +92,6 @@ com.tcl.t_solo                         # T-Solo "listen alone" (Bluetooth headph
 com.google.android.tungsten.setupwraith
 
 # launcherx is disabled by launcher/build-and-install.sh. Switch screensaver_components to
-# com.gathin.tvhome/.ClockDream before disabling dreamx.
+# app.polaris.tv/.ClockDream before disabling dreamx.
 # com.google.android.apps.tv.launcherx
 com.google.android.apps.tv.dreamx      # Google ambient screensaver (promos); screensaver set to ClockDream first

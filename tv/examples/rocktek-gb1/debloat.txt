@@ -13,7 +13,7 @@
 #
 # Home handover:
 # - The stock Google TV home is com.google.android.apps.tv.launcherx. build-and-install.sh disables it
-#   only after com.gathin.tvhome has become Home, so it is left commented below.
+#   only after app.polaris.tv has become Home, so it is left commented below.
 # - com.google.android.tungsten.setupwraith was disabled on this box so the replacement Home can stay in
 #   charge. Before applying the line, check whether it owns the saved Wi-Fi network: disable.sh will
 #   refuse it while it does. Rejoin the network in Settings first if necessary, and re-enable it before

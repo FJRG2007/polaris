@@ -19,7 +19,7 @@ The retail model comes from the set's own model name, not from `ro.product.model
 
 ## Home
 
-The original Home activity was `com.google.android.tvlauncher/.MainActivity`. The reference launcher `com.gathin.tvhome` was built from checkout `575d73f0` (before Launcher 3.0, versionCode 9) with household settings that are not in upstream and are not part of this note. After that launcher was installed and the stock launcher was disabled for user 0, Home resolved to `com.gathin.tvhome/.MainActivity`. The owner confirmed the home screen.
+The original Home activity was `com.google.android.tvlauncher/.MainActivity`. The reference launcher `app.polaris.tv` was built from checkout `575d73f0` (before Launcher 3.0, versionCode 9) with household settings that are not in upstream and are not part of this note. After that launcher was installed and the stock launcher was disabled for user 0, Home resolved to `app.polaris.tv/.MainActivity`. The owner confirmed the home screen.
 
 `pm list packages -d` showed only `com.google.android.tvlauncher`. Live TV (`org.droidtv.playtv`), voice, Chromecast, firmware updates, Ambilight/Hue, Play Store, Play Services and the owner's streaming apps stayed enabled. This is not a CVTE board. No factory menu was opened.
 

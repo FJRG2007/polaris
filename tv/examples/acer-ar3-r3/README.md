@@ -40,7 +40,7 @@ packages at boot the way the Google TV R4G note describes for a related platform
 `cmd package set-home-activity` worked directly here (no `stock_home_redirect` /
 `HomeKeyService` fallback needed, unlike the `acer-ar55ar2851udpro` unit): the stock launcher
 `com.google.android.tvlauncher` is disabled as part of the handover and Home resolves straight to
-`com.gathin.tvhome/.MainActivity`, confirmed with `dumpsys activity activities | grep mFocusedApp`
+`app.polaris.tv/.MainActivity`, confirmed with `dumpsys activity activities | grep mFocusedApp`
 and again after a cold boot.
 
 ```bash
@@ -115,7 +115,7 @@ TV_HOST=<tv ip> tools/restore.sh examples/acer-ar3-r3/debloat.txt
 TV_HOST=<tv ip> tools/theme.sh --reset
 ```
 
-Uninstall the launcher (`pm uninstall com.gathin.tvhome`) to give the Home button back to the stock
+Uninstall the launcher (`pm uninstall app.polaris.tv`) to give the Home button back to the stock
 launcher (`pm enable --user 0 com.google.android.tvlauncher` first, since it was disabled as part of
 the handover). If you installed the optional Bluetooth Connect add-on, `pm uninstall
 com.gathin.btconnect` removes it too; it is unrelated to the rest of the undo.

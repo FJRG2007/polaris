@@ -33,7 +33,7 @@ For environments where an authorized ADB connection is already established, the 
 
 ## CleanYourTV Launcher Takeover
 
-1. **Build**: CleanYourTV (`com.gathin.tvhome`) compiles cleanly for API 34.
+1. **Build**: CleanYourTV (`app.polaris.tv`) compiles cleanly for API 34.
 2. **Install**:
    ```bash
    adb push app-release.apk /sdcard/cleanyourtv.apk
@@ -42,11 +42,11 @@ For environments where an authorized ADB connection is already established, the 
    ```
 3. **Set Default Home**:
    ```bash
-   adb shell cmd package set-home-activity com.gathin.tvhome/.MainActivity
+   adb shell cmd package set-home-activity app.polaris.tv/.MainActivity
    ```
 4. **DO NOT DISABLE `com.htc.luminaos` COMPLETELY**:
    Unlike standard Android TV devices where the stock launcher can be safely disabled, `com.htc.luminaos` also hosts the projector's keystone adjustment receivers (`com.htc.intent.action.OPEN_MANUAL_KEYSTONE`), projection orientation modes, and Bluetooth remote bindings. 
-   Leaving `com.htc.luminaos` enabled while pointing `set-home-activity` to `com.gathin.tvhome` works reliably across reboots without losing projector controls.
+   Leaving `com.htc.luminaos` enabled while pointing `set-home-activity` to `app.polaris.tv` works reliably across reboots without losing projector controls.
 
 ---
 

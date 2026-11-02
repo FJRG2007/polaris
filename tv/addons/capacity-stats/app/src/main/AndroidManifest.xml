@@ -6,8 +6,8 @@
         android:label="@string/app_name" android:icon="@drawable/icon" android:banner="@drawable/icon">
         <activity android:name=".StatsActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>
-            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="com.gathin.tvhome.category.DOCK_CARD" /></intent-filter>
-            <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="app.polaris.tv.category.DOCK_CARD" /></intent-filter>
+            <meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />
         </activity>
 
     </application>

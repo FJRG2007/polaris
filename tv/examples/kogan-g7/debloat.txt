@@ -26,7 +26,7 @@
 #   (checked with the real remote). Shell cannot disable launcherx's HomeActivity on its own
 #   (SecurityException), and with launcherx enabled it takes HOME back, so the other three stay dead.
 # - Disabling dreamx leaves screensaver_components pointing at it. Point it at the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 
 # Retail demo / store mode
 com.realtek.storemode

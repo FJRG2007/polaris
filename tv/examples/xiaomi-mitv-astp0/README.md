@@ -74,7 +74,7 @@ Tested on Xiaomi MiTV-ASTP0 (`mulan`), Android 9, firmware `23.2.15.1886`.
 
 ### Default Home launcher
 
-On this firmware, setting `com.gathin.tvhome` as the default Home activity returned success, but Android continued resolving Home to `com.mitv.tvhome/.MainActivityUserMode`.
+On this firmware, setting `app.polaris.tv` as the default Home activity returned success, but Android continued resolving Home to `com.mitv.tvhome/.MainActivityUserMode`.
 
 Building CleanYourTV with an alternative application ID resolved the issue:
 
@@ -85,7 +85,7 @@ Building CleanYourTV with an alternative application ID resolved the issue:
 After installing the APK, the following command successfully assigned CleanYourTV as the default Home application:
 
 ```bash
-adb shell cmd package set-home-activity --user 0 com.ts.launcher/com.gathin.tvhome.MainActivity
+adb shell cmd package set-home-activity --user 0 com.ts.launcher/app.polaris.tv.MainActivity
 ```
 
 The new Home selection survived a reboot. Xiaomi's original launcher remained installed and enabled.

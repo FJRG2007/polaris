@@ -113,7 +113,7 @@ com.google.android.apps.mediashell      # Chromecast receiver
 com.google.android.youtube.tvmusic      # YouTube Music
 
 # Second pass, applied after the launcher. The launcher's Clock screensaver replaces Ambient Mode:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 com.google.android.backdrop             # Ambient Mode screensaver (Google content)
 com.google.android.tts                  # Google text-to-speech; only accessibility uses it
 com.google.android.marvin.talkback      # screen reader; re-enable if someone needs it

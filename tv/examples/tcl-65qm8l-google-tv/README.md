@@ -53,7 +53,7 @@ Apply in small batches, with a screenshot between them (`tools/tv.py --screensho
 
 1. Disable everything above the "Launcher handover" block with `tools/disable.sh` (or `disable.ps1`).
 2. Set the clock screensaver, then run the full list again so setupwraith and dreamx go:
-   `tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'`.
+   `tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'`.
 3. Build and install the launcher. It disables launcherx once it owns Home:
    `launcher/build-and-install.sh` (or `.ps1`).
 4. Push this folder's [config.json](config.json): `tools/theme.sh examples/tcl-65qm8l-google-tv`.

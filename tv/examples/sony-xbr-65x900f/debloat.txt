@@ -29,7 +29,7 @@
 #   sticker or the Help app.
 # - Launcher works. Same as the X900E: the stock launcher's HOME filter wins until
 #   com.google.android.tvlauncher is disabled; disable it, then `cmd package set-home-activity
-#   com.gathin.tvhome/.MainActivity`. Home key from inside apps returns to the new launcher.
+#   app.polaris.tv/.MainActivity`. Home key from inside apps returns to the new launcher.
 # - Inputs works: HDMI 1-4 (HDMI 3/ARC), Video and Live TV listed via com.sony.dtv.tvx. This firmware
 #   reports real per-port status ("No device" / "Connected"), not every port as connected.
 #   config.xml: hidden_apps com.sony.dtv.tvx and com.sony.dtv.tvxlauncher.programguide,

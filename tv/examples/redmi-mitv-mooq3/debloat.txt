@@ -15,7 +15,7 @@
 # so both were disabled with TVINPUT_ALLOW=1 in a run of their own; HDMI 1-3 and AV still list and switch.
 #
 # Stock launcher: com.google.android.tvlauncher. It is NOT in this list: launcher/build-and-install.sh
-# disables it after com.gathin.tvhome is installed and verified as Home. Only the stock launcher and
+# disables it after app.polaris.tv is installed and verified as Home. Only the stock launcher and
 # com.android.tv.settings/.system.FallbackHome claim HOME; setupwraith does not, and the saved Wi-Fi network
 # belongs to android.uid.system, so setupwraith stays enabled.
 #

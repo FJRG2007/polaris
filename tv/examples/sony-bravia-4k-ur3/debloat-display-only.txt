@@ -43,7 +43,7 @@
 #   again after the batch that disabled it; disabled once more it stayed off across a reboot.
 #
 # Screensaver: the stock one is com.google.android.backdrop, which this list disables. On this OLED the
-# launcher's Clock took its place: `settings put secure screensaver_components com.gathin.tvhome/.ClockDream`.
+# launcher's Clock took its place: `settings put secure screensaver_components app.polaris.tv/.ClockDream`.
 # It moves the clock to a new spot every minute (ClockScene.MOVE_MS), and `clock_glow` false leaves plain black
 # behind it.
 #

@@ -104,12 +104,12 @@ opened from the app library.
 
 ## HomeKeyService on every boot
 
-GMUI 6 drops `com.gathin.tvhome/.HomeKeyService` from `enabled_accessibility_services` on every boot.
+GMUI 6 drops `app.polaris.tv/.HomeKeyService` from `enabled_accessibility_services` on every boot.
 `restore_key_services: true` did not put it back (tested across four reboots); the author's helper
 re-adds it from a BOOT_COMPLETED receiver. Without that helper, after a reboot re-enable it over ADB:
 
 ```sh
-settings put secure enabled_accessibility_services "com.xgimi.duertts/com.xgimi.duertts.MonitorService:com.gathin.tvhome/.HomeKeyService"
+settings put secure enabled_accessibility_services "com.xgimi.duertts/com.xgimi.duertts.MonitorService:app.polaris.tv/.HomeKeyService"
 settings put secure accessibility_enabled 1
 ```
 

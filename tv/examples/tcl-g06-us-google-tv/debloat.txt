@@ -35,7 +35,7 @@
 # - Wait about a minute after the last batch before rebooting, as on the other AR2101 lists.
 # - com.tcl.smartalexa and com.tcl.usercenter are switched back on at every boot (as on the 40S5400A and
 #   32ES570F); both stay idle, so they are commented out below rather than disabled again at each boot.
-# - Launcher: launcher/ became Home (mFocusedApp = com.gathin.tvhome after Home and after a reboot). The
+# - Launcher: launcher/ became Home (mFocusedApp = app.polaris.tv after Home and after a reboot). The
 #   YouTube and Prime Video buttons are broadcasts only launcherx answers (as on examples/tcl-g03-google-tv), so
 #   launcherx is enabled again behind "stock_home_redirect" with "key_filter": false; see README.md.
 # - Reboot-checked twice: everything listed stays disabled, Home and the helper survive, Wi-Fi stays connected.

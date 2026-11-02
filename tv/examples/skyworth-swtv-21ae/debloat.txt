@@ -29,7 +29,7 @@ com.android.tv.feedbackconsent
 com.google.android.youtube.tv                # official YouTube; SmartTube is used instead
 com.cltv.fast                                # iWedia free channels with ads; starts at boot
 com.google.android.backdrop                  # ambient screensaver; screensaver_components still names it, so
-                                             # point it at com.gathin.tvhome/.ClockDream (README, Clock screensaver)
+                                             # point it at app.polaris.tv/.ClockDream (README, Clock screensaver)
 
 # Stock home. Disable only after the new launcher is installed and set as home.
 com.google.android.tvrecommendations         # recommendation rows for the stock launcher

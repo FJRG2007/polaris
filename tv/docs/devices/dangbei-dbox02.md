@@ -6,7 +6,7 @@ Do not apply another projector's list just because it also has MediaTek componen
 
 ## Home handover and saved Wi-Fi
 
-`cmd package set-home-activity` reported `Success`, but Google TV still resolved as Home. The replacement launcher was installed and visibly running before the stock Home packages were disabled with the repository's guarded PowerShell tool. Afterward, the HOME resolver and foreground activity pointed to `com.gathin.tvhome/.MainActivity`, including after reboot. No Home or Input accessibility helper was enabled.
+`cmd package set-home-activity` reported `Success`, but Google TV still resolved as Home. The replacement launcher was installed and visibly running before the stock Home packages were disabled with the repository's guarded PowerShell tool. Afterward, the HOME resolver and foreground activity pointed to `app.polaris.tv/.MainActivity`, including after reboot. No Home or Input accessibility helper was enabled.
 
 Before disabling `com.google.android.tungsten.setupwraith`, the owner found that it owned the saved Wi-Fi network. They forgot and rejoined that network through TV Settings, then checked that `com.android.tv.settings` owned the new saved network. Skipping that check could leave another unit without its saved connection. Keep the original package states and recovery record so the guarded restore tool can reverse the session's changes.
 

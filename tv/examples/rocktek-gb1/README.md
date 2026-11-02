@@ -15,7 +15,7 @@ other TV.
 ## Home handover
 
 Google TV Home is `com.google.android.apps.tv.launcherx`. It was disabled only after
-`com.gathin.tvhome` had become Home and stayed there across a reboot. The first-run wizard,
+`app.polaris.tv` had become Home and stayed there across a reboot. The first-run wizard,
 `com.google.android.tungsten.setupwraith`, also has to be disabled on this unit for the replacement Home
 to remain active.
 

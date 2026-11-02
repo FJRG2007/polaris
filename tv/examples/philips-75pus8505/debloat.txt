@@ -18,7 +18,7 @@
 # (disable.ps1 on Windows): Assistant, Alexa, Apple TV and YouTube Music off, Chromecast, DLNA and
 # the firmware updater kept. 36 packages were disabled in all, counting the 16 uk.co.freeview.* and
 # org.droidtv.freeviewplayers entries that this Italian unit also had off out of the box. After one
-# reboot the disabled list was identical, Home resolved to com.gathin.tvhome and the Home and SOURCES
+# reboot the disabled list was identical, Home resolved to app.polaris.tv and the Home and SOURCES
 # keys were pressed on the real remote. Applied on 2026-10-31; not yet lived with for days. The stock
 # launcher was disabled by launcher/build-and-install.ps1, and the TV still boots to Live TV
 # (org.droidtv.playtv) by itself. Netflix, Prime Video, YouTube, Disney+, Kodi and RaiPlay were
@@ -43,7 +43,7 @@
 #    script ran through on its own.
 # 2. The stock launcher's HOME filter has priority=2, a third-party launcher's always 0, and Android
 #    picks the higher priority before it looks at the preferred activity. So with the stock launcher
-#    still enabled, set-home-activity succeeds and the HOME role moves to com.gathin.tvhome, yet the
+#    still enabled, set-home-activity succeeds and the HOME role moves to app.polaris.tv, yet the
 #    Home key still opens com.google.android.tvlauncher. The new launcher only takes over once the
 #    stock one is disabled, as note 3 in examples/philips-55oled707 found on the Android 11 board.
 #
@@ -117,7 +117,7 @@ com.google.android.youtube.tvmusic        # YouTube Music
 # Stock launcher and its content engine, replaced by launcher/. ORDER MATTERS, as on
 # examples/philips-50pus8517: disable the launcher FIRST, it holds a provider reference into
 # tvrecommendations. After disabling tvlauncher, run set-home-activity again (Android drops the
-# preference when the set of HOME apps changes); Home then resolved to com.gathin.tvhome, and both
+# preference when the set of HOME apps changes); Home then resolved to app.polaris.tv, and both
 # an injected KEYCODE_HOME and the remote's Home key landed there. tvrecommendations also owns the system
 # notification panel, which is gone device-wide afterwards.
 # com.google.android.tvlauncher   # disabled by launcher/build-and-install.sh (or by hand) once the new launcher has started; ~140 MB resident

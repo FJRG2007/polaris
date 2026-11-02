@@ -79,7 +79,7 @@ home picker.
 English, German, Danish, Spanish, Latin American Spanish, Catalan, French, Russian, Serbian (Latin), Polish, Czech, Italian, Portuguese,
 Turkish, Arabic, Hebrew, Simplified Chinese, Traditional Chinese (Taiwan), Thai, Finnish, Vietnamese,
 Bangla, Indonesian, Norwegian Bokmål, Swedish, Dutch, Uzbek (Latin), Ukrainian, Korean and Asturian. The launcher follows the TV's language. Android 13+ can set it for the launcher
-alone: `tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales ca'`.
+alone: `tools/tv.py 'cmd locale set-app-locales app.polaris.tv --locales ca'`.
 
 Hebrew mirrors the layout:
 
@@ -104,7 +104,7 @@ contract: [`docs/specs/card.md`](specs/card.md). Ready-made ones are in [`addons
 Pick "Clock" in the TV's screensaver settings, or over ADB:
 
 ```bash
-tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'
+tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream; settings put secure screensaver_enabled 1'
 ```
 
 ## Remote keys

@@ -62,7 +62,7 @@ com.google.android.music
 com.google.android.feedback
 com.google.android.backdrop             # ambient screensaver. Once it is gone the screensaver has to
                                         # point somewhere else: settings put secure
-                                        # screensaver_components com.gathin.tvhome/.ClockDream;
+                                        # screensaver_components app.polaris.tv/.ClockDream;
                                         # settings put secure screensaver_enabled 1
 
 # Preloaded games (user-space apps: disable-user is enough, and reversible)

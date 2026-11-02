@@ -67,7 +67,7 @@ com.tcl.UpdatePeripheral               # TCL soundbar/speaker firmware updates (
 
 # Launcher handover. Disable these only AFTER launcher/ is installed and set as Home.
 # setupwraith: forget and re-join the Wi-Fi network first (see header), or the TV drops off Wi-Fi.
-# dreamx: set screensaver_components to com.gathin.tvhome/.ClockDream first.
+# dreamx: set screensaver_components to app.polaris.tv/.ClockDream first.
 # launcherx: with it gone, setupwraith's RecoveryActivity claims HOME; launcher/build-and-install.sh
 #   disables launcherx with its start-first ordering and will skip it until the new launcher owns Home.
 com.google.android.tungsten.setupwraith

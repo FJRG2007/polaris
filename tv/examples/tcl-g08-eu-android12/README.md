@@ -141,7 +141,7 @@ disabled package stayed disabled, and Home and Wi-Fi came back each time. One da
   `cname=com.google.android.tungsten.setupwraith`); once the owner forgot and re-joined it in Settings,
   `tools/disable.sh` disabled `setupwraith` without `FORCE_SETUPWRAITH`. `launcher/build-and-install.sh`
   was run with `STOCK_LAUNCHER=none` (this set's `launcherx` is not in the script's known-stock list);
-  after a reboot Home was `com.gathin.tvhome/.MainActivity`, confirmed via `dumpsys activity activities`.
+  after a reboot Home was `app.polaris.tv/.MainActivity`, confirmed via `dumpsys activity activities`.
 - **Live TV shortcut** set to `com.tcl.tv` via `launcher/app/src/main/res/values/config.xml` for this set
   (the built-in default targets a MediaTek package not present here). A rebuild needs that one-line edit,
   or `live_tv_package` in a pushed theme.
@@ -150,7 +150,7 @@ disabled package stayed disabled, and Home and Wi-Fi came back each time. One da
   (Wikimedia Commons, CC BY/CC BY-SA) rotate every 5 minutes with place + photographer captions, over a
   frosted-glass dock at 40% opacity; `wallpaper_true_color` is on (the set has ~2.4 GB RAM). The merge
   keeps the six columns, the dock order and the button remaps below. The Google photo screensaver
-  (`dreamx`) was disabled; the system screensaver was set to `com.gathin.tvhome/.ClockDream` with
+  (`dreamx`) was disabled; the system screensaver was set to `app.polaris.tv/.ClockDream` with
   `clock_wallpaper: true`, so the clock drifts over the wallpaper images instead of plain black.
 - **Remote buttons.** With `launcherx` off, the YouTube and Disney+ buttons did nothing until
   `HomeKeyService` mapped them. Scancodes read with `getevent -lt`:

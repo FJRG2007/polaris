@@ -59,7 +59,7 @@ The commands run from the repo folder. Each `tools/*.sh` script has a PowerShell
 5. Switch the screensaver to the launcher's clock, since Google's promo screensaver (dreamx) is in the list:
 
    ```sh
-   TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+   TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
    ```
 
 ## Re-enable one app
@@ -122,7 +122,7 @@ For a rotating set, look at `themes/scenes`, or try a ready-made look with `TV_H
 TCL updates can turn apps back on or give Home back to Google TV. To see what changed:
 
 ```sh
-TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/check.py examples/tcl-65c7l-google-tv/debloat.txt com.gathin.tvhome
+TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/check.py examples/tcl-65c7l-google-tv/debloat.txt app.polaris.tv
 ```
 
 Add `--fix` after `check.py` to re-disable whatever came back and put the launcher back on Home.
@@ -136,7 +136,7 @@ TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/tv.py 'settings delete secur
 
 The first line turns every disabled app back on and makes the Google TV home Home again. The second
 puts Google's screensaver back. To remove the new launcher as well, run
-`tools/tv.py 'pm uninstall com.gathin.tvhome'` the same way.
+`tools/tv.py 'pm uninstall app.polaris.tv'` the same way.
 
 ## When you're done
 

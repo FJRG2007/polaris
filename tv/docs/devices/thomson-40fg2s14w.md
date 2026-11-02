@@ -20,12 +20,12 @@ profile either.
 
 ## Home
 
-- `cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity` printed `Success`, and the Home
+- `cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity` printed `Success`, and the Home
   resolver still selected `com.google.android.apps.tv.launcherx`: pressing Home opened Google TV.
 - Disabling `com.google.android.tungsten.setupwraith` on its own did not change that; the resolver still picked
   `launcherx`. (Before disabling that package on any Google TV set, read
   `dumpsys wifi | grep -o 'cname=[^ ]*'`: a network saved during first setup belongs to it and goes with it.)
-- The system Home role reported `com.gathin.tvhome` while Home still opened Google TV, so the role holder is not
+- The system Home role reported `app.polaris.tv` while Home still opened Google TV, so the role holder is not
   the resolver. What Home does is `cmd package resolve-activity --brief -a android.intent.action.MAIN -c
   android.intent.category.HOME`, which is also what `tools/disable.sh`'s Home guard reads.
 - The handover itself is not broken on this firmware: `launcher/build-and-install.sh`, which starts the new
@@ -52,7 +52,7 @@ five HOME activities on this board:
 |---|---|
 | `com.google.android.apps.tv.launcherx/.home.HomeActivity` | 2 |
 | `com.google.android.tungsten.setupwraith/.RecoveryActivity` | 1 |
-| `com.gathin.tvhome/.MainActivity` | 0 |
+| `app.polaris.tv/.MainActivity` | 0 |
 | `com.express.at.factory.factorymanager/.FallbackHome` | -999 |
 | `com.android.tv.settings/.system.FallbackHome` | -1000 |
 
@@ -60,10 +60,10 @@ So this board is not one of the sets without a fallback: the ODM's factory manag
 TvSettings each declare one. The stock launcher also carries the highest HOME priority of the five, which is
 what the `set-home-activity` attempts above ran into.
 
-`dumpsys package com.gathin.tvhome | grep -o "[A-Z_]*DIRECT_BOOT_AWARE"` printed
+`dumpsys package app.polaris.tv | grep -o "[A-Z_]*DIRECT_BOOT_AWARE"` printed
 `PARTIALLY_DIRECT_BOOT_AWARE`, twice. That is the answer for the package, not for the activity Home starts
 in: in the launcher's manifest `HomeKeyService` is the one component marked
-`android:directBootAware="true"`, and `com.gathin.tvhome/.MainActivity` is not marked, so the line does not
+`android:directBootAware="true"`, and `app.polaris.tv/.MainActivity` is not marked, so the line does not
 say whether Home can start before the first unlock.
 
 What that session leaves open is the boot the CVTE rule is about: with the stock launcher disabled, does this

@@ -21,7 +21,7 @@
 # com.tcl.cyberui is absent on this unit (Unknown package); not listed.
 #
 # Tested 2026-10-27 on a real unit: launcher installed first, then this list, reboot once: Home stayed
-# on com.gathin.tvhome, voice/Miracast/OTA stayed off, Chromecast (mediashell) kept. Not yet lived
+# on app.polaris.tv, voice/Miracast/OTA stayed off, Chromecast (mediashell) kept. Not yet lived
 # with for days; treat as reboot-checked rather than long-term.
 #
 # DO NOT DISABLE (load-bearing on this firmware):

@@ -56,8 +56,8 @@ same menu SHIPPING INIT and BOARD INIT reset the set. This is a remote key seque
   then force-stopped the new launcher:
 
   ```
-  D kill    : 当前进程是用户进程:com.gathin.tvhome
-  I ActivityManager: Force stopping com.gathin.tvhome appid=10046 user=0: from pid 1986
+  D kill    : 当前进程是用户进程:app.polaris.tv
+  I ActivityManager: Force stopping app.polaris.tv appid=10046 user=0: from pid 1986
   ```
 
 - The `com.ts.launcher` application-ID build that works on China Xiaomi TVs

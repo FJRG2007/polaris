@@ -68,4 +68,4 @@ com.hbo.hbonow                          # old HBO Now app, same
 # Batch 4 (after the launcher is installed): Google ambient screensaver
 com.google.android.backdrop             # the screensaver was already off on this unit. If you turn it
                                         # back on, pick the launcher's clock: settings put secure
-                                        # screensaver_components com.gathin.tvhome/.ClockDream
+                                        # screensaver_components app.polaris.tv/.ClockDream

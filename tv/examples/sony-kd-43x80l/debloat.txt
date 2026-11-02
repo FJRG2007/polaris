@@ -15,7 +15,7 @@
 # com.youview.poa, com.sony.dtv.iplayerlauncher, com.sony.dtv.itvlauncher, com.sony.dtv.ardlauncher,
 # com.sony.dtv.b2b.softap, com.sony.dtv.all4launcher.
 #
-# Tested and lived with on a KD-43X80L running the clean Apple TV style launcher (com.gathin.tvhome).
+# Tested and lived with on a KD-43X80L running the clean Apple TV style launcher (app.polaris.tv).
 # setupwraith disabled safely (Wi-Fi network owned by com.android.tv.settings, no reconnection issues).
 # Disabling setupwraith gives Home back but can break casting (Chromecast built-in); comment out its line
 # below if you want to keep casting.

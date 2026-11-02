@@ -15,7 +15,7 @@
 - **The launcher installs** and owns Home (`mFocusedApp`) reliably across cold reboots. CleanYourTV runs at ~38.3 MB PSS (compared to ~140–160 MB for the stock launcher suite and ~140 MB for Google Backdrop with its Chromium sandbox process).
 - **Remote buttons:** Home, Input, Settings and app keys work directly with no extra helper service.
 - **Live TV:** Routes to `com.mediatek.wwtv.tvcenter/.nav.TurnkeyUiMainActivity` directly from CleanYourTV's Inputs menu.
-- **Screensaver:** Replaced `com.google.android.backdrop` with `com.gathin.tvhome/.ClockDream`.
+- **Screensaver:** Replaced `com.google.android.backdrop` with `app.polaris.tv/.ClockDream`.
 - **HDMI-CEC Native Device Names:**
   On this firmware, Android TV Settings pre-assigns generic labels ("Game console", "Blu-ray") to ports in `tv_input_custom_labels`, which overrides the CEC broadcast names. Clearing this setting via:
   ```bash

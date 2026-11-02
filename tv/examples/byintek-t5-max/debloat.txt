@@ -14,7 +14,7 @@
 # - com.google.android.apps.tv.launcherx and setupwraith were disabled separately, later, only
 #   after the owner forgot and rejoined the Wi-Fi network in Settings (cname then read
 #   android.uid.system:1000): `pm disable-user --user 0` for both, then
-#   `cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity`. Undo that pair with
+#   `cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity`. Undo that pair with
 #   `pm enable --user 0 com.google.android.apps.tv.launcherx`, `pm enable --user 0
 #   com.google.android.tungsten.setupwraith`, then set-home-activity back to launcherx. Before the
 #   rejoin, disabling launcherx alone dropped Home to setupwraith's RecoveryActivity (rolled back).

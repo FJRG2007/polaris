@@ -37,7 +37,7 @@
 #  - Additional bloat discovered and disabled: BRAVIA CAM services (camerafwupdate, settings, distancealert,
 #    livingfit), Sony seeds IoT auth and remotestart, Sony help and eco dashboard.
 #  - screensaver: dreamx is commented out below because disabling it requires setting screensaver_components
-#    first (e.g. com.gathin.tvhome/.ClockDream or com.android.dreams.basic/.Colors).
+#    first (e.g. app.polaris.tv/.ClockDream or com.android.dreams.basic/.Colors).
 #
 # Third unit (New Zealand, Wi-Fi, redirect route):
 # Same model line and the same PA build. Applied in three batches with a screenshot between, then the
@@ -53,7 +53,7 @@
 #  - com.qterics.da.product was back on (enabled state "default") after the first reboot; disabled again by
 #    hand it stayed off through five more restarts.
 #  - The screensaver shipped pointing at com.sony.dtv.livingfit (BRAVIA CAM Living Fit), which this list
-#    disables: screensaver_components was moved to com.gathin.tvhome/.ClockDream, then dreamx disabled.
+#    disables: screensaver_components was moved to app.polaris.tv/.ClockDream, then dreamx disabled.
 #  - Off by choice on this unit: Netflix, Prime Video, Spotify, HbbTV, the Sony bug report service and the
 #    customer support tile. The remote's Netflix and Prime Video buttons then open the app's Play Store
 #    page, which has an Enable button. Kept: QuickSet, Chromecast, AirPlay/HomeKit, DLNA, updates;
@@ -92,8 +92,8 @@ com.google.android.katniss
 com.sony.dtv.voicesearch
 com.sony.dtv.assistantadapter
 
-# screensaver: set basic screensaver first, or the launcher's clock (com.gathin.tvhome/.ClockDream). The third
-# unit did that (settings put secure screensaver_components com.gathin.tvhome/.ClockDream) and then disabled it.
+# screensaver: set basic screensaver first, or the launcher's clock (app.polaris.tv/.ClockDream). The third
+# unit did that (settings put secure screensaver_components app.polaris.tv/.ClockDream) and then disabled it.
 # com.google.android.apps.tv.dreamx # Ambient screensaver and background sync jobs
 
 # streaming apps (off on the third unit by choice; other owners can uncomment them; the remote's Netflix and Prime Video buttons then open the

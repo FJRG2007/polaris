@@ -20,7 +20,7 @@
 # - Home: the framework filters third-party HOME candidates by a package-name allowlist, the same
 #   mechanism as MiTV-AETP0 (services.vdex has isThirdpartyHomeAllowed and
 #   APP_WHITELIST_ALLOW_THIRDPARTY_HOME; the list is /data/system/mitv_security_center.xml, not readable
-#   from the shell). The standard com.gathin.tvhome build installed and opened, and
+#   from the shell). The standard app.polaris.tv build installed and opened, and
 #   `cmd package set-home-activity` printed Success, but HOME still resolved to com.mitv.tvhome.
 #   The opt-in application-ID build from docs/devices/xiaomi-mitv-aetp0-dofus.md
 #   (`./gradlew assembleRelease -PlauncherApplicationId=com.ts.launcher`) became Home with

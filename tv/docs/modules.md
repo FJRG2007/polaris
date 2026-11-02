@@ -22,9 +22,9 @@ On the activity that already has the `LEANBACK_LAUNCHER` filter, add a second fi
     </intent-filter>
     <intent-filter>
         <action android:name="android.intent.action.MAIN" />
-        <category android:name="com.gathin.tvhome.category.DOCK_CARD" />
+        <category android:name="app.polaris.tv.category.DOCK_CARD" />
     </intent-filter>
-    <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
+    <meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />
 </activity>
 ```
 
@@ -126,7 +126,7 @@ the `game_day` key (`config.xml` or a theme); there is no card prompt for it.
 1. Name a read-only content provider in a `meta-data` on your `<application>`:
 
    ```xml
-   <meta-data android:name="com.gathin.tvhome.games" android:value="com.example.games" />
+   <meta-data android:name="app.polaris.tv.games" android:value="com.example.games" />
    <provider android:name=".GamesProvider" android:authorities="com.example.games" android:exported="true" />
    ```
 

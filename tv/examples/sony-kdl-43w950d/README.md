@@ -26,7 +26,7 @@ list's own last section).
   unit (`dumpsys wifi | grep cname` showed nothing); `tools/disable.sh` disabled
   it cleanly with no warning.
 - The debloat list and the launcher install both survived a full reboot, with
-  the Wi-Fi connection, Home (`com.gathin.tvhome`), and every disabled package
+  the Wi-Fi connection, Home (`app.polaris.tv`), and every disabled package
   state intact afterwards.
 - D-pad navigation was verified by injected key events: Right/Left move across
   the dock with the glass highlight and ambient glow following; Up from the dock

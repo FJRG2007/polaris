@@ -32,8 +32,8 @@
 # 1. Screensaver. screensaver_components ships as com.google.android.backdrop/.Backdrop with a
 #    5-minute screen_off_timeout. Once backdrop is disabled the screensaver points at a disabled
 #    component, so set another one:
-#      settings put secure screensaver_components com.gathin.tvhome/.ClockDream
-#      settings put secure screensaver_default_component com.gathin.tvhome/.ClockDream
+#      settings put secure screensaver_components app.polaris.tv/.ClockDream
+#      settings put secure screensaver_default_component app.polaris.tv/.ClockDream
 #    (or com.android.dreams.basic/.Colors without the launcher).
 # 2. Chromecast on a shared network. On this owner's Wi-Fi (a large shared network, ~150 hosts
 #    across 192.168.1-18.x) about 150 devices held connections to the TV's Cast port 8009, and
@@ -88,7 +88,7 @@
 # the third unit: persist.odm.tpv.fw.revision=TPM215E_R.101.000.198.158, persist.odm.tpv.region=eu,
 # ro.product.name=PH0M_EA_T32, Android 11. Tested the same evening only, with two reboots.
 # Applied: the four telemetry lines, nettv.market, fusion.android.tv.demo, partnercustomizer, tvrecommendations,
-# backdrop (screensaver moved to com.gathin.tvhome/.ClockDream, quirk 1), videos, youtube.tvmusic, play.games and
+# backdrop (screensaver moved to app.polaris.tv/.ClockDream, quirk 1), videos, youtube.tvmusic, play.games and
 # Spotify, plus com.google.android.katniss (Assistant) by the owner's choice. Kept by choice: mediashell
 # (Chromecast, on a home network; casting from a phone works), Netflix and Prime Video. Fitness is not installed.
 # tools/disable.sh skipped com.mstar.android.tv.disclaimercustomization (dumpsys shows no permission block for it on
@@ -108,7 +108,7 @@
 # low_ram. Tested the same evening only, with two reboots.
 # Applied: the four telemetry lines, nettv.market, fusion.android.tv.demo, disclaimercustomization (tools/disable.sh
 # took it here, unlike on the fourth unit), partnercustomizer, tvrecommendations, backdrop (screensaver moved to
-# com.gathin.tvhome/.ClockDream, quirk 1) and Prime Video, plus com.google.android.katniss (Assistant) by the owner's
+# app.polaris.tv/.ClockDream, quirk 1) and Prime Video, plus com.google.android.katniss (Assistant) by the owner's
 # choice. Kept by choice: mediashell (Chromecast), Netflix, Disney+ and YouTube. videos, youtube.tvmusic, play.games
 # and fitness were already disabled before the session; Spotify is not installed. org.droidtv.eum,
 # nettvregistration and the MMP player stayed enabled.

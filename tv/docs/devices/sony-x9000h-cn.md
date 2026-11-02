@@ -41,14 +41,14 @@ was therefore built from main and installed with:
 
 ```sh
 adb install -r launcher/app/build/outputs/apk/release/app-release.apk
-adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.HOME -n com.gathin.tvhome/.MainActivity      # Status: ok, cold start 926 ms
-adb shell cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity
+adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.HOME -n app.polaris.tv/.MainActivity      # Status: ok, cold start 926 ms
+adb shell cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity
 ```
 
 Dangbei was left enabled as the fallback (`STOCK_LAUNCHER=none`). After a `svc power reboot`:
 
 - `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME`
-  still resolved to `com.gathin.tvhome/.MainActivity`;
+  still resolved to `app.polaris.tv/.MainActivity`;
 - the launcher was the focused window after boot;
 - the Home key returned to it from the system Settings and from the input panel.
 

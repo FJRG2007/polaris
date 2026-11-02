@@ -72,7 +72,7 @@ STOCK_LAUNCHER=com.google.android.apps.tv.launcherx TV_HOST=<tv ip> launcher/bui
 
 ## Verified
 - Debloat applied cleanly
-- CleanYourTV launcher (`com.gathin.tvhome`) installed and set as default HOME
+- CleanYourTV launcher (`app.polaris.tv`) installed and set as default HOME
 - Stock `com.google.android.apps.tv.launcherx` disabled
 
 ## Additional SWTV-22SA-FHD units (28 October 2026)

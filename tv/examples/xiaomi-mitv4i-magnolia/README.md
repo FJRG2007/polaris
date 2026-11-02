@@ -36,8 +36,8 @@ All packages are disabled via `pm disable-user --user 0` (nothing is uninstalled
 - **Phone remote:** `com.mitv.milinkservice` is commented out in `debloat.txt`; shared lists keep it on (this set had it off).
 
 ### 3. Launcher Handover
-- Built reference launcher (`com.gathin.tvhome`) with platform 34 and minSdk 26.
-- Made default home activity with `cmd package set-home-activity com.gathin.tvhome/.MainActivity`.
+- Built reference launcher (`app.polaris.tv`) with platform 34 and minSdk 26.
+- Made default home activity with `cmd package set-home-activity app.polaris.tv/.MainActivity`.
 - Disabled stock `com.google.android.tvlauncher` only after confirming Home focus.
 - Remote control behaviour:
   - D-pad navigation, Back, Volume, and Power work natively.

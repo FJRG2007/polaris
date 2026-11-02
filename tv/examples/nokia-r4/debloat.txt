@@ -79,7 +79,7 @@ com.realtek.factorytools
 com.apps.factory.ui
 com.google.android.backdrop                     # ambient screensaver; point the launcher's ClockDream
                                                 # at the screensaver first:
-                                                # settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+                                                # settings put secure screensaver_components app.polaris.tv/.ClockDream
 
 # Stock launcher, replaced by launcher/
 com.google.android.tvlauncher

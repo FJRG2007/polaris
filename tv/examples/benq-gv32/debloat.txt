@@ -28,7 +28,7 @@
 # Notes from this unit (verified with screenshots, 21 October 2026):
 # - Only Wireless debugging (TLS) is offered; pair, connect, then `adb tcpip 5555`. Port 5555 came back by itself
 #   after a reboot.
-# - Launcher: HOME takeover works once setupwraith is disabled (mFocusedApp = com.gathin.tvhome after Home and after
+# - Launcher: HOME takeover works once setupwraith is disabled (mFocusedApp = app.polaris.tv after Home and after
 #   a reboot). Inputs lists HDMI 1 and HDMI 2; they open in com.google.android.tv.inputplayer. No tuner.
 # - Remote ("RCI078/079", BT): Home, Back, volume, D-pad, YouTube/Netflix/Prime Video buttons, Input (Google's input
 #   switcher), focus (com.sdmc.kt), auto-keystone (KEY_F20, ToF sensor and focus motor), the BenQ help button and the

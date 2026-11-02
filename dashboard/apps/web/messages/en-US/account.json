@@ -273,6 +273,10 @@
             "streamdeck": {
                 "badge": "Stream Deck",
                 "title": "Made by connecting the Polaris plugin on a Stream Deck. Downloads lists the connected decks and can disconnect them."
+            },
+            "tv": {
+                "badge": "TV",
+                "title": "Made by connecting Polaris TV. It shows your name and notification counts on that set, nothing more."
             }
         },
         "form": {
@@ -1585,6 +1589,38 @@
             "nothingWaiting": "Nothing is waiting on that code. Press Connect in the plugin again for a new one.",
             "cannotAnswer": "That request cannot be answered.",
             "noScopes": "Your account cannot use anything a Stream Deck offers. Ask an administrator for access."
+        }
+    },
+    "tv": {
+        "page": {
+            "title": "Connect a TV",
+            "intro": "Type the code your TV is showing. Nothing is connected until you say so."
+        },
+        "title": "Connect {device}",
+        "code": "Code {code}",
+        "system": "System",
+        "version": "App version",
+        "askedFrom": "Asked from",
+        "on": "On",
+        "unknown": "Unknown",
+        "asksTo": "It will see",
+        "consent": "Saying yes lets this TV show your name and how many notifications are waiting, for a year. It cannot read them or do anything else.",
+        "working": "Working",
+        "approve": "Connect it",
+        "deny": "Turn it away",
+        "signedIn": "Connected.",
+        "signedInHint": "Go back to the TV; it carries on by itself. You can end it under <link>API keys</link>.",
+        "turnedAway": "Turned away.",
+        "turnedAwayHint": "Nothing was handed over. The TV says so and stops.",
+        "codeLabel": "The code your TV is showing",
+        "looking": "Looking",
+        "find": "Find it",
+        "errors": {
+            "tooMany": "Too many codes tried. Wait a few minutes.",
+            "notACode": "That is not a code from Polaris TV.",
+            "nothingWaiting": "Nothing is waiting on that code. Press Connect on the TV again for a new one.",
+            "cannotAnswer": "That request cannot be answered.",
+            "noScopes": "Your account cannot connect a TV."
         }
     }
 }

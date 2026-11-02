@@ -34,7 +34,7 @@
 #   the newer Android TV 11 release (V728 / AR05) does NOT exhibit the Bluetooth bug and resumes
 #   cleanly with quick_start_mode=1 enabled.
 # - TclAppBoot blocks third-party launcher autostart unless granted via appops:
-#   cmd appops set com.gathin.tvhome AUTO_START allow && cmd appops set com.gathin.tvhome APP_AUTO_START allow && appops write-settings
+#   cmd appops set app.polaris.tv AUTO_START allow && cmd appops set app.polaris.tv APP_AUTO_START allow && appops write-settings
 # - OOBE Wi-Fi ownership (setupwraith): If Wi-Fi was configured during initial setup, the saved
 #   network carries cname=com.google.android.tungsten.setupwraith; keep setupwraith enabled (or
 #   forget and reconnect Wi-Fi via Settings so android.uid.system owns it).

@@ -39,7 +39,7 @@
 #   The Input button keeps opening TCL's source panel; the launcher's Inputs pill opens the glass menu.
 # - With com.tcl.interactive disabled, com.tcl.tv logs "tias_sdk getService failure" ~10x/s for a few
 #   seconds when the TV player starts, then stops. CPU on HDMI measured the same (~23%) with it on or off.
-# - Disabling dreamx: set screensaver_components to com.gathin.tvhome/.ClockDream first.
+# - Disabling dreamx: set screensaver_components to app.polaris.tv/.ClockDream first.
 
 # TCL tracking and analytics
 com.tcl.ttvs                           # Samba TV ACR viewing tracking, TCL "BI" analytics, Alexa core, T-Cast

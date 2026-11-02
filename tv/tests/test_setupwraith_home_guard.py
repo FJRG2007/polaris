@@ -2,16 +2,16 @@
 
 On Google TV, setupwraith's `.RecoveryActivity` answers HOME ahead of an installed launcher: on a
 Chromecast with Google TV 4K (Google TV 14, UTTC.250917.004) launcherx answers at priority 2,
-setupwraith at 1 and com.gathin.tvhome at 0. With launcherx disabled and setupwraith left on, Home goes
+setupwraith at 1 and app.polaris.tv at 0. With launcherx disabled and setupwraith left on, Home goes
 to the RecoveryActivity, the black screen system_server crash-loops on (docs/TROUBLESHOOTING.md).
 
 disable.sh and disable.ps1 reached that state: the Wi-Fi guard kept setupwraith because it owned the
-saved network, and the Home guard let launcherx go because com.gathin.tvhome was installed, although it
+saved network, and the Home guard let launcherx go because app.polaris.tv was installed, although it
 was not Home (build-and-install.sh rolls back when set-home-activity does not take, which that
 Chromecast's list records). Now, when Home's owner is listed and setupwraith answers HOME and stays
 enabled, the owner is skipped too, with FORCE_HOME=1 as the override, as for the rest of the Home
 guard. A launcher that already owns Home is not touched by this (examples/prismplus-q65-ultra-r10g
-disables launcherx and keeps setupwraith on once com.gathin.tvhome is Home).
+disables launcherx and keeps setupwraith on once app.polaris.tv is Home).
 
 check.py --fix had the same gap: when set-home-activity did not take it went on to disable the packages
 that came back, launcherx included, although its own comment says a Home that cannot be fixed stops
@@ -35,7 +35,7 @@ import test_home_guard as guard  # noqa: E402
 
 SETUP = "com.google.android.tungsten.setupwraith"
 LAUNCHERX = "com.google.android.apps.tv.launcherx"
-CUSTOM = "com.gathin.tvhome"
+CUSTOM = "app.polaris.tv"
 RECOVERY = f"{SETUP}/.RecoveryActivity"
 SETTINGS_FALLBACK = "com.android.tv.settings/.system.FallbackHome"
 LAUNCHERX_HOME = f"{LAUNCHERX}/.home.HomeActivity"
@@ -110,7 +110,7 @@ class DisableKeepsTheOwnerWhileSetupwraithStays(unittest.TestCase):
                 self.assertIn(f"pm disable-user --user 0 {LAUNCHERX}", sent)
 
     def test_a_launcher_that_owns_home_lets_the_list_disable_launcherx(self):
-        # examples/prismplus-q65-ultra-r10g: com.gathin.tvhome is Home, setupwraith stays on, and the
+        # examples/prismplus-q65-ultra-r10g: app.polaris.tv is Home, setupwraith stays on, and the
         # list disables launcherx. Home's owner is not listed, so this guard has nothing to say.
         self.write_list([LAUNCHERX, "com.example.ads"])
         for entry in self.entries():
@@ -147,7 +147,7 @@ class CheckFixKeepsHomeWhileSetupwraithStays(unittest.TestCase):
 
     def test_a_home_switch_that_does_not_take_stops_before_anything_is_disabled(self):
         # The issue's run: an update turned both back on, setupwraith owns the Wi-Fi network, and the
-        # switch to com.gathin.tvhome does not take. Disabling launcherx then left Home to the
+        # switch to app.polaris.tv does not take. Disabling launcherx then left Home to the
         # RecoveryActivity.
         self.write_list([SETUP, LAUNCHERX, "com.example.music"])
         self.tv(home_locked=True)
@@ -157,7 +157,7 @@ class CheckFixKeepsHomeWhileSetupwraithStays(unittest.TestCase):
         self.assertEqual(self.sent(), [f"cmd package set-home-activity --user 0 {CUSTOM}/.MainActivity"])
 
     def test_a_home_switch_that_takes_lets_launcherx_go(self):
-        # With Home on com.gathin.tvhome, launcherx can go; setupwraith stays for the Wi-Fi network.
+        # With Home on app.polaris.tv, launcherx can go; setupwraith stays for the Wi-Fi network.
         self.write_list([SETUP, LAUNCHERX, "com.example.music"])
         self.tv()
         result = self.run_check("--fix", str(self.list_path))

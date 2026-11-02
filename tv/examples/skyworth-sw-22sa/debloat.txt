@@ -70,5 +70,5 @@ com.hisense.odinbrowser                      # sideloaded Hisense browser
 # setupwraith applied in a FORCE_SETUPWRAITH=1 pass after the connected network had been
 # forgotten + re-joined — dumpsys events show Globe1524 re-added under android.uid.system;
 # the stale setupwraith networks (Globe1524masters etc.) went with it, harmlessly).
-com.google.android.apps.tv.launcherx         # stock Google TV home; com.gathin.tvhome is Home now
+com.google.android.apps.tv.launcherx         # stock Google TV home; app.polaris.tv is Home now
 com.google.android.tungsten.setupwraith      # its RecoveryActivity otherwise steals Home and crash-loops system_server

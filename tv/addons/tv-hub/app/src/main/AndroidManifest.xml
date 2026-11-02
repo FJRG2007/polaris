@@ -61,9 +61,9 @@
             <!-- CleanYourTV module card, spec 1 (docs/specs/card.md): same activity as LEANBACK_LAUNCHER. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="com.gathin.tvhome.category.DOCK_CARD" />
+                <category android:name="app.polaris.tv.category.DOCK_CARD" />
             </intent-filter>
-            <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
+            <meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />
         </activity>
 
         <activity android:name=".ui.OnboardingActivity" android:exported="false" />

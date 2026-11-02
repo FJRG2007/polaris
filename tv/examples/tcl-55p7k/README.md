@@ -32,7 +32,7 @@ was checked with the real remote.
 | Prime Video | 752 | `TCL_PRIMEVIDEO` | **4099** | `4099:com.amazon.amazonvideo.livingroom` |
 | TCL Channel | — | `TCL_QUICK_MENU` | **4020** | `4020:com.tcl.tv` (Live TV) |
 | Guide | 365 | `TCL_EPG` | **4001** | `4001:com.tcl.tv` and `front:4001:guide:com.tcl.tv`: Live TV, then its guide |
-| TCL Home | 204 | `TCL_DASHBOARD` | **4137** | `4137:com.gathin.tvhome/.QuickSettingsActivity` (the launcher's panel) |
+| TCL Home | 204 | `TCL_DASHBOARD` | **4137** | `4137:app.polaris.tv/.QuickSettingsActivity` (the launcher's panel) |
 | Web | 651 | `TCL_BROWSEHERE` | **4159** | any app; this unit has no browser and used `4159:com.esaba.downloader` |
 | Settings (gear) | 233 | `NOTIFICATION` | **83** | `settings_key_keycodes` 83 |
 | Profile (person icon) | 653 | `PROFILE_SWITCH` | 288 | not mapped: Google TV profiles went with launcherx |
@@ -42,7 +42,7 @@ was checked with the real remote.
   `com.tcl.usercenter`, which the list disables; this unit gave the button to the launcher's panel instead.
 - **Web** opens BrowseHere on sets that have `com.tcl.browser`. This one does not: with `com.tcl.interactive`
   disabled, a press only makes `com.tcl.tv` retry `tcl_tias_tbrowser` for about 13 seconds, then stop.
-- Home, Home held (`3:home` plus `hold:3:com.gathin.tvhome/.QuickSettingsActivity`), Input, D-pad and the
+- Home, Home held (`3:home` plus `hold:3:app.polaris.tv/.QuickSettingsActivity`), Input, D-pad and the
   microphone work. The Assistant answers voice with launcherx disabled.
 - **Price:** with `HomeKeyService` filtering keys, Volume Up held moves one step per press, as on the TCL G09
   (`docs/devices/tcl-55p71b-g09-key-repeat.md`).

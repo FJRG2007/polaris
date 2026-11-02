@@ -18,8 +18,8 @@
 # TvInputService is not a registered TV input (dumpsys tv_input lists only the DVB-C tuner
 # com.inspur.tang.mwtvinput/.MWTvInputService/HW28), so disabling the launcher does not touch cable TV.
 # It is NOT in this list: launcher\build-and-install.ps1 -StockLauncher com.inspur.isoc.launcher disables
-# it once com.gathin.tvhome owns Home. While it stays enabled, HOME priority 2 beats the new launcher's 0
-# and `cmd package set-home-activity` to com.gathin.tvhome is ignored.
+# it once app.polaris.tv owns Home. While it stays enabled, HOME priority 2 beats the new launcher's 0
+# and `cmd package set-home-activity` to app.polaris.tv is ignored.
 #
 # Live TV: com.android.tv (operator build LiveTv_CNS) on the tuner above. It cannot parse the passthrough
 # channel URI the launcher's Inputs menu sends on a cold start (ContentUriUtils.safeParseId), and its window
@@ -37,7 +37,7 @@
 # Watchdog: com.inspur.android.daemon is left enabled. From its APK: LightsService (front LED),
 # ProcessMonitorService (force-stops cached processes not on the allow list in assets/processes.json),
 # GlobalKeyReceiver (remote keys such as YouTube), and boot-time sleep/dream/animation/HDMI-CEC settings.
-# Nothing in it re-enables packages or resets Home, and it did not kill com.gathin.tvhome in the
+# Nothing in it re-enables packages or resets Home, and it did not kill app.polaris.tv in the
 # background (Android protects the Home process). Disabling it would lose the LED and the YouTube key.
 #
 # Wi-Fi: disabling a uid 1000 com.inspur.* package logs "Remove all networks for app"; the saved networks

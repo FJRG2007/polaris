@@ -30,9 +30,9 @@ PY=tools/venv/bin/python
   [coocaa-home-shim](https://github.com/VincentYe123/coocaa-home-shim).
 - **Coocaa's memory manager force-stops third-party apps** about two seconds after they leave the
   screen. It spares packages whose second part is `coocaa`, `skyworth`, `tianci` or `android`. A
-  launcher installed as `com.gathin.tvhome` is killed as soon as an app opens, and Back from that app
+  launcher installed as `app.polaris.tv` is killed as soon as an app opens, and Back from that app
   then lands on the stock home. Build it as `com.coocaa.tvhome` with the existing
-  `launcherApplicationId` property; the Java namespace stays `com.gathin.tvhome`.
+  `launcherApplicationId` property; the Java namespace stays `app.polaris.tv`.
 - **Coocaa's boot flow opens the stock home itself** once the boot video ends, whatever the
   properties say. The shim watches for that during the first two minutes after boot and asks
   `com.tianci.system` to go Home (Coocaa blocks activity starts from background apps). With the
@@ -51,15 +51,15 @@ PY=tools/venv/bin/python
    (cd launcher && ./gradlew assembleRelease -PlauncherApplicationId=com.coocaa.tvhome)
    "$PY" -I tools/b64push.py launcher/app/build/outputs/apk/release/app-release.apk /data/local/tmp/tvhome.apk
    "$PY" -I tools/tv.py 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk'
-   "$PY" -I tools/tv.py 'am start -W -n com.coocaa.tvhome/com.gathin.tvhome.MainActivity'
+   "$PY" -I tools/tv.py 'am start -W -n com.coocaa.tvhome/app.polaris.tv.MainActivity'
    ```
 
-2. Push `config.json` (`tools/theme.sh` assumes `com.gathin.tvhome`, so push it by hand), and
+2. Push `config.json` (`tools/theme.sh` assumes `app.polaris.tv`, so push it by hand), and
    restart the launcher:
 
    ```bash
    "$PY" -I tools/b64push.py examples/skyworth-7s60-a5/config.json /sdcard/Android/data/com.coocaa.tvhome/files/config.json
-   "$PY" -I tools/tv.py 'am force-stop com.coocaa.tvhome; am start -n com.coocaa.tvhome/com.gathin.tvhome.MainActivity'
+   "$PY" -I tools/tv.py 'am force-stop com.coocaa.tvhome; am start -n com.coocaa.tvhome/app.polaris.tv.MainActivity'
    ```
 
 3. Install the shim (APK from its [releases](https://github.com/VincentYe123/coocaa-home-shim/releases),
@@ -87,7 +87,7 @@ Optional: `com.coocaa.screensaver` (ad SDK) is in the list; the launcher's clock
 its place:
 
 ```bash
-"$PY" -I tools/tv.py 'settings put secure screensaver_components com.coocaa.tvhome/com.gathin.tvhome.ClockDream; settings put secure screensaver_enabled 1'
+"$PY" -I tools/tv.py 'settings put secure screensaver_components com.coocaa.tvhome/app.polaris.tv.ClockDream; settings put secure screensaver_enabled 1'
 ```
 
 ## Inputs

@@ -29,7 +29,7 @@ The stock Home package was `com.google.android.tvlauncher`. Setting the replacem
 Home activity while stock Home remained enabled printed `Success`, but the resolver
 still selected stock Home. The existing guarded `launcher/build-and-install.sh`
 procedure started the replacement, disabled stock Home and assigned the new Home.
-`com.gathin.tvhome/.MainActivity` was confirmed as the default and returned after reboot.
+`app.polaris.tv/.MainActivity` was confirmed as the default and returned after reboot.
 Do not treat the command's success message alone as proof of a handover.
 
 The input-handler guard retained `com.google.android.tv`: package inspection showed

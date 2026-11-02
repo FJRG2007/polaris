@@ -53,7 +53,7 @@ The first `launcher/build-and-install.sh` run rolled back as designed: Home went
 setupwraith because the Wi-Fi network saved during setup belonged to it. The TV was on Ethernet and
 that changed nothing: the guard asks who owns the saved network, not which interface is up. Only
 after forgetting that network in Settings did the second run disable setupwraith and make
-`com.gathin.tvhome` Home.
+`app.polaris.tv` Home.
 
 So on a set like this, decide before the install, not after the rollback:
 
@@ -113,7 +113,7 @@ block, `com.tcl.gamebar`, `com.tcl.UpdatePeripheral` and `com.google.android.mar
 disabled. Prime Video ships preinstalled as `com.amazon.amazonvideo.livingroom`, which the list does
 not name. With launcherx, 25 packages were disabled; after `sync`, a 15-second wait and a reboot,
 `pm list packages -d` was the same 25, and the TV started straight into the new Home
-(`wm_set_resumed_activity` showed `FallbackHome`, then `com.gathin.tvhome`), not into Live TV.
+(`wm_set_resumed_activity` showed `FallbackHome`, then `app.polaris.tv`), not into Live TV.
 
 **setupwraith without losing Wi-Fi.** setupwraith owned one saved network, but not the one the TV
 was on: `dumpsys wifi` gave `cname=com.google.android.tungsten.setupwraith` for a network saved
@@ -121,7 +121,7 @@ during setup and no longer used, and `cname=android.uid.system:1000` for the con
 owner could not find it in Settings, so it was removed from the shell instead:
 `cmd wifi list-networks` for its id, then `cmd wifi forget-network <id>`. `dumpsys wifi` then showed
 `android.uid.system` only, `tools/disable.sh` disabled setupwraith without `FORCE_SETUPWRAITH=1`,
-Wi-Fi stayed connected, and `launcher/build-and-install.sh` made `com.gathin.tvhome` Home on its
+Wi-Fi stayed connected, and `launcher/build-and-install.sh` made `app.polaris.tv` Home on its
 first run.
 
 **The remote's keys.** The Bluetooth remote names itself `BT_RC923_M2` (key layout

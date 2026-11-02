@@ -10,7 +10,7 @@
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
 #
 # Stock launcher: com.google.android.apps.tv.launcherx (disabled here, replaced with reference launcher
-# com.gathin.tvhome as native default Home). Live TV / HDMI app: com.tcl.tv. Inputs: com.tcl.tvinput.
+# app.polaris.tv as native default Home). Live TV / HDMI app: com.tcl.tv. Inputs: com.tcl.tvinput.
 #
 # TESTING, honestly:
 # Tested on a live unit in Germany and lived with. Verified across reboots: CleanYourTV reference launcher is the default
@@ -22,7 +22,7 @@
 # - The active Wi-Fi network belongs to android.uid.system:1000, NOT setupwraith (verified with dumpsys wifi).
 #   Setupwraith can be safely disabled without dropping Wi-Fi or ADB.
 # - The stock screensaver (com.google.android.apps.tv.dreamx) is disabled in favor of ClockDream:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 #   Sleep timer set to 20 minutes (settings put system screen_off_timeout 1200000) to protect the panel.
 # - Remote key helpers and volume repeat (TCL G08 Android 12 firmware limitation):
 #   On this firmware, binding ANY key-filtering accessibility service causes the platform input dispatcher

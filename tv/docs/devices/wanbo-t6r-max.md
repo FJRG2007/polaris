@@ -28,7 +28,7 @@ Close it the usual way and check the right port: `tools/adb-closed.py <tv ip> 58
 - Stock launcher: `com.zeasn.whale.saas` (Zeasn Whale, a banner carousel and sponsored rows). The only other HOME
   claimant is `com.android.tv.settings`.
 - `launcher/build-and-install.sh` does not know this launcher, so install with `STOCK_LAUNCHER=none`, confirm
-  `com.gathin.tvhome` is resumed after Home, then disable `com.zeasn.whale.saas` with `tools/disable.sh`; Home and
+  `app.polaris.tv` is resumed after Home, then disable `com.zeasn.whale.saas` with `tools/disable.sh`; Home and
   ADB came back after a reboot. Pass `com.zeasn.whale.saas` to `tools/restore.sh` when undoing.
 - The preinstalled Kinopoisk TV app is `ru.kinopoisk.zeasn.tv`. The phone app `ru.kinopoisk` from an app store has
   no leanback entry, so it does not show up as a tile or in `dock_apps`.

@@ -60,8 +60,8 @@ pm query-services -a android.service.dreams.DreamService
 answers `No services found`. After the launcher install, point it at the launcher's own clock:
 
 ```sh
-settings put secure screensaver_components com.gathin.tvhome/.ClockDream
-settings put secure screensaver_default_component com.gathin.tvhome/.ClockDream
+settings put secure screensaver_components app.polaris.tv/.ClockDream
+settings put secure screensaver_default_component app.polaris.tv/.ClockDream
 ```
 
 ## `org.droidtv.usagelogger` and the TV_INPUT_HARDWARE guard
@@ -103,7 +103,7 @@ Applied with `tools/disable.sh`, then the launcher handover, then a reboot:
 - `pm list packages -d` read back exactly the 17 packages listed above — nothing was re-enabled by
   the firmware, and no other package was disabled by accident.
 - `cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME`
-  answers `com.gathin.tvhome/.MainActivity`.
+  answers `app.polaris.tv/.MainActivity`.
 - `pm query-services --components -a android.media.tv.TvInputService` still answers with
   `com.tpv.tvinput`'s six services, and the input menu still opens and lists HDMI 1, HDMI 2,
   HDMI 3 and composite.
@@ -124,7 +124,7 @@ Applied with `tools/disable.sh`, then the launcher handover, then a reboot:
   answers, but no cable was plugged in and no picture was seen.
 - **Standby and wake were not tested.** Whether the set comes back to the launcher after a long
   standby is unknown.
-- The launcher installed is the repo's own build, `com.gathin.tvhome` version 3.0 (versionCode 9),
+- The launcher installed is the repo's own build, `app.polaris.tv` version 3.0 (versionCode 9),
   built locally with `-PlauncherMinSdk` left at the default 26.
 - Only one unit and one build. Nothing here says another `EBONY_V560` behaves the same.
 

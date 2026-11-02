@@ -24,7 +24,7 @@ Accept the "Allow USB debugging?" prompt on the TV the first time a command conn
   had been disabled before.
 - **Kept**: everything that plays HDMI and the tuner, the input menu, remote pairing, keyboards, Play
   Store and Play Services, firmware updates, and all the streaming apps you use.
-- **Launcher**: `com.gathin.tvhome` is Home. Dock: YouTube, HBO Max, Crunchyroll, CineVS.
+- **Launcher**: `app.polaris.tv` is Home. Dock: YouTube, HBO Max, Crunchyroll, CineVS.
 - **Gear button**: the remote's Settings button only worked through the stock launcher, so the
   launcher's HomeKeyService (an accessibility service) now handles it. If the button stops working,
   check Settings > Accessibility > "Botão Home" is on, or reinstall the launcher as below.

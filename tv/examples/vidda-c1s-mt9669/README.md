@@ -24,11 +24,11 @@ TV_HOST=<projector ip> STOCK_LAUNCHER=none HOME_KEY_SERVICE=1 launcher/build-and
 What happened:
 
 - `cmd package set-home-activity` printed `Success`, and `cmd package resolve-activity` for HOME then
-  answered `com.gathin.tvhome/.MainActivity`. The only HOME candidate before the install was
+  answered `app.polaris.tv/.MainActivity`. The only HOME candidate before the install was
   `com.jamdeo.tv.vod/com.ju.main.launcher.LauncherActivity`.
 - The physical Home key on the Bluetooth remote, pressed from inside another app, opened the launcher:
   logcat shows `START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] ...
-  cmp=com.gathin.tvhome/.MainActivity} from uid 1000`. Injected `input keyevent HOME` was not used as proof.
+  cmp=app.polaris.tv/.MainActivity} from uid 1000`. Injected `input keyevent HOME` was not used as proof.
 - Boot still lands on 聚好看: the firmware starts it by component name,
   `START u0 {... cat=[android.intent.category.HOME] ... cmp=com.jamdeo.tv.vod/com.ju.main.launcher.LauncherActivity} from uid 0`,
   whatever Home resolves to. With `power_on_home_always` and `HOME_KEY_SERVICE=1`, the helper sends Home

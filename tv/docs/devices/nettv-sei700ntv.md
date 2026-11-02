@@ -51,8 +51,8 @@ HOME intent-filter. Because `pm disable-user` is blocked, it cannot be disabled 
 Takeover route:
 1. **RoleManager:** Android 14 manages the default Home role via RoleManager:
    ```sh
-   cmd role add-role-holder android.app.role.HOME com.gathin.tvhome
-   cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity
+   cmd role add-role-holder android.app.role.HOME app.polaris.tv
+   cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity
    ```
 2. **`HomeKeyService` with `stock_home_redirect`:**
    In `launcher/app/src/main/res/values/config.xml`:
@@ -62,15 +62,15 @@ Takeover route:
    ```
 3. Enable accessibility service and grant permissions:
    ```sh
-   settings put secure enabled_accessibility_services com.gathin.tvhome/.HomeKeyService
+   settings put secure enabled_accessibility_services app.polaris.tv/.HomeKeyService
    settings put secure accessibility_enabled 1
-   pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS
-   cmd notification allow_listener com.gathin.tvhome/.GuardRevival
+   pm grant app.polaris.tv android.permission.WRITE_SECURE_SETTINGS
+   cmd notification allow_listener app.polaris.tv/.GuardRevival
    ```
 
 **Cold boot test:**
 On boot, `np.com.geniussystems.android.atv.launcher` briefly initializes its splash, and `HomeKeyService`
-intercepts it, switching foreground focus to `com.gathin.tvhome/.MainActivity` in ~1.3 seconds.
+intercepts it, switching foreground focus to `app.polaris.tv/.MainActivity` in ~1.3 seconds.
 Verified via `logcat -b events -d | grep wm_set_resumed_activity`.
 
 ## Remote button click sensitivity

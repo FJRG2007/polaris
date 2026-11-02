@@ -5,7 +5,7 @@
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/seleco-tv39020hda9smart/debloat.txt cn.zeasn.launcher.vstoresubclient.toptech
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
 #
-# Stock launcher: cn.zeasn.launcher.vstoresubclient.toptech (Zeasn). Disabled last, only after com.gathin.tvhome
+# Stock launcher: cn.zeasn.launcher.vstoresubclient.toptech (Zeasn). Disabled last, only after app.polaris.tv
 # was confirmed as Home. Live TV and inputs: com.toptech.tvmenu (kept); its source picker is
 # com.toptech.tvmenu/.input.InputActivity, which config.json uses for the Inputs pill.
 # Kept: com.toptech.tv.service, com.toptech.tvmenu, com.realtek.dtv, com.realtek.tv.atv, com.realtek.tv.passthrough,

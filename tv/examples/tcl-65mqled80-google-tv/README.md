@@ -58,7 +58,7 @@ disabled stayed off across two reboots. One session so far, not yet lived with f
    step 1 again to disable dreamx and launcherx:
 
    ```sh
-   TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+   TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
    ```
 
 Then press the gear, YouTube, Netflix and Prime Video buttons on the real remote: an injected key does not

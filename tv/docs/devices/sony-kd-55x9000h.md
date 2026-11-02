@@ -30,7 +30,7 @@ The original Home component was:
 com.google.android.tvlauncher/.MainActivity
 ```
 
-The customized `com.gathin.tvhome/.MainActivity` installed and started
+The customized `app.polaris.tv/.MainActivity` installed and started
 successfully. During Home handover, the stock Home package was disabled with
 `pm disable-user`. The HOME resolver and foreground activity then both
 identified the custom launcher. This records the tested setup, without

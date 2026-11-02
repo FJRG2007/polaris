@@ -6,7 +6,7 @@
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/sharp-4t-c43dl1/debloat.txt
 # Everything is DISABLED for user 0, never uninstalled. Comment out any line you want to keep.
 #
-# Stock launcher: com.google.android.tvlauncher (disabled by launcher/build-and-install.sh once com.gathin.tvhome
+# Stock launcher: com.google.android.tvlauncher (disabled by launcher/build-and-install.sh once app.polaris.tv
 #   owned Home). Sharp's own jp.co.sharp.av.android.tvlauncher and monitormaintainer ship already disabled;
 #   jp.co.sharp.av.android.shlauncher stays as a HOME candidate and was left alone.
 # Live TV app: jp.co.sharp.av.android.aquostvapp (set as live_tv_package, see config.json); the Inputs menu

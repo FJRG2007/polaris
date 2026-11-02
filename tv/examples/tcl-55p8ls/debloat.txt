@@ -29,9 +29,9 @@
 # - Signing in to a Google account right after the list made Play Store install VTV Go, HBO Max and iQIYI
 #   (installer com.android.vending). They are ordinary apps: uninstall them, and turn off auto-update in
 #   Play Store settings.
-# - TclAppBoot leaves the launcher's key services unbound until `appops set com.gathin.tvhome
+# - TclAppBoot leaves the launcher's key services unbound until `appops set app.polaris.tv
 #   APP_AUTO_START allow` followed by `appops write-settings` (docs/TROUBLESHOOTING.md).
-# - Disabling dreamx: set screensaver_components to com.gathin.tvhome/.ClockDream first.
+# - Disabling dreamx: set screensaver_components to app.polaris.tv/.ClockDream first.
 # - Remote buttons with launcherx disabled, checked on the real remote: same codes as the C69B in
 #   tcl-g10-google-tv/. With INPUT_KEY_SERVICE=1 and HOME_KEY_SERVICE=1, settings_key_keycodes 83 and
 #   app_keys 4065:com.google.android.youtube.tv, 4062:com.netflix.ninja, Home, Input, Settings, YouTube,

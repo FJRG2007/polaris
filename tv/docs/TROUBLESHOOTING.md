@@ -601,13 +601,13 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   enabled - disabling it leaves only `FallbackHome` - and see the
   [device notes](devices/xiaomi-nemo-laser-cinema2.md) for the queries and the firmware code.
 - **ColorOS TV refuses a HOME install, or boots only a launcher that declares its own category**,
-  verified on an OPPO K9 55 (`OPPOCNM632`), Android 9. The default `com.gathin.tvhome` build is not
+  verified on an OPPO K9 55 (`OPPOCNM632`), Android 9. The default `app.polaris.tv` build is not
   accepted as Home. The working build is
   `-PlauncherApplicationId=com.oneplus.tv.launcher2`, and `MainActivity`'s HOME filter also declares
   `com.heytap.tv.launcher.category.MODERN_HOME` (without that category, ColorOS boot waits on the
   brand animation). Leave `com.heytap.tv.launcher` installed and enabled: it is the stock home, and
   building over that package name replaces it. `launcher/build-and-install.sh` installs
-  `com.gathin.tvhome` and would disable a stock launcher it was told to, so do not name
+  `app.polaris.tv` and would disable a stock launcher it was told to, so do not name
   `com.heytap.tv.launcher` as `STOCK_LAUNCHER`. The other allowlisted ids are
   `com.heytap.tv.launcher` (stock, do not overwrite) and `com.oppo.tv.launcher2`. The list is at
   [`examples/oppo-k9-55-oppocnm632/`](../examples/oppo-k9-55-oppocnm632/) and the full note is
@@ -891,7 +891,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   (`drwxrws--- shell ext_data_rw`) and the provider got EACCES writing the pictures into it, while the
   config still landed. `theme.sh` now leaves that folder to the provider. A set that already has one from an
   older checkout needs it removed once (it is empty), then push the theme again:
-  `tools/tv.py 'rmdir /sdcard/Android/data/com.gathin.tvhome/files/wallpapers'`.
+  `tools/tv.py 'rmdir /sdcard/Android/data/app.polaris.tv/files/wallpapers'`.
 - **Google TV comes back after a few remote presses**, seen on XGIMI (MoGo 3 Pro, Google TV 14). The
   remote's app buttons (YouTube, Netflix, Prime Video), the programmable button, the profile button and power
   all send F keys that the system hands to `com.xgimi.xrmservice/.XgimiGlobalKeyBroadcast` as global keys
@@ -915,9 +915,9 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   If the clock then jumps an hour ahead in spring, a fixed offset keeps it right:
   `tools/tv.py 'cmd alarm set-timezone GMT+03:30'`. The same applies to any country whose rules
   changed after the firmware was built.
-- **The network pill says "Wi-Fi" instead of the network name** after `pm clear com.gathin.tvhome`
+- **The network pill says "Wi-Fi" instead of the network name** after `pm clear app.polaris.tv`
   or a reinstall from scratch: clearing the launcher's data also drops the location permission
-  Android 10 needs to read the SSID. `pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION`
+  Android 10 needs to read the SSID. `pm grant app.polaris.tv android.permission.ACCESS_FINE_LOCATION`
   (the install script does this).
 - **Home is "Select a Home app"** after `tools/restore.sh` followed by re-applying a list: disabling a
   package that also claims HOME (PatchWall on Xiaomi) makes Android drop the default. The install
@@ -1051,8 +1051,8 @@ tools/tv.py 'dumpsys accessibility'
 
 | Helper | Component in the enabled-services list | Key it filters |
 | --- | --- | --- |
-| Home button | `com.gathin.tvhome/.HomeKeyService` | `KEYCODE_ALL_APPS` (an ordinary `KEYCODE_HOME` only with `home_long_press_home`, `config.xml` or a theme) and `KEYCODE_SETTINGS`, plus the keys in `settings_key_keycodes` and `app_keys` (`config.xml` or a theme) and in `settings_key_scancodes` (`config.xml` only) |
-| Input button | `com.gathin.tvhome/.InputKeyService` | `KEYCODE_TV`, `KEYCODE_TV_INPUT`, plus the keycodes in `input_key_keycodes` and `app_keys` (`config.xml` or a theme) |
+| Home button | `app.polaris.tv/.HomeKeyService` | `KEYCODE_ALL_APPS` (an ordinary `KEYCODE_HOME` only with `home_long_press_home`, `config.xml` or a theme) and `KEYCODE_SETTINGS`, plus the keys in `settings_key_keycodes` and `app_keys` (`config.xml` or a theme) and in `settings_key_scancodes` (`config.xml` only) |
+| Input button | `app.polaris.tv/.InputKeyService` | `KEYCODE_TV`, `KEYCODE_TV_INPUT`, plus the keycodes in `input_key_keycodes` and `app_keys` (`config.xml` or a theme) |
 
 A force stop of the launcher (Settings > Apps, a cleaner app, `am force-stop`) takes both helpers off
 that list. With `restore_key_services` on (`config.xml` or a theme) and `WRITE_SECURE_SETTINGS` granted
@@ -1071,11 +1071,11 @@ turned off in Settings stays off.
   after the first standby with another app open. By hand, the same three writes:
 
   ```sh
-  tools/tv.py "settings put secure enabled_accessibility_services com.gathin.tvhome/.InputKeyService; sleep 1; settings put secure enabled_accessibility_services ''; sleep 1; settings put secure enabled_accessibility_services com.gathin.tvhome/.InputKeyService"
+  tools/tv.py "settings put secure enabled_accessibility_services app.polaris.tv/.InputKeyService; sleep 1; settings put secure enabled_accessibility_services ''; sleep 1; settings put secure enabled_accessibility_services app.polaris.tv/.InputKeyService"
   ```
 
 - **Enabled** means the component is in that user's colon-separated list (the class may be written in
-  full, `com.gathin.tvhome/com.gathin.tvhome.HomeKeyService`). Match the whole component.
+  full, `app.polaris.tv/app.polaris.tv.HomeKeyService`). Match the whole component.
 - **Bound** means it appears under that user's `Bound services` section of the dump (`services` on older
   builds). Give it a few seconds after enabling and read again. Labels in the dump can be translated or
   shared with other services; a line containing "Home" is not proof.
@@ -1155,7 +1155,7 @@ turned off in Settings stays off.
 - **The list still names the helper but `accessibility_enabled` is `0`**, so nothing is bound and the
   button does nothing (not the force stop below): on a TCL C6K Pro (`G08`, Android 14,
   [#1047](https://github.com/Gathin23/cleanyourtv/issues/1047)) a reboot left
-  `enabled_accessibility_services` naming `com.gathin.tvhome/com.gathin.tvhome.HomeKeyService` while
+  `enabled_accessibility_services` naming `app.polaris.tv/app.polaris.tv.HomeKeyService` while
   `accessibility_enabled` read `0`, `dumpsys accessibility` showed `Bound services:{}` and the Home
   button opened Google TV. `restore_key_services` does not repair this state: `ServiceRepair` writes
   `accessibility_enabled 1` only on the path that also puts a missing helper back on the list, and here
@@ -1164,7 +1164,7 @@ turned off in Settings stays off.
   that manual flag change survived the next reboot was not retested; the cold-boot follow-up below
   tests the fork's separate opt-in startup repair. In one cold-boot test of that repair, TCL had reset
   `AUTO_START` to `ignore`; the boot log showed the firmware blocking both the accessibility-service
-  bind and the boot receiver. After allowing `AUTO_START` for `com.gathin.tvhome` and persisting app-op settings with
+  bind and the boot receiver. After allowing `AUTO_START` for `app.polaris.tv` and persisting app-op settings with
   `appops write-settings`, the next cold boot left `accessibility_enabled` at `1`, HomeKeyService
   bound, and CleanYourTV in the foreground about eight seconds after Google TV started. The owner
   confirmed this one run; it does not establish that the upstream launcher starts at boot or guarantee
@@ -1179,7 +1179,7 @@ turned off in Settings stays off.
   tools/tv.py 'dumpsys accessibility'
   ```
 
-A force-stop switches the helpers off for good: after `am force-stop com.gathin.tvhome` (or Force stop in
+A force-stop switches the helpers off for good: after `am force-stop app.polaris.tv` (or Force stop in
 Settings > Apps) Android removes the launcher's services from the enabled list, and they do not come back
 when the launcher starts again (seen on a TCL 55C715, Android TV 9). Enable them again the same way you did
 the first time, and avoid force-stopping the launcher while testing.
@@ -1187,14 +1187,14 @@ the first time, and avoid force-stopping the launcher while testing.
 Enabled but never bound points at a firmware restriction on auto-starting sideloaded services (some TCL
 builds log `OP_AUTO_START` denials). Look at `logcat` for the binding failure before changing settings,
 and do not rewrite the enabled-services list or grant app-ops as a blanket fix. On a TCL 55S470G (Google
-TV 12) the line is `[TclAppBoot] ... calleeComponent = 'com.gathin.tvhome/.HomeKeyService', bootType =
+TV 12) the line is `[TclAppBoot] ... calleeComponent = 'app.polaris.tv/.HomeKeyService', bootType =
 'bind_service', isAllow = 'false', reason = 'callee_does't_have_OP_AUTO_START_permission.'`, and
-`appops get com.gathin.tvhome` shows `APP_AUTO_START: ignore`. Allowing that one op for the launcher only
-and saving it (`appops set com.gathin.tvhome APP_AUTO_START allow; appops write-settings`) made the service
+`appops get app.polaris.tv` shows `APP_AUTO_START: ignore`. Allowing that one op for the launcher only
+and saving it (`appops set app.polaris.tv APP_AUTO_START allow; appops write-settings`) made the service
 bind on its own after a restart; toggling the service off and on in Accessibility works until the next
 restart. App-ops reach the disk lazily: without `write-settings`, a restart soon after the `set` drops the
 change and the denial is back. Seen on a TCL C89B (Google TV 14, `G08`, `UTT2.250416.001 AU02`), whose log
-reads `[TclAppBoot]:forbid bind service ComponentInfo{com.gathin.tvhome/com.gathin.tvhome.HomeKeyService}`
+reads `[TclAppBoot]:forbid bind service ComponentInfo{app.polaris.tv/app.polaris.tv.HomeKeyService}`
 and whose `appops get` names the op `AUTO_START`: use the name `appops get` prints. When reporting, give the
 model, build, current user and the relevant redacted lines, not the raw dump.
 
@@ -1248,7 +1248,7 @@ Android 11 (SDK 30), build RS8185.3885N:
 - `cmd package query-activities` for HOME: `com.amazon.tv.launcher/.ui.HomeActivity_vNext` at priority 950,
   `com.amazon.firehomestarter` at 1. A third-party launcher installed with `android:priority="1000"` on its
   HOME filter still sits at 0. Fire OS ignores the priority of a non-system app.
-- `cmd package set-home-activity com.gathin.tvhome/.MainActivity` prints `Success`, and HOME still resolves
+- `cmd package set-home-activity app.polaris.tv/.MainActivity` prints `Success`, and HOME still resolves
   to Amazon's launcher.
 - `pm disable-user --user 0` on `com.amazon.tv.launcher`, on its component `HomeActivity_vNext`, and on the
   other Fire OS home packages is refused: `Cannot disable a protected package`.
@@ -1332,7 +1332,7 @@ button still opened Netflix and the mapped app never started. `logcat` shows why
 - `pm disable com.netflix.ninja/.NetflixKeyReceiver` is refused for the shell user (`Shell cannot change
   component state`). Disabling the whole app works: `pm disable-user --user 0 com.netflix.ninja` (undo with
   `pm enable com.netflix.ninja`). Do that only if the person does not use Netflix.
-- With Netflix disabled the button does nothing, and `logcat` shows `Unhandled key: win=Window{... com.gathin.tvhome/...MainActivity}, keyCode=4062`:
+- With Netflix disabled the button does nothing, and `logcat` shows `Unhandled key: win=Window{... app.polaris.tv/...MainActivity}, keyCode=4062`:
   the key reaches the focused window, but the two accessibility helpers still never get it, so `app_keys`
   has no effect. The firmware appears to inject this key after the input filter the helpers sit on.
 
@@ -1518,11 +1518,11 @@ the first screen-on puts it back, so the keys it answers still work whenever the
 default; three writes turn it on, and none of them is part of an ordinary install:
 
 ```sh
-tools/tv.py 'pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS'
-tools/tv.py 'cmd notification allow_listener com.gathin.tvhome/.GuardRevival'
-tools/tv.py 'am broadcast -a com.gathin.tvhome.GUARD -n com.gathin.tvhome/.GuardConfig --ez guard_off_in_standby true'
+tools/tv.py 'pm grant app.polaris.tv android.permission.WRITE_SECURE_SETTINGS'
+tools/tv.py 'cmd notification allow_listener app.polaris.tv/.GuardRevival'
+tools/tv.py 'am broadcast -a app.polaris.tv.GUARD -n app.polaris.tv/.GuardConfig --ez guard_off_in_standby true'
 # off again:
-tools/tv.py 'am broadcast -a com.gathin.tvhome.GUARD -n com.gathin.tvhome/.GuardConfig --ez guard_off_in_standby false'
+tools/tv.py 'am broadcast -a app.polaris.tv.GUARD -n app.polaris.tv/.GuardConfig --ez guard_off_in_standby false'
 ```
 
 The broadcast prints `guard_off_in_standby=true` back, so the answer is readable without a reboot. The
@@ -1537,7 +1537,7 @@ first two writes are what make the opt-in survive, so read why:
 - `GuardRevival` is the listener the system re-binds once the process is gone, and firmware that kills
   third-party apps in standby takes the screen-on watch with it. The rebind is what re-arms it.
 
-While the opt-in is on, `dumpsys accessibility` naming no `com.gathin.tvhome/.HomeKeyService` during
+While the opt-in is on, `dumpsys accessibility` naming no `app.polaris.tv/.HomeKeyService` during
 standby is the opt-in working, not a fault: wake the TV and read it again. Only that helper stands down;
 `InputKeyService` keeps filtering, so the Input button still works.
 

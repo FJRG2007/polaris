@@ -35,7 +35,7 @@
 #
 # Quirks on this firmware, all checked on the TV:
 # - Port 5555 answered after the reboot that follows turning on USB + Wireless debugging (as on the BenQ).
-# - `cmd package set-home-activity com.gathin.tvhome/.MainActivity` prints Success but Home stays on
+# - `cmd package set-home-activity app.polaris.tv/.MainActivity` prints Success but Home stays on
 #   launcherx while it is enabled (priority 2). Home moves only once launcherx is disabled; set it again
 #   after that and confirm with `dumpsys activity activities | grep mFocusedApp` (held across 4 reboots).
 # - The Wi-Fi network saved in the first-run wizard belonged to setupwraith (cname=...setupwraith).
@@ -103,15 +103,15 @@ com.google.android.videos                   # Google TV recommendations; TD43 on
 # com.google.android.katniss                # voice search / microphone button
 
 # Batch 4: screensaver. First set the launcher's clock as screensaver:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
-#   settings put secure screensaver_default_component com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
+#   settings put secure screensaver_default_component app.polaris.tv/.ClockDream
 com.google.android.apps.tv.dreamx           # ambient mode, mixes recommendations into the screensaver
 
 # Batch 5: stock home, LAST, only after launcher/ is installed.
 # Before setupwraith: `dumpsys wifi | grep -o 'cname=[^ ]*'`; if the Wi-Fi network belongs to it,
 # forget and re-join the network in Settings first, or the TV drops off Wi-Fi.
 com.google.android.tungsten.setupwraith      # disable before launcherx; costs phone casting after a reboot (the Cast receiver reads its credentials from setupwraith)
-com.google.android.apps.tv.launcherx         # then: cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity
+com.google.android.apps.tv.launcherx         # then: cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity
 # Launcher partner customization (MediaTek variant, tvlauncher.config only). The firmware re-enables it at
 # every boot (see above), so there is no point listing it. The Google-named twin
 # (com.google.android.leanbacklauncher.partnercustomizer) is not installed here.

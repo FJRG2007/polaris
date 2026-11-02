@@ -35,7 +35,7 @@ The local launcher configuration used these values in `launcher/app/src/main/res
 
 Replace the corresponding resource entries rather than adding duplicate names. Keep `com.tcl.tv` and `com.tcl.tvinput` enabled: hiding the TV tile is only a launcher presentation choice. Input services on this unit were `com.tcl.tvinput/.TDTVInputService` and `com.tcl.tvinput/.passthroughinput.TvPassThroughService`.
 
-The original HOME activity was `com.google.android.tvlauncher/.MainActivity`. The replacement was installed and launched before disabling stock HOME, then set as HOME and checked with the Home key. `com.gathin.tvhome/.MainActivity` was the resumed activity, including after restart. `com.google.android.tungsten.setupwraith` was installed but did not advertise HOME on this unit and stayed enabled. The TCL key-customization and Android Settings fallback HOME activities stayed enabled too. No accessibility helper or remote scancode remapping was needed.
+The original HOME activity was `com.google.android.tvlauncher/.MainActivity`. The replacement was installed and launched before disabling stock HOME, then set as HOME and checked with the Home key. `app.polaris.tv/.MainActivity` was the resumed activity, including after restart. `com.google.android.tungsten.setupwraith` was installed but did not advertise HOME on this unit and stayed enabled. The TCL key-customization and Android Settings fallback HOME activities stayed enabled too. No accessibility helper or remote scancode remapping was needed.
 
 ## Changes observed in this session
 

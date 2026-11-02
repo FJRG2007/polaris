@@ -50,7 +50,7 @@ is safe to disable.
 
 The launcher's app source and resources were byte-for-byte upstream. Only the
 local `versionCode` was raised above the previously installed build, and the
-existing signing key was retained. The package stayed `com.gathin.tvhome`;
+existing signing key was retained. The package stayed `app.polaris.tv`;
 there was no uninstall or app-data reset. No unmerged performance PR or local launcher
 fix was carried into this build.
 
@@ -91,7 +91,7 @@ accessibility key service or new remote-button mapping was enabled in this run.
 - With VLC in front, an artificial `RUNNING_LOW` memory-trim notification was
   sent to the launcher. Home returned with its tiles. This
   checks the recovery path, not natural memory-pressure performance.
-- After reboot, Home still resolved to `com.gathin.tvhome/.MainActivity`.
+- After reboot, Home still resolved to `app.polaris.tv/.MainActivity`.
   The installed APK matched the signed build, the external theme and disabled
   package set were unchanged, and the crash buffer had no launcher crash.
 

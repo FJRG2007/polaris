@@ -25,7 +25,7 @@
 #
 # Notes from this unit (verified with screenshots, 29 October 2026):
 # - Network debugging answered on port 5555 directly once USB debugging was on; no Wireless debugging pairing needed.
-# - Launcher: HOME takeover works with plain build-and-install.sh (mFocusedApp = com.gathin.tvhome after Home and
+# - Launcher: HOME takeover works with plain build-and-install.sh (mFocusedApp = app.polaris.tv after Home and
 #   after a reboot, and the first resumed activity after boot). Ambient screensaver (backdrop) left as it was.
 # - Remote: Home, Back, volume and the other buttons keep working without tvlauncher; no key helper needed.
 # - Volume goes over HDMI-CEC to the AV receiver (absolute volume), so holding a volume key moves one step;

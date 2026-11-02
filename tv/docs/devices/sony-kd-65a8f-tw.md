@@ -63,7 +63,7 @@ After the owner approved handover:
 - `set-home-activity` reported `Success` with stock Home enabled, but both the
   HOME resolver and the focused window still selected stock Home.
 - Disabling only `com.google.android.tvlauncher` and setting
-  `com.gathin.tvhome/.MainActivity` again made both checks select the replacement.
+  `app.polaris.tv/.MainActivity` again made both checks select the replacement.
   No setup wizard package was disabled.
 - A subsequent reboot changed the kernel boot ID and completed normally. ADB
   reconnected, the replacement was already focused before a Home key was
@@ -186,7 +186,7 @@ claim:
 ### Regression: the physical Apps button does nothing
 
 On the recorded version 2.7 build and Sony firmware above, press Home to show
-`com.gathin.tvhome/.MainActivity`, then press the physical Apps button. No app
+`app.polaris.tv/.MainActivity`, then press the physical Apps button. No app
 list opens. The same failure was reproduced from Sony's network settings.
 The physical key was observed as Android keycode 284 (`KEYCODE_ALL_APPS`),
 scan code 580, during a temporary diagnostic experiment.

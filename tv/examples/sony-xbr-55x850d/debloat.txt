@@ -7,7 +7,7 @@
 # Undo:  TV_HOST=<tv ip> tools/restore.sh examples/sony-xbr-55x850d/debloat.txt
 # Everything is DISABLED for user 0, not uninstalled. Save original enabled states first.
 # Install and verify the replacement Home before the final stock-launcher entry below.
-# Stock launcher: com.google.android.tvlauncher; replacement: com.gathin.tvhome.
+# Stock launcher: com.google.android.tvlauncher; replacement: app.polaris.tv.
 # Live TV AND HDMI playback app: com.sony.dtv.tvx — KEEP IT ENABLED.
 # Keep Sony TV/input providers, CEC/BRAVIA Sync, remote/pairing, keyboard, Settings,
 # Google services/Store, MediaTek services, firmware updater, recovery and boot monitor.

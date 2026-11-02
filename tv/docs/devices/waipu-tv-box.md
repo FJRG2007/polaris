@@ -46,7 +46,7 @@ STOCK_LAUNCHER=none HOME_KEY_SERVICE=1 TV_HOST=<box ip> launcher/build-and-insta
 ```
 
 `set-home-activity` took: `cmd package resolve-activity` and `mFocusedApp` both named
-`com.gathin.tvhome/.MainActivity`, and the Home button opens the launcher. The waipu app starts normally
+`app.polaris.tv/.MainActivity`, and the Home button opens the launcher. The waipu app starts normally
 from the dock or the app grid.
 
 The waipu app still has the boot receiver `de.exaring.waipu/.entrypoint.RichBootReceiver` and

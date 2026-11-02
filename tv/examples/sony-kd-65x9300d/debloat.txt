@@ -20,7 +20,7 @@
 #
 # Notes from this firmware:
 # - build-and-install.sh hands Home over cleanly: com.google.android.tvlauncher is disabled last and
-#   Home resolves to com.gathin.tvhome straight away.
+#   Home resolves to app.polaris.tv straight away.
 # - Inputs works: com.sony.dtv.tvx handles the passthrough URIs; HDMI 1-4 (with CEC device names),
 #   Video 1/2 and Live TV listed. Dock: Netflix, YouTube, Prime Video, com.sony.dtv.tvx; live_tv_package
 #   com.sony.dtv.tvx; nothing hidden (the grid is Play Store, Timers, Programme guide, Screen mirroring).

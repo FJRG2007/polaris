@@ -42,7 +42,7 @@ com.zhixin.atvchannel                        # channel app, found installed as a
 
 # --- Off by owner's choice (comment out to keep) ---
 # Set the launcher's clock screensaver before disabling backdrop:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 com.google.android.backdrop                  # Ambient Mode screensaver
 com.google.android.marvin.talkback           # TalkBack screen reader
 com.google.android.tts                       # text-to-speech; re-enable if the Assistant stops speaking answers

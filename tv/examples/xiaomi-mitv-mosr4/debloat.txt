@@ -13,7 +13,7 @@
 # That is a first-day report, not the few days of living with it that CONTRIBUTING.md asks for, so
 # treat the list as provisional.
 #
-# HOME on this build: com.gathin.tvhome owns Home only once com.google.android.tungsten.setupwraith is
+# HOME on this build: app.polaris.tv owns Home only once com.google.android.tungsten.setupwraith is
 # disabled too - on the first run setupwraith/.RecoveryActivity took Home back and the install script's
 # rollback re-enabled launcherx. Same story as examples/xiaomi-mitv-moor2.
 #
@@ -82,7 +82,7 @@ com.mitv.upgrader
 com.mitv.ABUpdateStatus
 
 # ---------------------------------------------------------------------------------------------
-# ONLY AFTER com.gathin.tvhome IS INSTALLED. Do not apply this section on a fresh run, or the
+# ONLY AFTER app.polaris.tv IS INSTALLED. Do not apply this section on a fresh run, or the
 # Home button has nowhere to go.
 #
 # Disabling the stock launcher is not enough on Google TV: com.google.android.tungsten.setupwraith

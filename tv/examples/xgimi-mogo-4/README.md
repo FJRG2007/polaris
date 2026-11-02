@@ -94,7 +94,7 @@ What the A/B test on this unit showed:
 
 | `enabled_accessibility_services` | Hold volume | Hold D-pad | Home press keeps the new launcher |
 | --- | --- | --- | --- |
-| `com.gathin.tvhome/.HomeKeyService` | one step per press | repeats normally | yes |
+| `app.polaris.tv/.HomeKeyService` | one step per press | repeats normally | yes |
 | `""`, with `accessibility_enabled 0` | ramps continuously | repeats normally | **no**, the stock launcher takes over |
 
 Two things differ from that note. Only the **volume** keys lost repeat; a held D-pad direction still
@@ -108,10 +108,10 @@ To switch, two `settings` writes either way:
 # helper off: volume ramps, the stock launcher will take Home back
 tools/tv.py "settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0"
 # helper on
-tools/tv.py "settings put secure enabled_accessibility_services com.gathin.tvhome/.HomeKeyService; settings put secure accessibility_enabled 1"
+tools/tv.py "settings put secure enabled_accessibility_services app.polaris.tv/.HomeKeyService; settings put secure accessibility_enabled 1"
 ```
 
-`am force-stop com.gathin.tvhome`, a cleaner app and `tools/theme.sh` all drop the helper; `theme.sh`
+`am force-stop app.polaris.tv`, a cleaner app and `tools/theme.sh` all drop the helper; `theme.sh`
 puts it back.
 
 ## Remote buttons

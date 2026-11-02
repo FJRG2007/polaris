@@ -18,7 +18,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 STOCK_HOME = "com.google.android.tvlauncher/.MainActivity"
-NEW_HOME = "com.gathin.tvhome/.MainActivity"
+NEW_HOME = "app.polaris.tv/.MainActivity"
 
 # Stands in for tools/tv.py: a TV that answers shell commands and keeps the state the script changes.
 FAKE_TV = r'''
@@ -56,10 +56,10 @@ def run(command):
         return "secure-settings-revoked\n"
     if "am start" in command:
         if state["start_fails"]:
-            return ("Starting: Intent { cmp=com.gathin.tvhome/.MainActivity }\n"
+            return ("Starting: Intent { cmp=app.polaris.tv/.MainActivity }\n"
                     "Error: Activity not started, unable to resolve Intent\n")
-        return ("Starting: Intent { cmp=com.gathin.tvhome/.MainActivity }\n"
-                "Status: ok\nActivity: com.gathin.tvhome/.MainActivity\n")
+        return ("Starting: Intent { cmp=app.polaris.tv/.MainActivity }\n"
+                "Status: ok\nActivity: app.polaris.tv/.MainActivity\n")
     if "pm disable-user" in command:
         if state["disable_fails"]:
             return "Error: java.lang.SecurityException\n"

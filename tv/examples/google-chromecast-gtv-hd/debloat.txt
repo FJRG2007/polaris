@@ -60,7 +60,7 @@
 #   installed and enabled, so the on-screen keyboard comes back with
 #   `ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME`.
 # - Disabling dreamx leaves screensaver_components pointing at it. Point it at the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 #   `cmd dreams start-dreaming` needs root here; to see the screensaver, set screen_off_timeout to
 #   60000 for a minute and put it back (600000 by default).
 # - Location is off by default, so the launcher's Wi-Fi pill shows "Wi-Fi" instead of the network name.

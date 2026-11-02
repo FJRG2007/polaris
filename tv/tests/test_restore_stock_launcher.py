@@ -6,7 +6,7 @@ neither was missing from the record, so restore turned it on whatever its state 
 
 1. examples/verizon-stream-tv leaves tvlauncher out of its list because the factory disabled it, and
    restore.sh turned it on anyway.
-2. After launcher/build-and-install.sh made com.gathin.tvhome Home and disabled tvlauncher, undoing a
+2. After launcher/build-and-install.sh made app.polaris.tv Home and disabled tvlauncher, undoing a
    second list (privacy.py prints `tools/restore.sh privacy.txt`) turned tvlauncher back on and, as
    the recorded Home was this project's launcher, gave Home to tvlauncher too.
 
@@ -77,7 +77,7 @@ class RestoreStockLauncherTest(unittest.TestCase):
         self.assertEqual(home_commands(sent), [f"cmd package set-home-activity --user 0 {VERIZON_HOME}"])
 
     def test_undoing_a_second_list_leaves_this_projects_launcher_on_home(self):
-        # Case 2: build-and-install.sh made com.gathin.tvhome Home and disabled tvlauncher, then a second
+        # Case 2: build-and-install.sh made app.polaris.tv Home and disabled tvlauncher, then a second
         # list (privacy.txt) was applied and is now undone with no launcher argument.
         result = self.disable_then_restore(
             installed=["com.example.ads", STOCK, recovery.CUSTOM_LAUNCHER], disabled=[STOCK],

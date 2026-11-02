@@ -88,7 +88,7 @@ com.smartdevice.tv.aircast                       # Coocaa iCast AirPlay/mirrorin
                                                  # no receiver works on a client-isolated network.
 com.google.android.backdrop                      # Google aerial screensaver
 com.google.android.tvrecommendations             # launcher recommendation rows. Only safe
-                                                 # once com.gathin.tvhome owns Home and
+                                                 # once app.polaris.tv owns Home and
                                                  # com.google.android.tvlauncher is disabled.
                                                  # Toshiba UKNV.260528.001 re-enables it at every
                                                  # boot; harmless with tvlauncher off, so leave it.

@@ -313,7 +313,7 @@ def parse(argv):
     p = argparse.ArgumentParser(description="Launcher numbers from tools/trace.py traces. See tools/trace.md.")
     p.add_argument("traces", nargs="+", help=".pftrace files or folders of them")
     p.add_argument("--vs", nargs="+", metavar="TRACES", help="the traces to compare against the first set")
-    p.add_argument("--package", default="com.gathin.tvhome", help="the launcher's package (default com.gathin.tvhome)")
+    p.add_argument("--package", default="app.polaris.tv", help="the launcher's package (default app.polaris.tv)")
     p.add_argument("--engine", metavar="PATH", help="a trace_processor_shell to use instead of downloading one")
     p.add_argument("--markdown", action="store_true", help="print Markdown tables")
     args = p.parse_args(argv)

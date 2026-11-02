@@ -8,7 +8,7 @@
 #
 # Stock launcher: com.google.android.tvlauncher. Live TV: com.mediatek.wwtv.tvcenter.
 # Tested the same day on one set and through two reboots, not a multi-day soak. Every package stayed
-# disabled after both reboots. Then launcher/build-and-install.sh set com.gathin.tvhome as Home (checked with
+# disabled after both reboots. Then launcher/build-and-install.sh set app.polaris.tv as Home (checked with
 # mFocusedApp after Home and after a reboot) and tools/theme.sh pushed config.json (dock: Netflix, YouTube,
 # Prime Video, RaiPlay). Checked: D-pad across the dock, grid and top bar; Inputs lists HDMI 1, HDMI 2,
 # AV and Live TV, and Live TV opens tvcenter; a video plays (YouTube or Netflix) with AdGuard Private DNS on; the real

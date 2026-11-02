@@ -26,18 +26,18 @@ ColorOS accepts a HOME install only for three package names:
 over it. Stop if `pm path com.oneplus.tv.launcher2` (or `com.oppo.tv.launcher2`, if you have to use
 that one) already names some other application.
 
-The default `com.gathin.tvhome` build was blocked as a HOME install on this set. The same refusal
+The default `app.polaris.tv` build was blocked as a HOME install on this set. The same refusal
 is quoted on the K9 65 note as
 `INSTALL_FAILED_DUPLICATE_PERMISSION: App installation is banned, because of launcher categories`.
 
-Do not run `launcher/build-and-install.sh` here. It always builds and installs `com.gathin.tvhome`,
-then points Home at `com.gathin.tvhome/.MainActivity`. Naming `com.heytap.tv.launcher` as
+Do not run `launcher/build-and-install.sh` here. It always builds and installs `app.polaris.tv`,
+then points Home at `app.polaris.tv/.MainActivity`. Naming `com.heytap.tv.launcher` as
 `STOCK_LAUNCHER` would disable the stock home. Leave that package enabled.
 
 ## What this set confirmed
 
 Install reported Success for versionName 3.0 / versionCode 9, signed with the debug keystore.
-Home was set to `com.oneplus.tv.launcher2/com.gathin.tvhome.MainActivity`. `com.heytap.tv.launcher`
+Home was set to `com.oneplus.tv.launcher2/app.polaris.tv.MainActivity`. `com.heytap.tv.launcher`
 stayed enabled. The owner confirmed the home screen. Android 9 is API 28, above the launcher's
 minSdk 26.
 

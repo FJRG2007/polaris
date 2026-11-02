@@ -26,9 +26,9 @@
             <!-- Clean Your TV module card (docs/specs/card.md): the tile reads "Game Day" once the owner says Show. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="com.gathin.tvhome.category.DOCK_CARD" />
+                <category android:name="app.polaris.tv.category.DOCK_CARD" />
             </intent-filter>
-            <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
+            <meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />
         </activity>
         <activity android:name=".CalendarActivity" android:exported="false" android:screenOrientation="landscape" />
         <activity android:name=".AddCalendarActivity" android:exported="false" android:screenOrientation="landscape"
@@ -36,7 +36,7 @@
         <activity android:name=".SecondsActivity" android:exported="false" android:screenOrientation="landscape" />
 
         <!-- Clean Your TV launcher, game_day (docs/modules.md): where Home reads each team's next game. -->
-        <meta-data android:name="com.gathin.tvhome.games" android:value="io.github.justinnewman.gameday.games" />
+        <meta-data android:name="app.polaris.tv.games" android:value="io.github.justinnewman.gameday.games" />
 
         <!-- Read-only and holding no links: what Home shows anyway. -->
         <provider

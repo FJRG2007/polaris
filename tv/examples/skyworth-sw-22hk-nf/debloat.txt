@@ -18,7 +18,7 @@
 # - Launcher handover works (launcher/build-and-install.sh, INPUT_KEY_SERVICE=1). The first run rolled back
 #   because com.google.android.tungsten.setupwraith claimed Home once launcherx was disabled; the saved Wi-Fi
 #   network in use was owned by android.uid.system, so FORCE_SETUPWRAITH=1 was safe, and a second run kept
-#   com.gathin.tvhome as Home through a reboot. Disabling it deleted one stale saved network that setupwraith owned.
+#   app.polaris.tv as Home through a reboot. Disabling it deleted one stale saved network that setupwraith owned.
 # - The remote's Input key opens Skyworth's source panel (com.smartdevice.dailyshortcut).
 #
 # Kept on purpose: com.smartdevice.livetv + overlay_SANLUX (Live TV), com.mediatek.tvinput (HDMI/tuner/AV),
@@ -57,4 +57,4 @@ com.smartdevice.dtv.icast                    # Miracast + DLNA
 
 # Handover (applied after the list above; needed only if you install the Clean Your TV launcher)
 com.google.android.tungsten.setupwraith      # RecoveryActivity otherwise steals Home; needs FORCE_SETUPWRAITH=1 when the saved Wi-Fi is not setupwraith's
-com.google.android.apps.tv.launcherx         # stock Google TV home; com.gathin.tvhome is Home now
+com.google.android.apps.tv.launcherx         # stock Google TV home; app.polaris.tv is Home now

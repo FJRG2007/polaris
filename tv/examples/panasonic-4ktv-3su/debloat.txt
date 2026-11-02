@@ -18,7 +18,7 @@
 #   TV_HOST=<tv ip> STOCK_LAUNCHER=none HOME_KEY_SERVICE=1 launcher/build-and-install.sh
 # and, since that run stops early, switch on HomeKeyService as the script's enable_service does. Checked with
 # dumpsys activity activities | grep mFocusedApp: Home from YouTube, an explicit start of launcherx, and power-on
-# after a reboot (launcherx resumes for ~1 s, then com.gathin.tvhome/.MainActivity) all end on the new launcher.
+# after a reboot (launcherx resumes for ~1 s, then app.polaris.tv/.MainActivity) all end on the new launcher.
 # Driven from the Google TV phone app's remote (no physical remote at hand), which still works with launcherx kept.
 #
 # Applied on 2026-10-26 in three batches with a screenshot after each; Home, D-pad, the Inputs menu and Live TV

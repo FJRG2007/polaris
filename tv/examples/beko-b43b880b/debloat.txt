@@ -24,7 +24,7 @@
 #
 # Launcher works: installed with launcher/build-and-install.ps1 (Windows), owns Home also after a reboot;
 # every remote button (Home, Input, Settings, app keys) works without the key services. Screensaver set to
-# com.gathin.tvhome/.ClockDream before backdrop goes.
+# app.polaris.tv/.ClockDream before backdrop goes.
 #
 # Owner's choices: Chromecast, AirScreen, YouTube Music and the phone remotes
 # (com.google.android.tv.remote.service, com.arcelik.smartremotecompanion.beko) kept; voice assistant,
@@ -52,4 +52,4 @@ com.google.android.katniss                      # Google voice search / Assistan
 # --- After launcher/ owns Home (build-and-install disables com.google.android.tvlauncher itself)
 com.google.android.tvlauncher                   # stock Android TV home: sponsored rows
 com.google.android.tvrecommendations            # feeds the stock home's recommendation rows
-com.google.android.backdrop                     # Ambient screensaver; replaced by com.gathin.tvhome/.ClockDream
+com.google.android.backdrop                     # Ambient screensaver; replaced by app.polaris.tv/.ClockDream

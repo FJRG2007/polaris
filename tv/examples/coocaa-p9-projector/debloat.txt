@@ -31,8 +31,8 @@
 #    (cd launcher && ./gradlew assembleRelease -PlauncherApplicationId=com.coocaa.tvhome)
 # 2. Install and set home properties:
 #    tools/tv.py 'setprop persist.service.homepage.pkg com.coocaa.tvhome'
-#    tools/tv.py 'setprop persist.service.homepage.cls com.gathin.tvhome.MainActivity'
-#    tools/tv.py 'cmd package set-home-activity com.coocaa.tvhome/com.gathin.tvhome.MainActivity'
+#    tools/tv.py 'setprop persist.service.homepage.cls app.polaris.tv.MainActivity'
+#    tools/tv.py 'cmd package set-home-activity com.coocaa.tvhome/app.polaris.tv.MainActivity'
 # 3. Undo launcher handover:
 #    tools/tv.py 'setprop persist.service.homepage.pkg com.tianci.movieplatform; setprop persist.service.homepage.cls com.coocaa.homepage.vast.projector.ProjectorHomeActivity; cmd package set-home-activity com.tianci.movieplatform/com.coocaa.homepage.vast.projector.ProjectorHomeActivity'
 # Note: Stock values were pkg=com.tianci.movieplatform, cls=com.coocaa.homepage.vast.projector.ProjectorHomeActivity.

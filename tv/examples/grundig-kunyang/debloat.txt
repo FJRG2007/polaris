@@ -24,7 +24,7 @@
 # Reboot-checked: pm list packages -d identical before and after; nothing is re-enabled at boot.
 # Launcher works: installs over pm install (no verifier), owns Home (mFocusedApp) also after reboot;
 # every remote button (Home, Input, Settings, app keys) works without the key services. Live TV is
-# com.mediatek.wwtv.tvcenter. Screensaver set to com.gathin.tvhome/.ClockDream before backdrop goes.
+# com.mediatek.wwtv.tvcenter. Screensaver set to app.polaris.tv/.ClockDream before backdrop goes.
 # Private DNS works on this set.
 #
 # Owner's choices: Chromecast and YouTube Music kept; voice assistant, AirScreen/AirCast,
@@ -60,4 +60,4 @@ com.arcelik.smartremotecompanion.grundig        # Grundig Smart Remote phone-app
 # --- After launcher/ owns Home (build-and-install.sh disables com.google.android.tvlauncher itself)
 com.google.android.tvlauncher                   # stock Android TV home: shopping tab, sponsored rows
 com.google.android.tvrecommendations            # feeds the stock home's recommendation rows
-com.google.android.backdrop                     # Ambient screensaver, ~160 MB resident; replaced by com.gathin.tvhome/.ClockDream
+com.google.android.backdrop                     # Ambient screensaver, ~160 MB resident; replaced by app.polaris.tv/.ClockDream

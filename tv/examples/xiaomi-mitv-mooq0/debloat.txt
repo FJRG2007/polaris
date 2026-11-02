@@ -75,7 +75,7 @@
 # - Live TV (com.mediatek.wwtv.tvcenter) can't be disabled even if you never use the tuner: its
 #   TurnkeyUiMainActivity is also the HDMI/AV window. Hide it in the launcher instead (hidden_apps).
 # - Before disabling com.mitv.dream, point the screensaver elsewhere:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 # - After power-on the TV returns to the last source, not the launcher.
 
 # ---- Xiaomi telemetry and analytics ----

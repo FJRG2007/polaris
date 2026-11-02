@@ -3,9 +3,9 @@
 In the redirect setup the stock launcher stays enabled and stays Home on purpose, and HomeKeyService
 sends its home screen on to this launcher: the Chromecast with Google TV 4K (sabrina) runs that way
 with launcherx and setupwraith kept for casting, and so does the Acer AR55AR2851UDPRO, where
-`set-home-activity` does not stick. tools/check.py expects com.gathin.tvhome on Home whenever it is
+`set-home-activity` does not stick. tools/check.py expects app.polaris.tv on Home whenever it is
 installed, so on those TVs every run reported Home as drift ("Home is
-com.google.android.apps.tv.launcherx/.home.HomeActivity, not com.gathin.tvhome", exit 1), and
+com.google.android.apps.tv.launcherx/.home.HomeActivity, not app.polaris.tv", exit 1), and
 `--fix` asked for a Home switch the TV does not keep. Naming the stock launcher as check.py's second
 argument makes the same run come back clean. The README mentioned that argument only for forks.
 
@@ -49,7 +49,7 @@ KEEP_CAST = FOLDER / "debloat-keep-cast.txt"
 ACER = ROOT / "examples" / "acer-ar55ar2851udpro"
 ACER_LIST = ACER / "debloat.txt"
 STOCK = "com.google.android.apps.tv.launcherx"
-CUSTOM = "com.gathin.tvhome"
+CUSTOM = "app.polaris.tv"
 SETUPWRAITH = "com.google.android.tungsten.setupwraith"
 # `tools/check.py <list> [launcher]`, with the list's path as the docs write it (`<your tv>` included).
 CHECK = re.compile(r"tools/check\.py\s+(?P<list>examples/.+?\.txt)(?:\s+(?P<launcher>[A-Za-z_][\w.]*))?\s*$")

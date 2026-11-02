@@ -23,7 +23,7 @@
 #   was installed without the Input-button service (no INPUT_KEY_SERVICE).
 # - setupwraith disabled with no side effects on Ethernet (Wi-Fi saved during setup not tested).
 # - launcherx and dreamx disabled only after the new launcher was installed, with the launcher's clock as
-#   screensaver: settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   screensaver: settings put secure screensaver_components app.polaris.tv/.ClockDream
 # - Everything stays disabled and Home stays on the new launcher after `svc power reboot`.
 # - Screenshots come out empty while Netflix is on screen; press Home first.
 # - Launcher config: live_tv_package com.sony.dtv.tvx, hidden apps com.sony.dtv.tvx and the Vewd browser

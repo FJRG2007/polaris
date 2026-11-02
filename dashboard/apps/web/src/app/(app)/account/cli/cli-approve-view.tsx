@@ -18,7 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { formatUserCode } from "@/lib/device-code";
 import type { PendingCliSignIn, SignInKind, SignInScope } from "@/lib/cli/sign-in";
 import { SystemMark } from "@/components/client-marks";
-import { Globe, Grid3x3, Info, Network, Tag, Terminal } from "lucide-react";
+import { Globe, Grid3x3, Info, Network, Tag, Terminal, Tv } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { answerCliSignInAction, describeCliSignInAction } from "./actions";
 import {
@@ -49,14 +49,14 @@ const SCOPE_WORDS = {
 
 /**
  * The approval for either client the device grant serves: `plr login`, or the
- * Stream Deck plugin (`kind="streamdeck"`), each in its own words and finding
- * only its own requests.
+ * Stream Deck plugin (`kind="streamdeck"`), or Polaris TV (`kind="tv"`), each in
+ * its own words and finding only its own requests.
  */
 export function CliApproveView({ account, kind = "cli" }: { account?: string; kind?: SignInKind }) {
     const asked = useSearchParams().get("code") ?? "";
     const t = useTranslations("account");
     const words = kind;
-    const Requester = kind === "streamdeck" ? Grid3x3 : Terminal;
+    const Requester = kind === "tv" ? Tv : kind === "streamdeck" ? Grid3x3 : Terminal;
     const [typed, setTyped] = useState(asked);
     const [pending, setPending] = useState<PendingCliSignIn | null>(null);
     const [error, setError] = useState("");

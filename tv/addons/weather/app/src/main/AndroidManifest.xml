@@ -26,9 +26,9 @@
             <!-- Clean Your TV module card (docs/specs/card.md): the tile shows as "Weather" once the owner says Show. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="com.gathin.tvhome.category.DOCK_CARD" />
+                <category android:name="app.polaris.tv.category.DOCK_CARD" />
             </intent-filter>
-            <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
+            <meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />
         </activity>
     </application>
 </manifest>

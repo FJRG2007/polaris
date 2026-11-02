@@ -57,7 +57,7 @@ stayed 1 and HDMI and the remote kept working. Don't open the other `com.cvte.*`
 TV_HOST=<tv-ip> tools/disable.sh examples/sber-salute-tv-at30a6/debloat.txt
 TV_HOST=<tv-ip> STOCK_LAUNCHER=ru.sberdevices.starlauncher launcher/build-and-install.sh
 TV_HOST=<tv-ip> tools/theme.sh examples/sber-salute-tv-at30a6
-TV_HOST=<tv-ip> tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+TV_HOST=<tv-ip> tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 ```
 
 The last line matters: while `screensaver_default_component` points at Sber's screensaver, StarOS re-enabled

@@ -48,7 +48,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "tools"
-LAUNCHER_PKG = "com.gathin.tvhome"
+LAUNCHER_PKG = "app.polaris.tv"
 
 
 # ---------------------------------------------------------------- reading the repo

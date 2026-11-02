@@ -38,7 +38,7 @@
 # - After tools/theme.sh restarted Home, HomeKeyService was left enabled but UNBOUND (dumpsys
 #   accessibility: "Bound services:{}") and the gear did nothing (#994). Clearing the list, toggling
 #   accessibility_enabled off, waiting 2 s and writing it back bound it again; `appops set
-#   com.gathin.tvhome AUTO_START allow; appops write-settings` first, and restore_key_services in the theme.
+#   app.polaris.tv AUTO_START allow; appops write-settings` first, and restore_key_services in the theme.
 # - `tools/tv.py 'reboot'` never returns on this set (#995): run it with a timeout.
 #
 # Also used on a TCL 65C745 QLED, France (2023; same product G05_4K_GB, build AR2101, incremental AR25, software
@@ -62,7 +62,7 @@
 #   volume key steps the volume twice; an injected KEYCODE_VOLUME_UP steps it once, and consuming the key in the
 #   helper does not stop the double step. key_filter: false brings back one step per press, at the price of every
 #   remote button mapped above.
-# - The auto-start op is named APP_AUTO_START here (`appops get <package>`): `appops set com.gathin.tvhome AUTO_START
+# - The auto-start op is named APP_AUTO_START here (`appops get <package>`): `appops set app.polaris.tv AUTO_START
 #   allow` fails (Unknown operation string), APP_AUTO_START is accepted. Allowed and saved with `appops write-settings`,
 #   it let a third-party screensaver (Aerial Views) bind, and it still did after a reboot (docs/TROUBLESHOOTING.md,
 #   "A third-party screensaver never shows"). After a theme push only one of the two helpers was bound at a time; a
@@ -148,5 +148,5 @@ com.google.android.tungsten.setupwraith # first-run wizard; its RecoveryActivity
                                         # before a factory reset (restore.sh does it).
 
 # Batch 6 (55C728) - once the launcher's clock is the screensaver:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 # com.google.android.apps.tv.dreamx     # 55C728, 65C745: Google TV ambient mode screensaver and smart-home panel

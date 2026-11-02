@@ -25,7 +25,7 @@ spec = importlib.util.spec_from_file_location("cyt_trace_report", ROOT / "tools"
 report = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(report)
 
-PKG = "com.gathin.tvhome"
+PKG = "app.polaris.tv"
 MS = 1_000_000
 
 
@@ -39,12 +39,12 @@ def fake_trace(cold=False, frames=(), draws=(), missed=1, gpu=()):
         create table thread_track (id integer, utid integer);
         create table slice (id integer primary key, ts integer, dur integer, name text, track_id integer);
         create table actual_frame_timeline_slice (ts integer, dur integer, upid integer, jank_type text);
-        insert into process values (1, 90, 'com.gathin.tvhome'), (2, 100, 'com.gathin.tvhome'), (3, 200, 'other');
-        insert into thread values (1, 2, 100, 'com.gathin.tvhome'), (2, 2, 101, 'RenderThread'),
-                                  (3, 1, 90, 'com.gathin.tvhome');
+        insert into process values (1, 90, 'app.polaris.tv'), (2, 100, 'app.polaris.tv'), (3, 200, 'other');
+        insert into thread values (1, 2, 100, 'app.polaris.tv'), (2, 2, 101, 'RenderThread'),
+                                  (3, 1, 90, 'app.polaris.tv');
         insert into thread_track values (10, 1), (20, 2), (30, 3);
     """)
-    main = [("performStart:com.gathin.tvhome.MainActivity", 1000, 5), ("activityResume", 1005, 30),
+    main = [("performStart:app.polaris.tv.MainActivity", 1000, 5), ("activityResume", 1005, 30),
             ("traversal", 1040, 20), ("traversal", 1200, 5)]
     if cold:
         main = [("bindApplication", 900, 40), ("activityStart", 945, 50)] + main

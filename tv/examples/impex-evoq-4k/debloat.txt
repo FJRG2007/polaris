@@ -16,7 +16,7 @@
 # Tested on one set the same day, not a multi-day soak: after each batch Home opens and the Input menu still
 # lists Live TV, AV and HDMI 1-4; HDMI 1 switches and Home returns; YouTube and JioHotstar launch and play.
 # After a reboot with the whole list and the launcher: the disabled list is identical (no package re-enabled at
-# boot), Home is com.gathin.tvhome at power-on (no Live TV autostart, so neither power_on_home nor
+# boot), Home is app.polaris.tv at power-on (no Live TV autostart, so neither power_on_home nor
 # boot_to_live_tv), the crash buffer is empty. AdGuard Private DNS (dns.adguard-dns.com) validates.
 #
 # KEEP, even though the names look like bloat:

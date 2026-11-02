@@ -710,7 +710,7 @@ Hiervoor heb je JDK 17 en Android SDK-platform 34 nodig. Op macOS: `brew install
 <details>
 <summary><b>Talen</b></summary>
 
-Engels, Duits, Deens, Spaans, Catalaans, Frans, Russisch, Servisch (Latijn), Pools, Tsjechisch, Italiaans, Portugees, Turks, Arabisch, Hebreeuws, Vereenvoudigd Chinees, Traditioneel Chinees (Taiwan), Thai, Fins, Vietnamees, Bangla, Indonesisch, Noors Bokmål, Nederlands, Oezbeeks (Latijn), Oekraïens en Koreaans. De launcher volgt de taal van de tv. Vanaf Android 13 kun je de taal alleen voor de launcher instellen met `tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales ca'`.
+Engels, Duits, Deens, Spaans, Catalaans, Frans, Russisch, Servisch (Latijn), Pools, Tsjechisch, Italiaans, Portugees, Turks, Arabisch, Hebreeuws, Vereenvoudigd Chinees, Traditioneel Chinees (Taiwan), Thai, Fins, Vietnamees, Bangla, Indonesisch, Noors Bokmål, Nederlands, Oezbeeks (Latijn), Oekraïens en Koreaans. De launcher volgt de taal van de tv. Vanaf Android 13 kun je de taal alleen voor de launcher instellen met `tools/tv.py 'cmd locale set-app-locales app.polaris.tv --locales ca'`.
 
 Bij Hebreeuws wordt de indeling gespiegeld: menuknoppen staan links, datum en klok rechts met de begroeting erboven, dock en app-rijen beginnen rechts met bijbehorende navigatie via de afstandsbediening, en de pictogrammen en labels van de ingangsselector staan rechts. Datums gebruiken het Hebreeuwse voorvoegsel ב voor de maand (bijvoorbeeld 19 באוקטובר). De klokschermbeveiliging lijnt datum en tijd rechts uit. Het Russisch is op alle schermen vertaald, inclusief raceweekenden, feestdagbegroetingen en de Shamsi-datum. Andere talen behouden hun oorspronkelijke indeling.
 
@@ -729,7 +729,7 @@ Elke tv-app kan een eigen tegel declareren (label, bijschrift en gloed). De laun
 Kies 'Klok' in de instellingen voor schermbeveiliging van de tv, of voer via ADB het volgende uit:
 
 ```bash
-tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'
+tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream; settings put secure screensaver_enabled 1'
 ```
 
 </details>
@@ -811,7 +811,7 @@ De taak krijgt alleen antwoord van een tv waarop netwerk-ADB tussen uitvoeringen
 Voordat het iets uitschakelt, voert het dezelfde veiligheidscontroles uit als `tools/disable.sh`, omdat die na een update opnieuw van belang zijn. Het laat setupwraith ingeschakeld zolang het opgeslagen wifi-netwerk daarvan afhankelijk is (`FORCE_SETUPWRAITH=1` bij ethernet), laat pakketten voor HDMI-/AV-ingangen ingeschakeld (`TVINPUT_ALLOW=1` als je ze echt wilt uitschakelen), laat apps ingeschakeld waarmee de tv ingangen en Instellingen opent (`HANDLERS_ALLOW=1`) en stelt het startscherm nooit in op de `FallbackHome` van een fabrikant of een fabrieks-testapp.
 Bij elk pakket dat ingeschakeld blijft, wordt de reden vermeld en eindigt de opdracht met code `1`. De tv komt pas weer overeen met de lijst als je dat pakket handmatig hebt afgehandeld.
 
-Met `stock_home_redirect` kan de standaardlauncher bewust het startscherm blijven beheren: de lijst laat die ongemoeid, het installatiescript is uitgevoerd met `STOCK_LAUNCHER=none`, Android houdt die launcher als startscherm en `HomeKeyService` stuurt het startscherm door naar deze launcher. Op de Chromecast met Google TV 4K hoort deze configuratie bij `debloat-keep-cast.txt` in de betreffende map, niet bij `debloat.txt`; die laatste schakelt setupwraith en de twee schermbeveiligingspakketten uit die de omleidingsconfiguratie behoudt. Op de Acer AR55AR2851UDPRO hoort deze bij `debloat.txt`. Controleer deze lijsten met de standaardlauncher als tweede argument. Zonder dat argument verwacht de controle dat `com.gathin.tvhome` het startscherm beheert, waardoor elke uitvoering een afwijking meldt. `--fix` probeert het startscherm dan daarnaar om te zetten, maar deze tv's behouden die instelling niet:
+Met `stock_home_redirect` kan de standaardlauncher bewust het startscherm blijven beheren: de lijst laat die ongemoeid, het installatiescript is uitgevoerd met `STOCK_LAUNCHER=none`, Android houdt die launcher als startscherm en `HomeKeyService` stuurt het startscherm door naar deze launcher. Op de Chromecast met Google TV 4K hoort deze configuratie bij `debloat-keep-cast.txt` in de betreffende map, niet bij `debloat.txt`; die laatste schakelt setupwraith en de twee schermbeveiligingspakketten uit die de omleidingsconfiguratie behoudt. Op de Acer AR55AR2851UDPRO hoort deze bij `debloat.txt`. Controleer deze lijsten met de standaardlauncher als tweede argument. Zonder dat argument verwacht de controle dat `app.polaris.tv` het startscherm beheert, waardoor elke uitvoering een afwijking meldt. `--fix` probeert het startscherm dan daarnaar om te zetten, maar deze tv's behouden die instelling niet:
 
 ```bash
 TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/check.py examples/google-chromecast-gtv-4k/debloat-keep-cast.txt com.google.android.apps.tv.launcherx

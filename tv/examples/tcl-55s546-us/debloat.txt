@@ -63,5 +63,5 @@ com.tcl.assistant                           # TCL voice assistant / voice TV con
 com.google.android.tungsten.setupwraith
 
 # ---- 6. Google ambient screensaver (promos) ----
-# Switch the screensaver first: settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+# Switch the screensaver first: settings put secure screensaver_components app.polaris.tv/.ClockDream
 com.google.android.apps.tv.dreamx

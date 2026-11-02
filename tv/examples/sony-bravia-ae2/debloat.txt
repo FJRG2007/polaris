@@ -18,7 +18,7 @@
 #   before launcherx or Home can land on it.
 # - The default screensaver is com.sony.dtv.livingfit; with it disabled the TV has none until you
 #   pick another (the launcher's Clock: `settings put secure screensaver_components
-#   com.gathin.tvhome/.ClockDream`).
+#   app.polaris.tv/.ClockDream`).
 # - YouTube Music for TV (com.google.android.youtube.tvmusic) ends its media session when you leave it,
 #   so music stops on Home; SoundCloud keeps playing.
 #

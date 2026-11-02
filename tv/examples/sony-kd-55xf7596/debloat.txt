@@ -27,7 +27,7 @@
 # Second unit, 2026-10-28: a 65-inch EU set. getprop has no KD-65 name (model "BRAVIA 4K GB ATV3",
 # device BRAVIA_ATV3_4K, product BRAVIA_ATV3_4K_EU, panel 3840x2160, board mt5891) and the fingerprint
 # is the one above, which examples/sony-kd-55xf8096 also has, so a fingerprint prefix cannot tell the
-# two lists apart. com.gathin.tvhome was Home (`dumpsys window | grep mFocusedApp`) and
+# two lists apart. app.polaris.tv was Home (`dumpsys window | grep mFocusedApp`) and
 # com.google.android.tvlauncher was disabled. Already off from this list: Samba TV, promos, Sony Select,
 # bivlinfo, tvrecommendations, the Bravia auto-install, the three demo packages, da.service, Qterics,
 # both bug reporters, feedback, customersupport, smarthelp and imanual. Still enabled, so not tested

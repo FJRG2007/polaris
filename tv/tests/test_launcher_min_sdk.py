@@ -21,7 +21,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 STOCK_HOME = "com.google.android.tvlauncher/.MainActivity"
-NEW_HOME = "com.gathin.tvhome/.MainActivity"
+NEW_HOME = "app.polaris.tv/.MainActivity"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 README = ROOT / "README.md"
 EXAMPLES = ROOT / "examples" / "README.md"
@@ -87,7 +87,7 @@ exit 0
 # install-permissions line is there only while it is granted. A failed readback stops after the requested
 # list with a non-zero exit; a timed-out one stops there too, says so, and exits 0 as dumpsys does.
 DUMPSYS = """#!/bin/sh
-echo "  Package [com.gathin.tvhome] (1a2b3c):"
+echo "  Package [app.polaris.tv] (1a2b3c):"
 echo "    requested permissions:"
 echo "      android.permission.WRITE_SECURE_SETTINGS"
 case "$(cat "$FAKE_SECURE.readback")" in

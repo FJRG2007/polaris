@@ -20,7 +20,7 @@
 # it owned no saved network here), then enable HomeKeyService with the settings command
 # build-and-install.sh runs for HOME_KEY_SERVICE=1.
 # TclAppBoot blocks HomeKeyService at every boot until the launcher has AUTO_START, saved to disk:
-#   TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'appops set com.gathin.tvhome AUTO_START allow; appops write-settings'
+#   TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'appops set app.polaris.tv AUTO_START allow; appops write-settings'
 #
 # Remote (BT_RC933_U1): every TCL button arrives on scancode 240 and TCL's own key table picks the keycode,
 # so config.json matches keycodes: gear 83, Netflix 4062, Prime Video 4099, YouTube 190 (BUTTON_3). The

@@ -52,7 +52,7 @@ then `继续安装` (continue installation). Haier's `com.yunos.tvmgr` also show
 a `安全风险` confirmation. Wait for the button to become enabled; repeatedly
 issuing installation commands leaves duplicate requests. Update installation
 preserved the launcher's data. Verify the installed version with
-`dumpsys package com.gathin.tvhome` rather than relying on the dialog alone.
+`dumpsys package app.polaris.tv` rather than relying on the dialog alone.
 
 Wake/dismiss the screensaver before opening the installer. An installer can
 be running behind it while `uiautomator dump` shows only the screensaver.
@@ -81,7 +81,7 @@ and explicitly started, the tested handover was:
 ```sh
 adb -s <tv-ip>:5555 shell pm disable-user --user 0 com.haier.tv.provision
 adb -s <tv-ip>:5555 shell cmd package set-home-activity --user 0 \
-  com.gathin.tvhome/.MainActivity
+  app.polaris.tv/.MainActivity
 ```
 
 Coolme and `com.yunos.tv.alihomeshell` remained enabled as recovery paths.
@@ -203,7 +203,7 @@ That identifies a launch route; HDMI cables and tuner reception were not
 individually tested.
 
 Static wallpapers work via
-`/sdcard/Android/data/com.gathin.tvhome/files/wallpaper.jpg`; the existing
+`/sdcard/Android/data/app.polaris.tv/files/wallpaper.jpg`; the existing
 Launcher settings wallpaper picker can select a picture or no wallpaper.
 Use a dark, quiet image so the clock and app labels remain readable. There is
 no need for a network wallpaper service or animated background. Restarting the

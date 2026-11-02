@@ -62,7 +62,7 @@ or install the launcher and use its clock instead:
 
 ```bash
 STOCK_LAUNCHER=none launcher/build-and-install.sh   # the firmware refuses to disable the stock home anyway
-tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_default_component com.gathin.tvhome/.ClockDream'
+tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream; settings put secure screensaver_default_component app.polaris.tv/.ClockDream'
 ```
 
 ## Stock launcher

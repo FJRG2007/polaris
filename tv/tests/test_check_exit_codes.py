@@ -40,7 +40,7 @@ GUIDE = ROOT / "docs" / "firmware-updates.md"
 JOB = "## Exit codes, and a weekly job"
 CHECK = ROOT / "tools" / "check.py"
 STOCK = "com.google.android.tvlauncher"
-CUSTOM = "com.gathin.tvhome"
+CUSTOM = "app.polaris.tv"
 HEADING = "## After a firmware update"
 
 

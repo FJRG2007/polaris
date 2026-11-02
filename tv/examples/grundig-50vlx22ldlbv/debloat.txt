@@ -31,7 +31,7 @@
 # (Home, Input, Settings, app keys) works without the key services, pressed on the real remote.
 # HOME_KEY_SERVICE costs key repeat here, as in docs/devices/tcl-55p71b-g09-key-repeat.md:
 # with it bound, holding Volume Up gives one step per press; repeat returns once it is off.
-# Screensaver set to com.gathin.tvhome/.ClockDream before backdrop goes.
+# Screensaver set to app.polaris.tv/.ClockDream before backdrop goes.
 #
 # Owner's choices: YouTube, Prime Video, Chromecast, Play Movies and Play Games kept; Netflix, YouTube Music,
 # voice assistant and the phone-remote service off. Self-installed streaming apps untouched.
@@ -54,4 +54,4 @@ com.google.android.tv.remote.service            # phone-as-remote service (Googl
 # --- After launcher/ owns Home (build-and-install.sh disables com.google.android.tvlauncher itself)
 com.google.android.tvlauncher                   # stock Android TV home: sponsored rows
 com.google.android.tvrecommendations            # feeds the stock home's recommendation rows
-com.google.android.backdrop                     # Ambient screensaver; replaced by com.gathin.tvhome/.ClockDream
+com.google.android.backdrop                     # Ambient screensaver; replaced by app.polaris.tv/.ClockDream

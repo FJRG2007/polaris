@@ -50,13 +50,13 @@ com.sonypicturescore            # Sony Pictures Core
 #   1. launcher/build-and-install.sh with STOCK_LAUNCHER=none (Google TV stays Home)
 #   2. pm disable-user --user 0 com.google.android.tungsten.setupwraith, then watch the TV for 5 minutes
 #   3. pm disable-user --user 0 com.google.android.apps.tv.launcherx
-#      cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity
+#      cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity
 # It boots straight into the launcher afterwards. Re-enable setupwraith before a factory reset.
 # com.google.android.tungsten.setupwraith  # setup wizard; its RecoveryActivity also claims Home
 
 # ambient screensaver: shows "Unable to load content" once launcherx is off. First point the
 # screensaver at the launcher's clock, then disable it:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 # com.google.android.apps.tv.dreamx   # ambient mode + smart-home panel (59 MB, always running)
 
 # voice search (optional, NOT applied on the tested TV): removes the remote's mic button and the

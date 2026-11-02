@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="polaris_settings_row">Cuenta de Polaris</string>
+    <string name="polaris_intro">Opcional. Conecta esta TV a tu Polaris para ver aquí tu cuenta y tus alertas. La TV funciona igual sin ello.</string>
+    <string name="polaris_connect">Conectar</string>
+    <string name="polaris_connecting">Conectando...</string>
+    <string name="polaris_bad_address">Eso no es una dirección. Escribe la que usas para abrir Polaris.</string>
+    <string name="polaris_no_answer">%1$s no respondió como un Polaris. Revisa la dirección y que ese Polaris esté actualizado.</string>
+    <string name="polaris_qr">Código para escanear con el móvil</string>
+    <string name="polaris_pair_hint">Escanea el código con el móvil, o abre esta dirección y escribe el código:</string>
+    <string name="polaris_denied">Se rechazó la conexión. No se guardó nada.</string>
+    <string name="polaris_expired">El código caducó. Vuelve a conectar para obtener otro.</string>
+    <string name="polaris_sign_in_lost">Esta TV ya no está conectada. Vuelve a conectarla.</string>
+    <string name="polaris_loading">Cargando...</string>
+    <string name="polaris_unreachable">Tu Polaris no responde ahora mismo.</string>
+    <string name="polaris_on_local">Usando tu dirección de la red local: %1$s</string>
+    <string name="polaris_refused">%1$s responde como otro Polaris, así que tu sesión no se envió allí.</string>
+    <string name="polaris_untrusted">%1$s usa un certificado en el que esta TV no confía, así que no se puede usar.</string>
+    <string name="polaris_disconnect">Desconectar esta TV</string>
+    <plurals name="polaris_unread">
+        <item quantity="one">%d notificación sin leer</item>
+        <item quantity="other">%d notificaciones sin leer</item>
+    </plurals>
+    <plurals name="polaris_alerts">
+        <item quantity="one">%d alerta</item>
+        <item quantity="other">%d alertas</item>
+    </plurals>
+</resources>

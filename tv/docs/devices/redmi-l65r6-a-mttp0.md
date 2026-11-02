@@ -30,7 +30,7 @@ streaming apps. `com.mitv.care` was already disabled before the session and is n
 
 ## Home: the allowlist identity
 
-The ordinary `com.gathin.tvhome` build installed and opened, but `set-home-activity` printed `Success` and Home
+The ordinary `app.polaris.tv` build installed and opened, but `set-home-activity` printed `Success` and Home
 still resolved to PatchWall: the same package-name HOME allowlist as the MiTV-AETP0 and MiTV-MTEQ0
 ([`xiaomi-mitv-aetp0-dofus.md`](xiaomi-mitv-aetp0-dofus.md),
 [`xiaomi-mitv-mteq0-baymax.md`](xiaomi-mitv-mteq0-baymax.md)). A build from the same source with

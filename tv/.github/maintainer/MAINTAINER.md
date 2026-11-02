@@ -151,7 +151,7 @@ Drawn from the round notes. Each line names the PRs it comes from.
   becomes its second unit (#2114/#1990, #2120 over #1621).
 - Hold: drafts (#1990, #2188, #2305); commits *authored* by Claude, not just a Co-Authored-By trailer (#2098);
   Home/boot path changes without a real-TV run (#1992, #2193, #2194, #2327, #2328); forks shipping APKs under our
-  package name `com.gathin.tvhome`; big features with broad permissions or a LAN server (#2192, #2325).
+  package name `app.polaris.tv`; big features with broad permissions or a LAN server (#2192, #2325).
 - Close: anything needing root, Magisk or custom firmware, or going around the China TCL install check (#1729,
   #2318); a workflow change that widens CI token permissions, flagged (#1883); day-old tools repos shipping
   prebuilt binaries under our name (#1742, #1768). Quick start stays on the one reviewed phone app (#1630).

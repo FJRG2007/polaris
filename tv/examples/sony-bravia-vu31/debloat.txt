@@ -98,7 +98,7 @@ com.android.gallery3d                    # legacy photo viewer (2nd)
 com.android.camera2                      # crashes on open; no camera on this set
 
 # Screensaver: set `settings put secure screensaver_components com.android.dreams.basic/.Colors` first, or
-# with the launcher installed its clock, com.gathin.tvhome/.ClockDream (2nd; runs in the launcher's process)
+# with the launcher installed its clock, app.polaris.tv/.ClockDream (2nd; runs in the launcher's process)
 com.google.android.apps.tv.dreamx        # Ambient photo/art screensaver (~46 MB resident; ~80 MB PSS
                                          # right after it has run) and two photo-sync jobs
 

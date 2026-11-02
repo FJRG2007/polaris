@@ -178,7 +178,7 @@ trước khi tắt; `tools/disable.sh` không tạo bản sao lưu đó.
 
 ### 3. Build và cài launcher
 
-Launcher viết bằng Java và AndroidX RecyclerView, tên gói `com.gathin.tvhome`. Cần JDK 17, Android SDK Platform 34 và
+Launcher viết bằng Java và AndroidX RecyclerView, tên gói `app.polaris.tv`. Cần JDK 17, Android SDK Platform 34 và
 Build Tools 34.0.0. Trên macOS:
 
 ```bash
@@ -261,9 +261,9 @@ Các lệnh ADB dưới đây dùng đường dẫn venv của macOS/Linux; trê
 `tools/venv/bin/python -I tools/tv.py` thành `tools\venv\Scripts\python.exe -I tools\tv.py`.
 
 - **Ngôn ngữ** đổi theo ngôn ngữ hệ thống của TV, có tiếng Việt. Từ Android 13 có thể đặt ngôn ngữ riêng cho launcher:
-  `tools/venv/bin/python -I tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales vi-VN'`.
+  `tools/venv/bin/python -I tools/tv.py 'cmd locale set-app-locales app.polaris.tv --locales vi-VN'`.
 - **Trình bảo vệ màn hình đồng hồ**: chọn Clock trong cài đặt trình bảo vệ màn hình của TV, hoặc chạy
-  `tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'`.
+  `tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream; settings put secure screensaver_enabled 1'`.
 - **Nút Nguồn vào trên remote**: khi cài trên macOS/Linux thêm `INPUT_KEY_SERVICE=1` để bật dịch vụ trợ năng, giúp nút
   nguồn vào trên remote Google TV hoạt động; trên Windows dùng `-InputKeyService`.
 - **Nút Home / Cài đặt**: khi cài trên macOS/Linux thêm `HOME_KEY_SERVICE=1`, kết hợp các khoá phím trong `config.xml`

@@ -44,7 +44,7 @@ tools/disable.sh examples/panavox-google-tv/debloat.txt
 tools/theme.sh themes/aurora
 
 # the list disables Google's screensaver, so set the Clock screensaver
-tools/venv/bin/python -I tools/tv.py "settings put secure screensaver_components com.gathin.tvhome/.ClockDream"
+tools/venv/bin/python -I tools/tv.py "settings put secure screensaver_components app.polaris.tv/.ClockDream"
 ```
 
 When you are done, turn USB debugging off in Developer options.

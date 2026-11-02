@@ -186,7 +186,7 @@ tools/disable.sh examples/xiaomi-mi-tv-4a/debloat.txt
 
 ### 3. 編譯並安裝啟動器
 
-啟動器的套件名稱是 `com.gathin.tvhome`。本機編譯需要完整的 JDK 17 至 22（僅有 JRE 不足）、Android SDK Platform 34 與 Build Tools 34.0.0 或更新的 34.x 版本。JDK 23 以上無法配合目前的 Gradle 8.9；較新的 Android SDK Platform 不能取代 Platform 34。macOS 可使用：
+啟動器的套件名稱是 `app.polaris.tv`。本機編譯需要完整的 JDK 17 至 22（僅有 JRE 不足）、Android SDK Platform 34 與 Build Tools 34.0.0 或更新的 34.x 版本。JDK 23 以上無法配合目前的 Gradle 8.9；較新的 Android SDK Platform 不能取代 Platform 34。macOS 可使用：
 
 ```bash
 brew install openjdk@17 android-commandlinetools
@@ -300,21 +300,21 @@ TV_HOST=192.168.1.50 tools/theme.sh --reset
 - **語言：**啟動器預設跟隨電視的系統語言，已包含正體中文（臺灣）。可在 `config.xml` 或主題的 `locale` 指定語言標籤，例如 `zh-TW`；留空則使用系統語言。Android 13 以上也可透過系統為啟動器單獨設定語言；如要使用系統設定，請先清空內建設定與目前主題的 `locale`，並重新建置或推送所需的設定：
 
   ```bash
-  tools/venv/bin/python -I tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales zh-TW'
+  tools/venv/bin/python -I tools/tv.py 'cmd locale set-app-locales app.polaris.tv --locales zh-TW'
   ```
 
-  查詢系統的應用程式語言設定可用 `cmd locale get-app-locales com.gathin.tvhome`；改為英文時將 `zh-TW` 換成 `en`。Android 12 以下沒有此系統指令，可使用上述 `locale` 設定或變更電視系統語言。
+  查詢系統的應用程式語言設定可用 `cmd locale get-app-locales app.polaris.tv`；改為英文時將 `zh-TW` 換成 `en`。Android 12 以下沒有此系統指令，可使用上述 `locale` 設定或變更電視系統語言。
 
 - **時鐘螢幕保護程式：**在電視的螢幕保護程式設定中選擇「時鐘（Clock）」，或執行：
 
   ```bash
-  tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'
+  tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream; settings put secure screensaver_enabled 1'
   ```
 
 - **輸入來源鍵：**macOS／Linux 安裝時可使用 `INPUT_KEY_SERVICE=1` 啟用無障礙服務，支援 Google TV 遙控器的輸入來源按鈕；Windows 使用 `-InputKeyService`。
 - **Home／設定鍵與應用程式按鍵：**macOS／Linux 安裝時可使用 `HOME_KEY_SERVICE=1`，搭配 `config.xml` 或主題中的 `app_keys` 等設定；Windows 使用 `-HomeKeyService`。`settings_key_panel` 可讓設定鍵開啟快捷設定面板。詳細按鍵設定見[英文啟動器說明](docs/launcher.md#remote-keys)。
 
-無障礙按鍵服務必須用**實體遙控器**驗證，注入按鍵不算驗證。`am force-stop com.gathin.tvhome` 預設會關閉這些輔助服務；若啟用 `restore_key_services` 並在安裝時使用 `RESTORE_KEY_SERVICES=1` 授權，回到 Home 後會嘗試恢復。詳見[疑難排解](docs/TROUBLESHOOTING.md)與[功能設定](themes/README.md#keys)。
+無障礙按鍵服務必須用**實體遙控器**驗證，注入按鍵不算驗證。`am force-stop app.polaris.tv` 預設會關閉這些輔助服務；若啟用 `restore_key_services` 並在安裝時使用 `RESTORE_KEY_SERVICES=1` 授權，回到 Home 後會嘗試恢復。詳見[疑難排解](docs/TROUBLESHOOTING.md)與[功能設定](themes/README.md#keys)。
 
 ### 模組卡片
 

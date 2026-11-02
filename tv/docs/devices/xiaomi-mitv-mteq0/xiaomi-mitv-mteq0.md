@@ -9,7 +9,7 @@ no debloat list was applied.
 `MitvConfigParser` prints the cloud-controlled `mitv_security_center.xml` whitelist to logcat
 at boot (`adb shell logcat -d -s MitvConfigParser | grep "\[White\]"`; reboot first if the
 ring buffer has already wrapped). Only package names on that list may become Home. On this
-firmware `com.ts.launcher=511` is on it, `com.gathin.tvhome` is not, and
+firmware `com.ts.launcher=511` is on it, `app.polaris.tv` is not, and
 `com.dangbei.tvlauncher=1280` is on the `[Black]` list - which is why a stock launcher APK
 installs fine but `set-home-activity` reports Success while HOME still resolves to Xiaomi.
 
@@ -19,8 +19,8 @@ Build with the opt-in identity, exactly as on [xiaomi-mitv-aetp0-dofus](../xiaom
 (cd launcher && ./gradlew assembleRelease -PlauncherApplicationId=com.ts.launcher)
 ```
 
-The Home component is then `com.ts.launcher/com.gathin.tvhome.MainActivity`; the Java
-namespace stays `com.gathin.tvhome`. Check `pm path com.ts.launcher` first: if another
+The Home component is then `com.ts.launcher/app.polaris.tv.MainActivity`; the Java
+namespace stays `app.polaris.tv`. Check `pm path com.ts.launcher` first: if another
 application owns that name, stop rather than overwrite it.
 
 ## The settings button and the vendor settings app

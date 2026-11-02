@@ -27,7 +27,7 @@ Wi-Fi network. The owner had already forgotten Wi-Fi and connected Ethernet, but
 ADB inspection showed `com.google.android.tungsten.setupwraith` as the Wi-Fi config owner. After
 Ethernet was confirmed as the active default network, the setup wizard was disabled; the launcher
 build-and-install script installed and started CleanYourTV, made it Home, and only then disabled the
-stock launcher. After one reboot, Home still resolved to `com.gathin.tvhome/.MainActivity`.
+stock launcher. After one reboot, Home still resolved to `app.polaris.tv/.MainActivity`.
 
 Do not disable the setup wizard while the TV is still relying on its saved Wi-Fi network. Confirm
 that Ethernet (or another network not owned by the wizard) is active first. Disabling it can also stop phone casting after a reboot, since the Cast receiver reads its credentials from setupwraith.
@@ -80,7 +80,7 @@ The Android model alone does not establish its retail year or screen size.
 | Kernel | `5.15.192-android14-11-ga8e52546df5f-dirty`, build dated 2 July 2026 |
 | Memory reported by the kernel | `MemTotal: 1827500 kB` |
 | Display state, observed rather than changed for this report | Physical 3840x2160; existing override 1920x1080; density 320 |
-| Resolved Home | `com.gathin.tvhome/.MainActivity` |
+| Resolved Home | `app.polaris.tv/.MainActivity` |
 
 The [55-inch second-unit report](https://github.com/Gathin23/cleanyourtv/pull/1971) has the same full
 build string, while the 75-inch report in [issue #90](https://github.com/Gathin23/cleanyourtv/issues/90)

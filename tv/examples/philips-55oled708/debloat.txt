@@ -32,7 +32,7 @@
 #
 # Memory, `dumpsys meminfo` on the home screen; readings straddle a reboot, so approximate:
 #   Stock:                      1,755 MB used PSS (launcherx 182 MB across two processes)
-#   This list + launcher/:      1,582 MB used PSS (com.gathin.tvhome 159 MB)
+#   This list + launcher/:      1,582 MB used PSS (app.polaris.tv 159 MB)
 #
 # Quirks on this firmware:
 # 1. org.droidtv.demome asks for TV_INPUT_HARDWARE here, so tools/disable.sh refuses it (#321). Kept.
@@ -40,7 +40,7 @@
 #    the gear button (scancode 141, KEY_SETUP) starts launcherx/.dashboard.DashboardActivity and the
 #    Apps button (scancode 779, keycode 813) sends ALL_APPS. With launcherx disabled both do nothing.
 #    Fixed with the launcher's HomeKeyService (HOME_KEY_SERVICE=1): settings_key_scancodes 141 and
-#    app_keys 813:com.gathin.tvhome. Matching the gear button by keycode (327) did NOT work, by
+#    app_keys 813:app.polaris.tv. Matching the gear button by keycode (327) did NOT work, by
 #    scancode it does; checked with the real remote. SOURCES (768), Netflix (772), YouTube (776), TV
 #    (170, last source) and Quick menu (765) are handled by GlobalKey itself and keep working.
 #    TV Guide (172) does nothing on a set with no channels tuned, before and after.

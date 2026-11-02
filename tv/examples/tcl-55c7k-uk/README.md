@@ -21,11 +21,11 @@ new launcher and only then disables launcherx.
 TV_HOST=<tv ip> tools/disable.sh examples/tcl-55c7k-uk/debloat.txt
 HOME_KEY_SERVICE=1 TV_HOST=<tv ip> launcher/build-and-install.sh
 TV_HOST=<tv ip> tools/theme.sh examples/tcl-55c7k-uk
-tools/tv.py "cmd appops set com.gathin.tvhome AUTO_START allow; cmd appops write-settings; settings put secure accessibility_enabled 1"
+tools/tv.py "cmd appops set app.polaris.tv AUTO_START allow; cmd appops write-settings; settings put secure accessibility_enabled 1"
 ```
 
 `disable.sh` skips launcherx on the first run (its Home guard), and dreamx should go only after the screensaver
-is switched to `com.gathin.tvhome/.ClockDream` (`settings put secure screensaver_components ...`). The last line is
+is switched to `app.polaris.tv/.ClockDream` (`settings put secure screensaver_components ...`). The last line is
 needed for the remote buttons to keep working after a restart; see below. On the 50C7K the keys in `config.json`
 were set in `launcher/app/src/main/res/values/config.xml` instead and the theme push was not run; the keys are the
 same.

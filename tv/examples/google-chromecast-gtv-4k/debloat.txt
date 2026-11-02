@@ -16,7 +16,7 @@
 #   <ip:pairport> <code>`, `adb connect <ip:connectport>` (`adb mdns services` lists both ports), then
 #   `adb tcpip 5555`. After that tools/tv.py works on 5555
 #   (docs/TROUBLESHOOTING.md, "USB debugging never opens port 5555").
-# - `cmd package set-home-activity com.gathin.tvhome` returns Success but launcherx stays the default.
+# - `cmd package set-home-activity app.polaris.tv` returns Success but launcherx stays the default.
 #   Disable BOTH com.google.android.apps.tv.launcherx and com.google.android.tungsten.setupwraith
 #   (setupwraith re-enables launcherx), only after the new launcher is installed.
 # - WARNING: setupwraith can own a saved Wi-Fi network on this model too, as on the HD. On the second
@@ -67,7 +67,7 @@
 #   disabled at the factory; `pm disable-user` on them fails with "Shell cannot change component
 #   state". Don't add them to a restore list either.
 # - Disabling dreamx leaves screensaver_components pointing at it. Point it at the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 # - Animation scales already ship at 0.5x on this build.
 # - Disable in small batches, and wait before walking away. A run that disabled 21 packages in one
 #   batch had every one report "new state", then the device rebooted: 19 of the 21 were back

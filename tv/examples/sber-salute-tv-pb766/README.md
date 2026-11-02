@@ -19,7 +19,7 @@ any device on the network gets a shell, so switch debugging off when you are don
 ## Install
 
 ```bash
-TV_HOST=<tv-ip> tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+TV_HOST=<tv-ip> tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 TV_HOST=<tv-ip> tools/disable.sh examples/sber-salute-tv-pb766/debloat.txt
 TV_HOST=<tv-ip> STOCK_LAUNCHER=none launcher/build-and-install.sh
 TV_HOST=<tv-ip> tools/theme.sh examples/sber-salute-tv-pb766

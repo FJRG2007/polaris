@@ -8,7 +8,7 @@ reported since, with what they did differently.
 TCL 55C6K (QD-Mini LED, 55"), model "Smart TV Pro", device `G08`, product `G08_4K_GB`, MediaTek `mt5896`, the same
 `UTT2.250416.001 AU02`, vi-VN, on Wi-Fi. Set up on 31 October 2026 in four batches with screenshots between them,
 then the reference launcher; rebooted once afterwards: every package stayed disabled, nothing re-enabled itself,
-and the TV came up on the new Home (`FallbackHome`, then `com.gathin.tvhome`), not Live TV. One day of use, not
+and the TV came up on the new Home (`FallbackHome`, then `app.polaris.tv`), not Live TV. One day of use, not
 weeks.
 
 **Different choices from the first unit:** YouTube Music (`com.google.android.youtube.tvmusic`), Assistant

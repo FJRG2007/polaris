@@ -10,7 +10,7 @@ One day of use, two reboots, several standby cycles.
 
 The same package-name HOME allowlist as the MiTV-AETP0
 ([`xiaomi-mitv-aetp0-dofus.md`](xiaomi-mitv-aetp0-dofus.md)). With the standard
-`com.gathin.tvhome` ID, `set-home-activity` prints `Success` but HOME keeps resolving to
+`app.polaris.tv` ID, `set-home-activity` prints `Success` but HOME keeps resolving to
 `com.mitv.tvhome`, and disabling it leaves `com.android.tv.settings/.system.FallbackHome`
 (black screen).
 
@@ -21,11 +21,11 @@ tools/venv/bin/python -I tools/tv.py 'pm path com.ts.launcher'        # must pri
 (cd launcher && ./gradlew assembleRelease -PlauncherApplicationId=com.ts.launcher)
 tools/venv/bin/python -I tools/b64push.py launcher/app/build/outputs/apk/release/app-release.apk /data/local/tmp/ts.apk
 tools/venv/bin/python -I tools/tv.py 'pm install -r /data/local/tmp/ts.apk'
-tools/venv/bin/python -I tools/tv.py 'cmd package set-home-activity --user 0 com.ts.launcher/com.gathin.tvhome.MainActivity'
+tools/venv/bin/python -I tools/tv.py 'cmd package set-home-activity --user 0 com.ts.launcher/app.polaris.tv.MainActivity'
 tools/venv/bin/python -I tools/tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'
 ```
 
-`resolve-activity` answered `com.ts.launcher/com.gathin.tvhome.MainActivity`, also with
+`resolve-activity` answered `com.ts.launcher/app.polaris.tv.MainActivity`, also with
 `com.mitv.tvhome` disabled, after a reboot, and after a force-stop. `com.mitv.cloudcontrol` was
 already disabled; the allowlist it had downloaded stays on disk. The launcher's optional overlay
 lives in `/sdcard/Android/data/com.ts.launcher/files/config.json`.

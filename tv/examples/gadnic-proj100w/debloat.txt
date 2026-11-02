@@ -29,9 +29,9 @@
 # Done 2026-10-21, one unit, same session (not lived with for days): this list applied, then the
 # DreamOS template installed as Home (dock: YouTube, Netflix, Disney+, Prime Video), screensaver
 # switched to the launcher's clock (`settings put secure screensaver_components
-# com.gathin.tvhome/.ClockDream` - com.google.android.apps.tv.dreamx itself was left enabled,
+# app.polaris.tv/.ClockDream` - com.google.android.apps.tv.dreamx itself was left enabled,
 # just no longer invoked), dock apps compiled with `cmd package compile -m speed -f`, and animation
-# scales set to 0.5. Reboot-checked: Home stayed com.gathin.tvhome, Wi-Fi stayed on
+# scales set to 0.5. Reboot-checked: Home stayed app.polaris.tv, Wi-Fi stayed on
 # android.uid.system. Idle metrics (REBOOT=1 metrics.sh, 150 s settle), same TV: MemAvailable 543 ->
 # 748 MB, swap used 456 -> 373 MB, CPU idle 281/400 -> 393/400. The debloat batches alone (before
 # the launcher) only moved CPU idle 281 -> 310/400; the launcher and screensaver swap accounted for

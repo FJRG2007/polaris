@@ -3,14 +3,14 @@ plugins {
 }
 
 android {
-    namespace 'com.gathin.tvhome'
+    namespace 'app.polaris.tv'
     compileSdk 34
 
     defaultConfig {
         // Opt-in identity for firmware with a package-name HOME allowlist.
         // Xiaomi: docs/devices/xiaomi-mitv-aetp0-dofus.md (com.ts.launcher).
         // ColorOS TV: docs/devices/oppo-k9-55-oppocnm632.md (com.oneplus.tv.launcher2).
-        applicationId providers.gradleProperty('launcherApplicationId').getOrElse('com.gathin.tvhome')
+        applicationId providers.gradleProperty('launcherApplicationId').getOrElse('app.polaris.tv')
         minSdk 26
         targetSdk 34
         versionCode 12
@@ -36,6 +36,10 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -45,6 +49,9 @@ android {
 dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+    // The code a phone scans to connect this TV to a Polaris. R8 keeps only the QR writer.
+    implementation 'com.google.zxing:core:3.5.3'
     // Test only (never in the APK): plain JVM tests for the module card validators, src/test.
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }

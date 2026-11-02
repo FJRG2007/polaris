@@ -11,7 +11,7 @@
 # Its HOME filter is priority 0 and the reference launcher's is priority 0 too, so the tie is settled
 # by the preferred activity:
 #
-#   cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity
+#   cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity
 #
 # While com.mitv.tvhome is enabled that preference holds, survives a reboot, and PatchWall is never
 # shown. Disabling com.mitv.tvhome makes HOME resolve to
@@ -63,7 +63,7 @@
 #
 # This is what makes the kids section usable next to a replacement Home: PatchWall's own home activity
 # drops straight back when it is not the preferred Home, but KidsHomeActivity stays in the foreground
-# (verified over a minute of sampling while com.gathin.tvhome owned Home). A ~12 KB bridge app whose
+# (verified over a minute of sampling while app.polaris.tv owned Home). A ~12 KB bridge app whose
 # only launcher activity starts that component, placed on the new Home, opens the kids section with one
 # remote click and leaves Home working. The screen is the same one as before: 我的 / DK百科 / 成长VIP /
 # 儿歌 / 动画 / 儿童影院 / 绘本馆 / 互动思维 / 英文分级阅读, with 家长中心 and 退出 in the top bar.
@@ -83,7 +83,7 @@
 # blocked"), with app_pi_control / app_pi_install_black_list / app_pi_strong_install_black_list all
 # true. It names ~100 packages (IPTV players, third-party launchers, browsers, app stores). A plain
 # adb install of a blacklisted package is refused by the package installer. The reference launcher
-# (com.gathin.tvhome) installed normally; com.dangbeimarket (当贝市场) and a FongMi build
+# (app.polaris.tv) installed normally; com.dangbeimarket (当贝市场) and a FongMi build
 # (com.hisen.android.tv) are installed and working.
 
 # ---- App discovery ----

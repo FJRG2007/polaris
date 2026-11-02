@@ -7,7 +7,7 @@ not a several-day debloat list or a recommendation to apply another model's list
 ## Home handover
 
 The stock Home component was `com.google.android.tvlauncher/.MainActivity`. The reference launcher,
-`com.gathin.tvhome/.MainActivity`, installed and started successfully. It was checked with a TV
+`app.polaris.tv/.MainActivity`, installed and started successfully. It was checked with a TV
 screenshot and `mFocusedApp` while the stock launcher was still enabled.
 
 With stock Home enabled, `cmd package set-home-activity` printed `Success`, but resolving Home

@@ -21,7 +21,7 @@
 # Non-HOME apks then install fine. Any APK declaring android.intent.category.HOME is refused
 # with INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES even for a never-installed package name
 # — the launcher signature gate, disguised as a cert error (same gate as tcl-ak30a5/Q10G Pro).
-# A HOME-free build of com.gathin.tvhome installs but crashes instantly on this Android 5.1
+# A HOME-free build of app.polaris.tv installs but crashes instantly on this Android 5.1
 # and logd is disabled, so it cannot be debugged. Conclusion: debloat only, stock CyberUI
 # launcher stays. (uninstall of the test app also failed with DELETE_FAILED_INTERNAL_ERROR;
 # `pm hide <pkg>` removes it from the user-facing list.)

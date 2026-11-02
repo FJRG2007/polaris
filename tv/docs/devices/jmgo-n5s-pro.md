@@ -75,10 +75,10 @@ The reference launcher from this repo was built (AGP 8.5.2 / Gradle 8.9 / JDK 17
 470 KB) and installed over ADB with `tools/b64push.py` plus `pm install -r`. On Android 11 everything in
 `launcher/build-and-install.ps1` worked as written, with `-StockLauncher com.jmgo.launcher`:
 
-1. `cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity` succeeded.
+1. `cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity` succeeded.
 2. The launcher started cold in 652 ms (`am start -W`).
 3. `pm disable-user --user 0 com.jmgo.launcher`, then `set-home-activity` again, then
-   `cmd package resolve-activity` confirmed Home resolved to `com.gathin.tvhome`.
+   `cmd package resolve-activity` confirmed Home resolved to `app.polaris.tv`.
 4. `dumpsys activity activities` showed `mFocusedApp` as the new launcher.
 
 The revert path was verified in the same session and is what another owner needs:
@@ -86,7 +86,7 @@ The revert path was verified in the same session and is what another owner needs
 ```sh
 pm enable --user 0 com.jmgo.launcher
 cmd package set-home-activity --user 0 com.jmgo.launcher/com.jmgo.os.home.HomeActivity
-pm uninstall com.gathin.tvhome
+pm uninstall app.polaris.tv
 ```
 
 followed by `input keyevent KEYCODE_HOME` and the `mFocusedApp` check. The owner stayed on the stock

@@ -35,12 +35,12 @@ $ adb shell cmd package query-activities --brief -a android.intent.action.MAIN -
     priority=-1000 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
     com.android.tv.settings/.system.FallbackHome
 
-$ adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME -n com.ts.launcher/com.gathin.tvhome.MainActivity
+$ adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME -n com.ts.launcher/app.polaris.tv.MainActivity
 No activity found
 
-$ adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -n com.ts.launcher/com.gathin.tvhome.MainActivity
+$ adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -n com.ts.launcher/app.polaris.tv.MainActivity
 priority=0 preferredOrder=0 match=0x0 specificIndex=-1 isDefault=false
-com.ts.launcher/com.gathin.tvhome.MainActivity
+com.ts.launcher/app.polaris.tv.MainActivity
 
 $ adb shell getprop ro.formovie.launcher_type
 Patchwall

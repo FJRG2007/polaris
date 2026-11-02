@@ -30,7 +30,7 @@
 #    order the 8505 notes warn against. The stock home still drew and opened apps afterwards, and
 #    build-and-install.sh moved Home without trouble, so on this unit the order did not matter.
 # 3. Launcher: build-and-install.sh ran through on its own, without the `am start -W` timeout the
-#    8505 saw (cold start 2.2 s), and Home resolved to com.gathin.tvhome. config.xml used:
+#    8505 saw (cold start 2.2 s), and Home resolved to app.polaris.tv. config.xml used:
 #    live_tv_package org.droidtv.playtv; hidden_apps org.droidtv.playtv, org.droidtv.demome,
 #    org.droidtv.eum, org.droidtv.channels, com.vewd.core.browserui (hidden, not disabled: eum and
 #    channels back the SOURCES drawer, vewd is the HbbTV engine).
@@ -45,7 +45,7 @@
 # - Every entry of batches 1-3 that is installed on this unit was disabled; Fitness Buddy, YouTube
 #   Music and Play Games were not installed or already off from the factory. Batches 4 and 5 were not
 #   installed at all. usagelogger and demome left alone, as note 1 says.
-# - build-and-install.sh with HOME_KEY_SERVICE=1 ran through, Home resolved to com.gathin.tvhome, and it
+# - build-and-install.sh with HOME_KEY_SERVICE=1 ran through, Home resolved to app.polaris.tv, and it
 #   still did after the reboot, without a key press. Same live_tv_package and hidden_apps as note 3.
 # - The firmware opens org.droidtv.playtv at power-on; power_on_home sent it back to Home.
 # - The remote's TV button sends scancode 170 (KEY_ISO). app_keys scan:170:<package> made it open a

@@ -29,7 +29,7 @@ Batches 1 and 2 of `debloat.txt` were applied (batches 3 and 4 were not), with t
 
 ## Launcher
 
-`launcher/build-and-install.sh` set `com.gathin.tvhome` as Home (checked with `mFocusedApp`), then `tools/theme.sh`
+`launcher/build-and-install.sh` set `app.polaris.tv` as Home (checked with `mFocusedApp`), then `tools/theme.sh`
 pushed the `scenes` theme. Weather Clock was set as the screensaver and forced with
 `am start -n com.android.systemui/.Somnambulator`; the weather emoji draw correctly with the stock
 `NotoColorEmoji.ttf`.

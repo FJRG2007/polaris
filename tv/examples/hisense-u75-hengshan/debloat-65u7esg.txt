@@ -70,7 +70,7 @@ com.vt.tv.airplaykeycheck                    # AirPlay key check
 
 # Google TV's ambient mode (the Backdrop screensaver with suggestions; two processes). Pick another screensaver
 # afterwards, for instance the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 com.google.android.apps.tv.dreamx
 
 # Broadcast interactivity for standards Colombia does not use (its DTT is DVB-T2); antenna TV kept working.

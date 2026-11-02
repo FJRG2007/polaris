@@ -23,7 +23,7 @@
 # - com.tcl.ttvs is the firmware updater, not text-to-speech. Kept for OTA updates.
 # - com.tcl.usercenter is re-enabled by the system at boot (remains idle).
 # - Photo screensaver (com.google.android.backdrop) uses ~105 MB RAM. Switch to ClockDream before disabling:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 #
 # DO NOT DISABLE on this TV (vital system services):
 # com.tcl.tv                           # Live TV app, plays HDMI, source picker on Input key

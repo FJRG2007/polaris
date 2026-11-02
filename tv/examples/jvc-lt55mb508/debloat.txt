@@ -14,7 +14,7 @@
 # Debloat and launcher both work. Stock launcher: com.google.android.tvlauncher (the scripts' default).
 # HOME is claimed only by tvlauncher (priority 2) and com.android.tv.settings/.system.FallbackHome; setupwraith
 # does not claim HOME on this build. `set-home-activity` prints Success but Home stays on tvlauncher until it
-# is disabled, which launcher/build-and-install.sh does; Home then resolves to com.gathin.tvhome and survives
+# is disabled, which launcher/build-and-install.sh does; Home then resolves to app.polaris.tv and survives
 # a reboot. Home, Input and the settings button on the physical remote work with no accessibility helper.
 # Live TV: com.mediatek.wwtv.tvcenter. TV inputs (com.mediatek.tvinput): HDMI 1-4 = HW4-HW7, AV = HW1,
 # tuners = HW0, HW8.
@@ -74,7 +74,7 @@ br.tv.horizonte.android.premierefc      # Premiere FC
 # Batch 5: personal choice, voice and features
 com.google.android.katniss              # Assistant: the stock home's search stops working, voice AND keyboard
 com.google.android.apps.mediashell      # Chromecast built-in
-com.google.android.backdrop             # Ambient screensaver; set another one first: com.gathin.tvhome/.ClockDream
+com.google.android.backdrop             # Ambient screensaver; set another one first: app.polaris.tv/.ClockDream
                                         # or com.android.dreams.basic/.Colors (secure screensaver_components)
 com.mediatek.wwtv.mediaplayer           # MMP: the TV's USB and DLNA media player
 

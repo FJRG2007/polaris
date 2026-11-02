@@ -31,7 +31,7 @@ tool. Screenshot capture needed time for the first new frame to settle after res
 
 Twelve selected packages, including the stock launcher, accepted `pm disable-user`
 through the existing safety checks. They were still disabled after a cold boot, Home
-still resolved to `com.gathin.tvhome/.MainActivity`, and the theme persisted. The owner
+still resolved to `app.polaris.tv/.MainActivity`, and the theme persisted. The owner
 confirmed physical Home/D-pad/app buttons, Kodi and streaming playback. All streaming
 apps and the remote, audio, HDMI, input and firmware-update services checked stayed
 enabled. The originally disabled `com.nes.seilivetv` was left alone.

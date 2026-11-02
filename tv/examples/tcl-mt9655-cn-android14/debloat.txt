@@ -54,7 +54,7 @@
 #     -d content://media/external/file/<id> --grant-read-uri-permission \
 #     -n com.android.packageinstaller/.InstallStart
 # does show "应用未被认证，是否继续安装" and then fails with
-#   verifier: signature not match for tcl com.gathin.tvhome, will not be installed !
+#   verifier: signature not match for tcl app.polaris.tv, will not be installed !
 #
 # Root cause, readable with:
 #   content query --uri content://com.tcl.providers.config/all | grep InstallConfig

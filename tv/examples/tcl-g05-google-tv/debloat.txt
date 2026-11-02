@@ -26,7 +26,7 @@
 #   Recover with: pm enable com.google.android.apps.tv.launcherx; pm enable com.google.android.tungsten.setupwraith
 # - AR71 (US, a TCL 55Q750G, 21 October 2026): the first run of build-and-install.sh on G05 firmware.
 #   setupwraith stayed disabled across a reboot and Home stayed with the new launcher (mFocusedApp =
-#   com.gathin.tvhome). Order: setupwraith first, while launcherx still owns Home, then build-and-install.sh,
+#   app.polaris.tv). Order: setupwraith first, while launcherx still owns Home, then build-and-install.sh,
 #   which starts the new launcher and only then disables launcherx. On Wi-Fi, run
 #   `tools/tv.py "dumpsys wifi | grep -o 'cname=[^ ]*'"` first: the network saved during first setup belonged
 #   to setupwraith, so disable.sh skips it. Forget the network and join it again in Settings, typing the

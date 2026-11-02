@@ -17,7 +17,7 @@
 #   With the launcher added by redirect they can go too, and the stick still advertises Cast (a cast from a
 #   phone was not retried): note `settings get secure screensaver_components`, point the screensaver at the
 #   launcher's clock, then disable the pair as their own list, so tools/restore.sh can undo just them:
-#     settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#     settings put secure screensaver_components app.polaris.tv/.ClockDream
 #   Undo: restore.sh that list, then settings put secure screensaver_components <the value you noted>. Measured on 2026-11-01 (launcher 3.3): dreamx ran two
 #   processes, itself and dreamx:smarthome, at 63 and 75 MB. After a reboot the pair was still disabled,
 #   screensaver_components still named the clock, Home still redirected, and the stick advertised

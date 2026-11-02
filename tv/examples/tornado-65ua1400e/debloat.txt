@@ -68,7 +68,7 @@
 #   had been checked after a reboot. After that Live TV still opened and the TV rebooted onto the launcher;
 #   HDMI was checked before these six went, not again straight after.
 # - The Home handover worked as on unit 1: launcher/build-and-install.sh with the default STOCK_LAUNCHER
-#   disabled tvlauncher, Home resolved to com.gathin.tvhome, and setupwraith (left enabled) did not take it.
+#   disabled tvlauncher, Home resolved to app.polaris.tv, and setupwraith (left enabled) did not take it.
 #   dumpsys wifi listed the saved network's owners as android.uid.system and com.google.uid.shared.
 # - After each reboot the TV came up on the launcher, not on Live TV (no boot_to_live_tv or power_on_home).
 # - On the real remote Home, Back, Input, the app buttons and Settings all worked with no key helper (no
@@ -105,7 +105,7 @@ com.android.cts.priv.ctsshim                # Android test shim
 com.google.android.syncadapters.calendar
 com.android.providers.calendar
 
-# --- Batch 4: only once com.gathin.tvhome owns Home (applied after the launcher took Home)
+# --- Batch 4: only once app.polaris.tv owns Home (applied after the launcher took Home)
 com.google.android.tvrecommendations                   # stock launcher recommendation rows
 com.google.android.leanbacklauncher.partnercustomizer  # "Featured by Google Play" partner row config
 # com.google.android.tvlauncher   # launcher/build-and-install.sh disables the stock launcher itself, after Home has moved

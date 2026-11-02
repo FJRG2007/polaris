@@ -37,7 +37,7 @@ com.xiaomi.wfdsinkhelperservice
 ```
 
 Alexa, Prime Video and Netflix were already disabled before this work. `com.google.android.tvlauncher` was
-disabled by `launcher/build-and-install.sh` after `com.gathin.tvhome` was confirmed as Home.
+disabled by `launcher/build-and-install.sh` after `app.polaris.tv` was confirmed as Home.
 
 ## Differences from the Android 10 list
 
@@ -66,7 +66,7 @@ disabled by `launcher/build-and-install.sh` after `com.gathin.tvhome` was confir
 ## Tested after the debloat
 
 With the real remote: navigation, volume, the microphone button and switching to HDMI. Home was
-`com.gathin.tvhome` after the launcher install, and D-pad Up and Down moved between the dock, the grid and the
+`app.polaris.tv` after the launcher install, and D-pad Up and Down moved between the dock, the grid and the
 top bar as expected. Chromecast and Miracast were not separately re-tested.
 
 ## A third unit: Android TV 11, firmware `RTM4.220307.164.8277`
@@ -79,7 +79,7 @@ and reboot-checked in one session. Alexa, Prime Video and Netflix were already d
 ```
 # Xiaomi preloads
 com.xiaomo.tv.milegal                         # Xiaomi legal / privacy screens
-# stock launcher plumbing, disabled after com.gathin.tvhome was confirmed as Home
+# stock launcher plumbing, disabled after app.polaris.tv was confirmed as Home
 com.google.android.tvrecommendations
 # by the owner's choice; keep them for a set you share
 com.mitv.tvlock                               # Xiaomi TV lock / parental PIN
@@ -105,7 +105,7 @@ com.xiaomi.mimusic2
   `.9021`.
 - At power-on before the debloat, the first resumed activity was PatchWall's `com.mitv.tvhome.atv/.app.BannerLogoB`,
   then the stock launcher. Afterwards `logcat -b events | grep wm_set_resumed_activity` goes from `FallbackHome`
-  straight to `com.gathin.tvhome`; the set does not open Live TV by itself, so neither `power_on_home` nor
+  straight to `app.polaris.tv`; the set does not open Live TV by itself, so neither `power_on_home` nor
   `boot_to_live_tv` is needed.
 - With the real remote after the debloat and the launcher, with neither key helper enabled (no
   `HOME_KEY_SERVICE` or `INPUT_KEY_SERVICE`): Home, the microphone, the Input/Source button and holding volume

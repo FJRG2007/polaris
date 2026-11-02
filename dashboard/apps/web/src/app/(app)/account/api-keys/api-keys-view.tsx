@@ -422,6 +422,10 @@ function KeyRow({
                         >
                             <Badge variant="neutral">{t("apiKeys.list.streamdeck.badge")}</Badge>
                         </Link>
+                    ) : entry.kind === "tv" ? (
+                        <span className="shrink-0" title={t("apiKeys.list.tv.title")}>
+                            <Badge variant="neutral">{t("apiKeys.list.tv.badge")}</Badge>
+                        </span>
                     ) : null}
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of

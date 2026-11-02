@@ -66,7 +66,7 @@
 # - With launcherx disabled the YouTube button on the remote does nothing. It sends BUTTON_3
 #   (keycode 190). The launcher maps it itself: set app_keys to "190:com.google.android.youtube.tv"
 #   in config.xml (or a theme's config.json) and enable InputKeyService:
-#     settings put secure enabled_accessibility_services com.gathin.tvhome/.InputKeyService
+#     settings put secure enabled_accessibility_services app.polaris.tv/.InputKeyService
 #     settings put secure accessibility_enabled 1
 #   Record the trigger with the physical remote: keys injected with `input keyevent 190` don't reach
 #   the accessibility service. Key Mapper (keymapperorg/KeyMapper) does the same job if you prefer it;
@@ -102,7 +102,7 @@
 #   disabled at the factory; `pm disable-user` on them fails with "Shell cannot change component
 #   state". Don't add them to a restore list either.
 # - Disabling dreamx leaves screensaver_components pointing at it. Point it at the launcher's clock:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 # - Animation scales already ship at 0.5x on this build.
 #
 # Kept on purpose: Google Assistant (com.google.android.katniss), Cast receiver

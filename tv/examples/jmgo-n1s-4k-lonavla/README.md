@@ -29,7 +29,7 @@ almost the same, and that list was the starting point.
   After that, the network belonged to `android.uid.system:1000`, and disabling setupwraith kept Wi-Fi.
 - Order that worked: setupwraith with `tools/disable.sh`, then
   `STOCK_LAUNCHER=com.google.android.apps.tv.launcherx launcher/build-and-install.sh`. `mFocusedApp` named
-  `com.gathin.tvhome` straight away and again after a reboot.
+  `app.polaris.tv` straight away and again after a reboot.
 - Power-on: FallbackHome, then the new launcher (`wm_set_resumed_activity`). No Live TV app takes over, since
   there is no tuner. Leave `live_tv_package` empty; the one HDMI input is `com.mediatek.tvinput/.hdmi.HDMIInputService/HW4`.
 - Location is off (`location_mode 0`), so the Wi-Fi pill reads "Wi-Fi" instead of the network name.

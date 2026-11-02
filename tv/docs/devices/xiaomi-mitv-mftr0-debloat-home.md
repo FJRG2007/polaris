@@ -181,15 +181,15 @@ What worked, in this order:
 
 1. Build the reference launcher with `-PlauncherApplicationId=com.ts.launcher`
    (`./gradlew assembleRelease`; the APK was 535,569 B) and install it. Its HOME component
-   is `com.ts.launcher/com.gathin.tvhome.MainActivity`, and
+   is `com.ts.launcher/app.polaris.tv.MainActivity`, and
    `cmd package query-activities --brief -a android.intent.action.MAIN -c
    android.intent.category.HOME` lists it next to PatchWall.
 2. `pm disable-user --user 0 com.mitv.tvhome`.
-3. HOME resolved to `com.ts.launcher/com.gathin.tvhome.MainActivity`, and it was still
+3. HOME resolved to `com.ts.launcher/app.polaris.tv.MainActivity`, and it was still
    Home after a reboot. The undo is `pm enable --user 0 com.mitv.tvhome` and a reboot.
 
 The HOME choice follows the package name: the same APK is accepted under `com.ts.launcher`
-and not under its default `com.gathin.tvhome`, which is why the identity is rebuilt with the
+and not under its default `app.polaris.tv`, which is why the identity is rebuilt with the
 Gradle property rather than renamed after the fact.
 
 ### What the behaviour does and does not establish
@@ -216,7 +216,7 @@ The two checks that decide it gave the same answers as 3.0.103:
 
 - `cmd package set-home-activity` printed `Success` and logcat carried the same
   `W/PackageManager: addPreferredActivity: Don't set 3-app default home`.
-- With `com.mitv.tvhome` disabled, the build under the default `com.gathin.tvhome` fell to
+- With `com.mitv.tvhome` disabled, the build under the default `app.polaris.tv` fell to
   `com.xiaomi.mitv.settings/.entry.FallbackHome` and the picture stayed black, while the
   `com.ts.launcher` build was Home and was still Home after a reboot.
 

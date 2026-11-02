@@ -111,8 +111,8 @@ the hub. Later, go to **Sources > Add a source**.
 
 ## Module card
 
-`AndroidManifest.xml` puts the `com.gathin.tvhome.category.DOCK_CARD` filter and the
-`com.gathin.tvhome.card` meta-data on `MainActivity`, the same exported activity as
+`AndroidManifest.xml` puts the `app.polaris.tv.category.DOCK_CARD` filter and the
+`app.polaris.tv.card` meta-data on `MainActivity`, the same exported activity as
 `LEANBACK_LAUNCHER`, as [the spec](https://github.com/Gathin23/cleanyourtv/blob/main/docs/specs/card.md) requires:
 
 ```xml

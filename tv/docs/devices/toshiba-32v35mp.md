@@ -21,7 +21,7 @@ With the replacement installed, the HOME claimants were:
 | Component | Priority |
 |---|---:|
 | `com.google.android.tvlauncher/.MainActivity` | 2 |
-| `com.gathin.tvhome/.MainActivity` | 0 |
+| `app.polaris.tv/.MainActivity` | 0 |
 | `com.android.tv.settings/.system.FallbackHome` | -1000 |
 
 `set-home-activity` reported `Success`, but resolving HOME still returned the stock launcher.
@@ -30,7 +30,7 @@ The direct-boot-aware HOME query returned the Settings `FallbackHome`; no factor
 
 The replacement was opened explicitly and checked before disabling stock Home. An initial reboot
 with stock Home still enabled completed and ADB returned. After the guarded `tools/disable.sh`
-handover, both the HOME resolver and foreground window identified `com.gathin.tvhome/.MainActivity`;
+handover, both the HOME resolver and foreground window identified `app.polaris.tv/.MainActivity`;
 this held across subsequent software reboots. This is the observed result on this firmware, not a
 reason to skip the CVTE/Home checks in [PROMPT.md](../../PROMPT.md) on another unit.
 

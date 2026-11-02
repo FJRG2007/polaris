@@ -29,7 +29,7 @@
 #   volume kept working. HOME_KEY_SERVICE=1 with this folder's config.json brought all four back (pressed on the
 #   real remote). The cost: a held Volume Up (sent over CEC to a soundbar here) moved about two steps instead
 #   of ramping, reported by the owner, not measured (docs/devices/tcl-55p71b-g09-key-repeat.md).
-# - Disabling dreamx: set screensaver_components to com.gathin.tvhome/.ClockDream first.
+# - Disabling dreamx: set screensaver_components to app.polaris.tv/.ClockDream first.
 
 # TCL tracking and analytics
 com.tcl.ttvs                           # Samba TV ACR viewing tracking, TCL "BI" analytics, Alexa core, T-Cast

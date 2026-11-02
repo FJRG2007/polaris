@@ -83,7 +83,7 @@
 #   receiver for the shell, and neither the Live TV menu nor Settings has a power-on option. power_on_home (#1445)
 #   with HOME_KEY_SERVICE=1 fixes it here too: checked across reboots, a wake from standby and the real remote.
 # - Memory, MemAvailable / swap in use about 7.5 min after a reboot: 263 / 386 MB stock, 330 / 216 MB with the list,
-#   343 / 209 MB with the extras above. tvlauncher took about 105 MB, com.gathin.tvhome 31 MB right after boot.
+#   343 / 209 MB with the extras above. tvlauncher took about 105 MB, app.polaris.tv 31 MB right after boot.
 
 # Homwee store, ads, installers and media extras
 com.homwee.aipont                       # brand portal

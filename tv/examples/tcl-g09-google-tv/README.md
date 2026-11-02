@@ -25,7 +25,7 @@ then `build-and-install.sh` starts the new launcher and only then disables launc
 TV_HOST=<tv-ip> tools/disable.sh examples/tcl-g09-google-tv/debloat.txt
 INPUT_KEY_SERVICE=1 TV_HOST=<tv-ip> launcher/build-and-install.sh
 TV_HOST=<tv-ip> tools/theme.sh examples/tcl-g09-google-tv
-TV_HOST=<tv-ip> tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+TV_HOST=<tv-ip> tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 ```
 
 The last line swaps the Ambient screensaver (`dreamx`, disabled by the list) for the launcher's Clock.
@@ -108,7 +108,7 @@ This unit uses the redirect route rather than disabling the stock home:
 - Enable and bind CleanYourTV's `HomeKeyService`. No Projectivy accessibility service remained active.
 - Set `stock_home_redirect` to `com.google.android.apps.tv.launcherx` in `config.xml`.
 - Set `home_long_press_home=true` and `power_on_home_always=true` in the theme.
-- `APP_AUTO_START=allow` was also persisted for `com.gathin.tvhome` on this firmware.
+- `APP_AUTO_START=allow` was also persisted for `app.polaris.tv` on this firmware.
 
 With `stock_home_redirect` alone, the helper stayed bound but Google TV's home remained on screen
 after reboot until CleanYourTV was opened manually. With both theme options added, CleanYourTV's

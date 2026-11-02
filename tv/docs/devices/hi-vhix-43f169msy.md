@@ -21,7 +21,7 @@ CVTE board, or a similarly named UHD model.
 ## Home and settings
 
 The original Home component is `com.yandex.tv.home/.HomeActivity`. The replacement
-`com.gathin.tvhome/.MainActivity` was opened first, made Home, and the original
+`app.polaris.tv/.MainActivity` was opened first, made Home, and the original
 package disabled for user 0. Home and network ADB returned after reboots with both
 launcher 2.4 and 2.6. No accessibility key helper was added in these sessions.
 

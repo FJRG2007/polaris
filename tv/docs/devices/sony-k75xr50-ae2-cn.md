@@ -51,7 +51,7 @@ pass it explicitly:
 STOCK_LAUNCHER=com.dangbei.TVHomeLauncher launcher/build-and-install.sh
 ```
 
-The script installs and switches Home with `cmd package set-home-activity com.gathin.tvhome/.MainActivity`.
+The script installs and switches Home with `cmd package set-home-activity app.polaris.tv/.MainActivity`.
 Keep the stock launcher enabled until the new one answers HOME, reboot once, then confirm with
 `dumpsys activity activities | grep mFocusedApp` before anything else. On this set the handover held across
 two reboots.

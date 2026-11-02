@@ -145,7 +145,7 @@ tv.twitch.android.app
 # com.azteca.live                         # Azteca Live, RT41KA unit
 
 # Second pass, applied the same day. The launcher's Clock screensaver replaces Ambient Mode:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 com.google.android.backdrop             # Ambient Mode screensaver (Google content)
 com.google.android.tts                  # Google text-to-speech, ~18 MB resident; only accessibility uses it
 com.google.android.marvin.talkback      # screen reader; re-enable if someone needs it

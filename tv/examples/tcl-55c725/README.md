@@ -25,7 +25,7 @@ TV_HOST=<tv-ip> tools/theme.sh <your theme folder>      # with the config.json b
 
 Set the screensaver before dreamx goes:
 `tools/tv.py 'settings put secure screensaver_components com.android.dreams.basic/.Colors'`
-(or `com.gathin.tvhome/.ClockDream`). Then check that the remote-button service is **bound**, not just enabled
+(or `app.polaris.tv/.ClockDream`). Then check that the remote-button service is **bound**, not just enabled
 (see Quirks): `tools/tv.py 'dumpsys accessibility' | grep 'Bound services'`.
 
 ## Undo
@@ -178,7 +178,7 @@ Three things seen on this unit, not yet checked on the others:
 
 - **The button service is switched off at every boot.** After each of three reboots,
   `settings get secure accessibility_enabled` was `0` and `dumpsys accessibility` showed `Bound services:{}`, with
-  `com.gathin.tvhome/.HomeKeyService` still listed. Setting the flag back to `1` alone did not bind it; clearing
+  `app.polaris.tv/.HomeKeyService` still listed. Setting the flag back to `1` alone did not bind it; clearing
   the list and writing it back (as `build-and-install` does) did. Until that is fixed, the remapped buttons need
   that toggle over ADB after every power-on. The same state as
   [#1047](https://github.com/Gathin23/cleanyourtv/issues/1047) (docs/TROUBLESHOOTING.md).
@@ -187,7 +187,7 @@ Three things seen on this unit, not yet checked on the others:
   key both before the filter and when the service hands it back.
 - **Right after `build-and-install`, Home left the previous app or HDMI picture on screen.** The launcher had
   focus but `dumpsys activity a` showed it with `mOccludesParent=false`, so the app below stayed `PAUSED` and
-  visible (and the HDMI picture kept playing). `am force-stop com.gathin.tvhome`, or a reboot, fixed it: the next
+  visible (and the HDMI picture kept playing). `am force-stop app.polaris.tv`, or a reboot, fixed it: the next
   instance had `mOccludesParent=true`, and Home worked from apps, HDMI and Settings.
 
 Launcher memory on this unit: about 23 MB PSS, with about 430 MB of RAM available at Home.
@@ -209,7 +209,7 @@ After the changes, launcher with the aurora wallpaper, 4 per row:
 | RAM (2 GB) | ~1.55 GB | ~490 MB available |
 | Swap (1 GB) | ~130 MB | ~900 MB |
 | `/data` (10 GB) | 2.5 GB | 7.4 GB |
-| Launcher (`com.gathin.tvhome`) | ~78 MB PSS | |
+| Launcher (`app.polaris.tv`) | ~78 MB PSS | |
 
 Before the changes, 370 MB was available, but that was read at a different moment, so it is not a clean
 before/after figure. CPU was not measured at idle: the reading taken 2 minutes after boot (~16%) only shows apps
@@ -219,7 +219,7 @@ starting.
 
 - **The button service can stay enabled but unbound** after the launcher is reinstalled and the theme pushed:
   `enabled_accessibility_services` lists it, and `dumpsys accessibility` shows `Bound services:{}`. Android binds
-  it again only when the list changes, so set it to `""` and then back to `com.gathin.tvhome/.HomeKeyService`.
+  it again only when the list changes, so set it to `""` and then back to `app.polaris.tv/.HomeKeyService`.
 - **Sideloading works.** Every user-installed app here is a split APK. Reinstalling one with an install session
   that writes all its parts (`pm install-create -r` / `install-write` / `install-commit`) succeeded, and so did
   the launcher. The launcher's base64 transfer passed its md5 check here, unlike on the 43C645.

@@ -60,5 +60,5 @@ com.google.android.youtube.tvmusic
 com.google.android.tungsten.setupwraith
 
 # Batch 5: after the launcher is Home. Point the screensaver at the launcher's clock first:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 com.google.android.apps.tv.dreamx       # Ambient screensaver (mixes recommendations in)

@@ -11,6 +11,6 @@
   "settings_key_panel": true,
   "app_keys": [
     "scan:225:com.mediatek.wwtv.tvcenter",
-    "KEYCODE_NOTIFICATION:com.gathin.tvhome/.QuickSettingsActivity"
+    "KEYCODE_NOTIFICATION:app.polaris.tv/.QuickSettingsActivity"
   ]
 }

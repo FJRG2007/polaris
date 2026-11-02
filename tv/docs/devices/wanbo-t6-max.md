@@ -32,7 +32,7 @@ These HOME candidates were observed:
 |---|---:|
 | `com.google.android.tvlauncher/.MainActivity` | 2 |
 | `com.google.android.tungsten.setupwraith/.RecoveryActivity` | 1 |
-| `com.gathin.tvhome/.MainActivity` | 0 |
+| `app.polaris.tv/.MainActivity` | 0 |
 
 `cmd package set-home-activity` printed `Success`, but HOME still resolved to the
 stock launcher. After disabling setupwraith and the stock launcher, the resolver
@@ -56,7 +56,7 @@ stock-launcher-disable step. A successful installer or preferred-Home command
 alone is not proof that this redirect is enabled, bound or working.
 
 After a reboot, the enabled `AccessibilityServiceInfo` for
-`com.gathin.tvhome/.HomeKeyService` reported `flags=0x0`, no
+`app.polaris.tv/.HomeKeyService` reported `flags=0x0`, no
 `FLAG_REQUEST_FILTER_KEY_EVENTS`, and event type 32
 (`TYPE_WINDOW_STATE_CHANGED`). Capability 8 means it *can* request key filtering,
 not that filtering is active. This does **not** establish that held-volume

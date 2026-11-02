@@ -53,7 +53,7 @@ if (-not $StockLauncher) {
     if ($LASTEXITCODE -ne 0 -or -not $homePkg) { throw 'could not ask the TV which launcher owns Home; check -TvHost and the debugging prompt, or pass -StockLauncher <package>' }
     $homePkg = "$homePkg".Trim().Split('/')[0]
     if ($knownStock -contains $homePkg) { $StockLauncher = $homePkg }
-    elseif ($homePkg -eq 'com.gathin.tvhome') { $StockLauncher = 'none'; Write-Host 'Home already belongs to this launcher; nothing will be disabled.' }
+    elseif ($homePkg -eq 'app.polaris.tv') { $StockLauncher = 'none'; Write-Host 'Home already belongs to this launcher; nothing will be disabled.' }
     elseif ($homePkg -eq 'android') {
         # Android's chooser: launchers tie and no default is set (a restore followed by a re-applied list
         # ends here). Take the one known stock launcher among the HOME claimants, if there is exactly one.
@@ -77,26 +77,26 @@ if ($LASTEXITCODE -ne 0 -or "$out" -notmatch 'Success') { throw 'pm install fail
 # Stop the instance Android restarted mid-update, which can come up non-occluding (see build-and-install.sh,
 # #1101), and write back a key helper the force stop took off the list. Through stdin: Windows PowerShell 5.1
 # drops the inner double quotes from a native argument.
-'s=$(settings get secure enabled_accessibility_services); a=$(settings get secure accessibility_enabled); am force-stop com.gathin.tvhome; case "$s" in *com.gathin.tvhome*) settings put secure enabled_accessibility_services ""; settings put secure enabled_accessibility_services "$s"; settings put secure accessibility_enabled "$a" ;; esac' |
+'s=$(settings get secure enabled_accessibility_services); a=$(settings get secure accessibility_enabled); am force-stop app.polaris.tv; case "$s" in *app.polaris.tv*) settings put secure enabled_accessibility_services ""; settings put secure enabled_accessibility_services "$s"; settings put secure accessibility_enabled "$a" ;; esac' |
     & $py -I ..\tools\tv.py --batch | Out-Null
 # Android 9 only accepts a component here; Android 10+ also takes a bare package name.
-$out = & $py -I ..\tools\tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+$out = & $py -I ..\tools\tv.py 'cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity'
 Write-Host $out
 if ($LASTEXITCODE -ne 0 -or "$out" -match 'Error') { throw 'could not set the new launcher as home; the stock launcher was left untouched' }
 # Start the launcher on its own, before the stock Home is touched (see build-and-install.sh, #239):
 # in the batch a failed start only prints an Error line and the stock launcher would be disabled anyway.
 # With -StockLauncher none the stock launcher stays Home (stock_home_redirect): a MAIN+HOME start would make this
 # launcher the home process until a restart, and Android then blocks the stock launcher's button launches (#1274).
-$startCmd = if ($StockLauncher -eq 'none') { 'am start -W -n com.gathin.tvhome/.MainActivity' }
-            else { 'am start -W -a android.intent.action.MAIN -c android.intent.category.HOME -n com.gathin.tvhome/.MainActivity' }
+$startCmd = if ($StockLauncher -eq 'none') { 'am start -W -n app.polaris.tv/.MainActivity' }
+            else { 'am start -W -a android.intent.action.MAIN -c android.intent.category.HOME -n app.polaris.tv/.MainActivity' }
 $start = (& $py -I ..\tools\tv.py $startCmd) -join "`n"
 Write-Host $start
 if ($LASTEXITCODE -ne 0 -or $start -notmatch 'Status: ok' -or $start -match '(?m)^Error') { throw "the new launcher did not start (see above); $StockLauncher was left enabled" }
 @(
-    'pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted',
-    'cmd package compile -m speed -f com.gathin.tvhome',
+    'pm grant app.polaris.tv android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted',
+    'cmd package compile -m speed -f app.polaris.tv',
     $disableStock,
-    'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+    'cmd package set-home-activity --user 0 app.polaris.tv/.MainActivity'
 ) | & $py -I ..\tools\tv.py --batch
 # A failed batch is not fatal here: the stock launcher may already be disabled, so fall through to the
 # Home check, which rolls back when Home is not ours.
@@ -144,7 +144,7 @@ function Undo-Handover {
 # Order matters, see build-and-install.sh: start the new launcher, disable the stock one, set the
 # preference last, then check where Home ended up and put the stock launcher back if it is not ours.
 $homeNow = Get-HomeNow
-if ($homeNow -notlike 'com.gathin.tvhome/*') {
+if ($homeNow -notlike 'app.polaris.tv/*') {
     $reason = if ($homeNow) { "Home resolves to '$homeNow', not to the new launcher" } else { 'the TV stopped answering while Home was being switched, so the outcome is unknown' }
     $restored = Undo-Handover
     $hint = if ($homeNow) { ' On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to your debloat list (see README, Troubleshooting), apply it, then run this script again.' } else { '' }
@@ -153,11 +153,11 @@ if ($homeNow -notlike 'com.gathin.tvhome/*') {
 Write-Host "Home now resolves to $homeNow"
 # Optional accessibility services, appended to enabled_accessibility_services without dropping others.
 function Enable-Service([string]$Name) {
-    $svc = "com.gathin.tvhome/.$Name"
+    $svc = "app.polaris.tv/.$Name"
     # Through stdin: Windows PowerShell 5.1 drops the inner double quotes from a native argument, and the
     # TV's shell then fails with "no closing quote" while the service stays off.
     # TCL names the op AUTO_START or APP_AUTO_START; without write-settings the grant is lost at the next reboot.
-    ('cmd appops set com.gathin.tvhome AUTO_START allow 2>/dev/null; cmd appops set com.gathin.tvhome APP_AUTO_START allow 2>/dev/null; appops write-settings 2>/dev/null; s=$(settings get secure enabled_accessibility_services); case "$s" in *' + $Name + '*) settings put secure enabled_accessibility_services ""; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services "$s" ;; null|"") settings put secure enabled_accessibility_services ' + $svc + ' ;; *) settings put secure enabled_accessibility_services "$s:' + $svc + '" ;; esac; settings put secure accessibility_enabled 1; echo ' + $Name + ' enabled') |
+    ('cmd appops set app.polaris.tv AUTO_START allow 2>/dev/null; cmd appops set app.polaris.tv APP_AUTO_START allow 2>/dev/null; appops write-settings 2>/dev/null; s=$(settings get secure enabled_accessibility_services); case "$s" in *' + $Name + '*) settings put secure enabled_accessibility_services ""; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services "$s" ;; null|"") settings put secure enabled_accessibility_services ' + $svc + ' ;; *) settings put secure enabled_accessibility_services "$s:' + $svc + '" ;; esac; settings put secure accessibility_enabled 1; echo ' + $Name + ' enabled') |
         & $py -I ..\tools\tv.py --batch
     if ($LASTEXITCODE -ne 0) { throw "could not enable $Name (tv.py exit code $LASTEXITCODE); Home is already the new launcher" }
 }
@@ -169,17 +169,17 @@ if ($HomeKeyService) { Enable-Service 'HomeKeyService' }
 # state it wants, and the install stops when the marker is missing (see build-and-install.sh). The steps are the
 # same text as there, which tests/test_launcher_secure_ack.py checks.
 $secure = 'android.permission.WRITE_SECURE_SETTINGS'
-$read = 's=$(dumpsys package com.gathin.tvhome) && case "$s" in *"DUMP TIMEOUT"*) ;; *"' + $secure + ': granted=true"*)'
+$read = 's=$(dumpsys package app.polaris.tv) && case "$s" in *"DUMP TIMEOUT"*) ;; *"' + $secure + ': granted=true"*)'
 if ($RestoreKeyServices) {
-    $step = 'pm grant com.gathin.tvhome ' + $secure + ' && ' + $read + ' echo restore-granted ;; esac'; $mark = 'restore-granted'
+    $step = 'pm grant app.polaris.tv ' + $secure + ' && ' + $read + ' echo restore-granted ;; esac'; $mark = 'restore-granted'
     $hint = 'the launcher does not hold it, so restore_key_services cannot put the helpers back'
 } else {
-    $step = 'pm revoke com.gathin.tvhome ' + $secure + '; ' + $read + ' ;; *"' + $secure + '"*) echo secure-settings-revoked ;; esac'
+    $step = 'pm revoke app.polaris.tv ' + $secure + '; ' + $read + ' ;; *"' + $secure + '"*) echo secure-settings-revoked ;; esac'
     $mark = 'secure-settings-revoked'
     $hint = 'the launcher may still hold it; run again with -RestoreKeyServices to keep it on purpose'
 }
 $out = ($step | & $py -I ..\tools\tv.py --batch) -join "`n"
 Write-Host $out
 # Only a line that is the marker and nothing else counts: tv.py --batch echoes the step, which contains it too.
-if (($out -split '\r?\n') -cnotcontains $mark) { throw "WRITE_SECURE_SETTINGS is not in the state this install asked for ($mark missing): $hint. The launcher is installed and is Home. Check by hand: tools\tv.py 'dumpsys package com.gathin.tvhome'" }
+if (($out -split '\r?\n') -cnotcontains $mark) { throw "WRITE_SECURE_SETTINGS is not in the state this install asked for ($mark missing): $hint. The launcher is installed and is Home. Check by hand: tools\tv.py 'dumpsys package app.polaris.tv'" }
 Write-Host 'Installed. Press Home on the remote to see it.'

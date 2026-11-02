@@ -23,7 +23,7 @@
 #   INPUT_KEY_SERVICE=1 bring them back (getevent -l names Prime KEY_PRIMEVIDEO; its scancode is 752, not 365).
 # - Gear (233, TCL_SET) also went dead; app_keys KEYCODE_TCL_SET did not catch it, settings_key_scancodes 233
 #   with HOME_KEY_SERVICE=1 did.
-# - TclAppBoot refuses to start the key services at boot until `appops set com.gathin.tvhome APP_AUTO_START allow`.
+# - TclAppBoot refuses to start the key services at boot until `appops set app.polaris.tv APP_AUTO_START allow`.
 # All verified with the real remote, also after a reboot. Live TV app: com.tcl.tv (live_tv_package, hidden_apps).
 #
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/tcl-65q650g/debloat.txt

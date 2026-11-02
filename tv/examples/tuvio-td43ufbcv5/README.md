@@ -67,7 +67,7 @@ home grid but remains in the app library and the Inputs menu. Edit the dock for 
 apps before pushing it. This config describes the TD50; it does not change launcher defaults or
 claim that the TD43 used this layout.
 
-The TD50 used the launcher's clock screensaver (`com.gathin.tvhome/.ClockDream`) for both
+The TD50 used the launcher's clock screensaver (`app.polaris.tv/.ClockDream`) for both
 `screensaver_components` and `screensaver_default_component` before disabling dreamx.
 
 ## Restore

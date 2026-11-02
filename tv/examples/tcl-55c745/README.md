@@ -76,4 +76,4 @@ TV_HOST=<tv-ip> tools/theme.sh --reset
 
 TCL 65Q6C, model "Smart TV Pro", device `G08`, product `G08_4K_GB`, the same `UTT2.250416.001 AU02`, on
 Ethernet. Owner report from 28 October 2026: the debloat and the Clean Your TV launcher worked, Home stayed on
-`com.gathin.tvhome` after a reboot, and the Home and Settings keys worked.
+`app.polaris.tv` after a reboot, and the Home and Settings keys worked.

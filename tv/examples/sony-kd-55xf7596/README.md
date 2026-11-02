@@ -28,7 +28,7 @@ is the owner's; getprop does not carry a KD-65 name. The panel is 3840x2160 and 
 [`sony-kd-55xf8096/`](../sony-kd-55xf8096/debloat.txt) has this same fingerprint, so the two lists cannot
 be told apart by a fingerprint prefix.
 
-`com.gathin.tvhome` was the focused Home app, and `com.google.android.tvlauncher` was disabled. Already
+`app.polaris.tv` was the focused Home app, and `com.google.android.tvlauncher` was disabled. Already
 disabled from this list: Samba TV, promos, Sony Select, bivlinfo, the recommendation rows, the Bravia
 auto-install, the three demo packages, the Sony and Qterics device agents, both bug reporters, feedback,
 and the three help apps. Still enabled, so not tested on this unit: Discover, both launcher-customizer
@@ -52,7 +52,7 @@ on its built-in Ethernet. Nothing was disabled before the run and `com.google.an
 - A user-installed Projectivy Launcher (`com.spocky.projengmenu`) also answers HOME. It was disabled before
   `launcher/build-and-install.sh` ran, so only the stock launcher and Sony's FallbackHome were left to hand over from.
 - Launcher built with `tools/docker-build.sh` (no local JDK) and installed with `SKIP_BUILD=1`. `mFocusedApp` was
-  `com.gathin.tvhome` before and after a reboot. At power-on the TV goes from FallbackHome straight to the
+  `app.polaris.tv` before and after a reboot. At power-on the TV goes from FallbackHome straight to the
   launcher (on Android 9 the events log tag is `am_set_resumed_activity`, not `wm_set_resumed_activity`), so
   neither `power_on_home` nor `boot_to_live_tv` is needed.
 - On the real remote, Netflix, YouTube, Input, Home, Action Menu and TV all work without the accessibility

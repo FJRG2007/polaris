@@ -71,7 +71,7 @@ Before the handover, Home was `com.google.android.tvlauncher/.MainActivity`, and
 alongside `com.android.tv.settings`. `launcher/build-and-install.sh` (built from source,
 `INPUT_KEY_SERVICE=1`) succeeded in one run: the new launcher started (`Status: ok`),
 `pm disable-user --user 0 com.google.android.tvlauncher` ran, and Home resolved to
-`com.gathin.tvhome/.MainActivity`. After the cold reboot Home still resolved there, all eight
+`app.polaris.tv/.MainActivity`. After the cold reboot Home still resolved there, all eight
 disabled packages stayed disabled, all seven `TvInputService` providers were intact, and the
 `InputKeyService` was bound (after one clear-and-rewrite of `enabled_accessibility_services`, as
 described in `docs/TROUBLESHOOTING.md`).

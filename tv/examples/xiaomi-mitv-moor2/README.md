@@ -17,7 +17,7 @@ Both `com.google.android.apps.tv.launcherx` and
 <bool name="key_filter">false</bool>
 ```
 
-Only `com.gathin.tvhome/.HomeKeyService` was enabled, through Settings → System →
+Only `app.polaris.tv/.HomeKeyService` was enabled, through Settings → System →
 Accessibility → Home button. `InputKeyService` stayed off, `app_keys` stayed empty,
 and `restore_key_services` stayed false. No key mappings or automatic service-repair
 permission were added.

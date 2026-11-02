@@ -9,7 +9,7 @@
 # Stock Home: com.google.android.apps.tv.launcherx; setupwraith's RecoveryActivity also claims HOME, and the
 # first build-and-install.sh run rolled back because RecoveryActivity took Home. The saved Wi-Fi network
 # belonged to setupwraith: forgotten + re-joined in Settings (then cname=android.uid.system), setupwraith
-# disabled, build-and-install.sh run again: mFocusedApp = com.gathin.tvhome/.MainActivity.
+# disabled, build-and-install.sh run again: mFocusedApp = app.polaris.tv/.MainActivity.
 # Live TV app: com.smartdevice.livetv; launcher Inputs menu lists HDMI 1-3, AV, Live TV and switches through it.
 # Remote: Input, YouTube, Netflix, Prime Video, mic all work without launcherx. The Settings/dashboard
 # button sends keycode 83 (KEYCODE_NOTIFICATION, scancode 240 KEY_UNKNOWN, HID 0c009f), which only launcherx

@@ -74,4 +74,4 @@ tools/restore.sh examples/panasonic-4ktv-3mup/debloat.txt
 tools/theme.sh --reset
 ```
 
-Uninstall the launcher (`pm uninstall com.gathin.tvhome`) to give the Home button back to launcherx.
+Uninstall the launcher (`pm uninstall app.polaris.tv`) to give the Home button back to launcherx.

@@ -23,7 +23,7 @@ reaches it. `docs/specs/card.md`'s "Rules for the declaration" say the filter an
 on the activity that already carries `LEANBACK_LAUNCHER`, that it is `exported` and enabled, and that a
 package declares one card - and `Cards.read()` refuses all of that in words a TV owner never sees
 (`card activity is not exported and enabled`, `card activity has no LEANBACK_LAUNCHER intent filter`,
-`no <meta-data android:name="com.gathin.tvhome.card" android:resource=...>`, `declares a second card`),
+`no <meta-data android:name="app.polaris.tv.card" android:resource=...>`, `declares a second card`),
 one `TvHomeCards` line per Home. So an add-on could ship the card file this file reads, point its
 `meta-data` at another activity, drop `android:exported`, or leave the `DOCK_CARD` filter off the
 activity the launcher queries and the card would never appear - with every test here green. This file
@@ -48,8 +48,8 @@ FIELDS = ("spec", "label", "caption", "accent")
 
 # The three names Cards.discover() and Cards.read() look for, in the manifest rather than in the card.
 MANIFEST_ANDROID = "{http://schemas.android.com/apk/res/android}"
-CARD_META_DATA = "com.gathin.tvhome.card"          # Cards.META_DATA
-DOCK_CARD = "com.gathin.tvhome.category.DOCK_CARD"  # Cards.CATEGORY
+CARD_META_DATA = "app.polaris.tv.card"          # Cards.META_DATA
+DOCK_CARD = "app.polaris.tv.category.DOCK_CARD"  # Cards.CATEGORY
 MAIN_ACTION = "android.intent.action.MAIN"
 LEANBACK_CATEGORY = "android.intent.category.LEANBACK_LAUNCHER"
 # The elements PackageManager may hand back from its MAIN + DOCK_CARD query: an <activity> and the
@@ -480,8 +480,8 @@ class DeclarationReaderTest(unittest.TestCase):
             '<intent-filter><action android:name="android.intent.action.MAIN" />'
             '<category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>'
             '<intent-filter><action android:name="android.intent.action.MAIN" />'
-            '<category android:name="com.gathin.tvhome.category.DOCK_CARD" /></intent-filter>'
-            '<meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />'
+            '<category android:name="app.polaris.tv.category.DOCK_CARD" /></intent-filter>'
+            '<meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />'
             '</activity>')
 
     def test_the_shipped_shape_is_quiet(self):
@@ -514,7 +514,7 @@ class DeclarationReaderTest(unittest.TestCase):
         self.assertIn("no LEANBACK_LAUNCHER intent filter", reasons[0])
 
     def test_a_card_without_the_dock_card_filter_is_named(self):
-        activity = self.TILE.replace('<category android:name="com.gathin.tvhome.category.DOCK_CARD" />', "")
+        activity = self.TILE.replace('<category android:name="app.polaris.tv.category.DOCK_CARD" />', "")
         reasons = self.check(self.manifest(activity))
         self.assertEqual(len(reasons), 1, reasons)
         self.assertIn("Cards.discover() finds a card by querying exactly that", reasons[0])
@@ -523,11 +523,11 @@ class DeclarationReaderTest(unittest.TestCase):
         # The meta-data now sits on a second activity that is not the tile: the launcher reads it there
         # and drops the card, and the tile answers the card query with nothing.
         activity = self.TILE.replace(
-            '<meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />', "")
-        other = ('<activity android:name=".Settings"><meta-data android:name="com.gathin.tvhome.card" '
+            '<meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />', "")
+        other = ('<activity android:name=".Settings"><meta-data android:name="app.polaris.tv.card" '
                  'android:resource="@xml/module_card" /></activity>')
         reasons = self.check(self.manifest(activity + other))
-        self.assertTrue(any(".Settings has no MAIN + com.gathin.tvhome.category.DOCK_CARD" in r
+        self.assertTrue(any(".Settings has no MAIN + app.polaris.tv.category.DOCK_CARD" in r
                             for r in reasons), reasons)
         self.assertTrue(any(".Main carries" in r for r in reasons), reasons)
 
@@ -545,9 +545,9 @@ class DeclarationReaderTest(unittest.TestCase):
 
     def test_a_card_on_a_service_is_named(self):
         activity = self.TILE.replace(
-            '<meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />', "")
+            '<meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />', "")
         reasons = self.check(self.manifest(activity + '<service android:name=".Sync">'
-                                           '<meta-data android:name="com.gathin.tvhome.card" '
+                                           '<meta-data android:name="app.polaris.tv.card" '
                                            'android:resource="@xml/module_card" /></service>'))
         self.assertEqual(len(reasons), 2, reasons)   # the tile now answers a card query with nothing
         self.assertTrue(any("only returns activities" in r for r in reasons), reasons)
@@ -556,8 +556,8 @@ class DeclarationReaderTest(unittest.TestCase):
         extra = ('<activity android:name=".Second" android:exported="true"><intent-filter>'
                  '<action android:name="android.intent.action.MAIN" />'
                  '<category android:name="android.intent.category.LEANBACK_LAUNCHER" />'
-                 '<category android:name="com.gathin.tvhome.category.DOCK_CARD" /></intent-filter>'
-                 '<meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />'
+                 '<category android:name="app.polaris.tv.category.DOCK_CARD" /></intent-filter>'
+                 '<meta-data android:name="app.polaris.tv.card" android:resource="@xml/module_card" />'
                  '</activity>')
         reasons = self.check(self.manifest(self.TILE + extra))
         self.assertEqual(len(reasons), 1, reasons)
@@ -566,7 +566,7 @@ class DeclarationReaderTest(unittest.TestCase):
     def test_a_card_filter_with_no_card_is_named(self):
         extra = ('<activity android:name=".Settings" android:exported="true"><intent-filter>'
                  '<action android:name="android.intent.action.MAIN" />'
-                 '<category android:name="com.gathin.tvhome.category.DOCK_CARD" /></intent-filter>'
+                 '<category android:name="app.polaris.tv.category.DOCK_CARD" /></intent-filter>'
                  '</activity>')
         reasons = self.check(self.manifest(self.TILE + extra))
         self.assertEqual(len(reasons), 1, reasons)

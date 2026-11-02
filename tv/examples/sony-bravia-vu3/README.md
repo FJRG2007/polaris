@@ -49,10 +49,10 @@ off. The buttons then go through launcherx as they did before the cleanup, and t
 3. Before step 2, set these in `launcher/app/src/main/res/values/config.xml`: `stock_home_redirect` to
    `com.google.android.apps.tv.launcherx`, `key_filter` to false and `restore_key_services` to true.
 4. Enable the helper:
-   `tools/tv.py 'settings put secure enabled_accessibility_services com.gathin.tvhome/.HomeKeyService'` and
+   `tools/tv.py 'settings put secure enabled_accessibility_services app.polaris.tv/.HomeKeyService'` and
    `tools/tv.py 'settings put secure accessibility_enabled 1'`.
 
-Home from inside an app lands on `com.gathin.tvhome/.MainActivity` (`mFocusedApp`); Google TV's home flashes for a
+Home from inside an app lands on `app.polaris.tv/.MainActivity` (`mFocusedApp`); Google TV's home flashes for a
 moment first. After a reboot the TV started into the new launcher. Do not force-stop the launcher from Settings:
 that unbinds the helper until Home next starts, and `restore_key_services` puts it back then.
 

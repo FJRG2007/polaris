@@ -31,7 +31,7 @@ com.mitv.cloudcontrol               # cloud control: starts on connectivity, rem
 com.mitv.shoplugin
 
 # Stock screensaver, replaced by the launcher's ClockDream:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 com.mitv.screensaver
 
 # OTA updater: stops firmware updates re-enabling everything above. Trade-off: no security updates

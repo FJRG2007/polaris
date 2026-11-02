@@ -16,7 +16,7 @@
 # - ADB: the Developer options switch is labelled "ADB debugging", not "USB debugging". Port 5555
 #   stays closed until it is on.
 # - com.google.android.tungsten.setupwraith is installed but did not take Home: build-and-install.ps1
-#   landed Home on com.gathin.tvhome first time with only com.google.android.tvlauncher disabled.
+#   landed Home on app.polaris.tv first time with only com.google.android.tvlauncher disabled.
 #   Hide com.sony.dtv.tvx and com.sony.dtv.tvxlauncher.programguide in config.xml and leave
 #   live_tv_package empty if you have no antenna; Inputs lists HDMI 1-4 (with CEC names) and Video 1/2.
 # - The stock launcher's "Free Live TV" / "Top Selling" rows and the top banner come from

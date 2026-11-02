@@ -3,7 +3,7 @@
 `docs/workflows/perf-ab.md` sends a contributor to `tools/trace.md`, `tools/flamechart.md` and
 `tools/screendiff.md`, and each of those pages reads as the reference for its tool: the option tables are what
 a reader looks in, and there is no `--help` in a page. Six options were in no page at all, `--package` among
-them, so a fork built under another package name - SHOWCASE.md lists several - measured `com.gathin.tvhome`,
+them, so a fork built under another package name - SHOWCASE.md lists several - measured `app.polaris.tv`,
 and the report printed `-` for every step without saying the package was never in the trace.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
@@ -30,7 +30,7 @@ GUIDES = {
 TABLE_DEFAULTS = {
     ("tools/flamechart.py", "--window"): "first-frame",
     ("tools/flamechart.py", "--threads"): "main,RenderThread",
-    ("tools/flamechart.py", "--package"): "com.gathin.tvhome",
+    ("tools/flamechart.py", "--package"): "app.polaris.tv",
     ("tools/flamechart.py", "--labels"): "Before,After",
     ("tools/flamechart.py", "--title"): "Launcher: start to first frame",
     ("tools/flamechart.py", "--width"): "1600",
@@ -122,7 +122,7 @@ class PerfGuideOptionsTest(unittest.TestCase):
         for guide in ("tools/trace.md", "tools/flamechart.md"):
             with self.subTest(guide=guide):
                 self.assertIn("--package", source(guide))
-                self.assertIn("com.gathin.tvhome", source(guide))
+                self.assertIn("app.polaris.tv", source(guide))
 
 
 if __name__ == "__main__":

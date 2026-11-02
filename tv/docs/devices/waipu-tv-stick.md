@@ -52,7 +52,7 @@ The waipu app is the stock launcher: `de.exaring.waipu/.MainActivity` and Settin
 only two HOME claimants, and there is no separate vendor launcher to disable. The new launcher was
 installed with `STOCK_LAUNCHER=none launcher/build-and-install.sh` (the script does not know the waipu app
 as a stock launcher and stops without that), and `set-home-activity` really took:
-`cmd package resolve-activity` and `mFocusedApp` both named `com.gathin.tvhome`. It was still installed and
+`cmd package resolve-activity` and `mFocusedApp` both named `app.polaris.tv`. It was still installed and
 still Home after a reboot, so `com.nes.coreservice` did not remove it here, unlike what the TiVo note
 describes for that box.
 

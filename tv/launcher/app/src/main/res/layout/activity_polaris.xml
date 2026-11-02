@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF101419"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="72dp"
+        android:paddingEnd="72dp"
+        android:paddingTop="38dp"
+        android:paddingBottom="38dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/polaris_title"
+            android:textColor="#FFFFFFFF"
+            android:textSize="34sp" />
+
+        <TextView
+            android:id="@+id/polarisMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:textColor="#FFFFD60A"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/polarisConnectForm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/polaris_intro"
+                android:textColor="#B3FFFFFF"
+                android:textSize="18sp" />
+
+            <EditText
+                android:id="@+id/polarisAddress"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="24dp"
+                android:hint="@string/polaris_address_hint"
+                android:imeOptions="actionGo"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:singleLine="true"
+                android:textColor="#FFFFFFFF"
+                android:textColorHint="#80FFFFFF"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/polarisConnect"
+                style="@style/SettingsRow"
+                android:layout_marginTop="14dp"
+                android:text="@string/polaris_connect" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/polarisPairing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/polarisQr"
+                android:layout_width="220dp"
+                android:layout_height="220dp"
+                android:layout_marginEnd="40dp"
+                android:contentDescription="@string/polaris_qr" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/polaris_pair_hint"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/polarisVerifyAddress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/polarisCode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="44sp" />
+
+                <TextView
+                    android:id="@+id/polarisCancel"
+                    style="@style/SettingsRow"
+                    android:layout_marginTop="14dp"
+                    android:text="@android:string/cancel" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/polarisConnected"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/polarisAccount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFFFF"
+                android:textSize="26sp" />
+
+            <TextView
+                android:id="@+id/polarisInstance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="#B3FFFFFF"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/polarisCounts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textColor="#FFFFFFFF"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/polarisAddressInUse"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="#B3FFFFFF"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/polarisDisconnect"
+                style="@style/SettingsRow"
+                android:layout_marginTop="24dp"
+                android:text="@string/polaris_disconnect" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

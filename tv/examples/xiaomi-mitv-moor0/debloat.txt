@@ -73,7 +73,7 @@ com.google.android.youtube.tvmusic              # YouTube Music
 # com.google.android.youtube.tv                 # stock YouTube app
 
 # ---------------------------------------------------------------------------------------------
-# ONLY AFTER com.gathin.tvhome IS INSTALLED.
+# ONLY AFTER app.polaris.tv IS INSTALLED.
 # com.google.android.tungsten.setupwraith also answers HOME (.RecoveryActivity at priority 1), which
 # outranks a third-party launcher once launcherx is disabled. On this unit all saved Wi-Fi networks
 # belong to android.uid.system:1000 (`dumpsys wifi | grep -o 'cname=[^ ]*'`), so disabling setupwraith

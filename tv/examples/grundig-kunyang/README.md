@@ -20,7 +20,7 @@
   The stock input panel is `com.mediatek.wwtv.tvcenter/.nav.inputpanel.InputsPanelActivity`.
 - **Remote buttons:** Home, Input, Settings and the app buttons all work with the stock launcher disabled, with no
   `HOME_KEY_SERVICE` or `INPUT_KEY_SERVICE`. The real buttons were pressed on the remote, not injected.
-- **Screensaver:** set it to `com.gathin.tvhome/.ClockDream` before disabling `com.google.android.backdrop`. Backdrop
+- **Screensaver:** set it to `app.polaris.tv/.ClockDream` before disabling `com.google.android.backdrop`. Backdrop
   held about 160 MB resident.
 - **Private DNS** works on this set.
 

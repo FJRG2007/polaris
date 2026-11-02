@@ -80,7 +80,7 @@ com.google.android.videos                # Play Movies & TV (second unit; the fi
 # Off on this set by the owner's choice; uncomment to disable.
 # com.graymatrix.did                     # ZEE5
 com.google.android.backdrop              # Ambient screensaver; set the launcher's clock first:
-                                         # settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+                                         # settings put secure screensaver_components app.polaris.tv/.ClockDream
 
 # Stock Android TV home and its recommendation rows, replaced by launcher/
 # (tools/disable.sh skips the launcher until another app is Home)

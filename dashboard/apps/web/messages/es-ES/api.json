@@ -95,7 +95,8 @@
         "fileOpenFailed": "No se pudo abrir ese archivo.",
         "rangeBackwards": "El inicio del rango es posterior a su final.",
         "fileLargerThan": "Ese archivo supera los {megabytes} MB.",
-        "deckSignInAsk": "Hace falta el nombre del equipo, y solo se pueden pedir los permisos que usa un Stream Deck."
+        "deckSignInAsk": "Hace falta el nombre del equipo, y solo se pueden pedir los permisos que usa un Stream Deck.",
+        "tvSignInAsk": "Hace falta el nombre del equipo."
     },
     "refusals": {
         "session": {

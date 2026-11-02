@@ -73,7 +73,7 @@ Install: `adb install -r app/build/outputs/apk/debug/app-debug.apk`. Write down 
 - [ ] Streaming apps: installed known apps are pre-ticked; "Show every TV app" lists the rest; the Home shortcut opens the app; uninstall the app and it disappears from Home.
 
 ### 6. CleanYourTV module card
-On a TV running CleanYourTV (com.gathin.tvhome) or a fork that keeps its card category:
+On a TV running CleanYourTV (app.polaris.tv) or a fork that keeps its card category:
 
 ```bash
 adb shell pm dump io.github.maxhayim.tvhub | grep -B2 -A6 DOCK_CARD

@@ -23,7 +23,7 @@
 # "already disabled" shipped that way. The others were disabled in this session
 # and were still disabled after a power cycle, before the new launcher was
 # installed. launcher/build-and-install.sh with INPUT_KEY_SERVICE=1 then set
-# com.gathin.tvhome as Home.
+# app.polaris.tv as Home.
 #
 # Checked on that home, by screenshot and by the window in front:
 # - D-pad moves focus across the dock and down into the grid.

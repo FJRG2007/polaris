@@ -5,7 +5,7 @@ Android TV 9 (SDK 28), firmware `1.1.52` (`PPR2.180905.006.A1`, userdebug/dev-ke
 `ro.product.model` is the generic `JmGO`; the board and device string is `m7642_JmGO_H7A0`.
 
 This is a one-session report, not a several-day list. Eight packages were disabled, `tools/check.py`
-reported no drift and Home resolved to `com.gathin.tvhome/.MainActivity` before the final ADB-off
+reported no drift and Home resolved to `app.polaris.tv/.MainActivity` before the final ADB-off
 reboot. The reboot itself and a few days of use were not observed yet, so the demo package is left
 commented out below until the remote's Input key has been checked with it off.
 

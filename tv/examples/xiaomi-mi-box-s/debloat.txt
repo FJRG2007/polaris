@@ -18,7 +18,7 @@
 # - USB debugging CUTS POWER to the USB port: with sys.usb.config=adb, /vendor/etc/init/hw/init.amlogic.usb.rc
 #   writes 0xFDFFFFFF to register 0xc883443c and the port switches to ADB device mode, so a USB speaker or drive
 #   goes dead; sys.usb.config=mtp (debugging off) writes 0xFD7FFFFF and powers it again. Turn debugging off when done.
-# - cmd package set-home-activity needs the component on Android 9 (com.gathin.tvhome/.MainActivity).
+# - cmd package set-home-activity needs the component on Android 9 (app.polaris.tv/.MainActivity).
 # - Location is off, so Android 9 hides the Wi-Fi name from apps and the launcher's pill just says "Wi-Fi".
 # - Remote (Vendor_2717_Product_32b9): the Netflix key still opens Netflix; BUTTON_2 opened Live Channels and
 #   does nothing once it is disabled; BUTTON_3/4 and ALL_APPS did nothing even on stock. No crashes either way.
@@ -84,7 +84,7 @@ com.google.android.marvin.talkback     # screen reader (was off)
 com.android.printspooler
 
 # Google Ambient photo screensaver, replaced by the launcher's Clock. Switch the screensaver first:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 com.google.android.backdrop
 
 # Already disabled on this unit before we started; uncomment the ones yours still has enabled

@@ -23,7 +23,7 @@
 # claim HOME, and the saved Wi-Fi belongs to Play services (com.google.android.gms), not setupwraith.
 # Location is off (location_mode=0), so the network pill reads "Wi-Fi", not the network name.
 # Screensaver: backdrop is the default dream. Point it at the launcher's clock before disabling it:
-#   settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   settings put secure screensaver_components app.polaris.tv/.ClockDream
 #
 # Hoppr: com.hoppr.androidtv.thumper.prodtv (4.6.0.30, /system/priv-app/Hoppr_Newest) is preinstalled
 # and runs from boot as a foreground service. It holds RECORD_AUDIO, READ_CONTACTS,

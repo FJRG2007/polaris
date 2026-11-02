@@ -30,7 +30,7 @@
 # - Free TV / "Freeplay" lives inside launcherx and goes with it.
 # - Google TV / Play Movies (com.google.android.videos) is not preinstalled on this box.
 # - Disabling dreamx leaves no screensaver set (screensaver_components was null; the default was dreamx).
-#   Point it at the launcher's clock: settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+#   Point it at the launcher's clock: settings put secure screensaver_components app.polaris.tv/.ClockDream
 # - Animation scales already ship at 0.5x on this build.
 #
 # Kept on purpose: voice (com.google.android.katniss) and com.google.android.tv.remote.service (see above),

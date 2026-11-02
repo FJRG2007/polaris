@@ -165,7 +165,7 @@ com.mediatek.MtkDemo                   # MediaTek demo app; on one AU10 unit and
 com.google.android.tungsten.setupwraith
 
 # Batch 4: after launcher/ is Home and the screensaver is switched to the launcher's clock:
-#   tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream'
+#   tools/tv.py 'settings put secure screensaver_components app.polaris.tv/.ClockDream'
 # (it was unset, so the default com.google.android.apps.tv.dreamx/.service.Backdrop ran;
 #  undo with 'settings delete secure screensaver_components')
 com.google.android.apps.tv.dreamx      # Google TV Ambient mode screensaver (promos)

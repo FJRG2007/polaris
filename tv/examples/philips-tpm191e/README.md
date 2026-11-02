@@ -6,7 +6,7 @@ Checked on a Philips 50PUS8505, TP Vision TPM191E (`PH9M_EA_5599`), Android TV 1
 
 - Disabled an owner-selected subset of 13 packages from the existing list: Philips analytics, usage logging, demo and promotion/store packages; the Sticker and Fitness Buddy preloads; and Google feedback/setup-only packages. Nothing was uninstalled.
 - After one reboot, all 13 selected packages remained disabled.
-- Installed the repository launcher, then disabled the stock launcher. Home resolved to `com.gathin.tvhome/.MainActivity` after installation and was focused during the navigation checks.
+- Installed the repository launcher, then disabled the stock launcher. Home resolved to `app.polaris.tv/.MainActivity` after installation and was focused during the navigation checks.
 - The physical remote's Sources and Settings buttons continued to open Philips' internal menus. The launcher's Inputs menu reported HDMI and YPbPr, with Live TV configured as `org.droidtv.playtv`; no separate AV input was reported.
 
 This is a single-session report, not a several-day debloat test. The full `debloat.txt` was not applied to this model. Streaming-app playback, broadcast/HDMI playback, USB-drive playback, app-shortcut remapping and long-press volume repeat were not validated here. Keep the existing list's package choices commented out unless they match your own use.
@@ -18,7 +18,7 @@ lead unit above (`STT2.230526.001`). Details and package names are in `debloat.t
 note; this section covers the launcher side.
 
 - Installed the repository launcher, then disabled the stock launcher, same order as the 50PUS8505
-  unit. Home resolved to `com.gathin.tvhome/.MainActivity` and stayed focused there.
+  unit. Home resolved to `app.polaris.tv/.MainActivity` and stayed focused there.
 - The Sources drawer (Inputs pill) listed USB, Network, a connected recording drive, a Switch on
   HDMI 1, an Xbox on HDMI 2, HDMI 3, HDMI 4 and YPbPr, each correctly named from HDMI-CEC where a
   device reported one. `org.droidtv.eum` was disabled briefly, then re-enabled on reading the
@@ -59,7 +59,7 @@ unit" note; this section covers the launcher side.
   75PUS8505 list describes. With
   the stock launcher still enabled, Home stayed with it (its HOME filter has priority 2, as the
   75PUS8505 list explains); the new launcher took Home the moment the stock one was disabled. The Home
-  key from Live TV then landed on `com.gathin.tvhome/.MainActivity` (`mFocusedApp`).
+  key from Live TV then landed on `app.polaris.tv/.MainActivity` (`mFocusedApp`).
 - config.xml as on the 65PUS9435: `live_tv_package` `org.droidtv.playtv`; `hidden_apps`
   `org.droidtv.playtv`, `org.droidtv.demome`, `org.droidtv.eum`, `org.droidtv.channels`,
   `com.vewd.core.browserui`.
@@ -87,7 +87,7 @@ lead unit (`STT2.230526.001`), with its original Philips remote. Package details
 unit" note; this section covers the launcher side. One session with two restarts, not a several-day test.
 
 - `launcher/build-and-install.sh` ran through on its own: cold start in 1.7 s, and Home moved to
-  `com.gathin.tvhome/.MainActivity` once the stock launcher was disabled (`mFocusedApp`).
+  `app.polaris.tv/.MainActivity` once the stock launcher was disabled (`mFocusedApp`).
 - The Inputs menu listed HDMI 1 / MHL, HDMI 2 to 4 (a computer on HDMI 3 by its HDMI-CEC name, marked connected),
   YPbPr and Live TV, with `live_tv_package` `org.droidtv.playtv`. Live TV opened from it, and Home came back
   opaque over the picture.
@@ -116,7 +116,7 @@ lead unit (`STT2.230526.001`), with its original Philips remote. Package details
 unit" note; this section covers the launcher side. One session with two restarts, not a several-day test.
 
 - `launcher/build-and-install.sh` with `HOME_KEY_SERVICE=1` ran through on its own: cold start in 1.8 s, Home moved
-  to `com.gathin.tvhome/.MainActivity` once the stock launcher was disabled (`mFocusedApp`), and it stayed there
+  to `app.polaris.tv/.MainActivity` once the stock launcher was disabled (`mFocusedApp`), and it stayed there
   after a restart.
 - config.xml as on the 50PUS7354: `live_tv_package` `org.droidtv.playtv`, `hidden_apps` `org.droidtv.playtv`,
   `org.droidtv.demome`, `org.droidtv.eum`; `home_long_press_home` and `power_on_home_always` true. A held Home and
@@ -137,7 +137,7 @@ lead unit (`STT2.230526.001`), with its original Philips remote. Package details
 unit" note; this section covers the launcher side. One session with three restarts, not a several-day test.
 
 - The launcher was built with `tools/docker-build.sh` and installed with `SKIP_BUILD=1 launcher/build-and-install.sh`,
-  which ran through on its own: cold start in 2.0 s, and Home moved to `com.gathin.tvhome/.MainActivity` once the
+  which ran through on its own: cold start in 2.0 s, and Home moved to `app.polaris.tv/.MainActivity` once the
   stock launcher was disabled (`mFocusedApp`).
 - config.xml: `live_tv_package` `org.droidtv.playtv`; `hidden_apps` `org.droidtv.playtv`, `org.droidtv.eum`;
   `columns` 6; `home_long_press_home` and `power_on_home_always` true, installed with `HOME_KEY_SERVICE=1`.
@@ -167,7 +167,7 @@ lead unit (`STT2.230526.001`), with its original Philips remote. Package details
 note; this section covers the launcher side.
 
 - `launcher/build-and-install.sh` with `HOME_KEY_SERVICE=1` ran through on its own: cold start in 1.5 s, and Home
-  moved to `com.gathin.tvhome/.MainActivity` once the stock launcher was disabled (`mFocusedApp`).
+  moved to `app.polaris.tv/.MainActivity` once the stock launcher was disabled (`mFocusedApp`).
 - config.xml: `live_tv_package` `org.droidtv.playtv`; `hidden_apps` `org.droidtv.playtv`, `org.droidtv.demome`,
   `org.droidtv.eum`; `columns` 5; `home_long_press_home` and `power_on_home_always` true.
 - The Inputs menu listed HDMI 1 / MHL (a sound system by its HDMI-CEC name, marked connected), HDMI 2, HDMI 3,

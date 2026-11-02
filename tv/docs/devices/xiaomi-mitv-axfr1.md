@@ -30,7 +30,7 @@ The debloat list in [`examples/xiaomi-mitv-axfr1/debloat.txt`](../../examples/xi
 
 ---
 
-## 3. Launcher Configuration (`com.gathin.tvhome`)
+## 3. Launcher Configuration (`app.polaris.tv`)
 
 - **Sideloading & Custom Home**: Android TV 11 on this set accepts third-party `CATEGORY_HOME` packages without requiring a manufacturer signature.
 - **Icon-Only Top Bar**:

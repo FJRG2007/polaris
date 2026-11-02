@@ -11,7 +11,7 @@
 # kept as its own folder since the retail model and market differ, per CONTRIBUTING.
 #
 # Stock launcher: com.google.android.tvlauncher (not leanbacklauncher, though that package is also
-# present and disabled below once Home no longer needs it). Replacement: com.gathin.tvhome.
+# present and disabled below once Home no longer needs it). Replacement: app.polaris.tv.
 # Live TV AND every HDMI input: com.sony.dtv.tvx — KEEP IT ENABLED.
 #
 # com.sony.dtv.b2b.hotelmode must stay enabled on this board: com.android.tv.settings' MainFragment
@@ -139,7 +139,7 @@ com.alphainventor.filemanager
 com.estrongs.android.pop
 com.teamsmart.videomanager.tv                    # Smart IPTV
 
-# Home handover ONLY after installing, launching and verifying the new launcher (com.gathin.tvhome
+# Home handover ONLY after installing, launching and verifying the new launcher (app.polaris.tv
 # confirmed as ResumedActivity). com.google.android.tvlauncher is also disabled automatically by
 # launcher/build-and-install.sh; it is listed here too for a from-scratch run of this list.
 # com.google.android.tungsten.setupwraith: check `dumpsys wifi | grep cname` first if the TV is on

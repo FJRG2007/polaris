@@ -117,7 +117,7 @@
 #   otherwise disabling its owner drops Wi-Fi and the ADB connection.
 # - TclAppBoot blocks the launcher's key services (and WireGuard's VPN) at every boot until the
 #   package has APP_AUTO_START (docs/TROUBLESHOOTING.md). Run `appops write-settings` after
-#   `appops set com.gathin.tvhome APP_AUTO_START allow`: app-ops are saved lazily, and a plain
+#   `appops set app.polaris.tv APP_AUTO_START allow`: app-ops are saved lazily, and a plain
 #   `reboot` drops the change. Confirmed on the C69B over three reboots.
 # - The remote's mic button needs com.google.android.tv.remote.service, which is commented out below: a
 #   press starts AtvSearchAssistantService inside that package, so with the package disabled the button

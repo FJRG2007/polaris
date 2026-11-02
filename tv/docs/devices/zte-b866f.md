@@ -35,7 +35,7 @@ On boot completion, `ZteKeyInterceptorReceiver` schedules a `TimerTask`
 1. `Q(Context)` queries `PackageManager.queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)`.
 2. It ignores `com.google.android.tungsten.setupwraith` and `com.android.tv.settings`, and checks
    whether any remaining enabled `HOME` activity has `ApplicationInfo.FLAG_SYSTEM` (`(flags & 1) != 0`).
-3. A sideloaded launcher (`com.gathin.tvhome`) is installed in `/data/app` without `FLAG_SYSTEM`. If
+3. A sideloaded launcher (`app.polaris.tv`) is installed in `/data/app` without `FLAG_SYSTEM`. If
    both `com.google.android.tvlauncher` and `com.ebsproject.drawer` (or `com.google.android.tvlauncher`
    alone on firmware where it is the only system launcher) have been disabled with
    `pm disable-user --user 0`, `Q(Context)` returns `null`.

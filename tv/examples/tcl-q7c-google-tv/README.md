@@ -168,7 +168,7 @@ creator was `com.android.tv.settings`, not `android.uid.system` as on the
 Order used, as in the Q7C README: setupwraith first, while launcherx still owned Home, then
 `STOCK_LAUNCHER=com.google.android.apps.tv.launcherx INPUT_KEY_SERVICE=1 HOME_KEY_SERVICE=1
 launcher/build-and-install.sh`, which started the new launcher, disabled launcherx and reported
-`Home now resolves to com.gathin.tvhome/.MainActivity`. `mFocusedApp` confirmed it.
+`Home now resolves to app.polaris.tv/.MainActivity`. `mFocusedApp` confirmed it.
 
 ### The list as applied
 
@@ -278,7 +278,7 @@ Pushed with `tools/theme.sh` (`greeting_name` left out here):
 ### Reboot and closing ADB
 
 After one reboot, `pm list packages -d` returned the same 33 packages as before it: the 29 above, launcherx, and
-the three disabled before the session. Nothing came back. HOME still resolved to `com.gathin.tvhome/.MainActivity`,
+the three disabled before the session. Nothing came back. HOME still resolved to `app.polaris.tv/.MainActivity`,
 and `enabled_accessibility_services` still listed `InputKeyService` and `HomeKeyService`.
 
 To close: `tools/tv.py 'settings put global adb_wifi_enabled 0'`, then `'settings put global adb_enabled 0'`.
@@ -334,7 +334,7 @@ Instead of disabling setupwraith, both it and launcherx stayed enabled and the l
   `app_keys` `190:com.google.android.youtube.tv` and `4062:com.netflix.ninja`, `live_tv_package` `com.tcl.tv`.
 - `STOCK_LAUNCHER=none launcher/build-and-install.sh` installs it and leaves launcherx alone. Its Home check then
   reports launcherx, which is expected here; `HomeKeyService` was enabled afterwards the same way the script does.
-- Home from inside YouTube landed on `com.gathin.tvhome/.MainActivity` (`mFocusedApp`), and after a reboot the TV
+- Home from inside YouTube landed on `app.polaris.tv/.MainActivity` (`mFocusedApp`), and after a reboot the TV
   started straight into it. Launcherx flashes for a moment before the redirect.
 - The owner pressed Home, Settings, YouTube, Netflix and Input on the real remote: all worked. Holding volume up
   kept ramping with `HomeKeyService` bound and `key_filter` true, so the G09 repeat loss did not show on this set.
@@ -342,9 +342,9 @@ Instead of disabling setupwraith, both it and launcherx stayed enabled and the l
 ### TclAppBoot after a reboot
 
 After the first reboot `HomeKeyService` was enabled but unbound, `accessibility_enabled` read `0`, and logcat had
-`[TclAppBoot]:forbid bind service ComponentInfo{com.gathin.tvhome/com.gathin.tvhome.HomeKeyService}`.
-`appops get com.gathin.tvhome` showed `AUTO_START: ignore`: the install script's `cmd appops set ... AUTO_START
-allow` had not reached the disk. `appops set com.gathin.tvhome AUTO_START allow; appops write-settings`, then
+`[TclAppBoot]:forbid bind service ComponentInfo{app.polaris.tv/app.polaris.tv.HomeKeyService}`.
+`appops get app.polaris.tv` showed `AUTO_START: ignore`: the install script's `cmd appops set ... AUTO_START
+allow` had not reached the disk. `appops set app.polaris.tv AUTO_START allow; appops write-settings`, then
 clearing and rewriting the enabled list, bound the helper, and it bound on its own after the next reboot. The Sleep
 Timer add-on needed the same op (`AUTO_START` here, not `APP_AUTO_START`).
 
@@ -426,9 +426,9 @@ repeat together. The two settings for this mode were:
 
 - Leave `com.google.android.apps.tv.launcherx` enabled, unlike the standard install above. Google TV's native
   receiver handles the app buttons; `app_keys` in a key-filtering helper is not what restores them here.
-- Enable only `com.gathin.tvhome/.HomeKeyService`, with `InputKeyService` off. The Home helper observes window
+- Enable only `app.polaris.tv/.HomeKeyService`, with `InputKeyService` off. The Home helper observes window
   changes without filtering keys. Android still resolves Google TV as Home; the helper opens Clean Your TV.
-- Allow `AUTO_START` for `com.gathin.tvhome` and persist it with `appops write-settings`, as in
+- Allow `AUTO_START` for `app.polaris.tv` and persist it with `appops write-settings`, as in
   [TclAppBoot after a reboot](#tclappboot-after-a-reboot).
 - On this unit setupwraith stayed disabled after the owner forgot and rejoined Wi-Fi in Settings. The saved
   network then belonged to `com.android.tv.settings`; this differs from the third unit, which kept the wizard.
@@ -438,7 +438,7 @@ repeat together. The two settings for this mode were:
 The owner pressed Home, Netflix, Prime Video and YouTube on the physical remote: Home returned to Clean Your TV,
 the three apps opened, and held volume changed continuously.
 
-After a reboot, before injecting navigation keys, the focused app was `com.gathin.tvhome/.MainActivity`.
+After a reboot, before injecting navigation keys, the focused app was `app.polaris.tv/.MainActivity`.
 `dumpsys accessibility` showed only `HomeKeyService` bound, with `TYPE_WINDOW_STATE_CHANGED`, and no
 `KeyboardInterceptor`. The helper also remained bound after a later `tools/theme.sh` push.
 
@@ -535,7 +535,7 @@ Left alone, as on the Q7C: `com.tcl.tv`, `com.tcl.tvinput`, `com.tcl.suspension`
 
 No key helper was installed. On the real remote, Home, Input (TCL's source panel) and YouTube worked with launcherx
 off; the gear did nothing. The gear's keycode 83 reaches the focused window here (`logcat`:
-`InputDispatcher: TIDD: publishKeyEvent(... com.gathin.tvhome/...MainActivity ..., keyCode=83)`), so
+`InputDispatcher: TIDD: publishKeyEvent(... app.polaris.tv/...MainActivity ..., keyCode=83)`), so
 `settings_key_keycodes` `[83]` in `config.xml` answers it while Home is in front **without `HomeKeyService`**,
 and the owner confirmed it opens Settings. Inside an app the button still goes to that app. With no helper bound,
 a held Volume + moves one step and then repeats slowly (`repeatCount=1` after about 400 ms in `logcat`): that is
@@ -543,7 +543,7 @@ this firmware's own volume handling, not the helper trade described in the G09 n
 
 ### Other checks
 
-- Power-on lands on the new launcher (`wm_set_resumed_activity`: `FallbackHome`, then `com.gathin.tvhome`); the
+- Power-on lands on the new launcher (`wm_set_resumed_activity`: `FallbackHome`, then `app.polaris.tv`); the
   firmware does not open Live TV by itself, so neither `power_on_home` nor `boot_to_live_tv` is needed.
 - The Inputs menu listed HDMI 1 to 4 and Live TV; HDMI 1 opened `com.tcl.tv/com.tcl.player.TVActivity`.
 - Private DNS (`dns.adguard-dns.com`) validated, and YouTube loaded its feed through it.
@@ -609,7 +609,7 @@ with `stock_home_redirect`, then launcherx and setupwraith were disabled so Goog
   Chromecast hardware). The Wi-Fi network belonged to setupwraith: it was forgotten and rejoined first.
 - **Home held** opened Google TV's notification panel, which is launcherx's
   (`.dashboard.DashboardHandler` answers `TOGGLE_NOTIFICATION_HANDLER_PANEL`). With launcherx disabled nothing opens it,
-  and Settings has no notification screen. `app_keys` `3:home` and `hold:3:com.gathin.tvhome/.QuickSettingsActivity`
+  and Settings has no notification screen. `app_keys` `3:home` and `hold:3:app.polaris.tv/.QuickSettingsActivity`
   put the launcher's quick panel there instead.
 - **TCL Channel** (4020) → `4020:com.tcl.tv` opens Live TV. Settings (gear) needs `settings_key_keycodes` `[83]`.
 - **Not looked into:** there is no recents screen (`KEYCODE_APP_SWITCH` does nothing), and the mic answers "Google
@@ -661,7 +661,7 @@ As on the 55Q6C: `stock_home_redirect` `com.google.android.apps.tv.launcherx`, t
 `STOCK_LAUNCHER=none launcher/build-and-install.sh`. Its Home check reports launcherx and stops before the
 helpers, which is expected here, so `HomeKeyService` was enabled afterwards the way the script's `enable_service`
 does (`AUTO_START` allowed first). Home from inside YouTube and the first screen after a reboot were
-`com.gathin.tvhome/.MainActivity` (`mFocusedApp`). Unlike the 55Q6C, `HomeKeyService` was bound after the first
+`app.polaris.tv/.MainActivity` (`mFocusedApp`). Unlike the 55Q6C, `HomeKeyService` was bound after the first
 reboot with `AUTO_START: allow` already on disk, and no `TclAppBoot` refusal was logged.
 
 ### Remote buttons and the volume ramp
@@ -739,7 +739,7 @@ launcher was Home. Check `dumpsys wifi | grep -o 'cname=[^ ]*'` for every saved 
   `live_tv_package` `com.tcl.tv`, and `com.tcl.dashboard`, `com.tcl.partnercustomizer`, `com.tcl.suspension` and
   `com.tcl.gallery` hidden from the tiles. The `scenes` theme was pushed later with `tools/theme.ps1`.
 - The Inputs pill lists HDMI 1 to 4 and Live TV.
-- **Reboot:** `FallbackHome` showed for about nine seconds, then `com.gathin.tvhome/.MainActivity` took Home. Every
+- **Reboot:** `FallbackHome` showed for about nine seconds, then `app.polaris.tv/.MainActivity` took Home. Every
   disabled package stayed disabled; the OS re-enabled none.
 - One set, one week of use. Casting, AirPlay, Miracast and voice were turned off by choice, so they were not tested
   after the list.

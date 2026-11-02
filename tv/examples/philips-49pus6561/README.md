@@ -13,7 +13,7 @@ USB debugging alone opens ADB on TCP 5555. The "Allow USB debugging?" prompt app
 
 The stock Home is `com.google.android.tvlauncher`; `com.google.android.leanbacklauncher` is also installed but
 claims no HOME intent, so it was left alone. `launcher/build-and-install.sh` disabled the stock launcher after
-the new Home was confirmed, and Home resolved to `com.gathin.tvhome/.MainActivity` across three reboots.
+the new Home was confirmed, and Home resolved to `app.polaris.tv/.MainActivity` across three reboots.
 
 The Inputs pill lists HDMI 1-4, SCART, Y Pb Pr and Live TV. [`config.json`](config.json) sets the Live TV package and
 hides three tiles: Live TV (the Inputs menu covers it), `org.droidtv.eum` (the "How to..." videos) and

@@ -41,11 +41,11 @@ To get the repeat back for a test, and to put the helpers back afterwards:
 ```sh
 # keep the string the first read printed; the empty list also unbinds TalkBack and any other service
 tools/tv.py "settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0"
-tools/tv.py "settings put secure enabled_accessibility_services com.gathin.tvhome/com.gathin.tvhome.HomeKeyService:com.gathin.tvhome/com.gathin.tvhome.InputKeyService; settings put secure accessibility_enabled 1"
+tools/tv.py "settings put secure enabled_accessibility_services app.polaris.tv/app.polaris.tv.HomeKeyService:app.polaris.tv/app.polaris.tv.InputKeyService; settings put secure accessibility_enabled 1"
 ```
 
 That second line is the launcher's two helpers, not "the value": write back what the read printed.
-`theme.sh` already re-puts the list after a theme push, `am force-stop com.gathin.tvhome` drops it on
+`theme.sh` already re-puts the list after a theme push, `am force-stop app.polaris.tv` drops it on
 its own (see [TROUBLESHOOTING](../TROUBLESHOOTING.md)), and re-running `launcher/build-and-install.sh`
 without `INPUT_KEY_SERVICE=1`/`HOME_KEY_SERVICE=1` leaves the helpers off.
 
@@ -237,7 +237,7 @@ owner wanted reach the stock launcher by name rather than through a vendor keyco
 
 | `enabled_accessibility_services` | holding Volume Up |
 | --- | --- |
-| `com.gathin.tvhome/.InputKeyService` | one step per press |
+| `app.polaris.tv/.InputKeyService` | one step per press |
 | `''`, with `accessibility_enabled 0` | ramps continuously |
 | `InputKeyService` written back | one step per press again |
 
@@ -264,7 +264,7 @@ Installed with `INPUT_KEY_SERVICE=1`, as that folder's first unit was:
 
 | `enabled_accessibility_services` | holding Volume Up |
 | --- | --- |
-| `com.gathin.tvhome/.InputKeyService` (the only service bound) | one step per press |
+| `app.polaris.tv/.InputKeyService` (the only service bound) | one step per press |
 | `""`, with `accessibility_enabled 0` | ramps continuously |
 
 So far this is the Mi TV 4A's pair of rows on a fifth vendor. What differs is what the control costs,

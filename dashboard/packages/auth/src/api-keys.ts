@@ -81,11 +81,11 @@ export interface ApiKeyView {
  * revocable and narrowed to its owner the same way; the kind only says where it
  * came from, so the list can label it and the CLI can end its own sign-in.
  */
-export type ApiKeyKind = "key" | "cli" | "streamdeck";
+export type ApiKeyKind = "key" | "cli" | "streamdeck" | "tv";
 
 /** The kind a stored row names, with anything unknown read as an ordinary key. */
 export function apiKeyKindOf(stored: string): ApiKeyKind {
-    return stored === "cli" || stored === "streamdeck" ? stored : "key";
+    return stored === "cli" || stored === "streamdeck" || stored === "tv" ? stored : "key";
 }
 
 /** A verified key: who it acts as, what it may do, and where it may be used from. */
