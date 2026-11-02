@@ -38,9 +38,7 @@ function thread(text: string): exports.ExportThread {
 
 describe("the HTML export", () => {
     it("shows a model's markup as text and can run nothing", () => {
-        const html = exports.threadHtml(thread("<script>alert(1)</script>
-
-**bold**"), NAMES);
+        const html = exports.threadHtml(thread("<script>alert(1)</script>\n\n**bold**"), NAMES);
         expect(html).not.toContain("<script>");
         expect(html).toContain("&lt;script&gt;");
         expect(html).toContain("<strong>bold</strong>");
