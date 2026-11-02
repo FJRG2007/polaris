@@ -304,7 +304,12 @@ export async function claimCliSignIn(
             environment: kind === "cli" ? "development" : "production",
             // Only to pass the form's own rule; the line after this puts back the real list.
             scopes: kind === "tv" ? ["deploy.read"] : scopes,
-            expiresInDays: kind === "tv" ? TV_TOKEN_DAYS : kind === "streamdeck" ? DECK_TOKEN_DAYS : CLI_TOKEN_DAYS
+            expiresInDays:
+                kind === "tv"
+                    ? TV_TOKEN_DAYS
+                    : kind === "streamdeck"
+                      ? DECK_TOKEN_DAYS
+                      : CLI_TOKEN_DAYS
         }),
         scopes
     };
