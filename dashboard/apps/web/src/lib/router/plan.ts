@@ -39,6 +39,15 @@ const DOCKER_ALLOW_CHAIN = "POLARIS-ROUTER";
 const INTERFACE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,14}$/;
 const MAC = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/;
 const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+/** What a config line can carry whole: no control character can end it early. */
+const ONE_LINE = /^[^\p{Cc}]+$/u;
+/** WPA2's own rule for a passphrase. */
+const WIFI_PASSWORD = /^[\x20-\x7e]{8,63}$/;
+const COUNTRY = /^[A-Z]{2}$/;
+/** The most a Wi-Fi name can hold, in bytes. */
+const SSID_BYTES = 32;
+/** The channels every regulatory domain allows without radar detection. */
+const WIFI_CHANNEL = { "2.4": 6, "5": 36 } as const;
 
 const interfaceName = z.string().trim().regex(INTERFACE, "badPort");
 const ipv4 = z.string().trim().regex(IPV4);
@@ -63,9 +72,68 @@ export function routerPlanKey(hostId: string): string {
     return `router.plan.${hostId}`;
 }
 
+/** The setting that holds its passwords, sealed as a whole: a sealed value inside a
+ *  plan would not open after moving to another Polaris, which reseals only whole values. */
+export function routerSecretsKey(hostId: string): string {
+    return `router.secrets.${hostId}`;
+}
+
+/** A secret as the screen sends it: it is taken off the plan before anything is stored
+ *  (`withoutSecrets`), and blank on an edit means keep the one the machine has. */
+const lineSecret = z.string().regex(ONE_LINE).max(128);
+
+/** How a line reaches the internet. Left out on a row from before there was a choice. */
+export const WAN_MODES = ["dhcp", "static", "pppoe"] as const;
+export type WanMode = (typeof WAN_MODES)[number];
+
 /** One way out to the internet, tried in list order. */
-export const wanSchema = z.object({ interface: interfaceName, vlan });
+export const wanSchema = z.object({
+    interface: interfaceName,
+    vlan,
+    /** Names this line's stored password, which outlives a change of port or VLAN. */
+    id: z.string().uuid().optional(),
+    mode: z.enum(WAN_MODES).optional(),
+    /** A fixed line's address with its prefix, as 203.0.113.2/29. */
+    address: z.string().trim().optional(),
+    gateway: z.string().trim().optional(),
+    /** A PPPoE line's sign-in. */
+    username: z.string().trim().regex(ONE_LINE).max(128).optional(),
+    password: lineSecret.optional()
+});
 export type RouterWan = z.infer<typeof wanSchema>;
+
+export function modeOf(wan: RouterWan): WanMode {
+    return wan.mode ?? "dhcp";
+}
+
+/** Whether a fixed line's address and gateway can work together. */
+export function staticLineFits(wan: { address?: string; gateway?: string }): boolean {
+    const [host, bits] = (wan.address ?? "").split("/");
+    const gateway = wan.gateway ?? "";
+    if (!host || !bits || !/^\d{1,2}$/.test(bits)) return false;
+    const prefix = Number(bits);
+    if (prefix < 8 || prefix > 30 || !IPV4.test(host) || !IPV4.test(gateway)) return false;
+    const subnet = normalizeCidr(wan.address ?? "");
+    return host !== gateway && isHostOf(subnet, host) && isHostOf(subnet, gateway);
+}
+
+function byteLength(text: string): number {
+    return new TextEncoder().encode(text).length;
+}
+
+/** The access point a network on a radio port runs. */
+export const wifiSchema = z.object({
+    ssid: z
+        .string()
+        .trim()
+        .regex(ONE_LINE, "badWifi")
+        .refine((ssid) => byteLength(ssid) <= SSID_BYTES, "badWifi"),
+    password: z.string().regex(WIFI_PASSWORD, "badWifi").optional(),
+    /** The rules a radio has to follow depend on where it is. */
+    country: z.string().trim().toUpperCase().regex(COUNTRY, "badWifi"),
+    band: z.enum(["2.4", "5"])
+});
+export type RouterWifi = z.infer<typeof wifiSchema>;
 
 export const reservationSchema = z.object({
     mac: z.string().trim().toLowerCase().regex(MAC),
@@ -103,7 +171,10 @@ const storedLanSchema = z
         internet: z.boolean(),
         /** Devices here reach no other network behind this router. */
         isolated: z.boolean(),
-        reservations: z.array(reservationSchema).max(MAX_RESERVATIONS)
+        reservations: z.array(reservationSchema).max(MAX_RESERVATIONS),
+        /** Devices here also get public IPv6, from the first line's delegated prefix. */
+        ipv6: z.boolean().optional(),
+        wifi: wifiSchema.optional()
     })
     .refine((lan) => isHostOf(lan.cidr, lan.address), { path: ["address"] })
     .refine((lan) => lan.reservations.every(({ address }) => isHostOf(lan.cidr, address)), {
@@ -135,6 +206,12 @@ export function deviceOf(link: { interface: string; vlan: number | null }): stri
     const name = `${link.interface}.${link.vlan}`;
     if (name.length <= DEVICE_NAME_MAX) return name;
     return `v${link.vlan}.${link.interface.slice(-(DEVICE_NAME_MAX - `v${link.vlan}.`.length))}`;
+}
+
+/** The device a line's traffic leaves by. A PPPoE session is one of its own on top of
+ *  the port, named from it so the same line keeps the same name. */
+export function lineDevice(wan: RouterWan): string {
+    return modeOf(wan) === "pppoe" ? `ppp-${deviceOf(wan).slice(-11)}` : deviceOf(wan);
 }
 
 function sameValues(values: readonly string[]): boolean {
@@ -169,6 +246,25 @@ function checkPlan(
         plan.lans.some((lan) => isHostOf(lan.cidr, address))
     );
     if (!inside) issue.addIssue({ code: "custom", path: ["forwards"], message: "outside" });
+    for (const wan of plan.wans) {
+        const mode = modeOf(wan);
+        if (mode === "static" && !staticLineFits(wan)) {
+            issue.addIssue({ code: "custom", path: ["wans"], message: "badStaticLine" });
+        }
+        if (mode === "static" && overlapsLan(wan, plan.lans)) {
+            issue.addIssue({ code: "custom", path: ["wans"], message: "lineSubnet" });
+        }
+        if (mode === "pppoe" && !(wan.id && wan.username)) {
+            issue.addIssue({ code: "custom", path: ["wans"], message: "badPppoe" });
+        }
+    }
+    if (plan.lans.some((lan) => lan.wifi && lan.vlan !== null)) {
+        issue.addIssue({ code: "custom", path: ["lans"], message: "wifiVlan" });
+    }
+}
+
+function overlapsLan(wan: RouterWan, lans: readonly { cidr: string }[]): boolean {
+    return lans.some((lan) => cidrsOverlap(lan.cidr, normalizeCidr(wan.address ?? "")));
 }
 
 /** Everything the operator decides about one router. */
@@ -195,6 +291,41 @@ export function readPlan(stored: unknown): RouterPlan | null {
     return parsed.success ? parsed.data : null;
 }
 
+/** A plan as it may be stored and shown: passwords never leave `routerSecretsKey`. */
+export function withoutSecrets(plan: RouterPlan): RouterPlan {
+    return {
+        ...plan,
+        wans: plan.wans.map(({ password: _password, ...wan }) => wan),
+        lans: plan.lans.map((lan) => {
+            if (!lan.wifi) return lan;
+            const { password: _password, ...wifi } = lan.wifi;
+            return { ...lan, wifi };
+        })
+    };
+}
+
+/** The passwords of one router, by the id of the line or network each belongs to. */
+export type RouterSecrets = Readonly<Record<string, string>>;
+
+/** The passwords this plan needs, typed now or kept from before. Null when one has
+ *  neither, since a machine cannot sign in or start an access point without it. */
+export function secretsOf(plan: RouterPlan, stored: RouterSecrets): RouterSecrets | null {
+    const secrets: Record<string, string> = {};
+    for (const wan of plan.wans) {
+        if (modeOf(wan) !== "pppoe" || !wan.id) continue;
+        const password = wan.password || stored[wan.id];
+        if (!password) return null;
+        secrets[wan.id] = password;
+    }
+    for (const lan of plan.lans) {
+        if (!lan.wifi) continue;
+        const password = lan.wifi.password || stored[lan.id];
+        if (!password || !WIFI_PASSWORD.test(password)) return null;
+        secrets[lan.id] = password;
+    }
+    return secrets;
+}
+
 /** Where the machine stands while the plan is applied and read. */
 export interface RouterAccess {
     /** The address Polaris connects from, kept open from the internet side. */
@@ -211,7 +342,8 @@ function quotedList(values: readonly string[]): string {
  *  on the machine is left to the rules their engine writes, except that a network
  *  cut off from the others is cut off from them and the tailnet too. */
 export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
-    const wans = plan.wans.map(deviceOf);
+    const wans = plan.wans.map(lineDevice);
+    const outside = [...new Set([...wans, ...plan.wans.map(deviceOf)])];
     const lans = plan.lans.map(deviceOf);
     const open = plan.lans.filter((lan) => !lan.isolated).map(deviceOf);
     const online = plan.lans.filter((lan) => lan.internet).map(deviceOf);
@@ -219,6 +351,8 @@ export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
     const confined = plan.lans.filter((lan) => lan.isolated || !lan.internet).map(deviceOf);
     const engineLinks = '{ "docker0", "br-*", "tailscale0" }';
     const managed = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"];
+    const ipv6 = hasIpv6(plan);
+    const sessions = plan.wans.some((wan) => modeOf(wan) === "pppoe");
     return [
         "table inet polaris_router {}",
         "delete table inet polaris_router",
@@ -230,17 +364,22 @@ export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
         '        iifname "lo" accept',
         "        ip protocol icmp accept",
         "        ip6 nexthdr icmpv6 accept",
-        `        iifname ${quotedList(lans)} udp dport { 53, 67 } accept`,
+        `        iifname ${quotedList(lans)} udp dport { 53, 67${ipv6 ? ", 547" : ""} } accept`,
         `        iifname ${quotedList(lans)} tcp dport 53 accept`,
+        // A delegated prefix's replies come back to a link-local address, untracked.
+        ...(ipv6 ? [`        iifname ${quotedList(wans)} udp sport 547 udp dport 546 accept`] : []),
         ...(access.management
             ? [`        ip saddr ${access.management} tcp dport ${access.sshPort} accept`]
             : []),
-        `        iifname ${quotedList([...closed, ...wans])} tcp dport ${access.sshPort} drop`,
+        `        iifname ${quotedList([...closed, ...outside])} tcp dport ${access.sshPort} drop`,
         `        ip saddr { ${managed.join(", ")} } tcp dport ${access.sshPort} accept`,
         `        iifname ${engineLinks} accept`,
         "    }",
         "    chain forward {",
         "        type filter hook forward priority filter; policy drop;",
+        // A session's packets are smaller than a device expects, and a line that drops
+        // the "too big" answers leaves pages hanging unless connections ask for less.
+        ...(sessions ? ["        tcp flags syn tcp option maxseg size set rt mtu"] : []),
         "        ct state established,related accept",
         "        ct state invalid drop",
         ...(confined.length > 0
@@ -265,7 +404,8 @@ export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
         "    }",
         "    chain outgoing {",
         "        type nat hook postrouting priority srcnat; policy accept;",
-        `        oifname ${quotedList(wans)} masquerade`,
+        // Public IPv6 addresses are the devices' own, so only IPv4 is translated.
+        `        oifname ${quotedList(wans)} meta nfproto ipv4 masquerade`,
         "    }",
         "}",
         ""
@@ -286,7 +426,8 @@ export function renderDnsmasq(plan: RouterPlan): string {
         "dhcp-rapid-commit",
         "server=1.1.1.1",
         "server=9.9.9.9",
-        "no-resolv"
+        "no-resolv",
+        ...(hasIpv6(plan) ? ["enable-ra"] : [])
     ];
     for (const lan of plan.lans) {
         const device = deviceOf(lan);
@@ -297,6 +438,7 @@ export function renderDnsmasq(plan: RouterPlan): string {
             `dhcp-option=tag:${device},option:router,${lan.address}`,
             `dhcp-option=tag:${device},option:dns-server,${lan.address}`
         );
+        if (lan.ipv6) lines.push(`dhcp-range=::,constructor:${device},ra-stateless,64,12h`);
         for (const { mac, address } of lan.reservations) {
             lines.push(`dhcp-host=${mac},${address}`);
         }
@@ -313,22 +455,32 @@ function unmanaged(device: string): string {
     return `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${device} managed no >/dev/null 2>&1 || true`;
 }
 
+type DockerFirewall = "iptables" | "ip6tables";
+
 /** Docker leaves iptables' FORWARD chain on a DROP policy, and a packet has to pass
  *  every firewall on the machine, so what the router's own table accepts dies there.
  *  Only the pairs the router joins are let through, in both directions; the router's
  *  table still decides which of them pass. */
-function renderDockerAllow(plan: RouterPlan): string[] {
+function renderDockerAllow(plan: RouterPlan, tool: DockerFirewall): string[] {
     const lans = shellWords(plan.lans.map(deviceOf));
-    const wans = shellWords(plan.wans.map(deviceOf));
+    const wans = shellWords(plan.wans.map(lineDevice));
     const allow = (from: string, to: string) =>
-        `    for from in ${from}; do for to in ${to}; do [ "$from" = "$to" ] || iptables -w -A ${DOCKER_ALLOW_CHAIN} -i "$from" -o "$to" -j ACCEPT; done; done`;
+        `    for from in ${from}; do for to in ${to}; do [ "$from" = "$to" ] || ${tool} -w -A ${DOCKER_ALLOW_CHAIN} -i "$from" -o "$to" -j ACCEPT; done; done`;
     return [
-        "if iptables -w -n -L DOCKER-USER >/dev/null 2>&1; then",
-        `    iptables -w -N ${DOCKER_ALLOW_CHAIN} 2>/dev/null || iptables -w -F ${DOCKER_ALLOW_CHAIN}`,
-        `    iptables -w -C DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null || iptables -w -I DOCKER-USER -j ${DOCKER_ALLOW_CHAIN}`,
+        `if ${tool} -w -n -L DOCKER-USER >/dev/null 2>&1; then`,
+        `    ${tool} -w -N ${DOCKER_ALLOW_CHAIN} 2>/dev/null || ${tool} -w -F ${DOCKER_ALLOW_CHAIN}`,
+        `    ${tool} -w -C DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null || ${tool} -w -I DOCKER-USER -j ${DOCKER_ALLOW_CHAIN}`,
         allow(lans, `${lans} ${wans}`),
         allow(wans, lans),
         "fi"
+    ];
+}
+
+function dockerAllowRemoval(tool: DockerFirewall): string[] {
+    return [
+        `${tool} -w -D DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        `${tool} -w -F ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        `${tool} -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`
     ];
 }
 
@@ -338,9 +490,125 @@ function clientPid(device: string): string {
     return `/run/dhclient-polaris.${device}.pid`;
 }
 
-/** Whether a pid file names a live DHCP client. A file can outlive its process, and the
- *  number can be somebody else's by then. */
-const CLIENT_RUNNING = `running() { [ "$(cat "/proc/$(cat "$1" 2>/dev/null)/comm" 2>/dev/null)" = dhclient ]; }`;
+/** Whether a pid file names a live process of that name, a DHCP client unless told. A
+ *  file can outlive its process, and the number can be somebody else's by then. */
+const CLIENT_RUNNING = `running() { [ "$(cat "/proc/$(cat "$1" 2>/dev/null)/comm" 2>/dev/null)" = "\${2:-dhclient}" ]; }`;
+
+/** What Polaris started and has to stop or put back, kept where a reboot clears it
+ *  along with what it describes. */
+const RUN_DIR = "/run/polaris-router";
+const PREFIX_CLIENT_PID = `${RUN_DIR}/dhcpcd.pid`;
+const FORWARDING_MARK = `${RUN_DIR}/ipv6-forwarding`;
+const ACCEPT_RA_MARK = `${RUN_DIR}/accept-ra`;
+
+function hasIpv6(plan: RouterPlan): boolean {
+    return plan.lans.some((lan) => lan.ipv6);
+}
+
+/** Polaris's mark that it, and not the system, put a fixed line's address there. */
+function addedMark(device: string): string {
+    return `${RUN_DIR}/address.${device}`;
+}
+
+/** Written by whoever starts pppd, whose own file only appears once it has connected:
+ *  a line with nobody answering would be dialled again on every round. */
+function sessionPid(device: string): string {
+    return `${RUN_DIR}/pppd.${device}.pid`;
+}
+
+function accessPointPid(device: string): string {
+    return `${RUN_DIR}/hostapd.${device}.pid`;
+}
+
+function sysctlName(device: string): string {
+    return device.replace(/\./g, "/");
+}
+
+/** The session's sign-in, quoted the way pppd reads its option files. */
+function pppQuoted(value: string): string {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/** What pppd reads for one line. The password sits here and never on a command line,
+ *  where any process could read it. */
+export function renderPppOptions(wan: RouterWan, password: string, ipv6: boolean): string {
+    return [
+        `ifname ${lineDevice(wan)}`,
+        `user ${pppQuoted(wan.username ?? "")}`,
+        `password ${pppQuoted(password)}`,
+        "noauth",
+        "noipdefault",
+        "persist",
+        "maxfail 0",
+        "holdoff 5",
+        "lcp-echo-interval 20",
+        "lcp-echo-failure 3",
+        "mtu 1492",
+        "mru 1492",
+        ...(ipv6 ? ["+ipv6"] : []),
+        ""
+    ].join("\n");
+}
+
+function hexOf(text: string): string {
+    return Array.from(new TextEncoder().encode(text), (byte) =>
+        byte.toString(16).padStart(2, "0")
+    ).join("");
+}
+
+/** An access point. WPA2 on 20 MHz channels, which every radio that can be an access
+ *  point supports: wider ones are refused outright by those that cannot. The name goes
+ *  in hex so nothing in it can be read as configuration. */
+export function renderAccessPoint(lan: RouterLan, password: string): string {
+    const wifi = lan.wifi;
+    if (!wifi) throw new Error("This network has no access point");
+    const fast = wifi.band === "5";
+    return [
+        `interface=${deviceOf(lan)}`,
+        "driver=nl80211",
+        `ssid2=${hexOf(wifi.ssid)}`,
+        "utf8_ssid=1",
+        `country_code=${wifi.country}`,
+        "ieee80211d=1",
+        `hw_mode=${fast ? "a" : "g"}`,
+        `channel=${WIFI_CHANNEL[wifi.band]}`,
+        "ieee80211n=1",
+        ...(fast ? ["ieee80211ac=1"] : []),
+        "wmm_enabled=1",
+        "auth_algs=1",
+        "wpa=2",
+        "wpa_key_mgmt=WPA-PSK",
+        "rsn_pairwise=CCMP",
+        `wpa_passphrase=${password}`,
+        ""
+    ].join("\n");
+}
+
+/** The prefix client: the first line asks for a prefix and each network gets its own
+ *  /64 of it. Line order is failover order, so IPv6 stays with the first line. Polaris's
+ *  own instance, with no hook scripts, so it never touches the machine's name servers. */
+export function renderPrefixClient(plan: RouterPlan): string {
+    const first = plan.wans[0];
+    if (!first) return "";
+    const line = lineDevice(first);
+    const lans = plan.lans.filter((lan) => lan.ipv6);
+    const shares = lans.map((lan, at) => `${deviceOf(lan)}/${at + 1}/64`);
+    return [
+        "script /bin/true",
+        // Containers and small systems run no udev, and dhcpcd would wait for it forever.
+        "nodev",
+        "ipv6only",
+        "duid",
+        "persistent",
+        `allowinterfaces ${[line, ...lans.map(deviceOf)].join(" ")}`,
+        `interface ${line}`,
+        "    ipv6rs",
+        "    ia_na 1",
+        `    ia_pd 2 ${shares.join(" ")}`,
+        ...lans.flatMap((lan) => [`interface ${deviceOf(lan)}`, "    noipv6rs"]),
+        ""
+    ].join("\n");
+}
 
 function present(port: string): string {
     return `ip link show ${port} >/dev/null 2>&1`;
@@ -363,6 +631,19 @@ function lanAddress(lan: RouterLan): string {
     return `${lan.address}/${lan.cidr.split("/")[1]}`;
 }
 
+/** Forwarding makes Linux ignore router announcements on any interface left at 1, and
+ *  that is how the machine itself may have its IPv6 route, so those move to 2. Both are
+ *  noted to be put back: when forwarding was already on, it is somebody else's. */
+const IPV6_FORWARDING = [
+    `if [ "$(cat /proc/sys/net/ipv6/conf/all/forwarding)" = 0 ]; then`,
+    `    : > ${FORWARDING_MARK}`,
+    `    for file in /proc/sys/net/ipv6/conf/*/accept_ra; do`,
+    `        if [ "$(cat "$file")" = 1 ]; then echo "$file" >> ${ACCEPT_RA_MARK}; echo 2 > "$file"; fi`,
+    "    done",
+    "    sysctl -q -w net.ipv6.conf.all.forwarding=1",
+    "fi"
+];
+
 /** Bring the networks up. Run again on every boot and every change, so each step
  *  has to hold when it is already done. */
 export function renderUp(plan: RouterPlan): string {
@@ -380,17 +661,21 @@ export function renderUp(plan: RouterPlan): string {
         lines.push(
             `    ${unmanaged(device)}`,
             `    ip link set ${device} up`,
-            `    ip addr flush dev ${device}`,
+            // Only IPv4: IPv6 needs its link-local address, and the prefix client owns the rest.
+            `    ip -4 addr flush dev ${device}`,
             `    ip addr add ${lanAddress(lan)} dev ${device}`,
             "fi"
         );
     }
     lines.push(
+        `mkdir -p ${RUN_DIR}`,
         `/bin/sh ${ROUTER_DIR}/lines.sh`,
         `nft -f ${ROUTER_DIR}/rules.nft`,
-        ...renderDockerAllow(plan),
+        ...renderDockerAllow(plan, "iptables"),
+        ...(hasIpv6(plan) ? renderDockerAllow(plan, "ip6tables") : []),
         // Last: a machine that forwards has its firewall in place first.
         "sysctl -q -w net.ipv4.ip_forward=1",
+        ...(hasIpv6(plan) ? IPV6_FORWARDING : []),
         ""
     );
     return lines.join("\n");
@@ -403,7 +688,7 @@ export function renderUp(plan: RouterPlan): string {
  * the rest.
  */
 export function renderLines(plan: RouterPlan): string {
-    const lines = ["#!/bin/sh", CLIENT_RUNNING];
+    const lines = ["#!/bin/sh", CLIENT_RUNNING, `mkdir -p ${RUN_DIR}`];
     for (const lan of plan.lans) {
         const device = deviceOf(lan);
         lines.push(
@@ -414,17 +699,27 @@ export function renderLines(plan: RouterPlan): string {
             `        ip link set ${device} up`,
             `        ip addr add ${lanAddress(lan)} dev ${device}`,
             "    fi",
+            ...(lan.wifi ? accessPointStart(device) : []),
             "fi"
         );
     }
     for (const wan of plan.wans) {
         const device = deviceOf(wan);
         const pid = clientPid(device);
+        const mode = modeOf(wan);
+        if (mode === "static") {
+            lines.push(...staticLine(wan));
+            continue;
+        }
+        if (mode === "pppoe") {
+            lines.push(...sessionLine(wan));
+            continue;
+        }
         lines.push(
             `if ${present(wan.interface)}; then`,
             ...tagged(wan),
             `    ip link set ${device} up`,
-            `    sysctl -q -w net.ipv4.conf.${device.replace(".", "/")}.rp_filter=2`,
+            `    sysctl -q -w net.ipv4.conf.${sysctlName(device)}.rp_filter=2`,
             `    if { [ -z "$(ip -4 -o addr show dev ${device})" ] || [ -f ${pid} ]; } && ! running ${pid} && ! running /run/dhclient.${device}.pid && command -v dhclient >/dev/null 2>&1; then`,
             "        mkdir -p /var/lib/dhcp",
             `        dhclient -4 -nw -e IF_METRIC=${LINE_METRIC} -pf ${pid} -lf /var/lib/dhcp/dhclient.${device}.leases ${device}`,
@@ -432,8 +727,73 @@ export function renderLines(plan: RouterPlan): string {
             "fi"
         );
     }
+    if (hasIpv6(plan)) {
+        lines.push(
+            `if ! running ${PREFIX_CLIENT_PID} dhcpcd && command -v dhcpcd >/dev/null 2>&1; then`,
+            `    setsid dhcpcd -B -M -6 -f ${ROUTER_DIR}/dhcpcd.conf </dev/null >/dev/null 2>&1 &`,
+            `    echo $! > ${PREFIX_CLIENT_PID}`,
+            "fi"
+        );
+    }
     lines.push("exit 0", "");
     return lines.join("\n");
+}
+
+/** A radio starts blocked on some machines, and a Wi-Fi client holding it stops an
+ *  access point from starting. Only reached on a port Polaris does not log in through. */
+function accessPointStart(device: string): string[] {
+    const pid = accessPointPid(device);
+    return [
+        `    if ! running ${pid} hostapd; then`,
+        "        ! command -v rfkill >/dev/null 2>&1 || rfkill unblock wifi",
+        `        ! command -v wpa_cli >/dev/null 2>&1 || wpa_cli -i ${device} terminate >/dev/null 2>&1`,
+        `        hostapd -B -P ${pid} ${ROUTER_DIR}/wifi-${device}.conf >/dev/null 2>&1`,
+        "    fi"
+    ];
+}
+
+/** A fixed line: its address only when the machine does not have it yet, noted so that
+ *  stopping takes back what Polaris added and never the system's own. */
+function staticLine(wan: RouterWan): string[] {
+    const device = deviceOf(wan);
+    const address = wan.address ?? "";
+    return [
+        `if ${present(wan.interface)}; then`,
+        ...tagged(wan),
+        `    ${unmanaged(device)}`,
+        `    ip link set ${device} up`,
+        `    sysctl -q -w net.ipv4.conf.${sysctlName(device)}.rp_filter=2`,
+        `    if ! ip -4 -o addr show dev ${device} | grep -q " ${address} "; then`,
+        `        ip addr add ${address} dev ${device} && : > ${addedMark(device)}`,
+        "    fi",
+        `    ip route replace default via ${wan.gateway ?? ""} dev ${device} metric ${LINE_METRIC}`,
+        "fi"
+    ];
+}
+
+/** A PPPoE line: pppd keeps redialling by itself, so this only starts it, and gives the
+ *  session its route each round because a session comes back with none. */
+function sessionLine(wan: RouterWan): string[] {
+    const link = deviceOf(wan);
+    const session = lineDevice(wan);
+    return [
+        `if ${present(wan.interface)}; then`,
+        ...tagged(wan),
+        `    ${unmanaged(link)}`,
+        `    ip link set ${link} up`,
+        `    if ! running ${sessionPid(session)} pppd; then`,
+        '        plugin="$(ls /usr/lib/pppd/*/pppoe.so /usr/lib/pppd/*/rp-pppoe.so 2>/dev/null | head -n 1)"',
+        '        if [ -n "$plugin" ]; then',
+        `            setsid pppd plugin "$plugin" nic-${link} file ${ROUTER_DIR}/ppp-${session}.conf nodetach </dev/null >/dev/null 2>&1 &`,
+        `            echo $! > ${sessionPid(session)}`,
+        "        fi",
+        "    fi",
+        "fi",
+        `if ${present(session)}; then`,
+        `    sysctl -q -w net.ipv4.conf.${sysctlName(session)}.rp_filter=2`,
+        `    ip route replace default dev ${session} metric ${LINE_METRIC}`,
+        "fi"
+    ];
 }
 
 /** Undo `renderUp`, leaving the machine as an ordinary one. */
@@ -445,19 +805,51 @@ export function renderDown(plan: RouterPlan): string {
         `ip rule del priority ${ROUTE_TABLE} 2>/dev/null`,
         `ip rule del priority ${ROUTE_TABLE + 1} 2>/dev/null`,
         `ip route flush table ${ROUTE_TABLE} 2>/dev/null`,
-        `iptables -w -D DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
-        `iptables -w -F ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
-        `iptables -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
-        "rm -f /run/polaris-router/wan"
+        ...dockerAllowRemoval("iptables"),
+        ...(hasIpv6(plan) ? dockerAllowRemoval("ip6tables") : []),
+        "rm -f /run/polaris-router/wan",
+        `! running ${PREFIX_CLIENT_PID} dhcpcd || kill "$(cat ${PREFIX_CLIENT_PID})" 2>/dev/null`,
+        `rm -f ${PREFIX_CLIENT_PID}`,
+        `if [ -f ${FORWARDING_MARK} ]; then`,
+        "    sysctl -q -w net.ipv6.conf.all.forwarding=0",
+        `    [ ! -f ${ACCEPT_RA_MARK} ] || while read -r file; do echo 1 > "$file"; done < ${ACCEPT_RA_MARK}`,
+        `    rm -f ${FORWARDING_MARK} ${ACCEPT_RA_MARK}`,
+        "fi"
     ];
+    for (const lan of plan.lans) {
+        if (!lan.wifi) continue;
+        const pid = accessPointPid(deviceOf(lan));
+        lines.push(`! running ${pid} hostapd || kill "$(cat ${pid})" 2>/dev/null`, `rm -f ${pid}`);
+    }
     for (const wan of plan.wans) {
-        const pid = clientPid(deviceOf(wan));
+        const mode = modeOf(wan);
+        const device = deviceOf(wan);
+        if (mode === "pppoe") {
+            const pid = sessionPid(lineDevice(wan));
+            lines.push(`! running ${pid} pppd || kill "$(cat ${pid})" 2>/dev/null`);
+        }
+        if (mode === "static") {
+            lines.push(
+                `if [ -f ${addedMark(device)} ]; then ip addr del ${wan.address ?? ""} dev ${device} 2>/dev/null; rm -f ${addedMark(device)}; fi`
+            );
+        }
+        if (mode !== "dhcp") {
+            lines.push(
+                `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${device} managed yes >/dev/null 2>&1`
+            );
+            continue;
+        }
+        const pid = clientPid(device);
         // The address stays, and so does this file: an address can be the system's own,
         // and taking it could cut the login. The next start renews through the file.
         lines.push(`! running ${pid} || kill "$(cat ${pid})" 2>/dev/null`);
     }
     for (const lan of plan.lans) {
-        lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
+        // A delegated address goes, and the link-local one stays: announcements need it.
+        lines.push(
+            `ip -4 addr flush dev ${deviceOf(lan)} 2>/dev/null`,
+            `ip -6 addr flush dev ${deviceOf(lan)} scope global 2>/dev/null`
+        );
         lines.push(
             `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${deviceOf(lan)} managed yes >/dev/null 2>&1`
         );
@@ -476,7 +868,7 @@ export function renderDown(plan: RouterPlan): string {
  */
 export function renderWanWatch(plan: RouterPlan): string {
     return `#!/bin/sh
-WANS="${shellWords(plan.wans.map(deviceOf))}"
+WANS="${shellWords(plan.wans.map(lineDevice))}"
 HOSTS="1.1.1.1 9.9.9.9"
 TABLE=${ROUTE_TABLE}
 STATE=/run/polaris-router
@@ -487,8 +879,12 @@ alive() {
     done
     return 1
 }
-gateway() {
-    ip -4 route show default dev "$1" 2>/dev/null | awk '/via/ { print $3; exit }'
+# A session has a route but no gateway: its other end is the only place to send to.
+routed() {
+    [ -n "$(ip -4 route show default dev "$1" 2>/dev/null)" ]
+}
+hop() {
+    ip -4 route show default dev "$1" 2>/dev/null | awk '/via/ { print "via", $3; exit }'
 }
 current=""
 bad=0
@@ -497,7 +893,7 @@ while :; do
     /bin/sh ${ROUTER_DIR}/lines.sh >/dev/null 2>&1
     best=""
     for wan in $WANS; do
-        if [ -n "$(gateway "$wan")" ] && alive "$wan"; then best=$wan; break; fi
+        if routed "$wan" && alive "$wan"; then best=$wan; break; fi
     done
     if [ -z "$current" ]; then
         target=$best
@@ -524,16 +920,14 @@ while :; do
         fi
     fi
     if [ -n "$target" ] && [ "$target" != "$current" ]; then
-        via=$(gateway "$target")
-        if [ -n "$via" ] && ip route replace default via "$via" dev "$target" table $TABLE; then
+        if routed "$target" && ip route replace default $(hop "$target") dev "$target" table $TABLE; then
             ! command -v conntrack >/dev/null 2>&1 || conntrack -F >/dev/null 2>&1
             current=$target
             bad=0
             good=0
         fi
     elif [ -n "$current" ]; then
-        via=$(gateway "$current")
-        [ -z "$via" ] || ip route replace default via "$via" dev "$current" table $TABLE
+        ! routed "$current" || ip route replace default $(hop "$current") dev "$current" table $TABLE
     fi
     printf '%s\\n' "$current" > "$STATE/wan"
     sleep 5
@@ -617,8 +1011,19 @@ function renderInstall(plan: RouterPlan): string {
     const optional = dhcpClient
         ? ""
         : `\ncommand -v dhclient >/dev/null 2>&1 || { DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq isc-dhcp-client; } >/dev/null 2>&1 || true`;
+    // Without it IPv6 stays off and the screen says so; the networks still work. The base
+    // package, since the full one starts a client that takes over every interface.
+    const prefixClient = hasIpv6(plan)
+        ? `\ncommand -v dhcpcd >/dev/null 2>&1 || { DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dhcpcd-base; } >/dev/null 2>&1 || true`
+        : "";
+    const session = plan.wans.some((wan) => modeOf(wan) === "pppoe")
+        ? `command -v pppd >/dev/null 2>&1 || need="$need ppp"\n`
+        : "";
+    const radio = plan.lans.some((lan) => lan.wifi)
+        ? `command -v hostapd >/dev/null 2>&1 || need="$need hostapd"\n`
+        : "";
     return `need=""
-${dhcpClient}command -v nft >/dev/null 2>&1 || need="$need nftables"
+${dhcpClient}${session}${radio}command -v nft >/dev/null 2>&1 || need="$need nftables"
 [ -x /usr/sbin/dnsmasq ] || need="$need dnsmasq-base"
 command -v ping >/dev/null 2>&1 || need="$need iputils-ping"
 command -v conntrack >/dev/null 2>&1 || need="$need conntrack"
@@ -626,11 +1031,16 @@ if [ -n "$need" ]; then
     command -v apt-get >/dev/null 2>&1 || { echo unsupported-system; exit 3; }
     DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $need >/dev/null
-fi${optional}`;
+fi${optional}${prefixClient}`;
 }
 
 function heredoc(path: string, content: string): string {
     return `cat > '${path}' <<'POLARIS_ROUTER_EOF'\n${content}POLARIS_ROUTER_EOF`;
+}
+
+/** A file only root reads, since it holds a password. */
+function privateFile(path: string, content: string): string {
+    return `(umask 077; ${heredoc(path, content)}\n)`;
 }
 
 /** Where an earlier version kept the file, which a confined client could not write: it
@@ -679,7 +1089,12 @@ fi`;
  * before it. Only a confirmed configuration ever becomes the way back: a change
  * replacing one nobody confirmed leaves the last good one where it is.
  */
-export function renderApply(plan: RouterPlan, access: RouterAccess, applyId: string): string {
+export function renderApply(
+    plan: RouterPlan,
+    access: RouterAccess,
+    applyId: string,
+    secrets: RouterSecrets = {}
+): string {
     const next = `${ROUTER_DIR}.next`;
     const previous = `${ROUTER_DIR}.previous`;
     const files: Record<string, string> = {
@@ -688,8 +1103,22 @@ export function renderApply(plan: RouterPlan, access: RouterAccess, applyId: str
         "up.sh": renderUp(plan),
         "down.sh": renderDown(plan),
         "lines.sh": renderLines(plan),
-        "wan-watch.sh": renderWanWatch(plan)
+        "wan-watch.sh": renderWanWatch(plan),
+        ...(hasIpv6(plan) ? { "dhcpcd.conf": renderPrefixClient(plan) } : {})
     };
+    const privateFiles: Record<string, string> = {};
+    for (const wan of plan.wans) {
+        if (modeOf(wan) !== "pppoe") continue;
+        privateFiles[`ppp-${lineDevice(wan)}.conf`] = renderPppOptions(
+            wan,
+            secrets[wan.id ?? ""] ?? "",
+            hasIpv6(plan)
+        );
+    }
+    for (const lan of plan.lans) {
+        if (!lan.wifi) continue;
+        privateFiles[`wifi-${deviceOf(lan)}.conf`] = renderAccessPoint(lan, secrets[lan.id] ?? "");
+    }
     const activate = `#!/bin/sh
 ${STOP_ALL}
 if [ -f ${UNCONFIRMED} ]; then
@@ -722,6 +1151,9 @@ echo rolled-back > ${LAST}
         `rm -rf ${next}`,
         `mkdir -p ${next}`,
         ...Object.entries(files).map(([name, content]) => heredoc(`${next}/${name}`, content)),
+        ...Object.entries(privateFiles).map(([name, content]) =>
+            privateFile(`${next}/${name}`, content)
+        ),
         ...Object.entries(UNITS).map(([name, content]) =>
             heredoc(`/etc/systemd/system/${name}`, content)
         ),
@@ -800,6 +1232,18 @@ echo "---links"
 ip -j link show 2>/dev/null || echo '[]'
 echo "---addresses"
 ip -j -4 addr show 2>/dev/null || echo '[]'
+echo "---publicsix"
+ip -j -6 addr show scope global 2>/dev/null || echo '[]'
+echo "---radios"
+for radio in /sys/class/net/*/wireless; do [ ! -e "$radio" ] || basename "$(dirname "$radio")"; done
+echo "---airing"
+for pid in ${RUN_DIR}/hostapd.*.pid; do
+    [ "$(cat "/proc/$(cat "$pid" 2>/dev/null)/comm" 2>/dev/null)" = hostapd ] || continue
+    name="\${pid##*/hostapd.}"
+    printf '%s\\n' "\${name%.pid}"
+done
+echo "---prefixclient"
+! command -v dhcpcd >/dev/null 2>&1 || echo yes
 echo "---routes"
 ip -j -4 route show default 2>/dev/null || echo '[]'
 echo "---client"

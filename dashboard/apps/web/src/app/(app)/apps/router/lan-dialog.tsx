@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import * as ui from "@polaris/ui";
+import { Field } from "./router-field";
 import { VlanInput } from "./router-view";
 import { Plus, Trash2 } from "lucide-react";
 import type { MachinesAnswer } from "./actions";
@@ -14,6 +15,7 @@ import {
     newLanId,
     reservationFits,
     reservationSchema,
+    wifiSchema,
     type RouterLan
 } from "@/lib/router/plan";
 import {
@@ -25,10 +27,18 @@ import {
     suggestCidr
 } from "@/lib/vpn/networks";
 
+/** The browser's region, the likeliest place the radio is in. Blank when it has none. */
+function defaultCountry(): string {
+    if (typeof navigator === "undefined") return "";
+    return /-([A-Z]{2})$/.exec(navigator.language)?.[1] ?? "";
+}
+
 export function LanDialog({
     lan,
     taken,
     ports,
+    radios,
+    wired,
     privateNetworks,
     onClose,
     onSave
@@ -36,6 +46,10 @@ export function LanDialog({
     lan: RouterLan | null;
     taken: readonly RouterLan[];
     ports: readonly string[];
+    /** The ports that can run an access point. */
+    radios: readonly string[];
+    /** The ports the machine shows that have no radio. */
+    wired: readonly string[];
     privateNetworks: MachinesAnswer["privateNetworks"];
     onClose: () => void;
     onSave: (lan: RouterLan) => void;
@@ -53,12 +67,28 @@ export function LanDialog({
     const [internet, setInternet] = useState(lan?.internet ?? true);
     const [isolated, setIsolated] = useState(lan?.isolated ?? false);
     const [reservations, setReservations] = useState(lan?.reservations ?? []);
+    const [ipv6, setIpv6] = useState(lan?.ipv6 ?? false);
+    const [broadcast, setBroadcast] = useState(lan?.wifi !== undefined);
+    const [ssid, setSsid] = useState(lan?.wifi?.ssid ?? "");
+    const [wifiPassword, setWifiPassword] = useState("");
+    const [band, setBand] = useState<"2.4" | "5">(lan?.wifi?.band ?? "5");
+    const [country, setCountry] = useState(lan?.wifi?.country ?? defaultCountry());
 
     const clean = normalizeCidr(cidr);
     const subnetBad = cidr.trim() !== "" && !isUsableCidr(clean);
     const subnetTaken = !subnetBad && others.some((other) => cidrsOverlap(clean, other));
     const addressBad =
         address.trim() !== "" && isUsableCidr(clean) && !isHostOf(clean, address.trim());
+    const unseenRadio = lan?.wifi !== undefined && !wired.includes(port);
+    const isRadio = radios.includes(port) || unseenRadio;
+    const airing = isRadio && broadcast;
+    const keptPassword = lan?.wifi?.password;
+    const typedPassword = wifiPassword || keptPassword;
+    const hasPassword = lan?.wifi !== undefined;
+    const wifi = airing
+        ? { ssid, country, band, ...(typedPassword ? { password: typedPassword } : {}) }
+        : undefined;
+    const wifiBad = airing && wifi !== undefined && !wifiSchema.safeParse(wifi).success;
     const candidate = {
         id,
         name,
@@ -68,11 +98,15 @@ export function LanDialog({
         address,
         internet,
         isolated,
-        reservations
+        reservations,
+        ...(ipv6 ? { ipv6 } : {}),
+        ...(wifi ? { wifi } : {})
     };
     const parsed = lanSchema.safeParse(candidate);
     const vlanBad = vlan !== null && (vlan < 2 || vlan > 4094);
-    const valid = parsed.success && !subnetTaken;
+    const wifiComplete =
+        !airing || (ssid.trim() !== "" && (hasPassword || wifiPassword !== "") && vlan === null);
+    const valid = parsed.success && !subnetTaken && wifiComplete;
 
     function changeCidr(next: string): void {
         setCidr(next);
@@ -118,6 +152,7 @@ export function LanDialog({
                     <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field id="lan-port" label={`${t("port")} *`}>
                             <ui.Select
+                                id="lan-port"
                                 aria-label={t("port")}
                                 value={port}
                                 onValueChange={setPort}
@@ -178,6 +213,74 @@ export function LanDialog({
                         value={isolated}
                         onChange={setIsolated}
                     />
+                    <Toggle
+                        label={t("ipv6")}
+                        hint={t("ipv6Hint")}
+                        value={ipv6}
+                        onChange={setIpv6}
+                    />
+                    {isRadio ? (
+                        <Toggle
+                            label={t("wifi")}
+                            hint={vlan === null ? t("wifiHint") : t("problems.wifiVlan")}
+                            value={broadcast}
+                            onChange={setBroadcast}
+                        />
+                    ) : null}
+                    {airing ? (
+                        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field id="lan-ssid" label={`${t("wifiName")} *`}>
+                                <ui.Input
+                                    id="lan-ssid"
+                                    value={ssid}
+                                    onChange={(event) => setSsid(event.target.value)}
+                                />
+                            </Field>
+                            <Field
+                                id="lan-wifi-password"
+                                label={hasPassword ? t("wifiPassword") : `${t("wifiPassword")} *`}
+                            >
+                                <ui.Input
+                                    id="lan-wifi-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    placeholder={hasPassword ? t("keepPassword") : undefined}
+                                    value={wifiPassword}
+                                    onChange={(event) => setWifiPassword(event.target.value)}
+                                />
+                            </Field>
+                            <Field id="lan-band" label={t("wifiBand")}>
+                                <ui.Select
+                                    id="lan-band"
+                                    aria-label={t("wifiBand")}
+                                    value={band}
+                                    onValueChange={(next) => setBand(next as "2.4" | "5")}
+                                    options={[
+                                        { value: "5", label: t("wifiBand5") },
+                                        { value: "2.4", label: t("wifiBand24") }
+                                    ]}
+                                />
+                            </Field>
+                            <Field
+                                id="lan-country"
+                                label={`${t("wifiCountry")} *`}
+                                hint={t("wifiCountryHint")}
+                            >
+                                <ui.Input
+                                    id="lan-country"
+                                    className="font-mono uppercase"
+                                    maxLength={2}
+                                    value={country}
+                                    onChange={(event) => setCountry(event.target.value)}
+                                />
+                            </Field>
+                            {wifiBad && (ssid !== "" || wifiPassword !== "") ? (
+                                <p role="alert" className="text-xs text-danger sm:col-span-2">
+                                    {t("problems.badWifi")}
+                                </p>
+                            ) : null}
+                        </div>
+                    ) : null}
                     <div className="flex min-w-0 flex-col gap-2">
                         <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-medium">{t("reservations")}</span>
@@ -268,36 +371,6 @@ export function LanDialog({
                 </ui.DialogFooter>
             </ui.DialogContent>
         </ui.Dialog>
-    );
-}
-
-function Field({
-    id,
-    label,
-    error,
-    hint,
-    children
-}: {
-    id: string;
-    label: string;
-    error?: string | null;
-    hint?: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex min-w-0 flex-col gap-1">
-            <label htmlFor={id} className="text-sm font-medium">
-                {label}
-            </label>
-            {children}
-            {error ? (
-                <p role="alert" className="text-xs text-danger">
-                    {error}
-                </p>
-            ) : hint ? (
-                <p className="text-xs text-muted-foreground">{hint}</p>
-            ) : null}
-        </div>
     );
 }
 
