@@ -6,7 +6,9 @@
  */
 
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
+import { isGatewayFailure } from "@polaris/core/instance-fallback";
 import manifest from "../../src/app/manifest";
 
 const worker = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
@@ -29,7 +31,33 @@ describe("the manifest", () => {
 describe("the service worker", () => {
     it("answers only page loads, and only when they fail", () => {
         expect(worker).toContain('if (event.request.mode !== "navigate") return;');
-        expect(worker).toMatch(/fetch\(event\.request\)\.catch\(/);
+        expect(worker).toMatch(/fetch\(event\.request\)\s*\.then\(/);
+    });
+
+    it("answers with the offline page exactly when a gateway speaks for a dead Polaris", async () => {
+        const offline = new Response("offline");
+        const navigate = async (status: number) => {
+            const listeners = new Map<string, (event: unknown) => void>();
+            const self = {
+                addEventListener: (name: string, handler: (event: unknown) => void) =>
+                    listeners.set(name, handler)
+            };
+            runInNewContext(worker, {
+                self,
+                caches: { match: async () => offline },
+                fetch: async () => new Response(null, { status }),
+                Response
+            });
+            let answered: Promise<Response> | undefined;
+            listeners.get("fetch")?.({
+                request: { mode: "navigate" },
+                respondWith: (reply: Promise<Response>) => (answered = reply)
+            });
+            return (await answered) === offline;
+        };
+        for (const status of [200, 401, 404, 500, 501, 502, 503, 504, 505, 519, 520, 530, 531]) {
+            expect(await navigate(status), `status ${status}`).toBe(isGatewayFailure(status));
+        }
     });
 
     it("stores nothing but the offline page", () => {

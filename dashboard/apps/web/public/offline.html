@@ -40,8 +40,17 @@
                 margin: 0 0 1.25rem;
                 color: var(--muted);
             }
+            #local {
+                margin: 0.5rem 0 0;
+            }
+            #local a {
+                display: inline-block;
+                padding: 0.75rem 1rem;
+                color: var(--fg);
+            }
             button {
                 font: inherit;
+                min-height: 44px;
                 padding: 0.5rem 1rem;
                 border-radius: 6px;
                 border: 0;
@@ -56,6 +65,130 @@
             <h1>Polaris is not reachable</h1>
             <p>This device cannot reach it right now. Check that you are online and that the machine running Polaris is on.</p>
             <button type="button" onclick="location.reload()">Try again</button>
+            <p id="local" hidden><a>Open on your network</a></p>
         </main>
+        <script>
+            // The offer lib/local-address.ts makes, for a tab with no bundle to run it.
+            // Reads what that file stored while this address worked.
+            (function () {
+                var WAIT_MS = 3000;
+                var LOCAL_HOST =
+                    /(\.local|^10\.\d+\.\d+\.\d+|^192\.168\.\d+\.\d+|^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/;
+                var WORDS = {
+                    en: { local: "Open on your network", other: "Open another address" },
+                    es: {
+                        title: "No se puede acceder a Polaris",
+                        detail: "Este dispositivo no puede acceder ahora mismo. Comprueba que tienes conexión y que la máquina donde se ejecuta Polaris está encendida.",
+                        retry: "Reintentar",
+                        local: "Abrir en tu red",
+                        other: "Abrir otra dirección"
+                    }
+                };
+                var chosen = /(?:^|;\s*)polaris-locale=([^;]+)/.exec(document.cookie);
+                var spanish = /^es/i.test(chosen ? chosen[1] : navigator.language);
+                var words = spanish ? WORDS.es : WORDS.en;
+
+                if (spanish) {
+                    document.documentElement.lang = "es-ES";
+                    document.title = words.title;
+                    document.querySelector("h1").textContent = words.title;
+                    document.querySelector("main > p").textContent = words.detail;
+                    document.querySelector("button").textContent = words.retry;
+                }
+
+                function fromBase64Url(value) {
+                    var binary = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+                    return Uint8Array.from(binary, function (one) {
+                        return one.charCodeAt(0);
+                    });
+                }
+
+                function freshNonce() {
+                    var bytes = crypto.getRandomValues(new Uint8Array(32));
+                    return btoa(String.fromCharCode.apply(null, bytes))
+                        .replace(/\+/g, "-")
+                        .replace(/\//g, "_")
+                        .replace(/=+$/, "");
+                }
+
+                function isGatewayFailure(status) {
+                    return status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530);
+                }
+
+                function isLocal(origin) {
+                    return LOCAL_HOST.test(new URL(origin).hostname);
+                }
+
+                async function challenge(origin, record) {
+                    var nonce = freshNonce();
+                    var controller = new AbortController();
+                    var timer = setTimeout(function () {
+                        controller.abort();
+                    }, WAIT_MS);
+                    var response;
+                    try {
+                        response = await fetch(origin + "/api/instance/challenge", {
+                            method: "POST",
+                            credentials: "omit",
+                            headers: { "content-type": "application/json", accept: "application/json" },
+                            body: JSON.stringify({ nonce: nonce }),
+                            signal: controller.signal
+                        });
+                    } catch (error) {
+                        return "unreachable";
+                    } finally {
+                        clearTimeout(timer);
+                    }
+                    if (isGatewayFailure(response.status)) return "unreachable";
+                    try {
+                        var answer = await response.json();
+                        if (!response.ok || answer.id !== record.id || answer.nonce !== nonce) return "different";
+                        var key = await crypto.subtle.importKey(
+                            "raw",
+                            fromBase64Url(record.publicKey),
+                            { name: "Ed25519" },
+                            false,
+                            ["verify"]
+                        );
+                        var signed = await crypto.subtle.verify(
+                            { name: "Ed25519" },
+                            key,
+                            fromBase64Url(answer.signature),
+                            new TextEncoder().encode("polaris-instance-v1\n" + record.id + "\n" + origin + "\n" + nonce)
+                        );
+                        return signed ? "same" : "different";
+                    } catch (error) {
+                        return "different";
+                    }
+                }
+
+                async function offer() {
+                    var record = JSON.parse(localStorage.getItem("polaris.instance")).record;
+                    var others = record.addresses.filter(function (origin) {
+                        return origin !== location.origin;
+                    });
+                    var verdicts = await Promise.all(
+                        others.map(function (origin) {
+                            return challenge(origin, record);
+                        })
+                    );
+                    var proven = others.find(function (origin, index) {
+                        return verdicts[index] === "same";
+                    });
+                    var unasked = others.find(function (origin, index) {
+                        return verdicts[index] === "unreachable" && isLocal(origin);
+                    });
+                    var origin = proven || unasked;
+                    if (!origin) return;
+                    var link = document.querySelector("#local a");
+                    link.href = proven ? origin + location.pathname + location.search : origin;
+                    link.textContent = isLocal(origin) ? words.local : words.other;
+                    document.getElementById("local").hidden = false;
+                }
+
+                // Nothing remembered: the page stands as it is.
+                offer().catch(function () {});
+            })();
+        </script>
     </body>
 </html>

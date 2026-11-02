@@ -15,6 +15,7 @@
  *   server that is down or restarting, or a network holding requests for its own
  *   sign-in page. From `lib/reachability`, which asks only after something the
  *   app was already doing failed, and never while everything works.
+ *   When the same Polaris can be found on another address, that is offered here.
  * - Updating: the same silence while this device has an update rolling over,
  *   which is expected and says so instead of sounding like a failure.
  * - No internet: Polaris answers, but the server it runs on cannot reach the
@@ -32,6 +33,13 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { checkForNewBuild } from "@/lib/new-build";
+import {
+    findLocalAddress,
+    isLocalOrigin,
+    offerHref,
+    rememberInstance,
+    type LocalOffer
+} from "@/lib/local-address";
 import { updateInProgress } from "@/lib/update-in-progress";
 import { hostOffline, subscribeHostOffline } from "@/lib/host-internet";
 import {
@@ -59,7 +67,24 @@ export function ConnectionBanner() {
     const noInternet = useSyncExternalStore(subscribeHostOffline, hostOffline, () => false);
     const [back, setBack] = useState<Back>("none");
     const [retrying, setRetrying] = useState(false);
+    const [local, setLocal] = useState<LocalOffer | null>(null);
     const seenRecoveries = useRef(reach.recoveries);
+
+    useEffect(() => {
+        void rememberInstance();
+    }, []);
+
+    // Asked only once Polaris stopped answering, and forgotten when it is back.
+    useEffect(() => {
+        if (reach.reachable) return setLocal(null);
+        let cancelled = false;
+        void findLocalAddress().then((offer) => {
+            if (!cancelled) setLocal(offer);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [reach.reachable]);
 
     // A request nothing caught is still a signal: an action awaited with no
     // handler of its own, refused because nothing answered.
@@ -134,7 +159,7 @@ export function ConnectionBanner() {
         <BannerStrip>
             <p
                 className={cn(
-                    "flex min-w-0 max-w-full items-center justify-center gap-2 border-b px-4 py-1 text-sm",
+                    "flex min-w-0 max-w-full flex-wrap items-center justify-center gap-x-2 border-b px-4 py-1 text-sm",
                     good
                         ? "border-success-edge bg-success-soft text-success-ink"
                         : state === "offline"
@@ -142,21 +167,35 @@ export function ConnectionBanner() {
                           : "border-warning-edge bg-warning-soft text-warning-ink"
                 )}
             >
-                <Icon
-                    className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
-                    aria-hidden
-                />
-                <span className="min-w-0">{t(`network.${state}`)}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                    <Icon
+                        className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
+                        aria-hidden
+                    />
+                    <span className="min-w-0">{t(`network.${state}`)}</span>
+                </span>
                 {state === "unreachable" ? (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 shrink-0 px-2"
-                        onClick={() => void retry()}
-                        disabled={retrying}
-                    >
-                        {t("network.retry")}
-                    </Button>
+                    <span className="flex shrink-0 items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-11 shrink-0 px-2 sm:h-6"
+                            onClick={() => void retry()}
+                            disabled={retrying}
+                        >
+                            {t("network.retry")}
+                        </Button>
+                        {local ? (
+                            <a
+                                href={offerHref(local)}
+                                className="inline-flex h-11 shrink-0 items-center whitespace-nowrap px-2 font-medium underline sm:h-6"
+                            >
+                                {isLocalOrigin(local.origin)
+                                    ? t("network.useLocal")
+                                    : t("network.useOther")}
+                            </a>
+                        ) : null}
+                    </span>
                 ) : null}
             </p>
         </BannerStrip>

@@ -24,6 +24,14 @@ vi.mock("@/lib/host-internet", () => ({
     subscribeHostOffline: () => () => {}
 }));
 
+// Remembering and finding the address has its own test (test/lib/local-address.test.ts).
+let offer: { origin: string; proven: boolean } | null = null;
+vi.mock("@/lib/local-address", async (original) => ({
+    ...(await original<typeof import("@/lib/local-address")>()),
+    rememberInstance: async () => undefined,
+    findLocalAddress: async () => offer
+}));
+
 const { BANNER_HEIGHT_VAR, ConnectionBanner, SlowConnectionNotice } =
     await import("@/components/connection-banner");
 const { noteStreamTrouble, probeNow, resetReachability } = await import("@/lib/reachability");
@@ -136,6 +144,38 @@ describe("when Polaris itself does not answer", () => {
         expect(status).toContain("Can't reach Polaris");
         expect(status).not.toContain("offline");
         expect(screen.getByRole("button", { name: "Try now" })).toBeTruthy();
+    });
+
+    it("offers this Polaris on another address once it stops answering", async () => {
+        offer = { origin: "https://polaris.local", proven: true };
+        answering = false;
+        render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        await streamDrops();
+        await act(async () => {});
+        const link = screen.getByRole("link", { name: "Open on your network" });
+        expect(link.getAttribute("href")).toContain("https://polaris.local/");
+        offer = null;
+    });
+
+    it("sends an unproven address nothing of the current one", async () => {
+        offer = { origin: "https://polaris.local", proven: false };
+        answering = false;
+        render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        await streamDrops();
+        await act(async () => {});
+        const link = screen.getByRole("link", { name: "Open on your network" });
+        expect(link.getAttribute("href")).toBe("https://polaris.local");
+        offer = null;
+    });
+
+    it("does not call a public address your network", async () => {
+        offer = { origin: "https://other.example.com", proven: true };
+        answering = false;
+        render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        await streamDrops();
+        await act(async () => {});
+        expect(screen.getByRole("link", { name: "Open another address" })).toBeTruthy();
+        offer = null;
     });
 
     it("says only that the device is offline when it is, without asking Polaris", async () => {
