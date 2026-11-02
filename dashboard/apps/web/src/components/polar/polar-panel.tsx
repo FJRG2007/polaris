@@ -906,22 +906,26 @@ export function PolarChat({
     // question typed under it when the menu brought one.
     const asked = state?.asked ?? null;
     const drafted = state?.drafted ?? null;
-    const sendOnInput = useRef(false);
+    // The question waiting to go by itself, held until the chat can take it.
+    const [toSend, setToSend] = useState<string | null>(null);
+    // Whether the chat this panel reopens on has arrived.
+    const [reopened, setReopened] = useState(false);
     useEffect(() => {
         if (!asked && !drafted) return;
         if (asked) setQuote(asked);
         if (drafted) setInput(drafted);
-        sendOnInput.current = Boolean(drafted && state?.sendDrafted);
+        if (drafted && state?.sendDrafted) setToSend(drafted);
         state?.takeAsked();
         textarea.current?.focus();
     }, [asked, drafted]);
     // Through the composer's own form, so a question sent from outside it meets
-    // every check a typed one does; one it refuses stays typed, nothing lost.
+    // every check a typed one does; one it refuses stays typed, nothing lost, and
+    // one edited while it waited is the person's again.
     useEffect(() => {
-        if (!sendOnInput.current || !input) return;
-        sendOnInput.current = false;
-        textarea.current?.form?.requestSubmit();
-    }, [input]);
+        if (toSend === null || providers === null || !reopened) return;
+        setToSend(null);
+        if (input === toSend) textarea.current?.form?.requestSubmit();
+    }, [toSend, providers, reopened]);
     const threadKey = scopedThreadKey(chatScope);
     const drawerButton = useRef<HTMLButtonElement>(null);
     const composerNext = useRef(false);
@@ -1406,14 +1410,16 @@ export function PolarChat({
         }
         if (fresh) {
             startNew(fresh === "1" ? null : fresh);
+            setReopened(true);
             return;
         }
         const keep = chatScope || reloaded() || polarDisplayStore.get().reopenLastChat;
         const reopen = named ?? (keep ? readStored(threadKey) : null);
         if (reopen) {
-            void openThread(reopen);
+            void openThread(reopen).finally(() => setReopened(true));
             return;
         }
+        setReopened(true);
         if (named || keep) return;
         // This device's copy of the setting may be behind the account's.
         const first = threadId;

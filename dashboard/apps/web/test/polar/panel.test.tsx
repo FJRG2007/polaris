@@ -111,8 +111,9 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
+const polarPanel = await import("@/components/polar/polar-panel");
 const { PolarAside, PolarChat, PolarProvider, ownCommandIn, resetReloadForTests, slashMatches } =
-    await import("@/components/polar/polar-panel");
+    polarPanel;
 const { polarDisplayStore } = await import("@/components/polar/polar-display");
 
 function mount() {
@@ -174,6 +175,111 @@ describe("an empty panel", () => {
         await ready();
         await type("Hello");
         expect(chat.sent.map((message) => message.text)).toEqual(["Hello"]);
+    });
+});
+
+describe("a question sent from outside the composer", () => {
+    const { usePolar, scopedThreadKey } = polarPanel;
+    const box = () => screen.getByLabelText("Message Polar") as HTMLTextAreaElement;
+
+    function Asker() {
+        const { ask } = usePolar();
+        return <button onClick={() => ask("", "Hello there", true)}>Ask</button>;
+    }
+
+    function drawAsker(scope?: string) {
+        render(
+            <PolarProvider>
+                <Asker />
+                <PolarChat chatScope={scope} />
+            </PolarProvider>,
+            { wrapper: MessagesWrapper }
+        );
+    }
+
+    /** Holds one address's answer until `release` is called. */
+    function holdFetch(held: string, answer: () => Response) {
+        const real = fetch;
+        let release = () => undefined as void;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string, init?: RequestInit) => {
+                if (url !== held) return real(url, init);
+                await gate;
+                return answer();
+            })
+        );
+        return { release: () => act(async () => release()) };
+    }
+
+    const models = () => Response.json({ providers, tools: {}, isAdmin: false });
+
+    it("goes as soon as the model list arrives", async () => {
+        const list = holdFetch("/api/polar/models", models);
+        drawAsker();
+        fireEvent.click(screen.getByText("Ask"));
+        await waitFor(() => expect(box().value).toBe("Hello there"));
+        expect(chat.sent).toEqual([]);
+        await list.release();
+        await waitFor(() => expect(chat.sent.map((one) => one.text)).toEqual(["Hello there"]));
+    });
+
+    it("stays typed when no model turns out to be available", async () => {
+        providers = [];
+        drawAsker();
+        fireEvent.click(screen.getByText("Ask"));
+        await screen.findByText("Polar needs an AI provider key");
+        await act(async () => undefined);
+        expect(box().value).toBe("Hello there");
+        expect(chat.sent).toEqual([]);
+    });
+
+    it("leaves a question edited while it waited to the person", async () => {
+        const list = holdFetch("/api/polar/models", models);
+        drawAsker();
+        fireEvent.click(screen.getByText("Ask"));
+        await waitFor(() => expect(box().value).toBe("Hello there"));
+        fireEvent.change(box(), { target: { value: "Hello there, and" } });
+        await list.release();
+        await ready();
+        fireEvent.change(box(), { target: { value: "Hello there, and more" } });
+        expect(chat.sent).toEqual([]);
+    });
+
+    it("goes even when the composer already held the same words, and arms nothing", async () => {
+        drawAsker();
+        await ready();
+        fireEvent.change(box(), { target: { value: "Hello there" } });
+        fireEvent.click(screen.getByText("Ask"));
+        await waitFor(() => expect(chat.sent.map((one) => one.text)).toEqual(["Hello there"]));
+        chat.status = "ready";
+        chat.sent = [];
+        fireEvent.change(box(), { target: { value: "half a thought" } });
+        await act(async () => undefined);
+        expect(chat.sent).toEqual([]);
+    });
+
+    it("waits for the chat being reopened, so it lands in that chat", async () => {
+        const stored = new Map([[scopedThreadKey("doc"), "t-old"]]);
+        vi.stubGlobal("localStorage", {
+            getItem: (key: string) => stored.get(key) ?? null,
+            setItem: (key: string, value: string) => void stored.set(key, value),
+            removeItem: (key: string) => void stored.delete(key)
+        });
+        storedThread = { id: "t-old", projectId: null, messages: [], queue: [], choice: null };
+        const thread = holdFetch("/api/polar/threads/t-old", () =>
+            Response.json({ thread: storedThread })
+        );
+        drawAsker("doc");
+        await ready();
+        fireEvent.click(screen.getByText("Ask"));
+        await waitFor(() => expect(box().value).toBe("Hello there"));
+        expect(chat.sent).toEqual([]);
+        await thread.release();
+        await waitFor(() => expect(chat.sent.map((one) => one.text)).toEqual(["Hello there"]));
     });
 });
 

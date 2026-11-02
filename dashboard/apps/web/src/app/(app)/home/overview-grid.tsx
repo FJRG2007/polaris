@@ -405,12 +405,27 @@ export function OverviewGrid({
         });
     }
 
+    // A note outlives the render that raised it, and what is on the grid by the
+    // time its button is pressed is what the button has to change.
+    const latestToggle = useRef(toggle);
+    useEffect(() => {
+        latestToggle.current = toggle;
+    });
+
     /** Off the grid at once, with the way back in the same note. */
     function dismiss(key: OverviewCardKey, name: string): void {
         toggle(key, false);
         toast.show({
             title: t("card.removed", { name }),
-            actions: [{ label: t("card.undo"), run: async () => { toggle(key, true); return null; } }]
+            actions: [
+                {
+                    label: t("card.undo"),
+                    run: async () => {
+                        latestToggle.current(key, true);
+                        return null;
+                    }
+                }
+            ]
         });
     }
 
