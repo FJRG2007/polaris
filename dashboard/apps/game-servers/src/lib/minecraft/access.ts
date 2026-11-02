@@ -85,7 +85,7 @@ export function addressMatches(rule: string, address: string): boolean {
     if (prefix === 0) return true;
     // Shifting by 32 is a no-op in JavaScript, so the full-length mask is written out.
     const mask = prefix === 32 ? 0xffffffff : (0xffffffff << (32 - prefix)) >>> 0;
-    return ((candidate & mask) >>> 0) === ((base & mask) >>> 0);
+    return (candidate & mask) >>> 0 === (base & mask) >>> 0;
 }
 
 /**
@@ -115,7 +115,9 @@ export interface PlayerAccess {
  *  as many places as they actually play from. */
 export function addressesFor(player: string, allowed: readonly PlayerAccess[]): string[] {
     const name = player.toLowerCase();
-    return allowed.filter((item) => item.username.toLowerCase() === name).map((item) => item.address);
+    return allowed
+        .filter((item) => item.username.toLowerCase() === name)
+        .map((item) => item.address);
 }
 
 /**
@@ -221,7 +223,10 @@ export function parseWhitelistNames(output: string): string[] {
  * one name, so the same name is not handed over twice. Matched case-insensitively
  * because the game's list answers with whatever capitalization it stored.
  */
-export function missingWhitelistNames(rules: readonly PlayerAccess[], listed: readonly string[]): string[] {
+export function missingWhitelistNames(
+    rules: readonly PlayerAccess[],
+    listed: readonly string[]
+): string[] {
     const have = new Set(listed.map((name) => name.toLowerCase()));
     const missing: string[] = [];
     for (const rule of rules) {

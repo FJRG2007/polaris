@@ -66,7 +66,7 @@ export function describePorts(ports: readonly GamePort[]): string {
 function runsOf(numbers: readonly number[]): string[] {
     const sorted = [...numbers].sort((left, right) => left - right);
     const runs: string[] = [];
-    for (let index = 0; index < sorted.length; ) {
+    for (let index = 0; index < sorted.length;) {
         let end = index;
         while (
             end + 1 < sorted.length &&
