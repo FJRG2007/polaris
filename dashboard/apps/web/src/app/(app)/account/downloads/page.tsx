@@ -87,42 +87,40 @@ export default async function DownloadsPage() {
     const repo = loadEnv().POLARIS_REPO;
 
     return (
-        <>
-            <DownloadsView
-                repo={repo}
-                serverUrl={serverUrl}
-                webApp={<InstallAppOffer />}
-                extensionFiles={
-                    <Suspense fallback={<FilesSkeleton />}>
-                        <ExtensionFiles repo={repo} />
-                    </Suspense>
-                }
-                deck={
-                    <StreamDeckSection
-                        decks={decks}
-                        repo={repo}
-                        address={serverUrl?.replace(/\/+$/, "") ?? null}
-                        pluginFile={
-                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                                <StreamDeckRelease repo={repo} />
-                            </Suspense>
-                        }
-                        moduleFile={
-                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                                <CompanionRelease repo={repo} />
-                            </Suspense>
-                        }
-                    />
-                }
-                desktopFiles={
-                    <NativeAppOffer>
-                        <Suspense fallback={<FilesSkeleton />}>
-                            <DesktopFiles repo={repo} />
+        <DownloadsView
+            repo={repo}
+            serverUrl={serverUrl}
+            webApp={<InstallAppOffer />}
+            tv={<TvOffer />}
+            extensionFiles={
+                <Suspense fallback={<FilesSkeleton />}>
+                    <ExtensionFiles repo={repo} />
+                </Suspense>
+            }
+            deck={
+                <StreamDeckSection
+                    decks={decks}
+                    repo={repo}
+                    address={serverUrl?.replace(/\/+$/, "") ?? null}
+                    pluginFile={
+                        <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                            <StreamDeckRelease repo={repo} />
                         </Suspense>
-                    </NativeAppOffer>
-                }
-            />
-            <TvOffer />
-        </>
+                    }
+                    moduleFile={
+                        <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                            <CompanionRelease repo={repo} />
+                        </Suspense>
+                    }
+                />
+            }
+            desktopFiles={
+                <NativeAppOffer>
+                    <Suspense fallback={<FilesSkeleton />}>
+                        <DesktopFiles repo={repo} />
+                    </Suspense>
+                </NativeAppOffer>
+            }
+        />
     );
 }

@@ -93,6 +93,9 @@ final class PolarisFailover {
         }
     }
 
+    private static final Pattern PRIVATE_IPV4 =
+            Pattern.compile("^(10\\.\\d{1,3}|192\\.168|172\\.(1[6-9]|2\\d|3[01]))\\.\\d{1,3}\\.\\d{1,3}$");
+
     /** What the address typed on the remote means: https unless it says otherwise or is plainly local. */
     static String readTyped(String typed) {
         if (typed == null) return null;
@@ -110,11 +113,15 @@ final class PolarisFailover {
             String host = new URI(origin).getHost();
             if (host == null) return false;
             return host.equals("localhost") || host.equals("polaris") || host.endsWith(".local")
-                    || host.startsWith("10.") || host.startsWith("192.168.")
-                    || host.matches("^172\\.(1[6-9]|2\\d|3[01])\\..*");
+                    || PRIVATE_IPV4.matcher(host).matches();
         } catch (URISyntaxException notAnAddress) {
             return false;
         }
+    }
+
+    /** Whether what goes to this address, the sign-in included, travels unencrypted. */
+    static boolean plain(String origin) {
+        return origin.startsWith("http://");
     }
 
     /** Reads what GET /api/instance answered, or null. Strict: nothing malformed is half-kept. */

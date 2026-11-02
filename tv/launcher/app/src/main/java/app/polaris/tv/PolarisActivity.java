@@ -20,6 +20,8 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Connecting this TV to a Polaris, and what it shows once connected. Nothing here is needed to use the TV. */
 public final class PolarisActivity extends Activity {
@@ -125,7 +127,7 @@ public final class PolarisActivity extends Activity {
 
     private void showPairing(int mine, String origin, String instance, PolarisLink.Pairing pairing) {
         show(pairingPanel);
-        say(null);
+        say(plainWarning(origin));
         String shown = pairing.userCode.length() == 8
                 ? pairing.userCode.substring(0, 4) + "-" + pairing.userCode.substring(4) : pairing.userCode;
         code.setText(shown);
@@ -225,8 +227,17 @@ public final class PolarisActivity extends Activity {
                     + getResources().getQuantityString(R.plurals.polaris_alerts, state.alerts, state.alerts));
             addressLine.setText(link.onLocalAddress() ? getString(R.string.polaris_on_local, host) : host);
         }
-        if (!link.refused().isEmpty()) say(getString(R.string.polaris_refused, PolarisLink.join(link.refused())));
-        else if (!link.untrusted().isEmpty()) say(getString(R.string.polaris_untrusted, PolarisLink.join(link.untrusted())));
+        List<String> notes = new ArrayList<>();
+        if (!link.refused().isEmpty()) notes.add(getString(R.string.polaris_refused, PolarisLink.join(link.refused())));
+        else if (!link.untrusted().isEmpty()) notes.add(getString(R.string.polaris_untrusted, PolarisLink.join(link.untrusted())));
+        String warning = plainWarning(link.addressInUse());
+        if (warning != null) notes.add(warning);
+        say(notes.isEmpty() ? null : String.join("\n", notes));
+    }
+
+    private String plainWarning(String origin) {
+        if (!PolarisFailover.plain(origin)) return null;
+        return getString(R.string.polaris_plain_http, origin.replaceFirst("^https?://", ""));
     }
 
     private void disconnect() {

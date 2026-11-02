@@ -4,6 +4,7 @@
  */
 
 import { available, byId, say } from "./dom";
+import { readTvAddress } from "@/shared/tv-address";
 import type { TvInstallState, TvOutcome, TvPhase } from "@/shared/bridge";
 
 const STEPS: Partial<Record<TvPhase, string>> = {
@@ -23,6 +24,8 @@ const OUTCOMES: Record<TvOutcome, string> = {
     "installed-home": "Polaris TV is installed and is now the Home screen.",
     "installed-home-refused":
         "Polaris TV is installed, but this TV kept its own Home screen. Open Polaris TV from the TV's apps.",
+    "installed-home-unknown":
+        "Polaris TV is installed, but the connection was lost before Home was confirmed. Press Home on the TV to see which screen opens.",
     "adb-off":
         "The TV refused the connection. On the TV, open Settings, About, press Build 7 times, then turn on USB debugging and Network debugging in Developer options.",
     "not-allowed": "Nobody answered on the TV. Try again and choose Allow on the TV's prompt.",
@@ -32,12 +35,22 @@ const OUTCOMES: Record<TvOutcome, string> = {
     "too-old": "This TV runs a version of Android older than 8.0, which Polaris TV does not support.",
     "not-released": "Polaris TV has not been published yet, so there is nothing to install. Nothing changed on the TV.",
     "download-failed": "Polaris TV could not be downloaded. Nothing changed on the TV. Check this computer's connection.",
+    "key-failed": "Polaris could not save its key on this computer, so it did not contact the TV. Try again.",
+    "connection-lost": "The connection to the TV was lost before anything was installed. Try again.",
+    "backup-failed":
+        "The backup could not be saved, so nothing was installed. Check the free space on this computer and try again.",
     "sideload-refused": "This TV refuses apps that do not come from its store. Nothing changed on it.",
-    "install-failed": "The TV could not install it. Nothing else changed on it."
+    "install-failed": "The TV could not install it. Nothing else changed on it.",
+    "install-interrupted":
+        "The connection was lost during the install, so it may not have finished. Look for Polaris TV among the TV's apps, or try again."
 };
+
+const NOT_AN_ADDRESS = "Type the TV's address on this network, like 192.168.1.50.";
+const NOT_STARTED = "The install could not start. Check the address and try again.";
 
 const heading = byId<HTMLHeadingElement>("title");
 const address = byId<HTMLInputElement>("address");
+const addressError = byId<HTMLParagraphElement>("address-error");
 const found = byId<HTMLDivElement>("found");
 const home = byId<HTMLInputElement>("home");
 const find = byId<HTMLButtonElement>("find");
@@ -50,8 +63,16 @@ const closed = byId<HTMLParagraphElement>("closed");
 const IDLE = new Set<TvPhase>(["ready", "done", "failed"]);
 const bridge = window.polarisLocal.tv;
 
+let notStarted = false;
+
 function validAddress(): boolean {
-    return /^\d{1,3}(\.\d{1,3}){3}$/.test(address.value.trim());
+    return readTvAddress(address.value) !== null;
+}
+
+function addressProblem(): string | null {
+    if (!address.value.trim()) return null;
+    if (!validAddress()) return NOT_AN_ADDRESS;
+    return notStarted ? NOT_STARTED : null;
 }
 
 function render(state: TvInstallState): void {
@@ -60,6 +81,7 @@ function render(state: TvInstallState): void {
     home.disabled = !idle;
     available(find, idle);
     available(start, idle && validAddress());
+    say(addressError, addressProblem());
     say(step, STEPS[state.phase] ?? null);
     say(result, state.outcome ? OUTCOMES[state.outcome] : null);
     heading.textContent = state.phase === "done" ? "Installed" : "Install on a TV";
@@ -92,6 +114,7 @@ bridge.onState((next) => {
     render(next);
 });
 address.addEventListener("input", () => {
+    notStarted = false;
     if (latest) render(latest);
 });
 find.addEventListener("click", () => {
@@ -99,7 +122,10 @@ find.addEventListener("click", () => {
 });
 start.addEventListener("click", () => {
     if (start.getAttribute("aria-disabled") === "true") return;
-    void bridge.start({ host: address.value.trim(), home: home.checked });
+    void bridge.start({ host: address.value.trim(), home: home.checked }).then((started) => {
+        notStarted = !started;
+        if (latest) render(latest);
+    });
 });
 void bridge.state().then((state) => {
     latest = state;

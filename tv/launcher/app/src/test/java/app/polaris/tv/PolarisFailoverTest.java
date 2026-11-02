@@ -82,6 +82,13 @@ public class PolarisFailoverTest {
         assertEquals("http://192.168.1.50:3000", PolarisFailover.readTyped("192.168.1.50:3000"));
         assertEquals("http://polaris.example.com", PolarisFailover.readTyped("http://polaris.example.com"));
         assertNull(PolarisFailover.readTyped("   "));
+        assertEquals("https://10.example.com", PolarisFailover.readTyped("10.example.com"));
+        assertEquals("https://192.168.example.com", PolarisFailover.readTyped("192.168.example.com"));
+        assertEquals("https://172.16.example.com", PolarisFailover.readTyped("172.16.example.com"));
+        assertEquals("http://10.0.0.2", PolarisFailover.readTyped("10.0.0.2"));
+        assertEquals("http://172.31.0.2", PolarisFailover.readTyped("172.31.0.2"));
+        assertTrue(PolarisFailover.plain("http://10.0.0.2"));
+        assertFalse(PolarisFailover.plain("https://10.0.0.2"));
     }
 
     @Test

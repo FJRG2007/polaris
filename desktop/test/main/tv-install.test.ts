@@ -5,7 +5,9 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server, type Socket } from "node:net";
-import { createPublicKey, publicDecrypt, constants } from "node:crypto";
+import { createHash, createPublicKey, publicDecrypt, constants } from "node:crypto";
+import { CHANNELS } from "@/shared/bridge";
+import { readTvAddress } from "@/shared/tv-address";
 import {
     AdbConnection,
     androidPublicKey,
@@ -15,10 +17,21 @@ import {
     signToken
 } from "../../src/main/adb-client";
 
-vi.mock("electron", () => ({ app: { getPath: () => "" }, BrowserWindow: class {}, ipcMain: {} }));
-vi.mock("../../src/main/windows", () => ({ openLocalWindow: () => null }));
+const handlers = vi.hoisted(() => new Map<string, (event: unknown, raw?: unknown) => unknown>());
 
-const { connectFailure, homeIsOurs, readTvAddress, tvRefusal } = await import("../../src/main/tv-install");
+vi.mock("electron", () => ({
+    app: { getPath: () => "" },
+    BrowserWindow: class {},
+    ipcMain: { handle: (channel: string, handler: (event: unknown, raw?: unknown) => unknown) => handlers.set(channel, handler) }
+}));
+vi.mock("../../src/main/windows", () => ({
+    openLocalWindow: () => null,
+    kindOf: (sender: { kind: string; }) => sender.kind
+}));
+
+const { connectFailure, homeIsOurs, lateFailure, latestApk, registerTvInstall, tvRefusal } = await import(
+    "../../src/main/tv-install"
+);
 
 const CNXN = 0x4e584e43;
 const AUTH = 0x48545541;
@@ -174,5 +187,80 @@ describe("what it agrees to touch", () => {
         expect(connectFailure({ code: "ECONNREFUSED" })).toBe("adb-off");
         expect(connectFailure({ message: "The TV stopped answering." })).toBe("not-allowed");
         expect(connectFailure({ code: "EHOSTUNREACH" })).toBe("unreachable");
+    });
+});
+
+describe("who may use the window's channels", () => {
+    registerTvInstall();
+    const call = (channel: string, kind: string, raw?: unknown) =>
+        handlers.get(channel)?.({ sender: { kind } }, raw);
+
+    it("answers only the TV window", async () => {
+        expect(await call(CHANNELS.tvState, "polaris")).toBeNull();
+        expect(await call(CHANNELS.tvFind, "connect")).toBeNull();
+        expect(await call(CHANNELS.tvStart, "polaris", { host: "192.168.1.50", home: true })).toBe(false);
+        expect(await call(CHANNELS.tvState, "tv")).toMatchObject({ phase: "ready" });
+    });
+
+    it("refuses what is not a private address, or not the right shape", async () => {
+        expect(await call(CHANNELS.tvStart, "tv", { host: "8.8.8.8", home: true })).toBe(false);
+        expect(await call(CHANNELS.tvStart, "tv", { host: "192.168.1.50" })).toBe(false);
+        expect(await call(CHANNELS.tvStart, "tv", undefined)).toBe(false);
+    });
+});
+
+describe("a failure part way through", () => {
+    it("says how far it got", () => {
+        expect(lateFailure("check")).toBe("connection-lost");
+        expect(lateFailure("backup")).toBe("backup-failed");
+        expect(lateFailure("send")).toBe("connection-lost");
+        expect(lateFailure("install")).toBe("install-interrupted");
+        expect(lateFailure("home")).toBe("installed-home-unknown");
+    });
+});
+
+describe("finding the release", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    const other = (at: number) => ({ tag_name: `desktop-v0.0.${at}`, draft: false, prerelease: false, assets: [] });
+    const apk = Buffer.from("apk");
+    const digest = createHash("sha256").update(apk).digest("hex");
+    const tv = {
+        tag_name: "tv-v1.2.3",
+        draft: false,
+        prerelease: false,
+        assets: [
+            { name: "polaris-tv.apk", browser_download_url: "https://files.example/apk" },
+            { name: "SHA256SUMS", browser_download_url: "https://files.example/sums" }
+        ]
+    };
+
+    function serve(pages: readonly (readonly unknown[])[], sums = `${digest}  polaris-tv.apk\n`) {
+        const asked: string[] = [];
+        vi.stubGlobal("fetch", async (url: string) => {
+            asked.push(url);
+            if (url.endsWith("/sums")) return new Response(sums);
+            if (url.endsWith("/apk")) return new Response(apk);
+            const page = Number(new URL(url).searchParams.get("page"));
+            return Response.json(pages[page - 1] ?? []);
+        });
+        return asked;
+    }
+
+    it("walks past a full page of other releases", async () => {
+        const asked = serve([Array.from({ length: 100 }, (_, at) => other(at)), [tv]]);
+        expect(await latestApk()).toMatchObject({ version: "1.2.3" });
+        expect(asked.filter((url) => url.includes("page=2"))).toHaveLength(1);
+    });
+
+    it("stops at a page that is not full and reports nothing released", async () => {
+        const asked = serve([[other(1)]]);
+        expect(await latestApk()).toBeNull();
+        expect(asked).toHaveLength(1);
+    });
+
+    it("refuses an APK that does not match its checksum", async () => {
+        serve([[tv]], `${"0".repeat(64)}  polaris-tv.apk\n`);
+        await expect(latestApk()).rejects.toThrow();
     });
 });

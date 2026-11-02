@@ -1612,6 +1612,8 @@
         "on": "On",
         "unknown": "Unknown",
         "asksTo": "It will see",
+        "seesName": "Your name",
+        "seesCounts": "How many notifications are waiting",
         "consent": "Saying yes lets this TV show your name and how many notifications are waiting, for a year. It cannot read them or do anything else.",
         "working": "Working",
         "approve": "Connect it",

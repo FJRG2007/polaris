@@ -16,6 +16,7 @@
     <string name="polaris_on_local">Usando tu dirección de la red local: %1$s</string>
     <string name="polaris_refused">%1$s responde como otro Polaris, así que tu sesión no se envió allí.</string>
     <string name="polaris_untrusted">%1$s usa un certificado en el que esta TV no confía, así que no se puede usar.</string>
+    <string name="polaris_plain_http">%1$s usa http sin cifrar, así que tu sesión viaja sin protección. Úsalo solo en una red de confianza.</string>
     <string name="polaris_disconnect">Desconectar esta TV</string>
     <plurals name="polaris_unread">
         <item quantity="one">%d notificación sin leer</item>

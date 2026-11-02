@@ -16,7 +16,7 @@ export interface TvCaller {
 }
 
 export async function tvCaller(request: Request): Promise<TvCaller | Response> {
-    const principal = await authenticateApiKey(request);
+    const principal = await authenticateApiKey(request, { tv: true });
     if (!principal || principal.kind !== "tv") {
         const t = translatorFor("en-US", "api");
         return Response.json({ error: t("errors.unauthorized") }, { status: 401 });

@@ -1,25 +1,30 @@
 /**
  * Installing Polaris TV on a set on this network, from a window, with no terminal.
  *
- * The rules come from the launcher's own PROMPT.md and are not this file's to
- * relax: a backup before the first change, nothing uninstalled or disabled, the
- * set's own launcher left enabled so Home always has a way back, Home confirmed
- * rather than assumed, and network ADB closed afterwards with only a refused
- * connection counting as closed.
+ * What this keeps from the launcher's own PROMPT.md: a backup before the first
+ * change, nothing uninstalled or disabled, the set's own launcher left enabled so
+ * Home always has a way back, Home confirmed rather than assumed, and network and
+ * USB debugging switched off afterwards with only a refused connection on port
+ * 5555 counting as closed.
  *
- * Debloating stays with the tools in `tv/`: it needs a person's choices per set.
+ * What it does not: PROMPT.md's closing also revokes USB debugging authorisations,
+ * checks the Wireless debugging port, reboots the set and checks again. Nobody
+ * asked this window to restart their TV, so those stay with the tools in `tv/`,
+ * as does debloating, which needs a person's choices per set.
  */
 
+import { z } from "zod";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { connect as tcp } from "node:net";
 import { networkInterfaces } from "node:os";
-import { openLocalWindow } from "./windows";
+import { kindOf, openLocalWindow } from "./windows";
 import { repository } from "../../package.json";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { AdbConnection, newAdbKey } from "./adb-client";
-import { parseChecksums, releaseSource } from "./releases";
+import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readTvAddress } from "@/shared/tv-address";
 import { CHANNELS, type TvInstallState, type TvOutcome } from "@/shared/bridge";
 
 const PACKAGE = "app.polaris.tv";
@@ -33,17 +38,10 @@ const SCAN_MS = 700;
 const SCAN_WIDTH = 48;
 const CLOSE_ATTEMPTS = 6;
 const CLOSE_WAIT_MS = 1_500;
-
-/** A private IPv4 address: the only kind this will talk ADB to. */
-export function readTvAddress(value: unknown): string | null {
-    if (typeof value !== "string") return null;
-    const typed = value.trim();
-    const parts = typed.split(".");
-    if (parts.length !== 4 || !parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)) return null;
-    const [a, b] = parts.map(Number) as [number, number];
-    const isPrivate = a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
-    return isPrivate ? parts.map(Number).join(".") : null;
-}
+const PAGE_SIZE = 100;
+const MAX_PAGES = 5;
+const LOOKUP_MS = 15_000;
+const DOWNLOAD_MS = 300_000;
 
 /** What a failed connection means, in terms the person can act on. */
 export function connectFailure(error: { code?: string; message?: string; }): TvOutcome {
@@ -113,36 +111,47 @@ async function adbKey(): Promise<string> {
     return key;
 }
 
-interface Asset {
-    readonly name: string;
-    readonly url: string;
+const releasesSchema = z.array(
+    z.object({
+        tag_name: z.string(),
+        draft: z.boolean(),
+        prerelease: z.boolean(),
+        assets: z.array(z.object({ name: z.string(), browser_download_url: z.string() })).default([])
+    })
+);
+
+type PublishedRelease = z.infer<typeof releasesSchema>[number];
+
+/** The newest TV release. One list holds every kind of release, so it can be
+ *  pages back from the first. */
+async function newestRelease(api: string): Promise<PublishedRelease | null> {
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+        const response = await fetch(`${api}&page=${page}`, {
+            headers: { accept: "application/vnd.github+json" },
+            signal: AbortSignal.timeout(LOOKUP_MS)
+        });
+        if (!response.ok) throw new Error("download");
+        const releases = releasesSchema.parse(await response.json());
+        const release = releases.find((one) => one.tag_name.startsWith(TAG_PREFIX) && !one.draft && !one.prerelease);
+        if (release) return release;
+        if (releases.length < PAGE_SIZE) return null;
+    }
+    return null;
 }
 
-/** The newest published APK and its checksum, or null when none has been released. */
-async function latestApk(): Promise<{ apk: Buffer; version: string; } | null> {
+/** The newest published APK, verified, or null when none has been released. */
+export async function latestApk(): Promise<{ apk: Buffer; version: string; } | null> {
     const source = releaseSource(repository);
     if (!source) return null;
-    const response = await fetch(source.api, { headers: { accept: "application/vnd.github+json" } });
-    if (!response.ok) throw new Error("download");
-    const releases = (await response.json()) as readonly {
-        tag_name?: string;
-        draft?: boolean;
-        prerelease?: boolean;
-        assets?: readonly { name?: string; browser_download_url?: string; }[];
-    }[];
-    const release = releases.find(
-        (one) => one.tag_name?.startsWith(TAG_PREFIX) && !one.draft && !one.prerelease
-    );
-    if (!release?.tag_name) return null;
-    const assets: Asset[] = (release.assets ?? []).flatMap((one) =>
-        one.name && one.browser_download_url ? [{ name: one.name, url: one.browser_download_url }] : []
-    );
-    const apkAsset = assets.find((one) => one.name === APK_NAME);
-    const sums = assets.find((one) => one.name === "SHA256SUMS");
+    const release = await newestRelease(source.api);
+    if (!release) return null;
+    const apkAsset = release.assets.find((one) => one.name === APK_NAME);
+    const sums = release.assets.find((one) => one.name === CHECKSUMS);
     if (!apkAsset || !sums) return null;
-    const expected = parseChecksums(await (await fetch(sums.url)).text()).get(APK_NAME);
-    const download = await fetch(apkAsset.url);
-    if (!download.ok || !expected) throw new Error("download");
+    const listed = await fetch(sums.browser_download_url, { signal: AbortSignal.timeout(LOOKUP_MS) });
+    const expected = parseChecksums(await listed.text()).get(APK_NAME);
+    const download = await fetch(apkAsset.browser_download_url, { signal: AbortSignal.timeout(DOWNLOAD_MS) });
+    if (!listed.ok || !download.ok || !expected) throw new Error("download");
     const apk = Buffer.from(await download.arrayBuffer());
     if (createHash("sha256").update(apk).digest("hex") !== expected) throw new Error("download");
     return { apk, version: release.tag_name.slice(TAG_PREFIX.length) };
@@ -183,12 +192,40 @@ async function closeAdb(adb: AdbConnection, host: string): Promise<boolean> {
     return false;
 }
 
+/** How far an install got, which decides what a failure can truthfully say. */
+export type TvStage = "check" | "backup" | "send" | "install" | "home";
+
+/** What an error part way through means for the set. */
+export function lateFailure(stage: TvStage): TvOutcome {
+    if (stage === "backup") return "backup-failed";
+    if (stage === "install") return "install-interrupted";
+    return stage === "home" ? "installed-home-unknown" : "connection-lost";
+}
+
 async function install(host: string, makeHome: boolean): Promise<void> {
-    publish({ phase: "connecting", outcome: null, backup: null, closed: null });
+    publish({ phase: "download", outcome: null, backup: null, closed: null });
+    const release = await latestApk().catch((caught: unknown) => {
+        console.error("[tv]", caught);
+        return undefined;
+    });
+    if (!release) {
+        publish({ phase: "failed", outcome: release === null ? "not-released" : "download-failed" });
+        return;
+    }
+    const key = await adbKey().catch((caught: unknown) => {
+        console.error("[tv]", caught);
+        return null;
+    });
+    if (!key) {
+        publish({ phase: "failed", outcome: "key-failed" });
+        return;
+    }
+
+    publish({ phase: "connecting" });
     const adb = new AdbConnection({
         host,
         port: ADB_PORT,
-        key: await adbKey(),
+        key,
         connectMs: 8_000,
         approveMs: 60_000,
         commandMs: 60_000,
@@ -201,32 +238,30 @@ async function install(host: string, makeHome: boolean): Promise<void> {
         publish({ phase: "failed", outcome: connectFailure(caught as NodeJS.ErrnoException) });
         return;
     }
+
+    let stage: TvStage = "check";
     try {
         publish({ phase: "checking" });
         const refusal = tvRefusal(await adb.shell("getprop ro.build.version.sdk"), await adb.shell("pm list features"));
         if (refusal) {
-            adb.close();
-            publish({ phase: "failed", outcome: refusal });
+            await finish(adb, host, refusal);
             return;
         }
+        stage = "backup";
         publish({ phase: "backup" });
         publish({ backup: await backUp(adb, host) });
 
-        publish({ phase: "download" });
-        const release = await latestApk().catch(() => undefined);
-        if (release === undefined || release === null) {
-            await finish(adb, host, release === null ? "not-released" : "download-failed");
-            return;
-        }
-
+        stage = "send";
         publish({ phase: "install" });
         await adb.push(REMOTE_APK, release.apk);
+        stage = "install";
         const installed = await adb.shell(`pm install -r ${REMOTE_APK}`, 180_000);
-        await adb.shell(`rm -f ${REMOTE_APK}`);
+        await adb.shell(`rm -f ${REMOTE_APK}`).catch(() => "");
         if (!installed.includes("Success")) {
             await finish(adb, host, /VERIFICATION_FAILURE/.test(installed) ? "sideload-refused" : "install-failed");
             return;
         }
+        stage = "home";
         await adb.shell(`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`).catch(() => "");
 
         let outcome: TvOutcome = "installed";
@@ -241,7 +276,7 @@ async function install(host: string, makeHome: boolean): Promise<void> {
         await finish(adb, host, outcome);
     } catch (caught) {
         console.error("[tv]", caught);
-        await finish(adb, host, "install-failed");
+        await finish(adb, host, lateFailure(stage));
     }
 }
 
@@ -264,9 +299,16 @@ export function openTvInstall(): void {
     });
 }
 
+const startSchema = z.object({
+    host: z.unknown().transform(readTvAddress).pipe(z.string()),
+    home: z.boolean()
+});
+
 export function registerTvInstall(): void {
-    ipcMain.handle(CHANNELS.tvState, () => state);
-    ipcMain.handle(CHANNELS.tvFind, async () => {
+    const fromTv = (event: IpcMainInvokeEvent): boolean => kindOf(event.sender) === "tv";
+    ipcMain.handle(CHANNELS.tvState, (event) => (fromTv(event) ? state : null));
+    ipcMain.handle(CHANNELS.tvFind, async (event) => {
+        if (!fromTv(event)) return null;
         if (busy) return state;
         busy = true;
         publish({ phase: "searching" });
@@ -275,12 +317,11 @@ export function registerTvInstall(): void {
         publish({ phase: "ready", found });
         return state;
     });
-    ipcMain.handle(CHANNELS.tvStart, async (_event, raw: unknown) => {
-        const input = (raw ?? {}) as { host?: unknown; home?: unknown; };
-        const host = readTvAddress(input.host);
-        if (!host || busy) return false;
+    ipcMain.handle(CHANNELS.tvStart, async (event, raw: unknown) => {
+        const input = startSchema.safeParse(raw);
+        if (!fromTv(event) || !input.success || busy) return false;
         busy = true;
-        void install(host, input.home === true).finally(() => {
+        void install(input.data.host, input.data.home).finally(() => {
             busy = false;
         });
         return true;

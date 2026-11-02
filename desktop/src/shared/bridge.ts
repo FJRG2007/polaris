@@ -266,6 +266,7 @@ export type TvOutcome =
     | "installed"
     | "installed-home"
     | "installed-home-refused"
+    | "installed-home-unknown"
     | "adb-off"
     | "not-allowed"
     | "unreachable"
@@ -273,8 +274,12 @@ export type TvOutcome =
     | "too-old"
     | "not-released"
     | "download-failed"
+    | "key-failed"
+    | "connection-lost"
+    | "backup-failed"
     | "sideload-refused"
-    | "install-failed";
+    | "install-failed"
+    | "install-interrupted";
 
 export interface TvInstallState {
     readonly phase: TvPhase;

@@ -18,6 +18,7 @@
     <string name="polaris_on_local">Using your local network address: %1$s</string>
     <string name="polaris_refused">%1$s answers as a different Polaris, so your sign-in was not sent there.</string>
     <string name="polaris_untrusted">%1$s uses a certificate this TV does not trust, so it cannot be used.</string>
+    <string name="polaris_plain_http">%1$s uses plain http, so your sign-in travels unencrypted. Use it only on a network you trust.</string>
     <string name="polaris_disconnect">Disconnect this TV</string>
     <plurals name="polaris_unread">
         <item quantity="one">%d unread notification</item>

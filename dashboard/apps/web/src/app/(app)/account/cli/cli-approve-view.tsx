@@ -192,7 +192,11 @@ export function CliApproveView({ account, kind = "cli" }: { account?: string; ki
             />
             <ConsentAbilities
                 title={t(`${words}.asksTo`)}
-                items={pending.scopes.map((scope) => t(SCOPE_WORDS[scope]))}
+                items={
+                    kind === "tv"
+                        ? [t("tv.seesName"), t("tv.seesCounts")]
+                        : pending.scopes.map((scope) => t(SCOPE_WORDS[scope]))
+                }
             />
         </ConsentCard>
     );
