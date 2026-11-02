@@ -39,7 +39,8 @@ const {
 const { LOOKUP_BUDGET, resetLookupBudget, takeLookup } = await import("@/lib/reputation-budget");
 
 /** A failure the way axios reports one. */
-const httpFailure = (status: number) => Object.assign(new Error("failed"), { response: { status } });
+const httpFailure = (status: number) =>
+    Object.assign(new Error("failed"), { response: { status } });
 
 beforeEach(() => {
     settings = new Map();
@@ -66,9 +67,7 @@ describe("asking a paid provider", () => {
         await whileServing("dymo", "Dymo API", () => Promise.reject(httpFailure(402))).catch(
             () => undefined
         );
-        expect(recorded).toEqual([
-            { provider: "dymo", reason: "credits", kind: "out-of-service" }
-        ]);
+        expect(recorded).toEqual([{ provider: "dymo", reason: "credits", kind: "out-of-service" }]);
     });
 
     it("does not raise an alert for something that passes on its own", async () => {

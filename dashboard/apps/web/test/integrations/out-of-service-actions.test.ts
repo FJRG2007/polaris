@@ -37,17 +37,13 @@ vi.mock("@/lib/integration-service", async (original) => ({
         hasSecret: true,
         config: stored.config
     }),
-    upsertIntegration: async (
-        provider: string,
-        input: { config?: Record<string, unknown> }
-    ) => {
+    upsertIntegration: async (provider: string, input: { config?: Record<string, unknown> }) => {
         saved.push({ provider, config: input.config });
     }
 }));
 
-const { dismissConnectionFailureAction, saveDymoAction } = await import(
-    "@/app/(app)/admin/integrations/actions"
-);
+const { dismissConnectionFailureAction, saveDymoAction } =
+    await import("@/app/(app)/admin/integrations/actions");
 
 beforeEach(() => {
     failure.held = null;

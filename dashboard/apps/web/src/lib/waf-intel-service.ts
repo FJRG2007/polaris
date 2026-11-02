@@ -26,7 +26,12 @@ import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { checkCriminalIp, readCriminalIpConfig } from "@/lib/integrations/criminalip";
-import { buildWafIntel, isCarrierGradeNat, type WafIntelEntry, type WafIntelReason } from "@polaris/core";
+import {
+    buildWafIntel,
+    isCarrierGradeNat,
+    type WafIntelEntry,
+    type WafIntelReason
+} from "@polaris/core";
 
 /** Where the snapshot is written. Mounted read-only into the edge guard as
  *  POLARIS_EDGE_INTEL_FILE. Kept out of Traefik's own dynamic directory on purpose:

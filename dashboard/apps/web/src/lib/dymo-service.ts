@@ -19,7 +19,9 @@ import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** Whether a visitor IP is allowed by the Dymo integration (allow-on-error). */
-export async function dymoIpAllowed(ip: string | undefined): Promise<{ allowed: boolean; reason?: string }> {
+export async function dymoIpAllowed(
+    ip: string | undefined
+): Promise<{ allowed: boolean; reason?: string }> {
     if (!ip) return { allowed: true };
     const state = await getIntegrationState("dymo");
     if (!state?.enabled) return { allowed: true };

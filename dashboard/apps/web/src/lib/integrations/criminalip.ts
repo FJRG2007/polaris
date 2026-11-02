@@ -56,7 +56,8 @@ export async function checkCriminalIp(
         });
     }
     const body: unknown = await response.json();
-    if (!body || typeof body !== "object") throw new Error("Criminal IP returned an unreadable body");
+    if (!body || typeof body !== "object")
+        throw new Error("Criminal IP returned an unreadable body");
 
     const report = body as Record<string, unknown>;
     const reasons: string[] = [];
@@ -80,9 +81,13 @@ export interface CriminalIpConfig {
  *  are the two that do not: an address seen scanning, and one already known bad. */
 const CRIMINALIP_DEFAULTS: CriminalIpConfig = { deny: ["is_scanner", "is_malicious"] };
 
-export function readCriminalIpConfig(config: Record<string, unknown> | undefined): CriminalIpConfig {
+export function readCriminalIpConfig(
+    config: Record<string, unknown> | undefined
+): CriminalIpConfig {
     const valid = new Set<string>(CRIMINALIP_RULES.map((rule) => rule.value));
     const raw = Array.isArray(config?.deny) ? (config?.deny as unknown[]) : [];
-    const deny = raw.filter((value): value is CriminalIpRule => typeof value === "string" && valid.has(value));
+    const deny = raw.filter(
+        (value): value is CriminalIpRule => typeof value === "string" && valid.has(value)
+    );
     return { deny: deny.length > 0 ? deny : CRIMINALIP_DEFAULTS.deny };
 }

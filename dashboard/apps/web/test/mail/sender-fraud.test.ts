@@ -37,7 +37,8 @@ vi.mock("@/lib/integration-service", () => ({
 }));
 
 vi.mock("@/lib/reputation", () => ({
-    knownReputation: async (kind: string, value: string) => remembered.get(`${kind}:${value}`) ?? null,
+    knownReputation: async (kind: string, value: string) =>
+        remembered.get(`${kind}:${value}`) ?? null,
     rememberReputation: (...args: unknown[]) => rememberReputation(...(args as [])),
     forgetReputation: async () => 0
 }));
