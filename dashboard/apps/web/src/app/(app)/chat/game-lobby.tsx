@@ -7,7 +7,8 @@
  * the reader can invite more people from here. Leaving goes back to the
  * conversation; the last player out ends the session and its card says so.
  *
- * The heading and the way back are on screen at once; only the game waits.
+ * The heading and the way back are on screen at once; only the game waits. A
+ * request that gets no answer says so and offers to try again.
  */
 
 import Link from "next/link";
@@ -56,10 +57,14 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
     const activity = useCallActivity(sessionId, room, ticket !== null, API);
 
     // In the lobby is playing: the seat is claimed as soon as the server says
-    // the reader may, once.
+    // the reader may, once - or again after a request that got no answer.
     const claimed = useRef(false);
     const game = entry?.ok ? entry.game : null;
     useEffect(() => {
+        if (activity.failed) {
+            claimed.current = false;
+            return;
+        }
         if (!game || claimed.current || left || activity.answer?.ok !== true) return;
         claimed.current = true;
         activity.play(game);
@@ -82,7 +87,10 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
               ? t(
                     `lobby.refused.${activity.answer.reason === "seat" ? "access" : activity.answer.reason}`
                 )
-              : null;
+              : activity.failed && !activity.playing
+                ? t("lobby.refused.server")
+                : null;
+    const canRetry = activity.failed && !activity.playing && room.status !== "failed";
 
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4">
@@ -99,9 +107,14 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
                 </h1>
             </header>
             {problem ? (
-                <p role="alert" className="text-sm text-muted-foreground">
-                    {problem}
-                </p>
+                <div role="alert" className="flex min-w-0 flex-col items-start gap-2">
+                    <p className="text-sm text-muted-foreground">{problem}</p>
+                    {canRetry && (
+                        <Button size="sm" onClick={activity.ask}>
+                            {t("lobby.retry")}
+                        </Button>
+                    )}
+                </div>
             ) : activity.session && activity.playing ? (
                 <CallGamesPanel
                     activity={{ ...activity, focused: true }}

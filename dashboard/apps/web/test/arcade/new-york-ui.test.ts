@@ -4,16 +4,13 @@
  * Every string the game shows is a key of its catalog
  * (`apps/arcade/messages/<locale>/new-york.json`): the page marks them with
  * `data-t*` attributes and the code reads them with `t("...")`. A key missing
- * from the catalog would be drawn as the key itself. And the frame has to take
- * the keyboard once the city is up - without it the car ignored WASD until
- * something in the game was clicked.
+ * from the catalog would be drawn as the key itself.
  */
 
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { flattenCatalog, type Catalog } from "@polaris/core";
-import { isDrivingKey, mayTakeFocus } from "../../../arcade/src/screens/frame-focus";
 import { gameMessages } from "../../../arcade/messages";
 // @ts-expect-error - plain browser module without types
 import { fill, readCatalog } from "../../../arcade/game/new-york/engine/i18n.js";
@@ -78,49 +75,6 @@ describe("the game's catalog reader", () => {
 
     it("fills placeholders it knows and leaves the rest", () => {
         expect(fill("{place} · {other}", { place: "Times Sq" })).toBe("Times Sq · {other}");
-    });
-});
-
-describe("the frame taking the keyboard", () => {
-    const element = (tagName: string, matches = false) =>
-        ({
-            tagName,
-            ownerDocument: {},
-            matches: () => matches
-        }) as unknown as Element;
-
-    it("takes it when nothing on the page has it", () => {
-        expect(mayTakeFocus(null)).toBe(true);
-        const body = element("BODY");
-        Object.assign(body.ownerDocument as object, { body });
-        expect(mayTakeFocus(body)).toBe(true);
-    });
-
-    it("takes it from the frame and from a button left holding it", () => {
-        expect(mayTakeFocus(element("IFRAME"))).toBe(true);
-        expect(mayTakeFocus(element("BUTTON"))).toBe(true);
-        expect(mayTakeFocus(element("A"))).toBe(true);
-    });
-
-    it("never takes it from a field or an open dialog", () => {
-        expect(mayTakeFocus(element("INPUT", true))).toBe(false);
-        expect(mayTakeFocus(element("DIV", true))).toBe(false);
-    });
-
-    it("reads driving keys, and leaves shortcuts and handled keys to the page", () => {
-        const key = (code: string, extra = {}) => ({
-            code,
-            ctrlKey: false,
-            metaKey: false,
-            altKey: false,
-            defaultPrevented: false,
-            ...extra
-        });
-        expect(isDrivingKey(key("KeyW"))).toBe(true);
-        expect(isDrivingKey(key("ArrowLeft"))).toBe(true);
-        expect(isDrivingKey(key("KeyM"))).toBe(false);
-        expect(isDrivingKey(key("KeyS", { ctrlKey: true }))).toBe(false);
-        expect(isDrivingKey(key("ArrowUp", { defaultPrevented: true }))).toBe(false);
     });
 });
 

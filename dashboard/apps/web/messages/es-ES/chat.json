@@ -2039,6 +2039,7 @@
     "lobby": {
         "title": "Juego",
         "back": "Volver",
+        "retry": "Reintentar",
         "refused": {
             "missing": "Este juego no está instalado aquí.",
             "denied": "No tienes permiso para jugar.",

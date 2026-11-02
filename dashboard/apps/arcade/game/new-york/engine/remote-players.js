@@ -97,7 +97,9 @@ export function createRemotePlayers(scene) {
   const projected = new THREE.Vector3();
 
   function dress(marker, mode) {
-    // A model that cannot be built must not take the game's loop with it: they stay on the map and keep their name
+    // A model that cannot be built must not take the game's loop with it: they stay on the map and keep their name,
+    // and each mode is tried once rather than with every message
+    marker.mode = mode;
     let model;
     try {
       model = buildModel(mode, marker.paint);
@@ -110,7 +112,6 @@ export function createRemotePlayers(scene) {
       marker.model.owned?.dispose();
     }
     marker.model = model;
-    marker.mode = mode;
     marker.root.add(model.root);
   }
 

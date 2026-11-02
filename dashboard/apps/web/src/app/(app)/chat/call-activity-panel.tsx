@@ -49,6 +49,8 @@ export interface CallActivity {
     readonly mine: callGame.ActivityClaim | null;
     readonly playing: boolean;
     readonly answer: actions.CallGamesAnswer | null;
+    /** The last request about playing never got an answer. */
+    readonly failed: boolean;
     readonly busy: boolean;
     readonly gameName: (id: string) => string | null;
     readonly nameOf: (seat: string) => string;
@@ -89,6 +91,9 @@ export type ActivityApi = Pick<
  *  again, and how many times: one that is really forged is not asked forever. */
 const VOUCH_RETRY_MS = 3000;
 const VOUCH_RETRIES = 5;
+/** A request that got no answer says nothing about the claim, so it is not
+ *  counted against it: it waits longer each time, up to this. */
+const VOUCH_OUTAGE_MAX_MS = 30_000;
 
 /** How far the server's clock is ahead of this browser's, read off a pass it
  *  has just minted. */
@@ -110,6 +115,7 @@ export function useCallActivity(
     const [mine, setMine] = useState<callGame.ActivityClaim | null>(null);
     const [vouched, setVouched] = useState<ReadonlySet<string>>(new Set());
     const [answer, setAnswer] = useState<actions.CallGamesAnswer | null>(null);
+    const [failed, setFailed] = useState(false);
     const [busy, setBusy] = useState(false);
     const asking = useRef(false);
     const { setActivity } = call;
@@ -150,19 +156,25 @@ export function useCallActivity(
     // A claim seen a moment before the server can answer for it (the reader's
     // own seat not admitted yet, a request that failed) is asked about again.
     const tries = useRef(new Map<string, number>());
+    const unanswered = useRef(0);
     const [vouchRound, setVouchRound] = useState(0);
-    const askAgain = useCallback((keys: readonly string[]) => {
-        const due = keys.filter((key) => {
-            const used = (tries.current.get(key) ?? 0) + 1;
-            tries.current.set(key, used);
-            return used <= VOUCH_RETRIES;
-        });
-        if (due.length === 0) return;
+    const askLater = useCallback((keys: readonly string[], after: number) => {
         window.setTimeout(() => {
-            for (const key of due) checked.current.delete(key);
+            for (const key of keys) checked.current.delete(key);
             setVouchRound((round) => round + 1);
-        }, VOUCH_RETRY_MS);
+        }, after);
     }, []);
+    const askAgain = useCallback(
+        (keys: readonly string[]) => {
+            const due = keys.filter((key) => {
+                const used = (tries.current.get(key) ?? 0) + 1;
+                tries.current.set(key, used);
+                return used <= VOUCH_RETRIES;
+            });
+            if (due.length > 0) askLater(due, VOUCH_RETRY_MS);
+        },
+        [askLater]
+    );
     useEffect(() => {
         const unasked = [...claims].filter(
             ([seat, claim]) => !checked.current.has(claimKey(seat, claim))
@@ -179,14 +191,19 @@ export function useCallActivity(
                 unasked.map(([seat, claim]) => ({ seat, claim }))
             )
             .then(({ seats, now }) => {
+                unanswered.current = 0;
                 for (const [seat, claim] of unasked)
                     checked.current.set(claimKey(seat, claim), seats.includes(seat));
                 setSkew(now - Date.now());
                 setVouched((was) => settleVouched(was, latestClaims.current, checked.current));
                 askAgain(keys.filter((key) => !checked.current.get(key)));
             })
-            .catch(() => askAgain(keys));
-    }, [claims, meetingId, api, askAgain, vouchRound]);
+            .catch(() => {
+                const wait = VOUCH_RETRY_MS * 2 ** unanswered.current;
+                unanswered.current += 1;
+                askLater(keys, Math.min(wait, VOUCH_OUTAGE_MAX_MS));
+            });
+    }, [claims, meetingId, api, askAgain, askLater, vouchRound]);
 
     const session = useMemo(() => {
         const people = [...claims].map(([seat, claim]) => ({ seat, claim }));
@@ -236,8 +253,11 @@ export function useCallActivity(
         asking.current = true;
         void api
             .callGames(meetingId)
-            .then(setAnswer)
-            .catch(() => undefined)
+            .then((next) => {
+                setAnswer(next);
+                setFailed(false);
+            })
+            .catch(() => setFailed(true))
             .finally(() => {
                 asking.current = false;
             });
@@ -269,6 +289,7 @@ export function useCallActivity(
             void api
                 .claimCallGame(meetingId, game)
                 .then((result) => {
+                    setFailed(false);
                     if ("claim" in result) {
                         setSkew(skewFrom(result.claim));
                         setMine(result.claim);
@@ -277,7 +298,7 @@ export function useCallActivity(
                         setAnswer({ ok: false, reason: result.reason });
                     }
                 })
-                .catch(() => undefined)
+                .catch(() => setFailed(true))
                 .finally(() => setBusy(false));
         },
         [meetingId, setActivity, api]
@@ -335,6 +356,7 @@ export function useCallActivity(
         mine,
         playing,
         answer,
+        failed,
         busy,
         gameName,
         nameOf,
