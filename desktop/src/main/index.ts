@@ -31,10 +31,13 @@ import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
 import { listServers, normalizeServerName, renameServer, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
+import { setOpenAtLogin } from "./login-item";
+import { restoredPlace } from "@/shared/window-place";
+import * as settings from "./settings";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
-import { app, BrowserWindow, dialog, net, session, shell } from "electron";
+import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
 import { describeNetError, netErrorCode } from "./reachability";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
 
@@ -117,9 +120,40 @@ function showUpdating(): Promise<void> {
     });
 }
 
+/** How long a window has to sit still before where it is gets written down. */
+const PLACE_SETTLES_MS = 400;
+
+/** Where the main window opens: where it was, if that place still exists. */
+function savedPlace(): ReturnType<typeof restoredPlace> | undefined {
+    const place = settings.windowPlace();
+    if (!place) return undefined;
+    const areas = screen.getAllDisplays().map((display) => display.workArea);
+    return restoredPlace(place, areas, screen.getPrimaryDisplay().workArea);
+}
+
+/** Keep where the window is, and write it once more on closing: an update closes it. */
+function rememberPlace(window: BrowserWindow): void {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const write = () => {
+        clearTimeout(timer);
+        if (window.isDestroyed() || window.isFullScreen()) return;
+        settings.setWindowPlace({ ...window.getNormalBounds(), maximized: window.isMaximized() });
+    };
+    const settle = () => {
+        clearTimeout(timer);
+        timer = setTimeout(write, PLACE_SETTLES_MS);
+    };
+    window.on("resize", settle);
+    window.on("move", settle);
+    window.on("maximize", settle);
+    window.on("unmaximize", settle);
+    window.on("close", write);
+}
+
 function openMain(url: string): void {
-    const window = openPolarisWindow(url, server);
+    const window = openPolarisWindow(url, server, savedPlace());
     main = window;
+    rememberPlace(window);
     window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
         // -3 is a load that another one replaced: a redirect, a click, nothing wrong.
         if (!isMainFrame || code === -3 || !current || !isServerUrl(url, current)) return;
@@ -271,6 +305,9 @@ function start(): void {
 
     app.whenReady().then(() => {
         if (process.platform === "win32" && !app.isPackaged) app.setAppUserModelId(process.execPath);
+        // Every start: the app's folder moves with each version, and the setting has
+        // to reach installs from before it existed.
+        setOpenAtLogin(settings.openAtLogin());
 
         session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
             callback(allowPermission(permission, details.requestingUrl, current));
@@ -286,6 +323,11 @@ function start(): void {
             isReporter: (sender) => Boolean(main && !main.isDestroyed() && main.webContents === sender),
             setCustomGames: (list) => games.setCustomGames(list),
             connectState: () => ({ address: current, error: loadError, servers: servers() }),
+            preferences: () => ({ openAtLogin: settings.openAtLogin(), version: app.getVersion() }),
+            setOpenAtLogin: (open) => {
+                settings.rememberOpenAtLogin(open);
+                setOpenAtLogin(open);
+            },
             connectSubmit,
             connectCheck,
             switchServer,

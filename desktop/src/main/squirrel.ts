@@ -8,6 +8,7 @@
  * instead would pop up in the middle of the installer.
  */
 
+import { setOpenAtLogin } from "./login-item";
 import { app } from "electron";
 import { spawn } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
@@ -33,6 +34,7 @@ export function handledSquirrelEvent(): boolean {
         return true;
     }
     if (event === "--squirrel-uninstall") {
+        setOpenAtLogin(false);
         updateThenQuit([`--removeShortcut=${exe}`]);
         return true;
     }
