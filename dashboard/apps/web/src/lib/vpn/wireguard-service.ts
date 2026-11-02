@@ -13,6 +13,7 @@ import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
 import { loadEnv } from "@polaris/config";
 import * as proxy from "@/lib/vpn/browser-proxy";
+import { proxyLogin, type ProxyLogin } from "@/lib/vpn/browser-proxy-login";
 import { remoteWriteScript } from "@/lib/deploy/router-remote";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { execCommand, openSshClient } from "@polaris/ssh";
@@ -196,7 +197,7 @@ async function publishProxy(connection: HostConnection, endpoint: string): Promi
 export async function browserLogin(
     user: { id: string; isAdmin: boolean },
     nodeId: string
-): Promise<proxy.ProxyLogin & { host: string; port: number }> {
+): Promise<ProxyLogin & { host: string; port: number }> {
     const access = await accessOf(user);
     if (!access || wg.accessStanding(access, new Date()) !== "active") {
         throw new WireGuardRefusal("noAccess");
@@ -214,7 +215,7 @@ export async function browserLogin(
         },
         loadEnv().POLARIS_MASTER_KEY
     );
-    const login = proxy.proxyLogin(secret, user.id, Math.floor(Date.now() / 1000));
+    const login = proxyLogin(secret, user.id, Math.floor(Date.now() / 1000));
     return { ...login, host: node.proxyHost, port: 443 };
 }
 

@@ -8,8 +8,6 @@
  * somebody who loses access simply gets no next one.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 export const PROXY_PORT = 51821;
 
 /** The machine as any container on it reaches it: Docker's default bridge, which
@@ -38,37 +36,6 @@ export function parseProxyUsage(output: string): { userId: string; used: bigint 
         const match = /^([0-9a-f-]{36}) (\d{1,20})$/.exec(line.trim());
         return match?.[1] && match[2] ? [{ userId: match[1], used: BigInt(match[2]) }] : [];
     });
-}
-
-export interface ProxyLogin {
-    readonly username: string;
-    readonly password: string;
-    readonly expiresAt: number;
-}
-
-function sign(secret: string, username: string): string {
-    return createHmac("sha256", secret).update(username).digest("hex");
-}
-
-/** A login for one device, good until `expiresAt` (seconds). */
-export function proxyLogin(secret: string, deviceId: string, nowSeconds: number): ProxyLogin {
-    const expiresAt = nowSeconds + PROXY_TOKEN_SECONDS;
-    const username = `${deviceId}.${expiresAt}`;
-    return { username, password: sign(secret, username), expiresAt };
-}
-
-/** The same check the node's script makes, kept here so a test can hold them together. */
-export function proxyLoginValid(
-    secret: string,
-    username: string,
-    password: string,
-    nowSeconds: number
-): boolean {
-    const expiresAt = Number(username.split(".").at(-1));
-    if (!Number.isInteger(expiresAt) || expiresAt < nowSeconds) return false;
-    const wanted = Buffer.from(sign(secret, username));
-    const given = Buffer.from(password);
-    return wanted.length === given.length && timingSafeEqual(wanted, given);
 }
 
 /** The edge's route: TLS ends there and the bytes go on to the proxy on the machine. */
