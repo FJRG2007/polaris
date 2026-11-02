@@ -39,9 +39,9 @@ Abre Polaris en un móvil con datos, con el Wi-Fi apagado.
 
 ## Después de cambiar un router
 
-Dos routers seguidos crean dos redes. Un dispositivo que elige su dirección solo se
-adapta al cambio, y una máquina con dirección fija no, así que acaba en una red donde
-nada puede alcanzarla.
+Dos routers seguidos crean dos redes. Un dispositivo conserva su dirección hasta que
+pide otra, y uno que sigue conectado puede no pedirla, así que acaba en una red donde
+nada puede alcanzarlo.
 
 - Vuelve a conectar la máquina al router donde estaba, o a un switch de ese router.
 - Si quieres una sola red, pon el segundo router en modo punto de acceso y aplica el
@@ -66,6 +66,11 @@ nada puede alcanzarla.
 Cuando el Polaris en uso deja de responder, la app de escritorio abre al lado la
 ventana de servidores para que puedas abrir otro. Tus otros servidores siguen ahí y
 cada uno se abre como siempre.
+
+## Un juego en una llamada
+
+Compartir un juego en pantalla completa exclusiva suele verse negro o congelado,
+porque la captura no puede leerlo. Pon el juego en modo ventana sin bordes.
 
 ## La velocidad se queda en 94 o 95 Mbps
 

@@ -91,6 +91,12 @@ const NOTHING: CallAddressState = {
  * address is one Polaris has not seen before, one question to the container
  * engine. A line whose address never changes never gets past the first step.
  */
+/** The relay's address when the media server is pointed at it, whatever the line
+ *  behind it is doing. */
+export async function relayAddress(): Promise<string | null> {
+    return (await readFile(callNodeIpFile(), "utf8").catch(() => "")).trim() || null;
+}
+
 export async function watchCallAddress(): Promise<CallAddressState> {
     const current = await detectPublicIp().catch(() => null);
     // No public address at all. Calls from outside cannot work either way, and
@@ -110,6 +116,12 @@ export async function watchCallAddress(): Promise<CallAddressState> {
         }
     }
     if (!changedAt) return { ...NOTHING, current };
+    // Callers are sent to the relay, so the line's address is not theirs to lose, and
+    // a restart would only cut every call in progress.
+    if (await relayAddress()) {
+        await setSetting(CHANGED_AT, null);
+        return { ...NOTHING, current };
+    }
 
     const endpoint = await callServer().catch(() => null);
     // A server somebody else runs is on their network, learned its address
@@ -237,6 +249,8 @@ export async function callAddressFacts(): Promise<{
     startedAt: string | null;
     stale: boolean;
 }> {
+    const relay = await relayAddress();
+    if (relay) return { current: relay, startedAt: null, stale: false };
     const [current, changedAt] = await Promise.all([
         detectPublicIp().catch(() => null),
         getSetting(CHANGED_AT)

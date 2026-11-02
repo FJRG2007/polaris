@@ -353,6 +353,11 @@ function refreshMenu(): void {
 }
 
 function start(): void {
+    // Windows reports a window behind a full-screen game as gone, and Chromium then
+    // starves it, along with the call inside.
+    app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+    app.commandLine.appendSwitch("disable-renderer-backgrounding");
+    app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
     current = serverAddress();
 
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
