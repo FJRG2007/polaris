@@ -20,6 +20,7 @@ import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
 import { installTool } from "./install-tool";
+import * as vpn from "./vpn";
 import { browserFromName, installRequestSchema, type InstallResult } from "@/shared/install-tools";
 import {
     type AddressCheck,
@@ -95,6 +96,15 @@ const customGamesSchema = z
         })
     )
     .max(100);
+
+const connectionSchema = z.object({
+    nodeId: z.string().uuid(),
+    address: z.string().min(1).max(64),
+    dns: z.array(z.string().min(1).max(64)).max(4),
+    nodePublicKey: z.string().min(1).max(64),
+    endpoint: z.string().min(1).max(255),
+    port: z.number().int().min(1).max(65535)
+});
 
 const windowSchema = z.object({
     path: z.string().min(1).max(2048),
@@ -320,6 +330,27 @@ export function registerIpc(host: IpcHost): void {
         if (!fromPolaris(event) || !z.tuple([]).safeParse(args).success) return REFUSED;
         return host.updates.install();
     });
+
+    ipcMain.handle(CHANNELS.vpnDeviceName, (event): string | null =>
+        fromPolaris(event) ? vpn.vpnDeviceName() : null
+    );
+    ipcMain.handle(CHANNELS.vpnKey, (event): Promise<string | null> | null =>
+        fromPolaris(event) ? vpn.vpnKey() : null
+    );
+    ipcMain.handle(CHANNELS.vpnUp, (event, raw: unknown): Promise<Outcome> | Outcome => {
+        const input = connectionSchema.safeParse(raw);
+        if (!fromPolaris(event) || !input.success) return REFUSED;
+        return vpn.vpnUp(input.data);
+    });
+    ipcMain.handle(CHANNELS.vpnDown, (event): Promise<Outcome> | Outcome =>
+        fromPolaris(event) ? vpn.vpnDown() : REFUSED
+    );
+    ipcMain.handle(CHANNELS.vpnStatus, (event) =>
+        fromPolaris(event) ? vpn.vpnStatus() : { nodeId: null }
+    );
+    ipcMain.handle(CHANNELS.vpnJoin, (event, raw: unknown): Promise<Outcome> | Outcome =>
+        fromPolaris(event) ? vpn.vpnJoinNetwork(raw) : REFUSED
+    );
 
     // A page saying it draws the restart button. Forgotten with the page: a
     // reload or another site in the window is a page that has not said it.

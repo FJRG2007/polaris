@@ -122,6 +122,26 @@ jobs:
           echo "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d  $runtime" | sha256sum -c -
           echo "APPIMAGE_RUNTIME=$runtime" >> "$GITHUB_ENV"
 
+      # The VPN service. Its driver on Windows comes from a fixed release, checked
+      # against its digest, and is shipped untouched beside its licence.
+      - name: VPN service
+        env:
+          TARGET: ${{ matrix.os == 'macos-latest' && (matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin') || '' }}
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          [ -z "$TARGET" ] || rustup target add "$TARGET" --toolchain 1.97.1
+          (cd vpn-helper && cargo +1.97.1 test --locked)
+          (cd vpn-helper && cargo +1.97.1 build --release --locked ${TARGET:+--target "$TARGET"})
+          if [ "$RUNNER_OS" = Windows ]; then
+            driver="$RUNNER_TEMP/wireguard-nt.zip"
+            curl -fsSL -o "$driver" https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip
+            echo "dceb30a9bc4be48cce0f74160fc88a585a2c2627366e8f846fc6658f9038dace  $driver" | sha256sum -c -
+            unzip -q "$driver" -d "$RUNNER_TEMP/wireguard-nt"
+            node vpn-helper/stage.mjs "$TARGET" "$RUNNER_TEMP/wireguard-nt/wireguard-nt"
+          else
+            node vpn-helper/stage.mjs "$TARGET"
+          fi
+
       - name: Which signing secrets exist
         id: signing
         if: startsWith(github.ref, 'refs/tags/desktop-v') || github.ref == 'refs/heads/main'

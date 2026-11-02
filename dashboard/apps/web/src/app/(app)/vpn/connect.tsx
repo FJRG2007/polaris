@@ -22,6 +22,14 @@ const GIB = 1024 ** 3;
 const CONNECTED_MS = 3 * 60_000;
 
 type Node = actions.ConnectAnswer["nodes"][number];
+type TunnelCode = "denied" | "failed" | "noAnswer" | "unreachable";
+
+const TUNNEL_CODES: ReadonlySet<string> = new Set<TunnelCode>([
+    "denied",
+    "failed",
+    "noAnswer",
+    "unreachable"
+]);
 
 function gib(bytes: string): string {
     return (Number(bytes) / GIB).toFixed(1);
@@ -73,6 +81,10 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
     const selected = picked ?? active ?? nodes[0]?.id ?? null;
     const chosen = nodes.find(({ id }) => id === selected) ?? null;
 
+    function tunnelError(code: string): string {
+        return t(`connect.tunnel.${TUNNEL_CODES.has(code) ? (code as TunnelCode) : "failed"}`);
+    }
+
     function remove(id: string): void {
         setError(null);
         startTransition(async () => {
@@ -87,15 +99,15 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
         setError(null);
         startTransition(async () => {
             const publicKey = await desktop.key();
-            if (!publicKey) return setError(t("connect.failed"));
+            if (!publicKey) return setError(t("connect.tunnel.denied"));
             const result = await actions.connectThisDeviceAction({
                 nodeId: node.id,
-                name: desktop.deviceName,
+                name: await desktop.deviceName(),
                 publicKey
             });
             if (result.error !== undefined) return setError(result.error);
             const up = await desktop.up({ ...result.connection, nodeId: node.id });
-            if (!up.ok) setError(up.error);
+            if (!up.ok) setError(tunnelError(up.error));
             setTunnel(await desktop.status());
             read.reload();
         });
@@ -106,7 +118,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
         setError(null);
         startTransition(async () => {
             const down = await desktop.down();
-            if (!down.ok) setError(down.error);
+            if (!down.ok) setError(tunnelError(down.error));
             setTunnel(await desktop.status());
         });
     }

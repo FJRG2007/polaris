@@ -167,7 +167,8 @@
         },
         "join": "Unirse a esta red",
         "joined": "Este ordenador se ha unido a la red.",
-        "noClient": "Tailscale no está instalado en este ordenador."
+        "noClient": "Tailscale no está instalado en este ordenador.",
+        "joinFailed": "Este ordenador no pudo unirse a la red. Inténtalo de nuevo."
     },
     "register": {
         "title": "¿Añadir este dispositivo a la VPN?",
@@ -287,11 +288,16 @@
         "connectTo": "Conectar a {name}",
         "switchTo": "Cambiar a {name}",
         "disconnect": "Desconectar",
-        "failed": "Este ordenador no pudo iniciar la VPN. Inténtalo de nuevo.",
         "useApps": "Conecta desde la app de Polaris en tu ordenador, o desde la extensión de Polaris solo para este navegador.",
         "getApps": "Ver las apps",
         "noPhoneApp": "Todavía no hay app de Polaris para móviles.",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "tunnel": {
+            "denied": "La VPN necesita tu permiso una vez para instalarse. Pulsa Conectar y acepta el aviso.",
+            "failed": "Este ordenador no pudo iniciar la VPN. Inténtalo de nuevo.",
+            "noAnswer": "Ese servidor no respondió. Prueba otra ubicación.",
+            "unreachable": "No se encontró la dirección de ese servidor. Prueba otra ubicación."
+        }
     },
     "nodes": {
         "title": "Servidores",

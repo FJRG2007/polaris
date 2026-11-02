@@ -35,7 +35,7 @@ export interface PolarisDesktop {
     /** This computer's VPN. Absent from an app older than the feature. */
     readonly vpn?: {
         /** What this computer calls itself on the device list. */
-        readonly deviceName: string;
+        deviceName(): Promise<string>;
         /** The public half of a key that stays in the app; null if it cannot make one. */
         key(): Promise<string | null>;
         up(input: {

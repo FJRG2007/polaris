@@ -111,7 +111,7 @@ export function AddDeviceSection() {
             if (made.error !== undefined) return setKeyError(made.error);
             const outcome = await vpn.joinNetwork({ server: target, key: made.key });
             if (outcome.ok) setJoined(true);
-            else setKeyError(outcome.error);
+            else setKeyError(t(outcome.error === "noClient" ? "add.noClient" : "add.joinFailed"));
         });
     }
 

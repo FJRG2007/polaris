@@ -1,0 +1,26 @@
+# The VPN's privileged half. Its own workspace, so the host daemon's small static
+# build never pulls in a tunnel, and CI builds it only with the desktop app.
+[package]
+name = "polaris-vpn-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-only"
+publish = false
+
+[workspace]
+
+[dependencies]
+defguard_wireguard_rs = "=0.12.4"
+hmac = "=0.12.1"
+sha2 = "=0.10.9"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "1.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "=0.8.0"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+panic = "abort"
