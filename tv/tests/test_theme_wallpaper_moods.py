@@ -33,7 +33,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 MOOD_JAVA = JAVA / "WallpaperMood.java"
 THEME_FILES_JAVA = JAVA / "ThemeFiles.java"
 CONFIG_JAVA = JAVA / "Config.java"

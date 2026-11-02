@@ -31,7 +31,7 @@ from tools import race_calendar
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TVHOME = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+TVHOME = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 RACE_WEEKEND = TVHOME / "RaceWeekend.java"
 CONFIG = TVHOME / "Config.java"
 PAGE = ROOT / "themes" / "README.md"

@@ -30,7 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 THEMES = ROOT / "themes"
-LAUNCHER = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+LAUNCHER = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 ROTATION_JAVA = LAUNCHER / "WallpaperRotation.java"
 CONFIG_JAVA = LAUNCHER / "Config.java"
 CAPTIONS_JAVA = LAUNCHER / "WallpaperCaptions.java"

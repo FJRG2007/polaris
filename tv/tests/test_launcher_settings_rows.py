@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LAYOUT = ROOT / "launcher/app/src/main/res/layout/activity_launcher_settings.xml"
-ACTIVITY = ROOT / "launcher/app/src/main/java/com/gathin/tvhome/LauncherSettingsActivity.java"
+ACTIVITY = ROOT / "launcher/app/src/main/java/app/polaris/tv/LauncherSettingsActivity.java"
 STRINGS = ROOT / "launcher/app/src/main/res/values/strings.xml"
 GUIDE = ROOT / "docs" / "launcher.md"
 

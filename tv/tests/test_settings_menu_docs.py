@@ -21,7 +21,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MAIN_ACTIVITY = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "MainActivity.java"
+MAIN_ACTIVITY = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "MainActivity.java"
 STRINGS = ROOT / "launcher" / "app" / "src" / "main" / "res" / "values" / "strings.xml"
 GUIDE = ROOT / "docs" / "launcher.md"
 VENDOR_NOTE = ROOT / "docs" / "devices" / "xiaomi-mitv-mteq0" / "xiaomi-mitv-mteq0.md"

@@ -31,7 +31,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "Config.java"
+CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "Config.java"
 THEMES_README = ROOT / "themes" / "README.md"
 
 # The readers Config.java calls on the overlay it read from the TV: bool(json, "columns", ...) and the

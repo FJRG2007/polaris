@@ -38,7 +38,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "Config.java"
+CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "Config.java"
 KEYS_TABLE = ROOT / "themes" / "README.md"
 
 # The readers that take no bounds, and what the launcher needs for each. `string(json, ...)` is matched

@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "TROUBLESHOOTING.md"
-JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 MANIFEST = ROOT / "launcher" / "app" / "src" / "main" / "AndroidManifest.xml"
 INSTALL = ROOT / "launcher" / "build-and-install.sh"
 

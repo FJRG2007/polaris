@@ -24,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "docs" / "specs" / "card.md"
-CARDS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "Cards.java"
+CARDS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "Cards.java"
 
 # The Limits table's first cell -> the constant in Cards.java that bounds the same thing. "Label and
 # caption length" is left out on purpose: tests/test_addon_module_cards.py already compares its two

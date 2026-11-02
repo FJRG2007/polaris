@@ -18,6 +18,8 @@
      language that names them itself (`values-zh-rCN`, `values-vi`, `values-ko`). Keep `lunar_stems` at ten
      items and `lunar_branches` at twelve: `Lunar.java` indexes both by position, so a short list crashes
      the launcher on a TV running that language and nothing anywhere else.
+   - `polaris_strings.xml`: the words of the Polaris connection screens, for a language that translates them
+     (`values-es`). A missing name falls back to English.
 3. Add the locale to `launcher/app/src/main/res/xml/locales_config.xml`, in the tag form: a language
    folder that is not registered there cannot be chosen for the launcher alone on Android 13+.
 4. Add the language to the Languages list in `docs/launcher.md`, in the name that list uses, and the same

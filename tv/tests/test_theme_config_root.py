@@ -118,7 +118,7 @@ class ThemeConfigRootTest(unittest.TestCase):
 
     def test_the_launcher_really_ignores_a_non_object(self):
         """The message's claim, read out of the launcher: an object is built, and any failure is no overlay."""
-        source = (ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+        source = (ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
                   / "Config.java").read_text(encoding="utf-8")
         read = source[source.index("private static JSONObject read(File file)"):]
         self.assertIn("return new JSONObject(text);", read)

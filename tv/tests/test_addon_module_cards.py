@@ -41,7 +41,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ADDONS = ROOT / "addons"
-CARDS_JAVA = ROOT / "launcher/app/src/main/java/com/gathin/tvhome/Cards.java"
+CARDS_JAVA = ROOT / "launcher/app/src/main/java/app/polaris/tv/Cards.java"
 SPEC = ROOT / "docs" / "specs" / "card.md"
 
 FIELDS = ("spec", "label", "caption", "accent")

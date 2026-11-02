@@ -25,8 +25,8 @@ def read(relative):
 
 
 CONFIG_XML = read("launcher/app/src/main/res/values/config.xml")
-CONFIG_JAVA = read("launcher/app/src/main/java/com/gathin/tvhome/Config.java")
-MAIN = read("launcher/app/src/main/java/com/gathin/tvhome/MainActivity.java")
+CONFIG_JAVA = read("launcher/app/src/main/java/app/polaris/tv/Config.java")
+MAIN = read("launcher/app/src/main/java/app/polaris/tv/MainActivity.java")
 THEMES_README = read("themes/README.md")
 
 

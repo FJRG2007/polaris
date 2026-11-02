@@ -22,12 +22,12 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
-HOME_KEYS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "HomeKeyService.java"
-SYSTEM_SETTINGS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "SystemSettings.java"
+HOME_KEYS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "HomeKeyService.java"
+SYSTEM_SETTINGS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "SystemSettings.java"
 KEYS_PAGE = ROOT / "themes" / "README.md"
 CONFIG_XML = ROOT / "launcher" / "app" / "src" / "main" / "res" / "values" / "config.xml"
-CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "Config.java"
-REMOTE_KEYS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "RemoteKeys.java"
+CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "Config.java"
+REMOTE_KEYS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "RemoteKeys.java"
 
 SECTION = "## Accessibility helper enabled but the remote button does nothing"
 START = "- **The Settings button opens Android TV Settings, not the TV's own menu**"

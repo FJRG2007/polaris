@@ -35,13 +35,13 @@ OTHER = "com.android.tv.settings/.MainSettings"
 # android-9.0.0_r1 schema (protos/perfetto/config/trace_config.proto). These independent
 # fixtures cover every buffer/data source, plus multi-byte lengths and duration varints.
 CONFIG_9000 = base64.b64decode(
-    "CgYIgIAEIAEKBQiAICABEocCCoQCCgxsaW51eC5mdHJhY2UQAKIG8AEKEnNjaGVkL3NjaGVkX3N3aXRj"
+    "CgYIgIAEIAEKBQiAICABEoQCCoECCgxsaW51eC5mdHJhY2UQAKIG7QEKEnNjaGVkL3NjaGVkX3N3aXRj"
     "aAoSc2NoZWQvc2NoZWRfd2FrZXVwChJzY2hlZC9zY2hlZF93YWtpbmcKE3Bvd2VyL2NwdV9mcmVxdWVu"
     "Y3kKDnBvd2VyL2NwdV9pZGxlChF0YXNrL3Rhc2tfbmV3dGFzawoQdGFzay90YXNrX3JlbmFtZQoYc2No"
     "ZWQvc2NoZWRfcHJvY2Vzc19leGl0EgJhbRICd20SBHZpZXcSA2dmeBIFaW5wdXQSBmRhbHZpaxIDcmVzEg1i"
-    "aW5kZXJfZHJpdmVyGhFjb20uZ2F0aGluLnR2aG9tZVCAgAFY+gESHgocChNsaW51eC5wcm9jZXNzX3N0"
-    "YXRzEAG6BgIQARIoCiYKJGFuZHJvaWQuc3VyZmFjZWZsaW5nZXIuZnJhbWV0aW1lbGluZRIZChcKFWFu"
-    "ZHJvaWQucGFja2FnZXNfbGlzdBioRg==")
+    "aW5kZXJfZHJpdmVyGg5hcHAucG9sYXJpcy50dlCAgAFY+gESHgocChNsaW51eC5wcm9jZXNzX3N0YXRz"
+    "EAG6BgIQARIoCiYKJGFuZHJvaWQuc3VyZmFjZWZsaW5nZXIuZnJhbWV0aW1lbGluZRIZChcKFWFuZHJv"
+    "aWQucGFja2FnZXNfbGlzdBioRg==")
 LONG_PACKAGE = "com.example." + "launcher" * 20
 CONFIG_LONG = base64.b64decode(
     "CgYIgIAEIAEKBQiAICABEqMDCqADCgxsaW51eC5mdHJhY2UQAKIGjAMKEnNjaGVkL3NjaGVkX3N3aXRj"

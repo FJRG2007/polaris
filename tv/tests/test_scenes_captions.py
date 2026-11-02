@@ -23,8 +23,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 THEMES = ROOT / "themes"
 SCENES = THEMES / "scenes"
-CAPTIONS_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "WallpaperCaptions.java"
-ROTATION_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "WallpaperRotation.java"
+CAPTIONS_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "WallpaperCaptions.java"
+ROTATION_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "WallpaperRotation.java"
 SCENES_PY = ROOT / "tools" / "scenes_wallpapers.py"
 
 

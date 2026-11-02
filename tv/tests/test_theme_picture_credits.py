@@ -41,7 +41,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 THEMES = ROOT / "themes"
-ROTATION_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "WallpaperRotation.java"
+ROTATION_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "WallpaperRotation.java"
 
 # A picture's file name as the six credits files write it. A title inside a Wikimedia URL is a page on
 # someone else's site, not a file here, so a name is only read from a bullet or from backticks.

@@ -36,7 +36,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "themes" / "README.md"
-REMOTE_KEYS = (ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+REMOTE_KEYS = (ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
                / "RemoteKeys.java")
 
 # The sentence in the Keys table that lists the action words: "An action word in place of the package
@@ -110,7 +110,7 @@ def page_words(row):
 
 
 def java_text(root=ROOT):
-    return (root / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+    return (root / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
             / "RemoteKeys.java").read_text(encoding="utf-8")
 
 
@@ -153,7 +153,7 @@ class ActionWordsTest(unittest.TestCase):
         # already carries. Holding the array to isAction() is what makes the next word be named
         # here too, and the page test above then makes it be named on the page.
         accepted = is_action_words(java_text())
-        java_test = (ROOT / "launcher" / "app" / "src" / "test" / "java" / "com" / "gathin" / "tvhome"
+        java_test = (ROOT / "launcher" / "app" / "src" / "test" / "java" / "app" / "polaris" / "tv"
                      / "RemoteKeysTest.java").read_text(encoding="utf-8")
         body = method_body(java_test, "void actionWordsAreTargets()", "RemoteKeysTest.java")
         array = re.search(r"new String\[\]\s*\{([^}]*)\}", body)

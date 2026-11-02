@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_accessibility_flag_note import SECTION, TROUBLE, section  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 
 # Table row (its first cell) -> the service it describes.
 ROWS = {"Home button": "HomeKeyService", "Input button": "InputKeyService"}

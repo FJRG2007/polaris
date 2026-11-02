@@ -20,7 +20,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "themes" / "README.md"
-REMOTE_KEYS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "RemoteKeys.java"
+REMOTE_KEYS = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "RemoteKeys.java"
 
 # A key is lowercase to stay readable next to `config.xml`; `app_keys` and `live_tv_package` qualify,
 # a backticked value such as `false` or `#RRGGBB` does not.

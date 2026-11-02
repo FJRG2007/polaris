@@ -31,7 +31,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs" / "modules.md"
-JAVA_DIR = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+JAVA_DIR = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 GAME_DAY = JAVA_DIR / "GameDay.java"
 ADDON = ROOT / "addons" / "game-day"
 PROVIDER = ADDON / "app" / "src" / "main" / "java" / "io" / "github" / "justinnewman" / "gameday" / "GamesProvider.java"

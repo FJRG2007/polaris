@@ -22,7 +22,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
-SERVICE_REPAIR = (ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome"
+SERVICE_REPAIR = (ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
                   / "ServiceRepair.java")
 THEMES_README = ROOT / "themes" / "README.md"
 START = "- **The list still names the helper but"

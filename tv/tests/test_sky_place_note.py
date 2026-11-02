@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKY_DOC = ROOT / "docs" / "sky.md"
 THEMES_DOC = ROOT / "themes" / "README.md"
 CONFIG_XML = ROOT / "launcher" / "app" / "src" / "main" / "res" / "values" / "config.xml"
-SKY_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "Sky.java"
+SKY_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "Sky.java"
 SKY_VIEW_JAVA = SKY_JAVA.with_name("SkyView.java")
 CONFIG_JAVA = SKY_JAVA.with_name("Config.java")
 

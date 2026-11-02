@@ -23,10 +23,10 @@ TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 PROMPT = ROOT / "PROMPT.md"
 EXAMPLES = ROOT / "examples" / "README.md"
 G09_README = ROOT / "examples" / "tcl-g09-google-tv" / "README.md"
-INPUT_SERVICE = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "InputKeyService.java"
-HOME_SERVICE = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "HomeKeyService.java"
+INPUT_SERVICE = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "InputKeyService.java"
+HOME_SERVICE = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "HomeKeyService.java"
 CONFIG_XML = ROOT / "launcher" / "app" / "src" / "main" / "res" / "values" / "config.xml"
-CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "com" / "gathin" / "tvhome" / "Config.java"
+CONFIG_JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "Config.java"
 
 
 def flat(path):

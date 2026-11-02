@@ -1084,7 +1084,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Nothing at all happens on a TV with no Polaris: no thread, no socket. */
     private void refreshPolaris() {
         if (!PolarisLink.connected(this)) {
-            if (btnPolaris.hasFocus()) btnSettings.requestFocus();
+            if (btnPolaris.hasFocus()) findViewById(R.id.btnSettings).requestFocus();
             btnPolaris.setVisibility(View.GONE);
             return;
         }
