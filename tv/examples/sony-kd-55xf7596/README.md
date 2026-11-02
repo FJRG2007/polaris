@@ -1,0 +1,91 @@
+# Sony BRAVIA KD-55XF7596 (Android TV 9)
+
+**Model:** Sony KD-55XF7596 (2018, X75F series), EU firmware
+**Platform:** `BRAVIA_ATV3_4K_EU` / device `BRAVIA_ATV3_4K`, MediaTek mt5891 (`ro.build.product` still says `BRAVIA_ATV2`)
+**OS:** Android TV 9 (SDK 28), build `PTT1.190515.001.S54 672201`, security patch 2022-01-05
+**RAM / storage:** 2 GB, 8.1 GB `/data`
+
+Same firmware build as [`sony-xbr-65x900f/`](../sony-xbr-65x900f/debloat.txt), so this list is that one plus the
+leftovers [`sony-kd-55xe8596/`](../sony-kd-55xe8596/debloat.txt) disables, with this owner's choices.
+
+## What was tested
+
+- The 38 packages in [`debloat.txt`](debloat.txt), applied with `tools/disable.sh` in six blocks (Samba TV
+  and promos, demo, telemetry, help, optional features, hotel mode and leftovers). After each block: Home
+  screenshot, Netflix, HDMI 1 and the DVB-T input, and the crash log. No crashes.
+- Rebooted afterwards: all 38 still disabled, nothing re-enabled by the firmware. Free RAM after boot
+  went from about 200 MB to about 500 MB.
+- Launcher built from `launcher/` and installed with `launcher/build-and-install.sh`. Home confirmed
+  with `dumpsys window | grep mFocusedApp` before and after a reboot. Netflix, YouTube, Input, Settings
+  and Home work on the real remote without the accessibility services. Inputs pill switches HDMI 1.
+- No antenna was connected: for DVB-T only the tuner service answering was checked, not reception.
+
+## Second unit (65-inch, EU, 2026-10-28)
+
+`tools/tv.py --probe` on this set returns the same identity as the 55-inch unit: model `BRAVIA 4K GB ATV3`,
+device `BRAVIA_ATV3_4K`, product `BRAVIA_ATV3_4K_EU`, firmware `PTT1.190515.001.S54 672201`. The inch size
+is the owner's; getprop does not carry a KD-65 name. The panel is 3840x2160 and the board is mt5891.
+[`sony-kd-55xf8096/`](../sony-kd-55xf8096/debloat.txt) has this same fingerprint, so the two lists cannot
+be told apart by a fingerprint prefix.
+
+`com.gathin.tvhome` was the focused Home app, and `com.google.android.tvlauncher` was disabled. Already
+disabled from this list: Samba TV, promos, Sony Select, bivlinfo, the recommendation rows, the Bravia
+auto-install, the three demo packages, the Sony and Qterics device agents, both bug reporters, feedback,
+and the three help apps. Still enabled, so not tested on this unit: Discover, both launcher-customizer
+packages, the Sony Select overlay, and every package under "Off by choice" and "Hotel / professional
+mode". This unit was not reboot-checked and has not been lived with for days. `com.sony.dtv.scrums.action`
+is installed and was left enabled.
+
+## Third unit (65-inch, EU, 2026-10-31)
+
+Same identity and fingerprint again (`BRAVIA 4K GB ATV3`, `BRAVIA_ATV3_4K_EU`, `PTT1.190515.001.S54 672201`),
+on its built-in Ethernet. Nothing was disabled before the run and `com.google.android.tvlauncher` was Home.
+
+- `tools/disable.sh` in six batches, the sections of the list, with a Home screenshot, Live TV and Netflix
+  after each one. 35 of the list's lines ran: `com.google.android.inputmethod.japanese` and
+  `com.google.android.music` are not installed on this unit, and `com.sony.dtv.smarthomesettings` was enabled
+  from the factory here, so the TV-input guard skipped it and it was left on.
+- By the owner's choice the DLNA packages and `com.google.android.tv.remote.service` went too (they are in the
+  list's "Left enabled" block). No crash, and Home, Live TV, Netflix and the remote were unaffected.
+- Rebooted twice: everything stayed disabled, nothing came back. MemAvailable after boot went from about 230 MB
+  to about 770 MB.
+- A user-installed Projectivy Launcher (`com.spocky.projengmenu`) also answers HOME. It was disabled before
+  `launcher/build-and-install.sh` ran, so only the stock launcher and Sony's FallbackHome were left to hand over from.
+- Launcher built with `tools/docker-build.sh` (no local JDK) and installed with `SKIP_BUILD=1`. `mFocusedApp` was
+  `com.gathin.tvhome` before and after a reboot. At power-on the TV goes from FallbackHome straight to the
+  launcher (on Android 9 the events log tag is `am_set_resumed_activity`, not `wm_set_resumed_activity`), so
+  neither `power_on_home` nor `boot_to_live_tv` is needed.
+- On the real remote, Netflix, YouTube, Input, Home, Action Menu and TV all work without the accessibility
+  services. The Inputs pill names HDMI 1 after the CEC device on it, and selecting it gives picture and sound;
+  `dumpsys tv_input` then shows the CEC device's input (`ExternalTvInputService/HDMI100003`), not `HW2`.
+- The `aurora` theme went on with `tools/theme.sh`. The UI stays at 1920x1080 / 320 dpi.
+- This firmware has no Wireless debugging: network ADB rides on USB debugging. With that off and the TV
+  restarted, `tools/adb-closed.py` reported 5555 closed.
+- Tested over one evening, not lived with for days.
+
+## Kept on purpose
+
+Chromecast, screen mirroring, DLNA, the phone remote, Sony IP control (`webapi.core`, `remoteaccess`) and
+`com.sony.dtv.b2b.vendorprotocol` for home automation, Prime Video and Sony firmware updates. Left alone as
+untested: YouView (`com.sony.dtv.youview`, `com.youview.tv.servicehost`), `interactivetvutil`,
+`b2b.noderuntime.*`, Vewd/HbbTV, `dialservice`.
+
+## Notes from this firmware
+
+- Android 9 has no `topResumedActivity`. Check what is on screen with
+  `dumpsys activity activities | grep mResumedActivity`; `mFocusedApp` is in `dumpsys window`.
+- HDMI 1 is `com.sony.dtv.tvinput.external/.ExternalTvInputService/HW2`, DVB-T is
+  `com.sony.dtv.tvinput.tuner/.DvbTerrCableInputService/HW0`. The active input shows in
+  `dumpsys tv_input | sed -n '/sessionStateMap/,$p' | grep inputId`.
+- Screenshots of Netflix, HDMI and Live TV come back empty (0 bytes).
+- `disable.sh` skips `com.sony.dtv.smarthomesettings`: it asks for `TV_INPUT_HARDWARE`. It is a false
+  positive here (`pm query-services -a android.media.tv.TvInputService` does not list it), and the package
+  already shipped disabled on this set.
+- With `katniss` and `backdrop` off, `voice_interaction_service` and `screensaver_components` still name
+  them. Android ignores disabled components, and leaving the settings means `restore.sh` brings both back.
+- The stock `tvlauncher` HOME filter has priority 2: `set-home-activity` only takes effect once it is
+  disabled, which `build-and-install.sh` does in the right order.
+- No display overrides: 1920x1080, density 320, `display_density_forced` null, before and after.
+
+config.xml used: `hidden_apps` `com.sony.dtv.tvx` and `com.sony.dtv.tvxlauncher.programguide`,
+`live_tv_package` `com.sony.dtv.tvx`.
