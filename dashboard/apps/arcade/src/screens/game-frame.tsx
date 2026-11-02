@@ -141,8 +141,7 @@ export function GameFrame({
     useEffect(() => {
         if (!ready) return;
         const onKey = (event: KeyboardEvent) => {
-            if (isDrivingKey(event) && mayTakeFocus(document.activeElement))
-                frame.current?.focus();
+            if (isDrivingKey(event) && mayTakeFocus(document.activeElement)) frame.current?.focus();
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);

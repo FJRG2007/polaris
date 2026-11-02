@@ -31,7 +31,6 @@ async function embedded() {
     const postMessage = vi.fn();
     vi.stubGlobal("parent", { postMessage });
     vi.resetModules();
-    // @ts-expect-error - plain browser module without types
     const embed = await import("../../../arcade/game/new-york/engine/embed.js");
     const sent = () => postMessage.mock.calls.map(([message]) => message.type as string);
     return { embed, sent };
@@ -78,7 +77,6 @@ describe("a player whose model cannot be built", () => {
         vi.doMock("../../../arcade/game/new-york/engine/embed.js", () => ({
             onPlayers: (listener: (players: unknown[]) => void) => listeners.push(listener)
         }));
-        // @ts-expect-error - plain browser module without types
         const remote = await import("../../../arcade/game/new-york/engine/remote-players.js");
         const players = remote.createRemotePlayers({ add: () => undefined });
         const hear = listeners[0]!;

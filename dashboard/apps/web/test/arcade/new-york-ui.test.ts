@@ -10,11 +10,9 @@
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
-import { flattenCatalog, type Catalog } from "@polaris/core";
 import { gameMessages } from "../../../arcade/messages";
-// @ts-expect-error - plain browser module without types
+import { flattenCatalog, type Catalog } from "@polaris/core";
 import { fill, readCatalog } from "../../../arcade/game/new-york/engine/i18n.js";
-// @ts-expect-error - plain browser module without types
 import * as markers from "../../../arcade/game/new-york/engine/player-markers.js";
 
 const GAME = resolve(__dirname, "../../../arcade/game/new-york");
