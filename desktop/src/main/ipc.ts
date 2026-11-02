@@ -282,7 +282,7 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.installTool, async (event, raw: unknown): Promise<InstallResult> => {
         const request = installRequestSchema.safeParse(raw);
         const window = BrowserWindow.fromWebContents(event.sender);
-        if (!fromPolaris(event) || !request.success || !window) return REFUSED;
+        if (!fromPolaris(event) || !request.success || !window) return { ok: false, reason: "refused" };
         return installTool(window, request.data);
     });
 

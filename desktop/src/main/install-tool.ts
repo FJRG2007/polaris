@@ -17,17 +17,18 @@ import { clipboard, dialog, shell, type BrowserWindow } from "electron";
 
 /** The most a script may take: a slow download, not a stuck one. */
 const INSTALL_TIMEOUT_MS = 5 * 60_000;
-const FAILED = "The install did not finish. Check your connection and try again.";
-const UNSUPPORTED = "This cannot be installed on this system.";
+/** The most a shell may take to start and say its PATH. */
+const SHELL_TIMEOUT_MS = 10_000;
 
 let running = false;
 
-function run(launch: tools.Launch): Promise<{ code: number | null; output: string; }> {
+function run(launch: tools.Launch, timeout: number, env = process.env): Promise<{ code: number | null; output: string; }> {
     return new Promise((resolve, reject) => {
         const child = spawn(launch.file, [...launch.args], {
             windowsHide: true,
             stdio: ["ignore", "pipe", "pipe"],
-            timeout: INSTALL_TIMEOUT_MS
+            timeout,
+            env
         });
         let output = "";
         const keep = (chunk: Buffer) => {
@@ -38,6 +39,15 @@ function run(launch: tools.Launch): Promise<{ code: number | null; output: strin
         child.on("error", reject);
         child.on("close", (code) => resolve({ code, output }));
     });
+}
+
+/** The environment a script runs in: on macOS and Linux, with the PATH of the
+ *  user's own shell. */
+async function scriptEnvironment(): Promise<NodeJS.ProcessEnv> {
+    if (process.platform === "win32") return process.env;
+    const launch = { file: process.env.SHELL || "/bin/sh", args: ["-ilc", tools.PATH_PROBE] };
+    const { output } = await run(launch, SHELL_TIMEOUT_MS).catch(() => ({ output: "" }));
+    return { ...process.env, PATH: tools.installPath(output, process.env.PATH) };
 }
 
 function folders(): tools.Folders {
@@ -64,8 +74,8 @@ function handOver(browser: tools.ExtensionBrowser | undefined, folder: string): 
 
 export async function installTool(window: BrowserWindow, input: tools.InstallRequest): Promise<tools.InstallResult> {
     const repo = tools.repositorySlug(repository);
-    if (!repo || !tools.installable(input.tool, process.platform)) return { ok: false, error: UNSUPPORTED };
-    if (running) return { ok: false, error: "Another install is running." };
+    if (!repo || !tools.installable(input.tool, process.platform)) return { ok: false, reason: "unsupported" };
+    if (running) return { ok: false, reason: "busy" };
     running = true;
     try {
         const { response } = await dialog.showMessageBox(window, {
@@ -76,19 +86,19 @@ export async function installTool(window: BrowserWindow, input: tools.InstallReq
             message: tools.installQuestion(input.tool),
             detail: "It downloads the official release from GitHub and needs no administrator rights."
         });
-        if (response !== 0) return { ok: false, error: "" };
-        const { code, output } = await run(tools.installLaunch(input.tool, process.platform, repo));
+        if (response !== 0) return { ok: false, reason: "cancelled" };
+        const launch = tools.installLaunch(input.tool, process.platform, repo);
+        const { code, output } = await run(launch, INSTALL_TIMEOUT_MS, await scriptEnvironment());
         const path = tools.installedPath(input.tool, process.platform, folders());
-        if (code !== 0 || !existsSync(path)) {
+        if (code !== 0 || !tools.scriptFinished(input.tool, output) || !existsSync(path)) {
             console.error("polaris: an install ended without the tool:", code, output);
-            return { ok: false, error: tools.lastSaid(output) ?? FAILED };
+            return tools.installFailure(input.tool, output, homedir());
         }
-        if (input.tool !== "extension") return { ok: true };
-        handOver(input.browser, path);
-        return { ok: true, folder: path };
+        if (input.tool === "extension") handOver(input.browser, path);
+        return { ok: true };
     } catch (error) {
         console.error("polaris: an install did not run:", error);
-        return { ok: false, error: FAILED };
+        return { ok: false, reason: "failed" };
     } finally {
         running = false;
     }

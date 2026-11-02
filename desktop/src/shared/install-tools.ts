@@ -22,8 +22,12 @@ export const installRequestSchema = z.object({
 });
 export type InstallRequest = z.infer<typeof installRequestSchema>;
 
-/** Answered to the page. `folder` is what to choose in Load unpacked. */
-export type InstallResult = { readonly ok: true; readonly folder?: string; } | { readonly ok: false; readonly error: string; };
+/**
+ * Answered to the page, which words the reason in its reader's language. `said`
+ * is the script's own sentence for a refusal.
+ */
+export type InstallFailure = "cancelled" | "unsupported" | "busy" | "refused" | "failed";
+export type InstallResult = { readonly ok: true; } | { readonly ok: false; readonly reason: InstallFailure; readonly said?: string; };
 
 const SCRIPTS: Readonly<Record<InstallTool, string>> = {
     extension: "dashboard/apps/extension/scripts",
@@ -71,6 +75,22 @@ export function installLaunch(tool: InstallTool, platform: string, repo: string)
     return { file: "/bin/sh", args: ["-c", `curl -fsSL '${scripts}/install.sh' | sh`] };
 }
 
+const PATH_MARK = "__POLARIS_PATH__";
+const USUAL_PATHS = ["/usr/local/bin", "/opt/homebrew/bin"];
+
+/** Prints the PATH of a shell, marked off from whatever its startup files print. */
+export const PATH_PROBE = `printf '${PATH_MARK}%s${PATH_MARK}' "$PATH"`;
+
+/**
+ * The PATH a script needs on macOS and Linux. An app opened from the desktop does
+ * not get the one a terminal has, so Node would look missing where it is there.
+ */
+export function installPath(probed: string, inherited: string | undefined): string {
+    const said = new RegExp(`${PATH_MARK}(.*?)${PATH_MARK}`).exec(probed)?.[1];
+    const entries = [said, inherited, ...USUAL_PATHS].flatMap((entry) => entry?.split(":") ?? []);
+    return [...new Set(entries.filter(Boolean))].join(":");
+}
+
 export interface Folders {
     readonly home: string;
     /** %LOCALAPPDATA% on Windows. */
@@ -80,11 +100,7 @@ export interface Folders {
     readonly xdgData?: string;
 }
 
-/**
- * What the script leaves behind when it worked. A script that refuses, because
- * Node is missing for example, says so and ends normally, so its exit code does
- * not tell the two apart.
- */
+/** What the script leaves behind when it worked. */
 export function installedPath(tool: InstallTool, platform: string, folders: Folders): string {
     const windows = platform === "win32";
     const join = (...parts: string[]) => parts.join(windows ? "\\" : "/");
@@ -96,22 +112,59 @@ export function installedPath(tool: InstallTool, platform: string, folders: Fold
         return join(xdg, "polaris", "extension", "chrome");
     }
     if (tool === "cli") {
-        if (windows) return join(folders.localAppData ?? "", "Programs", "polaris-cli");
-        return join(xdg, "polaris-cli");
+        if (windows) return join(folders.localAppData ?? "", "Programs", "polaris-cli", "polaris.mjs");
+        return join(xdg, "polaris-cli", "polaris.mjs");
     }
     const plugin = "io.github.fjrg2007.polaris.sdPlugin";
     if (windows) return join(folders.appData ?? "", "Elgato", "StreamDeck", "Plugins", plugin);
     return join(macData, "com.elgato.StreamDeck", "Plugins", plugin);
 }
 
-/** The last thing the script said, without its prefix, for a refusal. */
-export function lastSaid(output: string): string | null {
-    const line = output
-        .split(/\r?\n/)
-        .map((entry) => entry.replace(/^polaris:\s*/, "").trim())
-        .filter((entry) => /[a-z]/i.test(entry))
-        .at(-1);
-    return line ? line.slice(0, 300) : null;
+/** What each script prints only once it has reached its end. */
+const FINISHED: Readonly<Record<InstallTool, string>> = {
+    extension: "First time: open chrome://extensions",
+    cli: "installed plr",
+    deck: "Next: open the Stream Deck app"
+};
+
+/**
+ * Whether the script ran to its end. On Windows every refusal and failed download
+ * ends normally, and a piped script hides a failed fetch everywhere, so neither
+ * the exit code nor a file an earlier install left can tell.
+ */
+export function scriptFinished(tool: InstallTool, output: string): boolean {
+    return output.includes(FINISHED[tool]);
+}
+
+const CLI_PROBLEM = /^!\s*polaris-cli:\s*/;
+const SCRIPT_LINE = /^polaris:\s*/;
+
+/** The script's own last sentence, without its prefix or this account's folder,
+ *  or null when it said nothing of its own. A CLI refusal can span several lines. */
+export function lastSaid(output: string, home: string): string | null {
+    const lines = output.split(/\r?\n/).map((entry) => entry.trim());
+    const problems = lines.map((entry) => CLI_PROBLEM.test(entry));
+    const end = problems.lastIndexOf(true);
+    let said: string | undefined;
+    if (end >= 0) {
+        let start = end;
+        while (start > 0 && problems[start - 1]) start--;
+        said = lines.slice(start, end + 1).map((entry) => entry.replace(CLI_PROBLEM, "")).join(" ");
+    } else {
+        said = lines
+            .filter((entry) => SCRIPT_LINE.test(entry))
+            .map((entry) => entry.replace(SCRIPT_LINE, ""))
+            .filter((entry) => /[a-z]/i.test(entry))
+            .at(-1);
+    }
+    if (!said) return null;
+    return (home ? said.replaceAll(home, "~") : said).slice(0, 300);
+}
+
+/** The answer for a script that did not leave the tool installed. */
+export function installFailure(tool: InstallTool, output: string, home: string): InstallResult {
+    const said = scriptFinished(tool, output) ? null : lastSaid(output, home);
+    return said ? { ok: false, reason: "failed", said } : { ok: false, reason: "failed" };
 }
 
 /** A browser by the name the system gives the default one, or null for one no

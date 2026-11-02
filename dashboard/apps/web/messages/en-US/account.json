@@ -1227,7 +1227,9 @@
         "install": {
             "action": "Install",
             "running": "Installing...",
-            "failed": "The install did not finish. Try again.",
+            "failed": "The install did not finish. Check your connection and try again.",
+            "unsupported": "This cannot be installed on this system.",
+            "busy": "Another install is running.",
             "extensionDone": "Installed. Your browser is on its extensions page: turn on Developer mode, press Load unpacked and paste the folder, which is already copied. Browsers only add an extension by themselves from their store.",
             "cliDone": "Installed. Open a new terminal to use it, then sign in with the line below.",
             "deckDone": "Installed. It updates by itself."

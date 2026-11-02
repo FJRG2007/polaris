@@ -1227,7 +1227,9 @@
         "install": {
             "action": "Instalar",
             "running": "Instalando...",
-            "failed": "La instalación no terminó. Inténtalo de nuevo.",
+            "failed": "La instalación no terminó. Comprueba tu conexión e inténtalo de nuevo.",
+            "unsupported": "Esto no se puede instalar en este sistema.",
+            "busy": "Ya hay otra instalación en curso.",
             "extensionDone": "Instalada. Tu navegador está en su página de extensiones: activa el modo de desarrollador, pulsa Cargar descomprimida y pega la carpeta, que ya está copiada. Los navegadores solo añaden una extensión por sí solos desde su tienda.",
             "cliDone": "Instalado. Abre una terminal nueva para usarlo e inicia sesión con la línea de abajo.",
             "deckDone": "Instalado. Se actualiza solo."

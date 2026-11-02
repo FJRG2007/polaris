@@ -15,7 +15,7 @@ import type { InstallPlatform } from "./install-platform";
 
 export type DesktopTool = "extension" | "cli" | "deck";
 
-type InstallResult = { ok: true; folder?: string } | { ok: false; error: string };
+type InstallResult = { ok: true } | { ok: false; reason: string; said?: string };
 
 interface DesktopInstaller {
     readonly platform: string;
@@ -66,14 +66,17 @@ export function DesktopInstall({
         setError(null);
         const result = await desktopInstaller()
             ?.installTool?.({ tool, browser })
-            .catch((): InstallResult => ({ ok: false, error: t("downloads.install.failed") }));
+            .catch((): InstallResult => ({ ok: false, reason: "failed" }));
         if (result?.ok) {
             setState("done");
             return;
         }
         setState("idle");
-        // No sentence is the confirmation being cancelled.
-        if (result?.error) setError(result.error);
+        if (!result || result.reason === "cancelled") return;
+        if (result.said) setError(result.said);
+        else if (result.reason === "unsupported") setError(t("downloads.install.unsupported"));
+        else if (result.reason === "busy") setError(t("downloads.install.busy"));
+        else setError(t("downloads.install.failed"));
     }
 
     return (

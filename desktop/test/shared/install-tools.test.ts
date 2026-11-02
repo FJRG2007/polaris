@@ -3,19 +3,30 @@
  * started with no shell on Windows, and a refusal is told from a real install.
  */
 
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
     browserFromName,
     extensionsPageLaunch,
     installable,
     installedPath,
+    installFailure,
     installLaunch,
+    installPath,
     installRequestSchema,
+    INSTALL_TOOLS,
     lastSaid,
-    repositorySlug
+    repositorySlug,
+    scriptFinished
 } from "@/shared/install-tools";
 
 const REPO = "example/polaris";
+const SCRIPTS = {
+    extension: "dashboard/apps/extension/scripts",
+    cli: "dashboard/packages/cli/scripts",
+    deck: "dashboard/apps/streamdeck/scripts"
+};
 
 describe("what a page may ask for", () => {
     it("takes a tool from the list and nothing else", () => {
@@ -52,23 +63,86 @@ describe("how a script starts", () => {
     });
 });
 
+describe("the PATH a script gets", () => {
+    it("is the shell's, past anything its startup files print", () => {
+        expect(installPath("welcome\n__POLARIS_PATH__/nvm/bin:/usr/bin__POLARIS_PATH__\n", "/usr/bin:/bin")).toBe(
+            "/nvm/bin:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
+        );
+    });
+
+    it("still reaches the usual places when the shell said nothing", () => {
+        expect(installPath("", "/usr/bin")).toBe("/usr/bin:/usr/local/bin:/opt/homebrew/bin");
+        expect(installPath("", undefined)).toBe("/usr/local/bin:/opt/homebrew/bin");
+    });
+});
+
 describe("whether it worked", () => {
     it("looks where each script installs", () => {
         const windows = { home: "C:\\Users\\fixture", localAppData: "C:\\Local", appData: "C:\\Roaming" };
         expect(installedPath("extension", "win32", windows)).toBe("C:\\Local\\Polaris\\extension\\chrome");
-        expect(installedPath("cli", "win32", windows)).toBe("C:\\Local\\Programs\\polaris-cli");
+        expect(installedPath("cli", "win32", windows)).toBe("C:\\Local\\Programs\\polaris-cli\\polaris.mjs");
         expect(installedPath("deck", "win32", windows)).toContain("C:\\Roaming\\Elgato\\StreamDeck\\Plugins");
-        expect(installedPath("cli", "linux", { home: "/home/fixture" })).toBe("/home/fixture/.local/share/polaris-cli");
+        expect(installedPath("cli", "linux", { home: "/home/fixture" })).toBe("/home/fixture/.local/share/polaris-cli/polaris.mjs");
         expect(installedPath("extension", "darwin", { home: "/Users/fixture" })).toBe(
             "/Users/fixture/Library/Application Support/Polaris/extension/chrome"
         );
     });
 
-    it("says what the script said when it refused", () => {
-        expect(lastSaid("polaris: fetching\r\npolaris: Node 20 or newer is required\r\n+----+\r\n")).toBe(
-            "Node 20 or newer is required"
+    it("knows the end of every script, on every system", () => {
+        for (const tool of INSTALL_TOOLS) {
+            for (const file of ["install.ps1", "install.sh"]) {
+                const script = readFileSync(join(__dirname, "../../..", SCRIPTS[tool], file), "utf8");
+                expect(scriptFinished(tool, script), `${tool} ${file}`).toBe(true);
+            }
+        }
+    });
+
+    it("does not take a refusal for the end", () => {
+        expect(scriptFinished("cli", "+  Polaris CLI\n!  polaris-cli: could not find a CLI release\n")).toBe(false);
+        expect(scriptFinished("extension", "polaris: could not reach GitHub: timed out\n")).toBe(false);
+        expect(scriptFinished("deck", "")).toBe(false);
+    });
+
+    it("says what a script said when it refused", () => {
+        expect(lastSaid("polaris: fetching\r\npolaris: the download does not match\r\npolaris: \r\n", "/h")).toBe(
+            "the download does not match"
         );
-        expect(lastSaid("\n\n")).toBeNull();
+        expect(lastSaid("+  Polaris CLI\n!  polaris-cli: node is not installed: https://nodejs.org\n", "/h")).toBe(
+            "node is not installed: https://nodejs.org"
+        );
+    });
+
+    it("keeps a refusal of several lines whole", () => {
+        const output = [
+            "+  Polaris CLI",
+            "!  polaris-cli: this computer runs a Polaris server (a server checkout at /opt/polaris).",
+            "!  polaris-cli: the server has its own polaris and plr commands,",
+            "!  polaris-cli: so it is not installed here.",
+            ""
+        ].join("\n");
+        expect(lastSaid(output, "/h")).toBe(
+            "this computer runs a Polaris server (a server checkout at /opt/polaris). the server has its own polaris and plr commands, so it is not installed here."
+        );
+    });
+
+    it("does not pass on what PowerShell or curl printed", () => {
+        expect(lastSaid("irm : Unable to connect\n    + FullyQualifiedErrorId : WebCmdlet\n", "/h")).toBeNull();
+        expect(lastSaid("curl: (6) Could not resolve host\n", "/h")).toBeNull();
+        expect(lastSaid("\n\n", "/h")).toBeNull();
+    });
+
+    it("keeps this account's folder off the page", () => {
+        const output = "!  polaris-cli: this computer runs a Polaris server (C:\\Users\\fixture\\AppData\\polaris.ps1).\n";
+        expect(lastSaid(output, "C:\\Users\\fixture")).toBe("this computer runs a Polaris server (~\\AppData\\polaris.ps1).");
+    });
+
+    it("gives no sentence when the script ended but the tool is not there", () => {
+        const output = "polaris: Next: open the Stream Deck app, find Polaris in the actions list\n";
+        expect(installFailure("deck", output, "/h")).toEqual({ ok: false, reason: "failed" });
+    });
+
+    it("hands a refusal to the page as a reason and its sentence", () => {
+        expect(installFailure("cli", "!  polaris-cli: nope\n", "/h")).toEqual({ ok: false, reason: "failed", said: "nope" });
     });
 });
 

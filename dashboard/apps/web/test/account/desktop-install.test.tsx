@@ -47,7 +47,7 @@ describe("the Install button", () => {
     });
 
     it("says nothing when the confirmation was cancelled", async () => {
-        bridge(async () => ({ ok: false, error: "" }));
+        bridge(async () => ({ ok: false, reason: "cancelled" }));
         const { container } = line();
         fireEvent.click(await screen.findByRole("button"));
         await waitFor(() => expect(screen.getByRole("button").hasAttribute("disabled")).toBe(false));
@@ -55,9 +55,31 @@ describe("the Install button", () => {
     });
 
     it("shows a refusal as it came", async () => {
-        bridge(async () => ({ ok: false, error: "Node 20 is required" }));
+        bridge(async () => ({ ok: false, reason: "failed", said: "Node 20 is required" }));
         line();
         fireEvent.click(await screen.findByRole("button"));
         expect(await screen.findByText("Node 20 is required")).toBeTruthy();
+    });
+
+    it.each([
+        ["unsupported", "downloads.install.unsupported"],
+        ["busy", "downloads.install.busy"],
+        ["failed", "downloads.install.failed"],
+        ["refused", "downloads.install.failed"],
+        ["from a newer app", "downloads.install.failed"]
+    ])("words the reason %s in the reader's language", async (reason, key) => {
+        bridge(async () => ({ ok: false, reason }));
+        line();
+        fireEvent.click(await screen.findByRole("button"));
+        expect(await screen.findByText(key)).toBeTruthy();
+    });
+
+    it("words a bridge that failed outright", async () => {
+        bridge(async () => {
+            throw new Error("gone");
+        });
+        line();
+        fireEvent.click(await screen.findByRole("button"));
+        expect(await screen.findByText("downloads.install.failed")).toBeTruthy();
     });
 });
