@@ -43,7 +43,7 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
-    entryPoints: ["connect", "api-key", "push", "tv", "overlay"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
+    entryPoints: ["connect", "api-key", "push", "tv", "overlay", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
     outdir: join(DIST, "renderer")
 });
 

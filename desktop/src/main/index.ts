@@ -146,7 +146,7 @@ function showOpening(): void {
 let updating: BrowserWindow | null = null;
 /** Show that an update is going in. Settles when the window is closed. */
 function showUpdating(): Promise<void> {
-    const window = openLocalWindow("updating", { title: "Polaris", width: 420, height: 320 });
+    const window = openLocalWindow("updating", { title: "Polaris", width: 380, height: 360 });
     updating = window;
     return new Promise((resolve) => {
         window.on("closed", () => {

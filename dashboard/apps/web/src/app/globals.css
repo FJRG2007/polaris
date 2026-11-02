@@ -1001,3 +1001,30 @@ dialog.pdfSlick-dialog .dialogButton {
         display: none;
     }
 }
+
+/* An update going through: expected, so it moves rather than warns. */
+.update-line {
+    position: absolute;
+    inset: auto auto 0 0;
+    width: 30%;
+    height: 2px;
+    background: hsl(var(--primary));
+    animation: polaris-update-line 1.6s ease-in-out infinite;
+}
+
+@keyframes polaris-update-line {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(334%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .update-line {
+        width: 100%;
+        animation: none;
+        opacity: 0.6;
+    }
+}

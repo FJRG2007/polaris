@@ -159,21 +159,21 @@ export function ConnectionBanner() {
         <BannerStrip>
             <p
                 className={cn(
-                    "flex min-w-0 max-w-full flex-wrap items-center justify-center gap-x-2 border-b px-4 py-1 text-sm",
+                    "relative flex min-w-0 max-w-full flex-wrap items-center justify-center gap-x-2 overflow-hidden border-b px-4 py-1 text-sm",
                     good
                         ? "border-success-edge bg-success-soft text-success-ink"
                         : state === "offline"
                           ? "border-danger-edge bg-danger-soft text-danger-ink"
-                          : "border-warning-edge bg-warning-soft text-warning-ink"
+                          : state === "updating"
+                            ? "border-border bg-surface text-foreground"
+                            : "border-warning-edge bg-warning-soft text-warning-ink"
                 )}
             >
                 <span className="flex min-w-0 items-center gap-2">
-                    <Icon
-                        className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
-                        aria-hidden
-                    />
+                    <Icon className="size-4 shrink-0" aria-hidden />
                     <span className="min-w-0">{t(`network.${state}`)}</span>
                 </span>
+                {state === "updating" ? <span className="update-line" aria-hidden /> : null}
                 {state === "unreachable" ? (
                     <span className="flex shrink-0 items-center gap-2">
                         <Button

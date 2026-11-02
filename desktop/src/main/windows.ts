@@ -77,6 +77,22 @@ function titleBar(): BrowserWindowConstructorOptions {
     };
 }
 
+/** A fixed window whose page is all there is: no title bar, the system's close
+ *  button over the page's own ground. */
+function splashChrome(): BrowserWindowConstructorOptions {
+    const fixed = { resizable: false, maximizable: false, fullscreenable: false };
+    if (process.platform === "darwin") return { ...fixed, titleBarStyle: "hiddenInset" };
+    return {
+        ...fixed,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+            color: ground(),
+            symbolColor: defaultTitleBarColors(nativeTheme.shouldUseDarkColors).symbol,
+            height: 32
+        }
+    };
+}
+
 function polarisPreferences(): WebPreferences {
     // A call keeps running behind a full-screen game, which is when a window is hidden.
     return preferences("app.js", { backgroundThrottling: false, additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`] });
@@ -265,7 +281,8 @@ export function openLocalWindow(
             minHeight: 320,
             parent: options.parent,
             modal: false,
-            webPreferences: preferences("local.js")
+            webPreferences: preferences("local.js"),
+            ...(kind === "updating" ? splashChrome() : {})
         })
     );
     register(window.webContents, kind);
