@@ -15,6 +15,7 @@
 
 import type { Outcome } from "@/shared/bridge";
 import { readUpdateReady, type UpdateReady } from "@/shared/update-ready";
+import { RESTART_BEFORE_OPENING_MS } from "./update-first";
 
 export interface FoundUpdate {
     readonly version: string;
@@ -23,7 +24,8 @@ export interface FoundUpdate {
 
 export class UpdateReadyState {
     private ready: { readonly state: NonNullable<UpdateReady>; readonly restart: () => void; } | null = null;
-    private installing = false;
+    /** Until when a restart already asked for may still end this process. */
+    private restartingUntil = 0;
     /** The pages, by their web contents, that draw the button now. */
     private readonly offering = new Set<number>();
 
@@ -39,7 +41,7 @@ export class UpdateReadyState {
         if (!update.restart || !state) return;
         if (state.version === this.ready?.state.version && update.restart === this.ready.restart) return;
         this.ready = { state, restart: update.restart };
-        this.installing = false;
+        this.restartingUntil = 0;
         this.changed(this.current());
     }
 
@@ -65,16 +67,18 @@ export class UpdateReadyState {
         return this.ready ? this.ready.state : null;
     }
 
-    /** Restart into the waiting update, once however often it is asked. */
+    /** Restart into the waiting update, once however often it is asked while
+     *  that restart can still end this process. One that returned and left the
+     *  app running, a quit somebody cancelled, can be asked for again. */
     install(): Outcome {
         if (!this.ready) return { ok: false, error: "There is no update waiting to be installed." };
-        if (this.installing) return { ok: true };
-        this.installing = true;
+        if (Date.now() < this.restartingUntil) return { ok: true };
+        this.restartingUntil = Date.now() + RESTART_BEFORE_OPENING_MS;
         try {
             this.ready.restart();
             return { ok: true };
         } catch (caught) {
-            this.installing = false;
+            this.restartingUntil = 0;
             console.error("[update]", caught);
             return { ok: false, error: "The update could not be installed. Polaris installs it the next time it starts." };
         }

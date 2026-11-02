@@ -90,7 +90,7 @@ export function setSavedServers(servers: readonly SavedServer[]): void {
     save({ ...settings, servers: knownServers({ ...settings, servers: [...servers] }) });
 }
 
-/** The version a start last restarted into, whether or not it took. */
+/** The version a start last held the app back for, whether or not it took. */
 export function updateAttempted(): string | null {
     return load().updateAttempted;
 }

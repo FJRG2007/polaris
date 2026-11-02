@@ -23,7 +23,7 @@ export const UPDATE_BEFORE_OPENING_MS = 3 * 60_000;
 export const RESTART_BEFORE_OPENING_MS = 30_000;
 
 export interface OpeningSteps {
-    /** The version last restarted into, if any. */
+    /** The version a start last held the app back for, if any. */
     readonly attempted: () => string | null;
     /** Remember the version this start is holding the app back for. */
     readonly attempt: (version: string) => void;
