@@ -95,16 +95,24 @@ fn server_answered(api: &WGApi<Backend>) -> bool {
     })
 }
 
+fn discard(mut api: WGApi<Backend>) {
+    if let Err(error) = api.remove_interface() {
+        eprintln!("polaris-vpn: could not remove the interface: {error}");
+        // The library stops at a system with no DNS manager, before the interface
+        // goes. A tunnel left behind would carry on holding the routes.
+        #[cfg(target_os = "linux")]
+        let _ = std::process::Command::new("ip").args(["link", "delete", INTERFACE]).status();
+    }
+}
+
 impl Tunnel {
     pub fn node_id(&self) -> Option<&str> {
         self.node_id.as_deref()
     }
 
     pub fn down(&mut self) {
-        if let Some(mut api) = self.live.take()
-            && let Err(error) = api.remove_interface()
-        {
-            eprintln!("polaris-vpn: could not remove the interface: {error}");
+        if let Some(api) = self.live.take() {
+            discard(api);
         }
         self.node_id = None;
     }
@@ -120,13 +128,13 @@ impl Tunnel {
         })?;
         if let Err(error) = start(&mut api, private_key, &target) {
             eprintln!("polaris-vpn: the tunnel did not start: {error}");
-            let _ = api.remove_interface();
+            discard(api);
             return Err("failed");
         }
         let deadline = Instant::now() + HANDSHAKE_WAIT;
         while !server_answered(&api) {
             if Instant::now() >= deadline {
-                let _ = api.remove_interface();
+                discard(api);
                 return Err("noAnswer");
             }
             sleep(Duration::from_millis(250));

@@ -126,8 +126,10 @@ jobs:
       # against its digest, and is shipped untouched beside its licence.
       - name: VPN service
         env:
-          TARGET: ${{ matrix.os == 'macos-latest' && (matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin') || '' }}
+          # Static on Linux, so it runs on systems older than the build machine.
+          TARGET: ${{ matrix.os == 'macos-latest' && (matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin') || matrix.os == 'ubuntu-latest' && 'x86_64-unknown-linux-musl' || '' }}
         run: |
+          [ "$RUNNER_OS" != Linux ] || sudo apt-get install -y musl-tools
           rustup toolchain install 1.97.1 --profile minimal
           [ -z "$TARGET" ] || rustup target add "$TARGET" --toolchain 1.97.1
           (cd vpn-helper && cargo +1.97.1 test --locked)
