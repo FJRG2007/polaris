@@ -50,6 +50,10 @@ export const WATCH_SENTENCES: Readonly<Record<string, WatchKey>> = {
     "This server would not say what its containers are using.": "text.containersSilent",
     "Idle, and anything outside a container": "text.idleOutside",
     "Free, and anything outside a container": "text.freeOutside",
+    "Everything else on the machine": "text.restOfMachine",
+    Free: "text.freeMemory",
+    "Running directly on the machine.": "text.runningOnMachine",
+    "Containers and programs as they use memory now. Programs share some of it, so their figures can overlap.": "text.memoryNote",
     "The machine itself, and whatever is installed on it directly.": "text.machineItself",
     "Measured from the containers this server is running. The chart above is the whole machine, so anything outside a container is the last row.":
         "text.loadNote",

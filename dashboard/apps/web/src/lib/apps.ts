@@ -2085,7 +2085,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // from its approval card, each with Revoke.
         {
             label: "Polar permissions", // i18n-ignore
-            href: "/polar/settings#permissions",
+            href: "/polar/settings?section=permissions",
             icon: ShieldCheck,
             hidden: true,
             keywords: ["polar", "always allow", "approvals", "permissions", "assistant"]

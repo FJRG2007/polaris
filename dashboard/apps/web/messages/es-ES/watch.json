@@ -172,7 +172,11 @@
         "deploying": "Desplegando",
         "notDeployed": "Sin desplegar",
         "thisMachine": "La máquina donde funciona Polaris",
-        "thisMachineAt": "{address} - la máquina donde funciona Polaris"
+        "thisMachineAt": "{address} - la máquina donde funciona Polaris",
+        "restOfMachine": "Todo lo demás en la máquina",
+        "freeMemory": "Libre",
+        "runningOnMachine": "Se ejecuta directamente en la máquina.",
+        "memoryNote": "Contenedores y programas según usan la memoria ahora. Los programas comparten parte, así que sus cifras pueden solaparse."
     },
     "cards": {
         "noHistory": "Aún falta historial",
@@ -199,7 +203,15 @@
         "readAgo": "Leído hace {age}.",
         "heaviestFirst": "De mayor a menor.",
         "shareOfMachine": "Parte del total de la máquina, de mayor a menor.",
-        "inTotal": "{total} en total, de mayor a menor."
+        "inTotal": "{total} en total, de mayor a menor.",
+        "whose": "De quién es",
+        "group": {
+            "polaris": "Polaris",
+            "apps": "Tus apps",
+            "other": "Otros contenedores",
+            "machine": "La máquina",
+            "free": "Libre"
+        }
     },
     "subject": {
         "metrics": "Métricas",

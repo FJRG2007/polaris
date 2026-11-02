@@ -263,7 +263,7 @@ describe("the servers Watch shows", () => {
         const cards = await getWatchServers("u1");
 
         expect(cards.map((card) => card.id)).toEqual([LOCAL_SUBJECT, "h2"]);
-        expect(cards[0]?.name).toBe("Local");
+        expect(cards[0]?.name).toBe("box");
     });
 
     it("lists the box's containers once, not once per route to it", async () => {

@@ -2,15 +2,20 @@
 
 export const POLAR_SETTINGS_PATH = "/polar/settings";
 
+/** One section of the settings, by address. */
+export function settingsSection(id: string): string {
+    return `${POLAR_SETTINGS_PATH}?section=${id}`;
+}
+
 /** Set by the chat as it opens the settings, so their Back link knows there is a chat to go back to. */
 export const SETTINGS_FROM_CHAT_KEY = "polar.settingsFromChat";
 
 /** Opens the settings from the chat, remembering that it was the chat that opened them. */
-export function openFromChat(push: (href: string) => void, hash = ""): void {
+export function openFromChat(push: (href: string) => void, section?: string): void {
     try {
         window.sessionStorage.setItem(SETTINGS_FROM_CHAT_KEY, "1");
     } catch {
         // Not remembered; Back goes to Polar's own page instead.
     }
-    push(`${POLAR_SETTINGS_PATH}${hash}`);
+    push(section ? settingsSection(section) : POLAR_SETTINGS_PATH);
 }

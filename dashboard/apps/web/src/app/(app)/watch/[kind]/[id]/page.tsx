@@ -1,6 +1,8 @@
 import { prisma } from "@polaris/db";
 import { listHosts } from "@/lib/host-service";
 import { LOCAL_SERVER_ID } from "@polaris/core";
+import { localServerName } from "@/lib/local-server";
+import { serverFromSlug, serverSlug } from "@/lib/watch/server-route";
 import { listAlarms } from "@/lib/watch-service";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
@@ -52,13 +54,20 @@ export default async function WatchSubjectPage({
         // have to arrive somewhere.
         if (id === LOCAL_HOST_SUBJECT) redirect(`/watch/server/${LOCAL_SERVER_ID}`);
 
-        if (id === LOCAL_SERVER_ID) {
+        const addressed = id === LOCAL_SERVER_ID ? localHost : serverFromSlug(hosts, decodeURIComponent(id));
+        const canonical = addressed ? serverSlug(hosts, addressed, LOCAL_SERVER_ID) : null;
+        // Old links arrive by id or by the reserved word; the address reads as the name.
+        if (canonical && canonical !== id) redirect(`/watch/server/${encodeURIComponent(canonical)}`);
+
+        // The machine Polaris runs on is measured directly rather than over SSH to
+        // itself, so its history lives under the local subject whatever the address.
+        const local = id === LOCAL_SERVER_ID || (addressed !== null && addressed === localHost);
+        if (local) {
             return (
                 <WatchSubjectDetail
                     kind="server"
-                    id={id}
-                    // i18n-ignore the same word in both languages
-                    name={localHost?.name ?? "Local"}
+                    id={LOCAL_SERVER_ID}
+                    name={await localServerName(localHost?.name)}
                     // Said in the reader's words by the detail screen.
                     detail={
                         localHost
@@ -76,16 +85,12 @@ export default async function WatchSubjectPage({
                 />
             );
         }
-        const host = hosts.find((entry) => entry.id === id);
+        const host = addressed;
         if (!host) notFound();
-        // A server that is the machine Polaris runs on is measured directly rather
-        // than over SSH to itself, so its history lives under the local subject.
-        // Its own id would open a page with nothing on it.
-        if (isLocalMachine(host, identity)) redirect(`/watch/server/${LOCAL_SERVER_ID}`);
         return (
             <WatchSubjectDetail
                 kind="server"
-                id={id}
+                id={host.id}
                 name={host.name}
                 detail={`${host.username}@${host.address}`}
                 alarms={watching(host.id)}

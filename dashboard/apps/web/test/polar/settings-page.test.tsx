@@ -145,6 +145,18 @@ describe("tools by MCP server", () => {
         expect(groups[1]!.tools.map((tool) => tool.title)).toEqual(["List issues"]);
     });
 
+    it("finds a tool by name across every server and opens where it is", async () => {
+        page();
+        const search = await screen.findByRole("searchbox", { name: "Search tools" });
+        fireEvent.change(search, { target: { value: "issues" } });
+        expect(screen.getByRole("switch", { name: "List issues" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /Polaris/ })).toBeNull();
+        fireEvent.change(search, { target: { value: "nothing like it" } });
+        expect(screen.getByText("No tool matches.")).toBeTruthy();
+        fireEvent.change(search, { target: { value: "" } });
+        expect(screen.getByRole("button", { name: /Polaris/ })).toBeTruthy();
+    });
+
     it("shows each server with its switch and a count, and its tools behind a disclosure", async () => {
         kept.set("polar.toolsOff", JSON.stringify(["delete_task"]));
         page();

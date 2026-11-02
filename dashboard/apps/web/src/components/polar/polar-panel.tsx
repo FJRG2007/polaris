@@ -1847,7 +1847,7 @@ export function PolarChat({
             return setTemporary(!temporary);
         }
         if (command === "memory")
-            return settingsPath.openFromChat((href) => router.push(href), "#memory");
+            return settingsPath.openFromChat((href) => router.push(href), "memory");
         if (command === "context") return setShowContext(true);
         if (command === "usage") {
             return chat.messages.length === 0 ? setShowUsage(true) : setShowContext(true);

@@ -423,7 +423,9 @@
             "count": "{on} of {total} on",
             "serverOff": "Switched off",
             "serverToggle": "Use {server}",
-            "offNote": "Every tool here stays off while {server} is off. Your choices below are kept."
+            "offNote": "Every tool here stays off while {server} is off. Your choices below are kept.",
+            "search": "Search tools",
+            "noMatch": "No tool matches."
         },
         "data": {
             "title": "Your chats",
@@ -454,7 +456,8 @@
         },
         "back": "Back to chat",
         "nav": {
-            "permissions": "Permissions and connectors"
+            "permissions": "Permissions and connectors",
+            "connectors": "Connectors"
         },
         "browserSites": {
             "title": "Your browser",

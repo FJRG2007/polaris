@@ -17,6 +17,8 @@ import { prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
 import { inFlightDeployments } from "./deploy-service";
 import { isLocalMachine, localMachineIdentity } from "./local-machine";
+import { LOCAL_SERVER_ID, localServerName } from "./local-server";
+import { serverSlug } from "./watch/server-route";
 import { hostRouteId, LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
 import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
 import {
@@ -170,6 +172,7 @@ export async function getWatchServers(ownerId: string): Promise<WatchCard[]> {
 async function buildServers(ownerId: string, alarms: Map<string, number>): Promise<WatchCard[]> {
     const now = Date.now();
     const { local, remote } = await watchHosts(ownerId);
+    const everyHost = local ? [local, ...remote] : remote;
 
     const ids = [LOCAL_HOST_SUBJECT, ...remote.map((host) => host.id)];
     const series = await sparklines("host", ids, now);
@@ -178,7 +181,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
         {
             id: LOCAL_HOST_SUBJECT,
             kind: "server",
-            name: local?.name ?? "Local",
+            name: await localServerName(local?.name),
             detail: local
                 ? `${local.username}@${local.address} - the machine Polaris runs on`
                 : "The machine Polaris runs on",
@@ -186,7 +189,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
             alarms: local ? (alarms.get(local.id) ?? 0) : 0,
             // Addressed as the machine, not as the reserved subject its samples
             // are filed under.
-            href: `/watch/server/${hostRouteId(LOCAL_HOST_SUBJECT)}`
+            href: `/watch/server/${local ? serverSlug(everyHost, local, LOCAL_SERVER_ID) : hostRouteId(LOCAL_HOST_SUBJECT)}`
         },
         ...remote.map((host) => ({
             id: host.id,
@@ -285,8 +288,7 @@ export async function getWatchContainers(ownerId: string): Promise<WatchCard[]> 
         {
             id: LOCAL_HOST_SUBJECT,
             connectionId: LOCAL_DOCKER_CONNECTION_ID,
-            // i18n-ignore the same word in both languages
-            label: local?.name ?? "Local",
+            label: await localServerName(local?.name),
             open: async () => localDockerDriver()
         },
         ...remote.map((host) => ({

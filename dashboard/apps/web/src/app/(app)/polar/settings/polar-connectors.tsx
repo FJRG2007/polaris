@@ -82,6 +82,9 @@ async function send(path: string, init: RequestInit): Promise<{ ok: boolean; bod
     return { ok: response.ok, body };
 }
 
+/** A list this long is easier to search than to scroll. */
+const SEARCH_FROM = 6;
+
 export function PolarConnectors({
     initial,
     returned
@@ -92,6 +95,10 @@ export function PolarConnectors({
 }) {
     const t = useTranslations("account");
     const [rows, setRows] = useState(initial);
+    const [query, setQuery] = useState("");
+    const shown = rows.filter((row) =>
+        row.name.toLowerCase().includes(query.trim().toLowerCase())
+    );
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(
         returned === "failed" ? t("polarConnectors.errors.signInFailed") : null
@@ -218,7 +225,16 @@ export function PolarConnectors({
                     </CardBody>
                 </Card>
             ) : null}
-            {rows.map((row) => (
+            {rows.length > SEARCH_FROM ? (
+                <Input
+                    type="search"
+                    value={query}
+                    aria-label={t("polarConnectors.search")}
+                    placeholder={t("polarConnectors.search")}
+                    onChange={(event) => setQuery(event.target.value)}
+                />
+            ) : null}
+            {shown.map((row) => (
                 <Card key={row.id}>
                     <CardBody className="flex flex-col gap-3">
                         <div className="flex items-center gap-3">
