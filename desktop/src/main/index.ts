@@ -16,6 +16,7 @@
  */
 
 import { registerIpc } from "./ipc";
+import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink, type DeepLink } from "@/shared/deep-link";
 import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
@@ -104,6 +105,34 @@ function showPolaris(path?: string): void {
         return;
     }
     openMain(url ?? `${current}${START}`);
+}
+
+/**
+ * Show what a polaris:// link names: in this window when it is the Polaris open
+ * here, after switching when it is another one kept here, and in the browser when
+ * this app does not know it, so a link is never just dropped.
+ */
+function openDeepLink(link: DeepLink): void {
+    if (link.server === current) {
+        showPolaris(link.path);
+        return;
+    }
+    if (savedServers().some((saved) => saved.origin === link.server)) {
+        void switchServer(link.server).then(() => showPolaris(link.path));
+        return;
+    }
+    void shell.openExternal(`${link.server}${link.path}`);
+}
+
+/** The link this app was started for, until its first window opens. */
+let startedFor: DeepLink | null = deepLinkIn(process.argv);
+
+/** The first window: what the app was started for, if anything. */
+function showOpening(): void {
+    const link = startedFor;
+    startedFor = null;
+    if (link) openDeepLink(link);
+    else showPolaris();
 }
 
 /** The window shown while an update goes in before the app opens. */
@@ -308,6 +337,7 @@ function start(): void {
         // Every start: the app's folder moves with each version, and the setting has
         // to reach installs from before it existed.
         setOpenAtLogin(settings.openAtLogin());
+        if (app.isPackaged) app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
 
         session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
             callback(allowPermission(permission, details.requestingUrl, current));
@@ -424,19 +454,30 @@ function start(): void {
             .catch((): Opening => "open")
             .then((opening) => {
                 app.on("activate", () => {
-                    if (BrowserWindow.getAllWindows().length === 0) showPolaris();
+                    if (BrowserWindow.getAllWindows().length === 0) showOpening();
                 });
                 if (opening !== "open") return;
                 // The app opens first: closing the last window would quit it.
                 const waited = updating;
                 updating = null;
-                showPolaris();
+                showOpening();
                 waited?.close();
                 if (heldBack) announce(heldBack);
             });
     });
 
-    app.on("second-instance", () => showPolaris());
+    app.on("second-instance", (_event, argv) => {
+        const link = deepLinkIn(argv);
+        if (link) openDeepLink(link);
+        else showPolaris();
+    });
+    app.on("open-url", (event, url) => {
+        event.preventDefault();
+        const link = readDeepLink(url);
+        if (!link) return;
+        if (app.isReady() && BrowserWindow.getAllWindows().length > 0) openDeepLink(link);
+        else startedFor = link;
+    });
 
     app.on("window-all-closed", () => {
         if (process.platform !== "darwin") app.quit();

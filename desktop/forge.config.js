@@ -51,6 +51,8 @@ module.exports = {
         name: "Polaris",
         executableName: "polaris",
         appBundleId: "io.github.fjrg2007.polaris",
+        // macOS reads the links an app answers from its bundle; elsewhere the app registers at start.
+        protocols: [{ name: "Polaris", schemes: ["polaris"] }],
         appCategoryType: "public.app-category.developer-tools",
         // macOS asks before a call reaches the microphone or camera, and shows
         // these words when it does.
