@@ -28,7 +28,11 @@
         "moveDown": "Bajar",
         "width": "Ancho",
         "clearHistory": "Borrar historial",
-        "hide": "Ocultar"
+        "hide": "Ocultar",
+        "remove": "Quitar {name}",
+        "removeCard": "Quitar tarjeta",
+        "removed": "Tarjeta quitada: {name}. Recupérala desde Personalizar.",
+        "undo": "Deshacer"
     },
     "sizes": {
         "sm": "Estrecha",
@@ -88,6 +92,10 @@
         "activity": {
             "label": "Actividad reciente",
             "description": "Lo que se ha hecho con tu cuenta, y desde dónde."
+        },
+        "polar": {
+            "label": "Polar",
+            "description": "Haz una pregunta desde aquí sin salir de Overview."
         },
         "dnsBlocker": {
             "label": "Filtro de red",
@@ -181,6 +189,10 @@
         "assigned": "<big>{count}</big><rest> {count, plural, one {asignada} other {asignadas}}</rest>",
         "overdue": " - {count, plural, one {# atrasada} other {# atrasadas}}",
         "dueToday": " - {count, plural, one {# vence hoy} other {# vencen hoy}}"
+    },
+    "polarCard": {
+        "placeholder": "Pregunta a Polar",
+        "send": "Preguntar"
     },
     "appCards": {
         "section": "De tus apps",

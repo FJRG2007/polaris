@@ -15,7 +15,8 @@
 import { useState, type ReactNode } from "react";
 import { AppLogo, type PolarisApp } from "@polaris/ui";
 import { moveFavorite } from "@/lib/app-launcher";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { OVERVIEW_APP_ID } from "@/lib/apps";
+import { ArrowDown, ArrowUp, House, Star } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import {
@@ -45,7 +46,15 @@ export function ArrangeAppsDialog({
     order: readonly string[];
 }) {
     const t = useTranslations("nav");
-    const { order: arranged, arrangeApps, resetOrder } = useFavoriteApps();
+    const {
+        order: arranged,
+        favorites,
+        home,
+        arrangeApps,
+        resetOrder,
+        toggleFavorite,
+        setHome
+    } = useFavoriteApps();
     const synced = open ? arranged : null;
     const [shownFor, setShownFor] = useState(synced);
     const [shown, setShown] = useState(order);
@@ -70,6 +79,35 @@ export function ArrangeAppsDialog({
                     {listed.map((app, at) => {
                         return (
                             <Row key={app.id} app={app}>
+                                {app.id === OVERVIEW_APP_ID ? null : (
+                                    <IconButton
+                                        label={`${t(favorites.includes(app.id) ? "switcher.unfavorite" : "switcher.favorite")}: ${app.label}`}
+                                        pressed={favorites.includes(app.id)}
+                                        onClick={() => toggleFavorite(app.id)}
+                                    >
+                                        <Star
+                                            className={cn(
+                                                "size-4",
+                                                favorites.includes(app.id) &&
+                                                    "fill-current text-primary"
+                                            )}
+                                            aria-hidden="true"
+                                        />
+                                    </IconButton>
+                                )}
+                                <IconButton
+                                    label={`${t(home === app.id ? "switcher.notStart" : "switcher.start")}: ${app.label}`}
+                                    pressed={home === app.id}
+                                    onClick={() => setHome(home === app.id ? null : app.id)}
+                                >
+                                    <House
+                                        className={cn(
+                                            "size-4",
+                                            home === app.id && "fill-current text-primary"
+                                        )}
+                                        aria-hidden="true"
+                                    />
+                                </IconButton>
                                 <IconButton
                                     label={t("switcher.moveEarlier", { app: app.label })}
                                     blocked={at === 0}
@@ -128,11 +166,13 @@ function Row({ app, children }: { app: PolarisApp; children: ReactNode }) {
 function IconButton({
     label,
     blocked = false,
+    pressed,
     onClick,
     children
 }: {
     label: string;
     blocked?: boolean;
+    pressed?: boolean;
     onClick: () => void;
     children: ReactNode;
 }) {
@@ -141,6 +181,7 @@ function IconButton({
             type="button"
             aria-label={label}
             title={label}
+            aria-pressed={pressed}
             aria-disabled={blocked || undefined}
             onClick={() => {
                 if (!blocked) onClick();

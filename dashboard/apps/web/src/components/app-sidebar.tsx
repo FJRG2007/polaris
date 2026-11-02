@@ -31,6 +31,7 @@ import { railApps } from "@/lib/app-launcher";
 import { ChevronLeft, LayoutGrid, Star } from "lucide-react";
 import { useAppFavorites } from "@/components/use-app-favorites";
 import { useLastPlaces } from "@/lib/last-place";
+import { AppActionsMenu } from "@/components/app-actions-menu";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
@@ -284,7 +285,7 @@ function RailLink({
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
-    return (
+    const row = (
         <Link
             href={href}
             aria-current={active ? "page" : undefined}
@@ -321,4 +322,5 @@ function RailLink({
             ) : null}
         </Link>
     );
+    return !inApp && appId ? <AppActionsMenu appId={appId}>{row}</AppActionsMenu> : row;
 }

@@ -10,12 +10,18 @@
 import { createContext, useContext } from "react";
 
 export interface FavoriteApps {
-    /** The favorites an older app menu saved with its star, in order - kept, and
-     *  read as before, until the menu is arranged; see `arrangedPrefs`. */
+    /** The apps somebody marked as favorites, in order: what the Overview's rail
+     *  lists. */
     readonly favorites: readonly string[];
     /** The order the app menu was arranged in, kept the same way; empty until
      *  somebody arranges it. */
     readonly order: readonly string[];
+    /** The app to open on entering Polaris; null for the usual landing. */
+    readonly home: string | null;
+    /** Make an app a favorite, or stop it being one. */
+    readonly toggleFavorite: (id: string) => void;
+    /** Choose the app to open on entering Polaris, or none. */
+    readonly setHome: (id: string | null) => void;
     /** Put the app menu in this order; apps not on screen keep their slots. */
     readonly arrangeApps: (visible: readonly string[]) => void;
     /** Forget the arrangement: favorites first and the rest by use again. */
@@ -35,6 +41,9 @@ export interface FavoriteApps {
 const NONE: FavoriteApps = {
     favorites: [],
     order: [],
+    home: null,
+    toggleFavorite: () => undefined,
+    setHome: () => undefined,
     arrangeApps: () => undefined,
     resetOrder: () => undefined,
     replacePrefs: () => undefined,

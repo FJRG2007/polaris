@@ -12,15 +12,17 @@ import manifest from "../../src/app/manifest";
 const worker = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
 
 describe("the manifest", () => {
-    it("opens Polaris in a window of its own on the overview", () => {
+    it("opens Polaris in a window of its own, through the address that picks the start", () => {
         const app = manifest();
         expect(app.display).toBe("standalone");
-        expect(app.start_url).toBe("/home");
+        expect(app.start_url).toBe("/");
         expect(app.icons?.some((icon) => icon.sizes === "any")).toBe(true);
     });
 
     it("offers the installed app for mailto links, at the address Mail registers", () => {
-        expect(manifest().protocol_handlers).toEqual([{ protocol: "mailto", url: "/mail/compose?url=%s" }]);
+        expect(manifest().protocol_handlers).toEqual([
+            { protocol: "mailto", url: "/mail/compose?url=%s" }
+        ]);
     });
 });
 

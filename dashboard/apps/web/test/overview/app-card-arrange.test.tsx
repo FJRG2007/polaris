@@ -14,6 +14,7 @@ import type { OverviewPreferences } from "@polaris/core";
 import type { AppWidgetKind } from "@/lib/overview/app-widgets";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { ToastProvider } from "@polaris/ui";
 
 const saveLayout = vi.hoisted(() => vi.fn(async (_input: unknown) => ({})));
 const saveCards = vi.hoisted(() => vi.fn(async (_input: unknown) => ({})));
@@ -131,6 +132,66 @@ afterEach(() => {
     vi.unstubAllGlobals();
     saveLayout.mockClear();
     saveCards.mockClear();
+});
+
+describe("a card taken off the Overview", () => {
+    function drawWithToasts() {
+        return render(
+            <MessagesWrapper>
+                <ToastProvider>
+                    <OverviewGrid
+                        name="Fixture User"
+                        isAdmin={false}
+                        preferences={PREFERENCES}
+                        available={["shortcuts", "apps"]}
+                        layout={PREFERENCES.widgets}
+                        apps={[{ id: "drive", label: "Drive", description: "", href: "/drive" }]}
+                        gate={{ held: [], installed: [] }}
+                        appKinds={[KIND]}
+                    />
+                </ToastProvider>
+            </MessagesWrapper>
+        );
+    }
+
+    const removeButton = (container: HTMLElement, key: string) =>
+        container.querySelector(`[data-widget="${key}"] button[aria-label^="Remove"]`)!;
+
+    it("is put back without undoing what was changed after it", async () => {
+        const { container, getAllByRole } = drawWithToasts();
+        fireEvent.click(removeButton(container, "shortcuts"));
+        fireEvent.click(removeButton(container, "apps"));
+        expect(drawn(container)).toEqual(["app:card0001"]);
+        const undo = getAllByRole("button", { name: "Put back" });
+        await act(async () => fireEvent.click(undo[undo.length - 1]!));
+        await act(async () => fireEvent.click(undo[0]!));
+        await act(async () => vi.runOnlyPendingTimers());
+        const saved = saveLayout.mock.lastCall![0] as {
+            widgets: { id: string; hidden: boolean }[];
+        };
+        const hidden = saved.widgets.filter((widget) => widget.hidden).map((widget) => widget.id);
+        expect(new Set(drawn(container))).toEqual(new Set(["shortcuts", "apps", "app:card0001"]));
+        expect(hidden).toEqual([]);
+    });
+
+    it("leaves a second removed card off when only the first is put back", async () => {
+        const { container, getByRole } = drawWithToasts();
+        fireEvent.click(removeButton(container, "shortcuts"));
+        const undo = getByRole("button", { name: "Put back" });
+        fireEvent.click(removeButton(container, "apps"));
+        await act(async () => fireEvent.click(undo));
+        expect(drawn(container)).toEqual(["shortcuts", "app:card0001"]);
+    });
+
+    it("keeps an app card's own change made while the note is up", async () => {
+        const { container, getAllByRole } = drawWithToasts();
+        fireEvent.click(removeButton(container, "app:card0001"));
+        fireEvent.click(removeButton(container, "apps"));
+        const undo = getAllByRole("button", { name: "Put back" });
+        await act(async () => fireEvent.click(undo[0]!));
+        expect(drawn(container)).toContain("app:card0001");
+        expect(drawn(container)).not.toContain("apps");
+    });
 });
 
 describe("an app card on the Overview", () => {

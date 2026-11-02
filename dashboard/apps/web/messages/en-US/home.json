@@ -28,7 +28,11 @@
         "moveDown": "Move down",
         "width": "Width",
         "clearHistory": "Clear history",
-        "hide": "Hide card"
+        "hide": "Hide card",
+        "remove": "Remove {name}",
+        "removeCard": "Remove card",
+        "removed": "{name} removed. Bring it back from Customize.",
+        "undo": "Put back"
     },
     "sizes": {
         "sm": "Narrow",
@@ -92,6 +96,10 @@
         "dnsBlocker": {
             "label": "Network filter",
             "description": "The last 24 hours' lookups on your network, and how many were blocked."
+        },
+        "polar": {
+            "label": "Polar",
+            "description": "Ask a question from here without leaving the Overview."
         }
     },
     "picker": {
@@ -181,6 +189,10 @@
         "assigned": "<big>{count}</big><rest> assigned</rest>",
         "overdue": " - {count} overdue",
         "dueToday": " - {count} due today"
+    },
+    "polarCard": {
+        "placeholder": "Ask Polar anything",
+        "send": "Ask Polar"
     },
     "appCards": {
         "section": "From your apps",

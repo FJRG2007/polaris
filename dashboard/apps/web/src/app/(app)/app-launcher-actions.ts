@@ -11,7 +11,8 @@
  * loses an app for a week finds it where they left it when it comes back.
  *
  * A bare list is the favorites alone - what a tab loaded before the menu could
- * be arranged sends - and keeps the arrangement already stored.
+ * be arranged sends - and keeps the arrangement already stored. Whatever a save
+ * does not name, an older tab's included, keeps its stored opening app.
  */
 
 import { requireUser } from "@/lib/session";
@@ -26,9 +27,10 @@ export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: 
     // the sentence in their language, and the menu puts their list back.
     if (!parsed.success)
         return { error: (await getTranslations("nav"))("errors.favoritesNotSaved") };
+    const stored = await getLauncherPrefs(user.id);
     const prefs = Array.isArray(parsed.data)
-        ? { favorites: parsed.data, order: (await getLauncherPrefs(user.id)).order }
-        : parsed.data;
+        ? { favorites: parsed.data, order: stored.order, home: stored.home }
+        : { ...parsed.data, home: parsed.data.home === undefined ? stored.home : parsed.data.home };
     await saveLauncherPrefs(user.id, prefs);
     return {};
 }

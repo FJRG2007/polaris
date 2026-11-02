@@ -43,19 +43,32 @@ const appListSchema = z
     .max(MAX_FAVORITE_APPS)
     .refine((ids) => new Set(ids).size === ids.length, "An app can only be pinned once.");
 
-/** What an account keeps about its app menu: the favorites, and the order it
- *  arranged the menu in - empty until it arranges it. */
+/** What an account keeps about its app menu: the favorites, the order it
+ *  arranged the menu in - empty until it arranges it - and the app it wants to
+ *  open when it enters Polaris, null for the usual landing. */
 export interface LauncherPrefs {
     readonly favorites: readonly string[];
     readonly order: readonly string[];
+    readonly home: string | null;
 }
 
-export const NO_LAUNCHER_PREFS: LauncherPrefs = { favorites: [], order: [] };
+export const NO_LAUNCHER_PREFS: LauncherPrefs = { favorites: [], order: [], home: null };
 
-/** A save: both lists. A bare list is the favorites alone, which is what a tab
- *  loaded before the menu could be arranged still sends. */
+/** A save: both lists, and the opening app. A tab loaded before there was one
+ *  leaves it out, and a bare list is the favorites alone, which is what a tab
+ *  loaded before the menu could be arranged still sends: neither says anything
+ *  about what they do not name, so both keep what is stored. */
 export const launcherPrefsSchema = z.union([
-    z.object({ favorites: appListSchema, order: appListSchema }),
+    z.object({
+        favorites: appListSchema,
+        order: appListSchema,
+        home: z
+            .string()
+            .trim()
+            .refine((id) => PINNABLE.has(id), "That app does not exist.")
+            .nullable()
+            .optional()
+    }),
     appListSchema
 ]);
 
@@ -78,22 +91,30 @@ export function parseLauncherPrefs(raw: string | null | undefined): LauncherPref
     if (!raw) return NO_LAUNCHER_PREFS;
     try {
         const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) return { favorites: keepApps(parsed), order: [] };
+        if (Array.isArray(parsed)) return { favorites: keepApps(parsed), order: [], home: null };
         if (!parsed || typeof parsed !== "object") return NO_LAUNCHER_PREFS;
-        const stored = parsed as { favorites?: unknown; order?: unknown };
-        return { favorites: keepApps(stored.favorites), order: keepApps(stored.order) };
+        const stored = parsed as { favorites?: unknown; order?: unknown; home?: unknown };
+        return {
+            favorites: keepApps(stored.favorites),
+            order: keepApps(stored.order),
+            home: keepApps([stored.home])[0] ?? null
+        };
     } catch {
         return NO_LAUNCHER_PREFS;
     }
 }
 
-/** The stored form: the old bare list while nothing has been arranged, so an
- *  account that never arranged its menu stores exactly what it always did, and
+/** The stored form: the old bare list while there is only that to keep, so an
+ *  account that changed nothing else stores exactly what it always did, and
  *  nothing at all when there is nothing to keep. */
 export function serializeLauncherPrefs(prefs: LauncherPrefs): string | null {
-    if (prefs.order.length === 0)
+    if (prefs.order.length === 0 && !prefs.home)
         return prefs.favorites.length > 0 ? JSON.stringify(prefs.favorites) : null;
-    return JSON.stringify({ favorites: prefs.favorites, order: prefs.order });
+    return JSON.stringify({
+        favorites: prefs.favorites,
+        order: prefs.order,
+        ...(prefs.home ? { home: prefs.home } : {})
+    });
 }
 
 /** How much one app has been used: a decayed count of opens as of `at`. */
@@ -251,20 +272,18 @@ export function arrangeApps(stored: readonly string[], visible: readonly string[
 /**
  * The preferences after somebody arranged the menu into `visible`.
  *
- * Arranging is the one way to say what comes first now that there is no star,
- * so the first arrangement folds the favorites into the order and retires them:
- * the order already drew them first, so nothing moves on screen. A favorite this
- * account cannot open today keeps its place in the stored order, and comes back
- * where it was. Until somebody arranges, favorites saved by an older menu are
- * kept exactly as they were - the menu and the Overview's rail read them the
- * same way they always did.
+ * The first arrangement folds the favorites into the order, which already drew
+ * them first, so nothing moves on screen. They stay favorites: arranging says
+ * what comes first in the menu, and being a favorite is what puts an app on the
+ * Overview's rail. A favorite this account cannot open today keeps its place in
+ * the stored order, and comes back where it was.
  */
 export function arrangedPrefs(stored: LauncherPrefs, visible: readonly string[]): LauncherPrefs {
     const kept = [...stored.order, ...stored.favorites.filter((id) => !stored.order.includes(id))];
     const order = arrangeApps(kept, visible);
     // Nothing moved: nothing to save, and nothing to retire either.
     if (stored.order.length > 0 && sameOrder(order, kept)) return stored;
-    return { favorites: [], order };
+    return { ...stored, order };
 }
 
 export function sameOrder(left: readonly string[], right: readonly string[]): boolean {

@@ -36,6 +36,7 @@ import { usePathname } from "next/navigation";
 import { readMenuUsage } from "@/lib/app-usage";
 import { ArrowUpDown, CheckCheck, Store } from "lucide-react";
 import { badgeLabel } from "@/lib/notification-badge";
+import { AppActionsMenu } from "@/components/app-actions-menu";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { anythingWaiting, useAppUnread } from "@/components/app-unread";
@@ -205,6 +206,7 @@ export function AppLauncher({
                 // The count on a tile is what is waiting in it; the tile marks it
                 // read without opening the app - see `launcher-waiting`.
                 tileAction={marks.tileAction}
+                wrapTile={(app, tile) => <AppActionsMenu appId={app.id}>{tile}</AppActionsMenu>}
                 // Icons only, so the options take one short row under the grid;
                 // the words stay as the accessible name and the hover tooltip.
                 footer={

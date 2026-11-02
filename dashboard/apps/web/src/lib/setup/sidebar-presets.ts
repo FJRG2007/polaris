@@ -35,13 +35,13 @@ export const SIDEBAR_PRESETS: Readonly<Record<SidebarPresetId, readonly string[]
 
 /** The stored preferences a preset stands for. Applying one starts the app menu
  *  over from its order too, so the rail draws exactly the preset. */
-export function presetPrefs(id: SidebarPresetId): LauncherPrefs {
+export function presetPrefs(id: SidebarPresetId): Omit<LauncherPrefs, "home"> {
     const apps = SIDEBAR_PRESETS[id];
     return apps.length === 0 ? NO_LAUNCHER_PREFS : { favorites: [...apps], order: [] };
 }
 
 /** The preset these preferences are, or "custom" when they are none of them. */
-export function matchPreset(prefs: LauncherPrefs): SidebarPresetId | "custom" {
+export function matchPreset(prefs: Omit<LauncherPrefs, "home">): SidebarPresetId | "custom" {
     if (prefs.favorites.length === 0 && prefs.order.length === 0) return "default";
     if (prefs.order.length > 0) return "custom";
     const found = SIDEBAR_PRESET_IDS.find((id) => {
