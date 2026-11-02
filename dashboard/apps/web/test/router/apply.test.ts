@@ -143,7 +143,7 @@ describe("applyRouter", () => {
     it("keeps the plan when the confirmation arrived but its answer was lost", async () => {
         machine((script) => (isRollback(script) ? "confirmed\n" : new Error("connection lost")));
         await settled(applyRouter(HOST, "owner", PLAN));
-        expect(setSetting).toHaveBeenCalledTimes(1);
+        expect(setSetting).toHaveBeenCalledWith(`router.plan.${HOST}`, JSON.stringify(PLAN));
     });
 
     it("does not claim a rollback it never saw from a machine that went silent", async () => {

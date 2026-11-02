@@ -33,6 +33,10 @@ export interface RouterPort {
     readonly up: boolean;
     readonly mac: string | null;
     readonly addresses: readonly string[];
+    /** Public IPv6 addresses, which a network only has once a prefix reached it. */
+    readonly publicAddresses?: readonly string[];
+    /** A radio, which can run an access point. */
+    readonly wireless?: boolean;
     /** The machine reaches the internet this way now. */
     readonly hasGateway: boolean;
     readonly received: number;
@@ -52,11 +56,20 @@ export interface RouterReading {
     readonly activeWan: string | null;
     readonly running: boolean;
     readonly clients: readonly RouterClient[];
+    /** The PPPoE sessions up now, by device: they are lines, not ports to choose. */
+    readonly sessions?: readonly string[];
+    /** The radios on the air now. */
+    readonly airing?: readonly string[];
     /** The last change did not stick and the machine went back. */
     readonly rolledBack: boolean;
 }
 
-const VIRTUAL = /^(lo|docker\d*|br-|veth|tailscale|wg|virbr|cni|flannel)/;
+const SESSION = /^ppp-/;
+const VIRTUAL = /^(lo|docker\d*|br-|veth|tailscale|wg|virbr|cni|flannel|ppp-)/;
+
+function namesIn(raw: string): string[] {
+    return raw.split("\n").flatMap((line) => line.trim() || []);
+}
 
 function jsonList<T>(raw: string, schema: z.ZodType<T>): T[] {
     try {
@@ -105,6 +118,8 @@ export function readProbe(output: string): RouterReading {
     const addresses = jsonList(section("addresses"), addressSchema);
     const routes = jsonList(section("routes"), routeSchema);
     const counters = jsonList(section("counters"), countersSchema);
+    const publicSix = jsonList(section("publicsix"), addressSchema);
+    const radios = namesIn(section("radios"));
     const ports = links
         .filter(({ ifname }) => !VIRTUAL.test(ifname))
         .map((link): RouterPort => {
@@ -116,6 +131,10 @@ export function readProbe(output: string): RouterReading {
                 addresses: (
                     addresses.find(({ ifname }) => ifname === link.ifname)?.addr_info ?? []
                 ).map(({ local, prefixlen }) => `${local}/${prefixlen}`),
+                publicAddresses: (
+                    publicSix.find(({ ifname }) => ifname === link.ifname)?.addr_info ?? []
+                ).map(({ local, prefixlen }) => `${local}/${prefixlen}`),
+                wireless: radios.includes(link.ifname),
                 hasGateway: routes.some(({ dev, gateway }) => dev === link.ifname && !!gateway),
                 received: stats?.rx.bytes ?? 0,
                 sent: stats?.tx.bytes ?? 0
@@ -124,6 +143,10 @@ export function readProbe(output: string): RouterReading {
     return {
         ports,
         activeWan: section("wan") || null,
+        sessions: links.flatMap(({ ifname }) =>
+            SESSION.test(ifname) && addresses.some((one) => one.ifname === ifname) ? ifname : []
+        ),
+        airing: namesIn(section("airing")),
         running: section("services")
             .split("\n")
             .filter(Boolean)

@@ -8,6 +8,7 @@
  * (`renderApply`).
  */
 
+import { z } from "zod";
 import * as plans from "./plan";
 import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
@@ -17,6 +18,7 @@ import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { cidrsOverlap } from "@/lib/vpn/networks";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { openText, sealText } from "@/lib/tls/managed-certificates";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";
 
 /** The most machines offered: the picker searches within these. */
@@ -35,6 +37,8 @@ export type RouterRefusalCode =
     | "missingPort"
     | "lineOverlap"
     | "lockout"
+    | "notRadio"
+    | "noPassword"
     | "rolledBack"
     | "unconfirmed"
     | "invalid";
@@ -68,6 +72,26 @@ async function storedPlan(hostId: string): Promise<plans.RouterPlan | null> {
     } catch {
         return null;
     }
+}
+
+/** The passwords kept for a machine. Unreadable reads as none: the screen then asks for
+ *  them again, rather than a machine being told a wrong one. */
+async function storedSecrets(hostId: string): Promise<plans.RouterSecrets> {
+    const opened = openText(await getSetting(plans.routerSecretsKey(hostId)));
+    if (!opened) return {};
+    try {
+        const parsed: unknown = JSON.parse(opened);
+        return secretsSchema.parse(parsed);
+    } catch {
+        return {};
+    }
+}
+
+const secretsSchema = z.record(z.string(), z.string());
+
+async function keepSecrets(hostId: string, secrets: plans.RouterSecrets): Promise<void> {
+    const value = Object.keys(secrets).length > 0 ? sealText(JSON.stringify(secrets)) : null;
+    await setSetting(plans.routerSecretsKey(hostId), value);
 }
 
 const queues = new Map<string, Promise<unknown>>();
@@ -186,6 +210,13 @@ export function refusalOf(
     const known = new Set([...reading.ports.map(({ name }) => name), ...held]);
     const used = [...plan.wans, ...plan.lans].map((link) => link.interface);
     if (used.some((name) => !known.has(name))) return "missingPort";
+    const notRadio = plan.lans.some((lan) => {
+        if (!lan.wifi) return false;
+        const port = reading.ports.find(({ name }) => name === lan.interface);
+        // Unplugged is not refused: a USB radio returns, as any other held port does.
+        return port ? port.wireless !== true : false;
+    });
+    if (notRadio) return "notRadio";
     const lines = reading.ports.filter(({ name }) =>
         plan.wans.some((wan) => wan.interface === name)
     );
@@ -200,7 +231,15 @@ export function refusalOf(
         const carries = port?.addresses.some((held) => held.split("/")[0] === connectedTo);
         return carries === true && lan.address !== connectedTo;
     });
-    return lockedOut ? "lockout" : null;
+    if (lockedOut) return "lockout";
+    // A fixed line in place of the address Polaris comes in by leaves it talking to nobody.
+    const movesLogin = plan.wans.some((wan) => {
+        if (plans.modeOf(wan) !== "static" || wan.vlan !== null) return false;
+        const port = reading.ports.find(({ name }) => name === wan.interface);
+        const carries = port?.addresses.some((held) => held.split("/")[0] === connectedTo);
+        return carries === true && wan.address?.split("/")[0] !== connectedTo;
+    });
+    return movesLogin ? "lockout" : null;
 }
 
 type ApplyEnding = "confirmed" | "rolledBack";
@@ -247,16 +286,19 @@ export async function applyRouter(hostId: string, ownerId: string, input: unknow
         const saved = await storedPlan(hostId);
         const refusal = refusalOf(plan, reading, connection.address, saved);
         if (refusal) throw new RouterRefusal(refusal);
+        const secrets = plans.secretsOf(plan, await storedSecrets(hostId));
+        if (!secrets) throw new RouterRefusal("noPassword");
         const management = await managementAddress(connection).catch(() => null);
         const applyId = randomUUID();
         await runScript(
             connection,
-            plans.renderApply(plan, { management, sshPort: connection.port }, applyId)
+            plans.renderApply(plan, { management, sshPort: connection.port }, applyId, secrets)
         );
         const ending = await applyEnding(connection, applyId);
         if (ending === null) throw new RouterRefusal("unconfirmed");
         if (ending === "rolledBack") throw new RouterRefusal("rolledBack");
-        await setSetting(plans.routerPlanKey(hostId), JSON.stringify(plan));
+        await keepSecrets(hostId, secrets);
+        await setSetting(plans.routerPlanKey(hostId), JSON.stringify(plans.withoutSecrets(plan)));
     });
 }
 
@@ -266,5 +308,6 @@ export async function removeRouter(hostId: string, ownerId: string): Promise<voi
         const connection = await connectionFor(hostId, ownerId);
         await runScript(connection, plans.REMOVE_SCRIPT);
         await setSetting(plans.routerPlanKey(hostId), null);
+        await setSetting(plans.routerSecretsKey(hostId), null);
     });
 }

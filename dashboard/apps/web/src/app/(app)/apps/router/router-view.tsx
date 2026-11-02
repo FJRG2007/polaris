@@ -11,6 +11,7 @@ import Link from "next/link";
 import * as ui from "@polaris/ui";
 import * as actions from "./actions";
 import { LanDialog } from "./lan-dialog";
+import { LineDialog } from "./line-dialog";
 import { ForwardDialog } from "./forward-dialog";
 import { useVpnRead } from "../vpn/use-vpn-read";
 import type { RouterView } from "@/lib/router/service";
@@ -21,6 +22,8 @@ import { ArrowDown, ArrowUp, Loader2, Plus, Pencil, RefreshCw, Trash2 } from "lu
 import {
     deviceOf,
     isPortName,
+    lineDevice,
+    modeOf,
     routerPlanSchema,
     MAX_CLIENTS,
     MAX_LANS,
@@ -39,20 +42,39 @@ function linkProblem(
     applied: readonly RouterWan[] | undefined,
     reading: RouterReading | null,
     isLine: boolean
-): "lineMissing" | "lineNoWay" | null {
+): LinkProblem | null {
     if (!reading?.running) return null;
     if (!applied?.some((one) => deviceOf(one) === deviceOf(link))) return null;
     const port = reading.ports.find(({ name }) => name === deviceOf(link));
     if (!port) return "lineMissing";
+    if (isLine && modeOf(link) === "pppoe") {
+        return reading.sessions?.includes(lineDevice(link)) ? null : "sessionDown";
+    }
     return isLine && !port.hasGateway ? "lineNoWay" : null;
 }
+
+/** What a running network was asked for and is not doing yet. */
+function networkProblem(
+    lan: RouterLan,
+    applied: readonly RouterLan[] | undefined,
+    reading: RouterReading | null
+): LinkProblem | null {
+    const missing = linkProblem(lan, applied, reading, false);
+    if (missing || !reading?.running) return missing;
+    if (!applied?.some((one) => one.id === lan.id)) return null;
+    if (lan.wifi && !reading.airing?.includes(deviceOf(lan))) return "notAiring";
+    const port = reading.ports.find(({ name }) => name === deviceOf(lan));
+    return lan.ipv6 && !port?.publicAddresses?.length ? "noPrefix" : null;
+}
+
+type LinkProblem = "lineMissing" | "lineNoWay" | "sessionDown" | "notAiring" | "noPrefix";
 
 function LinkWarning({
     t,
     problem
 }: {
     t: Translate;
-    problem: "lineMissing" | "lineNoWay" | null;
+    problem: LinkProblem | null;
 }) {
     if (problem === null) return null;
     return <span className="w-full text-xs text-warning">{t(problem)}</span>;
@@ -69,6 +91,11 @@ const PROBLEMS = [
     "badReservation",
     "badPort",
     "badVlan",
+    "badStaticLine",
+    "lineSubnet",
+    "badPppoe",
+    "badWifi",
+    "wifiVlan",
     "sharedPort",
     "overlap",
     "samePort",
@@ -146,6 +173,7 @@ function RouterEditor({
     const read = useVpnRead<RouterView>(`router:${hostId}`, load, t("errors.generic"));
     const [draft, setDraft] = useState<RouterPlan | null>(null);
     const [editingLan, setEditingLan] = useState<RouterLan | "new" | null>(null);
+    const [editingLine, setEditingLine] = useState<number | null>(null);
     const [addingForward, setAddingForward] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -168,6 +196,11 @@ function RouterEditor({
         return [...new Set([...present, ...held])];
     }, [reading, saved]);
     const portOptions = ports.map((name) => ({ value: name, label: name }));
+    const radios = useMemo(
+        () => reading?.ports.filter(({ wireless }) => wireless).map(({ name }) => name) ?? [],
+        [reading]
+    );
+    const lineShown = editingLine === null ? undefined : plan.wans[editingLine];
     const changed = JSON.stringify(plan) !== JSON.stringify(saved ?? EMPTY_PLAN);
     const check = routerPlanSchema.safeParse(plan);
     const problem = check.success
@@ -284,6 +317,14 @@ function RouterEditor({
                                     })
                                 }
                             />
+                            {modeOf(wan) === "dhcp" ? null : (
+                                <ui.Badge variant="neutral">
+                                    {t(`lineModes.${modeOf(wan)}`)}
+                                </ui.Badge>
+                            )}
+                            <IconButton label={t("editLine")} onClick={() => setEditingLine(at)}>
+                                <Pencil />
+                            </IconButton>
                             <IconButton
                                 label={t("moveUp")}
                                 disabled={at === 0}
@@ -350,6 +391,8 @@ function RouterEditor({
                             {lan.isolated ? (
                                 <ui.Badge variant="neutral">{t("isolated")}</ui.Badge>
                             ) : null}
+                            {lan.wifi ? <ui.Badge variant="neutral">{lan.wifi.ssid}</ui.Badge> : null}
+                            {lan.ipv6 ? <ui.Badge variant="neutral">{t("ipv6")}</ui.Badge> : null}
                             <IconButton label={t("edit")} onClick={() => setEditingLan(lan)}>
                                 <Pencil />
                             </IconButton>
@@ -363,7 +406,7 @@ function RouterEditor({
                             </IconButton>
                             <LinkWarning
                                 t={t}
-                                problem={linkProblem(lan, saved?.lans, reading, false)}
+                                problem={networkProblem(lan, saved?.lans, reading)}
                             />
                         </li>
                     ))}
@@ -450,9 +493,24 @@ function RouterEditor({
                     lan={editingLan === "new" ? null : editingLan}
                     taken={plan.lans}
                     ports={ports}
+                    radios={radios}
                     privateNetworks={privateNetworks}
                     onClose={() => setEditingLan(null)}
                     onSave={saveLan}
+                />
+            ) : null}
+            {lineShown ? (
+                <LineDialog
+                    wan={lineShown}
+                    onClose={() => setEditingLine(null)}
+                    onSave={(wan) => {
+                        change({
+                            wans: plan.wans.map((one, index) =>
+                                index === editingLine ? wan : one
+                            )
+                        });
+                        setEditingLine(null);
+                    }}
                 />
             ) : null}
             {addingForward ? (
@@ -586,6 +644,11 @@ function ClientList({ t, clients }: { t: Translate; clients: RouterReading["clie
     );
 }
 
+/** A line by its port: a session's device name means nothing on screen. */
+function lineName(plan: RouterPlan | null, device: string): string {
+    return plan?.wans.find((wan) => lineDevice(wan) === device)?.interface ?? device;
+}
+
 function Status({
     t,
     view,
@@ -612,7 +675,7 @@ function Status({
             )}
             {reading?.activeWan ? (
                 <span className="text-muted-foreground">
-                    {t("usingLine", { line: reading.activeWan })}
+                    {t("usingLine", { line: lineName(plan, reading.activeWan) })}
                 </span>
             ) : null}
             {reading?.rolledBack ? <ui.Badge variant="warning">{t("wentBack")}</ui.Badge> : null}

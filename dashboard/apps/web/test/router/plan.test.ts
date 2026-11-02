@@ -76,7 +76,7 @@ describe("the firewall", () => {
         const rules = router.renderFirewall(parsed(PLAN), ACCESS);
         expect(rules).toContain("policy drop");
         expect(rules).toContain("ip saddr 192.0.2.9 tcp dport 22 accept");
-        expect(rules).toContain('oifname { "eth0" } masquerade');
+        expect(rules).toContain('oifname { "eth0" } meta nfproto ipv4 masquerade');
     });
 
     it("gives a network without internet no way out, and an isolated one no login", () => {

@@ -11,7 +11,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { setSetting } from "@/lib/setting-store";
-import { routerPlanKey } from "@/lib/router/plan";
+import { routerPlanKey, routerSecretsKey } from "@/lib/router/plan";
 import { dropGrantsFor } from "@/lib/access/grants";
 import { dropSshConnections } from "@/lib/connection-pool";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
@@ -240,6 +240,7 @@ export async function deleteHost(ownerId: string, hostId: string): Promise<void>
     if (count > 0) {
         await dropGrantsFor("place.server", hostId);
         await setSetting(routerPlanKey(hostId), null);
+        await setSetting(routerSecretsKey(hostId), null);
     }
     // Connections are pooled and outlive a single request, so a machine that is no
     // longer Polaris's must have its open sessions closed here rather than waiting
