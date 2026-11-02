@@ -15,6 +15,7 @@
  * these are the whole content of the card they sit in.
  */
 
+import { desktopInstaller } from "./desktop-install";
 import { Select } from "../../index";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "../../index";
@@ -76,10 +77,13 @@ export function useBrowserChoice(
     useEffect(() => {
         let alive = true;
         void (async () => {
-            const found = detectBrowser(navigator.userAgent);
+            // Inside the desktop app the page is not in a browser the reader
+            // uses, so the question goes to the system: its default one.
+            const named = await desktopInstaller()?.defaultBrowser?.();
+            const found = named ? (named as BrowserId) : detectBrowser(navigator.userAgent);
             // Brave answers as Chrome in the user agent, so the guess is put to
             // the browser itself before it is shown - see `isBraveBrowser`.
-            const real = found === "chrome" && (await isBraveBrowser()) ? "brave" : found;
+            const real = !named && found === "chrome" && (await isBraveBrowser()) ? "brave" : found;
             if (!alive) return;
             setDetected(real);
             if (!picked.current && real) setBrowser(real);

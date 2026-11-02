@@ -72,6 +72,8 @@ export interface PolarisDesktop {
     ): Promise<boolean>;
     /** The programs running now, for picking one to add as a game. */
     runningPrograms?(): Promise<readonly string[]>;
+    /** The window that adds and switches servers. Absent from an older app. */
+    openServers?(): Promise<void>;
     /** The screens and windows to share, each with a small picture, for the
      *  picker this page draws. Null where the system's own picker is the one to
      *  use (macOS). Absent from an app older than the picker, which then shows

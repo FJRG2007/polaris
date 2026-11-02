@@ -1224,6 +1224,14 @@
             "title": "Downloads",
             "intro": "Polaris on your desktop, in your browser, and on your own machine."
         },
+        "install": {
+            "action": "Install",
+            "running": "Installing...",
+            "failed": "The install did not finish. Try again.",
+            "extensionDone": "Installed. Your browser is on its extensions page: turn on Developer mode, press Load unpacked and paste the folder, which is already copied. Browsers only add an extension by themselves from their store.",
+            "cliDone": "Installed. Open a new terminal to use it, then sign in with the line below.",
+            "deckDone": "Installed. It updates by itself."
+        },
         "extension": {
             "title": "Browser extension",
             "description": "Fills a login, saves a new one, and unlocks from your vault. It asks the browser for permission to talk to this Polaris and no other, and holds no standing access to the pages you open.",

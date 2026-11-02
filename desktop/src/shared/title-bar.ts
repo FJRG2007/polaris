@@ -25,10 +25,11 @@ export type TitleBarColors = z.infer<typeof titleBarColorsSchema>;
 export const TITLE_BAR_HEIGHT = 48;
 
 /** The buttons' height at a page zoom, so they keep lining up with the header
- *  the zoom scaled. */
+ *  the zoom scaled. They stop above its bottom border: they are drawn over the
+ *  page, and over it the line would end where they begin. */
 export function overlayHeight(zoom: number): number {
     const factor = Number.isFinite(zoom) && zoom > 0 ? Math.min(Math.max(zoom, 0.25), 5) : 1;
-    return Math.round(TITLE_BAR_HEIGHT * factor);
+    return Math.round(TITLE_BAR_HEIGHT * factor) - Math.max(1, Math.round(factor));
 }
 
 /** The buttons' colours before a page has said what is under them, following

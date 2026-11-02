@@ -19,6 +19,8 @@ import { isServerUrl, serverPath } from "./navigation";
 import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
+import { installTool } from "./install-tool";
+import { browserFromName, installRequestSchema, type InstallResult } from "@/shared/install-tools";
 import {
     type AddressCheck,
     CHANNELS,
@@ -31,7 +33,7 @@ import type { ServerRow } from "@/shared/servers";
 import type { UpdateReadyState } from "./update-ready";
 import { readServerAddress } from "@/shared/server-address";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
-import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -46,6 +48,8 @@ export interface IpcHost extends PushHost {
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
     readonly removeServer: (origin: string) => Outcome;
+    /** The window that adds, names, removes and switches servers. */
+    readonly openServers: () => void;
     /** The update waiting for a restart, and the restart into it. */
     readonly updates: Pick<UpdateReadyState, "current" | "install" | "offer">;
 }
@@ -272,6 +276,25 @@ export function registerIpc(host: IpcHost): void {
         if (!fromPolaris(event)) return;
         stopDrawing();
         endShare();
+    });
+
+    // Takes a name from a list and nothing else; see `install-tools`.
+    ipcMain.handle(CHANNELS.installTool, async (event, raw: unknown): Promise<InstallResult> => {
+        const request = installRequestSchema.safeParse(raw);
+        const window = BrowserWindow.fromWebContents(event.sender);
+        if (!fromPolaris(event) || !request.success || !window) return REFUSED;
+        return installTool(window, request.data);
+    });
+
+    ipcMain.handle(CHANNELS.defaultBrowser, (event): string | null => {
+        if (!fromPolaris(event)) return null;
+        const name = app.getApplicationNameForProtocol("https://");
+        if (/firefox/i.test(name)) return "firefox";
+        return browserFromName(name);
+    });
+
+    ipcMain.handle(CHANNELS.openServers, (event): void => {
+        if (fromPolaris(event)) host.openServers();
     });
 
     // The window buttons drawn over the page's header, in its colours.

@@ -25,11 +25,11 @@ describe("title bar colours", () => {
     });
 
     it("sizes the window buttons with the page zoom, so they stay level with the header", () => {
-        expect(overlayHeight(1)).toBe(48);
-        expect(overlayHeight(1.25)).toBe(60);
-        expect(overlayHeight(0.8)).toBe(38);
-        expect(overlayHeight(Number.NaN)).toBe(48);
-        expect(overlayHeight(100)).toBe(240);
+        expect(overlayHeight(1)).toBe(47);
+        expect(overlayHeight(1.25)).toBe(59);
+        expect(overlayHeight(0.8)).toBe(37);
+        expect(overlayHeight(Number.NaN)).toBe(47);
+        expect(overlayHeight(100)).toBe(235);
     });
 
     it("moves a provider's page below the buttons and lets the window be dragged above it", () => {

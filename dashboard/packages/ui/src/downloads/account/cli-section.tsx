@@ -19,6 +19,7 @@ import { Skeleton } from "../../index";
 import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { InstallLine } from "./install-line";
+import { DesktopInstall } from "./desktop-install";
 import { TerminalPreview } from "./download-previews";
 import { CopyButton } from "../../index";
 import { useTranslations } from "../../i18n";
@@ -77,6 +78,13 @@ export function CliSection({
                 onPlatformChange={setPlatform}
                 command={line.command}
                 hint={t("downloads.cli.hint", { shell: line.shell })}
+                install={
+                    <DesktopInstall
+                        tool="cli"
+                        platform={platform}
+                        done={t("downloads.install.cliDone")}
+                    />
+                }
             />
 
             <div className="flex min-w-0 flex-col gap-2">

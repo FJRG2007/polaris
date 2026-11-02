@@ -291,6 +291,7 @@ function start(): void {
             switchServer,
             nameServer,
             removeServer,
+            openServers: openConnect,
             updates
         });
 

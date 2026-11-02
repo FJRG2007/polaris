@@ -110,7 +110,7 @@ describe("loading it by hand", () => {
         expect(source).toContain(
             "<ExtensionSteps key={browser} initial={browser} picker={false} />"
         );
-        expect(source).toContain("<ExtensionCommand repo={repo} />");
+        expect(source).toContain("<ExtensionCommand repo={repo} browser={browser} />");
         expect(await page).toContain("<ExtensionCard");
     });
 
