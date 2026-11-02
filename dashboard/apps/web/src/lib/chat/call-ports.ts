@@ -84,4 +84,7 @@ export interface CallPortsReading {
     readonly askedAt: string | null;
     /** Whether what it is handing out predates the last change of address. */
     readonly addressStale: boolean;
+    /** Whether callers reach the media through the relay, which `publicIp` is
+     *  then the address of: its firewall decides, and no router here plays a part. */
+    readonly relayed: boolean;
 }

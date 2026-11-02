@@ -260,6 +260,21 @@ export async function readConfig(): Promise<BackupConfig> {
     return parse(configSchema, await getSetting(BACKUP_CONFIG_KEY)) ?? DEFAULT_CONFIG;
 }
 
+/** The relay's public address while it is what the world reaches this machine
+ *  through, or null. Whether a call server is pointed at it plays no part. */
+export async function servingRelayAddress(): Promise<string | null> {
+    const [config, state, relay] = await Promise.all([
+        readConfig(),
+        getSetting(BACKUP_STATE_KEY).then(readState),
+        getSetting(RELAY_KEY).then((raw) => parse(relaySchema, raw))
+    ]);
+    return callNodeIp({
+        serving: state.serving,
+        path: config.path,
+        relayAddress: relay?.address ?? null
+    });
+}
+
 /** Why callers outside the house cannot reach a call now, or null when they can. */
 export async function callsOutsideNow(): Promise<CallsOutside | null> {
     const [config, state, relay, reach] = await Promise.all([

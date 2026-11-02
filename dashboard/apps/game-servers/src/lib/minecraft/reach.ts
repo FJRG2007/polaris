@@ -21,12 +21,13 @@ import { pingBedrock } from "./raknet";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 import { fresh } from "../fresh";
+import { isContainerGateway } from "./access";
 
 const { getLocalEnvironment } = host.networkService;
 const { getHostLanIp, isLanAddress } = host.hostAddress;
 const { getPortBlocks, getPortPolicy } = host.appsPortBlockStore;
 const { probeTcpPort, publicProbeHost } = host.netPortProbe;
-const { gameReachAdvice, gameStoppedAdvice } = host.appsPortAdvice;
+const { gameReachAdvice, gameStoppedAdvice, relayAddress } = host.appsPortAdvice;
 type GamePort = AppHostTypes["GamePort"];
 type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
@@ -104,10 +105,16 @@ export async function gameServerRunning(applicationId: string | null): Promise<b
  *
  * Only a public address counts. A join from the same LAN went nowhere near the
  * router, so treating it as proof would clear the warning for exactly the operator
- * who tested from their own desk - the one case where it means nothing.
+ * who tested from their own desk - the one case where it means nothing. While the
+ * relay serves, every player outside arrives from the container gateway, so that
+ * private address counts too.
  */
-export async function noteReachedFrom(installedAppId: string, address: string): Promise<boolean> {
-    if (isLanAddress(address)) return false;
+export async function noteReachedFrom(
+    installedAppId: string,
+    address: string,
+    relayServing = false
+): Promise<boolean> {
+    if (isLanAddress(address) && !(relayServing && isContainerGateway(address))) return false;
     await patchInstallConfig(installedAppId, { portReachableAt: new Date().toISOString() });
     return true;
 }
@@ -206,13 +213,14 @@ export interface PendingReach {
  * forward working. Nothing is concluded from silence - see `probeTcpPort` - and
  * nothing is attempted at all unless this line has an address the internet could
  * dial, since knocking on a LAN address would clear the warning for the one
- * operator whose forward does not exist.
+ * operator whose forward does not exist. While the relay serves, players arrive at
+ * the relay's address, so that is the one knocked on.
  *
  * Returns the installs proven by this pass.
  */
 export async function probeReach(pending: readonly PendingReach[]): Promise<string[]> {
     if (pending.length === 0) return [];
-    const host = await publicProbeHost();
+    const host = (await relayAddress().catch(() => null)) ?? (await publicProbeHost());
     if (!host) return [];
     const reached: string[] = [];
     for (const entry of pending) {
@@ -273,6 +281,9 @@ export async function reachAdviceFor(
     if (!running) return gameStoppedAdvice(ports);
     // Only asked when it would change what is said: a local connect on every
     // render would be a page waiting on a socket for nothing.
-    const listening = await probeListening(ports, lanIp).catch(() => null);
-    return gameReachAdvice(environment, ports, false, lanIp, policy, blocks, listening);
+    const [listening, relay] = await Promise.all([
+        probeListening(ports, lanIp).catch(() => null),
+        relayAddress().catch(() => null)
+    ]);
+    return gameReachAdvice(environment, ports, false, lanIp, policy, blocks, listening, relay);
 }

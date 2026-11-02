@@ -120,6 +120,7 @@ const load = {
     appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
     appStorage: once(() => import("@/lib/storage-moves/app-storage")),
     auditService: once(() => import("@/lib/audit-service")),
+    backupAccessService: once(() => import("@/lib/backup-access/service")),
     backupsManage: once(() => import("@/lib/backups/manage")),
     calendarHost: once(() => import("@/lib/calendar-host")),
     crmHost: once(() => import("@/lib/crm-host")),
@@ -259,7 +260,8 @@ export const serverHost = {
         describeBlocksFor: appsPortAdvice.describeBlocksFor,
         describePorts: appsPortAdvice.describePorts,
         gameReachAdvice: appsPortAdvice.gameReachAdvice,
-        gameStoppedAdvice: appsPortAdvice.gameStoppedAdvice
+        gameStoppedAdvice: appsPortAdvice.gameStoppedAdvice,
+        relayAddress: later(load.backupAccessService, "servingRelayAddress")
     },
     appsPortBlock: {
         describeBlock: appsPortBlock.describeBlock,

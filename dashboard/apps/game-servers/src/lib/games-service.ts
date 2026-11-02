@@ -931,7 +931,8 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
                       lanIp,
                       policy,
                       blocks,
-                      listening
+                      listening,
+                      await host.appsPortAdvice.relayAddress().catch(() => null)
                   ),
         lanIp,
         policy,

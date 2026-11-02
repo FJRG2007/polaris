@@ -29,6 +29,17 @@ vi.mock("@/lib/setting-store", () => ({
     }
 }));
 
+/** The relay the media server is pointed at, if any. */
+let relay: string | null = null;
+vi.mock("@/lib/chat/call-address-watch", () => ({
+    callAddressFacts: async () => ({
+        current: relay,
+        startedAt: null,
+        stale: false,
+        relayed: relay !== null
+    })
+}));
+
 /** The address the probe knocks on, and the port it finds there. */
 let probeHost: string | null = "127.0.0.1";
 vi.mock("@/lib/net/port-probe", async (importActual) => ({
@@ -74,6 +85,7 @@ beforeEach(() => {
     endpoint = { url: "/livekit", shipped: true };
     up = true;
     probeHost = "127.0.0.1";
+    relay = null;
     for (const key of Object.keys(settings)) delete settings[key];
     // The knock is rate limited to one every thirty seconds per process, which
     // is right for a page left open and wrong for a suite where each case is a
@@ -138,6 +150,20 @@ describe("the call ports", () => {
         // answers on it need not be this machine - and calls from outside will
         // not work at all, which is worth saying rather than probing around.
         expect((await readCallPorts(true)).cannotProbe).toMatch(/public address/);
+    });
+
+    it("knocks on the relay when it carries the media, whatever the line is", async () => {
+        probeHost = null;
+        relay = "127.0.0.1";
+        const server = await listenOnCallPort();
+        try {
+            const reading = await readCallPorts(true);
+            expect(reading.relayed).toBe(true);
+            expect(reading.confirmed).toBe(true);
+            expect(reading.cannotProbe).toBeNull();
+        } finally {
+            server.close();
+        }
     });
 
     it("says nothing about a call server somebody else runs", async () => {

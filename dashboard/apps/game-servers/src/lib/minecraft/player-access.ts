@@ -56,6 +56,7 @@ import { signInAddresses } from "../game-sign-in-addresses";
 import {
     ANY_ADDRESS,
     accessRefusal,
+    arrivalAddress,
     isAddressRule,
     isPlayerName,
     missingWhitelistNames,
@@ -1140,10 +1141,12 @@ export async function enforcePlayerAddresses(
 
     // Reachability first, and for everyone on rather than only the allowed: a
     // player who was about to be kicked still proves the packet arrived.
+    const relayServing = (await host.appsPortAdvice.relayAddress().catch(() => null)) !== null;
     let reachedFromOutside = false;
     for (const player of status.players.players) {
         const address = addresses.get(player.toLowerCase());
-        if (address && (await noteReachedFrom(installedAppId, address))) reachedFromOutside = true;
+        if (address && (await noteReachedFrom(installedAppId, address, relayServing)))
+            reachedFromOutside = true;
     }
 
     // The list is only enforced once there is a list. A server whose rules were all
@@ -1154,7 +1157,8 @@ export async function enforcePlayerAddresses(
     const kicked: string[] = [];
     const unknown: string[] = [];
     for (const player of status.players.players) {
-        const address = addresses.get(player.toLowerCase()) ?? null;
+        const joinedFrom = addresses.get(player.toLowerCase());
+        const address = joinedFrom ? arrivalAddress(joinedFrom, relayServing) : null;
         // A player whose join line has scrolled out of the log is judged on their
         // name alone: kicking them for a line that has aged out would empty the
         // server every time somebody talked a lot.

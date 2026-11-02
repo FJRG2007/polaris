@@ -85,7 +85,7 @@ export function addressMatches(rule: string, address: string): boolean {
     if (prefix === 0) return true;
     // Shifting by 32 is a no-op in JavaScript, so the full-length mask is written out.
     const mask = prefix === 32 ? 0xffffffff : (0xffffffff << (32 - prefix)) >>> 0;
-    return ((candidate & mask) >>> 0) === ((base & mask) >>> 0);
+    return (candidate & mask) >>> 0 === (base & mask) >>> 0;
 }
 
 /**
@@ -115,7 +115,32 @@ export interface PlayerAccess {
  *  as many places as they actually play from. */
 export function addressesFor(player: string, allowed: readonly PlayerAccess[]): string[] {
     const name = player.toLowerCase();
-    return allowed.filter((item) => item.username.toLowerCase() === name).map((item) => item.address);
+    return allowed
+        .filter((item) => item.username.toLowerCase() === name)
+        .map((item) => item.address);
+}
+
+/**
+ * Whether this is a container network's own gateway, in either of the engine's
+ * default address pools, rather than a player.
+ */
+export function isContainerGateway(address: string): boolean {
+    return /^(172\.(1[6-9]|2\d|3[01])\.\d{1,3}|192\.168\.(0|16|32|48|64|80|96|112|128|144|160|176|192|208|224|240))\.1$/.test(
+        address.trim()
+    );
+}
+
+/**
+ * The address to judge a connection by, or null when it says nothing.
+ *
+ * A player arriving through the relay reaches the server from the container
+ * gateway, whoever they are, so while the relay serves that address cannot be
+ * read and they are judged on the name. With no relay it stays an address like
+ * any other: a stranger reaching a published port over IPv6 also shows up from
+ * the gateway, and must not get past the address half for it.
+ */
+export function arrivalAddress(address: string, relayServing: boolean): string | null {
+    return relayServing && isContainerGateway(address) ? null : address;
 }
 
 /**
@@ -198,7 +223,10 @@ export function parseWhitelistNames(output: string): string[] {
  * one name, so the same name is not handed over twice. Matched case-insensitively
  * because the game's list answers with whatever capitalization it stored.
  */
-export function missingWhitelistNames(rules: readonly PlayerAccess[], listed: readonly string[]): string[] {
+export function missingWhitelistNames(
+    rules: readonly PlayerAccess[],
+    listed: readonly string[]
+): string[] {
     const have = new Set(listed.map((name) => name.toLowerCase()));
     const missing: string[] = [];
     for (const rule of rules) {

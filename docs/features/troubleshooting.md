@@ -37,8 +37,8 @@ Open Polaris on a phone using mobile data, with Wi-Fi off.
 
 ## After changing a router
 
-Two routers in a row make two networks. A device that picks its address by itself
-follows the change, and a machine with a fixed address does not, so it ends up on a
+Two routers in a row make two networks. A device keeps the address it has until it
+asks for a new one, and one that stays plugged in may not ask, so it ends up on a
 network where nothing can reach it.
 
 - Plug the machine back into the router it was on, or into a switch on that router.
@@ -63,6 +63,11 @@ network where nothing can reach it.
 When the Polaris in use stops answering, the desktop app opens the servers window
 beside it, so you can open another one. Your other servers are still listed there,
 and each opens as usual.
+
+## A game in a call
+
+Sharing a game in exclusive full screen often shows black or freezes, because the
+capture cannot read it. Run the game in borderless window mode.
 
 ## Speed stops at 94 or 95 Mbps
 

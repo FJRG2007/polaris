@@ -66,7 +66,7 @@ export function describePorts(ports: readonly GamePort[]): string {
 function runsOf(numbers: readonly number[]): string[] {
     const sorted = [...numbers].sort((left, right) => left - right);
     const runs: string[] = [];
-    for (let index = 0; index < sorted.length; ) {
+    for (let index = 0; index < sorted.length;) {
         let end = index;
         while (
             end + 1 < sorted.length &&
@@ -159,7 +159,9 @@ export function gameReachAdvice(
     blocks: PortBlocks = DEFAULT_PORT_BLOCKS,
     /** Whether the game answers on the port here, on this network. Null when it
      *  was not checked. */
-    listening: boolean | null = null
+    listening: boolean | null = null,
+    /** The relay carrying this line, whose firewall is the one that decides. */
+    relayAddress: string | null = null
 ): GameReachAdvice {
     if (ports.length === 0) return NO_PORTS;
     const named = describePorts(ports);
@@ -189,6 +191,19 @@ export function gameReachAdvice(
                 : "Not answering yet, so its port cannot be checked", // i18n-ignore
             detail: `The server is not answering on ${named} yet, and a port with nothing behind it looks the same from outside whether it is open or not. A first start takes minutes - the server fetches itself, then generates a world - and Polaris checks this by itself once it answers.`,
             steps: [],
+            forward: false
+        };
+    }
+    if (relayAddress) {
+        return {
+            ok: false,
+            actionable: true,
+            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`, // i18n-ignore
+            detail: `Players arrive through the relay at ${relayAddress}, so your router has no part in this. The relay's provider decides what gets through.`, // i18n-ignore
+            steps: [
+                `If ${many ? "they are" : "it is"} not allowed yet, allow inbound ${named} in the firewall of the relay's provider.`, // i18n-ignore
+                "Polaris marks this done by itself the moment the port answers from outside, or the first time somebody joins on it." // i18n-ignore
+            ],
             forward: false
         };
     }

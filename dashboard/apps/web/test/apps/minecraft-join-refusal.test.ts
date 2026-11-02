@@ -10,8 +10,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const calls = vi.hoisted(() => ({ order: [] as string[], rules: [] as unknown[] }));
+const calls = vi.hoisted(() => ({
+    order: [] as string[],
+    rules: [] as unknown[],
+    relay: null as string | null
+}));
 
+vi.mock("@/lib/backup-access/service", () => ({ servingRelayAddress: async () => calls.relay }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: { findUnique: async () => ({ config: {} }) }
@@ -38,6 +43,7 @@ const SERVER = { installedAppId: "server-1" } as never;
 
 beforeEach(() => {
     calls.order = [];
+    calls.relay = null;
     calls.rules = [{ username: "yeray", address: "198.51.100.7" }];
 });
 
@@ -51,5 +57,12 @@ describe("the door", () => {
     it("still turns away an address nobody allowed", async () => {
         expect(await service.joinRefusal(SERVER, "yeray", "203.0.113.9")).not.toBeNull();
         expect(calls.order).toContain("refused");
+    });
+
+    it("reads the container gateway as no address only while the relay serves", async () => {
+        expect(await service.joinRefusal(SERVER, "yeray", "172.22.0.1")).not.toBeNull();
+        calls.relay = "203.0.113.20";
+        expect(await service.joinRefusal(SERVER, "yeray", "172.22.0.1")).toBeNull();
+        expect(await service.joinRefusal(SERVER, "mallory", "172.22.0.1")).not.toBeNull();
     });
 });

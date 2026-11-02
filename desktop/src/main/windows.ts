@@ -78,7 +78,8 @@ function titleBar(): BrowserWindowConstructorOptions {
 }
 
 function polarisPreferences(): WebPreferences {
-    return preferences("app.js", { additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`] });
+    // A call keeps running behind a full-screen game, which is when a window is hidden.
+    return preferences("app.js", { backgroundThrottling: false, additionalArguments: [`${VERSION_ARGUMENT}${app.getVersion()}`] });
 }
 
 function register(contents: WebContents, kind: WindowKind): void {

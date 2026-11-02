@@ -14,6 +14,7 @@ import { parseJoinAddresses } from "@polaris-app/game-servers/src/lib/minecraft/
 import { describePorts, gameReachAdvice } from "@/lib/apps/port-advice";
 import {
     accessRefusal,
+    arrivalAddress,
     addressesFor,
     addressMatches,
     isAddressRule,
@@ -80,6 +81,19 @@ describe("isPlayerName", () => {
 });
 
 describe("accessRefusal", () => {
+    it("judges a relayed player on the name alone, and only while the relay serves", () => {
+        const allowed = [{ username: "Steve", address: "203.0.113.9" }];
+        for (const gateway of ["172.22.0.1", "192.168.16.1"]) {
+            const relayed = arrivalAddress(gateway, true);
+            expect(accessRefusal("Steve", relayed, allowed)).toBeNull();
+            expect(accessRefusal("Mallory", relayed, allowed)).not.toBeNull();
+            expect(accessRefusal("Steve", arrivalAddress(gateway, false), allowed)).not.toBeNull();
+        }
+        for (const player of ["172.22.0.7", "192.168.1.1", "192.168.17.1"]) {
+            expect(accessRefusal("Steve", arrivalAddress(player, true), allowed)).not.toBeNull();
+        }
+    });
+
     const allowed = [{ username: "Steve", address: "203.0.113.9" }];
 
     it("lets in a registered player from their own address", () => {

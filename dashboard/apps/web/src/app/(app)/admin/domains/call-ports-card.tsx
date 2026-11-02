@@ -181,15 +181,23 @@ export function CallPortsCard({ onKnown }: { onKnown?: (shown: boolean) => void 
                         {t("domainsPorts.call.onlyLocal")}
                     </p>
                     <p className="text-muted-foreground">
-                        {reading.cannotProbe ?? t("domainsPorts.call.nothingArrived")}
+                        {reading.relayed
+                            ? t("domainsPorts.call.nothingArrivedRelay", {
+                                  ports: reading.ports
+                                      .map((entry) => `${entry.port}/${entry.protocol}`)
+                                      .join(", ")
+                              })
+                            : (reading.cannotProbe ?? t("domainsPorts.call.nothingArrived"))}
                     </p>
-                    <div className="text-muted-foreground">
-                        <RouterSteps
-                            server={null}
-                            lanIp={reading.lanIp}
-                            rules={CALL_FORWARD_RULES}
-                        />
-                    </div>
+                    {!reading.relayed && (
+                        <div className="text-muted-foreground">
+                            <RouterSteps
+                                server={null}
+                                lanIp={reading.lanIp}
+                                rules={CALL_FORWARD_RULES}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
         </PageSection>
@@ -237,34 +245,38 @@ function AddressRow({ reading, onDone }: { reading: CallPortsReading; onDone: ()
                 )}
             </div>
             <p className="text-muted-foreground">
-                {reading.addressStale
-                    ? t("domainsPorts.call.addressStaleBody")
-                    : t("domainsPorts.call.addressBody")}
+                {reading.relayed
+                    ? t("domainsPorts.call.addressRelayBody")
+                    : reading.addressStale
+                      ? t("domainsPorts.call.addressStaleBody")
+                      : t("domainsPorts.call.addressBody")}
                 {reading.askedAt
                     ? ` ${t("domainsPorts.call.askedAt", { time: new Date(reading.askedAt).toLocaleString() })}`
                     : ""}
             </p>
             {said && <p className="text-muted-foreground">{said}</p>}
-            <div>
-                <Button
-                    size="sm"
-                    variant={reading.addressStale ? "primary" : "secondary"}
-                    disabled={busy}
-                    onClick={async () => {
-                        setBusy(true);
-                        setSaid("");
-                        const result = await repairCallAddressAction().catch(() => ({
-                            ok: false,
-                            message: t("domainsPorts.call.repairFailed")
-                        }));
-                        setSaid(result.message);
-                        setBusy(false);
-                        onDone();
-                    }}
-                >
-                    {busy ? t("domainsPorts.call.restarting") : t("domainsPorts.call.repair")}
-                </Button>
-            </div>
+            {!reading.relayed && (
+                <div>
+                    <Button
+                        size="sm"
+                        variant={reading.addressStale ? "primary" : "secondary"}
+                        disabled={busy}
+                        onClick={async () => {
+                            setBusy(true);
+                            setSaid("");
+                            const result = await repairCallAddressAction().catch(() => ({
+                                ok: false,
+                                message: t("domainsPorts.call.repairFailed")
+                            }));
+                            setSaid(result.message);
+                            setBusy(false);
+                            onDone();
+                        }}
+                    >
+                        {busy ? t("domainsPorts.call.restarting") : t("domainsPorts.call.repair")}
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }

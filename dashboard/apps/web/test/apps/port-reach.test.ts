@@ -15,6 +15,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 /** Every write the probe made, in place of the install row it would patch. */
 const patched: { id: string; patch: Record<string, unknown> }[] = [];
 let publicIp: string | null = "127.0.0.1";
+/** The relay this deployment is serving through, if any. */
+let relay: string | null = null;
 
 /** The install the advice is asked about, and the application behind it - the
  *  ports it published and whether Polaris means it to be up. */
@@ -58,6 +60,7 @@ vi.mock("@/lib/apps/port-block-store", () => ({
         udp: { start: 19132, end: 19231 }
     })
 }));
+vi.mock("@/lib/backup-access/service", () => ({ servingRelayAddress: async () => relay }));
 vi.mock("@polaris/core", async (importActual) => ({
     ...(await importActual<typeof import("@polaris/core")>()),
     // A test cannot hold an address the internet could dial, so the loopback
@@ -65,9 +68,8 @@ vi.mock("@polaris/core", async (importActual) => ({
     isPublicIpv4: (value: string) => value === "127.0.0.1"
 }));
 
-const { noteReachedFrom, probeListening, probeReach, reachAdviceFor } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/reach"
-);
+const { noteReachedFrom, probeListening, probeReach, reachAdviceFor } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/reach");
 const { probeTcpPort } = await import("@/lib/net/port-probe");
 
 /** A port with something listening on it, and the same port once nothing is. */
@@ -163,6 +165,7 @@ async function java(
 afterEach(() => {
     patched.length = 0;
     publicIp = "127.0.0.1";
+    relay = null;
     install = { applicationId: "app", config: null };
     application = null;
 });
@@ -253,7 +256,57 @@ describe("proving a server's ports", () => {
     });
 });
 
+describe("proving a server's ports through the relay", () => {
+    it("knocks on the relay when the line itself has no usable address", async () => {
+        const { port, server } = await listener();
+        publicIp = "10.0.1.142";
+        relay = "127.0.0.1";
+
+        expect(
+            await probeReach([{ installedAppId: "relayed", ports: [{ port, protocol: "tcp" }] }])
+        ).toEqual(["relayed"]);
+        await close(server);
+    });
+
+    it("clears the advice once the relay's port answers", async () => {
+        const { port, server } = await java("status");
+        relay = "127.0.0.1";
+        application = {
+            sourceConfig: JSON.stringify({ hostPort: port, hostProtocol: "tcp" }),
+            desiredState: "running"
+        };
+
+        expect((await reachAdviceFor("cleared", true)).ok).toBe(true);
+        await close(server);
+    });
+
+    it("points at the relay's provider while nothing has answered", async () => {
+        const { port, server } = await java("status");
+        relay = "127.0.0.1";
+        application = {
+            sourceConfig: JSON.stringify({ hostPort: port, hostProtocol: "tcp" }),
+            desiredState: "running"
+        };
+
+        const advice = await reachAdviceFor("waiting");
+
+        expect(advice.forward).toBe(false);
+        expect(advice.detail).toContain("relay");
+        await close(server);
+    });
+});
+
 describe("recording what arrived", () => {
+    it("takes a join from the gateway only while the relay serves", async () => {
+        expect(await noteReachedFrom("direct", "172.22.0.1")).toBe(false);
+        expect(await noteReachedFrom("direct", "172.22.0.1", false)).toBe(false);
+        expect(patched).toEqual([]);
+        expect(await noteReachedFrom("relayed", "172.22.0.1", true)).toBe(true);
+        expect(patched[0]?.id).toBe("relayed");
+        // Somebody on this same network still went nowhere near the relay.
+        expect(await noteReachedFrom("desk", "10.0.1.50", true)).toBe(false);
+    });
+
     it("refuses a join from this same network", async () => {
         // The one case where it means nothing: the operator testing from their own
         // desk never went near the router.

@@ -84,6 +84,12 @@ const NOTHING: CallAddressState = {
     cannotHeal: null
 };
 
+/** The relay's address when the media server is pointed at it, whatever the line
+ *  behind it is doing. */
+async function relayAddress(): Promise<string | null> {
+    return (await readFile(callNodeIpFile(), "utf8").catch(() => "")).trim() || null;
+}
+
 /**
  * Look, repair, and say.
  *
@@ -110,6 +116,12 @@ export async function watchCallAddress(): Promise<CallAddressState> {
         }
     }
     if (!changedAt) return { ...NOTHING, current };
+    // Callers are sent to the relay, so the line's address is not theirs to lose, and
+    // a restart would only cut every call in progress.
+    if (await relayAddress()) {
+        await setSetting(CHANGED_AT, null);
+        return { ...NOTHING, current };
+    }
 
     const endpoint = await callServer().catch(() => null);
     // A server somebody else runs is on their network, learned its address
@@ -236,7 +248,10 @@ export async function callAddressFacts(): Promise<{
     current: string | null;
     startedAt: string | null;
     stale: boolean;
+    relayed: boolean;
 }> {
+    const relay = await relayAddress();
+    if (relay) return { current: relay, startedAt: null, stale: false, relayed: true };
     const [current, changedAt] = await Promise.all([
         detectPublicIp().catch(() => null),
         getSetting(CHANGED_AT)
@@ -246,7 +261,8 @@ export async function callAddressFacts(): Promise<{
     return {
         current,
         startedAt,
-        stale: Boolean(changedAt && startedAt && startedAt <= changedAt)
+        stale: Boolean(changedAt && startedAt && startedAt <= changedAt),
+        relayed: false
     };
 }
 

@@ -152,6 +152,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 }));
 
 vi.mock("@/lib/deploy-service", () => ({ readAppRuntimeLog: async () => joinLog }));
+vi.mock("@/lib/backup-access/service", () => ({ servingRelayAddress: async () => relay }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({
     noteReachedFrom: async () => false
 }));
@@ -169,11 +170,14 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
 
 const service = await import("@polaris-app/game-servers/src/lib/minecraft/player-access");
 
+let relay: string | null = null;
+
 function joined(name: string, address: string): string {
     return `[00:41:02 INFO]: ${name}[/${address}:52344] logged in with entity id 214 at (1.5, 64.0, 2.5)`;
 }
 
 beforeEach(() => {
+    relay = null;
     access = [];
     links = [];
     config = {};
@@ -279,6 +283,24 @@ describe("enforcing a linked player", () => {
         const report = await service.enforcePlayerAddresses(OWNER, SERVER);
         // Bob is only held to his address when the switch is on; Ada always is.
         expect(report.kicked).toEqual(["AdaMC"]);
+    });
+
+    it("reads the gateway as no address only while the relay serves", async () => {
+        config = { bindAddresses: true };
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "Bob",
+            address: "5.5.5.5"
+        });
+        online = ["Bob"];
+        joinLog = joined("Bob", "172.22.0.1");
+
+        relay = "203.0.113.20";
+        const relayed = await service.enforcePlayerAddresses(OWNER, SERVER);
+        expect(relayed.kicked).toEqual([]);
+        expect(relayed.unknown).toEqual(["Bob"]);
+
+        relay = null;
+        expect((await service.enforcePlayerAddresses(OWNER, SERVER)).kicked).toEqual(["Bob"]);
     });
 
     it("comes off the list when unlinked", async () => {
