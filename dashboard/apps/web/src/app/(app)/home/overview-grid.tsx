@@ -29,7 +29,9 @@ import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { emptyOverviewCards, writeEmptyCardsCookie } from "@/lib/overview/empty-cards";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
+import { useToast } from "@polaris/ui";
 import { CalendarWidget } from "./widgets/calendar";
+import { PolarWidget } from "./widgets/polar";
 import { DnsBlockerWidget } from "./widgets/dns-blocker";
 import {
     AppWidgetCatalog,
@@ -61,7 +63,8 @@ import {
     MoreVertical,
     RefreshCw,
     Settings2,
-    Trash2
+    Trash2,
+    X
 } from "lucide-react";
 import {
     Button,
@@ -223,6 +226,7 @@ export function OverviewGrid({
         return known;
     });
     const settled = useRef(false);
+    const toast = useToast();
     const appState = useAppWidgets(preferences.appWidgets);
     const live = useAppWidgetLive(appState, appKinds);
     const [order, setOrder] = useState<OverviewCardKey[] | undefined>(preferences.order);
@@ -398,6 +402,15 @@ export function OverviewGrid({
             widgets: widgets.map((widget) =>
                 widget.id === key ? { ...widget, hidden: !visible } : widget
             )
+        });
+    }
+
+    /** Off the grid at once, with the way back in the same note. */
+    function dismiss(key: OverviewCardKey, name: string): void {
+        toggle(key, false);
+        toast.show({
+            title: t("card.removed", { name }),
+            actions: [{ label: t("card.undo"), run: async () => { toggle(key, true); return null; } }]
         });
     }
 
@@ -710,7 +723,8 @@ export function OverviewGrid({
                                 last={index === visible.length - 1}
                                 onMove={(direction) => move(card.key, direction)}
                                 onResize={(next) => resize(card.key, next)}
-                                onHide={() => toggle(card.key, false)}
+                                onHide={card.app ? () => toggle(card.key, false) : undefined}
+                                onDismiss={() => dismiss(card.key, label)}
                                 onConfigure={
                                     card.app ? () => live.configure(card.app, card.kind) : undefined
                                 }
@@ -847,6 +861,8 @@ function WidgetBody({
             return <NotificationsWidget />;
         case "apps":
             return <AppsWidget apps={apps} />;
+        case "polar":
+            return <PolarWidget />;
         case "services":
             return (
                 <ServicesWidget data={data === undefined ? undefined : (data.services ?? null)} />
@@ -934,6 +950,7 @@ function WidgetMenu({
     onMove,
     onResize,
     onHide,
+    onDismiss,
     onClear,
     onConfigure,
     onRemove
@@ -945,7 +962,10 @@ function WidgetMenu({
     last: boolean;
     onMove: (direction: -1 | 1) => void;
     onResize: (size: OverviewWidgetSize) => void;
-    onHide: () => void;
+    /** An app's card: off the grid, kept with what it watches. */
+    onHide?: () => void;
+    /** Off the grid, and back from Customize. */
+    onDismiss: () => void;
     /** Only for the cards that hold something of the reader's to throw away. */
     onClear?: () => void;
     /** An app's card: choosing what it watches. */
@@ -955,6 +975,18 @@ function WidgetMenu({
 }) {
     const t = useTranslations("home");
     return (
+        <>
+        {/* Faint until the card is hovered, like the grip; a touch screen has
+            the same thing in the menu. */}
+        <button
+            type="button"
+            onClick={onDismiss}
+            title={t("card.remove", { name: label })}
+            aria-label={t("card.remove", { name: label })}
+            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-colors hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100 [@media(hover:none)]:hidden"
+        >
+            <X className="size-4" aria-hidden="true" />
+        </button>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
@@ -1006,17 +1038,18 @@ function WidgetMenu({
                         {t("card.clearHistory")}
                     </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={onHide}>
-                    <EyeOff className="size-4" aria-hidden="true" />
-                    {t("card.hide")}
-                </DropdownMenuItem>
-                {onRemove ? (
-                    <DropdownMenuItem variant="danger" onSelect={onRemove}>
-                        <Trash2 className="size-4" aria-hidden="true" />
-                        {t("appCards.remove")}
+                {onHide ? (
+                    <DropdownMenuItem onSelect={onHide}>
+                        <EyeOff className="size-4" aria-hidden="true" />
+                        {t("card.hide")}
                     </DropdownMenuItem>
                 ) : null}
+                <DropdownMenuItem variant="danger" onSelect={onRemove ?? onDismiss}>
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    {t(onRemove ? "appCards.remove" : "card.removeCard")}
+                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+        </>
     );
 }

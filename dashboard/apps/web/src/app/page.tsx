@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
-import { homePathForUser, requireUser } from "@/lib/session";
+import { startPathFor } from "@/lib/app-access";
+import { accessFor, requireUser } from "@/lib/session";
+import { getLauncherPrefs } from "@/lib/app-launcher-service";
 
 /**
  * The dashboard root sends everybody to their own starting point rather than to
- * a fixed app: the first one their role opens, or their account page when their
- * role opens none. Every "take me home" in Polaris - after signing in, after
+ * a fixed app: the one they chose to open on entering, or the first one their
+ * role opens, or their account page when their role opens none. Every "take me
+ * home" in Polaris - after signing in, after
  * unlocking, after being turned away from a screen - comes through here, so there
  * is one answer to maintain instead of one per redirect.
  *
@@ -21,5 +24,11 @@ import { homePathForUser, requireUser } from "@/lib/session";
  * is a plain 307 and the browser never renders this address at all.
  */
 export default async function DashboardIndex() {
-    redirect(await homePathForUser(await requireUser()));
+    const user = await requireUser();
+    // A preference is not worth keeping somebody out of Polaris over.
+    const chosen = await getLauncherPrefs(user.id).then(
+        (prefs) => prefs.home,
+        () => null
+    );
+    redirect(await startPathFor(accessFor(user), chosen));
 }

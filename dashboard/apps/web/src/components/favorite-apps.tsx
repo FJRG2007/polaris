@@ -28,23 +28,30 @@ const DRAWER_WAIT_FRAMES = 60;
 const NO_ORDER: readonly string[] = [];
 
 function samePrefs(left: LauncherPrefs, right: LauncherPrefs): boolean {
-    return sameOrder(left.favorites, right.favorites) && sameOrder(left.order, right.order);
+    return (
+        sameOrder(left.favorites, right.favorites) &&
+        sameOrder(left.order, right.order) &&
+        left.home === right.home
+    );
 }
 
 export function FavoriteAppsProvider({
     initial,
     initialOrder = NO_ORDER,
+    initialHome = null,
     children
 }: {
     /** The stored favorites, in order. */
     initial: readonly string[];
     /** The stored order of the app menu; empty when it was never arranged. */
     initialOrder?: readonly string[];
+    /** The stored app to open on entering Polaris, if there is one. */
+    initialHome?: string | null;
     children: ReactNode;
 }) {
     const toast = useToast();
     const t = useTranslations("nav");
-    const seed: LauncherPrefs = { favorites: initial, order: initialOrder };
+    const seed: LauncherPrefs = { favorites: initial, order: initialOrder, home: initialHome };
     const [prefs, setPrefs] = useState<LauncherPrefs>(seed);
     const [launcherOpen, setLauncherOpen] = useState(false);
     // The lists as of the latest change, read synchronously by the next one: two
@@ -56,10 +63,14 @@ export function FavoriteAppsProvider({
 
     // A server render that brings different lists (another device saved them)
     // replaces these.
-    const initialKey = JSON.stringify([initial, initialOrder]);
+    const initialKey = JSON.stringify([initial, initialOrder, initialHome]);
     useEffect(() => {
-        const [favorites, order] = JSON.parse(initialKey) as [string[], string[]];
-        const next: LauncherPrefs = { favorites, order };
+        const [favorites, order, home] = JSON.parse(initialKey) as [
+            string[],
+            string[],
+            string | null
+        ];
+        const next: LauncherPrefs = { favorites, order, home };
         latest.current = next;
         confirmed.current = next;
         setPrefs(next);
@@ -78,7 +89,11 @@ export function FavoriteAppsProvider({
                 setPrefs(confirmed.current);
                 toast.show({ title: message });
             };
-            void saveFavoriteAppsAction({ favorites: [...next.favorites], order: [...next.order] })
+            void saveFavoriteAppsAction({
+                favorites: [...next.favorites],
+                order: [...next.order],
+                home: next.home
+            })
                 .then((answer) => {
                     if (answer.error) rollback(answer.error);
                     else confirmed.current = next;
@@ -92,10 +107,25 @@ export function FavoriteAppsProvider({
         () => ({
             favorites: prefs.favorites,
             order: prefs.order,
+            home: prefs.home,
+            toggleFavorite: (id) => {
+                const { favorites } = latest.current;
+                save({
+                    ...latest.current,
+                    favorites: favorites.includes(id)
+                        ? favorites.filter((other) => other !== id)
+                        : [...favorites, id]
+                });
+            },
+            setHome: (home) => save({ ...latest.current, home }),
             arrangeApps: (visible) => save(arrangedPrefs(latest.current, visible)),
             resetOrder: () => save({ ...latest.current, order: [] }),
             replacePrefs: (next) =>
-                save({ favorites: [...next.favorites], order: [...next.order] }),
+                save({
+                    ...latest.current,
+                    favorites: [...next.favorites],
+                    order: [...next.order]
+                }),
             launcherOpen,
             setLauncherOpen,
             openLauncher: () => {

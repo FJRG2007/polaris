@@ -37,6 +37,7 @@ import { MenuSearch } from "../components/menu-search";
 import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import {
+    Fragment,
     useLayoutEffect,
     useRef,
     useState,
@@ -136,6 +137,7 @@ export function AppSwitcher({
     footer,
     below,
     tileAction,
+    wrapTile,
     strings = ENGLISH
 }: {
     apps: readonly PolarisApp[];
@@ -184,6 +186,8 @@ export function AppSwitcher({
     /** What a tile offers besides opening its app, if anything. Shown on hover
      *  and focus, always on a touch screen, and reached by Tab after its tile. */
     tileAction?: (app: PolarisApp) => AppTileAction | null;
+    /** Puts something around a tile - the host's right-click menu. */
+    wrapTile?: (app: PolarisApp, tile: ReactNode) => ReactNode;
     /** The switcher's own words, in the reader's language. English by default. */
     strings?: AppSwitcherStrings;
 }) {
@@ -427,9 +431,9 @@ export function AppSwitcher({
                     </p>
                 ) : null}
                 <div data-launcher-grid="" className="grid grid-cols-3 gap-1">
-                    {drawn.map((app) => (
+                    {drawn.map((app) => {
+                        const tile = (
                         <AppTile
-                            key={app.id}
                             app={app}
                             active={app.id === currentAppId}
                             Anchor={Anchor}
@@ -446,7 +450,9 @@ export function AppSwitcher({
                                     : undefined
                             }
                         />
-                    ))}
+                        );
+                        return <Fragment key={app.id}>{wrapTile?.(app, tile) ?? tile}</Fragment>;
+                    })}
                 </div>
                 {hidden ? (
                     <DropdownMenuItem

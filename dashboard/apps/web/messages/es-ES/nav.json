@@ -15,7 +15,11 @@
         "resetOrder": "Usar orden automático",
         "moveEarlier": "Subir {app}",
         "moveLater": "Bajar {app}",
-        "marketplace": "Buscar más apps"
+        "marketplace": "Buscar más apps",
+        "favorite": "Añadir a favoritas",
+        "unfavorite": "Quitar de favoritas",
+        "start": "Abrir al entrar",
+        "notStart": "Dejar de abrir al entrar"
     },
     "waiting": {
         "unread": "{count, plural, one {# mensaje sin leer} other {# mensajes sin leer}}",

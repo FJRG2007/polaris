@@ -38,7 +38,8 @@ export const OVERVIEW_WIDGET_IDS = [
     "activity",
     "games",
     "calendar",
-    "dnsBlocker"
+    "dnsBlocker",
+    "polar"
 ] as const;
 
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
@@ -185,12 +186,14 @@ export const EMPTY_OVERVIEW_PREFERENCES: OverviewPreferences = {
  * flow); these are what give it something to backfill with, rather than a row of
  * identical halves.
  *
- * Every card is on. A landing screen that hides half of itself until somebody
- * finds the customize button is a landing screen that teaches nobody what is
- * there.
+ * Every card about the reader's things is on. A landing screen that hides half
+ * of itself until somebody finds the customize button is a landing screen that
+ * teaches nobody what is there. Asking Polar is the exception: it is a tool
+ * rather than something to read, and is there for whoever adds it.
  */
 export const DEFAULT_OVERVIEW_LAYOUT: readonly OverviewWidgetPreference[] = [
     { id: "shortcuts", size: "lg", hidden: false },
+    { id: "polar", size: "lg", hidden: true },
     { id: "usage", size: "sm", hidden: false },
     { id: "services", size: "md", hidden: false },
     { id: "notifications", size: "md", hidden: false },

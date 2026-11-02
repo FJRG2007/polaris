@@ -269,7 +269,7 @@ describe("stored favorites", () => {
 
     it("keeps a list stored before the menu could be arranged, in its order", () => {
         const stored = parseLauncherPrefs('["mail","drive","chat"]');
-        expect(stored).toEqual({ favorites: ["mail", "drive", "chat"], order: [] });
+        expect(stored).toEqual({ favorites: ["mail", "drive", "chat"], order: [], home: null });
         expect(
             launcherOrder({
                 available: ["drive", "chat", "mail", "notes"],
@@ -281,17 +281,29 @@ describe("stored favorites", () => {
     });
 
     it("stores the old list until the menu is arranged, and both lists after", () => {
-        expect(serializeLauncherPrefs({ favorites: [], order: [] })).toBeNull();
-        expect(serializeLauncherPrefs({ favorites: ["mail"], order: [] })).toBe('["mail"]');
-        const both = serializeLauncherPrefs({ favorites: ["mail"], order: ["chat", "mail"] });
-        expect(parseLauncherPrefs(both)).toEqual({ favorites: ["mail"], order: ["chat", "mail"] });
+        expect(serializeLauncherPrefs({ favorites: [], order: [], home: null })).toBeNull();
+        expect(serializeLauncherPrefs({ favorites: ["mail"], order: [], home: null })).toBe('["mail"]');
+        const both = serializeLauncherPrefs({
+            favorites: ["mail"],
+            order: ["chat", "mail"],
+            home: null
+        });
+        expect(parseLauncherPrefs(both)).toEqual({
+            favorites: ["mail"],
+            order: ["chat", "mail"],
+            home: null
+        });
     });
 
     it("reads a stored arrangement that is not usable as none, keeping what is", () => {
         const stored = JSON.stringify({ favorites: "mail", order: ["chat", "nope", "chat"] });
-        expect(parseLauncherPrefs(stored)).toEqual({ favorites: [], order: ["chat"] });
-        expect(parseLauncherPrefs("42")).toEqual({ favorites: [], order: [] });
-        expect(parseLauncherPrefs(JSON.stringify(null))).toEqual({ favorites: [], order: [] });
+        expect(parseLauncherPrefs(stored)).toEqual({ favorites: [], order: ["chat"], home: null });
+        expect(parseLauncherPrefs("42")).toEqual({ favorites: [], order: [], home: null });
+        expect(parseLauncherPrefs(JSON.stringify(null))).toEqual({
+            favorites: [],
+            order: [],
+            home: null
+        });
     });
 
     it("accepts a save of both lists, or of the favorites alone from an older tab", () => {

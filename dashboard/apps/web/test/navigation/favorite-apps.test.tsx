@@ -84,14 +84,18 @@ function mount(initial: string[], extra?: ReactNode, initialOrder: string[] = []
 }
 
 describe("the favorites store", () => {
-    it("folds the old favorites into the order the first time the menu is arranged", async () => {
+    it("folds the favorites into the order the first time the menu is arranged, and keeps them", async () => {
         let answer: (value: { error?: string }) => void = () => undefined;
         save.mockReturnValue(new Promise((resolve) => (answer = resolve)));
         const store = mount(["mail", "chat"]);
         act(() => store.get().arrangeApps(["chat", "mail", "drive"]));
         expect(store.order()).toBe("chat,mail,drive");
-        expect(store.shown()).toBe("");
-        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["chat", "mail", "drive"] });
+        expect(store.shown()).toBe("mail,chat");
+        expect(save).toHaveBeenCalledWith({
+            favorites: ["mail", "chat"],
+            order: ["chat", "mail", "drive"],
+            home: null
+        });
         await act(async () => answer({}));
         expect(store.order()).toBe("chat,mail,drive");
         expect(show).not.toHaveBeenCalled();
@@ -101,7 +105,11 @@ describe("the favorites store", () => {
         save.mockResolvedValue({});
         const store = mount(["admin", "mail"]);
         act(() => store.get().arrangeApps(["chat", "mail"]));
-        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["admin", "chat", "mail"] });
+        expect(save).toHaveBeenCalledWith({
+            favorites: ["admin", "mail"],
+            order: ["admin", "chat", "mail"],
+            home: null
+        });
     });
 
     it("puts the order back and says why when the server refuses", async () => {
@@ -109,7 +117,11 @@ describe("the favorites store", () => {
         const store = mount(["mail"], undefined, ["mail", "chat"]);
         act(() => store.get().arrangeApps(["chat", "mail"]));
         expect(store.order()).toBe("chat,mail");
-        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["chat", "mail"] });
+        expect(save).toHaveBeenCalledWith({
+            favorites: ["mail"],
+            order: ["chat", "mail"],
+            home: null
+        });
         await waitFor(() => expect(store.order()).toBe("mail,chat"));
         // Back to exactly what was saved, the old favorite included.
         expect(store.shown()).toBe("mail");
@@ -174,8 +186,9 @@ describe("the favorites store", () => {
         const store = mount(["mail"], undefined, ["mail", "admin", "chat"]);
         act(() => store.get().arrangeApps(["chat", "mail"]));
         expect(save).toHaveBeenCalledWith({
-            favorites: [],
-            order: ["chat", "admin", "mail"]
+            favorites: ["mail"],
+            order: ["chat", "admin", "mail"],
+            home: null
         });
     });
 
@@ -184,7 +197,7 @@ describe("the favorites store", () => {
         const store = mount(["mail"], undefined, ["chat", "mail"]);
         act(() => store.get().resetOrder());
         expect(store.order()).toBe("");
-        expect(save).toHaveBeenCalledWith({ favorites: ["mail"], order: [] });
+        expect(save).toHaveBeenCalledWith({ favorites: ["mail"], order: [], home: null });
     });
 });
 
@@ -213,7 +226,7 @@ describe("the Overview rail", () => {
 
     it("follows the menu's first apps once it is arranged, on the same frame", () => {
         save.mockReturnValue(new Promise(() => undefined));
-        const store = mount(["mail"], <AppSidebar appIds={appIds} />);
+        const store = mount([], <AppSidebar appIds={appIds} />);
         act(() =>
             store
                 .get()
@@ -292,7 +305,11 @@ describe("the app menu", () => {
         await user.click(screen.getByRole("button", { name: /drive/i }));
         await screen.findByRole("menu");
         await user.keyboard("{ArrowDown}{Alt>}{ArrowRight}{/Alt}");
-        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["chat", "drive", "mail"] });
+        expect(save).toHaveBeenCalledWith({
+            favorites: [],
+            order: ["chat", "drive", "mail"],
+            home: null
+        });
         expect(tiles()).toEqual(["chat", "drive", "mail"]);
         await act(async () => fail(new Error("offline")));
         expect(tiles()).toEqual(["drive", "chat", "mail"]);
@@ -306,9 +323,13 @@ describe("the app menu", () => {
         await user.click(screen.getByRole("button", { name: /drive/i }));
         await user.click(await screen.findByRole("menuitem", { name: "Arrange apps" }));
         await user.click(await screen.findByRole("button", { name: "Move Mail earlier" }));
-        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["chat", "mail", "drive"] });
+        expect(save).toHaveBeenCalledWith({
+            favorites: [],
+            order: ["chat", "mail", "drive"],
+            home: null
+        });
         await user.click(screen.getByRole("button", { name: "Use automatic order" }));
-        expect(save).toHaveBeenLastCalledWith({ favorites: [], order: [] });
+        expect(save).toHaveBeenLastCalledWith({ favorites: [], order: [], home: null });
     });
 
     it("draws the options under the grid as icons named by their words", async () => {

@@ -217,8 +217,11 @@ interface PolarState {
      *  right-click menu - taken with `asked`. */
     drafted: string | null;
     /** Quotes `text` in the composer, types `draft` under it, and opens the
-     *  panel. Does nothing for an account Polar is not for. */
-    ask: (text: string, draft?: string) => void;
+     *  panel. With `send`, the draft goes as if Enter had been pressed. Does
+     *  nothing for an account Polar is not for. */
+    ask: (text: string, draft?: string, send?: boolean) => void;
+    /** Whether the waiting draft is to be sent as soon as it is typed. */
+    sendDrafted: boolean;
     takeAsked: () => void;
 }
 
@@ -386,13 +389,15 @@ export function PolarProvider({
     }, [allowed]);
     const [asked, setAsked] = useState<string | null>(null);
     const [drafted, setDrafted] = useState<string | null>(null);
+    const [sendDrafted, setSendDrafted] = useState(false);
     const ask = useCallback(
-        (text: string, draft?: string) => {
+        (text: string, draft?: string, send = false) => {
             const quote = polarShared.selectionQuote(text);
             const typed = draft?.trim().slice(0, 2000) || null;
             if (!allowed || (!quote && !typed)) return;
             setAsked(quote);
             setDrafted(typed);
+            setSendDrafted(send);
             setOpen(true);
         },
         [allowed, setOpen]
@@ -400,6 +405,7 @@ export function PolarProvider({
     const takeAsked = useCallback(() => {
         setAsked(null);
         setDrafted(null);
+        setSendDrafted(false);
     }, []);
     // The browser extension on this page: its shortcut is this page's Ctrl+J,
     // which the browser hands to the extension first, so the extension passes
@@ -425,8 +431,19 @@ export function PolarProvider({
         return () => window.removeEventListener("message", onMessage);
     }, [allowed, ask, setOpen]);
     const value = useMemo(
-        () => ({ allowed, open, setOpen, extra, setExtra, asked, drafted, ask, takeAsked }),
-        [allowed, open, setOpen, extra, asked, drafted, ask, takeAsked]
+        () => ({
+            allowed,
+            open,
+            setOpen,
+            extra,
+            setExtra,
+            asked,
+            drafted,
+            sendDrafted,
+            ask,
+            takeAsked
+        }),
+        [allowed, open, setOpen, extra, asked, drafted, sendDrafted, ask, takeAsked]
     );
     return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
 }
@@ -889,13 +906,22 @@ export function PolarChat({
     // question typed under it when the menu brought one.
     const asked = state?.asked ?? null;
     const drafted = state?.drafted ?? null;
+    const sendOnInput = useRef(false);
     useEffect(() => {
         if (!asked && !drafted) return;
         if (asked) setQuote(asked);
         if (drafted) setInput(drafted);
+        sendOnInput.current = Boolean(drafted && state?.sendDrafted);
         state?.takeAsked();
         textarea.current?.focus();
     }, [asked, drafted]);
+    // Through the composer's own form, so a question sent from outside it meets
+    // every check a typed one does; one it refuses stays typed, nothing lost.
+    useEffect(() => {
+        if (!sendOnInput.current || !input) return;
+        sendOnInput.current = false;
+        textarea.current?.form?.requestSubmit();
+    }, [input]);
     const threadKey = scopedThreadKey(chatScope);
     const drawerButton = useRef<HTMLButtonElement>(null);
     const composerNext = useRef(false);

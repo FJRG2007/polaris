@@ -15,7 +15,11 @@
         "resetOrder": "Use automatic order",
         "moveEarlier": "Move {app} earlier",
         "moveLater": "Move {app} later",
-        "marketplace": "Find more apps"
+        "marketplace": "Find more apps",
+        "favorite": "Add to favorites",
+        "unfavorite": "Remove from favorites",
+        "start": "Open on entry",
+        "notStart": "Stop opening on entry"
     },
     "waiting": {
         "unread": "{count, plural, one {# unread message} other {# unread messages}}",

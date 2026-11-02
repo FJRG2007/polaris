@@ -17,6 +17,7 @@ import type { OverviewWidgetId, OverviewWidgetSize } from "@polaris/core";
 import {
     Activity,
     Bell,
+    BotMessageSquare,
     CalendarDays,
     Clock,
     Gamepad2,
@@ -66,7 +67,7 @@ export interface OverviewWidgetEntry {
 }
 
 /** The things a card can depend on being present, answered once on the server. */
-export type OverviewFeature = "games" | "calendar" | "dnsBlocker";
+export type OverviewFeature = "games" | "calendar" | "dnsBlocker" | "polar";
 
 /** Which of those this account actually has. A feature absent from the record is
  *  treated as absent, so a new one is off until something answers for it. */
@@ -96,6 +97,16 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         href: null,
         sizes: ["md", "lg", "xl"],
         local: true
+    },
+    {
+        id: "polar",
+        label: "Polar", // i18n-ignore
+        description: "Ask a question from here without leaving the Overview.", // i18n-ignore
+        icon: BotMessageSquare,
+        href: "/polar",
+        sizes: ["md", "lg", "xl"],
+        local: true,
+        requires: "polar"
     },
     {
         id: "services",

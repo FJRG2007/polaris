@@ -257,6 +257,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                         <FavoriteAppsProvider
                                                             initial={launcherPrefs.favorites}
                                                             initialOrder={launcherPrefs.order}
+                                                            initialHome={launcherPrefs.home}
                                                         >
                                                             <ShortcutsProvider
                                                                 overrides={shortcuts}

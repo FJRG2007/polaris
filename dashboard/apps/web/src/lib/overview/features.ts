@@ -17,6 +17,7 @@ import { isGameServerApp } from "@/lib/apps/catalog";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { OverviewFeatures } from "@/lib/overview/catalog";
 import { DNS_BLOCKER_APP } from "@/lib/dns-blocker/settings";
+import { polarAccessFor } from "@/lib/polar/access";
 
 /**
  * Whether this account has any game server at all - one it owns, or one it was
@@ -33,10 +34,11 @@ async function hasGameServer(userId: string): Promise<boolean> {
 }
 
 export async function overviewFeatures(userId: string): Promise<OverviewFeatures> {
-    const [games, calendar, dnsBlocker] = await Promise.all([
+    const [games, calendar, dnsBlocker, polar] = await Promise.all([
         hasGameServer(userId),
         isAppInstalled("calendar"),
-        isAppInstalled(DNS_BLOCKER_APP)
+        isAppInstalled(DNS_BLOCKER_APP),
+        polarAccessFor(userId)
     ]);
-    return { games, calendar, dnsBlocker };
+    return { games, calendar, dnsBlocker, polar: polar.use };
 }

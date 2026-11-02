@@ -94,12 +94,12 @@ describe("the arrange apps dialog", () => {
         expect(arrangeApps).not.toHaveBeenCalled();
     });
 
-    it("offers moving and nothing else - no star on any row", () => {
+    it("offers, on each row, what a right click offers elsewhere", () => {
         renderDialog({ favorites: ["chat"] });
-        expect(screen.queryByRole("button", { name: /favorites/i })).toBeNull();
         for (const row of screen.getAllByRole("listitem")) {
-            expect(within(row).getAllByRole("button")).toHaveLength(2);
+            expect(within(row).getAllByRole("button")).toHaveLength(4);
         }
+        expect(screen.getByRole("button", { name: /remove from favorites.*chat/i })).toBeTruthy();
     });
 
     it("keeps the rows in place when the menu's order changes elsewhere, until a move", () => {

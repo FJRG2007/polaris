@@ -216,6 +216,19 @@ export async function reachableAppIds(input: AppAccessInput): Promise<string[]> 
  * or their own account when they can open none.
  */
 export async function homePathFor(input: AppAccessInput): Promise<string> {
+    return startPathFor(input, null);
+}
+
+/**
+ * Where entering Polaris lands: the app this person chose, while they can still
+ * open it, and otherwise their home.
+ *
+ * Only the dashboard root asks this. A screen turning somebody away goes to
+ * `homePathFor`, so the choice can never send them round in a circle, and the
+ * Overview keeps its own address for whenever they want it.
+ */
+export async function startPathFor(input: AppAccessInput, chosen: string | null): Promise<string> {
     const apps = await reachableApps(input);
-    return apps[0]?.href ?? ACCOUNT_HOME;
+    const app = apps.find((entry) => entry.id === chosen) ?? apps[0];
+    return app?.href ?? ACCOUNT_HOME;
 }

@@ -203,9 +203,11 @@ export async function checkDomain(
             latencyMs: Date.now() - started,
             detail: controller.signal.aborted
                 ? "Timed out"
-                : caught instanceof Error
-                  ? caught.message
-                  : "Unreachable",
+                : errorCode === "ENOTFOUND"
+                  ? "No DNS record for this name"
+                  : caught instanceof Error
+                    ? caught.message
+                    : "Unreachable",
             ...(typeof errorCode === "string" && !controller.signal.aborted ? { errorCode } : {})
         };
     } finally {
