@@ -153,7 +153,7 @@ describe("the app in the catalog", () => {
 
     it("is one id everywhere it is named", () => {
         expect(manifest?.id).toBe("mail-server");
-        const section = APP_SECTIONS.apps?.find((entry) => entry.href === "/mail-server");
+        const section = APP_SECTIONS["mail-server"]?.find((entry) => entry.href === "/mail-server");
         expect(section?.requiresApp).toBe(appInstall.MAIL_SERVER_APP);
         // The app keeps its own permission; installing is a separate grant.
         expect(section?.needs).toBe("mailserver.manage");

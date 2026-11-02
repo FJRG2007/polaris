@@ -11,8 +11,8 @@
  * runtime.
  */
 
-import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE } from "@polaris/core";
-import { DNS_BLOCKER_KEYWORDS, VPN_KEYWORDS } from "@/lib/apps";
+import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE, gameOfServer } from "@polaris/core";
+import { DNS_BLOCKER_KEYWORDS, GAME_SERVERS_BASE, INSTALLED_BASE, VPN_KEYWORDS } from "@/lib/apps";
 import { NATIVE_APPS, isNativeApp } from "@/lib/apps/native-apps";
 import {
     Bot,
@@ -1528,6 +1528,16 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
 export function isGameServerApp(catalogId: string): boolean {
     const manifest = findApp(catalogId);
     return manifest ? appHasCapability(manifest, "game-server") : false;
+}
+
+/** Where an install's own screens are, so a link never takes the redirect a
+ *  game server's old address answers with. */
+export function installedAppHref(
+    install: { readonly id: string; readonly catalogId: string },
+    tab = ""
+): string {
+    const base = gameOfServer(install.catalogId) ? GAME_SERVERS_BASE : INSTALLED_BASE;
+    return tab ? `${base}/${install.id}/${tab}` : `${base}/${install.id}`;
 }
 
 /** Every app manifest, offered or not. */

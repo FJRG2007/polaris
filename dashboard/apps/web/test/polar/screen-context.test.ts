@@ -93,6 +93,11 @@ describe("screen descriptor", () => {
         expect(screenFor("/chat/c/c1/settings/members").record?.kind).toBe("chat channel");
         expect(screenFor("/chat/c/c1/m9").record).toEqual({ kind: "chat message", id: "m9" });
         expect(screenFor("/apps/installed/abc/console").record?.kind).toBe("installed app");
+        expect(screenFor("/game-servers/abc/console").record).toEqual({
+            kind: "installed app",
+            id: "abc"
+        });
+        expect(screenFor("/game-servers").record).toBeUndefined();
         expect(screenFor("/mail/inbox").record).toBeUndefined();
         expect(screenFor("/drive/shared").section).toBe("Shared");
     });

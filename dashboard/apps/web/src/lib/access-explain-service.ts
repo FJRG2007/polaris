@@ -15,6 +15,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as auth from "@polaris/auth";
+import { installedAppHref } from "@/lib/apps/catalog";
 import { readerWords } from "@/lib/i18n/reader-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -62,14 +63,14 @@ async function resourceLabels(
     const ids = (kind: core.ResourceKind) =>
         grants.filter((grant) => grant.kind === kind).map((grant) => grant.resourceId);
     const [installs, projects, spaces, domains] = await Promise.all([
-        prisma.installedApp.findMany({ where: { id: { in: ids("install") } }, select: { id: true, name: true } }),
+        prisma.installedApp.findMany({ where: { id: { in: ids("install") } }, select: { id: true, name: true, catalogId: true } }),
         prisma.project.findMany({ where: { id: { in: ids("project") } }, select: { id: true, name: true } }),
         prisma.taskSpace.findMany({ where: { id: { in: ids("space") } }, select: { id: true, name: true } }),
         prisma.ownerDomain.findMany({ where: { id: { in: ids("domain") } }, select: { id: true, domain: true } })
     ]);
     const labels = new Map<string, { label: string; href: string | null }>();
     for (const row of installs) {
-        labels.set(`install:${row.id}`, { label: row.name, href: `/apps/installed/${row.id}/access` });
+        labels.set(`install:${row.id}`, { label: row.name, href: installedAppHref(row, "access") });
     }
     for (const row of projects) {
         labels.set(`project:${row.id}`, { label: row.name, href: `/apps/deploy/${row.id}` });

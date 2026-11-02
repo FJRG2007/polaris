@@ -2595,17 +2595,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     "mail-server": [
         {
-            // Here rather than under Management: a mail server is a service the
-            // operator runs on their machines, deployed through Deploy and backed
-            // up by Backups, beside which it sits. Management configures Polaris
-            // itself; reading mail stays in Mail. Only here once somebody installs
-            // it from the marketplace: a Polaris that runs no mail server should
-            // not carry a door onto one.
+            // Out of the rail: the app is this one screen. Kept so search finds
+            // it. Only here once somebody installs it from the marketplace: a
+            // Polaris that runs no mail server should not carry a door onto one.
             label: "Mail server", // i18n-ignore
             href: "/mail-server",
             needs: "mailserver.manage",
             requiresApp: "mail-server",
             icon: Mails,
+            hidden: true,
             keywords: [
                 "smtp",
                 "imap",
@@ -2621,8 +2619,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "aliases",
                 "forwards",
                 "catch-all"
-            ],
-            group: DATA_GROUP
+            ]
         }
     ],
     router: [
