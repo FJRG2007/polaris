@@ -42,8 +42,9 @@ export function DesktopInstall({
     done
 }: {
     tool: DesktopTool;
-    /** The system the line on screen is for: the button only works on this one. */
-    platform: InstallPlatform;
+    /** The system a line on screen is for, when there is one: the button only works on
+     *  this one. Left out, it is this computer. */
+    platform?: InstallPlatform;
     browser?: string;
     /** What is left to do once it is installed. */
     done: string;
@@ -56,7 +57,12 @@ export function DesktopInstall({
 
     useEffect(() => {
         const bridge = desktopInstaller();
-        setOffered(Boolean(bridge?.installTool) && SYSTEMS[bridge?.platform ?? ""] === platform);
+        const system = SYSTEMS[bridge?.platform ?? ""];
+        setOffered(
+            Boolean(bridge?.installTool) &&
+                system !== undefined &&
+                (!platform || system === platform)
+        );
     }, [platform]);
 
     if (!offered) return null;

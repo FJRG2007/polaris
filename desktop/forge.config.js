@@ -15,6 +15,7 @@ const { chmodSync, existsSync, renameSync, writeFileSync } = require("node:fs");
 
 const ICON = path.join(__dirname, "assets", "icon");
 const env = process.env;
+const LINK_MIME_TYPES = ["x-scheme-handler/polaris"];
 
 /** macOS: signed with a Developer ID when one is given, notarized when the Apple
  *  account is given as well. Hardened runtime is what notarization requires. */
@@ -51,6 +52,9 @@ module.exports = {
         name: "Polaris",
         executableName: "polaris",
         appBundleId: "io.github.fjrg2007.polaris",
+        // macOS reads the links an app answers from its bundle, Linux from the
+        // desktop entries below (LINK_MIME_TYPES); Windows registers them itself.
+        protocols: [{ name: "Polaris", schemes: ["polaris"] }],
         appCategoryType: "public.app-category.developer-tools",
         // macOS asks before a call reaches the microphone or camera, and shows
         // these words when it does.
@@ -134,7 +138,8 @@ module.exports = {
                     productName: "Polaris",
                     bin: "polaris",
                     icon: `${ICON}.png`,
-                    categories: ["Development", "Utility"]
+                    categories: ["Development", "Utility"],
+                    mimeType: LINK_MIME_TYPES
                 }
             }
         },
@@ -146,6 +151,7 @@ module.exports = {
                     bin: "polaris",
                     icon: `${ICON}.png`,
                     categories: ["Development", "Utility"],
+                    mimeType: LINK_MIME_TYPES,
                     // A runtime downloaded and checked against its digest by the
                     // workflow; without one the maker fetches the moving
                     // "continuous" build, which is fine for a local try only.

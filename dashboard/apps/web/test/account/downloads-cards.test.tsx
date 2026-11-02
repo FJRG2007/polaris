@@ -81,6 +81,23 @@ describe("the extension card", () => {
         expect(screen.getByRole("radio", { name: "Command" }).hasAttribute("disabled")).toBe(true);
         expect(screen.getByRole("link", { name: "release files" })).toBeTruthy();
     });
+
+    it("offers the app's Install button on every browser but Firefox", async () => {
+        const desktop = window as { polarisDesktop?: unknown };
+        desktop.polarisDesktop = { platform: "win32", installTool: async () => ({ ok: true }) };
+        try {
+            extensionCard();
+            expect(await screen.findByRole("button", { name: "Install" })).toBeTruthy();
+            await userEvent.click(
+                screen.getByRole("combobox", { name: "Which browser you are loading it into" })
+            );
+            await userEvent.click(await screen.findByRole("option", { name: "Firefox" }));
+            await screen.findByText("about:debugging#/runtime/this-firefox");
+            expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+        } finally {
+            delete desktop.polarisDesktop;
+        }
+    });
 });
 
 describe("the assistants card", () => {

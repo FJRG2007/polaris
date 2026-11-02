@@ -12,6 +12,7 @@
  */
 
 import { wordsFor } from "./words";
+import { openInDesktopApp } from "./desktop-app";
 import { keyImage } from "./render";
 import { backoffMs } from "./backoff";
 import { joinPath, normalizeAddress } from "./address";
@@ -285,11 +286,11 @@ class Hub {
         }
     }
 
-    /** Open a page of this Polaris in the browser. */
+    /** Open a page of this Polaris: in the desktop app when there is one, else the browser. */
     async open(path: string): Promise<boolean> {
         const url = this.credentials ? joinPath(this.credentials.address, path) : null;
         if (!url) return false;
-        await streamDeck.system.openUrl(url);
+        if (!(await openInDesktopApp(url))) await streamDeck.system.openUrl(url);
         return true;
     }
 
@@ -384,7 +385,7 @@ class Hub {
             const url = joinPath(address, opened.approvePath) ?? address;
             this.connecting = { phase: "waiting", userCode: opened.userCode, url };
             this.onChange();
-            await streamDeck.system.openUrl(url);
+            if (!(await openInDesktopApp(url))) await streamDeck.system.openUrl(url);
             const until = Date.parse(opened.expiresAt);
             while (!abort.signal.aborted && Date.now() < until) {
                 await new Promise((resolve) => setTimeout(resolve, Math.max(1000, opened.pollMs)));

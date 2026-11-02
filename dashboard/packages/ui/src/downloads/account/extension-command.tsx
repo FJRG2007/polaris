@@ -15,13 +15,12 @@
  */
 
 import { InstallLine } from "./install-line";
-import { DesktopInstall } from "./desktop-install";
 import { installCommand } from "./install-command";
 import { useTranslations } from "../../i18n";
 import { platformShell } from "./install-platform";
 import { useInstallPlatform } from "./platform-select";
 
-export function ExtensionCommand({ repo, browser }: { repo: string; browser?: string }) {
+export function ExtensionCommand({ repo }: { repo: string; browser?: string }) {
     const t = useTranslations("account");
     const [platform, setPlatform] = useInstallPlatform();
 
@@ -35,14 +34,6 @@ export function ExtensionCommand({ repo, browser }: { repo: string; browser?: st
             onPlatformChange={setPlatform}
             command={chosen.command}
             hint={t("downloads.command.hint", { shell: chosen.shell })}
-            install={
-                <DesktopInstall
-                    tool="extension"
-                    platform={platform}
-                    browser={browser}
-                    done={t("downloads.install.extensionDone")}
-                />
-            }
         />
     );
 }

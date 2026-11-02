@@ -9,6 +9,7 @@
  */
 
 import { setOpenAtLogin } from "./login-item";
+import { DEEP_LINK_SCHEME } from "@/shared/deep-link";
 import { app } from "electron";
 import { spawn } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
@@ -30,11 +31,13 @@ export function handledSquirrelEvent(): boolean {
     };
 
     if (event === "--squirrel-install" || event === "--squirrel-updated") {
+        app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
         updateThenQuit([`--createShortcut=${exe}`]);
         return true;
     }
     if (event === "--squirrel-uninstall") {
         setOpenAtLogin(false);
+        app.removeAsDefaultProtocolClient(DEEP_LINK_SCHEME);
         updateThenQuit([`--removeShortcut=${exe}`]);
         return true;
     }

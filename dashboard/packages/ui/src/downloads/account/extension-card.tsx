@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { DesktopInstall } from "./desktop-install";
 import { AppLink } from "./app-link";
 import { Puzzle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -99,6 +100,16 @@ export function ExtensionCard({
                         ]}
                     />
                 </div>
+
+                {/* Whichever way is showing: inside the app it is all one button.
+                    Firefox cannot load what the app's installer puts on disk. */}
+                {firefox ? null : (
+                    <DesktopInstall
+                        tool="extension"
+                        browser={browser}
+                        done={t("downloads.install.extensionDone")}
+                    />
+                )}
 
                 {way === "store" && storeUrl ? (
                     <a className="underline" href={storeUrl} target="_blank" rel="noreferrer">
