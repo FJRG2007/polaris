@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { InstallLine } from "./install-line";
+import { DesktopInstall } from "./desktop-install";
 import { detectPlatform } from "./install-platform";
 import { useTranslations } from "../../i18n";
 import {
@@ -42,6 +43,13 @@ export function DeckCommand({ repo }: { repo: string }) {
             onPlatformChange={(next) => setPlatform(deckLinePlatform(next))}
             command={chosen.command}
             hint={t("downloads.streamdeck.command.hint", { shell: chosen.shell })}
+            install={
+                <DesktopInstall
+                    tool="deck"
+                    platform={platform}
+                    done={t("downloads.install.deckDone")}
+                />
+            }
         />
     );
 }

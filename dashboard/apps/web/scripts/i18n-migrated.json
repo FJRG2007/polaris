@@ -2372,6 +2372,7 @@
         "../packages/ui/src/downloads/account/deck-command.tsx",
         "../packages/ui/src/downloads/account/deck-install-command.ts",
         "../packages/ui/src/downloads/account/deck-install-steps.tsx",
+        "../packages/ui/src/downloads/account/desktop-install.tsx",
         "../packages/ui/src/downloads/account/download-guide.tsx",
         "../packages/ui/src/downloads/account/download-previews.tsx",
         "../packages/ui/src/downloads/account/downloads-page.tsx",

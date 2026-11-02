@@ -18,7 +18,7 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { VERSION_ARGUMENT } from "@/shared/bridge";
-import { defaultTitleBarColors, foreignPageCss, overlayHeight, TITLE_BAR_HEIGHT } from "@/shared/title-bar";
+import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
 import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
     app,
@@ -73,7 +73,7 @@ function titleBar(): BrowserWindowConstructorOptions {
     const colors = defaultTitleBarColors(nativeTheme.shouldUseDarkColors);
     return {
         titleBarStyle: "hidden",
-        titleBarOverlay: { color: colors.background, symbolColor: colors.symbol, height: TITLE_BAR_HEIGHT }
+        titleBarOverlay: { color: colors.background, symbolColor: colors.symbol, height: overlayHeight(1) }
     };
 }
 

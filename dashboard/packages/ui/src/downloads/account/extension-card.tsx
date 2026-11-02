@@ -105,7 +105,7 @@ export function ExtensionCard({
                         {t("downloads.extension.store")}
                     </a>
                 ) : way === "command" ? (
-                    <ExtensionCommand repo={repo} />
+                    <ExtensionCommand repo={repo} browser={browser} />
                 ) : (
                     <>
                         <BrowserChoice.Provider value={browser}>{files}</BrowserChoice.Provider>

@@ -17,6 +17,7 @@
 
 import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
+import type { InstallRequest, InstallResult } from "./install-tools";
 import type { UpdateReady } from "./update-ready";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
@@ -90,6 +91,13 @@ export interface PolarisDesktop {
     /** The names of the programs running now, for picking one to add as a game.
      *  Only ever handed to the page that asked, on a press. */
     runningPrograms(): Promise<readonly string[]>;
+    /** Install a tool on this computer, after the app has asked in a dialog of
+     *  its own. A cancelled confirmation is a failure with no sentence. */
+    installTool(input: InstallRequest): Promise<InstallResult>;
+    /** The system's default browser, by a name of ours, or null. */
+    defaultBrowser(): Promise<string | null>;
+    /** Open the app's window for adding and switching servers. */
+    openServers(): Promise<void>;
     /** The screens and windows to share, each with a small picture, for the
      *  page's own picker. Null where the system's picker is the one to use.
      *  `thumbnails: false` answers faster, with names only. */
@@ -228,6 +236,9 @@ export const CHANNELS = {
     gameCurrent: "desktop:game-current",
     gameCustom: "desktop:game-custom",
     gamePrograms: "desktop:game-programs",
+    installTool: "desktop:install-tool",
+    defaultBrowser: "desktop:default-browser",
+    openServers: "desktop:open-servers",
     shareSources: "desktop:share-sources",
     chooseShare: "desktop:choose-share",
     drawOnShare: "desktop:draw-on-share",

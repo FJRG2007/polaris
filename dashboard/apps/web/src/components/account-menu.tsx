@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDesktopBridge } from "@/components/desktop-app";
 import { usePresence, usePresenceRefresh } from "@/components/presence-store";
 import { openTourList } from "@/lib/tours/target";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
@@ -27,7 +28,8 @@ import {
     LogOut,
     MessageSquareText,
     UserCog,
-    Users
+    Users,
+    Server
 } from "lucide-react";
 import {
     MAX_STATUS,
@@ -144,6 +146,7 @@ export function AccountMenu({
     const t = useTranslations("nav");
     const tTours = useTranslations("tours");
     const tc = useTranslations("common");
+    const desktop = useDesktopBridge();
     const toast = useToast();
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
@@ -644,6 +647,12 @@ export function AccountMenu({
                             {t("account.friends")}
                         </Link>
                     </DropdownMenuItem>
+                    {desktop?.openServers ? (
+                        <DropdownMenuItem onSelect={() => void desktop.openServers?.()}>
+                            <Server className="size-4" />
+                            {t("account.servers")}
+                        </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut className="size-4" />
                         {t("account.signOut")}
