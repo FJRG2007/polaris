@@ -9,7 +9,7 @@
  */
 
 import { readerWords } from "@/lib/i18n/reader-words";
-import { ProviderPaused, whileServing } from "@/lib/integrations/provider-pause";
+import { pauseReasonFor, ProviderPaused, whileServing } from "@/lib/integrations/provider-pause";
 import { takeLookup } from "@/lib/reputation-budget";
 
 const BASE = "https://www.virustotal.com/api/v3";
@@ -48,7 +48,8 @@ function noOpinion(caught: unknown, fallback: string): VtVerdict {
     const status = (caught as { status?: unknown } | null)?.status;
     const detail =
         typeof status === "number" && caught instanceof Error ? caught.message : fallback;
-    return { kind: "error", malicious: 0, suspicious: 0, detail };
+    const verdict: VtVerdict = { kind: "error", malicious: 0, suspicious: 0, detail };
+    return pauseReasonFor(caught) === null ? verdict : { ...verdict, deferred: true };
 }
 /** Public API file-upload ceiling. Larger files can only be looked up by hash. */
 export const VT_MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
@@ -61,9 +62,9 @@ export interface VtVerdict {
     suspicious: number;
     permalink?: string;
     detail?: string;
-    /** Requests ran out before there was an answer, so this says nothing about the
-     *  file. Asked again later: a stranger must not be able to spend the budget and
-     *  have the next file kept unread. */
+    /** Requests ran out or the service failed before there was an answer, so this says
+     *  nothing about the file. Asked again later: a stranger must not be able to spend
+     *  the budget and have the next file kept unread. */
     deferred?: boolean;
 }
 

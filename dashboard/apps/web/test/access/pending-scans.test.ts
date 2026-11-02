@@ -17,6 +17,8 @@ interface Row {
     sha256: string | null;
     verdict: string;
     action?: string;
+    path?: string | null;
+    detail?: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -26,8 +28,11 @@ const state = vi.hoisted(() => ({
     scans: [] as Row[],
     submissions: new Map<string, { status: string; storedPath?: string }>(),
     deleted: [] as string[],
+    moved: [] as [string, string][],
     notices: [] as { event: string }[],
-    onDetection: "block"
+    notify: null as (() => Promise<void>) | null,
+    onDetection: "block",
+    size: 5
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -62,8 +67,11 @@ vi.mock("@polaris/db", () => ({
                 state.submissions.has(where.id)
                     ? {
                           fileName: "report.pdf",
-                          storedPath: "drop/report.pdf",
-                          size: 5n,
+                          storedPath:
+                              state.submissions.get(where.id)?.storedPath ?? "drop/report.pdf",
+                          size: BigInt(state.size),
+                          status: state.submissions.get(where.id)?.status,
+                          submittedByUserId: null,
                           request: { ownerId: "owner", title: "Inbox" }
                       }
                     : null,
@@ -90,14 +98,22 @@ const file = () =>
     });
 
 const driver = {
+    stat: async () => ({}),
     readStream: async () => file(),
     delete: async (path: string) => void state.deleted.push(path),
     mkdir: async () => undefined,
-    move: async () => undefined,
+    move: async (from: string, to: string) => void state.moved.push([from, to]),
     dispose: async () => undefined
 };
 
 vi.mock("@/lib/storage-service", () => ({ getDriverForConnection: async () => driver }));
+vi.mock("@/lib/drive-meta-service", () => ({ recordItemCreator: async () => undefined }));
+vi.mock("@/lib/drive-folder-size", () => ({ invalidateFolderSizes: async () => undefined }));
+vi.mock("@/lib/file-request-service", () => ({
+    setSubmissionPath: async (id: string, storedPath: string) => {
+        Object.assign(state.submissions.get(id) ?? {}, { storedPath });
+    }
+}));
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async () => ({ enabled: true, config: {} }),
     getIntegrationSecret: async () => "key"
@@ -106,7 +122,10 @@ vi.mock("@/lib/integrations/registry", () => ({
     readVirusTotalConfig: () => ({ scanDropPoints: true, onDetection: state.onDetection })
 }));
 vi.mock("@/lib/notifications/dispatch", () => ({
-    notify: async (notice: { event: string }) => void state.notices.push(notice)
+    notify: async (notice: { event: string }) => {
+        await state.notify?.();
+        state.notices.push(notice);
+    }
 }));
 vi.mock("@/lib/notifications/notice-words", () => ({
     wordsFor: async () => (key: string) => key
@@ -133,12 +152,14 @@ vi.mock("@/lib/connections/attention", () => ({
 
 const { finishPendingScans, scanDropPointUpload } = await import("@/lib/scan-service");
 const { uploadAndScan } = await import("@/lib/integrations/virustotal");
+const { clearProviderPause } = await import("@/lib/integrations/provider-pause");
 
-const upload = () =>
+const upload = (destination?: string) =>
     scanDropPointUpload({
         driver: driver as never,
         connectionId: "connection",
         storedPath: "drop/.staged",
+        destination,
         fileName: "report.pdf",
         ownerId: "owner",
         dropPointTitle: "Inbox",
@@ -159,6 +180,9 @@ function age(by: number): void {
     }
 }
 
+const clean = new Response(
+    JSON.stringify({ data: { attributes: { last_analysis_stats: { harmless: 9 } } } })
+);
 const pending = () => state.scans.filter((scan) => scan.verdict === "pending");
 const malicious = new Response(
     JSON.stringify({ data: { attributes: { last_analysis_stats: { malicious: 9 } } } })
@@ -172,8 +196,11 @@ describe("a file that arrives after the budget is spent", () => {
         state.scans = [];
         state.submissions = new Map([["submission", { status: "stored" }]]);
         state.deleted = [];
+        state.moved = [];
         state.notices = [];
+        state.notify = null;
         state.onDetection = "block";
+        state.size = 5;
         answers.mockReset();
         answers.mockImplementation(async () => malicious.clone());
         vi.stubGlobal("fetch", (url: string) => answers(url));
@@ -231,7 +258,10 @@ describe("a file that arrives after the budget is spent", () => {
         await finishPendingScans();
 
         expect(pending()).toEqual([]);
-        expect(state.scans[0]).toMatchObject({ verdict: "unknown" });
+        expect(state.scans[0]).toMatchObject({
+            verdict: "unknown",
+            detail: "scan.waitedTooLong"
+        });
         expect(state.notices).toMatchObject([{ event: "scan.detection" }]);
     });
 
@@ -240,13 +270,195 @@ describe("a file that arrives after the budget is spent", () => {
         await upload();
         resetLookupBudget();
         age(2 * 60 * 1000);
-        const read = vi.spyOn(driver, "readStream").mockRejectedValueOnce(new Error("offline"));
+        const stat = vi.spyOn(driver, "stat").mockRejectedValueOnce(new Error("offline"));
 
         await finishPendingScans();
 
-        expect(read).toHaveBeenCalled();
+        expect(stat).toHaveBeenCalled();
+        expect(answers).not.toHaveBeenCalled();
         expect(pending()).toHaveLength(1);
         expect(Date.now() - pending()[0]!.updatedAt.getTime()).toBeLessThan(1000);
+    });
+
+    it.each([429, 500, 503])("stays owed when VirusTotal answers %i", async (status) => {
+        answers.mockImplementation(async () => new Response("{}", { status }));
+
+        await upload();
+
+        expect(pending()).toHaveLength(1);
+        expect(state.notices).toEqual([]);
+        await clearProviderPause("virustotal");
+    });
+
+    it("stays owed when a retry fails, and is finished by the next one", async () => {
+        spendTheBudget();
+        await upload();
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+        answers.mockImplementationOnce(async () => new Response("{}", { status: 503 }));
+
+        await finishPendingScans();
+
+        expect(pending()).toHaveLength(1);
+        await clearProviderPause("virustotal");
+        age(2 * 60 * 1000);
+
+        await finishPendingScans();
+
+        expect(state.submissions.get("submission")?.status).toBe("blocked");
+        expect(pending()).toEqual([]);
+    });
+
+    it("takes a refusal of the file itself as the answer", async () => {
+        answers.mockImplementation(async () => new Response("{}", { status: 422 }));
+
+        expect(await upload()).toMatchObject({ verdict: "error" });
+
+        expect(pending()).toEqual([]);
+    });
+
+    it("stays owed if acting on the verdict fails", async () => {
+        spendTheBudget();
+        await upload();
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+        state.notify = async () => {
+            throw new Error("down");
+        };
+
+        await finishPendingScans();
+
+        expect(state.submissions.get("submission")?.status).toBe("blocked");
+        expect(pending()).toHaveLength(1);
+    });
+
+    it("does not act twice on a file an earlier pass already blocked", async () => {
+        spendTheBudget();
+        await upload();
+        state.submissions.set("submission", { status: "blocked" });
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+
+        await finishPendingScans();
+
+        expect(answers).not.toHaveBeenCalled();
+        expect(state.deleted).toEqual([]);
+        expect(pending()).toEqual([]);
+    });
+
+    it("does not read the file while there is nothing to ask with", async () => {
+        spendTheBudget();
+        await upload();
+        age(2 * 60 * 1000);
+        const read = vi.spyOn(driver, "readStream");
+        read.mockClear();
+
+        await finishPendingScans();
+
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it("does not read the file when VirusTotal knows its hash", async () => {
+        spendTheBudget();
+        await upload();
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+        const read = vi.spyOn(driver, "readStream");
+        read.mockClear();
+
+        await finishPendingScans();
+
+        expect(read).not.toHaveBeenCalled();
+        expect(state.submissions.get("submission")?.status).toBe("blocked");
+    });
+
+    it("uploads a file VirusTotal has not seen, reading it only then", async () => {
+        spendTheBudget();
+        await upload();
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+        const read = vi.spyOn(driver, "readStream");
+        read.mockClear();
+        answers.mockImplementation(async (url) =>
+            url.endsWith("/files")
+                ? new Response(JSON.stringify({ data: { id: "analysis" } }))
+                : url.includes("/analyses/")
+                  ? new Response(
+                        JSON.stringify({
+                            data: { attributes: { status: "completed", stats: { malicious: 2 } } }
+                        })
+                    )
+                  : new Response("{}", { status: 404 })
+        );
+        vi.useFakeTimers();
+        try {
+            const sweep = finishPendingScans();
+            await vi.runAllTimersAsync();
+            await sweep;
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(state.submissions.get("submission")?.status).toBe("blocked");
+    });
+
+    it("says a file too large to upload could not be scanned, unread", async () => {
+        spendTheBudget();
+        await upload();
+        resetLookupBudget();
+        state.size = 33 * 1024 * 1024;
+        age(2 * 60 * 1000);
+        answers.mockImplementation(async () => new Response("{}", { status: 404 }));
+        const read = vi.spyOn(driver, "readStream");
+        read.mockClear();
+
+        await finishPendingScans();
+
+        expect(read).not.toHaveBeenCalled();
+        expect(pending()).toEqual([]);
+    });
+
+    it("holds an overwrite back until it is cleared, then puts it in place", async () => {
+        spendTheBudget();
+        expect(await upload("drop/report.pdf")).toMatchObject({ deferred: true });
+        state.submissions.set("submission", { status: "stored", storedPath: "drop/.staged" });
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+        answers.mockImplementation(async () => clean.clone());
+
+        await finishPendingScans();
+
+        expect(
+            state.moved.some(([from, to]) => from === "drop/.staged" && to === "drop/report.pdf")
+        ).toBe(true);
+        expect(state.submissions.get("submission")?.storedPath).toBe("drop/report.pdf");
+        expect(pending()).toEqual([]);
+    });
+
+    it("never touches the replaced file when a held overwrite is malicious", async () => {
+        spendTheBudget();
+        await upload("drop/report.pdf");
+        state.submissions.set("submission", { status: "stored", storedPath: "drop/.staged" });
+        resetLookupBudget();
+        age(2 * 60 * 1000);
+
+        await finishPendingScans();
+
+        expect(state.deleted).toEqual(["drop/.staged"]);
+        expect(state.moved).toEqual([]);
+    });
+
+    it("keeps a held overwrite under its own name if it was never scanned", async () => {
+        spendTheBudget();
+        await upload("drop/report.pdf");
+        state.submissions.set("submission", { status: "stored", storedPath: "drop/.staged" });
+        age(8 * DAY_MS);
+
+        await finishPendingScans();
+
+        expect(state.moved).toEqual([]);
+        expect(state.submissions.get("submission")?.storedPath).toBe("drop/.staged");
     });
 
     it("drops the debt when the submission is gone", async () => {

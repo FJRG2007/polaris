@@ -152,7 +152,8 @@
         "partialTitle": "No se pudo analizar la subida por completo",
         "failedTitle": "No se pudo analizar la subida",
         "notScanned": "No se pudo analizar \"{file}\", subido a \"{dropPoint}\" ({detail}). Se ha conservado.",
-        "unavailable": "analizador no disponible"
+        "unavailable": "analizador no disponible",
+        "waitedTooLong": "VirusTotal no aceptó solicitudes durante una semana"
     },
     "connections": {
         "stoppedTitle": "{name} ha dejado de funcionar",
