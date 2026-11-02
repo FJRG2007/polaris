@@ -56,10 +56,17 @@ export default async function WatchSubjectPage({
         const name = await localServerName(localHost?.name);
         const machine = { id: localHost?.id ?? LOCAL_SERVER_ID, name };
 
-        const addressed = addressedServer(decodeURIComponent(id), LOCAL_SERVER_ID, machine, here, remote);
+        const addressed = addressedServer(
+            decodeURIComponent(id),
+            LOCAL_SERVER_ID,
+            machine,
+            here,
+            remote
+        );
         if (!addressed) notFound();
         // Old links arrive by id or by the reserved word; the address reads as the name.
-        if (addressed.address !== id) redirect(`/watch/server/${encodeURIComponent(addressed.address)}`);
+        if (addressed.address !== id)
+            redirect(`/watch/server/${encodeURIComponent(addressed.address)}`);
 
         // The machine Polaris runs on is measured directly rather than over SSH to
         // itself, so its history lives under the local subject whatever the address.

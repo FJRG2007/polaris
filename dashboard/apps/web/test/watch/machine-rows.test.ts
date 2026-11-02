@@ -88,7 +88,9 @@ describe("a server's address", () => {
 
         it("sends a second row of the same box to the machine", () => {
             for (const slug of ["h2", "lirio-copy", "h1"]) {
-                expect(addressedServer(slug, "local", enrolled, [enrolled, second], remote)).toEqual({
+                expect(
+                    addressedServer(slug, "local", enrolled, [enrolled, second], remote)
+                ).toEqual({
                     host: null,
                     address: "lirio-0"
                 });
@@ -120,9 +122,9 @@ describe("a server's address", () => {
                 [{ id: "h1", name: "My box" }, [{ id: "h1", name: "My box" }]]
             ] as const) {
                 const first = addressedServer("local", "local", machine, here, remote)!;
-                expect(addressedServer(first.address, "local", machine, here, remote)?.address).toBe(
-                    first.address
-                );
+                expect(
+                    addressedServer(first.address, "local", machine, here, remote)?.address
+                ).toBe(first.address);
             }
         });
     });

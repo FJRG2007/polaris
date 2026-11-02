@@ -85,11 +85,16 @@ describe("machines in Places", () => {
             alarms: 0
         };
         expect(
-            inPlaces({ ...base, id: LOCAL_HOST_SUBJECT, kind: "server", href: "/watch/server/lirio" }).href
+            inPlaces({
+                ...base,
+                id: LOCAL_HOST_SUBJECT,
+                kind: "server",
+                href: "/watch/server/lirio"
+            }).href
         ).toBe("/places/machines/server/local");
-        expect(inPlaces({ ...base, id: "h1", kind: "server", href: "/watch/server/box" }).href).toBe(
-            "/places/machines/server/h1"
-        );
+        expect(
+            inPlaces({ ...base, id: "h1", kind: "server", href: "/watch/server/box" }).href
+        ).toBe("/places/machines/server/h1");
         expect(
             inPlaces({ ...base, id: "local:abc", kind: "container", href: "/apps/containers?c=x" })
                 .href

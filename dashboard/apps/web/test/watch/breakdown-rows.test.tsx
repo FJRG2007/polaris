@@ -5,9 +5,36 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rows = [
-    { key: "a", label: "Polaris - web", kind: "container", detail: null, value: 200, share: 0.2, href: "/apps/containers/a", group: "polaris" },
-    { key: "b", label: "My site", kind: "container", detail: null, value: 100, share: 0.1, href: "/apps/deploy/1", group: "apps" },
-    { key: "free", label: "Free", kind: "rest", detail: null, value: 700, share: 0.7, href: null, group: "free" }
+    {
+        key: "a",
+        label: "Polaris - web",
+        kind: "container",
+        detail: null,
+        value: 200,
+        share: 0.2,
+        href: "/apps/containers/a",
+        group: "polaris"
+    },
+    {
+        key: "b",
+        label: "My site",
+        kind: "container",
+        detail: null,
+        value: 100,
+        share: 0.1,
+        href: "/apps/deploy/1",
+        group: "apps"
+    },
+    {
+        key: "free",
+        label: "Free",
+        kind: "rest",
+        detail: null,
+        value: 700,
+        share: 0.7,
+        href: null,
+        group: "free"
+    }
 ];
 
 vi.mock("@/components/shared-polls", () => ({

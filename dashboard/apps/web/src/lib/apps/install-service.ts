@@ -41,7 +41,11 @@ import {
 } from "@/lib/apps/app-lifecycle";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { isPluginServer, purgeInstallFiles } from "@/lib/app-extensions/registry";
-import { getOrCreateHostTarget, getOrCreateLocalTarget, targetLabel } from "@/lib/deploy-target-service";
+import {
+    getOrCreateHostTarget,
+    getOrCreateLocalTarget,
+    targetLabel
+} from "@/lib/deploy-target-service";
 import { localServerName } from "@/lib/local-server";
 import {
     createApplication,

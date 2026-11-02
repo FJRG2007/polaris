@@ -208,7 +208,11 @@ function Rows({
     return (
         <>
             {groups.length > 1 ? (
-                <div role="group" aria-label={t("breakdown.whose")} className="flex flex-wrap gap-1">
+                <div
+                    role="group"
+                    aria-label={t("breakdown.whose")}
+                    className="flex flex-wrap gap-1"
+                >
                     {groups.map((name) => (
                         <button
                             key={name}
@@ -221,8 +225,12 @@ function Rows({
                                     : "border-border text-muted-foreground hover:bg-muted/60"
                             }`}
                         >
-                            <span className="whitespace-nowrap">{t(`breakdown.group.${name}`)}</span>
-                            <span className="whitespace-nowrap tabular-nums">{format(sum(name))}</span>
+                            <span className="whitespace-nowrap">
+                                {t(`breakdown.group.${name}`)}
+                            </span>
+                            <span className="whitespace-nowrap tabular-nums">
+                                {format(sum(name))}
+                            </span>
                         </button>
                     ))}
                 </div>
@@ -271,7 +279,10 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
                 )}
             </div>
             {row.href ? (
-                <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <ChevronRight
+                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                />
             ) : null}
         </>
     );

@@ -120,7 +120,10 @@ describe("searching the connectors", () => {
     });
 
     it("drops the filter along with the box", async () => {
-        vi.stubGlobal("fetch", vi.fn(async () => Response.json({})));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => Response.json({}))
+        );
         list();
         fireEvent.change(screen.getByRole("searchbox"), { target: { value: "one" } });
         fireEvent.click(screen.getByRole("button", { name: /^Remove/ }));

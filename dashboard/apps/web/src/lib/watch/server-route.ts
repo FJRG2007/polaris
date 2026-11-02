@@ -12,7 +12,11 @@ interface NamedServer {
 }
 
 /** The server's name when it is unique, readable and not a reserved word; else its id. */
-export function serverSlug(servers: readonly NamedServer[], server: NamedServer, reserved: string): string {
+export function serverSlug(
+    servers: readonly NamedServer[],
+    server: NamedServer,
+    reserved: string
+): string {
     const usable =
         READABLE.test(server.name) &&
         !UUID.test(server.name) &&
@@ -22,7 +26,10 @@ export function serverSlug(servers: readonly NamedServer[], server: NamedServer,
 }
 
 /** The server an address means, by id or by its name. */
-export function serverFromSlug<T extends NamedServer>(servers: readonly T[], slug: string): T | null {
+export function serverFromSlug<T extends NamedServer>(
+    servers: readonly T[],
+    slug: string
+): T | null {
     const wanted = slug.toLowerCase();
     return (
         servers.find(({ id }) => id === slug) ??
@@ -44,7 +51,8 @@ export function addressedServer<T extends NamedServer>(
     remote: readonly T[]
 ): { host: T | null; address: string } | null {
     const servers = [machine, ...remote];
-    const found = slug === reserved ? machine : (serverFromSlug(servers, slug) ?? serverFromSlug(here, slug));
+    const found =
+        slug === reserved ? machine : (serverFromSlug(servers, slug) ?? serverFromSlug(here, slug));
     if (!found) return null;
     const host = remote.find(({ id }) => id === found.id) ?? null;
     return { host, address: serverSlug(servers, host ?? machine, reserved) };

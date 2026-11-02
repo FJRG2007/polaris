@@ -879,7 +879,11 @@ export async function privateNetworkView(
         })(),
         prisma.application.findMany({
             where: { environmentId: service.environment.id, id: { not: service.id } },
-            select: { id: true, name: true, target: { select: { id: true, name: true, kind: true } } },
+            select: {
+                id: true,
+                name: true,
+                target: { select: { id: true, name: true, kind: true } }
+            },
             orderBy: { name: "asc" },
             take: 200
         })
@@ -1047,9 +1051,8 @@ export async function crossLinkCandidates(
             select: { sourceId: true }
         })
     ]);
-    const { accessCan, accessInEnvironment, projectAccess } = await import(
-        "@/lib/deploy-project-access"
-    );
+    const { accessCan, accessInEnvironment, projectAccess } =
+        await import("@/lib/deploy-project-access");
     const projectIds = [...new Set(apps.map((app) => app.environment.projectId))];
     const accesses = new Map(
         await Promise.all(
@@ -1166,12 +1169,7 @@ export async function revokeCrossLink(link: {
 export class PrivateLinkRefusal extends Error {
     constructor(
         readonly reason:
-            | "missing"
-            | "sameProject"
-            | "otherServer"
-            | "unreachable"
-            | "tooMany"
-            | "unsupported"
+            "missing" | "sameProject" | "otherServer" | "unreachable" | "tooMany" | "unsupported"
     ) {
         super(reason);
     }

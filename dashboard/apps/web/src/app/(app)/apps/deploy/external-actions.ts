@@ -379,7 +379,10 @@ export async function moveHomePlanAction(
         return {
             plan: accessCan(access, COPY_OUT) ? plan : { ...plan, variableKeys: [] },
             canCopyVariables: accessCan(access, COPY_HOME),
-            targets: targets.map((target) => ({ id: target.id, name: targetLabel(target, machine) }))
+            targets: targets.map((target) => ({
+                id: target.id,
+                name: targetLabel(target, machine)
+            }))
         };
     } catch (caught) {
         return { error: await refusal(caught) };

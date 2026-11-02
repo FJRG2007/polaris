@@ -642,7 +642,10 @@ export function ToolSettings({
             ) : null}
             {connectorsAllowed && connectorsListed ? (
                 <p className="text-xs">
-                    <a href={settingsSection("connectors")} className="text-primary hover:underline">
+                    <a
+                        href={settingsSection("connectors")}
+                        className="text-primary hover:underline"
+                    >
                         {t("settings.tools.manageConnectors")}
                     </a>
                 </p>

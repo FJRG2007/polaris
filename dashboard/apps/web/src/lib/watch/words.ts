@@ -45,7 +45,8 @@ export const WATCH_SENTENCES: Readonly<Record<string, WatchKey>> = {
     "That window has no time in it": "text.noWindow",
     "You can see this server's figures, but not what is on the machine itself.": "text.notYours",
     "A service is one container, so this figure has no parts to show.": "text.oneContainer",
-    "Polaris measures the disk of the machine it runs on. It cannot see this one's.": "text.diskOnlyLocal",
+    "Polaris measures the disk of the machine it runs on. It cannot see this one's.":
+        "text.diskOnlyLocal",
     "Nothing is running on this server right now.": "text.nothingRunning",
     "This server would not say what its containers are using.": "text.containersSilent",
     "Idle, and anything outside a container": "text.idleOutside",
@@ -53,7 +54,8 @@ export const WATCH_SENTENCES: Readonly<Record<string, WatchKey>> = {
     "Everything else on the machine": "text.restOfMachine",
     Free: "text.freeMemory",
     "Running directly on the machine.": "text.runningOnMachine",
-    "Containers and programs as they use memory now. Programs share some of it, so their figures can overlap.": "text.memoryNote",
+    "Containers and programs as they use memory now. Programs share some of it, so their figures can overlap.":
+        "text.memoryNote",
     "The machine itself, and whatever is installed on it directly.": "text.machineItself",
     "Measured from the containers this server is running. The chart above is the whole machine, so anything outside a container is the last row.":
         "text.loadNote",
@@ -70,7 +72,8 @@ export const WATCH_SENTENCES: Readonly<Record<string, WatchKey>> = {
     "Everything else on this machine": "text.everythingElse",
     "The system itself and anything installed outside Polaris.": "text.systemItself",
     "Volumes are measured one by one. Nothing here is removed for you.": "text.volumesNote",
-    "The volumes on this machine could not be listed, so only the store is broken out.": "text.volumesUnlisted",
+    "The volumes on this machine could not be listed, so only the store is broken out.":
+        "text.volumesUnlisted",
     "That service is not here any more.": "text.serviceGone",
     "This service has no volumes, so it stores nothing of its own.": "text.serviceNoVolumesNote",
     "Nothing has measured this service's volumes yet. They are read on a slower cadence than the chart.":
@@ -118,10 +121,16 @@ export function knownWatchText(t: WatchWords, message: string): string | null {
     // A reading against its threshold: "CPU 91.2% (threshold > 90%)".
     const reading = /^(.+) \(threshold ([<>] .+)\)$/.exec(message);
     if (reading?.[1] && reading[2]) {
-        const metric = ALARM_METRICS.find((entry) => reading[1]?.startsWith(`${METRIC_LABEL[entry]} `));
+        const metric = ALARM_METRICS.find((entry) =>
+            reading[1]?.startsWith(`${METRIC_LABEL[entry]} `)
+        );
         if (metric) {
             const value = reading[1].slice(METRIC_LABEL[metric].length + 1);
-            return t("text.reading", { metric: metricWord(t, metric), value, threshold: reading[2] });
+            return t("text.reading", {
+                metric: metricWord(t, metric),
+                value,
+                threshold: reading[2]
+            });
         }
     }
     return null;
@@ -135,12 +144,15 @@ export function watchText(t: WatchWords, message: string): string {
 /** What a metric is called. An id the catalog does not know shows as stored. */
 export function metricWord(t: WatchWords, metric: string): string {
     if (!(ALARM_METRICS as readonly string[]).includes(metric)) return metric;
-    return t(`labels.metric.${metric === "network_in" ? "networkIn" : metric === "network_out" ? "networkOut" : metric}` as WatchKey);
+    return t(
+        `labels.metric.${metric === "network_in" ? "networkIn" : metric === "network_out" ? "networkOut" : metric}` as WatchKey
+    );
 }
 
 /** An alarm's state as a badge says it. */
 export function alarmStateWord(t: WatchWords, state: string): string {
-    if (state === "ok" || state === "alarm" || state === "insufficient") return t(`labels.state.${state}`);
+    if (state === "ok" || state === "alarm" || state === "insufficient")
+        return t(`labels.state.${state}`);
     return state;
 }
 
@@ -151,6 +163,10 @@ export function thresholdWords(
 ): string {
     return t("labels.threshold", {
         metric: metricWord(t, alarm.metric),
-        threshold: formatThreshold(alarm.operator, alarm.threshold, alarmUnit(alarm.metric, alarm.targetType))
+        threshold: formatThreshold(
+            alarm.operator,
+            alarm.threshold,
+            alarmUnit(alarm.metric, alarm.targetType)
+        )
     });
 }

@@ -20,7 +20,12 @@ import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import { LOCAL_SERVER_ID, localServerName } from "./local-server";
 import { serverSlug } from "./watch/server-route";
 import { LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
-import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
+import {
+    cachedSamples,
+    oldestSampleAt,
+    refreshSamples,
+    STATS_TTL_MS
+} from "./container-stats-cache";
 import {
     hostDockerDriver,
     HOST_DOCKER_PREFIX,
@@ -74,10 +79,21 @@ async function sparklines(
     subjectType: MetricSubjectType,
     ids: string[],
     now: number
-): Promise<Map<string, { spark: SparkPoint[]; last: { cpu: number | null; used: bigint | null; total: bigint | null } }>> {
+): Promise<
+    Map<
+        string,
+        {
+            spark: SparkPoint[];
+            last: { cpu: number | null; used: bigint | null; total: bigint | null };
+        }
+    >
+> {
     const map = new Map<
         string,
-        { spark: SparkPoint[]; last: { cpu: number | null; used: bigint | null; total: bigint | null } }
+        {
+            spark: SparkPoint[];
+            last: { cpu: number | null; used: bigint | null; total: bigint | null };
+        }
     >();
     if (ids.length === 0) return map;
 
@@ -85,7 +101,13 @@ async function sparklines(
     const rows = await prisma.metricSample.findMany({
         where: { subjectType, subjectId: { in: ids }, ts: { gte: from } },
         orderBy: { ts: "asc" },
-        select: { subjectId: true, ts: true, cpuPercent: true, memUsedBytes: true, memTotalBytes: true }
+        select: {
+            subjectId: true,
+            ts: true,
+            cpuPercent: true,
+            memUsedBytes: true,
+            memTotalBytes: true
+        }
     });
 
     const bucketMs = SPARK_WINDOW_MS / SPARK_POINTS;
@@ -109,7 +131,10 @@ async function sparklines(
         }
         const spark = buckets.map((values, index) => ({
             t: now - SPARK_WINDOW_MS + index * bucketMs,
-            v: values.length === 0 ? null : Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
+            v:
+                values.length === 0
+                    ? null
+                    : Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
         }));
         const newest = list[list.length - 1];
         map.set(id, {
@@ -218,13 +243,19 @@ async function buildServices(ownerId: string, alarms: Map<string, number>): Prom
             id: true,
             name: true,
             currentDeploymentId: true,
-            environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+            environment: {
+                select: { name: true, projectId: true, project: { select: { name: true } } }
+            }
         },
         orderBy: { createdAt: "asc" }
     });
 
     const [series, building] = await Promise.all([
-        sparklines("app", apps.map((app) => app.id), now),
+        sparklines(
+            "app",
+            apps.map((app) => app.id),
+            now
+        ),
         inFlightDeployments(apps.map((app) => app.id))
     ]);
     return apps.map((app) => {
@@ -242,7 +273,11 @@ async function buildServices(ownerId: string, alarms: Map<string, number>): Prom
             name: app.name,
             detail: `${app.environment.project.name} / ${app.environment.name}`,
             state: app.currentDeploymentId ? readings.state : ("idle" as const),
-            stateLabel: app.currentDeploymentId ? readings.stateLabel : firstBuild ? "Deploying" : "Not deployed",
+            stateLabel: app.currentDeploymentId
+                ? readings.stateLabel
+                : firstBuild
+                  ? "Deploying"
+                  : "Not deployed",
             cpuPercent: readings.cpuPercent,
             memUsedBytes: readings.memUsedBytes,
             memTotalBytes: readings.memTotalBytes,
@@ -255,7 +290,10 @@ async function buildServices(ownerId: string, alarms: Map<string, number>): Prom
 
 export async function getWatchOverview(ownerId: string): Promise<WatchOverview> {
     const alarms = await firingByTarget(ownerId);
-    const [servers, services] = await Promise.all([buildServers(ownerId, alarms), buildServices(ownerId, alarms)]);
+    const [servers, services] = await Promise.all([
+        buildServers(ownerId, alarms),
+        buildServices(ownerId, alarms)
+    ]);
     return {
         servers,
         services,
@@ -328,7 +366,8 @@ async function containersOn(source: ContainerSource, ownerId: string): Promise<W
             // A stopped container has nothing to sample. Its last reading is not
             // shown either: the card already says it is not running, and a number
             // beside that reads as though it still were.
-            const sample = container.state === "running" ? (samples.get(container.id) ?? null) : null;
+            const sample =
+                container.state === "running" ? (samples.get(container.id) ?? null) : null;
             return {
                 id: `${source.id}:${container.id}`,
                 kind: "container" as const,
@@ -372,9 +411,17 @@ async function containersOn(source: ContainerSource, ownerId: string): Promise<W
 }
 
 function readingsFor(
-    entry: { spark: SparkPoint[]; last: { cpu: number | null; used: bigint | null; total: bigint | null } } | undefined,
+    entry:
+        | {
+              spark: SparkPoint[];
+              last: { cpu: number | null; used: bigint | null; total: bigint | null };
+          }
+        | undefined,
     now: number
-): Pick<WatchCard, "state" | "stateLabel" | "cpuPercent" | "memUsedBytes" | "memTotalBytes" | "spark"> {
+): Pick<
+    WatchCard,
+    "state" | "stateLabel" | "cpuPercent" | "memUsedBytes" | "memTotalBytes" | "spark"
+> {
     if (!entry) {
         return {
             state: "idle",
