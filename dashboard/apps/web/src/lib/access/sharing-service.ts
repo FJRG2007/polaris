@@ -602,7 +602,7 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
         case "agents.session":
             return `/apps/agents/sessions/${subjectId}`;
         case "dns.filter":
-            return "/apps/network-filter";
+            return "/network-filter";
         case "telemetry.project":
             return `/apps/telemetry?project=${encodeURIComponent(subjectId)}`;
         case "analytics.site":

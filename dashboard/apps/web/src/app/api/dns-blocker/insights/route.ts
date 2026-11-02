@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { jsonParam, pollRoute } from "@/lib/poll-route";
 import { queryFilterSchema } from "@/lib/dns-blocker/query-log";
-import { dnsInsightsAction } from "@/app/(app)/apps/network-filter/actions";
+import { dnsInsightsAction } from "@/app/(app)/network-filter/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

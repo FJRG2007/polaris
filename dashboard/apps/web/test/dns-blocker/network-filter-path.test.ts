@@ -1,6 +1,6 @@
 /**
  * The Network filter's screens moved from /apps/dns-blocker to
- * /apps/network-filter: every old address still lands on the same screen - as
+ * /network-filter: every old address still lands on the same screen - as
  * a redirect before anything is drawn - and nothing in the navigation points at
  * the old one.
  */
@@ -33,9 +33,9 @@ describe("the old Network filter address", () => {
         const rules = (await config.redirects()) as Redirect[];
         for (const screen of SCREENS)
             expect(follow(rules, `/apps/dns-blocker${screen}`)).toBe(
-                `/apps/network-filter${screen}`
+                `/network-filter${screen}`
             );
-        expect(follow(rules, "/apps/dns-blocker/log/extra")).toBe("/apps/network-filter/log/extra");
+        expect(follow(rules, "/apps/dns-blocker/log/extra")).toBe("/network-filter/log/extra");
     });
 
     it("is temporary, like every other moved screen", async () => {
@@ -46,10 +46,11 @@ describe("the old Network filter address", () => {
     });
 
     it("has no page left to shadow the redirect, and every new screen exists", () => {
-        const apps = join(process.cwd(), "src/app/(app)/apps");
-        expect(existsSync(join(apps, "dns-blocker"))).toBe(false);
+        const app = join(process.cwd(), "src/app/(app)");
+        expect(existsSync(join(app, "apps/dns-blocker"))).toBe(false);
+        expect(existsSync(join(app, "apps/network-filter"))).toBe(false);
         for (const screen of SCREENS)
-            expect(existsSync(join(apps, `network-filter${screen}`, "page.tsx"))).toBe(true);
+            expect(existsSync(join(app, `network-filter${screen}`, "page.tsx"))).toBe(true);
     });
 
     it("is what the navigation links to", () => {
@@ -57,9 +58,9 @@ describe("the old Network filter address", () => {
             sections.map((section) => section.href)
         );
         expect(hrefs.some((href) => href.startsWith("/apps/dns-blocker"))).toBe(false);
-        expect(hrefs).toContain("/apps/network-filter");
+        expect(hrefs).toContain("/network-filter");
         expect(APP_SECTIONS["dns-blocker"]?.map((section) => section.href)).toEqual(
-            SCREENS.map((screen) => `/apps/network-filter${screen}`)
+            SCREENS.map((screen) => `/network-filter${screen}`)
         );
     });
 });

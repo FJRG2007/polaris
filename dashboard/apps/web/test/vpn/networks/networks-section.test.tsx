@@ -22,7 +22,7 @@ import {
 const listNetworksAction = vi.fn();
 const createNetworkAction = vi.fn();
 const removeNetworkAction = vi.fn();
-vi.mock("@/app/(app)/apps/vpn/networks/actions", () => ({
+vi.mock("@/app/(app)/vpn/networks/actions", () => ({
     listNetworksAction,
     createNetworkAction,
     updateNetworkAction: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock("@/app/(app)/apps/vpn/networks/actions", () => ({
     removeNetworkAction
 }));
 
-const { VpnNetworksSection } = await import("@/app/(app)/apps/vpn/networks/networks");
+const { VpnNetworksSection } = await import("@/app/(app)/vpn/networks/networks");
 
 const render = (ui: ReactElement) => draw(ui, { wrapper: MessagesWrapper });
 

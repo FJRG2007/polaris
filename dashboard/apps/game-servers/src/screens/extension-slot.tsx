@@ -57,7 +57,7 @@ function GameServersHome() {
                 <p className="max-w-md text-sm text-muted-foreground">
                     {t("slot.createAsManyAsYou")}
                 </p>
-                <Link href="/apps/games">
+                <Link href="/game-servers">
                     <Button size="sm">{t("slot.openGameServers")}</Button>
                 </Link>
             </CardBody>

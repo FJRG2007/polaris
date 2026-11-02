@@ -1,0 +1,132 @@
+/**
+ * An installed app's adapted dashboard. The shell (status, lifecycle controls,
+ * runtime logs) is shared; app-specific panels mount inside it keyed by the
+ * catalog id (e.g. the Messaging bridge's channel panel). Apps without an adapted
+ * panel fall back to the shared log view.
+ *
+ * One catch-all route rather than a file per screen, so a game server's console,
+ * players and settings are real, linkable paths without four near-identical
+ * pages - the screen is chosen from the slug.
+ *
+ * What the viewer holds is resolved for THIS app rather than for the instance.
+ * Somebody invited to moderate one server reaches it without holding a single
+ * global grant, and somebody who holds one everywhere still does not reach a
+ * server that was never theirs.
+ */
+
+import { PolarRecord } from "@/components/polar/polar-panel";
+import { findApp } from "@/lib/apps/catalog";
+import { notFound, redirect } from "next/navigation";
+import { requireUser, userHasManage } from "@/lib/session";
+import { installedPanelSlot } from "@/lib/app-extensions/registry";
+import { canOpenGameTab, gameTabHref, isGameTab, settingsForViewer } from "./tabs";
+import { gameOfServer } from "@/lib/apps/games-catalog";
+import { heldOn, resourceAccess } from "@/lib/resource-access";
+import { Messages } from "@/components/i18n/messages";
+import { InstalledAppDashboard } from "./installed-app-dashboard";
+import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
+import { getInstalledApp, getInstalledAppSettings } from "@/lib/apps/install-service";
+
+export async function InstalledAppScreen({
+    params,
+    gameRoute = false
+}: {
+    params: Promise<{ id: string; tab?: string[] }>;
+    /** Drawn at /game-servers. A game server opened at the old address moves there;
+     *  anything else has no screen at the new one. */
+    gameRoute?: boolean;
+}) {
+    const [user, { id, tab }] = await Promise.all([requireUser(), params]);
+    // Everything the viewer holds on this install is asked at once. Each is its
+    // own round trip and none depends on another, so in turn they were the
+    // longest wait on the page; the answers are only acted on below, in the same
+    // order as before, so a viewer who holds nothing still gets nothing but the
+    // not-found page.
+    const [deployAccess, gameAccess, held, deployManage] = await Promise.all([
+        resourceAccess(user, installRef(id), "deploy.read"),
+        resourceAccess(user, installRef(id), "games.read"),
+        gamePermissionsFor(user, id),
+        heldOn(user, installRef(id), ["deploy.manage"])
+    ]);
+    // deploy.read is the weakest thing an installed app can be reached with, and a
+    // game grant carries it here rather than instance-wide. A viewer with neither
+    // gets the same answer as one asking about an app that does not exist.
+    const access = deployAccess ?? gameAccess;
+    if (!access) notFound();
+    // The settings need only the owner, so they are read beside the install
+    // rather than after it. Never a throw (see `getInstalledAppSettings`), but
+    // held as a promise so a page that redirects or is not found does not wait
+    // for them.
+    const settingsRead = getInstalledAppSettings(access.ownerId, id);
+    void settingsRead.catch(() => undefined);
+    const app = await getInstalledApp(access.ownerId, id);
+    if (!app) notFound();
+
+    // An app that runs nothing has nothing to manage here: this page would be
+    // Start, Redeploy and Uninstall over a status that can only ever read "not
+    // running", and the app itself is a screen somewhere else. Home and Game
+    // servers are both that, and both say where they live.
+    const opensAt = findApp(app.catalogId)?.opensAt;
+    if (opensAt) redirect(opensAt);
+
+    // Starting, stopping and redeploying are the manage grant on this server, or the
+    // deploy one for an app that is not a game. Removing it is nobody's but the
+    // owner's: "manage this server" was never an offer to take it away.
+    const canManage = held.includes("games.manage") || deployManage.length > 0;
+    const canRemove = access.isOwner || user.isAdmin;
+    // An unknown slug is a mistyped link, not an error worth a page of its own.
+    // Only a game server has screens; anything else is its shell and nothing more.
+    const slug = tab?.[0] ?? "";
+    // Which game it is decides which screens exist at all: ARK has no world to
+    // regenerate and no Modrinth to install from, so those slugs are not screens
+    // that are merely hidden here - they are screens this server does not have.
+    const gameId = gameOfServer(app.catalogId)?.id ?? null;
+    if (gameId && !gameRoute) redirect(gameTabHref(id, tab?.join("/") ?? ""));
+    if (!gameId && gameRoute) notFound();
+    if (slug && !isGameTab(slug, gameId)) notFound();
+    // Duplicating a game server takes what creating one does (instance-wide
+    // games.manage) and what removing this one does (owner or administrator) -
+    // the rule the game app's own duplicate action enforces. Offered to whoever
+    // may manage it, disabled with the reason for the ones that rule leaves out.
+    const duplicate =
+        gameId && canManage
+            ? !(await userHasManage(user, "games.manage"))
+                ? ({ allowed: false, reason: "cannot-create" } as const)
+                : !canRemove
+                  ? ({ allowed: false, reason: "not-owner" } as const)
+                  : ({ allowed: true } as const)
+            : null;
+    // A screen they do not hold reads the same as one that is not there. Hiding the
+    // tab is what the bar does; this is what makes the URL agree with it.
+    if (slug && !canOpenGameTab(slug, held, gameId)) notFound();
+
+    // What the app was deployed with, so its panel can paint its settings without
+    // waiting on a request of its own. Both are detail on a page whose job is to
+    // manage the install, so neither may take it down: an app that cannot be
+    // described is precisely the one somebody came here to stop or remove.
+    const [settings, slot] = await Promise.all([
+        settingsRead,
+        installedPanelSlot({
+            id: app.id,
+            catalogId: app.catalogId,
+            applicationId: app.applicationId,
+            ownerId: access.ownerId
+        }).catch(() => null)
+    ]);
+    return (
+        <Messages namespaces={["installed", "catalog", "marketplace"]}>
+            <PolarRecord kind="installed app" id={app.id} name={app.name} />
+            <InstalledAppDashboard
+                app={app}
+                // The full list is the Settings screen's; a reader who may not
+                // manage the server is sent only what the screens they open show.
+                settings={settingsForViewer(settings, canManage)}
+                slot={slot}
+                held={held}
+                canManage={canManage}
+                canRemove={canRemove}
+                duplicate={duplicate}
+            />
+        </Messages>
+    );
+}

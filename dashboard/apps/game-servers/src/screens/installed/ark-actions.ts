@@ -210,7 +210,7 @@ export async function setArkExclusiveJoinAction(
             targetType: "installedApp",
             targetId: installedAppId
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -238,7 +238,7 @@ export async function setArkJoinPasswordAction(
             targetType: "installedApp",
             targetId: installedAppId
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -270,7 +270,7 @@ export async function setArkGameLogAction(
             targetType: "installedApp",
             targetId: installedAppId
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -298,7 +298,7 @@ export async function setArkAdminPasswordAction(
             targetType: "installedApp",
             targetId: installedAppId
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -906,7 +906,7 @@ export async function restartArkServerAction(installedAppId: string): Promise<{ 
             targetType: "installedApp",
             targetId: parsed.data
         });
-        revalidatePath(`/apps/installed/${parsed.data}`);
+        revalidatePath(`/game-servers/${parsed.data}`);
         return {};
     } catch (caught) {
         return {

@@ -336,7 +336,7 @@ export async function sweepMemoryPlans(
                             : "notify.outOfMemoryAtMachine",
                         { size: formatMemory(planned.currentMb) }
                     ),
-                    href: `/apps/installed/${install.id}`,
+                    href: `/game-servers/${install.id}`,
                     level: "warning",
                     actionRequired: true
                 }).catch(() => undefined);
@@ -384,7 +384,7 @@ export async function sweepMemoryPlans(
                       ...heap,
                       reason: gameMessageIn(locale, applied.reason)
                   }),
-            href: `/apps/installed/${install.id}`,
+            href: `/game-servers/${install.id}`,
             level: exhausted ? "warning" : "info",
             actionRequired: false
         }).catch(() => undefined);

@@ -16,10 +16,10 @@ const dnsClientsAction = vi.fn(async (): Promise<{ clients: string[]; logOff: bo
     logOff: false
 }));
 
-vi.mock("../../src/app/(app)/apps/network-filter/actions", () => ({ dnsClientsAction }));
+vi.mock("../../src/app/(app)/network-filter/actions", () => ({ dnsClientsAction }));
 
 const { RouterDnsGuide, RouterDnsSteps, dnsUse } =
-    await import("../../src/app/(app)/apps/network-filter/router-dns-guide");
+    await import("../../src/app/(app)/network-filter/router-dns-guide");
 const { RouterSteps } = await import("../../src/app/(app)/admin/domains/router-steps");
 
 afterEach(cleanup);

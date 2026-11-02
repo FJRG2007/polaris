@@ -1,7 +1,7 @@
 // Every device the DNS blocker saw over a range, asked when the devices screen opens. A route, not an action: see lib/poll-route.
 import { z } from "zod";
 import { jsonParam, pollRoute } from "@/lib/poll-route";
-import { dnsDevicesAction } from "@/app/(app)/apps/network-filter/actions";
+import { dnsDevicesAction } from "@/app/(app)/network-filter/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

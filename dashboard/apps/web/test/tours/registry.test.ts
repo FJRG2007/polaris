@@ -110,7 +110,7 @@ describe("tour registry", () => {
             registry.availableTours(new Set(reachable)).map((tour) => tour.id);
         expect(ids([])).toEqual(["overview"]);
         expect(ids(["/chat", "/account"])).toEqual(["overview", "chat", "settings"]);
-        expect(ids(["/apps/deploy", "/apps/games", "/drive"])).toEqual([
+        expect(ids(["/apps/deploy", "/game-servers", "/drive"])).toEqual([
             "overview",
             "drive",
             "deploy",

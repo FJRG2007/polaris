@@ -12,14 +12,14 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 const listMachinesAction = vi.fn();
 const readRouterAction = vi.fn();
 const applyRouterAction = vi.fn();
-vi.mock("@/app/(app)/apps/router/actions", () => ({
+vi.mock("@/app/(app)/router/actions", () => ({
     listMachinesAction,
     readRouterAction,
     applyRouterAction,
     removeRouterAction: vi.fn()
 }));
 
-const { RouterSection } = await import("@/app/(app)/apps/router/router-view");
+const { RouterSection } = await import("@/app/(app)/router/router-view");
 
 const MACHINE = {
     id: "0190f1c2-0000-7000-8000-00000000000a",

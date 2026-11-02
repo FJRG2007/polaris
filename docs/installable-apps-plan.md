@@ -60,7 +60,7 @@ game-servers-<build>.tgz
   dashboard's own copies through a Node module resolution hook, so an app adds
   its own code and nothing else to memory.
 - **Screens** are served by one catch-all route per app surface
-  (`/apps/games/[...path]`, `/places/[...path]`). It asks the loaded bundle which
+  (`/game-servers/[...path]`, `/places/[...path]`). It asks the loaded bundle which
   component renders that path and hands it the data its server half returned.
   The client half is an ES module loaded by the browser with an import map that
   points shared libraries at the chunks the dashboard already serves.
@@ -188,7 +188,7 @@ false` only when it only adds (creating, sending, starting a run);
    the client half is `components/app-extensions/installed-client.tsx`. Game
    servers registers `lib/apps/games-extension.ts`, its jobs moved to
    `lib/apps/games-jobs.ts`, its firewall section and install panels are drawn
-   by `app/(app)/apps/games/extension-slot.tsx`. Catalog data and port policy
+   by `app/(app)/game-servers/extension-slot.tsx`. Catalog data and port policy
    (`games-catalog`, `ark-maps`, `port-advice`, `port-block*`, `game-logo`) are
    core. Places registers `apps/places/src/lib/places-extension.ts`: its jobs,
    what it starts at boot (its container upgrade and the camera watcher) and who
@@ -200,7 +200,7 @@ false` only when it only adds (creating, sending, starting a run);
    `@polaris-app/places`.
 2. **Move the app's code under its own workspace** (`apps/game-servers`,
    `apps/places`): services, routes, screens, jobs, tests - including the
-   routes that still sit in the dashboard's tree (`app/(app)/apps/games`, the
+   routes that still sit in the dashboard's tree (`app/(app)/game-servers`, the
    game tabs under `app/(app)/apps/installed/[id]`, `app/api/apps/games`,
    `app/api/minecraft`, and the `app/api/cron/game-*` triggers). Still compiled
    into the image, loaded through the registry. Verifiable here.
@@ -280,7 +280,7 @@ false` only when it only adds (creating, sending, starting a run);
      with its real default on `default` (`asCommonJs`), so `import Image from
 "next/image"` in an app is the component, not the module namespace.
    - **Screens.** An app page is a server component drawn by a catch-all route
-     per surface (`/places/[[...path]]`, `/apps/games/[[...path]]`; API routes
+     per surface (`/places/[[...path]]`, `/game-servers/[[...path]]`; API routes
      under `/api/home`, `/api/minecraft`, `/api/apps/games`,
      `/api/apps/installed/[id]`), matched against the bundle's route list with
      Next's precedence (`lib/app-bundles/route-match.ts`). Where the app imported

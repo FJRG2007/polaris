@@ -1,6 +1,6 @@
 /**
  * An installed app's page, drawn by the catch-all route of the surface it lives
- * under (`/places/...`, `/apps/games/...`).
+ * under (`/places/...`, `/game-servers/...`).
  *
  * The page is a server component from the app's bundle, drawn here with the
  * copies of React and the design system this layer draws with (see

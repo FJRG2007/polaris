@@ -26,7 +26,7 @@ afterEach(cleanup);
 const APPS: PolarisApp[] = [
     { id: "drive", label: "Drive", icon: HardDrive, href: "/drive" },
     { id: "chat", label: "Chat", icon: MessageCircle, href: "/chat" },
-    { id: "games", label: "Game servers", icon: Gamepad2, href: "/apps/games" },
+    { id: "games", label: "Game servers", icon: Gamepad2, href: "/game-servers" },
     { id: "mail", label: "Mail", icon: Mail, href: "/mail", locked: true }
 ];
 

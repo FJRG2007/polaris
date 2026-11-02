@@ -33,7 +33,7 @@ vi.stubEnv("POLARIS_AUTH_SECRET", "a-long-enough-string-for-the-schema");
 vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
 
 vi.mock("next/navigation", () => ({
-    usePathname: () => `/apps/installed/${INSTALL}/players`,
+    usePathname: () => `/game-servers/${INSTALL}/players`,
     useRouter: () => ({ refresh: () => undefined, push: () => undefined })
 }));
 

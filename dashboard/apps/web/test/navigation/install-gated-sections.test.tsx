@@ -1,8 +1,7 @@
 /**
  * A screen that exists only once its marketplace app is installed.
  *
- * The Mail server screen is a section of Apps, not an app of its own, so the
- * switcher's install gate never reached it. What is asserted: the rail, the
+ * Mail server's screen is what is checked here. What is asserted: the rail, the
  * phone drawer, the search and the Overview's shortcut picker all read one
  * answer; that answer is asked of administrators too - they pass every
  * permission and still have no screen for an app nobody installed; and a role
@@ -19,9 +18,9 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/apps/deploy" }));
 
 const { AppSidebar } = await import("@/components/app-sidebar");
 
-const MAIL = "/apps/mail-server";
-const ALL_APPS = POLARIS_APPS.map((app) => app.id);
-const mailSection = APP_SECTIONS.apps?.find((section) => section.href === MAIL) as AppSection;
+const MAIL = "/mail-server";
+const ALL_APPS = POLARIS_APPS.map((app) => app.id).filter((id) => id !== "mail-server");
+const mailSection = APP_SECTIONS["mail-server"]?.find((section) => section.href === MAIL) as AppSection;
 
 describe("whether a section is offered", () => {
     it("leaves an app nobody installed out, for an administrator too", () => {
@@ -65,18 +64,25 @@ describe("which apps the rails can name", () => {
 });
 
 describe("the rail", () => {
-    it("draws Mail server only once it is installed", () => {
-        const without = renderToStaticMarkup(<AppSidebar appIds={ALL_APPS} isAdmin />);
-        const withIt = renderToStaticMarkup(<AppSidebar appIds={ALL_APPS} isAdmin installed={["mail-server"]} />);
-        expect(without).not.toContain(`href="${MAIL}"`);
-        expect(without).toContain('href="/apps/deploy"');
-        expect(withIt).toContain(`href="${MAIL}"`);
+    it("no longer draws Mail server in the Apps rail", () => {
+        const html = renderToStaticMarkup(<AppSidebar appIds={ALL_APPS} isAdmin installed={["mail-server"]} />);
+        expect(html).not.toContain(`href="${MAIL}"`);
+        expect(html).toContain('href="/apps/deploy"');
     });
 });
 
 describe("the search", () => {
+    // What reachableApps hands search: the app itself is out for anybody it
+    // would turn away, so this mirrors its permission and its install.
+    const reachable = (gate: { held: string[]; installed: string[] } | undefined, isAdmin: boolean) =>
+        !gate ||
+        (gate.installed.includes("mail-server") && (isAdmin || gate.held.includes("mailserver.manage")));
     const hrefs = (gate?: { held: string[]; installed: string[] }, isAdmin = true) =>
-        navigationEntries(isAdmin, ALL_APPS, gate).map((entry) => entry.href);
+        navigationEntries(
+            isAdmin,
+            reachable(gate, isAdmin) ? [...ALL_APPS, "mail-server"] : ALL_APPS,
+            gate
+        ).map((entry) => entry.href);
 
     it("finds Mail server only once it is installed", () => {
         expect(hrefs({ held: [], installed: [] })).not.toContain(MAIL);

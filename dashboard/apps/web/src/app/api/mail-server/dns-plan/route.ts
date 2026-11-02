@@ -1,7 +1,7 @@
 // the DNS records a mail domain needs. A route, not an action: see lib/poll-route.
 import { z } from "zod";
 import { jsonParam, pollRoute } from "@/lib/poll-route";
-import { planDnsAction } from "@/app/(app)/apps/mail-server/actions";
+import { planDnsAction } from "@/app/(app)/mail-server/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

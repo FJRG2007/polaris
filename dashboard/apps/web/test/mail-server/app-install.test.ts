@@ -153,7 +153,7 @@ describe("the app in the catalog", () => {
 
     it("is one id everywhere it is named", () => {
         expect(manifest?.id).toBe("mail-server");
-        const section = APP_SECTIONS.apps?.find((entry) => entry.href === "/apps/mail-server");
+        const section = APP_SECTIONS.apps?.find((entry) => entry.href === "/mail-server");
         expect(section?.requiresApp).toBe(appInstall.MAIL_SERVER_APP);
         // The app keeps its own permission; installing is a separate grant.
         expect(section?.needs).toBe("mailserver.manage");
@@ -168,7 +168,7 @@ describe("the app in the catalog", () => {
             installMethod: "builtin",
             singleton: true,
             instanceWide: true,
-            opensAt: "/apps/mail-server"
+            opensAt: "/mail-server"
         });
         // No image and no ports of its own: the engine arrives with a server.
         expect(manifest.template).toBeUndefined();

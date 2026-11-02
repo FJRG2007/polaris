@@ -1244,7 +1244,7 @@ async function sweepOne(
                     name: install.name
                 }),
                 body: gameMessageIn(locale, message),
-                href: `/apps/installed/${install.id}/world`,
+                href: `/game-servers/${install.id}/world`,
                 level: "warning",
                 actionRequired: true
             });

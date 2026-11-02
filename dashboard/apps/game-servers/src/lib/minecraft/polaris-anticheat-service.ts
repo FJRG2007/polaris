@@ -561,7 +561,7 @@ async function tellOwner(
             body: t("notify.likelyCheatingBody", {
                 reasons: score.why.map((reason) => reasonLine(reason, said)).join(". ")
             }),
-            href: `/apps/installed/${server.installedAppId}/security`,
+            href: `/game-servers/${server.installedAppId}/security`,
             level: "warning",
             actionRequired: true
         });

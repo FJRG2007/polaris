@@ -35,21 +35,21 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined })
 }));
 // The actions module is the server's; the screens only need its names.
-vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
+vi.mock("@/app/(app)/mail-server/actions", () => ({
     installMailServerAppAction: async () => ({}),
     uninstallMailServerAppAction: async () => ({})
 }));
-vi.mock("@/app/(app)/apps/mail-server/mail-servers-view", () => ({
+vi.mock("@/app/(app)/mail-server/mail-servers-view", () => ({
     MailServersView: ({ canUninstall }: { canUninstall: boolean }) => (
         <div data-list={String(canUninstall)} />
     )
 }));
-vi.mock("@/app/(app)/apps/mail-server/[id]/server-view", () => ({
+vi.mock("@/app/(app)/mail-server/[id]/server-view", () => ({
     ServerView: ({ hostname }: { hostname: string }) => <div data-server={hostname} />
 }));
 
-const { default: ListPage } = await import("@/app/(app)/apps/mail-server/page");
-const { default: DetailPage } = await import("@/app/(app)/apps/mail-server/[id]/page");
+const { default: ListPage } = await import("@/app/(app)/mail-server/page");
+const { default: DetailPage } = await import("@/app/(app)/mail-server/[id]/page");
 
 const SERVER_ID = "0190a0b0-0000-7000-8000-000000000001";
 

@@ -251,7 +251,7 @@ export async function sweepCrashLoops(
             body: loop.cause
                 ? `${loop.cause}${loop.advice ? ` ${gameMessageIn(locale, loop.advice)}` : ""}`
                 : t("notify.crashLoopBody", { count: loop.restarts }),
-            href: `/apps/installed/${install.id}`,
+            href: `/game-servers/${install.id}`,
             level: "warning",
             actionRequired: true
         });

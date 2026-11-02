@@ -171,6 +171,9 @@
         "vpn": {
             "description": "Accede a tus dispositivos desde cualquier lugar"
         },
+        "mail-server": {
+            "description": "Aloja tu propio correo en tus máquinas"
+        },
         "router": {
             "description": "Usa una máquina Linux como router de tu red"
         },

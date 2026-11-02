@@ -185,7 +185,7 @@ export function ArkPanel({
     const router = useRouter();
     const pathname = usePathname();
     const tab = useMemo(() => {
-        const base = `/apps/installed/${installedAppId}`;
+        const base = `/game-servers/${installedAppId}`;
         const slug = pathname.startsWith(base)
             ? pathname.slice(base.length).replace(/^\//, "")
             : "";

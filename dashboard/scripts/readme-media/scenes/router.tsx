@@ -6,7 +6,7 @@ import { Chrome } from "../runtime/chrome";
 import type { RouterPlan } from "@/lib/router/plan";
 import type { RouterReading } from "@/lib/router/read";
 import { defineScene, type SceneContext } from "../runtime/scene";
-import { RouterSection } from "@/app/(app)/apps/router/router-view";
+import { RouterSection } from "@/app/(app)/router/router-view";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const MACHINE = id("router-machine", 1);
@@ -100,7 +100,7 @@ function reading(ctx: SceneContext): RouterReading {
     };
 }
 
-/** The page `/apps/router` draws, inside the frame its layout gives it. */
+/** The page `/router` draws, inside the frame its layout gives it. */
 function Router() {
     const t = useTranslations("router");
     return (
@@ -113,7 +113,7 @@ function Router() {
 
 export const router = defineScene({
     id: "router",
-    path: "/apps/router",
+    path: "/router",
     actions: (ctx) => ({
         listMachinesAction: () => ({
             machines: [{ id: MACHINE, name: "gateway-01", address: "10.20.0.1", root: true }],

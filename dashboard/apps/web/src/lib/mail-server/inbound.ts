@@ -102,7 +102,7 @@ async function fire(server: MailServer, rule: MailInboundRule, event: core.Inbou
         event: "mailserver.inbound",
         title: t("notices.arrived", { rule: rule.name, host: server.hostname }),
         body,
-        href: `/apps/mail-server/${server.id}?tab=rules`,
+        href: `/mail-server/${server.id}?tab=rules`,
         shelf: { orgId: server.orgId },
         metadata: { serverId: server.id, ruleId: rule.id }
     });

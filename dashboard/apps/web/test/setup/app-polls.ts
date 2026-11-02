@@ -279,8 +279,8 @@ vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
     )
 }));
 
-vi.mock("@/app/(app)/apps/network-filter/dns-blocker-polls", () => {
-    const actions = () => import("@/app/(app)/apps/network-filter/actions");
+vi.mock("@/app/(app)/network-filter/dns-blocker-polls", () => {
+    const actions = () => import("@/app/(app)/network-filter/actions");
     return {
         dnsInsights: forward(actions, "dnsInsightsAction", 2),
         dnsTail: forward(actions, "dnsTailAction", 1),
@@ -324,15 +324,15 @@ vi.mock("@/app/(app)/admin/inbox/inbox-polls", () => {
     };
 });
 
-vi.mock("@/app/(app)/apps/mail-server/mail-server-polls", () => ({
+vi.mock("@/app/(app)/mail-server/mail-server-polls", () => ({
     serverDetail: forward(
-        () => import("@/app/(app)/apps/mail-server/actions"),
+        () => import("@/app/(app)/mail-server/actions"),
         "serverDetailAction",
         1
     ),
-    dnsPlan: forward(() => import("@/app/(app)/apps/mail-server/actions"), "planDnsAction", 1),
+    dnsPlan: forward(() => import("@/app/(app)/mail-server/actions"), "planDnsAction", 1),
     placements: forward(
-        () => import("@/app/(app)/apps/mail-server/actions"),
+        () => import("@/app/(app)/mail-server/actions"),
         "listPlacementsAction",
         0
     )

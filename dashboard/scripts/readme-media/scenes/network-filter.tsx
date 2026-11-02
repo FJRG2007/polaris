@@ -8,8 +8,8 @@ import { routerBrandsFor } from "@/lib/router-guide";
 import { defineScene, type SceneContext } from "../runtime/scene";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { routerGuideIn } from "@/app/(app)/admin/domains/router-words";
-import { DnsOverviewSection } from "@/app/(app)/apps/network-filter/overview-section";
-import { DnsBlockerProvider } from "@/app/(app)/apps/network-filter/dns-blocker-context";
+import { DnsOverviewSection } from "@/app/(app)/network-filter/overview-section";
+import { DnsBlockerProvider } from "@/app/(app)/network-filter/dns-blocker-context";
 
 /** A documentation address range (RFC 5737) stands in for the LAN. */
 const ADDRESS = "192.0.2.10";
@@ -135,7 +135,7 @@ function history(ctx: SceneContext) {
 
 const wire = (value: unknown) => ({ value: toWire(value) });
 
-/** The page `/apps/network-filter` draws once the filter is blocking. */
+/** The page `/network-filter` draws once the filter is blocking. */
 function NetworkFilter() {
     const t = useTranslations("dnsBlocker");
     const tAdmin = useTranslations("admin");
@@ -155,7 +155,7 @@ function NetworkFilter() {
 
 export const networkFilter = defineScene({
     id: "network-filter",
-    path: "/apps/network-filter",
+    path: "/network-filter",
     api: (ctx) => ({
         "GET /api/dns-blocker/status": () =>
             wire({

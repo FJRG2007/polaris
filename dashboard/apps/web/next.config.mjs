@@ -178,10 +178,26 @@ const nextConfig = {
         // engine's id. Bookmarks, alerts and widgets saved before still land on
         // the same screen, with the query kept. Kept for good, temporary for
         // the reason above.
-        { source: "/apps/dns-blocker", destination: "/apps/network-filter", permanent: false },
+        // Official apps live at the top level. Temporary, like every moved screen: a
+        // browser keeps a permanent redirect and it could never be taken back.
+        ...[
+            ["/apps/router", "/router"],
+            ["/apps/vpn", "/vpn"],
+            ["/apps/network-filter", "/network-filter"],
+            ["/apps/mail-server", "/mail-server"],
+            ["/apps/games", "/game-servers"]
+        ].flatMap(([source, destination]) => [
+            { source, destination, permanent: false },
+            {
+                source: `${source}/:path*`,
+                destination: `${destination}/:path*`,
+                permanent: false
+            }
+        ]),
+        { source: "/apps/dns-blocker", destination: "/network-filter", permanent: false },
         {
             source: "/apps/dns-blocker/:path*",
-            destination: "/apps/network-filter/:path*",
+            destination: "/network-filter/:path*",
             permanent: false
         },
         // Management's screens were spread between /admin and the top level, so

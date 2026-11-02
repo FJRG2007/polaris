@@ -423,7 +423,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Mail server",
         category: "Messaging",
         icon: Mails,
-        opensAt: "/apps/mail-server",
+        opensAt: "/mail-server",
         summary: "Mail at your own domains, with its DNS written and checked for you.",
         description:
             "Send and receive mail at your own domains. Polaris writes the SPF, DKIM and DMARC records, checks that they are published, and files the DMARC reports receivers send back. Create mailboxes, aliases and forwards from here. Installing downloads nothing: each mail server you set up runs as a container on the machine you choose, and publishes ports 25, 465, 587, 993 and 4190 there.", // i18n-ignore
@@ -442,7 +442,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Network filter",
         category: "Tools",
         icon: ShieldBan,
-        opensAt: "/apps/network-filter",
+        opensAt: "/network-filter",
         summary: "Blocks ads, trackers and malware for every device on your network.",
         keywords: DNS_BLOCKER_KEYWORDS,
         description:
@@ -494,7 +494,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "VPN",
         category: "Tools",
         icon: Waypoints,
-        opensAt: "/apps/vpn",
+        opensAt: "/vpn",
         summary: "Reach your own devices from anywhere, through the Tailscale apps.",
         keywords: VPN_KEYWORDS,
         description:
@@ -548,7 +548,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Game servers",
         category: "Game servers",
         icon: Gamepad2,
-        opensAt: "/apps/games",
+        opensAt: "/game-servers",
         summary: "Create and run Minecraft, ARK and FiveM servers on your own machines.",
         description:
             "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, ARK: Survival Evolved, or FiveM for GTA V. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.", // i18n-ignore
@@ -564,7 +564,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "minecraft-manager",
         name: "Minecraft",
         legacy: true,
-        opensAt: "/apps/games",
+        opensAt: "/game-servers",
         category: "Game servers",
         icon: Gamepad2,
         summary: "Create and run as many Minecraft servers as you want.",

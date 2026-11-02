@@ -70,7 +70,7 @@ export async function setAnticheatAction(input: {
             targetType: "installedApp",
             targetId: parsed.data.installedAppId
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return {

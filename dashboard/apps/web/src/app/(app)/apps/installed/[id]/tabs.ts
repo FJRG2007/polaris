@@ -1,7 +1,7 @@
 /**
  * A game server's screens, as data.
  *
- * Each one is a real path (`/apps/installed/<id>/console`) rather than a piece of
+ * Each one is a real path (`/game-servers/<id>/console`) rather than a piece of
  * client state, so a screen can be reloaded, bookmarked and sent to somebody -
  * an operator who reloads while reading the console should land back on the
  * console, not on the overview.
@@ -163,5 +163,5 @@ export function canOpenGameTab(
 
 /** Where a screen lives, so every link is built the same way. */
 export function gameTabHref(installedAppId: string, slug: string): string {
-    return slug ? `/apps/installed/${installedAppId}/${slug}` : `/apps/installed/${installedAppId}`;
+    return slug ? `/game-servers/${installedAppId}/${slug}` : `/game-servers/${installedAppId}`;
 }

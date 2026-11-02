@@ -80,7 +80,7 @@ export async function chooseGameStorageAction(input: {
             targetId: parsed.data.installedAppId,
             metadata: { mode: parsed.data.mode, connectionId: parsed.data.connectionId }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { moving: result.moving };
     } catch {
         return { error: t("storage.refused.unexpected") };
