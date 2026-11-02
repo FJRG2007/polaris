@@ -1925,6 +1925,10 @@
             "download": "Download"
         },
         "attention": {
+            "stoppedTitle": "{name} has stopped working",
+            "stoppedCredits": "{name} is out of credits, so Polaris stopped asking it and is not checking visitors or mail.",
+            "stoppedKey": "{name} refused the key, so Polaris stopped asking it and is not checking visitors or mail.",
+            "stoppedClears": "Polaris tries once an hour and this goes away when it answers.",
             "title": "Somebody could not connect their account",
             "reason": "The last attempt was refused. {name} said: {reason}",
             "clears": "It clears itself as soon as one authorization completes.",

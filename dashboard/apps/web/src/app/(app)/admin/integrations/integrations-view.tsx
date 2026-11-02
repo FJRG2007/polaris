@@ -795,25 +795,34 @@ function AttentionNotice({
     const t = useTranslations("admin");
     const { pending, error, markSeen: onSeen } = useMarkSeen(slug);
     const apiOff = failure.kind === "api-off";
+    const stopped = failure.kind === "out-of-service";
 
     return (
         <div className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
                 <span className="text-sm font-medium">
-                    {apiOff
-                        ? t("integrations.attention.apiOffTitle", { name })
-                        : t("integrations.attention.title")}
+                    {stopped
+                        ? t("integrations.attention.stoppedTitle", { name })
+                        : apiOff
+                          ? t("integrations.attention.apiOffTitle", { name })
+                          : t("integrations.attention.title")}
                 </span>
                 <span className="text-muted-foreground">
-                    {apiOff
-                        ? t("integrations.attention.apiOffReason", { reason: failure.reason })
-                        : t("integrations.attention.reason", { name, reason: failure.reason })}
+                    {stopped
+                        ? failure.reason === "credits"
+                            ? t("integrations.attention.stoppedCredits", { name })
+                            : t("integrations.attention.stoppedKey", { name })
+                        : apiOff
+                          ? t("integrations.attention.apiOffReason", { reason: failure.reason })
+                          : t("integrations.attention.reason", { name, reason: failure.reason })}
                 </span>
                 <span className="text-muted-foreground">
-                    {apiOff
-                        ? t("integrations.attention.apiOffClears")
-                        : t("integrations.attention.clears")}
+                    {stopped
+                        ? t("integrations.attention.stoppedClears")
+                        : apiOff
+                          ? t("integrations.attention.apiOffClears")
+                          : t("integrations.attention.clears")}
                 </span>
                 {error ? (
                     <span role="alert" className="text-danger">
@@ -1067,6 +1076,9 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    {card.failure ? (
+                        <AttentionNotice failure={card.failure} name={card.name} slug={card.slug} />
+                    ) : null}
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -2231,6 +2243,9 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    {card.failure ? (
+                        <AttentionNotice failure={card.failure} name={card.name} slug={card.slug} />
+                    ) : null}
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">

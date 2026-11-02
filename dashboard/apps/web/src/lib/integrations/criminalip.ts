@@ -50,7 +50,11 @@ export async function checkCriminalIp(
         headers: { "x-api-key": apiKey },
         signal: AbortSignal.timeout(10_000)
     });
-    if (!response.ok) throw new Error(`Criminal IP responded ${response.status}`);
+    if (!response.ok) {
+        throw Object.assign(new Error(`Criminal IP responded ${response.status}`), {
+            status: response.status
+        });
+    }
     const body: unknown = await response.json();
     if (!body || typeof body !== "object") throw new Error("Criminal IP returned an unreadable body");
 

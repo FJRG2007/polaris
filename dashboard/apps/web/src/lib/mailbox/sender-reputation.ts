@@ -181,7 +181,7 @@ async function domainIsFraud(domain: string): Promise<ReputationFinding | null> 
         return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
 
     const apiKey = await getIntegrationSecret(DYMO);
-    if (!apiKey) return null;
+    if (!apiKey || !takeLookup(DYMO)) return null;
     try {
         const { fraud } = await verifyDomain(apiKey, domain);
         await rememberReputation(
@@ -242,7 +242,7 @@ async function addressOpinion(address: string): Promise<ReputationFinding | null
     if (known) return fromVerdict("email", address, known);
 
     const apiKey = await getIntegrationSecret(DYMO);
-    if (!apiKey) return null;
+    if (!apiKey || !takeLookup(DYMO)) return null;
 
     try {
         const { allow, reasons } = await verifyEmail(apiKey, address);

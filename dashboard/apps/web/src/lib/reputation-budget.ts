@@ -15,14 +15,15 @@
  * afternoon, not the provider's limit.
  */
 
-export const BUDGETED_PROVIDERS = ["virustotal", "dymo"] as const;
+export const BUDGETED_PROVIDERS = ["virustotal", "dymo", "criminalip"] as const;
 export type BudgetedProvider = (typeof BUDGETED_PROVIDERS)[number];
 
 export const LOOKUP_BUDGET: Readonly<
     Record<BudgetedProvider, { perMinute: number; perDay: number }>
 > = {
     virustotal: { perMinute: 4, perDay: 500 },
-    dymo: { perMinute: 30, perDay: 2000 }
+    dymo: { perMinute: 30, perDay: 2000 },
+    criminalip: { perMinute: 30, perDay: 2000 }
 };
 
 const MINUTE_MS = 60 * 1000;

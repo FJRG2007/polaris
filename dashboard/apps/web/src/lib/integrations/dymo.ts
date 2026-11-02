@@ -6,6 +6,16 @@
 
 import { z } from "zod";
 import DymoAPI, { type NegativeEmailRules, type NegativeIPRules } from "dymo-api";
+import { whileServing } from "@/lib/integrations/provider-pause";
+
+const PROVIDER = "dymo";
+const NAME = "Dymo API";
+
+/** The SDK retries a failed request twice by default, and each retry is billed. A
+ *  failure here pauses the provider instead, so one request is all it gets. */
+function clientFor(apiKey: string): DymoAPI {
+    return new DymoAPI({ apiKey, resilience: { retryAttempts: 0 } });
+}
 
 /**
  * What an answer has to look like before any of it is believed.
@@ -16,7 +26,14 @@ import DymoAPI, { type NegativeEmailRules, type NegativeIPRules } from "dymo-api
  * verdict turns into `false` and a message is accused by a parse error. Every
  * shape below is the minimum this file actually reads, and anything else in the
  * answer is left alone.
+ *
+ * A flag is read by comparing it to `true`, so it is not typed here. This service
+ * returns a sentence in place of a boolean for a field it has not built yet, and a
+ * paid answer rejected over a field nothing needed is remembered by nobody, so the
+ * same address is bought again on every pass.
  */
+const FLAG = z.unknown().optional();
+
 const VERDICT = z.object({
     allow: z.boolean(),
     reasons: z.array(z.string()).optional()
@@ -26,7 +43,7 @@ const VERDICT = z.object({
  *  else on purpose - the service adds fields, and a stricter schema here would
  *  turn a new one into a lookup that answers nothing. */
 const DOMAIN_ANALYSIS = z.object({
-    domain: z.object({ valid: z.boolean().optional(), fraud: z.boolean().optional() }).optional()
+    domain: z.object({ valid: FLAG, fraud: FLAG }).optional()
 });
 
 /** The IP verdict with the part of the analysis that says the address is shared:
@@ -35,9 +52,9 @@ const DOMAIN_ANALYSIS = z.object({
 const IP_VERDICT = VERDICT.extend({
     response: z
         .object({
-            vpn: z.boolean().optional(),
-            proxy: z.boolean().optional(),
-            mobile: z.boolean().optional()
+            vpn: FLAG,
+            proxy: FLAG,
+            mobile: FLAG
         })
         .optional()
 });
@@ -74,19 +91,31 @@ export function settleIpVerdict(answer: z.infer<typeof IP_VERDICT>): {
     return { allow: kept.length === 0, reasons: kept, shared };
 }
 
-/** Verify an IP; `allow` is false when it matches any of the `deny` conditions,
- *  with a shared address treated as `settleIpVerdict` describes. */
-export async function verifyIp(
+async function askIp(
     apiKey: string,
     ip: string,
     deny: string[]
 ): Promise<{ allow: boolean; reasons: string[] }> {
-    const client = new DymoAPI({ apiKey });
     const answer = IP_VERDICT.parse(
-        await client.isValidIP(ip, { deny: deny as NegativeIPRules[] })
+        await clientFor(apiKey).isValidIP(ip, { deny: deny as NegativeIPRules[] })
     );
     const { allow, reasons } = settleIpVerdict(answer);
     return { allow, reasons };
+}
+
+/** Verify an IP; `allow` is false when it matches any of the `deny` conditions,
+ *  with a shared address treated as `settleIpVerdict` describes. */
+export function verifyIp(
+    apiKey: string,
+    ip: string,
+    deny: string[]
+): Promise<{ allow: boolean; reasons: string[] }> {
+    return whileServing(PROVIDER, NAME, () => askIp(apiKey, ip, deny));
+}
+
+/** Try a key that may be new, so it ignores any pause; a bad key throws. */
+export async function testKey(apiKey: string): Promise<void> {
+    await askIp(apiKey, "8.8.8.8", ["FRAUD"]);
 }
 
 /**
@@ -108,14 +137,17 @@ export const MAIL_DENY_RULES: readonly NegativeEmailRules[] = [
     "HIGH_RISK_SCORE"
 ];
 
-export async function verifyEmail(
+export function verifyEmail(
     apiKey: string,
     email: string,
     deny: readonly NegativeEmailRules[] = MAIL_DENY_RULES
 ): Promise<{ allow: boolean; reasons: string[] }> {
-    const client = new DymoAPI({ apiKey });
-    const answer = VERDICT.parse(await client.isValidEmail(email, { deny: [...deny] }));
-    return { allow: answer.allow, reasons: answer.reasons ?? [] };
+    return whileServing(PROVIDER, NAME, async () => {
+        const answer = VERDICT.parse(
+            await clientFor(apiKey).isValidEmail(email, { deny: [...deny] })
+        );
+        return { allow: answer.allow, reasons: answer.reasons ?? [] };
+    });
 }
 
 /**
@@ -131,10 +163,11 @@ export async function verifyEmail(
  * domains - a free subdomain, an unusual ending, no MX records - and none of
  * them is a reason to file somebody's mail away.
  */
-export async function verifyDomain(apiKey: string, domain: string): Promise<{ fraud: boolean }> {
-    const client = new DymoAPI({ apiKey });
-    const answer = DOMAIN_ANALYSIS.parse(await client.isValidDataRaw({ domain }));
-    return { fraud: answer.domain?.fraud === true };
+export function verifyDomain(apiKey: string, domain: string): Promise<{ fraud: boolean }> {
+    return whileServing(PROVIDER, NAME, async () => {
+        const answer = DOMAIN_ANALYSIS.parse(await clientFor(apiKey).isValidDataRaw({ domain }));
+        return { fraud: answer.domain?.fraud === true };
+    });
 }
 
 /**
@@ -144,10 +177,11 @@ export async function verifyDomain(apiKey: string, domain: string): Promise<{ fr
  * check the account is billed for, and the question chat asks is the narrow one
  * of whether the page is a known scam.
  */
-export async function verifyUrl(apiKey: string, url: string): Promise<{ fraud: boolean }> {
-    const client = new DymoAPI({ apiKey });
-    const result = await client.isValidDataRaw({ url });
-    return { fraud: result.url?.fraud === true };
+export function verifyUrl(apiKey: string, url: string): Promise<{ fraud: boolean }> {
+    return whileServing(PROVIDER, NAME, async () => {
+        const result = await clientFor(apiKey).isValidDataRaw({ url });
+        return { fraud: result.url?.fraud === true };
+    });
 }
 
 /** The domain analysis with the NSFW plugin's answer, of which only the two
@@ -155,8 +189,8 @@ export async function verifyUrl(apiKey: string, url: string): Promise<{ fraud: b
 const DOMAIN_REPUTATION = z.object({
     domain: z
         .object({
-            fraud: z.boolean().optional(),
-            plugins: z.object({ nsfw: z.boolean().optional() }).partial().optional()
+            fraud: FLAG,
+            plugins: z.object({ nsfw: FLAG }).partial().optional()
         })
         .optional()
 });
@@ -167,17 +201,21 @@ const DOMAIN_REPUTATION = z.object({
  * the operator blocks adult domains, because each plugin is a further check the
  * account is billed for.
  */
-export async function domainReputation(
+export function domainReputation(
     apiKey: string,
     domain: string,
     adult: boolean
 ): Promise<{ fraud: boolean; adult: boolean }> {
-    const client = new DymoAPI({ apiKey });
-    const answer = DOMAIN_REPUTATION.parse(
-        await client.isValidDataRaw({ domain, ...(adult ? { plugins: ["nsfw"] } : {}) })
-    );
-    return {
-        fraud: answer.domain?.fraud === true,
-        adult: adult && answer.domain?.plugins?.nsfw === true
-    };
+    return whileServing(PROVIDER, NAME, async () => {
+        const answer = DOMAIN_REPUTATION.parse(
+            await clientFor(apiKey).isValidDataRaw({
+                domain,
+                ...(adult ? { plugins: ["nsfw"] } : {})
+            })
+        );
+        return {
+            fraud: answer.domain?.fraud === true,
+            adult: adult && answer.domain?.plugins?.nsfw === true
+        };
+    });
 }

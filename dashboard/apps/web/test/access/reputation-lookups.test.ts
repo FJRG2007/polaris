@@ -26,12 +26,17 @@ interface BanRow {
 }
 
 interface ReputationRow {
-    ip: string;
+    subject: string;
     provider: string;
     allow: boolean;
     reason: string | null;
     rules: string;
     checkedAt: Date;
+}
+
+interface SubjectKey {
+    subject: string;
+    provider: string;
 }
 
 let bans: BanRow[] = [];
@@ -77,15 +82,30 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async () => ({ count: 0 })
         },
-        addressReputation: {
-            findUnique: async ({ where }: { where: { ip: string } }) =>
-                verdicts.find((row) => row.ip === where.ip) ?? null,
-            upsert: async ({ where, create }: { where: { ip: string }; create: ReputationRow }) => {
-                verdicts = [...verdicts.filter((row) => row.ip !== where.ip), create];
+        subjectReputation: {
+            findUnique: async ({ where }: { where: { kind_subject_provider: SubjectKey } }) =>
+                verdicts.find(
+                    (row) =>
+                        row.subject === where.kind_subject_provider.subject &&
+                        row.provider === where.kind_subject_provider.provider
+                ) ?? null,
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { kind_subject_provider: SubjectKey };
+                create: ReputationRow;
+            }) => {
+                verdicts = [
+                    ...verdicts.filter(
+                        (row) =>
+                            row.subject !== where.kind_subject_provider.subject ||
+                            row.provider !== where.kind_subject_provider.provider
+                    ),
+                    create
+                ];
                 return create;
-            },
-            deleteMany: async () => ({ count: 0 }),
-            count: async () => verdicts.length
+            }
         },
         wafIpFeed: { findUnique: async () => null, upsert: async () => undefined },
         user: { findMany: async () => [] }
@@ -93,6 +113,7 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const { checkReputation } = await import("@/lib/waf-intel-service");
+const { resetLookupBudget } = await import("@/lib/reputation-budget");
 
 const TRAFFIC = ["8.8.8.8", "1.1.1.1", "9.9.9.9"];
 
@@ -101,6 +122,7 @@ beforeEach(() => {
     verdicts = [];
     asked = [];
     deny = ["FRAUD"];
+    resetLookupBudget();
 });
 
 describe("asking a provider about the addresses in the log", () => {
@@ -136,8 +158,22 @@ describe("asking a provider about the addresses in the log", () => {
     });
 
     it("leaves addresses nobody outside can reach alone", async () => {
-        await checkReputation(["192.168.50.5", "127.0.0.1", "10.0.0.3", "172.16.0.9"]);
+        await checkReputation([
+            "192.168.50.5",
+            "127.0.0.1",
+            "10.0.0.3",
+            "172.16.0.9",
+            "100.64.0.7",
+            "fd7a:115c::1",
+            "fe80::1"
+        ]);
         expect(asked).toEqual([]);
+    });
+
+    it("stops at its share of the budget however many strangers are in the log", async () => {
+        const strangers = Array.from({ length: 200 }, (_, at) => `8.8.${at}.1`);
+        for (let pass = 0; pass < 10; pass += 1) await checkReputation(strangers);
+        expect(asked).toHaveLength(15);
     });
 
     it("does not remember an outage as a verdict", async () => {

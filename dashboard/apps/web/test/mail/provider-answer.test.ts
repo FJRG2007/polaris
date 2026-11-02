@@ -29,7 +29,23 @@ vi.mock("dymo-api", () => ({
     }
 }));
 
-const { verifyDomain, verifyEmail } = await import("@/lib/integrations/dymo");
+vi.mock("@/lib/integrations/provider-pause", () => ({
+    whileServing: (_provider: string, _name: string, ask: () => Promise<unknown>) => ask()
+}));
+
+const { verifyDomain, verifyEmail, verifyIp } = await import("@/lib/integrations/dymo");
+
+describe("an answer about an IP", () => {
+    it("survives a field the service answers with a sentence or nothing", async () => {
+        for (const mobile of ["Coming soon", null]) {
+            emailAnswer = { allow: true, reasons: [], response: { vpn: false, mobile } };
+            expect(await verifyIp("key", "8.8.8.8", ["FRAUD"])).toEqual({
+                allow: true,
+                reasons: []
+            });
+        }
+    });
+});
 
 describe("an answer about an address", () => {
     it("is read when it says what it is supposed to say", async () => {

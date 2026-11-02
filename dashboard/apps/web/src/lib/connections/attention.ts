@@ -50,7 +50,7 @@ const ALERT_WINDOW_MS = 60 * 60 * 1000;
 /** What kind of trouble it is: somebody refused at authorization, or an API the
  *  application relies on switched off in the provider's console. Only the first
  *  is answered by an authorization completing. */
-export type FailureKind = "refusal" | "api-off";
+export type FailureKind = "refusal" | "api-off" | "out-of-service";
 
 /** What went wrong the last time somebody tried to authorize. */
 export interface ConnectionFailure {
@@ -76,7 +76,7 @@ export function readConnectionFailure(
     return {
         at,
         reason,
-        kind: kind === "api-off" ? "api-off" : "refusal",
+        kind: kind === "api-off" || kind === "out-of-service" ? kind : "refusal",
         ...(typeof seenAt === "string" ? { seenAt } : {})
     };
 }

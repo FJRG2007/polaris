@@ -1925,6 +1925,10 @@
             "download": "Descargar"
         },
         "attention": {
+            "stoppedTitle": "{name} ha dejado de funcionar",
+            "stoppedCredits": "{name} se ha quedado sin créditos, así que Polaris ha dejado de preguntarle y no está revisando visitantes ni correo.",
+            "stoppedKey": "{name} ha rechazado la clave, así que Polaris ha dejado de preguntarle y no está revisando visitantes ni correo.",
+            "stoppedClears": "Polaris lo prueba una vez por hora y esto desaparece cuando responda.",
             "title": "Alguien no ha podido conectar su cuenta",
             "reason": "Se rechazó el último intento. {name} dijo: {reason}",
             "clears": "Desaparece en cuanto una autorización se complete.",

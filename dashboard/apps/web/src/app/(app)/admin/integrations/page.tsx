@@ -180,9 +180,8 @@ export default async function IntegrationsPage({
                 oauthApp: OAUTH_APP_SLUGS.includes(entry.slug),
                 baseUrl
             }),
-            // Only where an authorization can fail: a card with no round trip has
-            // nothing to have been refused.
-            failure: connection ? (readConnectionFailure(state?.config) ?? undefined) : undefined,
+            // A refused authorization, or a paid service that stopped answering.
+            failure: readConnectionFailure(state?.config) ?? undefined,
             signInAllowed: connection
                 ? (signIn.get(entry.slug) ?? connection.signInDefault)
                 : undefined,
