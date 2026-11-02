@@ -36,11 +36,10 @@ import { getTranslations } from "@/lib/i18n/request";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
-import { listBlocked } from "@/lib/blocks";
 import { listChannelRoster } from "@/lib/chat/roster";
 import type { ChatRosterMember } from "@/lib/chat/roster-groups";
 import { allowedBy } from "@/lib/privacy-service";
-import { FriendError, friendIds, requestFriend } from "@/lib/friends-service";
+import { FriendError, requestFriend } from "@/lib/friends-service";
 import { groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
@@ -62,13 +61,7 @@ import type {
     ChatPage,
     MessageDelivery
 } from "@/lib/chat/messages";
-import type {
-    ChatCategoryView,
-    ChatChannelView,
-    ChatElsewhere,
-    ChatMemberView,
-    ChatSpaceView
-} from "@/lib/chat/chat-service";
+import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/chat-service";
 import { requirePostable, searchForConversation } from "@/lib/chat/access";
 
 const CHAT_PATH = "/chat";
@@ -96,45 +89,6 @@ export async function listChannelsAction(): Promise<{ channels: ChatChannelView[
 export async function conversationsElsewhereAction(): Promise<{ chats: ChatElsewhere[] }> {
     const me = await actor();
     return { chats: await chat.conversationsElsewhere(me) };
-}
-
-/**
- * Everything the chat context holds, in one request.
- *
- * Four answers the rail used to ask for as four actions - the conversations,
- * the spaces, their headings and who this reader has blocked. A browser runs
- * server actions one at a time, so four of them on every refresh were four
- * places in the queue a message being sent had to wait behind, each checking
- * the same permission again. One action checks it once and reads the four
- * together.
- *
- * Each part fails on its own, as the four did: one that could not be read comes
- * back null and the screen keeps what it had, rather than losing the other
- * three over it.
- */
-export async function chatListsAction(): Promise<{
-    channels: ChatChannelView[] | null;
-    spaces: ChatSpaceView[] | null;
-    categories: ChatCategoryView[] | null;
-    blocked: string[] | null;
-    friends: string[] | null;
-}> {
-    const me = await actor();
-    const part = <T>(read: Promise<T>): Promise<T | null> =>
-        read.catch((caught: unknown) => {
-            console.error("[chat] a part of the conversation list could not be read", caught);
-            return null;
-        });
-    const [channels, spaces, categories, blocked, friends] = await Promise.all([
-        part(chat.listChannels(me)),
-        part(chat.listSpaces(me)),
-        part(chat.listCategories(me)),
-        part(listBlocked(me.id).then((people) => people.map((person) => person.id))),
-        // Ids only, from one indexed read: what decides whether a person's menu
-        // offers "Remove friend".
-        part(friendIds(me.id).then((ids) => [...ids]))
-    ]);
-    return { channels, spaces, categories, blocked, friends };
 }
 
 /**

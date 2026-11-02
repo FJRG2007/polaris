@@ -641,6 +641,8 @@
         }
     },
     "sidebar": {
+        "listLoadFailed": "Your conversations could not be loaded. Trying again.",
+        "listRetry": "Try again",
         "directMessages": "Direct messages",
         "startADirectMessage": "Start a direct message",
         "addAChannelOrA": "Add a channel or a category",

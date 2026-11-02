@@ -231,8 +231,17 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
 }
 
 export function ChatSidebar() {
-    const { channels, spaces, categories, activeSpaceId, setActiveSpaceId, refresh, loaded } =
-        useChat();
+    const {
+        channels,
+        spaces,
+        categories,
+        activeSpaceId,
+        setActiveSpaceId,
+        refresh,
+        loaded,
+        kept,
+        loadFailed
+    } = useChat();
     const params = useParams<{ channelId?: string; spaceId?: string }>();
     const open = params.channelId ?? null;
     const spacePage = params.spaceId ?? null;
@@ -577,8 +586,18 @@ export function ChatSidebar() {
                     </p>
                 )}
 
-                {!loaded ? (
-                    <SidebarSkeleton />
+                {!loaded && loadFailed ? (
+                    <div role="alert" className="flex flex-col items-start gap-1 px-2 py-1 text-xs">
+                        <p className="text-foreground-subtle">{t("sidebar.listLoadFailed")}</p>
+                        <Button variant="ghost" size="sm" onClick={refresh} className="max-md:h-11">
+                            {t("sidebar.listRetry")}
+                        </Button>
+                    </div>
+                ) : null}
+                {!loaded && !kept ? (
+                    loadFailed ? null : (
+                        <SidebarSkeleton />
+                    )
                 ) : space === null ? (
                     <Section
                         label={t("sidebar.directMessages")}
