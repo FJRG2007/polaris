@@ -2587,14 +2587,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: ShieldBan,
-            keywords: [
-                "blocklists",
-                "adlists",
-                "allowlist",
-                "denylist",
-                "services",
-                "schedules"
-            ]
+            keywords: ["blocklists", "adlists", "allowlist", "denylist", "services", "schedules"]
         },
         {
             label: "Devices", // i18n-ignore

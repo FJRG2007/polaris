@@ -17,7 +17,12 @@ vi.mock("@polaris/db", () => ({
             findFirst: async ({ where }: { where: { catalogId: string } }) =>
                 where.catalogId === "vpn"
                     ? { id: "install-1", config: null }
-                    : { id: "engine-1", ownerId: "owner-1", applicationId: "app-1", status: "failed" }
+                    : {
+                          id: "engine-1",
+                          ownerId: "owner-1",
+                          applicationId: "app-1",
+                          status: "failed"
+                      }
         }
     }
 }));
