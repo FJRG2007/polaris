@@ -1,7 +1,7 @@
 {
     "page": {
         "title": "VPN",
-        "description": "Conéctate por tus propios servidores con las apps oficiales de WireGuard."
+        "description": "Conéctate a través de tus propios servidores y elige por dónde sale tu tráfico."
     },
     "install": {
         "title": "Instala la VPN",
@@ -122,19 +122,17 @@
         "windows": {
             "name": "Windows",
             "step1": "Instala Tailscale para Windows desde tailscale.com/download.",
-            "step2": "La app de Windows no tiene un campo para otro servidor: abre el Símbolo del sistema o PowerShell y ejecuta el comando de abajo.",
-            "step3": "Se abre un navegador en Polaris. Inicia sesión si te lo pide y pulsa Añadir este equipo."
+            "step2": "Abre esta página en la app de Polaris y pulsa Unirse a esta red."
         },
         "macos": {
             "name": "macOS",
             "step1": "Instala Tailscale para macOS desde la App Store o tailscale.com/download.",
-            "step2": "Abre un terminal y ejecuta el comando de abajo. Si ya hay otra red de Tailscale iniciada, también puedes abrir Ajustes, Cuentas, pulsar la flecha de la esquina inferior izquierda e introducir la dirección de esta VPN.",
-            "step3": "Se abre un navegador en Polaris. Pulsa Añadir este equipo."
+            "step2": "Abre esta página en la app de Polaris y pulsa Unirse a esta red."
         },
         "linux": {
             "name": "Linux",
-            "step1": "Instala Tailscale con las instrucciones de tu distribución en tailscale.com/download/linux.",
-            "step2": "Ejecuta el comando de abajo, abre el enlace que muestra y pulsa Añadir este equipo."
+            "step1": "Instala Tailscale desde tailscale.com/download/linux.",
+            "step2": "Abre esta página en la app de Polaris y pulsa Unirse a esta red."
         },
         "ios": {
             "name": "iPhone y iPad",
@@ -166,7 +164,10 @@
             "name": "Router o servidor",
             "step1": "Instala Tailscale en él: la mayoría de routers con OpenWrt, pfSense u OPNsense lo ofrecen como paquete.",
             "step2": "Crea una clave abajo y ejecuta el comando con ella en el dispositivo. Se une a tus dispositivos sin navegador."
-        }
+        },
+        "join": "Unirse a esta red",
+        "joined": "Este ordenador se ha unido a la red.",
+        "noClient": "Tailscale no está instalado en este ordenador."
     },
     "register": {
         "title": "¿Añadir este dispositivo a la VPN?",
@@ -254,28 +255,15 @@
         "linesBody": "Conecta cada línea al router y deja que elija él. En OpenWrt, usa el paquete mwan3. Polaris sigue llegando a la red."
     },
     "connect": {
-        "intro": "Añade un dispositivo y escanea su código o importa su archivo en WireGuard.",
         "devices": "Tus equipos",
-        "add": "Añadir equipo",
-        "addBody": "Cada dispositivo tiene su propia configuración.",
-        "name": "Nombre",
-        "location": "Servidor",
-        "create": "Crear",
-        "cancel": "Cancelar",
-        "empty": "Aún no hay dispositivos.",
+        "empty": "Aún no hay dispositivos. Cada uno aparece aquí al conectarse por primera vez.",
         "noNodes": "Aún no tienes servidores disponibles.",
         "setUp": "Añadir nodos",
-        "full": "Has llegado a tu límite de {count} dispositivos.",
         "usage": "{used} de {limit} GB usados este mes.",
         "online": "Conectado",
         "offline": "Sin conexión",
         "remove": "Quitar equipo",
         "torHint": "Tor es gratis y más privado, pero mucho más lento. Algunas webs lo bloquean y las llamadas o juegos no funcionan.",
-        "madeTitle": "Tu dispositivo está listo",
-        "madeBody": "Instala WireGuard desde tu tienda de apps o wireguard.com/install, añade un túnel y escanea el código o importa el archivo.",
-        "once": "Solo se muestra una vez. Si lo pierdes, quita el dispositivo y añádelo de nuevo.",
-        "download": "Descargar archivo",
-        "done": "Hecho",
         "standing": {
             "none": "No tienes acceso a la VPN. Pídeselo a un administrador.",
             "suspended": "Tu acceso a la VPN está suspendido. Pregunta a un administrador.",
@@ -294,7 +282,16 @@
             "noSuchPerson": "Nadie tiene ese correo aquí.",
             "tooManyNodes": "Este Polaris ha llegado a su límite de servidores.",
             "invalid": "Revisa los campos y reinténtalo."
-        }
+        },
+        "locations": "Ubicaciones",
+        "connectTo": "Conectar a {name}",
+        "switchTo": "Cambiar a {name}",
+        "disconnect": "Desconectar",
+        "failed": "Este ordenador no pudo iniciar la VPN. Inténtalo de nuevo.",
+        "useApps": "Conecta desde la app de Polaris en tu ordenador, o desde la extensión de Polaris solo para este navegador.",
+        "getApps": "Ver las apps",
+        "noPhoneApp": "Todavía no hay app de Polaris para móviles.",
+        "cancel": "Cancelar"
     },
     "nodes": {
         "title": "Servidores",

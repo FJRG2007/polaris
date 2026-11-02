@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * Add a device: the official Tailscale app on each platform, pointed at this
- * VPN's control server instead of Tailscale's. The steps follow Tailscale's own
- * guide for a custom control server (tailscale.com/kb/1507); a platform whose
- * app has no field for it is given the one command it takes.
+ * Join a private network: the official Tailscale app on each platform, pointed at
+ * this VPN's control server instead of Tailscale's. The steps follow Tailscale's
+ * own guide for a custom control server (tailscale.com/kb/1507). A computer's app
+ * has no field for that server, so the Polaris app signs it in with a one-time
+ * key; a phone or TV has the field, and a router is the one place a command is
+ * the operator's own to run.
  *
  * A device that cannot open a browser to sign in - a server, a router, a TV
  * without a keyboard - takes a one-time key instead, made here for an hour.
@@ -18,7 +20,8 @@ import * as ui from "@polaris/ui";
 import * as actions from "../actions";
 import { QRCodeSVG } from "qrcode.react";
 import { useVpnRead } from "../use-vpn-read";
-import { KeyRound, Loader2 } from "lucide-react";
+import { desktopBridge } from "@/lib/desktop-bridge";
+import { KeyRound, Loader2, Network } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRef, useState, useTransition, type KeyboardEvent } from "react";
 
@@ -36,8 +39,8 @@ type Platform = (typeof PLATFORMS)[number];
 
 /** How many numbered steps each platform's guide has (`add.<platform>.stepN`). */
 const STEPS: Record<Platform, number> = {
-    windows: 3,
-    macos: 3,
+    windows: 2,
+    macos: 2,
     linux: 2,
     ios: 4,
     android: 4,
@@ -46,10 +49,10 @@ const STEPS: Record<Platform, number> = {
     router: 2
 };
 
+const COMPUTERS: ReadonlySet<Platform> = new Set(["windows", "macos", "linux"]);
+
 /** The command a platform's guide shows, with the login server filled in. */
 function commandFor(platform: Platform, server: string, key: string | null): string | null {
-    if (platform === "windows" || platform === "macos" || platform === "linux")
-        return `tailscale login --login-server=${server}`;
     if (platform === "router")
         return `tailscale up --login-server=${server} --authkey=${key ?? "<key>"}`;
     return null;
@@ -65,6 +68,7 @@ export function AddDeviceSection() {
     const [platform, setPlatform] = useState<Platform>("windows");
     const [key, setKey] = useState<{ key: string; expiresAt: string } | null>(null);
     const [keyError, setKeyError] = useState<string | null>(null);
+    const [joined, setJoined] = useState(false);
     const [pending, startTransition] = useTransition();
     const tabs = useRef<(HTMLButtonElement | null)[]>([]);
     const status = read.data?.status ?? null;
@@ -95,7 +99,24 @@ export function AddDeviceSection() {
         });
     }
 
+    function join(target: string): void {
+        const vpn = desktopBridge()?.vpn;
+        if (!vpn) return;
+        setKeyError(null);
+        setJoined(false);
+        startTransition(async () => {
+            const made = await actions
+                .createVpnKeyAction()
+                .catch(() => ({ error: t("errors.generic") }));
+            if (made.error !== undefined) return setKeyError(made.error);
+            const outcome = await vpn.joinNetwork({ server: target, key: made.key });
+            if (outcome.ok) setJoined(true);
+            else setKeyError(outcome.error);
+        });
+    }
+
     const command = server ? commandFor(platform, server, key?.key ?? null) : null;
+    const canJoin = COMPUTERS.has(platform) && desktopBridge()?.vpn && server;
 
     return (
         <div className="flex flex-col gap-4">
@@ -187,6 +208,23 @@ export function AddDeviceSection() {
                             </li>
                         ))}
                     </ol>
+                    {canJoin ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <ui.Button
+                                size="sm"
+                                disabled={pending || status?.state !== "running"}
+                                onClick={() => join(server)}
+                            >
+                                {pending ? <Loader2 className="animate-spin" /> : <Network />}
+                                {t("add.join")}
+                            </ui.Button>
+                            {joined ? (
+                                <span className="text-sm text-muted-foreground">
+                                    {t("add.joined")}
+                                </span>
+                            ) : null}
+                        </div>
+                    ) : null}
                     {command ? (
                         <div className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-2">
                             <code

@@ -1,41 +1,77 @@
 "use client";
 
 /**
- * Connect: pick where to come out, name the device, and take the configuration to the
- * official WireGuard app. The configuration appears once, since its key is not kept.
+ * Connect: pick where to come out, on the map or the list, and connect from here
+ * when this page is inside the Polaris app. A browser tab cannot start a VPN, so
+ * it points at the app and the extension instead of asking anybody to set one up.
  */
 
 import Link from "next/link";
 import * as ui from "@polaris/ui";
-import { QRCodeSVG } from "qrcode.react";
 import { useVpnRead } from "./use-vpn-read";
+import { Power, Trash2 } from "lucide-react";
 import * as actions from "./connect-actions";
-import { useState, useTransition } from "react";
-import { Download, Plus, Trash2 } from "lucide-react";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { desktopBridge } from "@/lib/desktop-bridge";
+import { WorldMap, type MapPlace } from "./world-map";
+import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
 const GIB = 1024 ** 3;
 /** A device counts as connected while its last handshake is this recent. */
 const CONNECTED_MS = 3 * 60_000;
 
+type Node = actions.ConnectAnswer["nodes"][number];
+
 function gib(bytes: string): string {
     return (Number(bytes) / GIB).toFixed(1);
 }
 
+function countryName(code: string, locale: string): string {
+    try {
+        return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
+    } catch {
+        return code;
+    }
+}
+
 export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
     const t = useTranslations("vpn");
+    const locale = useLocale();
     const read = useVpnRead<actions.ConnectAnswer>(
         "connect",
         actions.connectAction,
         t("errors.generic")
     );
-    const [adding, setAdding] = useState(false);
-    const [made, setMade] = useState<{ config: string; fileName: string } | null>(null);
+    const [picked, setPicked] = useState<string | null>(null);
+    const [tunnel, setTunnel] = useState<DesktopVpnStatus | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const data = read.data;
+    const desktop = desktopBridge()?.vpn ?? null;
     const blocked = data && data.standing !== "active" ? data.standing : null;
-    const full = data ? data.devices.length >= data.deviceLimit : false;
+    const nodes = data?.nodes ?? [];
+
+    useEffect(() => {
+        void desktop?.status().then(setTunnel);
+    }, [desktop]);
+
+    const where = (node: Node): string =>
+        [node.city, node.country ? countryName(node.country, locale) : null]
+            .filter(Boolean)
+            .join(", ");
+    const places = useMemo<MapPlace[]>(
+        () =>
+            nodes.flatMap((node) =>
+                node.country && node.exit !== "tor"
+                    ? [{ id: node.id, country: node.country, label: node.name }]
+                    : []
+            ),
+        [nodes]
+    );
+    const active = tunnel?.nodeId ?? null;
+    const selected = picked ?? active ?? nodes[0]?.id ?? null;
+    const chosen = nodes.find(({ id }) => id === selected) ?? null;
 
     function remove(id: string): void {
         setError(null);
@@ -46,9 +82,37 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
         });
     }
 
+    function connect(node: Node): void {
+        if (!desktop) return;
+        setError(null);
+        startTransition(async () => {
+            const publicKey = await desktop.key();
+            if (!publicKey) return setError(t("connect.failed"));
+            const result = await actions.connectThisDeviceAction({
+                nodeId: node.id,
+                name: desktop.deviceName,
+                publicKey
+            });
+            if (result.error !== undefined) return setError(result.error);
+            const up = await desktop.up({ ...result.connection, nodeId: node.id });
+            if (!up.ok) setError(up.error);
+            setTunnel(await desktop.status());
+            read.reload();
+        });
+    }
+
+    function disconnect(): void {
+        if (!desktop) return;
+        setError(null);
+        startTransition(async () => {
+            const down = await desktop.down();
+            if (!down.ok) setError(down.error);
+            setTunnel(await desktop.status());
+        });
+    }
+
     return (
         <div className="flex min-w-0 flex-col gap-4">
-            <p className="text-sm text-muted-foreground">{t("connect.intro")}</p>
             {read.error ? <p className="text-sm text-danger">{read.error}</p> : null}
             {error ? (
                 <p role="alert" className="text-sm text-danger">
@@ -63,33 +127,112 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                     {t("connect.usage", { used: gib(data.usedBytes), limit: data.dataLimitGb })}
                 </p>
             ) : null}
-            <section className="flex min-w-0 flex-col gap-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium">{t("connect.devices")}</h2>
-                    <ui.Button
-                        size="sm"
-                        disabled={!data || !!blocked || full || data.nodes.length === 0}
-                        title={full ? t("connect.full", { count: data?.deviceLimit ?? 0 }) : undefined}
-                        onClick={() => setAdding(true)}
-                    >
-                        <Plus />
-                        {t("connect.add")}
-                    </ui.Button>
+
+            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                <ui.Card className="min-w-0 p-3">
+                    <WorldMap
+                        places={places}
+                        selected={selected}
+                        active={active}
+                        onSelect={setPicked}
+                    />
+                </ui.Card>
+                <section className="flex min-w-0 flex-col gap-2">
+                    <h2 className="text-sm font-medium">{t("connect.locations")}</h2>
+                    {data === null ? (
+                        <ui.Skeleton className="h-24 w-full" />
+                    ) : nodes.length === 0 ? (
+                        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                            <p>{t("connect.noNodes")}</p>
+                            {isAdmin ? (
+                                <Link
+                                    href="/admin/vpn/settings"
+                                    className="w-fit text-primary hover:underline"
+                                >
+                                    {t("connect.setUp")}
+                                </Link>
+                            ) : null}
+                        </div>
+                    ) : (
+                        <div
+                            role="radiogroup"
+                            aria-label={t("connect.locations")}
+                            className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto"
+                        >
+                            {nodes.map((node) => (
+                                <button
+                                    key={node.id}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={node.id === selected}
+                                    onClick={() => setPicked(node.id)}
+                                    className={ui.cn(
+                                        "flex min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                                        node.id === selected ? "bg-muted" : "hover:bg-muted/60"
+                                    )}
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col">
+                                        <span className="truncate font-medium" title={node.name}>
+                                            {node.name}
+                                        </span>
+                                        {where(node) ? (
+                                            <span className="truncate text-xs text-muted-foreground">
+                                                {where(node)}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                    {node.exit === "tor" ? (
+                                        <ui.Badge variant="neutral">Tor</ui.Badge>
+                                    ) : null}
+                                    {node.id === active ? (
+                                        <ui.Badge variant="success">{t("connect.online")}</ui.Badge>
+                                    ) : null}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {chosen?.exit === "tor" ? (
+                        <p className="text-xs text-muted-foreground">{t("connect.torHint")}</p>
+                    ) : null}
+                </section>
+            </div>
+
+            {desktop ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    {active ? (
+                        <ui.Button variant="outline" disabled={pending} onClick={disconnect}>
+                            <Power />
+                            {t("connect.disconnect")}
+                        </ui.Button>
+                    ) : null}
+                    {chosen && chosen.id !== active ? (
+                        <ui.Button
+                            disabled={pending || !!blocked}
+                            onClick={() => connect(chosen)}
+                        >
+                            <Power />
+                            {t(active ? "connect.switchTo" : "connect.connectTo", {
+                                name: chosen.name
+                            })}
+                        </ui.Button>
+                    ) : null}
                 </div>
-                {data?.nodes.length === 0 && isAdmin ? (
-                    <Link
-                        href="/admin/vpn/settings"
-                        className="text-primary w-fit text-sm hover:underline"
-                    >
-                        {t("connect.setUp")}
+            ) : (
+                <div className="flex min-w-0 flex-col gap-1 text-sm">
+                    <p className="text-muted-foreground">{t("connect.useApps")}</p>
+                    <Link href="/account/downloads" className="w-fit text-primary hover:underline">
+                        {t("connect.getApps")}
                     </Link>
-                ) : null}
+                    <p className="text-xs text-muted-foreground">{t("connect.noPhoneApp")}</p>
+                </div>
+            )}
+
+            <section className="flex min-w-0 flex-col gap-2">
+                <h2 className="text-sm font-medium">{t("connect.devices")}</h2>
                 {data === null ? (
                     <ui.Skeleton className="h-16 w-full" />
                 ) : data.devices.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        {data.nodes.length === 0 ? t("connect.noNodes") : t("connect.empty")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("connect.empty")}</p>
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {data.devices.map((device) => {
@@ -130,136 +273,6 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                     </ul>
                 )}
             </section>
-            {adding && data ? (
-                <AddDevice
-                    nodes={data.nodes}
-                    onClose={() => setAdding(false)}
-                    onMade={(next) => {
-                        setAdding(false);
-                        setMade(next);
-                        read.reload();
-                    }}
-                />
-            ) : null}
-            {made ? <DeviceConfig made={made} onClose={() => setMade(null)} /> : null}
         </div>
-    );
-}
-
-function AddDevice({
-    nodes,
-    onClose,
-    onMade
-}: {
-    nodes: actions.ConnectAnswer["nodes"];
-    onClose: () => void;
-    onMade: (made: { config: string; fileName: string }) => void;
-}) {
-    const t = useTranslations("vpn");
-    const [name, setName] = useState("");
-    const [nodeId, setNodeId] = useState(nodes[0]?.id ?? "");
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-    const chosen = nodes.find(({ id }) => id === nodeId);
-
-    function add(): void {
-        if (name.trim() === "" || pending) return;
-        setError(null);
-        startTransition(async () => {
-            const result = await actions.addVpnDeviceAction({ nodeId, name });
-            if (result.error !== undefined) setError(result.error);
-            else onMade(result);
-        });
-    }
-
-    return (
-        <ui.Dialog open onOpenChange={(open) => !open && onClose()}>
-            <ui.DialogContent>
-                <ui.DialogHeader>
-                    <ui.DialogTitle>{t("connect.add")}</ui.DialogTitle>
-                    <ui.DialogDescription>{t("connect.addBody")}</ui.DialogDescription>
-                </ui.DialogHeader>
-                <div className="flex min-w-0 flex-col gap-3">
-                    <label className="flex min-w-0 flex-col gap-1 text-sm font-medium">
-                        {`${t("connect.name")} *`}
-                        <ui.Input
-                            value={name}
-                            maxLength={40}
-                            onChange={(event) => setName(event.target.value)}
-                        />
-                    </label>
-                    <ui.Select
-                        aria-label={t("connect.location")}
-                        value={nodeId}
-                        onValueChange={setNodeId}
-                        options={nodes.map(({ id, name: label, exit }) => ({
-                            value: id,
-                            label: exit === "tor" ? `${label} (Tor)` : label
-                        }))}
-                    />
-                    {chosen?.exit === "tor" ? (
-                        <p className="text-xs text-muted-foreground">{t("connect.torHint")}</p>
-                    ) : null}
-                    {error ? (
-                        <p role="alert" className="text-sm text-danger">
-                            {error}
-                        </p>
-                    ) : null}
-                </div>
-                <ui.DialogFooter>
-                    <ui.Button variant="ghost" size="sm" onClick={onClose}>
-                        {t("connect.cancel")}
-                    </ui.Button>
-                    <ui.Button size="sm" aria-disabled={name.trim() === "" || pending} onClick={add}>
-                        {t("connect.create")}
-                    </ui.Button>
-                </ui.DialogFooter>
-            </ui.DialogContent>
-        </ui.Dialog>
-    );
-}
-
-function DeviceConfig({
-    made,
-    onClose
-}: {
-    made: { config: string; fileName: string };
-    onClose: () => void;
-}) {
-    const t = useTranslations("vpn");
-
-    function download(): void {
-        const url = URL.createObjectURL(new Blob([made.config], { type: "text/plain" }));
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = made.fileName;
-        link.click();
-        URL.revokeObjectURL(url);
-    }
-
-    return (
-        <ui.Dialog open onOpenChange={(open) => !open && onClose()}>
-            <ui.DialogContent>
-                <ui.DialogHeader>
-                    <ui.DialogTitle>{t("connect.madeTitle")}</ui.DialogTitle>
-                    <ui.DialogDescription>{t("connect.madeBody")}</ui.DialogDescription>
-                </ui.DialogHeader>
-                <div className="flex min-w-0 flex-col items-center gap-3">
-                    <div className="rounded-md bg-white p-3">
-                        <QRCodeSVG value={made.config} size={220} level="L" />
-                    </div>
-                    <p className="text-center text-xs text-muted-foreground">{t("connect.once")}</p>
-                </div>
-                <ui.DialogFooter>
-                    <ui.Button variant="secondary" size="sm" onClick={download}>
-                        <Download />
-                        {t("connect.download")}
-                    </ui.Button>
-                    <ui.Button size="sm" onClick={onClose}>
-                        {t("connect.done")}
-                    </ui.Button>
-                </ui.DialogFooter>
-            </ui.DialogContent>
-        </ui.Dialog>
     );
 }

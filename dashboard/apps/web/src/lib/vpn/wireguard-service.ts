@@ -5,9 +5,10 @@
  * owner lost access is taken out of the node's peer list on the next pass.
  */
 
+import { lookup } from "node:dns/promises";
+import { resolveGeo } from "@/lib/geo-service";
 import * as wg from "./wireguard";
 import { prisma } from "@polaris/db";
-import { generateKeyPairSync } from "node:crypto";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
 import { loadEnv } from "@polaris/config";
@@ -327,15 +328,6 @@ export async function listAccess() {
     return rows.map(({ usedBytes, ...row }) => ({ ...row, usedBytes: usedBytes.toString() }));
 }
 
-function newKeyPair(): { privateKey: string; publicKey: string } {
-    const { publicKey, privateKey } = generateKeyPairSync("x25519");
-    const encode = (value: string | undefined) => Buffer.from(value ?? "", "base64url").toString("base64");
-    return {
-        privateKey: encode(privateKey.export({ format: "jwk" }).d),
-        publicKey: encode(publicKey.export({ format: "jwk" }).x)
-    };
-}
-
 /** The nodes a person may pick from. */
 export async function nodesFor(user: { id: string; isAdmin: boolean }) {
     const access = await accessOf(user);
@@ -344,7 +336,7 @@ export async function nodesFor(user: { id: string; isAdmin: boolean }) {
         where: { publicKey: { not: null } },
         orderBy: { name: "asc" },
         take: wg.MAX_NODES,
-        select: { id: true, name: true, exit: true, proxyHost: true }
+        select: { id: true, name: true, exit: true, proxyHost: true, country: true, city: true }
     });
     return nodes
         .filter(({ id }) => wg.mayUseNode(access, id))
@@ -392,38 +384,6 @@ async function claimAddress(nodeId: string, userId: string, name: string, public
 
 /** Add a device, and hand back its configuration. This is the only time it exists: the
  *  private key is never stored. */
-export async function addDevice(
-    user: { id: string; isAdmin: boolean },
-    input: { nodeId: string; name: string }
-): Promise<{ config: string; fileName: string }> {
-    const access = await accessOf(user);
-    if (!access || wg.accessStanding(access, new Date()) !== "active") {
-        throw new WireGuardRefusal("noAccess");
-    }
-    if (!wg.mayUseNode(access, input.nodeId)) throw new WireGuardRefusal("noAccess");
-    const owned = await prisma.vpnPeer.count({ where: { userId: user.id } });
-    if (owned >= access.deviceLimit) throw new WireGuardRefusal("deviceLimit");
-    const node = await nodeRow(input.nodeId);
-    if (!node?.publicKey) throw new WireGuardRefusal("nodeNotReady");
-    const keys = newKeyPair();
-    const peer = await claimAddress(node.id, user.id, input.name, keys.publicKey);
-    await syncNode(node).catch(async (error: unknown) => {
-        await prisma.vpnPeer.delete({ where: { id: peer.id } });
-        console.error("polaris: a VPN device could not be added:", error);
-        throw new WireGuardRefusal("unreachable");
-    });
-    return {
-        config: wg.renderDeviceConfig({
-            privateKey: keys.privateKey,
-            address: wg.deviceAddress(node.subnetIndex, peer.hostIndex),
-            nodePublicKey: node.publicKey,
-            endpoint: node.endpoint,
-            port: node.port
-        }),
-        fileName: `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "polaris"}.conf`
-    };
-}
-
 /** What an app of ours needs to bring the tunnel up. Its private key never leaves it. */
 export interface ClientConnection {
     readonly deviceId: string;
@@ -507,6 +467,22 @@ function monthPassed(start: Date, now: Date): boolean {
  * Read every node's counters, add what grew to each person's month, and take out the
  * devices of anybody who ran out. On a schedule: run again it adds nothing new.
  */
+/**
+ * Where a server's traffic comes out, for the map. Asked of its own address, so
+ * nobody has to say and servers that predate the map fill in by themselves. A
+ * Tor exit changes all the time, so it has no place.
+ */
+async function placeNode(node: NodeRow): Promise<void> {
+    if (node.country || node.exit === "tor") return;
+    const ip = isIP(node.endpoint) ? node.endpoint : (await lookup(node.endpoint)).address;
+    const { countryCode, city } = await resolveGeo(ip);
+    if (!countryCode) return;
+    await prisma.vpnNode.update({
+        where: { id: node.id },
+        data: { country: countryCode, city }
+    });
+}
+
 export async function runVpnPass(): Promise<void> {
     const nodes = await prisma.vpnNode.findMany({ where: { publicKey: { not: null } } });
     const now = new Date();
@@ -520,6 +496,7 @@ export async function runVpnPass(): Promise<void> {
         }
     }
     for (const node of nodes) {
+        await placeNode(node).catch(() => undefined);
         try {
             const connection = await connectionOf(node.hostId);
             const counters = wg.parsePeerCounters(await runAsRoot(connection, wg.NODE_READ));

@@ -3,6 +3,8 @@ ALTER TABLE "VpnNode" ADD COLUMN "proxyKeySealed" BYTEA;
 ALTER TABLE "VpnNode" ADD COLUMN "proxyKeyNonce" BYTEA;
 ALTER TABLE "VpnNode" ADD COLUMN "proxyKeyId" TEXT;
 ALTER TABLE "VpnNode" ADD COLUMN "proxyHost" TEXT;
+ALTER TABLE "VpnNode" ADD COLUMN "country" TEXT;
+ALTER TABLE "VpnNode" ADD COLUMN "city" TEXT;
 
 CREATE TABLE "VpnProxyUsage" (
     "nodeId" UUID NOT NULL,

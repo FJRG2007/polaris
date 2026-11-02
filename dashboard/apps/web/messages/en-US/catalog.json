@@ -148,8 +148,8 @@
             "description": "Open a game from the Games page, or start one in a call and everyone there can join and see each other play. Games run in the browser and nothing runs on your servers. Admins choose who may play and who may play in calls."
         },
         "vpn": {
-            "summary": "A private VPN for your people, on your own servers, with the official WireGuard apps.",
-            "description": "Connect phones and computers through your own servers with the official WireGuard apps: scan a code or import a file, with no account anywhere else. Administrators add as many servers as they like, decide who may use each one, and can set limits on devices, traffic and time. A server can also send traffic through Tor, which is slower and more private."
+            "summary": "A private VPN for your people, on your own servers.",
+            "description": "Connect from the Polaris app or browser extension and pick where your traffic comes out, on your own servers. No accounts with anybody else."
         }
     },
     "help": {

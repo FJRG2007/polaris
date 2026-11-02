@@ -51,14 +51,20 @@ export async function connectAction(): Promise<Result<ConnectAnswer>> {
     }
 }
 
-const newDeviceSchema = z.object({ nodeId: z.string().uuid(), name: wg.deviceNameSchema });
+const thisDeviceSchema = z.object({
+    nodeId: z.string().uuid(),
+    name: wg.deviceNameSchema,
+    publicKey: z.string().refine(wg.isWireGuardKey)
+});
 
-export async function addVpnDeviceAction(
+/** The app on this computer joins a server. Its private key never leaves the app. */
+export async function connectThisDeviceAction(
     input: unknown
-): Promise<Result<{ config: string; fileName: string }>> {
+): Promise<Result<{ connection: service.ClientConnection }>> {
     const user = await requireUser();
     try {
-        return await service.addDevice(user, newDeviceSchema.parse(input));
+        const body = thisDeviceSchema.parse(input);
+        return { connection: await service.connectClient(user, body) };
     } catch (error) {
         return failed(error);
     }

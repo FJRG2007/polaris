@@ -495,10 +495,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         category: "Tools",
         icon: Waypoints,
         opensAt: "/vpn",
-        summary: "A private VPN for your people, on your own servers, with the official WireGuard apps.",
+        summary: "A private VPN for your people, on your own servers.",
         keywords: VPN_KEYWORDS,
         description:
-            "Connect phones and computers through your own servers with the official WireGuard apps: scan a code or import a file, with no account anywhere else. Administrators add as many servers as they like, decide who may use each one, and can set limits on devices, traffic and time. A server can also send traffic through Tor, which is slower and more private.", // i18n-ignore
+            "Connect from the Polaris app or browser extension and pick where your traffic comes out, on your own servers. No accounts with anybody else.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["vpn"],
         dashboard: "builtin",

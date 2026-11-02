@@ -16080,6 +16080,9 @@ model VpnNode {
     proxyKeyId     String?
     /// The name the extension connects to. Null until the edge took the route.
     proxyHost      String?
+    /// Where traffic comes out, read from the endpoint's address. Null until it was.
+    country     String?
+    city        String?
     /// Which address block this node has; see nodeSubnet.
     subnetIndex Int       @unique
     createdAt   DateTime  @default(now())

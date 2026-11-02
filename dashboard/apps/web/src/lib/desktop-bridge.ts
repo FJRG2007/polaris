@@ -23,9 +23,37 @@ export type DesktopFolder =
     | { readonly ok: false; readonly error: string }
     | null;
 
+/** Where this computer's tunnel stands. */
+export interface DesktopVpnStatus {
+    /** The server it is connected to, null when it is off. */
+    readonly nodeId: string | null;
+}
+
 export interface PolarisDesktop {
     readonly version: string;
     readonly platform: string;
+    /** This computer's VPN. Absent from an app older than the feature. */
+    readonly vpn?: {
+        /** What this computer calls itself on the device list. */
+        readonly deviceName: string;
+        /** The public half of a key that stays in the app; null if it cannot make one. */
+        key(): Promise<string | null>;
+        up(input: {
+            readonly nodeId: string;
+            readonly address: string;
+            readonly dns: readonly string[];
+            readonly nodePublicKey: string;
+            readonly endpoint: string;
+            readonly port: number;
+        }): Promise<DesktopOutcome>;
+        down(): Promise<DesktopOutcome>;
+        status(): Promise<DesktopVpnStatus>;
+        /** Signs this computer into a private network with a one-time key. */
+        joinNetwork(input: {
+            readonly server: string;
+            readonly key: string;
+        }): Promise<DesktopOutcome>;
+    };
     notify(input: {
         readonly title: string;
         readonly body?: string;

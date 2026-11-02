@@ -32,6 +32,7 @@ const node = {
 };
 const admin = { id: "admin", isAdmin: true };
 const person = { id: "person", isAdmin: false };
+const device = { nodeId: NODE_ID, name: "Phone", publicKey: `${"C".repeat(42)}E=` };
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -39,6 +40,7 @@ beforeEach(() => {
     db.vpnNode.findUnique.mockResolvedValue(node);
     db.vpnPeer.count.mockResolvedValue(0);
     db.vpnPeer.findMany.mockResolvedValue([]);
+    db.vpnPeer.findUnique.mockResolvedValue(null);
     db.vpnPeer.create.mockImplementation(async ({ data }) => ({ id: "peer", ...data }));
     script.setting.mockResolvedValue(null);
     script.run.mockResolvedValue({ code: 0 });
@@ -46,20 +48,20 @@ beforeEach(() => {
 
 describe("who may add a device", () => {
     it("refuses somebody with no access while the VPN is not open", async () => {
-        await expect(service.addDevice(person, { nodeId: NODE_ID, name: "Phone" })).rejects.toMatchObject(
+        await expect(service.connectClient(person, device)).rejects.toMatchObject(
             { code: "noAccess" }
         );
     });
 
     it("lets everybody in once it is open", async () => {
         script.setting.mockResolvedValue("true");
-        const made = await service.addDevice(person, { nodeId: NODE_ID, name: "Phone" });
-        expect(made.config).toContain("[Peer]");
+        const made = await service.connectClient(person, device);
+        expect(made.nodePublicKey).toBe(node.publicKey);
     });
 
     it("stops at the person's device limit", async () => {
         db.vpnPeer.count.mockResolvedValue(5);
-        await expect(service.addDevice(admin, { nodeId: NODE_ID, name: "Phone" })).rejects.toMatchObject({
+        await expect(service.connectClient(admin, device)).rejects.toMatchObject({
             code: "deviceLimit"
         });
     });
@@ -68,21 +70,14 @@ describe("who may add a device", () => {
 describe("a device", () => {
     it("looks again when two take one address at once", async () => {
         db.vpnPeer.create.mockRejectedValueOnce(Object.assign(new Error("taken"), { code: "P2002" }));
-        const made = await service.addDevice(admin, { nodeId: NODE_ID, name: "Phone" });
+        const made = await service.connectClient(admin, device);
         expect(db.vpnPeer.create).toHaveBeenCalledTimes(2);
-        expect(made.fileName).toBe("phone.conf");
-    });
-
-    it("hands the private key over and never stores it", async () => {
-        const made = await service.addDevice(admin, { nodeId: NODE_ID, name: "Phone" });
-        const key = /PrivateKey = (\S+)/.exec(made.config)?.[1];
-        expect(key).toBeTruthy();
-        expect(JSON.stringify(db.vpnPeer.create.mock.calls)).not.toContain(key);
+        expect(made.deviceId).toBe("peer");
     });
 
     it("is taken back when the node cannot be told", async () => {
         script.run.mockResolvedValue({ code: 1 });
-        await expect(service.addDevice(admin, { nodeId: NODE_ID, name: "Phone" })).rejects.toMatchObject({
+        await expect(service.connectClient(admin, device)).rejects.toMatchObject({
             code: "unreachable"
         });
         expect(db.vpnPeer.delete).toHaveBeenCalledWith({ where: { id: "peer" } });
@@ -125,7 +120,7 @@ describe("the peers a node lets in", () => {
                   ]
                 : []
         );
-        await service.addDevice(admin, { nodeId: NODE_ID, name: "Phone" });
+        await service.connectClient(admin, device);
         const sent = script.run.mock.calls[0]?.[2].input as string;
         expect(sent).toContain(key);
         expect(sent).not.toContain(gone);
