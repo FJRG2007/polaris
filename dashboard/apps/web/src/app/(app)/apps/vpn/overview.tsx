@@ -15,11 +15,14 @@ import Link from "next/link";
 import * as ui from "@polaris/ui";
 import * as actions from "./actions";
 import { Loader2 } from "lucide-react";
+import * as rules from "@/lib/vpn/settings";
 import { useVpnRead } from "./use-vpn-read";
 import { useEffect, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type Overview = actions.VpnOverview;
+/** The zone is absent until somebody picks one: an empty label is a real zone. */
+type HostnameChoice = { zoneLabel?: string; subdomain: string };
 type State = Overview["status"]["state"];
 
 const STATE_VARIANT: Record<State, "neutral" | "success" | "warning" | "danger"> = {
@@ -36,10 +39,12 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
     const [actionError, setActionError] = useState<string | null>(null);
     const [confirmOff, setConfirmOff] = useState(false);
     const [confirmRemove, setConfirmRemove] = useState(false);
-    const [choice, setChoice] = useState({ zoneLabel: "", subdomain: "vpn" });
+    const [choice, setChoice] = useState<HostnameChoice>({ subdomain: "vpn" });
     const [check, setCheck] = useState<HostnameCheck | null>(null);
     const status = read.data?.status ?? null;
     const picking = isAdmin && status?.state === "off" && !status.hostname;
+    const zones = read.data?.zones ?? [];
+    const zoneLabel = choice.zoneLabel ?? rules.defaultZone(zones);
 
     // A server still starting is asked again until it answers.
     useEffect(() => {
@@ -108,7 +113,8 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                             ) : null}
                             {picking ? (
                                 <HostnamePicker
-                                    zones={read.data?.zones ?? []}
+                                    zones={zones}
+                                    zoneLabel={zoneLabel}
                                     choice={choice}
                                     onChoice={setChoice}
                                     check={check}
@@ -126,7 +132,11 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                     <ui.Button
                                         size="sm"
                                         disabled={pending || (picking && !check?.ok)}
-                                        onClick={() => run(() => actions.turnOnVpnAction(choice))}
+                                        onClick={() =>
+                                            run(() =>
+                                                actions.turnOnVpnAction({ ...choice, zoneLabel })
+                                            )
+                                        }
                                     >
                                         {pending ? <Loader2 className="animate-spin" /> : null}
                                         {status.state === "failed"
@@ -255,24 +265,24 @@ type HostnameCheck = { text: string; ok: boolean };
  */
 function HostnamePicker({
     zones,
+    zoneLabel,
     choice,
     onChoice,
     check,
     onCheck: setCheck
 }: {
     zones: Overview["zones"];
-    choice: { zoneLabel: string; subdomain: string };
-    onChoice: (next: { zoneLabel: string; subdomain: string }) => void;
+    zoneLabel: string | undefined;
+    choice: HostnameChoice;
+    onChoice: (next: HostnameChoice) => void;
     check: HostnameCheck | null;
     onCheck: (next: HostnameCheck | null) => void;
 }) {
     const t = useTranslations("vpn");
-    const zoneLabel =
-        choice.zoneLabel || zones.find((zone) => zone.primary)?.label || zones[0]?.label || "";
 
     useEffect(() => {
         setCheck(null);
-        if (!zoneLabel) return;
+        if (zoneLabel === undefined) return;
         let live = true;
         const timer = window.setTimeout(async () => {
             const result = await actions
@@ -316,7 +326,7 @@ function HostnamePicker({
                 <span className="text-sm text-muted-foreground">.</span>
                 <ui.Select
                     className="min-w-0 max-w-full sm:w-64"
-                    value={zoneLabel}
+                    value={zoneLabel ?? ""}
                     onValueChange={(label) => onChoice({ ...choice, zoneLabel: label })}
                     options={zones.map((zone) => ({ value: zone.label, label: zone.host }))}
                 />

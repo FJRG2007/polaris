@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { APP_SECTIONS, APP_SUBAPPS } from "@/lib/apps";
+import { APP_SECTIONS } from "@/lib/apps";
 import config from "../../next.config.mjs";
 import { describe, expect, it } from "vitest";
 
@@ -58,9 +58,7 @@ describe("the old Network filter address", () => {
         );
         expect(hrefs.some((href) => href.startsWith("/apps/dns-blocker"))).toBe(false);
         expect(hrefs).toContain("/apps/network-filter");
-        const subapp = APP_SUBAPPS.find((item) => item.id === "dns-blocker");
-        expect(subapp?.base).toBe("/apps/network-filter");
-        expect(subapp?.sections.map((section) => section.href)).toEqual(
+        expect(APP_SECTIONS["dns-blocker"]?.map((section) => section.href)).toEqual(
             SCREENS.map((screen) => `/apps/network-filter${screen}`)
         );
     });

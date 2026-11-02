@@ -38,6 +38,7 @@ import { cloudServers } from "./cloud-servers";
 import { securityScans } from "./security-scans";
 import { crm } from "./crm";
 import { networkFilter } from "./network-filter";
+import { router } from "./router";
 import type { SceneDefinition } from "../runtime/scene";
 
 /** Every scene the README shows, in the order the capture takes them. */
@@ -84,6 +85,7 @@ export const SCENES: readonly SceneDefinition[] = [
     securityScans,
     crm,
     networkFilter,
+    router,
     marketplace,
     marketplaceInstall,
     launcher,

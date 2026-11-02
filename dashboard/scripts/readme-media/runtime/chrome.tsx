@@ -73,6 +73,7 @@ export const APP_IDS = [
     "status-pages",
     "inbox",
     "tools",
+    "router",
     "admin",
     "account"
 ];

@@ -35,10 +35,12 @@ describe("reachableAppIds", () => {
         expect(await reachableAppIds(holding("drive.read"))).toEqual([
             "overview",
             "drive",
+            "vpn",
             "polar"
         ]);
         expect(await reachableAppIds(holding("tasks.read"))).toEqual([
             "overview",
+            "vpn",
             "tasks",
             "polar"
         ]);
@@ -49,7 +51,7 @@ describe("reachableAppIds", () => {
             ...holding("drive.read"),
             closes: async (app: string) => app === "polar"
         };
-        expect(await reachableAppIds(closesPolar)).toEqual(["overview", "drive"]);
+        expect(await reachableAppIds(closesPolar)).toEqual(["overview", "drive", "vpn"]);
     });
 
     it("gives an administrator Management, and withholds it from everyone else", async () => {
@@ -61,6 +63,7 @@ describe("reachableAppIds", () => {
         expect(await reachableAppIds(holding("deploy.read"))).toEqual([
             "overview",
             "apps",
+            "vpn",
             "polar",
             "watch"
         ]);
@@ -88,7 +91,7 @@ describe("reachableAppIds", () => {
 describe("the Inbox door inside Management", () => {
     it("offers Management to a member, under Inbox's name and landing on it", async () => {
         const apps = await reachableApps(holding("inbox.read"));
-        expect(apps.map((app) => app.id)).toEqual(["overview", "polar", "admin"]);
+        expect(apps.map((app) => app.id)).toEqual(["overview", "vpn", "polar", "admin"]);
         const app = apps.find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Inbox");
         expect(app?.href).toBe("/admin/inbox");
@@ -110,7 +113,7 @@ describe("the Inbox door inside Management", () => {
 
     it("marks the guest entry for the switcher, and only the guest one", async () => {
         expect(await reachableAppNav(holding("inbox.read"))).toEqual({
-            ids: ["overview", "polar", "admin"],
+            ids: ["overview", "vpn", "polar", "admin"],
             guestIds: ["admin"],
             otherwiseIds: []
         });

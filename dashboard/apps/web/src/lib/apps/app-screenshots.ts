@@ -89,7 +89,8 @@ const BUILT_IN_SCENES: Readonly<Record<string, readonly string[]>> = {
     polar: ["polar"],
     automations: ["automations"],
     office: ["office", "office-doc"],
-    watch: ["watch"]
+    watch: ["watch"],
+    router: ["router"]
 };
 
 /** The capture scenes of built-in app `appId`; empty for one nobody has captured. */

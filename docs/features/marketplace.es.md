@@ -93,3 +93,8 @@ de red.
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/network-filter-light-es-desktop.webp">
   <img src="../assets/media/network-filter-dark-es-desktop.webp" alt="Filtro de red">
 </picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/router-light-es-desktop.webp">
+  <img src="../assets/media/router-dark-es-desktop.webp" alt="Router">
+</picture>

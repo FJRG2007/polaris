@@ -22,9 +22,10 @@ export const ACCOUNT_HOME = "/account";
 /** The id of the landing app, which is only offered alongside something to look
  *  at. */
 export const OVERVIEW_APP = "overview";
-/** Apps that only work on the others - Overview shows them, Polar acts in them -
- *  so an account reaching nothing else is not offered these either. */
-const COMPANION_APPS = new Set([OVERVIEW_APP, "polar"]);
+/** Apps that say nothing about what an account holds, so one reaching nothing
+ *  else is not offered these either: Overview shows the others, Polar acts in
+ *  them, and the VPN, once installed, is open to every account. */
+const COMPANION_APPS = new Set([OVERVIEW_APP, "polar", "vpn"]);
 
 export interface AppAccessInput {
     isAdmin: boolean;
@@ -78,7 +79,7 @@ export interface AppAccessInput {
  *  permission without being an administrator, so the switcher offers them the one
  *  door they have rather than the app's own.
  *
- *  Overview (and Polar beside it) is the exception to "an app with no permission
+ *  Overview (and Polar and the VPN beside it) is the exception to "an app with no permission
  *  is open to anyone": it is a view onto the other apps, so for an account that reaches none of them it
  *  is an empty grid offered as somewhere to be. Those accounts belong on their
  *  own account page, which is what dropping it here arranges. */

@@ -92,3 +92,8 @@ servers, Security scans, CRM and Network filter.
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/network-filter-light-en-desktop.webp">
   <img src="../assets/media/network-filter-dark-en-desktop.webp" alt="Network filter">
 </picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/router-light-en-desktop.webp">
+  <img src="../assets/media/router-dark-en-desktop.webp" alt="Router">
+</picture>

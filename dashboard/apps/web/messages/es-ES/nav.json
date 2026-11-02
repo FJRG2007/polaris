@@ -167,6 +167,15 @@
         "polar": {
             "description": "Pregunta por cualquier página y haz cosas con tu acceso"
         },
+        "vpn": {
+            "description": "Accede a tus dispositivos desde cualquier lugar"
+        },
+        "router": {
+            "description": "Usa una máquina Linux como router de tu red"
+        },
+        "dns-blocker": {
+            "description": "Bloquea anuncios, rastreadores y sitios no deseados en tu red"
+        },
         "arcade": {
             "description": "Juega solo o con otros desde una llamada"
         }
