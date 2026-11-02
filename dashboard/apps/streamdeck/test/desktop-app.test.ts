@@ -45,22 +45,33 @@ describe("finding the app", () => {
             return true;
         };
         expect(await desktopAppInstalled("win32", run, noFile, "/home/x", exists)).toBe(true);
-        expect(asked[0]).toEqual(["reg", "query", "HKCU\\Software\\Classes\\polaris\\shell\\open\\command"]);
+        expect(asked[0]).toEqual([
+            "reg",
+            "query",
+            "HKCU\\Software\\Classes\\polaris\\shell\\open\\command"
+        ]);
         expect(checked).toEqual(["C:\\Apps\\polaris-desktop\\app-0.1.7\\polaris.exe"]);
         expect(await desktopAppInstalled("win32", refuses, noFile, "/home/x", exists)).toBe(false);
     });
 
     it("does not trust a Windows key whose program is gone", async () => {
         const run = async () => REGISTERED;
-        expect(await desktopAppInstalled("win32", run, noFile, "/home/x", async () => false)).toBe(false);
-        expect(await desktopAppInstalled("win32", answers, noFile, "/home/x", async () => true)).toBe(false);
+        expect(await desktopAppInstalled("win32", run, noFile, "/home/x", async () => false)).toBe(
+            false
+        );
+        expect(
+            await desktopAppInstalled("win32", answers, noFile, "/home/x", async () => true)
+        ).toBe(false);
     });
 
     it("reads the app's own list of links on macOS", async () => {
         const read = (body: string) => async () => body;
-        const schemes = "<key>CFBundleURLSchemes</key>\n<array>\n<string>polaris</string>\n</array>";
+        const schemes =
+            "<key>CFBundleURLSchemes</key>\n<array>\n<string>polaris</string>\n</array>";
         expect(await desktopAppInstalled("darwin", answers, read(schemes), "/h")).toBe(true);
-        expect(await desktopAppInstalled("darwin", answers, read("<plist></plist>"), "/h")).toBe(false);
+        expect(await desktopAppInstalled("darwin", answers, read("<plist></plist>"), "/h")).toBe(
+            false
+        );
         expect(await desktopAppInstalled("darwin", answers, noFile, "/h")).toBe(false);
     });
 

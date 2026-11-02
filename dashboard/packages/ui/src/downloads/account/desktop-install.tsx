@@ -58,7 +58,11 @@ export function DesktopInstall({
     useEffect(() => {
         const bridge = desktopInstaller();
         const system = SYSTEMS[bridge?.platform ?? ""];
-        setOffered(Boolean(bridge?.installTool) && system !== undefined && (!platform || system === platform));
+        setOffered(
+            Boolean(bridge?.installTool) &&
+                system !== undefined &&
+                (!platform || system === platform)
+        );
     }, [platform]);
 
     if (!offered) return null;

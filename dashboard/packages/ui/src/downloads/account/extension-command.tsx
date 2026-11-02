@@ -20,7 +20,7 @@ import { useTranslations } from "../../i18n";
 import { platformShell } from "./install-platform";
 import { useInstallPlatform } from "./platform-select";
 
-export function ExtensionCommand({ repo, browser }: { repo: string; browser?: string }) {
+export function ExtensionCommand({ repo }: { repo: string; browser?: string }) {
     const t = useTranslations("account");
     const [platform, setPlatform] = useInstallPlatform();
 

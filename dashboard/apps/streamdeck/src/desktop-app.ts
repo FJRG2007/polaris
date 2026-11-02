@@ -16,7 +16,8 @@ const CHECK_MS = 60_000;
 const COMMAND_MS = 5_000;
 const WINDOWS_KEY = "HKCU\\Software\\Classes\\polaris\\shell\\open\\command";
 /** `polaris` among the bundle's link schemes: the same word is its executable's name. */
-const MAC_LINK_SCHEME = /<key>CFBundleURLSchemes<\/key>\s*<array>(?:(?!<\/array>)[\s\S])*<string>polaris<\/string>/;
+const MAC_LINK_SCHEME =
+    /<key>CFBundleURLSchemes<\/key>\s*<array>(?:(?!<\/array>)[\s\S])*<string>polaris<\/string>/;
 
 type Run = (file: string, args: readonly string[]) => Promise<string>;
 
@@ -39,7 +40,10 @@ export function desktopLink(url: string): string | null {
     }
 }
 
-async function macAppHandlesLinks(read: (path: string) => Promise<string>, home: string): Promise<boolean> {
+async function macAppHandlesLinks(
+    read: (path: string) => Promise<string>,
+    home: string
+): Promise<boolean> {
     for (const folder of ["/Applications", join(home, "Applications")]) {
         const plist = await read(join(folder, "Polaris.app/Contents/Info.plist")).catch(() => "");
         if (MAC_LINK_SCHEME.test(plist)) return true;
@@ -54,7 +58,10 @@ function registeredProgram(output: string): string | null {
 
 /** The registry outlives an app removed by hand and an update's old folder, and
  *  Windows reports no failure when the program is gone, so it has to be there. */
-async function windowsAppHandlesLinks(runCommand: Run, exists: (path: string) => Promise<boolean>): Promise<boolean> {
+async function windowsAppHandlesLinks(
+    runCommand: Run,
+    exists: (path: string) => Promise<boolean>
+): Promise<boolean> {
     const output = await runCommand("reg", ["query", WINDOWS_KEY]).catch(() => "");
     const program = registeredProgram(output);
     return program ? exists(program) : false;
@@ -97,7 +104,8 @@ export function desktopOpener(
     return async (url) => {
         const link = desktopLink(url);
         if (!link) return false;
-        if (!known || now() - known.at > CHECK_MS) known = { installed: await installed(), at: now() };
+        if (!known || now() - known.at > CHECK_MS)
+            known = { installed: await installed(), at: now() };
         if (!known.installed) return false;
         return open(link).then(
             () => true,
