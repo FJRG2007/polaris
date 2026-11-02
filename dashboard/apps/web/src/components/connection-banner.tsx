@@ -15,6 +15,7 @@
  *   server that is down or restarting, or a network holding requests for its own
  *   sign-in page. From `lib/reachability`, which asks only after something the
  *   app was already doing failed, and never while everything works.
+ *   When the same Polaris can be found on another address, that is offered here.
  * - Updating: the same silence while this device has an update rolling over,
  *   which is expected and says so instead of sounding like a failure.
  * - No internet: Polaris answers, but the server it runs on cannot reach the
@@ -32,6 +33,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { checkForNewBuild } from "@/lib/new-build";
+import { findLocalAddress, rememberInstance } from "@/lib/local-address";
 import { updateInProgress } from "@/lib/update-in-progress";
 import { hostOffline, subscribeHostOffline } from "@/lib/host-internet";
 import {
@@ -59,7 +61,24 @@ export function ConnectionBanner() {
     const noInternet = useSyncExternalStore(subscribeHostOffline, hostOffline, () => false);
     const [back, setBack] = useState<Back>("none");
     const [retrying, setRetrying] = useState(false);
+    const [local, setLocal] = useState<string | null>(null);
     const seenRecoveries = useRef(reach.recoveries);
+
+    useEffect(() => {
+        void rememberInstance();
+    }, []);
+
+    // Asked only once Polaris stopped answering, and forgotten when it is back.
+    useEffect(() => {
+        if (reach.reachable) return setLocal(null);
+        let cancelled = false;
+        void findLocalAddress().then((address) => {
+            if (!cancelled) setLocal(address);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [reach.reachable]);
 
     // A request nothing caught is still a signal: an action awaited with no
     // handler of its own, refused because nothing answered.
@@ -157,6 +176,14 @@ export function ConnectionBanner() {
                     >
                         {t("network.retry")}
                     </Button>
+                ) : null}
+                {state === "unreachable" && local ? (
+                    <a
+                        href={`${local}${window.location.pathname}${window.location.search}`}
+                        className="shrink-0 whitespace-nowrap font-medium underline"
+                    >
+                        {t("network.useLocal")}
+                    </a>
                 ) : null}
             </p>
         </BannerStrip>

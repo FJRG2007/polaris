@@ -12,7 +12,7 @@
  * replayed.
  */
 
-const CACHE = "polaris-offline-v1";
+const CACHE = "polaris-offline-v2";
 const OFFLINE = "/offline.html";
 
 self.addEventListener("install", (event) => {

@@ -1554,7 +1554,8 @@
         "updating": "Polaris is updating. It will be back in a moment.",
         "noInternet": "No internet connection - Polaris keeps working on your network",
         "polarisBack": "Polaris is back",
-        "retry": "Try now"
+        "retry": "Try now",
+        "useLocal": "Open on your network"
     },
     "customEmoji": {
         "from": "From {space}"

@@ -24,6 +24,13 @@ vi.mock("@/lib/host-internet", () => ({
     subscribeHostOffline: () => () => {}
 }));
 
+// Remembering and finding the address has its own test (test/lib/local-address.test.ts).
+let localAddress: string | null = null;
+vi.mock("@/lib/local-address", () => ({
+    rememberInstance: async () => undefined,
+    findLocalAddress: async () => localAddress
+}));
+
 const { BANNER_HEIGHT_VAR, ConnectionBanner, SlowConnectionNotice } =
     await import("@/components/connection-banner");
 const { noteStreamTrouble, probeNow, resetReachability } = await import("@/lib/reachability");
@@ -136,6 +143,17 @@ describe("when Polaris itself does not answer", () => {
         expect(status).toContain("Can't reach Polaris");
         expect(status).not.toContain("offline");
         expect(screen.getByRole("button", { name: "Try now" })).toBeTruthy();
+    });
+
+    it("offers this Polaris on another address once it stops answering", async () => {
+        localAddress = "https://polaris.local";
+        answering = false;
+        render(<ConnectionBanner />, { wrapper: MessagesWrapper });
+        await streamDrops();
+        await act(async () => {});
+        const link = screen.getByRole("link", { name: "Open on your network" });
+        expect(link.getAttribute("href")).toContain("https://polaris.local/");
+        localAddress = null;
     });
 
     it("says only that the device is offline when it is, without asking Polaris", async () => {
