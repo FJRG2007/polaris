@@ -10,26 +10,10 @@
  * seen in the access log, out of band, and caches the answer as an ordinary ban.
  */
 
+import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip-rules";
+import { whileServing } from "@/lib/integrations/provider-pause";
+
 const ENDPOINT = "https://api.criminalip.io/v1/asset/ip/report/summary";
-
-/** What Criminal IP reports that Polaris will act on. Each maps to a boolean their
- *  summary returns; an operator picks which ones count as a block. */
-export const CRIMINALIP_RULES = [
-    // i18n-ignore the integrations screen says it by value
-    { value: "is_vpn", label: "VPN" },
-    // i18n-ignore the integrations screen says it by value
-    { value: "is_proxy", label: "Proxy" },
-    // i18n-ignore the integrations screen says it by value
-    { value: "is_tor", label: "Tor" },
-    // i18n-ignore the integrations screen says it by value
-    { value: "is_hosting", label: "Hosting or datacenter" },
-    // i18n-ignore the integrations screen says it by value
-    { value: "is_scanner", label: "Known scanner" },
-    // i18n-ignore the integrations screen says it by value
-    { value: "is_malicious", label: "Known malicious" }
-] as const;
-
-export type CriminalIpRule = (typeof CRIMINALIP_RULES)[number]["value"];
 
 /** The scores Criminal IP returns, as the levels their API documents. Anything at
  *  "dangerous" or above is treated as malicious regardless of the boolean flags. */
@@ -41,7 +25,15 @@ const DANGEROUS_SCORES = new Set(["dangerous", "critical"]);
  * Throws on a transport or API failure rather than guessing: the caller treats not
  * knowing as not blocking, and that decision belongs there, not here.
  */
-export async function checkCriminalIp(
+export function checkCriminalIp(
+    apiKey: string,
+    ip: string,
+    deny: readonly string[]
+): Promise<{ allow: boolean; reasons: string[] }> {
+    return whileServing("criminalip", "Criminal IP", () => askCriminalIp(apiKey, ip, deny));
+}
+
+async function askCriminalIp(
     apiKey: string,
     ip: string,
     deny: readonly string[]
@@ -71,23 +63,4 @@ export async function checkCriminalIp(
         if (DANGEROUS_SCORES.has(inbound)) reasons.push(`Inbound score ${inbound}`);
     }
     return { allow: reasons.length === 0, reasons };
-}
-
-export interface CriminalIpConfig {
-    readonly deny: CriminalIpRule[];
-}
-
-/** Blocking a datacenter or a VPN blocks a lot of ordinary people, so the defaults
- *  are the two that do not: an address seen scanning, and one already known bad. */
-const CRIMINALIP_DEFAULTS: CriminalIpConfig = { deny: ["is_scanner", "is_malicious"] };
-
-export function readCriminalIpConfig(
-    config: Record<string, unknown> | undefined
-): CriminalIpConfig {
-    const valid = new Set<string>(CRIMINALIP_RULES.map((rule) => rule.value));
-    const raw = Array.isArray(config?.deny) ? (config?.deny as unknown[]) : [];
-    const deny = raw.filter(
-        (value): value is CriminalIpRule => typeof value === "string" && valid.has(value)
-    );
-    return { deny: deny.length > 0 ? deny : CRIMINALIP_DEFAULTS.deny };
 }

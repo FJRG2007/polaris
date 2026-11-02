@@ -128,6 +128,20 @@ describe("asking a paid provider", () => {
         expect(takeLookup("dymo")).toBe(true);
     });
 
+    it("stops at the day's budget, and a restart does not give it back", async () => {
+        const ask = vi.fn().mockResolvedValue("answer");
+        settings.set(
+            "integration.spent.dymo",
+            JSON.stringify({
+                day: new Date().toISOString().slice(0, 10),
+                count: LOOKUP_BUDGET.dymo.perDay - 1
+            })
+        );
+        await whileServing("dymo", "Dymo API", ask);
+        await expect(whileServing("dymo", "Dymo API", ask)).rejects.toBeInstanceOf(ProviderPaused);
+        expect(ask).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps one provider's pause from another", async () => {
         await whileServing("dymo", "Dymo API", () => Promise.reject(httpFailure(402))).catch(
             () => undefined

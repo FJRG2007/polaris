@@ -17,7 +17,7 @@ import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
+import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip-rules";
 import {
     use,
     useMemo,

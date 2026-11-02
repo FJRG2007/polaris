@@ -5,17 +5,22 @@
  * rightly: not knowing is not blocking, and an outage is not a verdict, so nothing
  * is remembered. What that left out is that the next pass asks again. With the
  * account out of credits every address in the log was asked about on every pass,
- * every thirty seconds, for a week: over two hundred thousand requests, none of
- * which could ever have been answered, while the firewall quietly did nothing.
+ * every thirty seconds, for days, none of which could ever have been answered,
+ * while the firewall quietly did nothing.
  *
  * So the provider is paused rather than the address forgotten. One failed request
  * stops all of them, across the firewall, share links and the mail filter, and
  * after the pause a single request finds out whether it is back. Kept in the
  * database, because an update restarts the process and must not restart the loop.
+ *
+ * This is the one way out to a service billed per request, and `whileServing` is
+ * also the last ceiling: requests sent are counted here per day, in the database,
+ * so no caller, loop or crashing process can send more than the budget allows.
+ * `test/access/metered-gate.test.ts` fails on a call that goes around it.
  */
 
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { takeLookup, type BudgetedProvider } from "@/lib/reputation-budget";
+import { LOOKUP_BUDGET, takeLookup, type BudgetedProvider } from "@/lib/reputation-budget";
 
 /** Why a provider stopped. The first two need the operator, the others pass. */
 export type PauseReason = "credits" | "key" | "busy" | "unavailable";
@@ -44,6 +49,33 @@ export class ProviderPaused extends Error {
 
 function settingKey(provider: string): string {
     return `integration.pause.${provider}`;
+}
+
+/**
+ * Count one request against today, or answer false when the day's are gone.
+ *
+ * Separate from `takeLookup`, which shares the budget out between callers in
+ * memory and starts again with the process. This one survives that, so a dashboard
+ * restarting in a loop cannot spend a fresh budget on every start.
+ */
+async function spendToday(provider: BudgetedProvider): Promise<boolean> {
+    const key = `integration.spent.${provider}`;
+    const day = new Date().toISOString().slice(0, 10);
+    let count = 0;
+    try {
+        const parsed = JSON.parse((await getSetting(key)) ?? "{}") as {
+            day?: unknown;
+            count?: unknown;
+        };
+        if (parsed.day === day && typeof parsed.count === "number") count = parsed.count;
+    } catch {
+        // Unreadable counts as a new day: the in-memory budget still stands.
+    }
+    const limit = LOOKUP_BUDGET[provider].perDay;
+    if (count >= limit) return false;
+    if (count + 1 === limit) console.error(`polaris: ${provider} spent today's budget`);
+    await setSetting(key, JSON.stringify({ day, count: count + 1 }));
+    return true;
 }
 
 async function storedPause(provider: string): Promise<StoredPause | null> {
@@ -104,12 +136,13 @@ export function pauseReasonFor(caught: unknown): PauseReason | null {
 
 /** Make one request to a paid provider, or none if it is paused. */
 export async function whileServing<T>(
-    provider: string,
+    provider: BudgetedProvider,
     name: string,
     ask: () => Promise<T>
 ): Promise<T> {
     const pause = await storedPause(provider);
     if (pause && pause.until > Date.now()) throw new ProviderPaused(provider);
+    if (!(await spendToday(provider))) throw new ProviderPaused(provider);
     try {
         const answer = await ask();
         // It answered, so whatever stopped it is over, topped up or not by hand.

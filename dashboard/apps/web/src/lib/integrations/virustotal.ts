@@ -9,8 +9,24 @@
  */
 
 import { readerWords } from "@/lib/i18n/reader-words";
+import { whileServing } from "@/lib/integrations/provider-pause";
 
 const BASE = "https://www.virustotal.com/api/v3";
+const PROVIDER = "virustotal";
+const NAME = "VirusTotal";
+
+/** A failed answer the gate can read the status of. Every lookup below reports it
+ *  to its caller as an `error` verdict, as it always did. */
+function failed(detail: string, status: number): Error {
+    return Object.assign(new Error(detail), { status });
+}
+
+/** The verdict for a request that was not answered or never sent. */
+function noOpinion(caught: unknown, fallback: string): VtVerdict {
+    const status = (caught as { status?: unknown } | null)?.status;
+    const detail = typeof status === "number" && caught instanceof Error ? caught.message : fallback;
+    return { kind: "error", malicious: 0, suspicious: 0, detail };
+}
 /** Public API file-upload ceiling. Larger files can only be looked up by hash. */
 export const VT_MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
 
@@ -77,24 +93,21 @@ export async function verifyKey(apiKey: string): Promise<{ ok: boolean; error?: 
  * seen the file (HTTP 404) so the caller can decide whether to upload it.
  */
 export async function lookupBySha256(apiKey: string, sha256: string): Promise<VtVerdict | null> {
-    const response = await fetch(`${BASE}/files/${sha256}`, {
-        headers: { "x-apikey": apiKey },
-        signal: AbortSignal.timeout(15000)
-    });
-    if (response.status === 404) return null;
-    if (!response.ok) {
-        return {
-            kind: "error",
-            malicious: 0,
-            suspicious: 0,
-            detail: `VirusTotal responded ${response.status}`
+    return whileServing(PROVIDER, NAME, async () => {
+        const response = await fetch(`${BASE}/files/${sha256}`, {
+            headers: { "x-apikey": apiKey },
+            signal: AbortSignal.timeout(15000)
+        });
+        if (response.status === 404) return null;
+        if (!response.ok) {
+            throw failed(`VirusTotal responded ${response.status}`, response.status);
+        }
+        const body = (await response.json()) as {
+            data?: { attributes?: { last_analysis_stats?: AnalysisStats } };
         };
-    }
-    const body = (await response.json()) as {
-        data?: { attributes?: { last_analysis_stats?: AnalysisStats } };
-    };
-    const stats = body.data?.attributes?.last_analysis_stats ?? {};
-    return verdictFromStats(stats, fileLink(sha256));
+        const stats = body.data?.attributes?.last_analysis_stats ?? {};
+        return verdictFromStats(stats, fileLink(sha256));
+    }).catch((caught: unknown) => noOpinion(caught, "VirusTotal was unreachable"));
 }
 
 /**
@@ -102,7 +115,17 @@ export async function lookupBySha256(apiKey: string, sha256: string): Promise<Vt
  * "unknown" if the analysis does not finish within the budget, so the caller can
  * fail open. The SHA-256 is only used to build the report permalink.
  */
-export async function uploadAndScan(
+export function uploadAndScan(
+    apiKey: string,
+    bytes: Uint8Array,
+    sha256: string
+): Promise<VtVerdict> {
+    return whileServing(PROVIDER, NAME, () => submitAndPoll(apiKey, bytes, sha256)).catch(
+        (caught: unknown) => noOpinion(caught, "VirusTotal was unreachable")
+    );
+}
+
+async function submitAndPoll(
     apiKey: string,
     bytes: Uint8Array,
     sha256: string
@@ -115,14 +138,7 @@ export async function uploadAndScan(
         body: form,
         signal: AbortSignal.timeout(60000)
     });
-    if (!submit.ok) {
-        return {
-            kind: "error",
-            malicious: 0,
-            suspicious: 0,
-            detail: `VirusTotal upload failed (${submit.status})`
-        };
-    }
+    if (!submit.ok) throw failed(`VirusTotal upload failed (${submit.status})`, submit.status);
     const submitBody = (await submit.json()) as { data?: { id?: string } };
     const analysisId = submitBody.data?.id;
     if (!analysisId)
@@ -175,22 +191,20 @@ export async function lookupDomain(apiKey: string, domain: string): Promise<VtVe
     if (!cleaned || !cleaned.includes(".")) {
         return { kind: "unknown", malicious: 0, suspicious: 0 };
     }
-    try {
+    return whileServing(PROVIDER, NAME, async () => {
         const response = await fetch(`${BASE}/domains/${encodeURIComponent(cleaned)}`, {
             headers: { "x-apikey": apiKey },
             signal: AbortSignal.timeout(15000)
         });
         if (response.status === 404) {
-            return { kind: "unknown", malicious: 0, suspicious: 0, permalink: domainLink(cleaned) };
-        }
-        if (!response.ok) {
             return {
-                kind: "error",
+                kind: "unknown" as const,
                 malicious: 0,
                 suspicious: 0,
-                detail: `VirusTotal answered ${response.status}`
+                permalink: domainLink(cleaned)
             };
         }
+        if (!response.ok) throw failed(`VirusTotal answered ${response.status}`, response.status);
         const body = (await response.json()) as {
             data?: { attributes?: { last_analysis_stats?: AnalysisStats } };
         };
@@ -198,7 +212,5 @@ export async function lookupDomain(apiKey: string, domain: string): Promise<VtVe
             body.data?.attributes?.last_analysis_stats ?? {},
             domainLink(cleaned)
         );
-    } catch {
-        return { kind: "error", malicious: 0, suspicious: 0, detail: "VirusTotal was unreachable" };
-    }
+    }).catch((caught: unknown) => noOpinion(caught, "VirusTotal was unreachable"));
 }

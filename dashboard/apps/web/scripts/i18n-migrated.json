@@ -1934,6 +1934,7 @@
         "web/src/lib/chat/invites.ts",
         "web/src/lib/chat/message-alert.ts",
         "web/src/lib/deploy/build-machine.ts",
+        "web/src/lib/integrations/criminalip-rules.ts",
         "web/src/lib/integrations/criminalip.ts",
         "web/src/lib/integrations/provider-pause.ts",
         "web/src/lib/integrations/dymo.ts",
