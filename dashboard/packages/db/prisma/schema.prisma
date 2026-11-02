@@ -16074,10 +16074,26 @@ model VpnNode {
     exit        String    @default("direct")
     /// Null until the machine answered with it.
     publicKey   String?
+    /// What signs the browser proxy's logins, sealed; the node made it.
+    proxyKeySealed Bytes?
+    proxyKeyNonce  Bytes?
+    proxyKeyId     String?
+    /// The name the extension connects to. Null until the edge took the route.
+    proxyHost      String?
     /// Which address block this node has; see nodeSubnet.
     subnetIndex Int       @unique
     createdAt   DateTime  @default(now())
     peers       VpnPeer[]
+}
+
+/// What a person has used through a node's browser proxy, as last read: its counter
+/// starts over with the proxy, so only what grew counts.
+model VpnProxyUsage {
+    nodeId String @db.Uuid
+    userId String @db.Uuid
+    seen   BigInt @default(0)
+
+    @@id([nodeId, userId])
 }
 
 /// One person's device on a node. Its private key was handed over once and not kept.

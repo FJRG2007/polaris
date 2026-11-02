@@ -11,6 +11,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const PROXY_PORT = 51821;
+
+/** The machine as any container on it reaches it: Docker's default bridge, which
+ *  answers from every network there. Not host.docker.internal, which only a
+ *  container started with that mapping can resolve, and an edge set up on a
+ *  remote server was not. */
+const DOCKER_HOST_GATEWAY = "172.17.0.1";
 /** Tor's local entrance for what the proxy sends. Not 9050: that may be the machine's own. */
 export const TOR_SOCKS_PORT = 9052;
 export const PROXY_TOKEN_SECONDS = 3600;
@@ -20,6 +26,19 @@ export const PROXY_USAGE_FILE = "/run/polaris-vpn-proxy/usage";
 export const PROXY_SCRIPT = "/usr/local/lib/polaris-vpn-proxy.py";
 export const PROXY_KEY = "/etc/polaris-vpn-proxy.key";
 export const PROXY_USER = "polaris-vpn-proxy";
+
+export const PROXY_USAGE_READ = `#!/bin/sh
+cat ${PROXY_USAGE_FILE} 2>/dev/null
+exit 0
+`;
+
+/** Each line is a person and what they have used since the proxy started. */
+export function parseProxyUsage(output: string): { userId: string; used: bigint }[] {
+    return output.split("\n").flatMap((line) => {
+        const match = /^([0-9a-f-]{36}) (\d{1,20})$/.exec(line.trim());
+        return match?.[1] && match[2] ? [{ userId: match[1], used: BigInt(match[2]) }] : [];
+    });
+}
 
 export interface ProxyLogin {
     readonly username: string;
@@ -69,7 +88,7 @@ export function renderProxyEdge(hostname: string): string {
         "    polaris-vpn-proxy:",
         "      loadBalancer:",
         "        servers:",
-        `          - address: "host.docker.internal:${PROXY_PORT}"`,
+        `          - address: "${DOCKER_HOST_GATEWAY}:${PROXY_PORT}"`,
         ""
     ].join("\n");
 }

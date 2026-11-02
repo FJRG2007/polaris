@@ -9,6 +9,11 @@ import * as wg from "./wireguard";
 import { prisma } from "@polaris/db";
 import { generateKeyPairSync } from "node:crypto";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
+import { isIP } from "node:net";
+import { loadEnv } from "@polaris/config";
+import * as proxy from "@/lib/vpn/browser-proxy";
+import { remoteWriteScript } from "@/lib/deploy/router-remote";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { getHostConnectionUnscoped, type HostConnection } from "@/lib/host-service";
@@ -66,6 +71,8 @@ async function connectionOf(hostId: string): Promise<HostConnection> {
     if (connection.username !== "root" && !connection.sudo) throw new WireGuardRefusal("noRoot");
     return connection;
 }
+
+const PROXY_EDGE_FILE = "polaris-vpn-proxy.yml";
 
 const PEER_FIELDS = { id: true, userId: true, publicKey: true, hostIndex: true } as const;
 
@@ -151,7 +158,63 @@ async function deployNode(node: NodeRow): Promise<NodeRow> {
     });
     const publicKey = /^public-key=(\S+)$/m.exec(said)?.[1];
     if (!publicKey || !wg.isWireGuardKey(publicKey)) throw new WireGuardRefusal("unreachable");
-    return prisma.vpnNode.update({ where: { id: node.id }, data: { publicKey } });
+    const proxyKey = /^proxy-key=(\S+)$/m.exec(said)?.[1];
+    return prisma.vpnNode.update({
+        where: { id: node.id },
+        data: {
+            publicKey,
+            ...(proxyKey ? sealedProxyKey(proxyKey) : {}),
+            proxyHost: await publishProxy(connection, node.endpoint)
+        }
+    });
+}
+
+function sealedProxyKey(key: string) {
+    const blob = encryptSecret(key, loadEnv().POLARIS_MASTER_KEY);
+    return { proxyKeySealed: blob.ciphertext, proxyKeyNonce: blob.nonce, proxyKeyId: blob.keyId };
+}
+
+/**
+ * Hand the edge the proxy's route. A browser only accepts a certificate for a name, so a
+ * node reached by bare address has none: its tunnel still works from the desktop app,
+ * and its extension row says why it cannot be picked.
+ */
+async function publishProxy(connection: HostConnection, endpoint: string): Promise<string | null> {
+    if (isIP(endpoint)) return null;
+    try {
+        const script = remoteWriteScript(proxy.renderProxyEdge(endpoint), undefined, PROXY_EDGE_FILE);
+        await runAsRoot(connection, script);
+        return endpoint;
+    } catch (error) {
+        console.error("polaris: the VPN proxy route could not be published:", error);
+        return null;
+    }
+}
+
+/** A login for the extension. It lasts an hour; the extension asks again before that. */
+export async function browserLogin(
+    user: { id: string; isAdmin: boolean },
+    nodeId: string
+): Promise<proxy.ProxyLogin & { host: string; port: number }> {
+    const access = await accessOf(user);
+    if (!access || wg.accessStanding(access, new Date()) !== "active") {
+        throw new WireGuardRefusal("noAccess");
+    }
+    if (!wg.mayUseNode(access, nodeId)) throw new WireGuardRefusal("noAccess");
+    const node = await nodeRow(nodeId);
+    if (!node?.proxyHost || !node.proxyKeySealed || !node.proxyKeyNonce || !node.proxyKeyId) {
+        throw new WireGuardRefusal("nodeNotReady");
+    }
+    const secret = decryptSecret(
+        {
+            ciphertext: Buffer.from(node.proxyKeySealed),
+            nonce: Buffer.from(node.proxyKeyNonce),
+            keyId: node.proxyKeyId
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+    const login = proxy.proxyLogin(secret, user.id, Math.floor(Date.now() / 1000));
+    return { ...login, host: node.proxyHost, port: 443 };
 }
 
 export async function listNodes() {
@@ -459,9 +522,29 @@ export async function runVpnPass(): Promise<void> {
             const connection = await connectionOf(node.hostId);
             const counters = wg.parsePeerCounters(await runAsRoot(connection, wg.NODE_READ));
             await recordCounters(node.id, counters);
+            await recordProxyUsage(node.id, await runAsRoot(connection, proxy.PROXY_USAGE_READ));
             await syncNode(node);
         } catch (error) {
             console.error("polaris: a VPN node could not be read:", error);
+        }
+    }
+}
+
+async function recordProxyUsage(nodeId: string, output: string): Promise<void> {
+    for (const { userId, used } of proxy.parseProxyUsage(output)) {
+        const key = { nodeId_userId: { nodeId, userId } };
+        const row = await prisma.vpnProxyUsage.findUnique({ where: key });
+        const grew = wg.counterGrowth(used, row?.seen ?? 0n);
+        await prisma.vpnProxyUsage.upsert({
+            where: key,
+            create: { nodeId, userId, seen: used },
+            update: { seen: used }
+        });
+        if (grew > 0n) {
+            await prisma.vpnAccess.updateMany({
+                where: { userId },
+                data: { usedBytes: { increment: grew } }
+            });
         }
     }
 }

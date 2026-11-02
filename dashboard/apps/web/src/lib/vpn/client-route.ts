@@ -54,3 +54,17 @@ export async function connectForClient(userId: string, request: Request): Promis
         return refused(error);
     }
 }
+
+const browserSchema = z.object({ nodeId: z.string().uuid() });
+
+export async function browserLoginForClient(userId: string, request: Request): Promise<Response> {
+    const person = await personOf(userId);
+    if (!person) return Response.json({ error: "unauthorized" }, { status: 401 });
+    const body = browserSchema.safeParse(await request.json().catch(() => null));
+    if (!body.success) return Response.json({ error: "invalid" }, { status: 400 });
+    try {
+        return Response.json(await service.browserLogin(person, body.data.nodeId));
+    } catch (error) {
+        return refused(error);
+    }
+}
