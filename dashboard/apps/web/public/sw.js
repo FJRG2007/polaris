@@ -3,7 +3,8 @@
  *
  * It exists for the installed app: when Polaris cannot be reached - the machine is
  * off, the laptop is on another network - a window that opens onto a browser
- * error page reads as a broken app. So a page load that fails is answered with a
+ * error page reads as a broken app. So a page load that fails, or that a gateway
+ * or tunnel answers on behalf of a Polaris it cannot reach, is answered with a
  * short page saying Polaris is not reachable, and nothing else is touched.
  *
  * Nothing is cached but that page. Every request, page loads included, goes to
@@ -14,6 +15,19 @@
 
 const CACHE = "polaris-offline-v2";
 const OFFLINE = "/offline.html";
+
+/* The same statuses as `isGatewayFailure` in `@polaris/core/instance-fallback`. */
+function isGatewayFailure(status) {
+    return status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530);
+}
+
+function offlinePage(answer) {
+    return caches
+        .match(OFFLINE)
+        .then(
+            (page) => page || answer || new Response("Polaris is not reachable.", { status: 503 })
+        );
+}
 
 self.addEventListener("install", (event) => {
     event.waitUntil(
@@ -40,11 +54,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
     if (event.request.mode !== "navigate") return;
     event.respondWith(
-        fetch(event.request).catch(() =>
-            caches
-                .match(OFFLINE)
-                .then((page) => page || new Response("Polaris is not reachable.", { status: 503 }))
-        )
+        fetch(event.request)
+            .then((answer) => (isGatewayFailure(answer.status) ? offlinePage(answer) : answer))
+            .catch(() => offlinePage())
     );
 });
 

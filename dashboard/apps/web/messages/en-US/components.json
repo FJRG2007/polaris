@@ -1555,7 +1555,8 @@
         "noInternet": "No internet connection - Polaris keeps working on your network",
         "polarisBack": "Polaris is back",
         "retry": "Try now",
-        "useLocal": "Open on your network"
+        "useLocal": "Open on your network",
+        "useOther": "Open another address"
     },
     "customEmoji": {
         "from": "From {space}"

@@ -33,7 +33,13 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNetworkState } from "@enigmax/primitives/react/network";
 import { checkForNewBuild } from "@/lib/new-build";
-import { findLocalAddress, rememberInstance } from "@/lib/local-address";
+import {
+    findLocalAddress,
+    isLocalOrigin,
+    offerHref,
+    rememberInstance,
+    type LocalOffer
+} from "@/lib/local-address";
 import { updateInProgress } from "@/lib/update-in-progress";
 import { hostOffline, subscribeHostOffline } from "@/lib/host-internet";
 import {
@@ -61,7 +67,7 @@ export function ConnectionBanner() {
     const noInternet = useSyncExternalStore(subscribeHostOffline, hostOffline, () => false);
     const [back, setBack] = useState<Back>("none");
     const [retrying, setRetrying] = useState(false);
-    const [local, setLocal] = useState<string | null>(null);
+    const [local, setLocal] = useState<LocalOffer | null>(null);
     const seenRecoveries = useRef(reach.recoveries);
 
     useEffect(() => {
@@ -72,8 +78,8 @@ export function ConnectionBanner() {
     useEffect(() => {
         if (reach.reachable) return setLocal(null);
         let cancelled = false;
-        void findLocalAddress().then((address) => {
-            if (!cancelled) setLocal(address);
+        void findLocalAddress().then((offer) => {
+            if (!cancelled) setLocal(offer);
         });
         return () => {
             cancelled = true;
@@ -153,7 +159,7 @@ export function ConnectionBanner() {
         <BannerStrip>
             <p
                 className={cn(
-                    "flex min-w-0 max-w-full items-center justify-center gap-2 border-b px-4 py-1 text-sm",
+                    "flex min-w-0 max-w-full flex-wrap items-center justify-center gap-x-2 border-b px-4 py-1 text-sm",
                     good
                         ? "border-success-edge bg-success-soft text-success-ink"
                         : state === "offline"
@@ -161,29 +167,35 @@ export function ConnectionBanner() {
                           : "border-warning-edge bg-warning-soft text-warning-ink"
                 )}
             >
-                <Icon
-                    className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
-                    aria-hidden
-                />
-                <span className="min-w-0">{t(`network.${state}`)}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                    <Icon
+                        className={cn("size-4 shrink-0", state === "updating" && "animate-spin")}
+                        aria-hidden
+                    />
+                    <span className="min-w-0">{t(`network.${state}`)}</span>
+                </span>
                 {state === "unreachable" ? (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 shrink-0 px-2"
-                        onClick={() => void retry()}
-                        disabled={retrying}
-                    >
-                        {t("network.retry")}
-                    </Button>
-                ) : null}
-                {state === "unreachable" && local ? (
-                    <a
-                        href={`${local}${window.location.pathname}${window.location.search}`}
-                        className="shrink-0 whitespace-nowrap font-medium underline"
-                    >
-                        {t("network.useLocal")}
-                    </a>
+                    <span className="flex shrink-0 items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-11 shrink-0 px-2 sm:h-6"
+                            onClick={() => void retry()}
+                            disabled={retrying}
+                        >
+                            {t("network.retry")}
+                        </Button>
+                        {local ? (
+                            <a
+                                href={offerHref(local)}
+                                className="inline-flex h-11 shrink-0 items-center whitespace-nowrap px-2 font-medium underline sm:h-6"
+                            >
+                                {isLocalOrigin(local.origin)
+                                    ? t("network.useLocal")
+                                    : t("network.useOther")}
+                            </a>
+                        ) : null}
+                    </span>
                 ) : null}
             </p>
         </BannerStrip>

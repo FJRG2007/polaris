@@ -7,7 +7,8 @@ vi.mock("@polaris/core/instance-fallback", async (original) => ({
     verifyAlternate: verify
 }));
 
-const { findLocalAddress, INSTANCE_KEY, isLocalOrigin } = await import("@/lib/local-address");
+const { findLocalAddress, INSTANCE_KEY, isLocalOrigin, offerHref } =
+    await import("@/lib/local-address");
 
 const here = window.location.origin;
 
@@ -44,16 +45,24 @@ describe("findLocalAddress", () => {
     it("prefers a proven address and never challenges this one", async () => {
         hold([here, "https://polaris.local", "https://other.example.com"]);
         verify.mockImplementation(async (origin: string) =>
-            origin.includes("other") ? { kind: "same" } : { kind: "unreachable", certificate: false }
+            origin.includes("other")
+                ? { kind: "same" }
+                : { kind: "unreachable", certificate: false }
         );
-        expect(await findLocalAddress()).toBe("https://other.example.com");
+        expect(await findLocalAddress()).toEqual({
+            origin: "https://other.example.com",
+            proven: true
+        });
         expect(verify).toHaveBeenCalledTimes(2);
     });
 
     it("offers a local address the browser could not ask", async () => {
         hold(["https://polaris.local"]);
         verify.mockResolvedValue({ kind: "unreachable", certificate: false });
-        expect(await findLocalAddress()).toBe("https://polaris.local");
+        expect(await findLocalAddress()).toEqual({
+            origin: "https://polaris.local",
+            proven: false
+        });
     });
 
     it("never offers one that answered with another key, or a silent public one", async () => {
@@ -63,6 +72,15 @@ describe("findLocalAddress", () => {
         hold(["https://public.example.com"]);
         verify.mockResolvedValue({ kind: "unreachable", certificate: false });
         expect(await findLocalAddress()).toBeNull();
+    });
+});
+
+describe("offerHref", () => {
+    it("carries the current address only to a proven one", () => {
+        window.history.replaceState(null, "", "/s/share-token?key=value");
+        const origin = "https://polaris.local";
+        expect(offerHref({ origin, proven: true })).toBe(`${origin}/s/share-token?key=value`);
+        expect(offerHref({ origin, proven: false })).toBe(origin);
     });
 });
 
