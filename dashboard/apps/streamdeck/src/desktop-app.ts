@@ -9,19 +9,21 @@
 
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
+import { access, readFile } from "node:fs/promises";
 
 const CHECK_MS = 60_000;
 const COMMAND_MS = 5_000;
 const WINDOWS_KEY = "HKCU\\Software\\Classes\\polaris\\shell\\open\\command";
+/** `polaris` among the bundle's link schemes: the same word is its executable's name. */
+const MAC_LINK_SCHEME = /<key>CFBundleURLSchemes<\/key>\s*<array>(?:(?!<\/array>)[\s\S])*<string>polaris<\/string>/;
 
-type Run = (file: string, args: readonly string[]) => Promise<void>;
+type Run = (file: string, args: readonly string[]) => Promise<string>;
 
 const run: Run = (file, args) =>
     new Promise((resolve, reject) => {
-        execFile(file, [...args], { timeout: COMMAND_MS, windowsHide: true }, (error) =>
-            error ? reject(error) : resolve()
+        execFile(file, [...args], { timeout: COMMAND_MS, windowsHide: true }, (error, stdout) =>
+            error ? reject(error) : resolve(stdout)
         );
     });
 
@@ -40,24 +42,39 @@ export function desktopLink(url: string): string | null {
 async function macAppHandlesLinks(read: (path: string) => Promise<string>, home: string): Promise<boolean> {
     for (const folder of ["/Applications", join(home, "Applications")]) {
         const plist = await read(join(folder, "Polaris.app/Contents/Info.plist")).catch(() => "");
-        if (plist.includes("<string>polaris</string>")) return true;
+        if (MAC_LINK_SCHEME.test(plist)) return true;
     }
     return false;
 }
+
+/** The program a `reg query` of the link's command names, or null. */
+function registeredProgram(output: string): string | null {
+    return /REG_(?:EXPAND_)?SZ\s+"([^"]+)"/.exec(output)?.[1] ?? null;
+}
+
+/** The registry outlives an app removed by hand and an update's old folder, and
+ *  Windows reports no failure when the program is gone, so it has to be there. */
+async function windowsAppHandlesLinks(runCommand: Run, exists: (path: string) => Promise<boolean>): Promise<boolean> {
+    const output = await runCommand("reg", ["query", WINDOWS_KEY]).catch(() => "");
+    const program = registeredProgram(output);
+    return program ? exists(program) : false;
+}
+
+const fileExists = (path: string): Promise<boolean> =>
+    access(path).then(
+        () => true,
+        () => false
+    );
 
 /** Whether the app that answers `polaris://` is on this computer. */
 export async function desktopAppInstalled(
     platform: NodeJS.Platform = process.platform,
     runCommand: Run = run,
     read: (path: string) => Promise<string> = (path) => readFile(path, "utf8"),
-    home = homedir()
+    home = homedir(),
+    exists: (path: string) => Promise<boolean> = fileExists
 ): Promise<boolean> {
-    if (platform === "win32") {
-        return runCommand("reg", ["query", WINDOWS_KEY]).then(
-            () => true,
-            () => false
-        );
-    }
+    if (platform === "win32") return windowsAppHandlesLinks(runCommand, exists);
     return platform === "darwin" ? macAppHandlesLinks(read, home) : false;
 }
 
@@ -66,21 +83,31 @@ async function openLink(link: string, platform: NodeJS.Platform, runCommand: Run
     else await runCommand("open", [link]);
 }
 
-let known: { installed: boolean; at: number } | null = null;
-
 /**
- * Open `url` in the app, answering whether it did. False leaves it to the caller,
- * which opens the browser, so a press never ends with nothing on screen.
+ * An opener that asks whether the app is there at most once a minute, and answers
+ * whether the app took the page. False leaves it to the caller, which opens the
+ * browser, so a press never ends with nothing on screen.
  */
-export async function openInDesktopApp(url: string): Promise<boolean> {
-    const link = desktopLink(url);
-    if (!link) return false;
-    if (!known || Date.now() - known.at > CHECK_MS) {
-        known = { installed: await desktopAppInstalled(), at: Date.now() };
-    }
-    if (!known.installed) return false;
-    return openLink(link, process.platform, run).then(
-        () => true,
-        () => false
-    );
+export function desktopOpener(
+    installed: () => Promise<boolean>,
+    open: (link: string) => Promise<void>,
+    now: () => number = Date.now
+): (url: string) => Promise<boolean> {
+    let known: { installed: boolean; at: number } | null = null;
+    return async (url) => {
+        const link = desktopLink(url);
+        if (!link) return false;
+        if (!known || now() - known.at > CHECK_MS) known = { installed: await installed(), at: now() };
+        if (!known.installed) return false;
+        return open(link).then(
+            () => true,
+            () => false
+        );
+    };
 }
+
+/** Open `url` in the desktop app, answering whether it did. */
+export const openInDesktopApp = desktopOpener(
+    () => desktopAppInstalled(),
+    (link) => openLink(link, process.platform, run)
+);

@@ -16,7 +16,8 @@
  */
 
 import { registerIpc } from "./ipc";
-import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink, type DeepLink } from "@/shared/deep-link";
+import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
+import { DeepLinks } from "./deep-links";
 import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
@@ -107,32 +108,37 @@ function showPolaris(path?: string): void {
     openMain(url ?? `${current}${START}`);
 }
 
-/**
- * Show what a polaris:// link names: in this window when it is the Polaris open
- * here, after switching when it is another one kept here, and in the browser when
- * this app does not know it, so a link is never just dropped.
- */
-function openDeepLink(link: DeepLink): void {
-    if (link.server === current) {
-        showPolaris(link.path);
-        return;
-    }
-    if (savedServers().some((saved) => saved.origin === link.server)) {
-        void switchServer(link.server).then(() => showPolaris(link.path));
-        return;
-    }
-    void shell.openExternal(`${link.server}${link.path}`);
+/** Ask before a link leaves the Polaris in use. No is the default: a website may
+ *  have started it. */
+async function confirmSwitch(origin: string): Promise<boolean> {
+    const { response } = await dialog.showMessageBox({
+        type: "question",
+        buttons: ["Switch", "Stay here"],
+        defaultId: 1,
+        cancelId: 1,
+        message: `Switch to ${new URL(origin).host}?`,
+        detail: "A link asked to open a page there. Switching closes the Polaris windows open now."
+    });
+    return response === 0;
 }
 
-/** The link this app was started for, until its first window opens. */
-let startedFor: DeepLink | null = deepLinkIn(process.argv);
+const deepLinks = new DeepLinks(
+    {
+        current: server,
+        saved: () => savedServers().map((saved) => saved.origin),
+        show: showPolaris,
+        confirmSwitch,
+        switchTo: switchOrSayWhy,
+        openInBrowser: (url) => void shell.openExternal(url)
+    },
+    deepLinkIn(process.argv)
+);
 
-/** The first window: what the app was started for, if anything. */
+/** The first window: what the app was started for, and always something on
+ *  screen, since a link the browser took opens nothing here. */
 function showOpening(): void {
-    const link = startedFor;
-    startedFor = null;
-    if (link) openDeepLink(link);
-    else showPolaris();
+    deepLinks.opened();
+    if (!main && !connect) showPolaris();
 }
 
 /** The window shown while an update goes in before the app opens. */
@@ -293,6 +299,15 @@ function switchServer(origin: string): Promise<Outcome> {
     return connectSubmit(origin);
 }
 
+/** Open a server from the list, and if that fails, say why in the servers window. */
+async function switchOrSayWhy(origin: string): Promise<boolean> {
+    const outcome = await switchServer(origin);
+    if (outcome.ok) return true;
+    loadError = outcome.error;
+    openConnect();
+    return false;
+}
+
 function nameServer(origin: string, typed: string): Outcome {
     const name = normalizeServerName(typed);
     if (name && name.length > SERVER_NAME_MAX) return { ok: false, error: `Use at most ${SERVER_NAME_MAX} characters.` };
@@ -373,14 +388,7 @@ function start(): void {
 
         const menu: MenuActions = {
             changeServer: openConnect,
-            switchServer: (origin) => {
-                void switchServer(origin).then((outcome) => {
-                    if (!outcome.ok) {
-                        loadError = outcome.error;
-                        openConnect();
-                    }
-                });
-            },
+            switchServer: (origin) => void switchOrSayWhy(origin),
             back: goBack,
             reload: () => BrowserWindow.getFocusedWindow()?.webContents.reload(),
             forgetApiKey: () => {
@@ -456,7 +464,10 @@ function start(): void {
                 app.on("activate", () => {
                     if (BrowserWindow.getAllWindows().length === 0) showOpening();
                 });
-                if (opening !== "open") return;
+                if (opening !== "open") {
+                    deepLinks.opened();
+                    return;
+                }
                 // The app opens first: closing the last window would quit it.
                 const waited = updating;
                 updating = null;
@@ -468,15 +479,13 @@ function start(): void {
 
     app.on("second-instance", (_event, argv) => {
         const link = deepLinkIn(argv);
-        if (link) openDeepLink(link);
-        else showPolaris();
+        if (link) deepLinks.arrive(link);
+        if (!link || updating) showPolaris();
     });
     app.on("open-url", (event, url) => {
         event.preventDefault();
         const link = readDeepLink(url);
-        if (!link) return;
-        if (app.isReady() && BrowserWindow.getAllWindows().length > 0) openDeepLink(link);
-        else startedFor = link;
+        if (link) deepLinks.arrive(link);
     });
 
     app.on("window-all-closed", () => {

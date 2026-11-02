@@ -3,7 +3,8 @@
  * app by something else on the computer, such as the Stream Deck plugin.
  *
  * Any website can start such a link, so it only ever names a page to show: it
- * carries nothing, and a page acts only on what somebody then presses.
+ * carries nothing, a page acts only on what somebody then presses, and a page on
+ * another Polaris kept here opens only after a yes (`main/deep-links`).
  */
 
 export const DEEP_LINK_SCHEME = "polaris";
