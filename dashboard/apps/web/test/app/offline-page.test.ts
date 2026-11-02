@@ -177,3 +177,34 @@ describe("the offline page", () => {
         expect(SCRIPT).toContain(es.network.useOther);
     });
 });
+
+describe("the way out of the page", () => {
+    afterEach(() => {
+        delete (window as { polarisDesktop?: unknown }).polarisDesktop;
+    });
+
+    it("links the guide, and offers no servers in a browser", async () => {
+        await open([here], {});
+        const guide = document.querySelector<HTMLAnchorElement>("#help a");
+        expect(guide?.href).toContain("/en/docs/troubleshooting/");
+        expect(document.getElementById("servers")?.hidden).toBe(true);
+    });
+
+    it("opens the servers window from the desktop app", async () => {
+        const openServers = vi.fn();
+        (window as { polarisDesktop?: unknown }).polarisDesktop = { openServers };
+        await open([here], {});
+        const button = document.getElementById("servers");
+        expect(button?.hidden).toBe(false);
+        button?.click();
+        expect(openServers).toHaveBeenCalledOnce();
+    });
+
+    it("sends a Spanish reader to the Spanish guide", async () => {
+        document.cookie = "polaris-locale=es-ES; Path=/";
+        await open([here], {});
+        const guide = document.querySelector<HTMLAnchorElement>("#help a");
+        expect(guide?.href).toContain("/es/docs/troubleshooting/");
+        expect(guide?.textContent).toBe("Cómo solucionarlo");
+    });
+});

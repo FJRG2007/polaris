@@ -41,7 +41,7 @@ import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpda
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
-import { describeNetError, netErrorCode } from "./reachability";
+import { describeNetError, isOfflinePage, netErrorCode } from "./reachability";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
 
 /** Where the dashboard opens, the same as the installable app's start page. */
@@ -196,6 +196,13 @@ function openMain(url: string): void {
         loadError = describeNetError(netErrorCode(description), new URL(current).host);
         openConnect();
         window.close();
+    });
+    // The Polaris's own worker answers for it when it is gone, so this load succeeded.
+    // The window stays for its Try again; the servers window is the way to the others.
+    window.webContents.on("did-finish-load", () => {
+        if (!current || !isOfflinePage(window.webContents.getTitle())) return;
+        loadError = describeNetError(null, new URL(current).host);
+        openConnect();
     });
     window.on("closed", () => {
         if (main === window) main = null;
