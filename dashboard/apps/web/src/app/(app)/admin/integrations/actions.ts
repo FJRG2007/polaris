@@ -13,7 +13,8 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
-import { verifyIp } from "@/lib/integrations/dymo";
+import { testKey } from "@/lib/integrations/dymo";
+import { clearProviderPause } from "@/lib/integrations/provider-pause";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
 import { connectionFailure, markConnectionFailureSeen } from "@/lib/connections/attention";
@@ -131,10 +132,11 @@ export async function dismissConnectionFailureAction(
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
-    if (typeof provider !== "string" || !findConnectionProvider(provider))
-        return { error: t("integrations.errors.unknownService") };
+    if (typeof provider !== "string") return { error: t("integrations.errors.unknownService") };
 
     const failure = await connectionFailure(provider).catch(() => null);
+    if (!failure && !findConnectionProvider(provider))
+        return { error: t("integrations.errors.unknownService") };
     if (!(await markConnectionFailureSeen(provider)))
         return { error: t("integrations.errors.notSaved") };
     // A Google API turned off is what Integrations counts; seen here, it is
@@ -640,7 +642,7 @@ export async function saveVirusTotalAction(input: {
 /** Verify a Dymo key by making one benign IP check; a bad key throws. */
 async function testDymoKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
     try {
-        await verifyIp(apiKey, "8.8.8.8", ["FRAUD"]);
+        await testKey(apiKey);
         return { ok: true };
     } catch (caught) {
         const t = await getTranslations("admin");
@@ -676,10 +678,15 @@ export async function saveDymoAction(input: {
 
     await upsertIntegration(provider, {
         enabled: input.enabled,
-        config: { verifyAccessIp: input.verifyAccessIp, deny: deny.length > 0 ? deny : ["FRAUD"] },
+        config: {
+            ...existing?.config,
+            verifyAccessIp: input.verifyAccessIp,
+            deny: deny.length > 0 ? deny : ["FRAUD"]
+        },
         secret: newKey,
         installedById: user.id
     });
+    await clearProviderPause(provider);
     await recordAudit({
         actorId: user.id,
         action: "integration.configure",
@@ -725,6 +732,7 @@ export async function saveCriminalIpAction(input: {
             secret: newKey,
             installedById: user.id
         });
+        await clearProviderPause(provider);
         await recordAudit({
             actorId: user.id,
             action: "integration.configure",

@@ -12,11 +12,8 @@
  * rather than one per feature - and one fact about a domain, rather than Polaris
  * believing two different things about it depending on which screen is asking.
  *
- * **The mail filter is what uses it today.** The firewall and share links still
- * read and write `lib/address-reputation`, which is the same idea for an address
- * and predates this. Their questions belong here under `kind: "ip"`, and that is
- * what the kind is for; until they are moved, the two caches do not answer each
- * other and nothing here should be read as if they did.
+ * The firewall and share links reach it through `lib/address-reputation` under
+ * `kind: "ip"`; the mail filter uses it directly.
  *
  * **Nothing here decides anything.** What is stored is what the provider said,
  * not what Polaris did about it, so a rule change is applied to a remembered

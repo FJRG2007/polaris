@@ -22,6 +22,7 @@
 
 import { prisma } from "@polaris/db";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { resolveCondition } from "@/lib/notification-service";
 import { findConnectionProvider } from "@polaris/core";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import {
@@ -44,13 +45,19 @@ export function attentionHref(provider: string): string {
     return `${PLAIN_HREF}?configure=${provider}`;
 }
 
+/** A service out of service stays that way until it answers: one notice per reader,
+ *  rewritten by every retry, ended when it recovers. */
+function outageCondition(provider: string): string {
+    return `${EVENT}:${provider}:out-of-service`;
+}
+
 /** How often one service may raise this. */
 const ALERT_WINDOW_MS = 60 * 60 * 1000;
 
 /** What kind of trouble it is: somebody refused at authorization, or an API the
  *  application relies on switched off in the provider's console. Only the first
  *  is answered by an authorization completing. */
-export type FailureKind = "refusal" | "api-off";
+export type FailureKind = "refusal" | "api-off" | "out-of-service";
 
 /** What went wrong the last time somebody tried to authorize. */
 export interface ConnectionFailure {
@@ -76,7 +83,7 @@ export function readConnectionFailure(
     return {
         at,
         reason,
-        kind: kind === "api-off" ? "api-off" : "refusal",
+        kind: kind === "api-off" || kind === "out-of-service" ? kind : "refusal",
         ...(typeof seenAt === "string" ? { seenAt } : {})
     };
 }
@@ -158,6 +165,7 @@ export async function recordConnectionFailure(
                 body: t("connections.refusedBody", { name, reason })
             }),
             ...notice,
+            ...(kind === "out-of-service" ? { condition: outageCondition(provider) } : {}),
             href: attentionHref(provider),
             level: "warning",
             actionRequired: true
@@ -183,6 +191,7 @@ export async function clearConnectionFailure(
         delete config[FAILURE];
         await upsertIntegration(provider, { config });
         await answerAlerts(provider);
+        if (failure.kind === "out-of-service") await resolveCondition(outageCondition(provider));
         return true;
     } catch (error) {
         console.error("polaris: could not clear the connection failure:", error);

@@ -10,7 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rows, alerts, throttle, broken, answered, throttled } = vi.hoisted(() => ({
+const { rows, alerts, throttle, broken, answered, throttled, resolved } = vi.hoisted(() => ({
     rows: new Map<
         string,
         {
@@ -21,14 +21,23 @@ const { rows, alerts, throttle, broken, answered, throttled } = vi.hoisted(() =>
             updatedAt: string | null;
         }
     >(),
-    alerts: [] as { event: string; title: string; body: string }[],
+    alerts: [] as { event: string; title: string; body: string; condition?: string }[],
     throttle: { ok: true },
     /** Set when the test wants the write itself to fail. */
     broken: { write: false },
     /** The bell alerts each clear answered, by the links it matched. */
     answered: [] as string[][],
     /** The throttle keys each alert was counted against. */
-    throttled: [] as string[]
+    throttled: [] as string[],
+    /** The conditions ended. */
+    resolved: [] as string[]
+}));
+
+vi.mock("@/lib/notification-service", () => ({
+    resolveCondition: async (key: string) => {
+        resolved.push(key);
+        return 1;
+    }
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -90,6 +99,31 @@ beforeEach(() => {
     alerts.length = 0;
     throttle.ok = true;
     broken.write = false;
+});
+
+describe("a service out of service", () => {
+    const notice = { title: "stopped", body: "stopped" };
+
+    beforeEach(() => {
+        resolved.length = 0;
+    });
+
+    it("raises one ongoing condition, and ends it when the service answers", async () => {
+        install("dymo");
+        await recordConnectionFailure("dymo", "credits", "out-of-service", notice);
+        expect(alerts[0]?.condition).toBe("integration.attention:dymo:out-of-service");
+
+        await clearConnectionFailure("dymo", "out-of-service");
+        expect(resolved).toEqual(["integration.attention:dymo:out-of-service"]);
+    });
+
+    it("leaves a refusal an ordinary alert", async () => {
+        install("epic");
+        await recordConnectionFailure("epic", "invalid_client");
+        expect(alerts[0]?.condition).toBeUndefined();
+        await clearConnectionFailure("epic");
+        expect(resolved).toEqual([]);
+    });
 });
 
 describe("describeFailure", () => {

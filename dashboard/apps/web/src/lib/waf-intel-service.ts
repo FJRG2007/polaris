@@ -20,11 +20,18 @@ import { verifyIp } from "@/lib/integrations/dymo";
 import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import type { BudgetedProvider } from "@/lib/reputation-budget";
+import { providerPaused, takeServedLookup, whileServing } from "@/lib/integrations/provider-pause";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { checkCriminalIp, readCriminalIpConfig } from "@/lib/integrations/criminalip";
-import { buildWafIntel, type WafIntelEntry, type WafIntelReason } from "@polaris/core";
+import {
+    buildWafIntel,
+    isCarrierGradeNat,
+    type WafIntelEntry,
+    type WafIntelReason
+} from "@polaris/core";
 
 /** Where the snapshot is written. Mounted read-only into the edge guard as
  *  POLARIS_EDGE_INTEL_FILE. Kept out of Traefik's own dynamic directory on purpose:
@@ -56,7 +63,10 @@ function routable(ip: string): boolean {
         ip.startsWith("127.") ||
         ip.startsWith("169.254.") ||
         ip === "::1" ||
-        isContainerAddress(ip)
+        isContainerAddress(ip) ||
+        isCarrierGradeNat(ip) ||
+        /^f[cd]/i.test(ip) ||
+        /^fe[89ab]/i.test(ip)
     );
 }
 
@@ -131,7 +141,7 @@ export async function refreshWafFeeds(force = false): Promise<void> {
 
 /** One reputation provider, reduced to the only thing the firewall needs from it. */
 interface ReputationProvider {
-    readonly slug: string;
+    readonly slug: BudgetedProvider;
     /** The deny rules the operator set, carried so a verdict can be remembered
      *  against them - a cached answer to a different question is not an answer. */
     readonly deny: readonly string[];
@@ -144,7 +154,7 @@ async function reputationProviders(): Promise<ReputationProvider[]> {
     const providers: ReputationProvider[] = [];
 
     const dymo = await getIntegrationState("dymo");
-    if (dymo?.enabled) {
+    if (dymo?.enabled && !(await providerPaused("dymo"))) {
         const config = readDymoConfig(dymo.config);
         const apiKey = await getIntegrationSecret("dymo");
         if (apiKey && config.deny.length > 0) {
@@ -157,14 +167,17 @@ async function reputationProviders(): Promise<ReputationProvider[]> {
     }
 
     const criminalIp = await getIntegrationState("criminalip");
-    if (criminalIp?.enabled) {
+    if (criminalIp?.enabled && !(await providerPaused("criminalip"))) {
         const config = readCriminalIpConfig(criminalIp.config);
         const apiKey = await getIntegrationSecret("criminalip");
         if (apiKey && config.deny.length > 0) {
             providers.push({
                 slug: "criminalip",
                 deny: config.deny,
-                check: (ip) => checkCriminalIp(apiKey, ip, config.deny)
+                check: (ip) =>
+                    whileServing("criminalip", "Criminal IP", () =>
+                        checkCriminalIp(apiKey, ip, config.deny)
+                    )
             });
         }
     }
@@ -229,6 +242,7 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
                 });
                 break;
             }
+            if (!(await takeServedLookup(provider.slug, SWEEP_SHARE))) continue;
             try {
                 asked += 1;
                 const { allow, reasons } = await provider.check(ip);
@@ -257,6 +271,10 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
 /** Lookups per pass. A provider is billed per call and a spike must not become a
  *  bill; anything not asked about this time is asked about next time. */
 const REPUTATION_BATCH = 25;
+
+/** The part of each provider's budget the sweep may use. It can wait for the next
+ *  pass; a visitor at a share link and a message being filed cannot. */
+const SWEEP_SHARE = 0.5;
 
 export interface WafBanInput {
     readonly ip: string;

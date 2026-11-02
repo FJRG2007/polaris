@@ -28,6 +28,7 @@
 import * as core from "@polaris/core";
 import { lookupDomain } from "@/lib/integrations/virustotal";
 import { takeLookup } from "@/lib/reputation-budget";
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { knownReputation, rememberReputation } from "@/lib/reputation";
 import { MAIL_DENY_RULES, verifyDomain, verifyEmail } from "@/lib/integrations/dymo";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -181,7 +182,7 @@ async function domainIsFraud(domain: string): Promise<ReputationFinding | null> 
         return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
 
     const apiKey = await getIntegrationSecret(DYMO);
-    if (!apiKey) return null;
+    if (!apiKey || !(await takeServedLookup(DYMO))) return null;
     try {
         const { fraud } = await verifyDomain(apiKey, domain);
         await rememberReputation(
@@ -242,7 +243,7 @@ async function addressOpinion(address: string): Promise<ReputationFinding | null
     if (known) return fromVerdict("email", address, known);
 
     const apiKey = await getIntegrationSecret(DYMO);
-    if (!apiKey) return null;
+    if (!apiKey || !(await takeServedLookup(DYMO))) return null;
 
     try {
         const { allow, reasons } = await verifyEmail(apiKey, address);

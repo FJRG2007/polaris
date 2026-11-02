@@ -19,80 +19,47 @@
  * A verdict is kept against the deny rules it was reached under. Changing what
  * counts as bad is a different question, so it is asked again rather than
  * answered from a cache that predates the change.
+ *
+ * Answers live in the platform's one cache (`lib/reputation`), keyed per provider.
+ * The older table held one row per address, so with two providers connected each
+ * overwrote the other's answer and both were asked again on every pass. It is only
+ * drained now.
  */
 
 import { prisma } from "@polaris/db";
-
-/**
- * How long an answer stands.
- *
- * A day for a clean address: reputation does change, and a host that becomes a
- * proxy tomorrow is worth catching, but not at the price of asking about the
- * same visitor every thirty seconds. Six hours for a flagged one, which is the
- * same window the ban it produced is held for.
- */
-const CLEAN_TTL_MS = 24 * 60 * 60 * 1000;
-const FLAGGED_TTL_MS = 6 * 60 * 60 * 1000;
-
-/** How long a verdict is kept at all. Past this it is history nobody reads, and
- *  the address will be asked about again long before it. */
-const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+import { knownReputation, rememberReputation } from "@/lib/reputation";
 
 export interface AddressVerdict {
     readonly allow: boolean;
     readonly reason: string | null;
 }
 
-/** The rules a verdict was reached under, as one comparable string. Sorted, so
- *  the same set written in a different order is the same question. */
-export function rulesKey(deny: readonly string[]): string {
-    return [...deny].map((rule) => rule.trim().toUpperCase()).sort().join(",");
-}
-
 /**
  * The remembered answer for this address, or null when there is none worth
  * having - never asked, asked too long ago, or asked under different rules.
  */
-export async function rememberedVerdict(
+export function rememberedVerdict(
     ip: string,
     provider: string,
     deny: readonly string[]
 ): Promise<AddressVerdict | null> {
-    const row = await prisma.addressReputation.findUnique({ where: { ip } });
-    if (!row || row.provider !== provider || row.rules !== rulesKey(deny)) return null;
-    const age = Date.now() - row.checkedAt.getTime();
-    if (age > (row.allow ? CLEAN_TTL_MS : FLAGGED_TTL_MS)) return null;
-    return { allow: row.allow, reason: row.reason };
+    return knownReputation("ip", ip, provider, deny);
 }
 
 /** Write down what a provider said, whatever it said. The clean answers are the
  *  point: they are the ones that were being bought over and over. */
-export async function rememberVerdict(
+export function rememberVerdict(
     ip: string,
     provider: string,
     deny: readonly string[],
     verdict: AddressVerdict
 ): Promise<void> {
-    const row = {
-        provider,
-        allow: verdict.allow,
-        reason: verdict.reason,
-        rules: rulesKey(deny),
-        checkedAt: new Date()
-    };
-    await prisma.addressReputation.upsert({ where: { ip }, create: { ip, ...row }, update: row });
+    return rememberReputation("ip", ip, provider, verdict, deny);
 }
 
-/** Drop verdicts nobody will read again. Runs with the firewall's other
- *  housekeeping. */
+/** Empty the older table as its rows age out. */
 export async function pruneAddressReputation(): Promise<void> {
     await prisma.addressReputation.deleteMany({
-        where: { checkedAt: { lt: new Date(Date.now() - RETENTION_MS) } }
+        where: { checkedAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }
     });
-}
-
-/** How many addresses have a remembered verdict, for the screen that has to say
- *  what the cache is doing. */
-export async function rememberedCount(): Promise<number> {
-    return prisma.addressReputation.count();
 }

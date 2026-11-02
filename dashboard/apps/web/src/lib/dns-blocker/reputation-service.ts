@@ -15,6 +15,7 @@ import { queryLogPath } from "./query-log";
 import { writeEngineFiles } from "./engine-files";
 import { engineTarget } from "./insights";
 import { domainReputation } from "@/lib/integrations/dymo";
+import { providerPaused } from "@/lib/integrations/provider-pause";
 import { dnsReputationOn, type DnsSettings } from "./settings";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import {
@@ -77,6 +78,7 @@ async function check(
     settings: DnsSettings,
     domain: string
 ): Promise<"checked" | "budget" | "failed"> {
+    if (await providerPaused("dymo")) return "failed";
     if (!takeLookup("dymo", BUDGET_SHARE)) return "budget";
     try {
         const verdict = await domainReputation(apiKey, domain, settings.reputation.adult);

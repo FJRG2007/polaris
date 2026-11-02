@@ -12,13 +12,16 @@
  * visit.
  */
 
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** Whether a visitor IP is allowed by the Dymo integration (allow-on-error). */
-export async function dymoIpAllowed(ip: string | undefined): Promise<{ allowed: boolean; reason?: string }> {
+export async function dymoIpAllowed(
+    ip: string | undefined
+): Promise<{ allowed: boolean; reason?: string }> {
     if (!ip) return { allowed: true };
     const state = await getIntegrationState("dymo");
     if (!state?.enabled) return { allowed: true };
@@ -33,6 +36,8 @@ export async function dymoIpAllowed(ip: string | undefined): Promise<{ allowed: 
             ? { allowed: true }
             : { allowed: false, reason: remembered.reason ?? "flagged" };
     }
+
+    if (!(await takeServedLookup("dymo"))) return { allowed: true };
 
     try {
         const { allow, reasons } = await verifyIp(apiKey, ip, config.deny);

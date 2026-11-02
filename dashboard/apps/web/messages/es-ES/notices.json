@@ -155,6 +155,9 @@
         "unavailable": "analizador no disponible"
     },
     "connections": {
+        "stoppedTitle": "{name} ha dejado de funcionar",
+        "stoppedCredits": "{name} se ha quedado sin créditos, así que Polaris ha dejado de preguntarle. Sus comprobaciones están desactivadas hasta que tenga créditos.",
+        "stoppedKey": "{name} ha rechazado la clave, así que Polaris ha dejado de preguntarle. Sus comprobaciones están desactivadas hasta que la clave funcione.",
         "expiredTitle": "Tu cuenta de GitHub {label} ha dejado de funcionar",
         "expiredToken": "El token que pegaste ha caducado o se ha retirado. Hasta que lo sustituyas, se rechazarán los despliegues de tus repositorios privados.",
         "expiredLink": "GitHub ya no acepta ese vínculo. Hasta que vuelvas a conectarla, se rechazarán los despliegues de tus repositorios privados.",
