@@ -10,9 +10,15 @@ name: Desktop
 # Unsigned unless the signing secrets exist (see desktop/README.md for their
 # names). Secrets are handed only to the step that signs, never to `npm ci`,
 # which runs third-party install scripts, and only on a `desktop-v*` tag or on
-# main: a run by hand from any other branch builds unsigned. Windows is signed
-# through SignPath once its token and variables exist, and with the certificate
-# file otherwise.
+# main: a run by hand from any other branch builds unsigned.
+#
+# SignPath is optional for good, and nothing a release needs may depend on it.
+# Its signed Windows build is a job of its own, after the ordinary builds: that job
+# failing for any reason - no approval in time, a revoked token or certificate,
+# even its action no longer existing, which would fail the whole job it is used
+# in before a single step ran - leaves the ordinary build to be published
+# instead. Squirrel takes an update from either, so an installed app never sees
+# the difference.
 #
 # The release also carries the macOS update feeds and a SHA256SUMS of every
 # file, which the app's self-update reads (desktop/src/main/updates.ts).
@@ -76,8 +82,7 @@ jobs:
           - os: ubuntu-latest
             arch: x64
     runs-on: ${{ matrix.os }}
-    # Windows waits for SignPath requests to be approved, once SignPath is set up.
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 150 || 45 }}
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: desktop
@@ -123,18 +128,8 @@ jobs:
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
         run: |
-          signpath=false
-          if [ -n "$SIGNPATH_API_TOKEN" ] && [ -n "$SIGNPATH_ORGANIZATION_ID" ] && [ -n "$SIGNPATH_PROJECT_SLUG" ] && [ -n "$SIGNPATH_SIGNING_POLICY_SLUG" ]; then
-            signpath=true
-          fi
-          echo "signpath=$signpath" >> "$GITHUB_OUTPUT"
-          # SignPath, once set up, signs Windows instead of the certificate file.
-          echo "windows=$([ -n "$WINDOWS_CERTIFICATE_BASE64" ] && [ "$signpath" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "windows=$([ -n "$WINDOWS_CERTIFICATE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "apple=$([ -n "$APPLE_CERTIFICATE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Windows code-signing certificate
@@ -165,7 +160,6 @@ jobs:
           rm -f "$certificate"
 
       - name: Build the installers
-        if: runner.os != 'Windows' || steps.signing.outputs.signpath != 'true'
         env:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ steps.signing.outputs.windows == 'true' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.apple == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
@@ -175,79 +169,6 @@ jobs:
         run: |
           npm run build
           npx electron-forge make --arch=${{ matrix.arch }}
-
-      # Windows through SignPath, in two rounds, because Squirrel packs the app
-      # into the installer: the packaged app is signed first and the installer
-      # is made from it, so the package inside carries the signed polaris.exe;
-      # then the installer itself is signed. Squirrel's own helpers (Update.exe
-      # and the shortcut stub) are upstream binaries and stay unsigned, as
-      # SignPath Foundation signs only what is built from this repository.
-      - name: Package the app to sign
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        run: |
-          npm run build
-          npx electron-forge package --arch=${{ matrix.arch }}
-
-      - name: Upload the app to sign
-        id: unsigned-app
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-app-${{ runner.os }}-${{ matrix.arch }}
-          path: desktop/out/Polaris-win32-${{ matrix.arch }}/
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Sign the app
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
-          wait-for-completion: true
-          # A release signing request waits for a person to approve it.
-          wait-for-completion-timeout-in-seconds: 2700
-          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-app
-
-      - name: Make the installer from the signed app
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        run: |
-          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/polaris.exe').Status -ne 'Valid') { Write-Error 'polaris.exe came back without a valid signature.'; exit 1 }"
-          rm -rf "out/Polaris-win32-${{ matrix.arch }}"
-          mv out/signed-app "out/Polaris-win32-${{ matrix.arch }}"
-          npx electron-forge make --skip-package --arch=${{ matrix.arch }}
-
-      - name: Upload the installer to sign
-        id: unsigned-installer
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-installer-${{ runner.os }}-${{ matrix.arch }}
-          path: desktop/out/make/squirrel.windows/${{ matrix.arch }}/Polaris-Setup.exe
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Sign the installer
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 2700
-          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-installer
-
-      - name: Put the signed installer in place
-        if: runner.os == 'Windows' && steps.signing.outputs.signpath == 'true'
-        run: |
-          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-installer/Polaris-Setup.exe').Status -ne 'Valid') { Write-Error 'Polaris-Setup.exe came back without a valid signature.'; exit 1 }"
-          mv -f out/signed-installer/Polaris-Setup.exe "out/make/squirrel.windows/${{ matrix.arch }}/Polaris-Setup.exe"
 
       - name: Remove the signing material
         if: always()
@@ -263,9 +184,139 @@ jobs:
           path: desktop/out/make/**
           if-no-files-found: error
 
+  # Whether SignPath is set up at all. Secrets cannot be read in a job's `if`.
+  signpath-configured:
+    if: startsWith(github.ref, 'refs/tags/desktop-v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+        run: |
+          configured=false
+          if [ -n "$SIGNPATH_API_TOKEN" ] && [ -n "$SIGNPATH_ORGANIZATION_ID" ] && [ -n "$SIGNPATH_PROJECT_SLUG" ] && [ -n "$SIGNPATH_SIGNING_POLICY_SLUG" ]; then
+            configured=true
+          fi
+          echo "configured=$configured" >> "$GITHUB_OUTPUT"
+
+  # The Windows build again, through SignPath. Never required: see the top of this
+  # file. Its artifact is uploaded last, so it exists only if every step passed.
+  windows-signpath:
+    needs: [build, signpath-configured]
+    if: needs.signpath-configured.outputs.configured == 'true'
+    continue-on-error: true
+    runs-on: windows-latest
+    # Above the sum of its steps' timeouts: a step that times out fails, which the
+    # release falls back from, and GitHub does not document what this one reports.
+    timeout-minutes: 190
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+      - uses: actions/setup-node@v7
+        timeout-minutes: 5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+        timeout-minutes: 10
+
+      # Windows through SignPath, in two rounds, because Squirrel packs the app
+      # into the installer: the packaged app is signed first and the installer
+      # is made from it, so the package inside carries the signed polaris.exe;
+      # then the installer itself is signed. Squirrel's own helpers (Update.exe
+      # and the shortcut stub) are upstream binaries and stay unsigned, as
+      # SignPath Foundation signs only what is built from this repository.
+      - name: Package the app to sign
+        timeout-minutes: 20
+        run: |
+          npm run build
+          npx electron-forge package --arch=x64
+
+      - name: Upload the app to sign
+        id: unsigned-app
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app-Windows-x64
+          path: desktop/out/Polaris-win32-x64/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Sign the app
+        timeout-minutes: 50
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          # A release signing request waits for a person to approve it.
+          wait-for-completion-timeout-in-seconds: 2700
+          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-app
+
+      - name: Make the installer from the signed app
+        timeout-minutes: 20
+        run: |
+          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/polaris.exe').Status -ne 'Valid') { Write-Error 'polaris.exe came back without a valid signature.'; exit 1 }"
+          rm -rf "out/Polaris-win32-x64"
+          mv out/signed-app "out/Polaris-win32-x64"
+          npx electron-forge make --skip-package --arch=x64
+
+      - name: Upload the installer to sign
+        id: unsigned-installer
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer-Windows-x64
+          path: desktop/out/make/squirrel.windows/x64/Polaris-Setup.exe
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Sign the installer
+        timeout-minutes: 50
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 2700
+          output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-installer
+
+      - name: Put the signed installer in place
+        timeout-minutes: 5
+        run: |
+          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-installer/Polaris-Setup.exe').Status -ne 'Valid') { Write-Error 'Polaris-Setup.exe came back without a valid signature.'; exit 1 }"
+          mv -f out/signed-installer/Polaris-Setup.exe "out/make/squirrel.windows/x64/Polaris-Setup.exe"
+
+      - uses: actions/upload-artifact@v4
+        timeout-minutes: 5
+        with:
+          name: polaris-signed-Windows-x64
+          path: desktop/out/make/**
+          if-no-files-found: error
+
   release:
-    if: startsWith(github.ref, 'refs/tags/desktop-v')
-    needs: build
+    # `!cancelled()` so a failed signed build, which is allowed, does not skip this,
+    # while cancelling the run still stops the release.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/desktop-v') && needs.build.result == 'success' }}
+    needs: [build, windows-signpath]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -278,6 +329,22 @@ jobs:
         with:
           pattern: polaris-desktop-*
           path: installers
+      - name: Fetch the signed Windows build, if there is one
+        id: signed
+        if: needs.windows-signpath.result != 'skipped'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: polaris-signed-Windows-x64
+          path: installers-signed
+      - name: Prefer the signed Windows build
+        run: |
+          if [ -f installers-signed/squirrel.windows/x64/Polaris-Setup.exe ] && [ -f installers-signed/squirrel.windows/x64/RELEASES ]; then
+            rm -rf installers/polaris-desktop-Windows-x64
+            mv installers-signed installers/polaris-desktop-Windows-x64
+          elif [ "${{ needs.windows-signpath.result }}" != "skipped" ]; then
+            echo "::warning::SignPath did not produce a signed build; this release carries the ordinary Windows build."
+          fi
       # The macOS update feeds name this release's zips (src/main/updates.ts);
       # the checksums are what an AppImage checks its replacement against.
       - name: Update feeds and checksums
@@ -309,6 +376,7 @@ jobs:
           # The repository releases the dashboard too; the desktop app is not
           # made its "latest release".
           make_latest: "false"
+          body: "[Code signing policy](https://github.com/${{ github.repository }}/blob/main/desktop/CODE_SIGNING.md)"
           files: |
             installers/**/*.exe
             installers/**/*.nupkg

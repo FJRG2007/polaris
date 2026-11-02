@@ -648,3 +648,5 @@ hosted service whose source you do not publish, ask for a commercial license
 under Apache-2.0.
 
 To cite Polaris, use [CITATION.cff](CITATION.cff).
+
+Windows builds: [code signing policy](desktop/CODE_SIGNING.md).

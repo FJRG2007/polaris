@@ -94,7 +94,7 @@ a `desktop-v*` tag or on `main`; a run by hand from another branch is unsigned.
 
 | Secret | Used for |
 | --- | --- |
-| `SIGNPATH_API_TOKEN` | Windows through SignPath (below); with it, the certificate file is not used |
+| `SIGNPATH_API_TOKEN` | Windows through SignPath (below) |
 | `WINDOWS_CERTIFICATE_BASE64` | The code-signing certificate (`.pfx`), base64-encoded |
 | `WINDOWS_CERTIFICATE_PASSWORD` | Its password |
 | `APPLE_CERTIFICATE_BASE64` | The Developer ID Application certificate (`.p12`), base64-encoded |
@@ -141,12 +141,21 @@ the packaged app, then the installer made from it.
 
 Squirrel puts the app into the installer, so the app is signed first, the
 installer and update package are made from the signed app, and the installer is
-signed last; the workflow fails if either comes back without a valid signature.
+signed last; the signed build is dropped if either comes back without a valid
+signature.
 Squirrel's own `Update.exe` and the small launcher it puts in front of
 `polaris.exe` are upstream binaries, which SignPath Foundation does not sign, so
 they stay unsigned; SmartScreen judges the downloaded installer, which is signed.
-Each release asks an approver in SignPath twice, and the Windows build waits for
-both.
+Each release asks an approver in SignPath twice, and the signed build waits up
+to 45 minutes for each.
+
+SignPath is never required. Its build is a separate job after the ordinary
+builds, so a tag that does not match the version or a failed build asks nobody
+for approval, and the release publishes the ordinary Windows build if the signed
+one does not finish, for whatever reason, with a warning on the run. Cancelling
+the run stops the release. Adding, changing or
+losing SignPath therefore changes what SmartScreen says about a new download and
+nothing else: Squirrel updates installed apps from either build.
 
 SignPath Foundation requires the project to publish [CODE_SIGNING.md](CODE_SIGNING.md),
 linked as "Code signing policy" from the repository's home page and from the
