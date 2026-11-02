@@ -158,6 +158,111 @@ describe("RouterSection", () => {
         expect(screen.queryByText(/No internet from this port/)).toBeNull();
     });
 
+    const WIFI_LAN = {
+        ...SAVED.lans[0],
+        interface: "wlan0",
+        wifi: { ssid: "Fixture", country: "ES", band: "5" }
+    };
+
+    /** Save a network from its dialog unchanged, and send the draft with a moved line. */
+    async function resaveNetwork(reading: unknown): Promise<{ wifi?: unknown }> {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        applyRouterAction.mockResolvedValue({});
+        readRouterAction.mockResolvedValue({ plan: { ...SAVED, lans: [WIFI_LAN] }, reading });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+        const form = await screen.findByRole("dialog");
+        fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        fireEvent.click(screen.getAllByRole("button", { name: "Move down" })[0] as HTMLElement);
+        fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+        const confirm = await screen.findByRole("dialog");
+        fireEvent.click(within(confirm).getByRole("button", { name: "Apply" }));
+        await waitFor(() => expect(applyRouterAction).toHaveBeenCalledTimes(1));
+        return applyRouterAction.mock.calls[0]?.[0].plan.lans[0];
+    }
+
+    it("keeps an access point whose radio is unplugged", async () => {
+        const lan = await resaveNetwork(READING);
+        expect(lan.wifi).toEqual(WIFI_LAN.wifi);
+    });
+
+    it("keeps an access point when the machine cannot be read", async () => {
+        const lan = await resaveNetwork(null);
+        expect(lan.wifi).toEqual(WIFI_LAN.wifi);
+    });
+
+    it("offers no access point on a port with no radio", async () => {
+        const ports = [...READING.ports, { ...PORT, name: "wlan0", wireless: true }];
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        readRouterAction.mockResolvedValue({
+            plan: { ...SAVED, lans: [{ ...WIFI_LAN, interface: "eth1" }] },
+            reading: { ...READING, ports }
+        });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+        const form = await screen.findByRole("dialog");
+        expect(within(form).queryByLabelText("Wi-Fi name *")).toBeNull();
+    });
+
+    it("judges what is running, not what the draft asks for", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        const ports = [
+            { ...PORT, name: "eth0", hasGateway: true },
+            { ...PORT, name: "eth1" }
+        ];
+        readRouterAction.mockResolvedValue({
+            plan: { ...SAVED, wans: [{ interface: "eth0", vlan: null }] },
+            reading: { ...READING, running: true, ports }
+        });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+        const network = await screen.findByRole("dialog");
+        fireEvent.click(within(network).getByRole("switch", { name: "IPv6" }));
+        fireEvent.click(within(network).getByRole("button", { name: "Save" }));
+        await screen.findByRole("button", { name: "Discard" });
+        expect(screen.getByText("IPv6")).toBeTruthy();
+        expect(screen.queryByText(/No IPv6 yet/)).toBeNull();
+    });
+
+    it("names the connection type on the line's form", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        readRouterAction.mockResolvedValue({ plan: SAVED, reading: READING });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        fireEvent.click(
+            (await screen.findAllByRole("button", { name: "Edit line" }))[0] as HTMLElement
+        );
+        const form = await screen.findByRole("dialog");
+        expect(within(form).getByText("Connection type")).toBeTruthy();
+    });
+
+    it("names a missing prefix client and lets Apply try again", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        const lans = SAVED.lans.map((lan) => ({ ...lan, ipv6: true }));
+        readRouterAction.mockResolvedValue({
+            plan: { ...SAVED, lans },
+            reading: { ...READING, running: true, prefixClient: false }
+        });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText(/could not install dhcpcd/)).toBeTruthy();
+        expect(screen.queryByText(/not offering a prefix/)).toBeNull();
+        const apply = screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement;
+        expect(apply.disabled).toBe(false);
+    });
+
+    it("blames the line only when the prefix client is there", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        const lans = SAVED.lans.map((lan) => ({ ...lan, ipv6: true }));
+        readRouterAction.mockResolvedValue({
+            plan: { ...SAVED, lans },
+            reading: { ...READING, running: true, prefixClient: true }
+        });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText(/not offering a prefix/)).toBeTruthy();
+        const apply = screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement;
+        expect(apply.disabled).toBe(true);
+    });
+
     it("names a stored fixed address that blocks the next change", async () => {
         listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
         const taken = { mac: "aa:bb:cc:dd:ee:01", address: "10.77.0.1" };

@@ -114,13 +114,22 @@ describe("a PPPoE line", () => {
         expect(router.renderWanWatch(session)).toContain(`WANS="${device}"`);
     });
 
+    it("keeps its port under the guard on a line's login port", () => {
+        const rules = router.renderFirewall(plan([SESSION]), ACCESS);
+        expect(rules).toContain('iifname { "ppp-eth0.6", "eth0.6" } tcp dport 22 drop');
+        const plain = router.renderFirewall(plan([{ interface: "eth0", vlan: null }]), ACCESS);
+        expect(plain).toContain('iifname { "eth0" } tcp dport 22 drop');
+    });
+
     it("quotes the sign-in and keeps it off every command line", () => {
         const session = plan([SESSION]);
         const wan = session.wans[0] ?? SESSION;
         expect(router.renderPppOptions(wan, 'a"b\\c', false)).toContain('password "a\\"b\\\\c"');
         expect(router.renderLines(session)).not.toContain("fixture");
         const script = router.renderApply(session, ACCESS, "id", { [LINE_ID]: "fixture-secret" });
-        expect(script).toContain("(umask 077; cat > '/etc/polaris-router.next/ppp-ppp-eth0.6.conf'");
+        expect(script).toContain(
+            "(umask 077; cat > '/etc/polaris-router.next/ppp-ppp-eth0.6.conf'"
+        );
     });
 
     it("keeps its 15 characters on a USB adapter", () => {
@@ -213,6 +222,22 @@ describe("IPv6", () => {
 
     it("keeps a network's link-local address through a restart", () => {
         expect(router.renderUp(six)).toContain("ip -4 addr flush dev eth1");
+        const down = router.renderDown(six);
+        expect(down).toContain("ip -4 addr flush dev eth1");
+        expect(down).toContain("ip -6 addr flush dev eth1 scope global");
+        expect(down).not.toContain("ip addr flush");
+    });
+
+    it("gets through Docker's IPv6 firewall too, and only when it is in use", () => {
+        expect(router.renderUp(six)).toContain("if ip6tables -w -n -L DOCKER-USER");
+        expect(router.renderUp(six)).toContain(
+            'ip6tables -w -A POLARIS-ROUTER -i "$from" -o "$to" -j ACCEPT'
+        );
+        expect(router.renderDown(six)).toContain("ip6tables -w -D DOCKER-USER -j POLARIS-ROUTER");
+        expect(router.renderDown(six)).toContain("ip6tables -w -X POLARIS-ROUTER");
+        const plain = plan([{ interface: "eth0", vlan: null }], [{ ...LAN, interface: "eth1" }]);
+        expect(router.renderUp(plain)).not.toContain("ip6tables");
+        expect(router.renderDown(plain)).not.toContain("ip6tables");
     });
 });
 
@@ -222,14 +247,16 @@ describe("passwords", () => {
     it("are gone from the plan that is stored and shown", () => {
         const stored = JSON.stringify(router.withoutSecrets(full));
         expect(stored).not.toContain("fixture-wifi");
-        expect(stored).not.toContain("fixture\\\"pass");
+        expect(stored).not.toContain('fixture\\"pass');
         expect(router.readPlan(JSON.parse(stored))).not.toBeNull();
     });
 
     it("are taken from what was typed, or kept from before", () => {
         const stored = router.withoutSecrets(full);
         expect(router.secretsOf(stored, {})).toBeNull();
-        expect(router.secretsOf(stored, { [LINE_ID]: "kept-line", [LAN_ID]: "kept-wifi1" })).toEqual({
+        expect(
+            router.secretsOf(stored, { [LINE_ID]: "kept-line", [LAN_ID]: "kept-wifi1" })
+        ).toEqual({
             [LINE_ID]: "kept-line",
             [LAN_ID]: "kept-wifi1"
         });
@@ -259,6 +286,8 @@ describe("reading a machine", () => {
                 "wlan0",
                 "---airing",
                 "wlan0",
+                "---prefixclient",
+                "yes",
                 "---routes",
                 "[]",
                 "---end"
@@ -267,6 +296,9 @@ describe("reading a machine", () => {
         expect(reading.ports.map(({ name }) => name)).toEqual(["eth0", "wlan0"]);
         expect(reading.sessions).toEqual(["ppp-eth0"]);
         expect(reading.airing).toEqual(["wlan0"]);
+        expect(reading.prefixClient).toBe(true);
+        expect(readProbe("---prefixclient\n---end").prefixClient).toBe(false);
+        expect(router.PROBE_SCRIPT).toContain("---prefixclient");
         expect(reading.ports[1]?.wireless).toBe(true);
         expect(reading.ports[0]?.publicAddresses).toEqual(["2001:db8:1::1/64"]);
     });

@@ -343,6 +343,7 @@ function quotedList(values: readonly string[]): string {
  *  cut off from the others is cut off from them and the tailnet too. */
 export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
     const wans = plan.wans.map(lineDevice);
+    const outside = [...new Set([...wans, ...plan.wans.map(deviceOf)])];
     const lans = plan.lans.map(deviceOf);
     const open = plan.lans.filter((lan) => !lan.isolated).map(deviceOf);
     const online = plan.lans.filter((lan) => lan.internet).map(deviceOf);
@@ -366,13 +367,11 @@ export function renderFirewall(plan: RouterPlan, access: RouterAccess): string {
         `        iifname ${quotedList(lans)} udp dport { 53, 67${ipv6 ? ", 547" : ""} } accept`,
         `        iifname ${quotedList(lans)} tcp dport 53 accept`,
         // A delegated prefix's replies come back to a link-local address, untracked.
-        ...(ipv6
-            ? [`        iifname ${quotedList(wans)} udp sport 547 udp dport 546 accept`]
-            : []),
+        ...(ipv6 ? [`        iifname ${quotedList(wans)} udp sport 547 udp dport 546 accept`] : []),
         ...(access.management
             ? [`        ip saddr ${access.management} tcp dport ${access.sshPort} accept`]
             : []),
-        `        iifname ${quotedList([...closed, ...wans])} tcp dport ${access.sshPort} drop`,
+        `        iifname ${quotedList([...closed, ...outside])} tcp dport ${access.sshPort} drop`,
         `        ip saddr { ${managed.join(", ")} } tcp dport ${access.sshPort} accept`,
         `        iifname ${engineLinks} accept`,
         "    }",
@@ -456,22 +455,32 @@ function unmanaged(device: string): string {
     return `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${device} managed no >/dev/null 2>&1 || true`;
 }
 
+type DockerFirewall = "iptables" | "ip6tables";
+
 /** Docker leaves iptables' FORWARD chain on a DROP policy, and a packet has to pass
  *  every firewall on the machine, so what the router's own table accepts dies there.
  *  Only the pairs the router joins are let through, in both directions; the router's
  *  table still decides which of them pass. */
-function renderDockerAllow(plan: RouterPlan): string[] {
+function renderDockerAllow(plan: RouterPlan, tool: DockerFirewall): string[] {
     const lans = shellWords(plan.lans.map(deviceOf));
     const wans = shellWords(plan.wans.map(lineDevice));
     const allow = (from: string, to: string) =>
-        `    for from in ${from}; do for to in ${to}; do [ "$from" = "$to" ] || iptables -w -A ${DOCKER_ALLOW_CHAIN} -i "$from" -o "$to" -j ACCEPT; done; done`;
+        `    for from in ${from}; do for to in ${to}; do [ "$from" = "$to" ] || ${tool} -w -A ${DOCKER_ALLOW_CHAIN} -i "$from" -o "$to" -j ACCEPT; done; done`;
     return [
-        "if iptables -w -n -L DOCKER-USER >/dev/null 2>&1; then",
-        `    iptables -w -N ${DOCKER_ALLOW_CHAIN} 2>/dev/null || iptables -w -F ${DOCKER_ALLOW_CHAIN}`,
-        `    iptables -w -C DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null || iptables -w -I DOCKER-USER -j ${DOCKER_ALLOW_CHAIN}`,
+        `if ${tool} -w -n -L DOCKER-USER >/dev/null 2>&1; then`,
+        `    ${tool} -w -N ${DOCKER_ALLOW_CHAIN} 2>/dev/null || ${tool} -w -F ${DOCKER_ALLOW_CHAIN}`,
+        `    ${tool} -w -C DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null || ${tool} -w -I DOCKER-USER -j ${DOCKER_ALLOW_CHAIN}`,
         allow(lans, `${lans} ${wans}`),
         allow(wans, lans),
         "fi"
+    ];
+}
+
+function dockerAllowRemoval(tool: DockerFirewall): string[] {
+    return [
+        `${tool} -w -D DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        `${tool} -w -F ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        `${tool} -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`
     ];
 }
 
@@ -662,7 +671,8 @@ export function renderUp(plan: RouterPlan): string {
         `mkdir -p ${RUN_DIR}`,
         `/bin/sh ${ROUTER_DIR}/lines.sh`,
         `nft -f ${ROUTER_DIR}/rules.nft`,
-        ...renderDockerAllow(plan),
+        ...renderDockerAllow(plan, "iptables"),
+        ...(hasIpv6(plan) ? renderDockerAllow(plan, "ip6tables") : []),
         // Last: a machine that forwards has its firewall in place first.
         "sysctl -q -w net.ipv4.ip_forward=1",
         ...(hasIpv6(plan) ? IPV6_FORWARDING : []),
@@ -795,9 +805,8 @@ export function renderDown(plan: RouterPlan): string {
         `ip rule del priority ${ROUTE_TABLE} 2>/dev/null`,
         `ip rule del priority ${ROUTE_TABLE + 1} 2>/dev/null`,
         `ip route flush table ${ROUTE_TABLE} 2>/dev/null`,
-        `iptables -w -D DOCKER-USER -j ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
-        `iptables -w -F ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
-        `iptables -w -X ${DOCKER_ALLOW_CHAIN} 2>/dev/null`,
+        ...dockerAllowRemoval("iptables"),
+        ...(hasIpv6(plan) ? dockerAllowRemoval("ip6tables") : []),
         "rm -f /run/polaris-router/wan",
         `! running ${PREFIX_CLIENT_PID} dhcpcd || kill "$(cat ${PREFIX_CLIENT_PID})" 2>/dev/null`,
         `rm -f ${PREFIX_CLIENT_PID}`,
@@ -836,7 +845,11 @@ export function renderDown(plan: RouterPlan): string {
         lines.push(`! running ${pid} || kill "$(cat ${pid})" 2>/dev/null`);
     }
     for (const lan of plan.lans) {
-        lines.push(`ip addr flush dev ${deviceOf(lan)} 2>/dev/null`);
+        // A delegated address goes, and the link-local one stays: announcements need it.
+        lines.push(
+            `ip -4 addr flush dev ${deviceOf(lan)} 2>/dev/null`,
+            `ip -6 addr flush dev ${deviceOf(lan)} scope global 2>/dev/null`
+        );
         lines.push(
             `! command -v nmcli >/dev/null 2>&1 || nmcli device set ${deviceOf(lan)} managed yes >/dev/null 2>&1`
         );
@@ -1229,6 +1242,8 @@ for pid in ${RUN_DIR}/hostapd.*.pid; do
     name="\${pid##*/hostapd.}"
     printf '%s\\n' "\${name%.pid}"
 done
+echo "---prefixclient"
+! command -v dhcpcd >/dev/null 2>&1 || echo yes
 echo "---routes"
 ip -j -4 route show default 2>/dev/null || echo '[]'
 echo "---client"

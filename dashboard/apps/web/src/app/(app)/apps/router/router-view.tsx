@@ -36,7 +36,7 @@ import {
 const EMPTY_PLAN: RouterPlan = { wans: [], lans: [], forwards: [] };
 
 /** Why a line or network the machine is running does nothing, in what the screen can
- *  see. A draft's own links have not been touched yet, so they have no problem to name. */
+ *  see. Only what was applied is judged: a draft has not reached the machine yet. */
 function linkProblem(
     link: RouterWan,
     applied: readonly RouterWan[] | undefined,
@@ -44,11 +44,12 @@ function linkProblem(
     isLine: boolean
 ): LinkProblem | null {
     if (!reading?.running) return null;
-    if (!applied?.some((one) => deviceOf(one) === deviceOf(link))) return null;
-    const port = reading.ports.find(({ name }) => name === deviceOf(link));
+    const running = applied?.find((one) => deviceOf(one) === deviceOf(link));
+    if (!running) return null;
+    const port = reading.ports.find(({ name }) => name === deviceOf(running));
     if (!port) return "lineMissing";
-    if (isLine && modeOf(link) === "pppoe") {
-        return reading.sessions?.includes(lineDevice(link)) ? null : "sessionDown";
+    if (isLine && modeOf(running) === "pppoe") {
+        return reading.sessions?.includes(lineDevice(running)) ? null : "sessionDown";
     }
     return isLine && !port.hasGateway ? "lineNoWay" : null;
 }
@@ -61,21 +62,19 @@ function networkProblem(
 ): LinkProblem | null {
     const missing = linkProblem(lan, applied, reading, false);
     if (missing || !reading?.running) return missing;
-    if (!applied?.some((one) => one.id === lan.id)) return null;
-    if (lan.wifi && !reading.airing?.includes(deviceOf(lan))) return "notAiring";
-    const port = reading.ports.find(({ name }) => name === deviceOf(lan));
-    return lan.ipv6 && !port?.publicAddresses?.length ? "noPrefix" : null;
+    const running = applied?.find((one) => one.id === lan.id);
+    if (!running) return null;
+    const device = deviceOf(running);
+    if (running.wifi && !reading.airing?.includes(device)) return "notAiring";
+    const port = reading.ports.find(({ name }) => name === device);
+    if (!running.ipv6 || port?.publicAddresses?.length) return null;
+    return reading.prefixClient === false ? "noPrefixClient" : "noPrefix";
 }
 
-type LinkProblem = "lineMissing" | "lineNoWay" | "sessionDown" | "notAiring" | "noPrefix";
+type LinkProblem =
+    "lineMissing" | "lineNoWay" | "sessionDown" | "notAiring" | "noPrefix" | "noPrefixClient";
 
-function LinkWarning({
-    t,
-    problem
-}: {
-    t: Translate;
-    problem: LinkProblem | null;
-}) {
+function LinkWarning({ t, problem }: { t: Translate; problem: LinkProblem | null }) {
     if (problem === null) return null;
     return <span className="w-full text-xs text-warning">{t(problem)}</span>;
 }
@@ -200,8 +199,15 @@ function RouterEditor({
         () => reading?.ports.filter(({ wireless }) => wireless).map(({ name }) => name) ?? [],
         [reading]
     );
+    const wired = useMemo(
+        () => reading?.ports.filter(({ wireless }) => !wireless).map(({ name }) => name) ?? [],
+        [reading]
+    );
     const lineShown = editingLine === null ? undefined : plan.wans[editingLine];
     const changed = JSON.stringify(plan) !== JSON.stringify(saved ?? EMPTY_PLAN);
+    const retryable = plan.lans.some(
+        (lan) => networkProblem(lan, saved?.lans, reading) === "noPrefixClient"
+    );
     const check = routerPlanSchema.safeParse(plan);
     const problem = check.success
         ? undefined
@@ -391,7 +397,9 @@ function RouterEditor({
                             {lan.isolated ? (
                                 <ui.Badge variant="neutral">{t("isolated")}</ui.Badge>
                             ) : null}
-                            {lan.wifi ? <ui.Badge variant="neutral">{lan.wifi.ssid}</ui.Badge> : null}
+                            {lan.wifi ? (
+                                <ui.Badge variant="neutral">{lan.wifi.ssid}</ui.Badge>
+                            ) : null}
                             {lan.ipv6 ? <ui.Badge variant="neutral">{t("ipv6")}</ui.Badge> : null}
                             <IconButton label={t("edit")} onClick={() => setEditingLan(lan)}>
                                 <Pencil />
@@ -481,7 +489,7 @@ function RouterEditor({
                 ) : null}
                 <ui.Button
                     size="sm"
-                    disabled={!check.success || !changed || pending}
+                    disabled={!check.success || !(changed || retryable) || pending}
                     onClick={() => setConfirming(true)}
                 >
                     {t("apply")}
@@ -494,6 +502,7 @@ function RouterEditor({
                     taken={plan.lans}
                     ports={ports}
                     radios={radios}
+                    wired={wired}
                     privateNetworks={privateNetworks}
                     onClose={() => setEditingLan(null)}
                     onSave={saveLan}
@@ -505,9 +514,7 @@ function RouterEditor({
                     onClose={() => setEditingLine(null)}
                     onSave={(wan) => {
                         change({
-                            wans: plan.wans.map((one, index) =>
-                                index === editingLine ? wan : one
-                            )
+                            wans: plan.wans.map((one, index) => (index === editingLine ? wan : one))
                         });
                         setEditingLine(null);
                     }}

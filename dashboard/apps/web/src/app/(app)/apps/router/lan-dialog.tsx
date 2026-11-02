@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import * as ui from "@polaris/ui";
+import { Field } from "./router-field";
 import { VlanInput } from "./router-view";
 import { Plus, Trash2 } from "lucide-react";
 import type { MachinesAnswer } from "./actions";
@@ -37,6 +38,7 @@ export function LanDialog({
     taken,
     ports,
     radios,
+    wired,
     privateNetworks,
     onClose,
     onSave
@@ -46,6 +48,8 @@ export function LanDialog({
     ports: readonly string[];
     /** The ports that can run an access point. */
     radios: readonly string[];
+    /** The ports the machine shows that have no radio. */
+    wired: readonly string[];
     privateNetworks: MachinesAnswer["privateNetworks"];
     onClose: () => void;
     onSave: (lan: RouterLan) => void;
@@ -75,7 +79,8 @@ export function LanDialog({
     const subnetTaken = !subnetBad && others.some((other) => cidrsOverlap(clean, other));
     const addressBad =
         address.trim() !== "" && isUsableCidr(clean) && !isHostOf(clean, address.trim());
-    const isRadio = radios.includes(port);
+    const unseenRadio = lan?.wifi !== undefined && !wired.includes(port);
+    const isRadio = radios.includes(port) || unseenRadio;
     const airing = isRadio && broadcast;
     const keptPassword = lan?.wifi?.password;
     const typedPassword = wifiPassword || keptPassword;
@@ -147,6 +152,7 @@ export function LanDialog({
                     <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field id="lan-port" label={`${t("port")} *`}>
                             <ui.Select
+                                id="lan-port"
                                 aria-label={t("port")}
                                 value={port}
                                 onValueChange={setPort}
@@ -245,16 +251,21 @@ export function LanDialog({
                             </Field>
                             <Field id="lan-band" label={t("wifiBand")}>
                                 <ui.Select
+                                    id="lan-band"
                                     aria-label={t("wifiBand")}
                                     value={band}
                                     onValueChange={(next) => setBand(next as "2.4" | "5")}
                                     options={[
-                                        { value: "5", label: "5 GHz" },
-                                        { value: "2.4", label: "2.4 GHz" }
+                                        { value: "5", label: t("wifiBand5") },
+                                        { value: "2.4", label: t("wifiBand24") }
                                     ]}
                                 />
                             </Field>
-                            <Field id="lan-country" label={`${t("wifiCountry")} *`} hint={t("wifiCountryHint")}>
+                            <Field
+                                id="lan-country"
+                                label={`${t("wifiCountry")} *`}
+                                hint={t("wifiCountryHint")}
+                            >
                                 <ui.Input
                                     id="lan-country"
                                     className="font-mono uppercase"
@@ -360,36 +371,6 @@ export function LanDialog({
                 </ui.DialogFooter>
             </ui.DialogContent>
         </ui.Dialog>
-    );
-}
-
-function Field({
-    id,
-    label,
-    error,
-    hint,
-    children
-}: {
-    id: string;
-    label: string;
-    error?: string | null;
-    hint?: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex min-w-0 flex-col gap-1">
-            <label htmlFor={id} className="text-sm font-medium">
-                {label}
-            </label>
-            {children}
-            {error ? (
-                <p role="alert" className="text-xs text-danger">
-                    {error}
-                </p>
-            ) : hint ? (
-                <p className="text-xs text-muted-foreground">{hint}</p>
-            ) : null}
-        </div>
     );
 }
 

@@ -60,6 +60,8 @@ export interface RouterReading {
     readonly sessions?: readonly string[];
     /** The radios on the air now. */
     readonly airing?: readonly string[];
+    /** The client that asks a line for an IPv6 prefix is on the machine. */
+    readonly prefixClient?: boolean;
     /** The last change did not stick and the machine went back. */
     readonly rolledBack: boolean;
 }
@@ -147,6 +149,7 @@ export function readProbe(output: string): RouterReading {
             SESSION.test(ifname) && addresses.some((one) => one.ifname === ifname) ? ifname : []
         ),
         airing: namesIn(section("airing")),
+        prefixClient: section("prefixclient") === "yes",
         running: section("services")
             .split("\n")
             .filter(Boolean)
