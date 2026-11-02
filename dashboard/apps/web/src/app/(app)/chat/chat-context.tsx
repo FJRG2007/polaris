@@ -15,6 +15,7 @@
  * already brings.
  */
 
+import { readChatLists, writeChatLists } from "./chat-list-cache";
 import * as core from "@polaris/core";
 import { chatListsAction, listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
@@ -23,6 +24,7 @@ import {
     useCallback,
     useContext,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -180,10 +182,17 @@ export function ChatProvider({
                 if (result.categories) setCategories(result.categories);
                 if (result.blocked) setBlocked(new Set(result.blocked));
                 if (result.friends) setFriends(new Set(result.friends));
+                if (result.channels && result.spaces && result.categories) {
+                    writeChatLists(viewerId, {
+                        channels: result.channels,
+                        spaces: result.spaces,
+                        categories: result.categories
+                    });
+                }
             })
             .catch(() => undefined)
             .finally(() => setLoaded(true));
-    }, []);
+    }, [viewerId]);
 
     const channelsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const refreshChannels = useCallback(() => {
@@ -206,6 +215,15 @@ export function ChatProvider({
         []
     );
 
+    // Before the paint, so a reload never flashes the skeleton over a rail it has.
+    useLayoutEffect(() => {
+        const kept = readChatLists<ChatChannelView, ChatSpaceView, ChatCategoryView>(viewerId);
+        if (!kept) return;
+        setChannels(kept.channels);
+        setSpaces(kept.spaces);
+        setCategories(kept.categories);
+        setLoaded(true);
+    }, [viewerId]);
     useEffect(refresh, [refresh]);
 
     // Once, when the app opens. The rules are an instance setting: they do not
