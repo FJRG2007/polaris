@@ -9,8 +9,10 @@
 import Link from "next/link";
 import * as ui from "@polaris/ui";
 import { useVpnRead } from "./use-vpn-read";
+import { OwnVpns } from "./own-vpns";
 import { Power, Trash2 } from "lucide-react";
 import * as actions from "./connect-actions";
+import { openProfileAction } from "./profile-actions";
 import { desktopBridge } from "@/lib/desktop-bridge";
 import { WorldMap, type MapPlace } from "./world-map";
 import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
@@ -59,6 +61,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
     const desktop = desktopBridge()?.vpn ?? null;
     const blocked = data && data.standing !== "active" ? data.standing : null;
     const nodes = data?.nodes ?? [];
+    const profiles = data?.profiles ?? [];
 
     useEffect(() => {
         void desktop?.status().then(setTunnel);
@@ -70,16 +73,20 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             .join(", ");
     const places = useMemo<MapPlace[]>(
         () =>
-            nodes.flatMap((node) =>
-                node.country && node.exit !== "tor"
-                    ? [{ id: node.id, country: node.country, label: node.name }]
+            [
+                ...nodes.filter((node) => node.exit !== "tor"),
+                ...profiles
+            ].flatMap((place) =>
+                place.country
+                    ? [{ id: place.id, country: place.country, label: place.name }]
                     : []
             ),
-        [nodes]
+        [nodes, profiles]
     );
     const active = tunnel?.nodeId ?? null;
-    const selected = picked ?? active ?? nodes[0]?.id ?? null;
+    const selected = picked ?? active ?? nodes[0]?.id ?? profiles[0]?.id ?? null;
     const chosen = nodes.find(({ id }) => id === selected) ?? null;
+    const chosenProfile = profiles.find(({ id }) => id === selected) ?? null;
 
     function tunnelError(code: string): string {
         return t(`connect.tunnel.${TUNNEL_CODES.has(code) ? (code as TunnelCode) : "failed"}`);
@@ -110,6 +117,34 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             if (!up.ok) setError(tunnelError(up.error));
             setTunnel(await desktop.status());
             read.reload();
+        });
+    }
+
+    function connectProfile(id: string): void {
+        if (!desktop) return;
+        setError(null);
+        startTransition(async () => {
+            const opened = await openProfileAction(id);
+            if (opened.error !== undefined) return setError(opened.error);
+            const { profile } = opened;
+            const [address = "", ...moreAddresses] = profile.addresses;
+            const up = await desktop.up({
+                nodeId: id,
+                address,
+                dns: profile.dns,
+                nodePublicKey: profile.publicKey,
+                endpoint: profile.endpoint,
+                port: profile.port,
+                own: {
+                    privateKey: profile.privateKey,
+                    presharedKey: profile.presharedKey,
+                    moreAddresses,
+                    allowedIps: profile.allowedIps,
+                    mtu: profile.mtu
+                }
+            });
+            if (!up.ok) setError(tunnelError(up.error));
+            setTunnel(await desktop.status());
         });
     }
 
@@ -203,6 +238,24 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                             ))}
                         </div>
                     )}
+                    {data ? (
+                        <OwnVpns
+                            profiles={profiles}
+                            selected={selected}
+                            active={active}
+                            where={(profile) =>
+                                [
+                                    profile.city,
+                                    profile.country ? countryName(profile.country, locale) : null
+                                ]
+                                    .filter(Boolean)
+                                    .join(", ")
+                            }
+                            onSelect={setPicked}
+                            onChanged={read.reload}
+                            onError={setError}
+                        />
+                    ) : null}
                     {chosen?.exit === "tor" ? (
                         <p className="text-xs text-muted-foreground">{t("connect.torHint")}</p>
                     ) : null}
@@ -215,6 +268,14 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                         <ui.Button variant="outline" disabled={pending} onClick={disconnect}>
                             <Power />
                             {t("connect.disconnect")}
+                        </ui.Button>
+                    ) : null}
+                    {chosenProfile && chosenProfile.id !== active ? (
+                        <ui.Button disabled={pending} onClick={() => connectProfile(chosenProfile.id)}>
+                            <Power />
+                            {t(active ? "connect.switchTo" : "connect.connectTo", {
+                                name: chosenProfile.name
+                            })}
                         </ui.Button>
                     ) : null}
                     {chosen && chosen.id !== active ? (
@@ -238,6 +299,14 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                     <p className="text-xs text-muted-foreground">{t("connect.noPhoneApp")}</p>
                 </div>
             )}
+            {isAdmin ? (
+                <Link
+                    href="/admin/domains/remote-access"
+                    className="w-fit text-sm text-primary hover:underline"
+                >
+                    {t("connect.remoteAccess")}
+                </Link>
+            ) : null}
 
             <section className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-sm font-medium">{t("connect.devices")}</h2>

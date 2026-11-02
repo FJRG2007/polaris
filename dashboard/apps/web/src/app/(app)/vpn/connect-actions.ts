@@ -9,6 +9,7 @@ import * as wg from "@/lib/vpn/wireguard";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import * as service from "@/lib/vpn/wireguard-service";
+import { profilesOf } from "@/lib/vpn/profile-service";
 import { requireAdmin, requireUser } from "@/lib/session";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
@@ -24,6 +25,7 @@ async function failed(error: unknown): Promise<{ error: string }> {
 export interface ConnectAnswer {
     readonly nodes: Awaited<ReturnType<typeof service.nodesFor>>;
     readonly devices: Awaited<ReturnType<typeof service.devicesOf>>;
+    readonly profiles: Awaited<ReturnType<typeof profilesOf>>;
     readonly standing: wg.AccessStanding | "none";
     readonly deviceLimit: number;
     readonly usedBytes: string;
@@ -33,14 +35,16 @@ export interface ConnectAnswer {
 export async function connectAction(): Promise<Result<ConnectAnswer>> {
     const user = await requireUser();
     try {
-        const [nodes, devices, access] = await Promise.all([
+        const [nodes, devices, profiles, access] = await Promise.all([
             service.nodesFor(user),
             service.devicesOf(user.id),
+            profilesOf(user.id),
             service.accessOf(user)
         ]);
         return {
             nodes,
             devices,
+            profiles,
             standing: access ? wg.accessStanding(access, new Date()) : "none",
             deviceLimit: access?.deviceLimit ?? 0,
             usedBytes: (access?.usedBytes ?? 0n).toString(),

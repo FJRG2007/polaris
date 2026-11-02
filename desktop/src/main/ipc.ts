@@ -103,7 +103,16 @@ const connectionSchema = z.object({
     dns: z.array(z.string().min(1).max(64)).max(4),
     nodePublicKey: z.string().min(1).max(64),
     endpoint: z.string().min(1).max(255),
-    port: z.number().int().min(1).max(65535)
+    port: z.number().int().min(1).max(65535),
+    own: z
+        .object({
+            privateKey: z.string().min(1).max(64),
+            presharedKey: z.string().min(1).max(64).nullable(),
+            moreAddresses: z.array(z.string().min(1).max(64)).max(3),
+            allowedIps: z.array(z.string().min(1).max(64)).min(1).max(64),
+            mtu: z.number().int().min(576).max(9000).nullable()
+        })
+        .optional()
 });
 
 const windowSchema = z.object({

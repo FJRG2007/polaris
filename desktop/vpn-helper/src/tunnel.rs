@@ -35,15 +35,38 @@ pub type Refusal = &'static str;
 
 pub struct Target {
     public_key: Key,
-    address: IpAddrMask,
+    private_key: Option<String>,
+    preshared_key: Option<Key>,
+    addresses: Vec<IpAddrMask>,
+    allowed_ips: Vec<IpAddrMask>,
+    mtu: Option<u32>,
     dns: Vec<IpAddr>,
     endpoint: SocketAddr,
+}
+
+fn network(value: &str) -> Result<IpAddrMask, Refusal> {
+    IpAddrMask::from_str(value).map_err(|_| "badRequest")
 }
 
 /// Everything from the app is checked before anything is touched.
 pub fn parse(request: &UpRequest) -> Result<Target, Refusal> {
     let public_key = Key::from_str(&request.node_public_key).map_err(|_| "badRequest")?;
-    let address = IpAddrMask::from_str(&request.address).map_err(|_| "badRequest")?;
+    let mut addresses = vec![network(&request.address)?];
+    let own = request.own.as_ref();
+    if let Some(own) = own {
+        Key::from_str(&own.private_key).map_err(|_| "badRequest")?;
+        for address in &own.more_addresses {
+            addresses.push(network(address)?);
+        }
+    }
+    let preshared_key = own
+        .and_then(|own| own.preshared_key.as_deref())
+        .map(|key| Key::from_str(key).map_err(|_| "badRequest"))
+        .transpose()?;
+    let allowed_ips = match own {
+        Some(own) => own.allowed_ips.iter().map(|ip| network(ip)).collect::<Result<_, _>>()?,
+        None => vec![network("0.0.0.0/0")?, network("::/0")?],
+    };
     let dns = request
         .dns
         .iter()
@@ -54,7 +77,16 @@ pub fn parse(request: &UpRequest) -> Result<Target, Refusal> {
         .map_err(|_| "unreachable")?
         .next()
         .ok_or("unreachable")?;
-    Ok(Target { public_key, address, dns, endpoint })
+    Ok(Target {
+        public_key,
+        private_key: own.map(|own| own.private_key.clone()),
+        preshared_key,
+        addresses,
+        allowed_ips,
+        mtu: own.and_then(|own| own.mtu),
+        dns,
+        endpoint,
+    })
 }
 
 #[derive(Default)]
@@ -71,18 +103,16 @@ fn start(
     let mut peer = Peer::new(target.public_key.clone());
     peer.endpoint = Some(target.endpoint);
     peer.persistent_keepalive_interval = Some(KEEPALIVE_SECONDS);
-    peer.allowed_ips = vec![
-        IpAddrMask::from_str("0.0.0.0/0").expect("a fixed network"),
-        IpAddrMask::from_str("::/0").expect("a fixed network"),
-    ];
+    peer.preshared_key = target.preshared_key.clone();
+    peer.allowed_ips = target.allowed_ips.clone();
     api.create_interface()?;
     api.configure_interface(&InterfaceConfiguration {
         name: INTERFACE.to_owned(),
-        prvkey: private_key.to_owned(),
-        addresses: vec![target.address.clone()],
+        prvkey: target.private_key.as_deref().unwrap_or(private_key).to_owned(),
+        addresses: target.addresses.clone(),
         port: 0,
         peers: vec![peer.clone()],
-        mtu: None,
+        mtu: target.mtu,
         fwmark: None,
     })?;
     api.configure_peer_routing(&[peer])?;

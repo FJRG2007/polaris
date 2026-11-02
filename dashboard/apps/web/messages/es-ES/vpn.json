@@ -297,6 +297,25 @@
             "failed": "Este ordenador no pudo iniciar la VPN. Inténtalo de nuevo.",
             "noAnswer": "Ese servidor no respondió. Prueba otra ubicación.",
             "unreachable": "No se encontró la dirección de ese servidor. Prueba otra ubicación."
+        },
+        "remoteAccess": "Tailscale y otras formas de entrar en este servidor",
+        "own": {
+            "title": "Tus propias VPN",
+            "hint": "Importa un archivo WireGuard de un proveedor como Proton o Mullvad. Se conecta desde la app de Polaris en tu ordenador.",
+            "import": "Importar",
+            "empty": "Aún no has importado nada.",
+            "added": "{count, plural, one {# VPN añadida} other {# VPN añadidas}}",
+            "rejected": "No son archivos WireGuard con un servidor: {names}",
+            "remove": "Quitar {name}",
+            "removeTitle": "¿Quitar {name}?",
+            "removeBody": "Su archivo se borra de Polaris. Tendrías que importarlo de nuevo para conectarte.",
+            "removeConfirm": "Quitar",
+            "inUse": "Desconéctate antes de quitarla",
+            "errors": {
+                "tooMany": "Puedes guardar hasta {limit} VPN. Quita alguna primero.",
+                "notFound": "Eso ya no está aquí.",
+                "unreadable": "No se han podido leer esos archivos. Usa los .conf que te da tu proveedor."
+            }
         }
     },
     "nodes": {

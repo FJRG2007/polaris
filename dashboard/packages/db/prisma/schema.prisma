@@ -294,6 +294,7 @@ model User {
     accessGroupBindings UserAccessGroup[]
     vpnPeers            VpnPeer[]
     vpnAccess           VpnAccess?
+    vpnProfiles         VpnProfile[]
     apiKeys             ApiKey[]
     oauthGrants         OAuthGrant[]
     twoFactors          TwoFactor[]
@@ -16075,7 +16076,7 @@ model VpnNode {
     /// Null until the machine answered with it.
     publicKey   String?
     /// What signs the browser proxy's logins, sealed; the node made it.
-    proxyKeySealed Bytes?
+    encryptedProxyKey Bytes?
     proxyKeyNonce  Bytes?
     proxyKeyId     String?
     /// The name the extension connects to. Null until the edge took the route.
@@ -16120,6 +16121,24 @@ model VpnPeer {
 
     @@unique([nodeId, hostIndex])
     @@index([userId, createdAt])
+}
+
+/// A VPN one person already has elsewhere, imported from its provider's file. The
+/// file holds their private key there, so all of it stays sealed.
+model VpnProfile {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    userId          String   @db.Uuid
+    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    name            String
+    encryptedConfig Bytes
+    configNonce     Bytes
+    configKeyId     String
+    /// Where traffic comes out, read from the server's address when it was imported.
+    country         String?
+    city            String?
+    createdAt       DateTime @default(now())
+
+    @@index([userId, name])
 }
 
 /// What one person may do on the VPN, granted by an administrator.

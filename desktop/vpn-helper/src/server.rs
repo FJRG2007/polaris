@@ -16,7 +16,7 @@ use std::{
 pub const PORT: u16 = 51898;
 /// Reported to the app, which reinstalls a service older than it expects.
 pub const VERSION: u32 = 1;
-const MAX_LINE: u64 = 4096;
+const MAX_LINE: u64 = 16 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Deserialize)]
@@ -28,6 +28,19 @@ pub struct UpRequest {
     pub node_public_key: String,
     pub endpoint: String,
     pub port: u16,
+    /// A VPN from elsewhere has its own keys and may not carry everything.
+    #[serde(default)]
+    pub own: Option<OwnTunnel>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnTunnel {
+    pub private_key: String,
+    pub preshared_key: Option<String>,
+    pub more_addresses: Vec<String>,
+    pub allowed_ips: Vec<String>,
+    pub mtu: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -123,6 +136,18 @@ mod tests {
     fn refuses_an_answer_to_another_challenge() {
         let order = read_order(&line(json!({ "order": "down" })), SECRET, "fresh");
         assert!(matches!(order, Err("denied")));
+    }
+
+    #[test]
+    fn reads_a_tunnel_with_its_own_keys() {
+        let body = json!({
+            "order": "up", "nodeId": "n", "address": "10.2.0.2/32", "dns": [],
+            "nodePublicKey": "k", "endpoint": "198.51.100.1", "port": 51820,
+            "own": { "privateKey": "p", "presharedKey": null, "moreAddresses": [],
+                     "allowedIps": ["0.0.0.0/0"], "mtu": 1320 }
+        });
+        let order = read_order(&line(body), SECRET, "nonce");
+        assert!(matches!(order, Ok(Order::Up(UpRequest { own: Some(_), .. }))));
     }
 
     #[test]

@@ -12,25 +12,6 @@ const access = {
 };
 const NOW = new Date("2026-11-02T00:00:00Z");
 
-describe("device configuration", () => {
-    const config = wg.renderDeviceConfig({
-        privateKey: "private",
-        address: "10.128.0.2",
-        nodePublicKey: "public",
-        endpoint: "vpn.example.test",
-        port: 51820
-    });
-
-    it("sends everything through the tunnel, IPv6 included", () => {
-        expect(config).toContain("AllowedIPs = 0.0.0.0/0, ::/0");
-        expect(config).toContain("Endpoint = vpn.example.test:51820");
-    });
-
-    it("names no node-only resolver, so a node can change exit", () => {
-        expect(config).not.toContain("DNS = 10.");
-    });
-});
-
 describe("node addresses", () => {
     it("gives every node its own range", () => {
         expect(wg.nodeSubnet(0).cidr).not.toBe(wg.nodeSubnet(1).cidr);

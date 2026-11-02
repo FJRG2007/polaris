@@ -172,7 +172,7 @@ async function deployNode(node: NodeRow): Promise<NodeRow> {
 
 function sealedProxyKey(key: string) {
     const blob = encryptSecret(key, loadEnv().POLARIS_MASTER_KEY);
-    return { proxyKeySealed: blob.ciphertext, proxyKeyNonce: blob.nonce, proxyKeyId: blob.keyId };
+    return { encryptedProxyKey: blob.ciphertext, proxyKeyNonce: blob.nonce, proxyKeyId: blob.keyId };
 }
 
 /**
@@ -203,12 +203,12 @@ export async function browserLogin(
     }
     if (!wg.mayUseNode(access, nodeId)) throw new WireGuardRefusal("noAccess");
     const node = await nodeRow(nodeId);
-    if (!node?.proxyHost || !node.proxyKeySealed || !node.proxyKeyNonce || !node.proxyKeyId) {
+    if (!node?.proxyHost || !node.encryptedProxyKey || !node.proxyKeyNonce || !node.proxyKeyId) {
         throw new WireGuardRefusal("nodeNotReady");
     }
     const secret = decryptSecret(
         {
-            ciphertext: Buffer.from(node.proxyKeySealed),
+            ciphertext: Buffer.from(node.encryptedProxyKey),
             nonce: Buffer.from(node.proxyKeyNonce),
             keyId: node.proxyKeyId
         },

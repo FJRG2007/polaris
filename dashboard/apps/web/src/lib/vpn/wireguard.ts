@@ -1,6 +1,6 @@
 /**
  * The VPN people use: plain WireGuard on machines an administrator connects, reached
- * with the official WireGuard app and no other account. Pure, so everything sent to a
+ * from the Polaris app and extension. Pure, so everything sent to a
  * node and every limit is asserted in tests.
  *
  * Each node gives its devices a /20 of 10.128.0.0/9. A device's private key is made
@@ -33,7 +33,6 @@ export const MAX_DEVICES_ON_NODE = 4093;
 /** Devices a person may add unless their access says otherwise. */
 export const DEFAULT_DEVICE_LIMIT = 5;
 export const PUBLIC_DNS = ["1.1.1.1", "9.9.9.9"] as const;
-const PUBLIC_RESOLVERS = PUBLIC_DNS.join(", ");
 const GIB = 1024 ** 3;
 
 /** A WireGuard key: 32 bytes of base64. */
@@ -123,31 +122,6 @@ export function accessStanding(access: VpnAccess, now: Date): AccessStanding {
 
 export function mayUseNode(access: VpnAccess, nodeId: string): boolean {
     return access.nodes.length === 0 || access.nodes.includes(nodeId);
-}
-
-/** What the official app imports. All traffic goes in, IPv6 too, so none of it leaks
- *  around a tunnel that only carries IPv4. A Tor node answers DNS itself whichever
- *  resolver is named here, so a node can change exit without new configurations. */
-export function renderDeviceConfig(input: {
-    privateKey: string;
-    address: string;
-    nodePublicKey: string;
-    endpoint: string;
-    port: number;
-}): string {
-    return [
-        "[Interface]",
-        `PrivateKey = ${input.privateKey}`,
-        `Address = ${input.address}/32`,
-        `DNS = ${PUBLIC_RESOLVERS}`,
-        "",
-        "[Peer]",
-        `PublicKey = ${input.nodePublicKey}`,
-        `Endpoint = ${input.endpoint}:${input.port}`,
-        "AllowedIPs = 0.0.0.0/0, ::/0",
-        "PersistentKeepalive = 25",
-        ""
-    ].join("\n");
 }
 
 export interface NodePlan {

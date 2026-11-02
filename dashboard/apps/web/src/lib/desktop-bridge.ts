@@ -45,6 +45,14 @@ export interface PolarisDesktop {
             readonly nodePublicKey: string;
             readonly endpoint: string;
             readonly port: number;
+            /** A VPN from elsewhere: its own keys and what it carries. */
+            readonly own?: {
+                readonly privateKey: string;
+                readonly presharedKey: string | null;
+                readonly moreAddresses: readonly string[];
+                readonly allowedIps: readonly string[];
+                readonly mtu: number | null;
+            };
         }): Promise<DesktopOutcome>;
         down(): Promise<DesktopOutcome>;
         status(): Promise<DesktopVpnStatus>;
