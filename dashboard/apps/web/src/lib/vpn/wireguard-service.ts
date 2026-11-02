@@ -344,9 +344,11 @@ export async function nodesFor(user: { id: string; isAdmin: boolean }) {
         where: { publicKey: { not: null } },
         orderBy: { name: "asc" },
         take: wg.MAX_NODES,
-        select: { id: true, name: true, exit: true }
+        select: { id: true, name: true, exit: true, proxyHost: true }
     });
-    return nodes.filter(({ id }) => wg.mayUseNode(access, id));
+    return nodes
+        .filter(({ id }) => wg.mayUseNode(access, id))
+        .map(({ proxyHost, ...node }) => ({ ...node, browser: proxyHost !== null }));
 }
 
 export async function devicesOf(userId: string) {

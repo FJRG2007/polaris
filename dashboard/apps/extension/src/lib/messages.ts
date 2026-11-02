@@ -12,6 +12,7 @@
  * hostile by default: anything a content script holds, the page can read.
  */
 
+import type { VpnState } from "@/lib/vpn";
 import type { UpdateNotice } from "@/lib/update";
 import type { ServerRef } from "@/lib/servers";
 import type { ReachStatus } from "@/lib/local-address";
@@ -388,6 +389,10 @@ export type Request =
       }
     /** The Stop button on the bar inside a tab Polar is using. */
     | { readonly kind: "polarBrowserStop" }
+    /** The VPN's servers and where this browser leaves from now. */
+    | { readonly kind: "vpn" }
+    | { readonly kind: "vpnConnect"; readonly nodeId: string }
+    | { readonly kind: "vpnDisconnect" }
     /** Change how long an unlocked vault may sit unused before it locks itself. */
     | { readonly kind: "setTimeout"; readonly timeoutMs: number }
     /**
@@ -474,6 +479,10 @@ export type Reply =
     | {
           readonly ok: true;
           readonly polarBrowser: { readonly sites: readonly string[] };
+      }
+    | {
+          readonly ok: true;
+          readonly vpn: VpnState;
       }
     /**
      * A build newer than this one, or null when this one is current - and the

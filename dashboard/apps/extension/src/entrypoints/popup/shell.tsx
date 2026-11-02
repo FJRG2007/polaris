@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { firstName, initials, initialsInk, tintFor } from "@polaris/core/faces";
 import { describeServer, type ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
+import { VpnRow } from "./vpn-row";
 import { PolarBrowserRow, PolarRow } from "./polar-row";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 
@@ -489,6 +490,7 @@ export function Home({
                 </li>
                 {status.canPolar === false ? null : <PolarRow status={status} />}
                 {status.canPolar === false ? null : <PolarBrowserRow />}
+                <VpnRow />
             </ul>
         </main>
     );

@@ -78,13 +78,21 @@ export default defineConfig({
         // box you can type into. It carries no install warning.
         // `tabGroups` keeps the tabs Polar opens in one group named Polar, so it
         // is plain which tabs it is using. Chromium only; it carries no warning.
+        // `proxy` carries the VPN's traffic, and `privacy` stops WebRTC stepping
+        // around it. Chromium answers the proxy's login through `webRequest` and
+        // `webRequestAuthProvider`; Firefox sends the login on each request.
+        // Chromium does not allow `proxy` to be requested later.
         permissions: [
             "storage",
             "activeTab",
             "scripting",
             "alarms",
             "contextMenus",
-            ...(browser === "firefox" ? [] : ["tabGroups"])
+            "proxy",
+            "privacy",
+            ...(browser === "firefox"
+                ? []
+                : ["tabGroups", "webRequest", "webRequestAuthProvider"])
         ],
         // Filling from the keyboard, without going through the toolbar. The
         // browser owns the binding - somebody can change or remove it in its own
