@@ -13,7 +13,7 @@ name: Desktop
 # main: a run by hand from any other branch builds unsigned.
 #
 # SignPath is optional for good, and nothing a release needs may depend on it.
-# Its signed Windows build is a job of its own, beside the ordinary one: that job
+# Its signed Windows build is a job of its own, after the ordinary builds: that job
 # failing for any reason - no approval in time, a revoked token or certificate,
 # even its action no longer existing, which would fail the whole job it is used
 # in before a single step ran - leaves the ordinary build to be published
@@ -209,24 +209,28 @@ jobs:
   # The Windows build again, through SignPath. Never required: see the top of this
   # file. Its artifact is uploaded last, so it exists only if every step passed.
   windows-signpath:
-    needs: signpath-configured
+    needs: [build, signpath-configured]
     if: needs.signpath-configured.outputs.configured == 'true'
     continue-on-error: true
     runs-on: windows-latest
-    # Each of the two requests can wait 45 minutes for an approval.
-    timeout-minutes: 150
+    # Above the sum of its steps' timeouts: a step that times out fails, which the
+    # release falls back from, and GitHub does not document what this one reports.
+    timeout-minutes: 190
     defaults:
       run:
         working-directory: desktop
         shell: bash
     steps:
       - uses: actions/checkout@v7
+        timeout-minutes: 5
       - uses: actions/setup-node@v7
+        timeout-minutes: 5
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
+        timeout-minutes: 10
 
       # Windows through SignPath, in two rounds, because Squirrel packs the app
       # into the installer: the packaged app is signed first and the installer
@@ -235,12 +239,14 @@ jobs:
       # and the shortcut stub) are upstream binaries and stay unsigned, as
       # SignPath Foundation signs only what is built from this repository.
       - name: Package the app to sign
+        timeout-minutes: 20
         run: |
           npm run build
           npx electron-forge package --arch=x64
 
       - name: Upload the app to sign
         id: unsigned-app
+        timeout-minutes: 5
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-app-Windows-x64
@@ -249,6 +255,7 @@ jobs:
           retention-days: 1
 
       - name: Sign the app
+        timeout-minutes: 50
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -262,6 +269,7 @@ jobs:
           output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-app
 
       - name: Make the installer from the signed app
+        timeout-minutes: 20
         run: |
           powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/polaris.exe').Status -ne 'Valid') { Write-Error 'polaris.exe came back without a valid signature.'; exit 1 }"
           rm -rf "out/Polaris-win32-x64"
@@ -270,6 +278,7 @@ jobs:
 
       - name: Upload the installer to sign
         id: unsigned-installer
+        timeout-minutes: 5
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer-Windows-x64
@@ -278,6 +287,7 @@ jobs:
           retention-days: 1
 
       - name: Sign the installer
+        timeout-minutes: 50
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -290,19 +300,22 @@ jobs:
           output-artifact-directory: ${{ github.workspace }}/desktop/out/signed-installer
 
       - name: Put the signed installer in place
+        timeout-minutes: 5
         run: |
           powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-installer/Polaris-Setup.exe').Status -ne 'Valid') { Write-Error 'Polaris-Setup.exe came back without a valid signature.'; exit 1 }"
           mv -f out/signed-installer/Polaris-Setup.exe "out/make/squirrel.windows/x64/Polaris-Setup.exe"
 
       - uses: actions/upload-artifact@v4
+        timeout-minutes: 5
         with:
           name: polaris-signed-Windows-x64
           path: desktop/out/make/**
           if-no-files-found: error
 
   release:
-    # `always()` so a failed signed build, which is allowed, does not skip this.
-    if: always() && startsWith(github.ref, 'refs/tags/desktop-v') && needs.build.result == 'success'
+    # `!cancelled()` so a failed signed build, which is allowed, does not skip this,
+    # while cancelling the run still stops the release.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/desktop-v') && needs.build.result == 'success' }}
     needs: [build, windows-signpath]
     runs-on: ubuntu-latest
     timeout-minutes: 15
