@@ -18,6 +18,7 @@ import { challengeMessage, isGatewayFailure } from "@polaris/core/instance-fallb
 const HTML = readFileSync(join(__dirname, "../../public/offline.html"), "utf8");
 const SCRIPT = /<script>([\s\S]*)<\/script>/.exec(HTML)?.[1] ?? "";
 const BODY = /<body>([\s\S]*)<script>/.exec(HTML)?.[1] ?? "";
+const STYLE = /<style>([\s\S]*)<\/style>/.exec(HTML)?.[1] ?? "";
 
 const ID = "plr_instance-one";
 const pair = generateKeyPairSync("ed25519");
@@ -175,5 +176,46 @@ describe("the offline page", () => {
     it("keeps the public label in step with the catalogs", () => {
         expect(SCRIPT).toContain(en.network.useOther);
         expect(SCRIPT).toContain(es.network.useOther);
+    });
+});
+
+describe("the way out of the page", () => {
+    beforeEach(() => {
+        const style = document.createElement("style");
+        style.textContent = STYLE;
+        document.head.append(style);
+    });
+
+    afterEach(() => {
+        delete (window as { polarisDesktop?: unknown }).polarisDesktop;
+        document.head.querySelector("style")?.remove();
+    });
+
+    it("links the guide, and offers no servers in a browser", async () => {
+        await open([here], {});
+        const guide = document.querySelector<HTMLAnchorElement>("#help a");
+        expect(guide?.href).toContain("/en/docs/troubleshooting/");
+        const button = document.getElementById("servers") as HTMLElement;
+        expect(button.hidden).toBe(true);
+        expect(getComputedStyle(button).display).toBe("none");
+    });
+
+    it("opens the servers window from the desktop app", async () => {
+        const openServers = vi.fn();
+        (window as { polarisDesktop?: unknown }).polarisDesktop = { openServers };
+        await open([here], {});
+        const button = document.getElementById("servers") as HTMLElement;
+        expect(button.hidden).toBe(false);
+        expect(getComputedStyle(button).display).toBe("block");
+        button.click();
+        expect(openServers).toHaveBeenCalledOnce();
+    });
+
+    it("sends a Spanish reader to the Spanish guide", async () => {
+        document.cookie = "polaris-locale=es-ES; Path=/";
+        await open([here], {});
+        const guide = document.querySelector<HTMLAnchorElement>("#help a");
+        expect(guide?.href).toContain("/es/docs/troubleshooting/");
+        expect(guide?.textContent).toBe("Cómo solucionarlo");
     });
 });

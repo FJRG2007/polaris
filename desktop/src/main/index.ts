@@ -41,7 +41,7 @@ import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpda
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
 import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
-import { describeNetError, netErrorCode } from "./reachability";
+import { describeNetError, finishedLoad, netErrorCode } from "./reachability";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
 
 /** Where the dashboard opens, the same as the installable app's start page. */
@@ -190,12 +190,25 @@ function openMain(url: string): void {
     const window = openPolarisWindow(url, server, savedPlace());
     main = window;
     rememberPlace(window);
+    let offline = false;
     window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
         // -3 is a load that another one replaced: a redirect, a click, nothing wrong.
         if (!isMainFrame || code === -3 || !current || !isServerUrl(url, current)) return;
+        offline = false;
         loadError = describeNetError(netErrorCode(description), new URL(current).host);
         openConnect();
         window.close();
+    });
+    // The Polaris's own worker answers for it when it is gone, so this load succeeded.
+    // The window stays for its Try again; the servers window is the way to the others.
+    window.webContents.on("did-finish-load", () => {
+        if (!current) return;
+        const load = finishedLoad(window.webContents.getTitle(), offline);
+        offline = load === "offline";
+        if (load === "recovered") loadError = null;
+        if (!offline) return;
+        loadError = describeNetError(null, new URL(current).host);
+        openConnect();
     });
     window.on("closed", () => {
         if (main === window) main = null;

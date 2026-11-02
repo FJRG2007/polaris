@@ -13,7 +13,7 @@
  * replayed.
  */
 
-const CACHE = "polaris-offline-v2";
+const CACHE = "polaris-offline-v3";
 const OFFLINE = "/offline.html";
 
 /* The same statuses as `isGatewayFailure` in `@polaris/core/instance-fallback`. */

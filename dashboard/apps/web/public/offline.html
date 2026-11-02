@@ -40,10 +40,18 @@
                 margin: 0 0 1.25rem;
                 color: var(--muted);
             }
-            #local {
+            #local,
+            #help {
                 margin: 0.5rem 0 0;
             }
-            #local a {
+            #servers:not([hidden]) {
+                display: block;
+                margin: 0.5rem auto 0;
+                background: transparent;
+                color: var(--fg);
+            }
+            #local a,
+            #help a {
                 display: inline-block;
                 padding: 0.75rem 1rem;
                 color: var(--fg);
@@ -65,7 +73,11 @@
             <h1>Polaris is not reachable</h1>
             <p>This device cannot reach it right now. Check that you are online and that the machine running Polaris is on.</p>
             <button type="button" onclick="location.reload()">Try again</button>
+            <button type="button" id="servers" hidden>Other servers</button>
             <p id="local" hidden><a>Open on your network</a></p>
+            <p id="help">
+                <a href="https://fjrg2007.github.io/polaris/en/docs/troubleshooting/" target="_blank" rel="noopener noreferrer">How to fix this</a>
+            </p>
         </main>
         <script>
             // The offer lib/local-address.ts makes, for a tab with no bundle to run it.
@@ -81,7 +93,10 @@
                         detail: "Este dispositivo no puede acceder ahora mismo. Comprueba que tienes conexión y que la máquina donde se ejecuta Polaris está encendida.",
                         retry: "Reintentar",
                         local: "Abrir en tu red",
-                        other: "Abrir otra dirección"
+                        other: "Abrir otra dirección",
+                        servers: "Otros servidores",
+                        help: "Cómo solucionarlo",
+                        guide: "https://fjrg2007.github.io/polaris/es/docs/troubleshooting/"
                     }
                 };
                 var chosen = /(?:^|;\s*)polaris-locale=([^;]+)/.exec(document.cookie);
@@ -94,6 +109,19 @@
                     document.querySelector("h1").textContent = words.title;
                     document.querySelector("main > p").textContent = words.detail;
                     document.querySelector("button").textContent = words.retry;
+                    document.getElementById("servers").textContent = words.servers;
+                    document.querySelector("#help a").textContent = words.help;
+                    document.querySelector("#help a").href = words.guide;
+                }
+
+                // The desktop app can open another server from here; a browser has none.
+                var desktop = window.polarisDesktop;
+                if (desktop && desktop.openServers) {
+                    var servers = document.getElementById("servers");
+                    servers.hidden = false;
+                    servers.onclick = function () {
+                        desktop.openServers();
+                    };
                 }
 
                 function fromBase64Url(value) {

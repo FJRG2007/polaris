@@ -13,6 +13,24 @@ export function netErrorCode(text: string): string | null {
     return /ERR_[A-Z0-9_]+/.exec(text)?.[0] ?? null;
 }
 
+/** The titles of the page Polaris's service worker answers with when the server is
+ *  gone. The load succeeds, so no failure event ever reports it. */
+const OFFLINE_TITLES: ReadonlySet<string> = new Set([
+    "Polaris is not reachable",
+    "No se puede acceder a Polaris"
+]);
+
+/** Whether a page with this title is that one, in place of a Polaris. */
+export function isOfflinePage(title: string): boolean {
+    return OFFLINE_TITLES.has(title.trim());
+}
+
+/** What a finished load means, given whether the last one ended on that page. */
+export function finishedLoad(title: string, wasOffline: boolean): "offline" | "recovered" | "online" {
+    if (isOfflinePage(title)) return "offline";
+    return wasOffline ? "recovered" : "online";
+}
+
 /** A sentence for a failed load of `host`, from Chromium's error code. */
 export function describeNetError(code: string | null, host: string): string {
     if (!code) return `Could not reach ${host}.`;
