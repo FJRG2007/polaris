@@ -54,7 +54,12 @@ export async function readCallPorts(probe = false): Promise<CallPortsReading> {
         getSetting(REACHED_AT),
         // Read, never repaired. A page that restarted a container by being
         // opened is a page nobody can open to look at.
-        callAddressFacts().catch(() => ({ current: null, startedAt: null, stale: false }))
+        callAddressFacts().catch(() => ({
+            current: null,
+            startedAt: null,
+            stale: false,
+            relayed: false
+        }))
     ]);
 
     const base = {
@@ -71,7 +76,8 @@ export async function readCallPorts(probe = false): Promise<CallPortsReading> {
         confirmed: Boolean(reachedAt),
         publicIp: address.current,
         askedAt: address.startedAt,
-        addressStale: address.stale
+        addressStale: address.stale,
+        relayed: address.relayed
     };
 
     // Nothing here is about a server somebody else runs, and nothing can be
@@ -80,7 +86,9 @@ export async function readCallPorts(probe = false): Promise<CallPortsReading> {
         return { ...base, cannotProbe: null };
     }
 
-    const host = await publicProbeHost();
+    // Callers arrive at the relay while it carries the media, so that is the door
+    // to knock on, not this line's own address.
+    const host = address.relayed ? address.current : await publicProbeHost();
     if (!host) {
         return {
             ...base,

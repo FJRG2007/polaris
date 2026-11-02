@@ -15,9 +15,15 @@ that, and the periodic check kicked them right after they joined.
 
 ## The fix
 
-`isContainerGateway` treats that gateway as an address that cannot be read, which is
-the case the check already had: the player is judged on their name, and counted as
-unknown. A name that is not on the list is still refused.
+While the relay serves (`servingRelayAddress`), `arrivalAddress` treats that gateway
+as an address that cannot be read, which is the case the check already had: the
+player is judged on their name, and counted as unknown. A name that is not on the
+list is still refused. With no relay the gateway stays an address like any other, so
+a stranger reaching a published port over IPv6 gets no way past the address half.
+
+A join from the gateway also proves the port while the relay serves, and the port
+probe knocks on the relay's address rather than the line's, so the port advice
+clears itself.
 
 ## What this does not cover
 
@@ -25,3 +31,7 @@ While the relay serves, the address half of the check cannot tell one network fr
 another, because the relay hides the player's address from the game server. The
 player list still applies. Telling networks apart again needs the real address
 carried through the relay, with PROXY protocol on the port and a server that reads it.
+
+Only the engine's default address pools are recognized as a gateway. A deployment on
+a custom subnet still reads as a player on the wrong network. A player still connected
+through the relay when the direct line takes over is kicked once and rejoins directly.

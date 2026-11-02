@@ -56,7 +56,7 @@ import { signInAddresses } from "../game-sign-in-addresses";
 import {
     ANY_ADDRESS,
     accessRefusal,
-    isContainerGateway,
+    arrivalAddress,
     isAddressRule,
     isPlayerName,
     missingWhitelistNames,
@@ -1141,10 +1141,12 @@ export async function enforcePlayerAddresses(
 
     // Reachability first, and for everyone on rather than only the allowed: a
     // player who was about to be kicked still proves the packet arrived.
+    const relayServing = (await host.appsPortAdvice.relayAddress().catch(() => null)) !== null;
     let reachedFromOutside = false;
     for (const player of status.players.players) {
         const address = addresses.get(player.toLowerCase());
-        if (address && (await noteReachedFrom(installedAppId, address))) reachedFromOutside = true;
+        if (address && (await noteReachedFrom(installedAppId, address, relayServing)))
+            reachedFromOutside = true;
     }
 
     // The list is only enforced once there is a list. A server whose rules were all
@@ -1155,7 +1157,8 @@ export async function enforcePlayerAddresses(
     const kicked: string[] = [];
     const unknown: string[] = [];
     for (const player of status.players.players) {
-        const address = addresses.get(player.toLowerCase()) ?? null;
+        const joinedFrom = addresses.get(player.toLowerCase());
+        const address = joinedFrom ? arrivalAddress(joinedFrom, relayServing) : null;
         // A player whose join line has scrolled out of the log is judged on their
         // name alone: kicking them for a line that has aged out would empty the
         // server every time somebody talked a lot.
@@ -1163,7 +1166,7 @@ export async function enforcePlayerAddresses(
         // With the address half off, only a linked player is held to one: the
         // link is the operator asking for exactly that.
         if (!install.bindAddresses && !isLinked) continue;
-        if (address === null || isContainerGateway(address)) unknown.push(player);
+        if (address === null) unknown.push(player);
         const refusal = accessRefusal(player, address, rules);
         if (!refusal) continue;
         const said = isLinked ? LINKED_REFUSAL : refusal;

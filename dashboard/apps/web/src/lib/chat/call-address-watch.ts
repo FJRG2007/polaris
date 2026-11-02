@@ -84,6 +84,12 @@ const NOTHING: CallAddressState = {
     cannotHeal: null
 };
 
+/** The relay's address when the media server is pointed at it, whatever the line
+ *  behind it is doing. */
+async function relayAddress(): Promise<string | null> {
+    return (await readFile(callNodeIpFile(), "utf8").catch(() => "")).trim() || null;
+}
+
 /**
  * Look, repair, and say.
  *
@@ -91,12 +97,6 @@ const NOTHING: CallAddressState = {
  * address is one Polaris has not seen before, one question to the container
  * engine. A line whose address never changes never gets past the first step.
  */
-/** The relay's address when the media server is pointed at it, whatever the line
- *  behind it is doing. */
-export async function relayAddress(): Promise<string | null> {
-    return (await readFile(callNodeIpFile(), "utf8").catch(() => "")).trim() || null;
-}
-
 export async function watchCallAddress(): Promise<CallAddressState> {
     const current = await detectPublicIp().catch(() => null);
     // No public address at all. Calls from outside cannot work either way, and
@@ -248,9 +248,10 @@ export async function callAddressFacts(): Promise<{
     current: string | null;
     startedAt: string | null;
     stale: boolean;
+    relayed: boolean;
 }> {
     const relay = await relayAddress();
-    if (relay) return { current: relay, startedAt: null, stale: false };
+    if (relay) return { current: relay, startedAt: null, stale: false, relayed: true };
     const [current, changedAt] = await Promise.all([
         detectPublicIp().catch(() => null),
         getSetting(CHANGED_AT)
@@ -260,7 +261,8 @@ export async function callAddressFacts(): Promise<{
     return {
         current,
         startedAt,
-        stale: Boolean(changedAt && startedAt && startedAt <= changedAt)
+        stale: Boolean(changedAt && startedAt && startedAt <= changedAt),
+        relayed: false
     };
 }
 

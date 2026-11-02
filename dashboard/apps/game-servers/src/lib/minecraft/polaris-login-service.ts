@@ -13,7 +13,7 @@
 import { gameMessage } from "../game-message";
 import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
-import { accessRefusal } from "./access";
+import { accessRefusal, arrivalAddress } from "./access";
 import { runSince } from "./run-since";
 import * as polarisLogin from "./polaris-login";
 import { bundledModVersion } from "./polaris-mod-files";
@@ -123,7 +123,8 @@ export async function joinRefusal(
     ]);
     if (rules.length === 0) return null;
     const bound = readInstallConfig(install?.config).bindAddresses !== false;
-    const from = bound && address && isIP(address) ? address : null;
+    const relayServing = (await host.appsPortAdvice.relayAddress().catch(() => null)) !== null;
+    const from = bound && address && isIP(address) ? arrivalAddress(address, relayServing) : null;
     const refusal = accessRefusal(player, from, rules);
     // Written down before it is answered. This is the door, so it is the only
     // place that sees somebody arrive from an address nobody has allowed yet -

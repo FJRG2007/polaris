@@ -119,15 +119,26 @@ export function addressesFor(player: string, allowed: readonly PlayerAccess[]): 
 }
 
 /**
- * Whether this is the container network's own gateway rather than a player.
- *
- * A connection that comes through a relay, or through the engine's port proxy,
- * reaches the server from that gateway, whoever is at the other end. It says
- * nothing about where they are, so it is treated as an address that cannot be
- * read: judged on the name, never refused as somebody on the wrong network.
+ * Whether this is a container network's own gateway, in either of the engine's
+ * default address pools, rather than a player.
  */
 export function isContainerGateway(address: string): boolean {
-    return /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.1$/.test(address.trim());
+    return /^(172\.(1[6-9]|2\d|3[01])\.\d{1,3}|192\.168\.(0|16|32|48|64|80|96|112|128|144|160|176|192|208|224|240))\.1$/.test(
+        address.trim()
+    );
+}
+
+/**
+ * The address to judge a connection by, or null when it says nothing.
+ *
+ * A player arriving through the relay reaches the server from the container
+ * gateway, whoever they are, so while the relay serves that address cannot be
+ * read and they are judged on the name. With no relay it stays an address like
+ * any other: a stranger reaching a published port over IPv6 also shows up from
+ * the gateway, and must not get past the address half for it.
+ */
+export function arrivalAddress(address: string, relayServing: boolean): string | null {
+    return relayServing && isContainerGateway(address) ? null : address;
 }
 
 /**
@@ -144,7 +155,7 @@ export function accessRefusal(
 ): string | null {
     const addresses = addressesFor(player, allowed);
     if (addresses.length === 0) return "You are not on this server's player list.";
-    if (address === null || isContainerGateway(address)) return null;
+    if (address === null) return null;
     return addresses.some((rule) => addressMatches(rule, address))
         ? null
         : "Your account is registered to a different network. Ask the server's owner to add this one.";
