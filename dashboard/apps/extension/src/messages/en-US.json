@@ -400,5 +400,21 @@
         "noOffSites": "No site is switched off.",
         "turnBackOn": "Turn back on",
         "turnBackOnFor": "Turn Polaris back on for {host}"
+    },
+    "vpn": {
+        "title": "VPN",
+        "off": "Off",
+        "on": "Leaving from {name}",
+        "disconnect": "Disconnect",
+        "throughTor": "{name} (Tor)",
+        "noBrowserRoute": "This server has no route a browser can use.",
+        "refused": {
+            "noSites": "The VPN needs access to every site to carry this browser's traffic. Allow it and try again.",
+            "noAccess": "This account cannot use that server.",
+            "notReady": "That server is not ready for browsers yet.",
+            "unreachable": "Polaris did not answer. Try again in a moment.",
+            "blocked": "Another extension controls this browser's proxy. Turn it off and try again.",
+            "noTraffic": "The server did not carry traffic, so this browser stayed as it was."
+        }
     }
 }

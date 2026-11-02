@@ -1,14 +1,14 @@
 /**
- * VPN (/vpn): the Overview. Where the control server stands and the
- * address devices sign in to; an administrator turns it on and off here.
+ * VPN (/vpn): connect a device. Servers and who may use them are an
+ * administrator's, under the app's settings.
  */
 
+import { ConnectSection } from "./connect";
 import { requireUser } from "@/lib/session";
-import { VpnOverviewSection } from "./overview";
 
 export const dynamic = "force-dynamic";
 
 export default async function VpnPage() {
     const user = await requireUser();
-    return <VpnOverviewSection isAdmin={user.isAdmin} />;
+    return <ConnectSection isAdmin={user.isAdmin} />;
 }

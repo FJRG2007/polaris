@@ -400,5 +400,21 @@
         "noOffSites": "Ninguna web está desactivada.",
         "turnBackOn": "Reactivar",
         "turnBackOnFor": "Volver a activar Polaris en {host}"
+    },
+    "vpn": {
+        "title": "VPN",
+        "off": "Apagada",
+        "on": "Saliendo por {name}",
+        "disconnect": "Desconectar",
+        "throughTor": "{name} (Tor)",
+        "noBrowserRoute": "Este servidor no tiene una ruta que pueda usar un navegador.",
+        "refused": {
+            "noSites": "La VPN necesita acceso a todos los sitios para llevar el tráfico de este navegador. Permítelo e inténtalo de nuevo.",
+            "noAccess": "Esta cuenta no puede usar ese servidor.",
+            "notReady": "Ese servidor aún no está listo para navegadores.",
+            "unreachable": "Polaris no respondió. Inténtalo de nuevo en un momento.",
+            "blocked": "Otra extensión controla el proxy del navegador. Apágala e inténtalo de nuevo.",
+            "noTraffic": "El servidor no dejó pasar tráfico, así que el navegador sigue como estaba."
+        }
     }
 }

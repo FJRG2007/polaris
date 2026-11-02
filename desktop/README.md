@@ -10,6 +10,10 @@ window and adds what a browser tab cannot do:
   the image, the way `polaris deploy --local` does, with the build and deploy log
   in a window of its own.
 - **Follow logs** of a service in a separate window.
+- **VPN**: connect this computer to a server of this Polaris, or to a WireGuard
+  provider you imported on the VPN screen. The tunnel is run by a small system
+  service, installed once under the system's own prompt, so it survives the app
+  closing or updating.
 - **What you are playing** beside your name in Polaris: the app looks at the
   programs running on this computer every fifteen seconds and matches them
   against the games it knows (`src/main/known-games.ts`) and the ones you added

@@ -122,6 +122,34 @@ export interface PolarisDesktop {
     onUpdateReady(listener: (update: UpdateReady) => void): () => void;
     /** Restart into the waiting update. */
     installUpdate(): Promise<Outcome>;
+    /** This computer's VPN. A refusal's `error` is a word, for the page to say. */
+    readonly vpn: {
+        deviceName(): Promise<string>;
+        /** The public half of a key the service holds; null without a service. */
+        key(): Promise<string | null>;
+        up(input: VpnConnection): Promise<Outcome>;
+        down(): Promise<Outcome>;
+        status(): Promise<{ readonly nodeId: string | null }>;
+        joinNetwork(input: { readonly server: string; readonly key: string }): Promise<Outcome>;
+    };
+}
+
+/** What the tunnel needs, as Polaris answered it. */
+export interface VpnConnection {
+    readonly nodeId: string;
+    readonly address: string;
+    readonly dns: readonly string[];
+    readonly nodePublicKey: string;
+    readonly endpoint: string;
+    readonly port: number;
+    /** A VPN from elsewhere: its own keys and what it carries. */
+    readonly own?: {
+        readonly privateKey: string;
+        readonly presharedKey: string | null;
+        readonly moreAddresses: readonly string[];
+        readonly allowedIps: readonly string[];
+        readonly mtu: number | null;
+    };
 }
 
 /** A screen or a window that can be shared. */
@@ -252,6 +280,12 @@ export const CHANNELS = {
     updateReady: "desktop:update-ready",
     updateCurrent: "desktop:update-current",
     installUpdate: "desktop:install-update",
+    vpnDeviceName: "desktop:vpn-device-name",
+    vpnKey: "desktop:vpn-key",
+    vpnUp: "desktop:vpn-up",
+    vpnDown: "desktop:vpn-down",
+    vpnStatus: "desktop:vpn-status",
+    vpnJoin: "desktop:vpn-join",
     offerUpdate: "desktop:offer-update",
     overlayStroke: "desktop:overlay-stroke",
     connectState: "local:connect-state",

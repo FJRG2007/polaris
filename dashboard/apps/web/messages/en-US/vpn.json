@@ -1,7 +1,7 @@
 {
     "page": {
         "title": "VPN",
-        "description": "Reach your own devices from anywhere, through the Tailscale apps."
+        "description": "Connect through your own servers and choose where your traffic comes out."
     },
     "install": {
         "title": "Install the VPN",
@@ -122,19 +122,17 @@
         "windows": {
             "name": "Windows",
             "step1": "Install Tailscale for Windows from tailscale.com/download.",
-            "step2": "The Windows app has no field for another server: open Command Prompt or PowerShell and run the command below.",
-            "step3": "A browser opens on Polaris. Sign in if asked and press Add this device."
+            "step2": "Open this page in the Polaris app and press Join this network."
         },
         "macos": {
             "name": "macOS",
             "step1": "Install Tailscale for macOS from the App Store or tailscale.com/download.",
-            "step2": "Open a terminal and run the command below. If another Tailscale network is already signed in, you can instead open Settings, Accounts, press the arrow in the lower-left corner and enter this VPN's address.",
-            "step3": "A browser opens on Polaris. Press Add this device."
+            "step2": "Open this page in the Polaris app and press Join this network."
         },
         "linux": {
             "name": "Linux",
-            "step1": "Install Tailscale with the instructions for your distribution at tailscale.com/download/linux.",
-            "step2": "Run the command below, open the link it prints, and press Add this device."
+            "step1": "Install Tailscale from tailscale.com/download/linux.",
+            "step2": "Open this page in the Polaris app and press Join this network."
         },
         "ios": {
             "name": "iPhone and iPad",
@@ -166,7 +164,11 @@
             "name": "Router or server",
             "step1": "Install Tailscale on it: most routers that run OpenWrt, pfSense or OPNsense offer it as a package.",
             "step2": "Create a key below and run the command with it on the device. It joins your devices with no browser."
-        }
+        },
+        "join": "Join this network",
+        "joined": "This computer joined the network.",
+        "noClient": "Tailscale is not installed on this computer.",
+        "joinFailed": "This computer could not join the network. Try again."
     },
     "register": {
         "title": "Add this device to the VPN?",
@@ -252,5 +254,130 @@
         "scriptLabel": "the OpenWrt setup",
         "linesTitle": "Backup internet lines",
         "linesBody": "Connect each line to the router and let the router choose. On OpenWrt, use the mwan3 package. Polaris keeps reaching this network either way."
+    },
+    "connect": {
+        "devices": "Your devices",
+        "empty": "No devices yet. A device appears here the first time it connects.",
+        "noNodes": "No servers are available to you yet.",
+        "setUp": "Add servers",
+        "tor": "Tor",
+        "usage": "{used} of {limit} GB used this month.",
+        "online": "Connected",
+        "offline": "Not connected",
+        "remove": "Remove device",
+        "torHint": "Tor is free and more private, but much slower. Some sites block it, and calls or games will not work.",
+        "standing": {
+            "none": "You do not have VPN access. Ask an administrator for it.",
+            "suspended": "Your VPN access is suspended. Ask an administrator.",
+            "expired": "Your VPN access has expired. Ask an administrator.",
+            "overLimit": "You have used this month's traffic. It renews next month."
+        },
+        "errors": {
+            "noRoot": "Polaris needs root on that machine. Edit its connection in Servers.",
+            "unreachable": "That machine did not answer. Check it is on and try again.",
+            "unsupported": "That machine's system is not supported. Use Debian or Ubuntu.",
+            "noAccess": "You do not have access to that server.",
+            "deviceLimit": "You have reached your device limit.",
+            "nodeFull": "That server is full. Pick another one.",
+            "nodeNotReady": "That server is still being set up. Try again in a minute.",
+            "notFound": "That is no longer here.",
+            "noSuchPerson": "Nobody here has that email.",
+            "tooManyNodes": "This Polaris has reached its limit of servers.",
+            "invalid": "Check the fields and try again."
+        },
+        "locations": "Locations",
+        "connectTo": "Connect to {name}",
+        "switchTo": "Switch to {name}",
+        "disconnect": "Disconnect",
+        "useApps": "Connect from the Polaris app on your computer, or from the Polaris extension for just this browser.",
+        "getApps": "Get the apps",
+        "noPhoneApp": "There is no Polaris app for phones yet.",
+        "cancel": "Cancel",
+        "tunnel": {
+            "denied": "The VPN needs your permission once to install. Press Connect and accept the prompt.",
+            "failed": "This computer could not start the VPN. Try again.",
+            "noAnswer": "That server did not answer. Try another location.",
+            "unreachable": "That server's address could not be found. Try another location."
+        },
+        "remoteAccess": "Tailscale and other ways into this server",
+        "own": {
+            "title": "Your own VPNs",
+            "hint": "Import a WireGuard file from a provider such as Proton or Mullvad. It connects from the Polaris app on your computer.",
+            "import": "Import",
+            "empty": "Nothing imported yet.",
+            "added": "{count, plural, one {# VPN added} other {# VPNs added}}",
+            "rejected": "Not WireGuard files with one server: {names}",
+            "remove": "Remove {name}",
+            "removeTitle": "Remove {name}?",
+            "removeBody": "Its file is deleted from Polaris. You would need to import it again to connect.",
+            "removeConfirm": "Remove",
+            "inUse": "Disconnect before removing it",
+            "errors": {
+                "tooMany": "You can keep up to {limit} VPNs. Remove some first.",
+                "notFound": "That is no longer here.",
+                "unreadable": "Those files could not be read. Use the .conf files your provider gives you."
+            }
+        }
+    },
+    "nodes": {
+        "title": "Servers",
+        "hint": "Machines people connect through. Add as many as you like.",
+        "add": "Add new server",
+        "addBody": "Polaris sets it up over the connection it already has.",
+        "edit": "Edit server",
+        "notYours": "Only the administrator who owns this machine can change it.",
+        "leftRunning": "The VPN on this server could not be removed, so it keeps running there.",
+        "editBody": "Devices keep working. A new address or port needs each device added again.",
+        "save": "Save",
+        "saving": "Saving...",
+        "adding": "Setting up...",
+        "empty": "No servers yet. People cannot connect until you add one.",
+        "noMachines": "Every machine with root is already a server. Add another in Servers.",
+        "machine": "Machine",
+        "name": "Name",
+        "endpoint": "Public address",
+        "port": "UDP port",
+        "exit": "Traffic leaves through",
+        "exits": {
+            "direct": "This server",
+            "tor": "Tor network"
+        },
+        "torHint": "Free and more private, but much slower. Only web-style traffic passes.",
+        "portHint": "UDP {port} has to be open towards this machine.",
+        "privateEndpoint": "That is a private address. Use a public one, or devices outside can't connect, and forward UDP {port} on your router.",
+        "devices": "{count} devices",
+        "editLabel": "Edit",
+        "remove": "Remove server",
+        "removeKind": "server",
+        "removeBody": "Its devices stop working and are removed.",
+        "removeAnyway": "Remove anyway",
+        "unreachableBody": "That machine did not answer, so it may keep running the VPN and letting its devices in until it is reinstalled."
+    },
+    "people": {
+        "title": "People",
+        "hint": "Who may connect, through which servers, and how much.",
+        "add": "Give access",
+        "addBody": "They need an account on this Polaris.",
+        "edit": "Edit access",
+        "editBody": "Changes reach the servers right away.",
+        "email": "Email",
+        "deviceLimit": "Devices",
+        "dataLimit": "GB per month",
+        "until": "Until",
+        "nodes": "Servers",
+        "allNodes": "All servers",
+        "suspend": "Suspended",
+        "suspended": "Suspended",
+        "open": "Open to everyone here",
+        "openHint": "Anyone with an account may connect, with {count} devices. Limits below still apply to the people listed.",
+        "gb": "{used} of {count} GB",
+        "used": "{used} GB this month",
+        "editLabel": "Edit",
+        "remove": "Remove access",
+        "empty": "Nobody has been given access yet. Administrators can always connect."
+    },
+    "mesh": {
+        "title": "Private networks",
+        "hint": "Optional: lets devices reach each other and a home network. Normal VPN use does not need it."
     }
 }

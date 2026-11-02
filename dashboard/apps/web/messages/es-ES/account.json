@@ -335,6 +335,7 @@
                 "vault": "Vault",
                 "notes": "Notas",
                 "office": "Office",
+                "vpn": "VPN",
                 "mail": "Correo",
                 "calendar": "Calendario",
                 "chat": "Chat",
@@ -401,6 +402,14 @@
                 "postMcp": {
                     "summary": "Endpoint de Model Context Protocol",
                     "description": "JSON-RPC 2.0 sobre HTTP en streaming: un mensaje o un lote de hasta 20. Las herramientas que se ofrecen dependen de los permisos de la clave."
+                },
+                "getVpnConnect": {
+                    "summary": "Listar nodos VPN",
+                    "description": "Los nodos que puede usar el dueño de esta clave. Necesita el permiso vpn.use."
+                },
+                "postVpnConnect": {
+                    "summary": "Conectar un dispositivo a la VPN",
+                    "description": "Envía solo la mitad pública de la clave WireGuard del dispositivo. La misma clave recupera el mismo dispositivo. Necesita el permiso vpn.use."
                 },
                 "getDeployProjects": {
                     "summary": "Listar proyectos"

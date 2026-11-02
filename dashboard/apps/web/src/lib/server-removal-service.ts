@@ -161,6 +161,10 @@ export async function removeServer(
 
     if (input.mode === "move" || input.mode === "clean") {
         warnings.push(...(await tearDown(ownerId, hostId)));
+        const { removeNodeOn } = await import("@/lib/vpn/wireguard-service");
+        if (!(await removeNodeOn(hostId))) {
+            warnings.push((await readerWords("vpn"))("nodes.leftRunning"));
+        }
         warnings.push(...(await revokeLogin(ownerId, hostId)));
     }
 
@@ -267,9 +271,8 @@ async function settleTunnels(
     hostId: string,
     before: Awaited<ReturnType<typeof tunnelsWithin>>
 ): Promise<string[]> {
-    const { moveTunnel, retireTunnels, tunnelsWithin } = await import(
-        "@/lib/deploy/wireguard/tunnel-service"
-    );
+    const { moveTunnel, retireTunnels, tunnelsWithin } =
+        await import("@/lib/deploy/wireguard/tunnel-service");
     const t = await readerWords("tunnels");
     const staying = new Set((await tunnelsWithin(ownerId, { hostId })).map((row) => row.id));
     const warnings: string[] = [];

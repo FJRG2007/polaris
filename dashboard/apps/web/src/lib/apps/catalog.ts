@@ -495,10 +495,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         category: "Tools",
         icon: Waypoints,
         opensAt: "/vpn",
-        summary: "Reach your own devices from anywhere, through the Tailscale apps.",
+        summary: "A private VPN for your people, on your own servers.",
         keywords: VPN_KEYWORDS,
         description:
-            "A private network between your phones, computers and TVs, run on this machine. Each person signs their devices in with their Polaris account through the official Tailscale apps and reaches only their own; administrators reach all of them and decide which devices may act as an exit node or share a home network. Installing downloads nothing: the control server starts on this machine when an administrator turns it on, at an address in one of your domains.", // i18n-ignore
+            "Connect from the Polaris app or browser extension and pick where your traffic comes out, on your own servers. No accounts with anybody else.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["vpn"],
         dashboard: "builtin",

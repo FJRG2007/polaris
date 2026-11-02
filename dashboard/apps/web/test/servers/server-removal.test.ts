@@ -96,6 +96,8 @@ vi.mock("@/lib/deploy-service", () => ({
     syncAppRoutes: async () => undefined
 }));
 
+vi.mock("@/lib/vpn/wireguard-service", () => ({ removeNodeOn: async () => true }));
+
 /** Tunnels with an end on the server: what each read returns, oldest first. */
 const tunnelReads: { id: string; hostname: string }[][] = [];
 const tunnelsWithin = vi.fn(async () => tunnelReads.shift() ?? []);

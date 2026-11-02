@@ -53,6 +53,7 @@
         "vault_use": "Sync the vault (items stay encrypted)",
         "notes_use": "Read and write your notes",
         "office_use": "Read and write documents",
+        "vpn_use": "Connect a device to the VPN",
         "mail_use": "Read and send mail",
         "mail_read": "Read and search your mail",
         "mail_send": "Send mail as you",

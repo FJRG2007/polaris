@@ -138,7 +138,8 @@
         "needsStorage": "Storage for: {volumes}.",
         "needsSettings": "Settings you fill in: {fields}.",
         "needsOnce": "One install serves everyone on this Polaris.",
-        "needsPermission": "Installing it needs permission to manage apps."
+        "needsPermission": "Installing it needs permission to manage apps.",
+        "settings": "Settings"
     },
     "templateDeploy": {
         "title": "Deploy {name}",

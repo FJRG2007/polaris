@@ -64,6 +64,11 @@ module.exports = {
         },
         icon: ICON,
         asar: true,
+        // The VPN service, built by CI (vpn-helper/stage.mjs). A package made
+        // without it still runs: only connecting the VPN says it cannot.
+        ...(existsSync(path.join(__dirname, "vpn-helper", "stage", "vpn-helper"))
+            ? { extraResource: [path.join(__dirname, "vpn-helper", "stage", "vpn-helper")] }
+            : {}),
         // The main process and preloads are bundled into dist/ (build/bundle.mjs),
         // so the app needs no node_modules: ship dist/ and package.json only.
         prune: false,

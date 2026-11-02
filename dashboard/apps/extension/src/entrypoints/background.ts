@@ -66,6 +66,7 @@ import {
     vaultBase
 } from "@/lib/server";
 import { learnOver, reachOrigin, reachStatus } from "@/lib/reach";
+import { BrowserVpn, type VpnApi, type VpnLogin, type VpnRoute } from "@/lib/vpn";
 
 /**
  * Everything that touches a key, a token or the network.
@@ -2258,13 +2259,21 @@ async function badge(): Promise<void> {
                 ? held
                 : null;
         const shown = update.badgeFor(count, notice);
-        await browser.action.setBadgeText({ text: shown.text });
-        await browser.action.setBadgeBackgroundColor({ color: shown.color });
+        // The count and the update notice say more, so the VPN only takes an
+        // empty badge. The tooltip below says it either way.
+        const onVpn = await vpn.isConnected();
+        const showVpn = onVpn && shown.text === "";
+        await browser.action.setBadgeText({ text: showVpn ? "VPN" : shown.text });
+        await browser.action.setBadgeBackgroundColor({ color: showVpn ? "#16a34a" : shown.color });
         const name = browser.i18n.getMessage("extName") || "Polaris";
         await browser.action.setTitle({
-            title: shown.announce
-                ? `${name} - ${await say("popup.update.title", { version: shown.announce })}`
-                : name
+            title: [
+                name,
+                ...(shown.announce
+                    ? [await say("popup.update.title", { version: shown.announce })]
+                    : []),
+                ...(onVpn ? [await say("vpn.title")] : [])
+            ].join(" - ")
         });
     } catch {
         // A badge is not worth an error path: a tab that went away between the
@@ -3046,6 +3055,17 @@ async function checkForUpdate(): Promise<void> {
 }
 
 /** Polar using this browser (`lib/polar-browser.ts`): asks for each site when it first needs it. */
+const vpn = new BrowserVpn({
+    api: browser as unknown as VpnApi,
+    route: storage.defineItem<VpnRoute | null>("local:vpn.route", { fallback: null }),
+    login: storage.defineItem<VpnLogin | null>("session:vpn.login", { fallback: null }),
+    link: async () => ({ origin: await reachOrigin(), token: await LINK_TOKEN.getValue() }),
+    origins: polarisOrigins,
+    changed: badge,
+    perRequest: import.meta.env.BROWSER === "firefox"
+});
+vpn.listen();
+
 const polarBrowser = new PolarBrowser({
     api: browser as unknown as BrowserApi,
     link: async () => ({ origin: await reachOrigin(), token: await LINK_TOKEN.getValue() }),
@@ -3699,6 +3719,24 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 await badge();
                 return { ok: true, ...(await blockedHere()) };
             }
+
+            case "vpn":
+                return { ok: true, vpn: await vpn.state() };
+
+            case "vpnConnect": {
+                if (!ours) return { ok: false, error: await say("errors.serverSilent") };
+                const node = (await vpn.state()).nodes.find((one) => one.id === request.nodeId);
+                if (!node?.browser) return { ok: false, error: await say("vpn.refused.notReady") };
+                const outcome = await vpn.connect(node);
+                if (!outcome.ok)
+                    return { ok: false, error: await say(`vpn.refused.${outcome.code}`) };
+                return { ok: true, vpn: await vpn.state() };
+            }
+
+            case "vpnDisconnect":
+                if (!ours) return { ok: false, error: await say("errors.serverSilent") };
+                await vpn.disconnect();
+                return { ok: true, vpn: await vpn.state() };
 
             case "polarBrowser":
                 return { ok: true, polarBrowser: await polarBrowser.status() };

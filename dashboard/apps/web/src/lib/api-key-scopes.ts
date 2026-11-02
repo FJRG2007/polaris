@@ -25,6 +25,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "vault.use": "Use the vault",
     "notes.use": "Keep notes",
     "office.use": "Write documents",
+    "vpn.use": "Connect to the VPN",
     "mail.use": "Read and send mail",
     "calendar.use": "Read and change calendars",
     "crm.use": "Read and change CRM records",
@@ -79,6 +80,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     // it is.
     "vault.use": "Sync the vault. The items stay encrypted; a key cannot read them.",
     "notes.use": "Read and write the owner's own notes.",
+    "vpn.use": "List the VPN servers this account may use and register a device on one.",
     "office.use":
         "Read and write the documents, spreadsheets, slides and diagrams the owner can reach.",
     "mail.use": "Read the owner's linked mailboxes and send from them.",
@@ -144,6 +146,8 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Notes", scopes: ["notes.use"] },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Office", scopes: ["office.use"] },
+    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+    { title: "VPN", scopes: ["vpn.use"] },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Mail", scopes: ["mail.use", "mailserver.manage"] },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker

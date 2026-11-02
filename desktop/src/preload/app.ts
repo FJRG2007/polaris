@@ -79,7 +79,15 @@ const bridge: PolarisDesktop = {
             if (--updateListeners === 0) void ipcRenderer.invoke(CHANNELS.offerUpdate, false);
         };
     },
-    installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate)
+    installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate),
+    vpn: {
+        deviceName: () => ipcRenderer.invoke(CHANNELS.vpnDeviceName),
+        key: () => ipcRenderer.invoke(CHANNELS.vpnKey),
+        up: (input) => ipcRenderer.invoke(CHANNELS.vpnUp, input),
+        down: () => ipcRenderer.invoke(CHANNELS.vpnDown),
+        status: () => ipcRenderer.invoke(CHANNELS.vpnStatus),
+        joinNetwork: (input) => ipcRenderer.invoke(CHANNELS.vpnJoin, input)
+    }
 };
 
 contextBridge.exposeInMainWorld("polarisDesktop", bridge);
