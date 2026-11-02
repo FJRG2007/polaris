@@ -221,7 +221,7 @@ export function MinecraftPanel({
     // The screen the URL names. Read from the path rather than held in state, so a
     // reload, a shared link and the browser's back button all agree with the tabs.
     const tab = useMemo(() => {
-        const base = `/apps/installed/${installedAppId}`;
+        const base = `/game-servers/${installedAppId}`;
         const slug = pathname.startsWith(base)
             ? pathname.slice(base.length).replace(/^\//, "")
             : "";

@@ -31,7 +31,7 @@ describe("the Ranks tab", () => {
     it("has a place on the server's rail, under its own path", () => {
         const subapp = installedAppSubapp(ID, { name: "Survival", tabs: ["", "players", "ranks"] });
         const section = subapp?.sections.find((one) => one.label === "Ranks");
-        expect(section?.href).toBe(`/apps/installed/${ID}/ranks`);
+        expect(section?.href).toBe(`/game-servers/${ID}/ranks`);
     });
 
     it("is named in both languages, in the tab bar and on the rail", () => {

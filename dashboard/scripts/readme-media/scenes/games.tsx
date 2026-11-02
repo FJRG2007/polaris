@@ -105,7 +105,7 @@ function subscribe(watcher: () => void) {
 
 /** Where `view` lives: the list, or one tab of one server. */
 function placeOf(view: View): { path: string; params: Record<string, string> } {
-    if (view.server === undefined) return { path: "/apps/games", params: {} };
+    if (view.server === undefined) return { path: "/game-servers", params: {} };
     const id = view.server === 0 ? survivalIdFor() : gameServers(ENGLISH)[view.server]!.id;
     return { path: `/apps/installed/${id}/${view.tab ?? ""}`, params: { id } };
 }
@@ -151,7 +151,7 @@ function Tour({ ctx }: { ctx: SceneContext }) {
 
 export const games = defineScene({
     id: "games",
-    path: "/apps/games",
+    path: "/game-servers",
     actions: (ctx) => ({
         ...gameInventory.actions?.(ctx),
         ...gameEvents.actions?.(ctx),

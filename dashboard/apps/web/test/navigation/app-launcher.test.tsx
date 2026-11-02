@@ -42,7 +42,7 @@ describe("Game servers in the switcher", () => {
         const games = POLARIS_APPS.find((app) => app.id === "games");
         expect(games).toMatchObject({
             label: "Game servers",
-            href: "/apps/games",
+            href: "/game-servers",
             requiresApp: "game-servers"
         });
         const reach = (installed: string[]) =>
@@ -56,12 +56,12 @@ describe("Game servers in the switcher", () => {
     });
 
     it("is no longer a screen of Apps", () => {
-        expect(APP_SECTIONS.apps?.some((section) => section.href === "/apps/games")).toBe(false);
+        expect(APP_SECTIONS.apps?.some((section) => section.href === "/game-servers")).toBe(false);
     });
 
     it("owns its path inside the Apps subtree, and Apps keeps the rest", () => {
-        expect(resolveActiveApp("/apps/games").id).toBe("games");
-        expect(resolveActiveApp("/apps/games/anything").id).toBe("games");
+        expect(resolveActiveApp("/game-servers").id).toBe("games");
+        expect(resolveActiveApp("/game-servers/anything").id).toBe("games");
         expect(resolveActiveApp("/apps/deploy").id).toBe("apps");
         expect(resolveActiveApp("/apps/gamesroom").id).toBe("apps");
         expect(resolveActiveApp("/apps/installed/abc").id).toBe("apps");
@@ -321,7 +321,7 @@ describe("the switcher", () => {
             label: "Game servers",
             description: "Servers",
             icon: Gamepad2,
-            href: "/apps/games"
+            href: "/game-servers"
         }
     ];
 

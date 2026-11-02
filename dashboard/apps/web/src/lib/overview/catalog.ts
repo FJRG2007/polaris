@@ -179,10 +179,9 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         description: "Which of your servers are up, and how full they are.", // i18n-ignore
         icon: Gamepad2,
         permission: "games.read",
-        href: "/apps/games",
-        // Each server's own page lives with the installed apps, and that is where
-        // somebody who runs one actually spends their time.
-        paths: ["/apps/installed"],
+        href: "/game-servers",
+        // Each server's own page is where somebody who runs one spends their time.
+        paths: ["/game-servers"],
         sizes: ALL_SIZES,
         // Nobody who has never installed one wants a card about them, and being
         // offered it in the customize panel is being told to go and find out what
@@ -206,7 +205,7 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         description: "The last 24 hours' lookups on your network, and how many were blocked.", // i18n-ignore
         icon: ShieldBan,
         adminOnly: true,
-        href: "/apps/network-filter",
+        href: "/network-filter",
         sizes: ["sm", "md", "lg"],
         requires: "dnsBlocker"
     },

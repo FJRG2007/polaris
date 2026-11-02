@@ -36,7 +36,7 @@ const APPS = [
         label: "Game servers",
         description: "Servers",
         icon: Gamepad2,
-        href: "/apps/games",
+        href: "/game-servers",
         keywords: ["Juegos"]
     }
 ];

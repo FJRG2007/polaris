@@ -354,7 +354,7 @@ async function act(
             type: "games.xray",
             title: t("notify.xrayTitle", { name: evidence.name, count: hits, server: serverName }),
             body: `${t("notify.xrayBody")}${done}`,
-            href: `/apps/installed/${installedAppId}/security`,
+            href: `/game-servers/${installedAppId}/security`,
             level: "warning",
             actionRequired: !banned
         }).catch(() => undefined);
@@ -738,7 +738,7 @@ async function reportMovement(
         body: t("notify.movementBody", {
             reasons: score.why.map((reason) => reasonLine(reason, said)).join(". ")
         }),
-        href: `/apps/installed/${installedAppId}/security`,
+        href: `/game-servers/${installedAppId}/security`,
         level: "warning",
         actionRequired: true
     }).catch(() => undefined);

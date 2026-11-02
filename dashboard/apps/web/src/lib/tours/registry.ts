@@ -80,7 +80,7 @@ export const TOURS: readonly Tour[] = [
     },
     {
         id: "games",
-        href: "/apps/games",
+        href: "/game-servers",
         steps: [
             { key: "create", target: "games.new", side: "bottom" },
             { key: "filters", target: "games.filters", side: "bottom" },

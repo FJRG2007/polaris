@@ -72,6 +72,6 @@ describe("the network filter's statistics, shared", () => {
         await expect(
             requireMayShare(as(true), "dns.filter", core.DNS_FILTER_ID)
         ).resolves.toBeUndefined();
-        expect(subjectHref("dns.filter", core.DNS_FILTER_ID)).toBe("/apps/network-filter");
+        expect(subjectHref("dns.filter", core.DNS_FILTER_ID)).toBe("/network-filter");
     });
 });

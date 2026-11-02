@@ -41,7 +41,7 @@ const SCANNED = {
     subject: "appImage",
     name: "Network filter DNS server",
     applicationId: "a1",
-    appHref: "/apps/network-filter",
+    appHref: "/network-filter",
     appGone: false,
     imageId: null,
     imageRef: "spx01/blocky:v0.26",
@@ -123,7 +123,7 @@ describe("FocusCard", () => {
             )
         ).toBeTruthy();
         expect(screen.getByRole("link", { name: "Open app" }).getAttribute("href")).toBe(
-            "/apps/network-filter"
+            "/network-filter"
         );
         // Only the announced advisories, the critical one first.
         await waitFor(() => expect(document.querySelectorAll("tr[data-new]").length).toBe(2));

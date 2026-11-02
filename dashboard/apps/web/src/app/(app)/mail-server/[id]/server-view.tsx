@@ -1,0 +1,114 @@
+"use client";
+
+/**
+ * One mail server: a header, a row of tabs, and the tab's panel. The tab is in
+ * the address (`?tab=`) so a notification can open the panel it is about.
+ */
+
+import Link from "next/link";
+import { DnsTab } from "./dns-tab";
+import { RulesTab } from "./rules-tab";
+import { ArrowLeft } from "lucide-react";
+import { BackupsTab } from "./backups-tab";
+import { ReportsTab } from "./reports-tab";
+import { SendingTab } from "./sending-tab";
+import { OverviewTab, type OverviewSeed } from "./overview-tab";
+import { ForwardsTab } from "./forwards-tab";
+import { MailboxesTab } from "./mailboxes-tab";
+import { Card, CardBody, cn, ScrollRow } from "@polaris/ui";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+
+/** The tabs, in order; each one's name is `tabs.<id>` in the catalog. */
+const TABS = [
+    { id: "overview" },
+    { id: "domains" },
+    { id: "mailboxes" },
+    { id: "forwards" },
+    { id: "sending" },
+    { id: "rules" },
+    { id: "reports" },
+    { id: "backups" }
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
+export function ServerView({
+    serverId,
+    hostname,
+    seed
+}: {
+    serverId: string;
+    hostname: string;
+    /** What the page already read to check access, so the overview's header is
+     *  drawn at once. */
+    seed: OverviewSeed;
+}) {
+    const t = useTranslations("mailServer");
+    const router = useRouter();
+    const params = useSearchParams();
+    const asked = params.get("tab");
+    const tab: TabId = TABS.some((entry) => entry.id === asked) ? (asked as TabId) : "overview";
+
+    function choose(next: TabId): void {
+        const query = new URLSearchParams(params.toString());
+        if (next === "overview") query.delete("tab");
+        else query.set("tab", next);
+        const search = query.toString();
+        router.replace(`/mail-server/${serverId}${search ? `?${search}` : ""}`, {
+            scroll: false
+        });
+    }
+
+    return (
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+            <div className="flex items-center gap-2">
+                <Link
+                    href="/mail-server"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label={t("view.back")}
+                    title={t("view.back")}
+                >
+                    <ArrowLeft className="size-4" />
+                </Link>
+                <h1
+                    className="min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground"
+                    title={hostname}
+                >
+                    {hostname}
+                </h1>
+            </div>
+            <Card>
+                <ScrollRow className="flex gap-1 border-b border-border px-2 py-2" role="tablist">
+                    {TABS.map((entry) => (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={tab === entry.id}
+                            onClick={() => choose(entry.id)}
+                            className={cn(
+                                "shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
+                                tab === entry.id
+                                    ? "bg-muted font-medium text-foreground"
+                                    : "text-muted-foreground"
+                            )}
+                        >
+                            {t(`tabs.${entry.id}`)}
+                        </button>
+                    ))}
+                </ScrollRow>
+                <CardBody className="min-h-[24rem]">
+                    {tab === "overview" ? <OverviewTab serverId={serverId} seed={seed} /> : null}
+                    {tab === "domains" ? <DnsTab serverId={serverId} /> : null}
+                    {tab === "mailboxes" ? <MailboxesTab serverId={serverId} /> : null}
+                    {tab === "forwards" ? <ForwardsTab serverId={serverId} /> : null}
+                    {tab === "sending" ? <SendingTab serverId={serverId} /> : null}
+                    {tab === "rules" ? <RulesTab serverId={serverId} /> : null}
+                    {tab === "reports" ? <ReportsTab serverId={serverId} /> : null}
+                    {tab === "backups" ? <BackupsTab serverId={serverId} /> : null}
+                </CardBody>
+            </Card>
+        </div>
+    );
+}

@@ -19,7 +19,9 @@ import type { GameContext } from "@polaris-app/game-servers/src/screens/installe
 import { playerWords } from "@polaris-app/game-servers/src/lib/player-vocabulary";
 import { gameCatalogs } from "@polaris-app/game-servers/messages";
 
-const { playerAction, playerFilters, playerStanding } = playerWords(gameCatalogs.translator("en-US", "games"));
+const { playerAction, playerFilters, playerStanding } = playerWords(
+    gameCatalogs.translator("en-US", "games")
+);
 // The dashboard's pieces the screen takes, as the layout provides them.
 import "@/components/app-host/client";
 
@@ -33,7 +35,7 @@ vi.stubEnv("POLARIS_AUTH_SECRET", "a-long-enough-string-for-the-schema");
 vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
 
 vi.mock("next/navigation", () => ({
-    usePathname: () => `/apps/installed/${INSTALL}/players`,
+    usePathname: () => `/game-servers/${INSTALL}/players`,
     useRouter: () => ({ refresh: () => undefined, push: () => undefined })
 }));
 

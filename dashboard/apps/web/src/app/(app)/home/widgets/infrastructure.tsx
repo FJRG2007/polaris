@@ -379,7 +379,7 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
             <WidgetEmpty
                 action={
                     <Link
-                        href="/apps/games"
+                        href="/game-servers"
                         className="text-xs font-medium text-primary hover:underline"
                     >
                         {t("games.create")}

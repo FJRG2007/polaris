@@ -358,7 +358,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                 setError(result.error ?? t("create.errors.createFailed"));
                 return;
             }
-            router.push(`/apps/installed/${result.installedAppId}`);
+            router.push(`/game-servers/${result.installedAppId}`);
         });
     }
 

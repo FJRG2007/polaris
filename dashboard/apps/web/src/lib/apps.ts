@@ -305,32 +305,41 @@ export const POLARIS_APPS: AppEntry[] = [
          *
          * An app of its own, beside Places and Tools, rather than a screen in
          * Apps: somebody who runs a server for their friends is not deploying
-         * anything, and it only exists once somebody installs it. Its path stays
-         * under /apps because every server's own screens already live there, with
-         * the installed apps, and links to them are in people's bookmarks.
+         * anything, and it only exists once somebody installs it. A server's own
+         * screens are at /game-servers/<id>; the old address redirects.
          */
         id: "games",
         category: "games",
         label: "Game servers", // i18n-ignore
         description: "Minecraft, ARK and FiveM servers on your own machines", // i18n-ignore
         icon: Gamepad2,
-        href: "/apps/games",
+        href: "/game-servers",
         permission: "games.read",
         requiresApp: GAME_SERVERS_APP_ID
     },
     {
         /**
          * The network's own services: apps of their own, beside Game servers,
-         * rather than screens in Apps. Their paths stay under /apps because the
-         * devices signed in to the VPN and people's bookmarks already use them.
+         * rather than screens in Apps. The old /apps addresses redirect, which is
+         * what a device already signed in to the VPN still follows.
          */
         id: "vpn",
         category: "infrastructure",
         label: "VPN", // i18n-ignore
         description: "Reach your own devices from anywhere", // i18n-ignore
         icon: Waypoints,
-        href: "/apps/vpn",
+        href: "/vpn",
         requiresApp: "vpn"
+    },
+    {
+        id: "mail-server",
+        category: "infrastructure",
+        label: "Mail server", // i18n-ignore
+        description: "Host your own email on your machines", // i18n-ignore
+        icon: Mails,
+        href: "/mail-server",
+        permission: "mailserver.manage",
+        requiresApp: "mail-server"
     },
     {
         id: "router",
@@ -338,7 +347,7 @@ export const POLARIS_APPS: AppEntry[] = [
         label: "Router", // i18n-ignore
         description: "Run a Linux machine as your network's router", // i18n-ignore
         icon: Router,
-        href: "/apps/router",
+        href: "/router",
         adminOnly: true
     },
     {
@@ -347,7 +356,7 @@ export const POLARIS_APPS: AppEntry[] = [
         label: "Network filter", // i18n-ignore
         description: "Block ads, trackers and unwanted sites across your network", // i18n-ignore
         icon: ShieldBan,
-        href: "/apps/network-filter",
+        href: "/network-filter",
         adminOnly: true,
         requiresApp: "dns-blocker"
     },
@@ -1331,7 +1340,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // alone beside itself would be a column of nothing. Kept so search
             // still finds it by the games it runs.
             label: "Servers", // i18n-ignore
-            href: "/apps/games",
+            href: "/game-servers",
             needs: "games.read",
             requiresApp: "game-servers",
             icon: Gamepad2,
@@ -1519,36 +1528,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             adminOnly: true,
             icon: Archive,
             keywords: ["restore", "snapshots"],
-            group: DATA_GROUP
-        },
-        {
-            // Here rather than under Management: a mail server is a service the
-            // operator runs on their machines, deployed through Deploy and backed
-            // up by Backups, beside which it sits. Management configures Polaris
-            // itself; reading mail stays in Mail. Only here once somebody installs
-            // it from the marketplace: a Polaris that runs no mail server should
-            // not carry a door onto one.
-            label: "Mail server", // i18n-ignore
-            href: "/apps/mail-server",
-            needs: "mailserver.manage",
-            requiresApp: "mail-server",
-            icon: Mails,
-            keywords: [
-                "smtp",
-                "imap",
-                "email server",
-                "mailboxes",
-                "domains",
-                "dkim",
-                "spf",
-                "dmarc",
-                "mx",
-                "relay",
-                "smarthost",
-                "aliases",
-                "forwards",
-                "catch-all"
-            ],
             group: DATA_GROUP
         },
         {
@@ -2567,7 +2546,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     "dns-blocker": [
         {
             label: "Overview", // i18n-ignore
-            href: "/apps/network-filter",
+            href: "/network-filter",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: LayoutDashboard,
@@ -2575,7 +2554,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Query log", // i18n-ignore
-            href: "/apps/network-filter/log",
+            href: "/network-filter/log",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: ScrollText,
@@ -2583,7 +2562,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Lists", // i18n-ignore
-            href: "/apps/network-filter/lists",
+            href: "/network-filter/lists",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: ShieldBan,
@@ -2591,7 +2570,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Devices", // i18n-ignore
-            href: "/apps/network-filter/devices",
+            href: "/network-filter/devices",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: MonitorSmartphone,
@@ -2599,7 +2578,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Local DNS", // i18n-ignore
-            href: "/apps/network-filter/local-dns",
+            href: "/network-filter/local-dns",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: Network,
@@ -2607,18 +2586,47 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Settings", // i18n-ignore
-            href: "/apps/network-filter/settings",
+            href: "/network-filter/settings",
             adminOnly: true,
             requiresApp: "dns-blocker",
             icon: SlidersHorizontal,
             keywords: ["upstream", "safe search", "cache", "export", "import", "backup"]
         }
     ],
+    "mail-server": [
+        {
+            // Out of the rail: the app is this one screen. Kept so search finds
+            // it. Only here once somebody installs it from the marketplace: a
+            // Polaris that runs no mail server should not carry a door onto one.
+            label: "Mail server", // i18n-ignore
+            href: "/mail-server",
+            needs: "mailserver.manage",
+            requiresApp: "mail-server",
+            icon: Mails,
+            hidden: true,
+            keywords: [
+                "smtp",
+                "imap",
+                "email server",
+                "mailboxes",
+                "domains",
+                "dkim",
+                "spf",
+                "dmarc",
+                "mx",
+                "relay",
+                "smarthost",
+                "aliases",
+                "forwards",
+                "catch-all"
+            ]
+        }
+    ],
     router: [
         {
             // Out of the rail: the app is this one screen. Kept so search finds it.
             label: "Router setup", // i18n-ignore
-            href: "/apps/router",
+            href: "/router",
             adminOnly: true,
             icon: Router,
             hidden: true,
@@ -2639,28 +2647,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     vpn: [
         {
             label: "Overview", // i18n-ignore
-            href: "/apps/vpn",
+            href: "/vpn",
             requiresApp: "vpn",
             icon: LayoutDashboard,
             keywords: [...VPN_KEYWORDS, "turn on", "hostname", "status"]
         },
         {
             label: "Devices", // i18n-ignore
-            href: "/apps/vpn/devices",
+            href: "/vpn/devices",
             requiresApp: "vpn",
             icon: MonitorSmartphone,
             keywords: ["machines", "nodes", "exit node", "subnet routes", "rename"]
         },
         {
             label: "Private networks", // i18n-ignore
-            href: "/apps/vpn/networks",
+            href: "/vpn/networks",
             requiresApp: "vpn",
             icon: Network,
             keywords: ["subnet", "home automation", "iot", "router", "wifi", "openwrt"]
         },
         {
             label: "Add a device", // i18n-ignore
-            href: "/apps/vpn/add",
+            href: "/vpn/add",
             requiresApp: "vpn",
             icon: Plus,
             keywords: ["install", "login server", "key", "phone", "tv", "router"]
@@ -2879,6 +2887,8 @@ export const APP_SUBAPPS: AppSubapp[] = [
 
 /** Where an installed app's own screens live. */
 export const INSTALLED_BASE = "/apps/installed";
+/** Where a game server's own screens live. */
+export const GAME_SERVERS_BASE = "/game-servers";
 
 const RUNNING_GROUP = "Running it";
 const TALKING_GROUP = "Talking to players";
@@ -3140,7 +3150,7 @@ export interface InstalledAppNav {
  * this install has no screens of its own to show.
  */
 export function installedAppSubapp(id: string, nav: InstalledAppNav): AppSubapp | null {
-    const base = `${INSTALLED_BASE}/${id}`;
+    const base = `${GAME_SERVERS_BASE}/${id}`;
     const sections = nav.tabs.flatMap((slug) => {
         const entry = GAME_RAIL[slug];
         if (!entry) return [];
@@ -3153,15 +3163,18 @@ export function installedAppSubapp(id: string, nav: InstalledAppNav): AppSubapp 
         label: nav.name,
         icon: Gamepad2,
         base,
-        parent: { label: "Game servers", href: "/apps/games" }, // i18n-ignore
+        parent: { label: "Game servers", href: "/game-servers" }, // i18n-ignore
         sections
     };
 }
 
 /** The installed app id in a path, or null when the path is not inside one. */
 export function installedAppIdForPath(pathname: string): string | null {
-    if (!pathname.startsWith(`${INSTALLED_BASE}/`)) return null;
-    const id = pathname.slice(INSTALLED_BASE.length + 1).split("/")[0] ?? "";
+    const base = [INSTALLED_BASE, GAME_SERVERS_BASE].find((path) =>
+        pathname.startsWith(`${path}/`)
+    );
+    if (!base) return null;
+    const id = pathname.slice(base.length + 1).split("/")[0] ?? "";
     return id ? decodeURIComponent(id) : null;
 }
 
@@ -3323,7 +3336,7 @@ function claimOn(app: AppEntry, pathname: string): number {
  *  which is the one screen that belongs to no app in particular.
  *
  *  The most specific claim wins: Apps owns `/apps`, and Game servers answers
- *  inside it at `/apps/games`. */
+ *  inside it at `/game-servers`. */
 export function resolveActiveApp(pathname: string): AppEntry {
     let best: AppEntry | null = null;
     let bestClaim = -1;

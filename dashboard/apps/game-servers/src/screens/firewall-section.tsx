@@ -34,7 +34,7 @@ export function GamesFirewallSection({ installedAppId, game, access }: GamesFire
             <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
                 {t("firewall.fivem")}{" "}
                 <Link
-                    href={`/apps/installed/${installedAppId}/security`}
+                    href={`/game-servers/${installedAppId}/security`}
                     className="text-primary hover:underline"
                 >
                     {t("firewall.openWhoMayJoin")}
@@ -48,7 +48,7 @@ export function GamesFirewallSection({ installedAppId, game, access }: GamesFire
             <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
                 {t("firewall.ark")}{" "}
                 <Link
-                    href={`/apps/installed/${installedAppId}/security`}
+                    href={`/game-servers/${installedAppId}/security`}
                     className="text-primary hover:underline"
                 >
                     {t("firewall.openWhoMayJoin")}

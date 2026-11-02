@@ -15,7 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { INSTALLED_BASE } from "@/lib/apps";
+import { GAME_SERVERS_BASE } from "@/lib/apps";
 import { sessionCanAny } from "@/lib/session";
 import { shelfScope } from "@/lib/tasks/access";
 import type { SessionUser } from "@/lib/session";
@@ -346,7 +346,7 @@ async function gameServers(userId: string): Promise<OverviewGames> {
         running: server.running,
         slots: server.slots,
         online: server.online ?? null,
-        href: `${INSTALLED_BASE}/${server.id}`
+        href: `${GAME_SERVERS_BASE}/${server.id}`
     }));
     return {
         running: rows.filter((row) => row.running).length,

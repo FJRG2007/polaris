@@ -313,7 +313,7 @@ export function GamesView({
         const server = servers.find((candidate) => candidate.id === askedToDuplicate);
         if (server?.duplicate?.allowed) setDuplicating({ id: server.id, name: server.name });
         else if (server) setError(duplicateRefusal(server));
-        router.replace("/apps/games");
+        router.replace("/game-servers");
         // Only when the address asks; the list moving under it is not a request.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [askedToDuplicate]);
@@ -784,7 +784,7 @@ function ServerRow({
     const canDuplicate = mayDuplicate && !server.copy;
     const failedCopy = server.copy?.stage === "failed";
     const definition = GAMES.find((game) => game.id === server.game) ?? null;
-    const href = `/apps/installed/${server.id}`;
+    const href = `/game-servers/${server.id}`;
     const files = filesHref(server.applicationId, server.game);
     const running = facts?.running ?? false;
     const address = facts?.address ?? null;

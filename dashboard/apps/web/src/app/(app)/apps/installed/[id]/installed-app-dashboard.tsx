@@ -131,7 +131,11 @@ export function InstalledAppDashboard({
     const isGame = gameForCatalogId(app.catalogId) !== undefined || isGameServersApp(app.catalogId);
     const manifest = findApp(app.catalogId);
     const polarisApp = manifest !== undefined && storeScope(manifest) === "polaris";
-    const backHref = isGame ? "/apps/games" : polarisApp ? POLARIS_APPS_PATH : DEPLOYABLE_APPS_PATH;
+    const backHref = isGame
+        ? "/game-servers"
+        : polarisApp
+          ? POLARIS_APPS_PATH
+          : DEPLOYABLE_APPS_PATH;
     // i18n-ignore: the rail's own labels, translated by navLabel where drawn
     const backLabel = navLabel(
         isGame ? "Game servers" : polarisApp ? "Polaris apps" : "Marketplace"
@@ -215,7 +219,7 @@ export function InstalledAppDashboard({
                             (duplicate.allowed ? (
                                 <Button asChild size="sm" variant="secondary">
                                     <Link
-                                        href={`/apps/games?duplicate=${encodeURIComponent(app.id)}`}
+                                        href={`/game-servers?duplicate=${encodeURIComponent(app.id)}`}
                                     >
                                         <CopyPlus className="size-4" /> {t("duplicate")}
                                     </Link>

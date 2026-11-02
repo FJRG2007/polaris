@@ -82,7 +82,7 @@ export async function gameLinksFor(
             // an address somewhere else is a request to somewhere else.
             logo: /^\/logos\/[\w.-]+$/.test(link.logo) ? link.logo : null,
             href: (await mayOpen(link.installedAppId, link.ownerId))
-                ? `/apps/installed/${link.installedAppId}`
+                ? `/game-servers/${link.installedAppId}`
                 : null,
             commands: link.commands
         };

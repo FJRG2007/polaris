@@ -812,7 +812,7 @@ export async function saveGameScheduleAction(
                 windows: parsed.data.schedule.windows.length
             }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -843,7 +843,7 @@ export async function setWakeOnJoinAction(
     try {
         await requireGameServer("games.manage", installedAppId);
         await patchInstallConfig(installedAppId, { [WAKE_KEY]: wake });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -1045,7 +1045,7 @@ export async function linkPlayerAccountAction(
                 followSignIns: parsed.data.followSignIns
             }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -1096,7 +1096,7 @@ export async function invitePlayerAccountAction(
             });
             return linked.error ? { error: linked.error } : { linked: true };
         }
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { invite: result.invite ?? {} };
     } catch (caught) {
         return {
@@ -1135,7 +1135,7 @@ export async function unlinkPlayerAccountAction(
             targetId: parsed.data.installedAppId,
             metadata: { player: parsed.data.username }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -1325,7 +1325,7 @@ export async function setGameHostnameAction(
             targetId: installedAppId,
             metadata: { hostname }
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return { hostname };
     } catch (caught) {
         return {
@@ -1359,7 +1359,7 @@ export async function setGameRoutedAction(
             targetId: installedAppId,
             metadata: { routed }
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return { ok: true };
     } catch (caught) {
         return {
@@ -1409,8 +1409,8 @@ export async function renameGameServerAction(
             targetId: installedAppId,
             metadata: { from: install.name, to: parsed.data }
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
-        revalidatePath("/apps/games");
+        revalidatePath(`/game-servers/${installedAppId}`);
+        revalidatePath("/game-servers");
         return { name: parsed.data };
     } catch (caught) {
         return {
@@ -1494,7 +1494,7 @@ export async function setServerIconAction(input: {
             targetType: "installedApp",
             targetId: parsed.data.installedAppId
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -2013,7 +2013,7 @@ export async function restoreWorldBackupAction(
             targetId: parsed.data.installedAppId,
             metadata: { name: parsed.data.name, level: restored.level }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { level: restored.level };
     } catch (caught) {
         return {
@@ -2058,7 +2058,7 @@ export async function resetServerConfigAction(
             targetId: installedAppId,
             metadata: { movedTo: aside }
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return { moved: aside !== null };
     } catch (caught) {
         return {
@@ -2107,7 +2107,7 @@ export async function pinLoaderAndStartAction(
             targetId: parsed.data,
             metadata: { loader: pinned.loader, version: pinned.version }
         });
-        revalidatePath(`/apps/installed/${parsed.data}`);
+        revalidatePath(`/game-servers/${parsed.data}`);
         return { loader: pinned.loader, version: pinned.version };
     } catch (caught) {
         return {
@@ -2170,7 +2170,7 @@ export async function updateLoaderAction(
             targetId: parsed.data,
             metadata: { from: released.from, restarted: restart }
         });
-        revalidatePath(`/apps/installed/${parsed.data}`);
+        revalidatePath(`/game-servers/${parsed.data}`);
         return { restarted: restart };
     } catch (caught) {
         return {
@@ -2251,7 +2251,7 @@ export async function chooseLoaderVersionAction(input: {
             targetId: parsed.data.installedAppId,
             metadata: { from: chosen.from, to: parsed.data.version, restarted: restart }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { restarted: restart };
     } catch (caught) {
         return {
@@ -2301,7 +2301,7 @@ export async function newWorldAction(
                 keptPlayers: created.carried
             }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { level: created.level, carried: created.carried };
     } catch (caught) {
         return {
@@ -2357,7 +2357,7 @@ export async function resetGameServerAction(
                 worldsAside: done.worldsAside
             }
         });
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return { level: done.level, version: done.version, carried: done.carried };
     } catch (caught) {
         return {
@@ -2394,7 +2394,7 @@ export async function switchWorldAction(
             targetId: parsed.data.installedAppId,
             metadata: { level: parsed.data.level }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return {
@@ -2578,7 +2578,7 @@ export async function updateClientModsAction(
             targetId: parsed.data.installedAppId,
             metadata: { count: parsed.data.entries.length }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return {};
     } catch (error) {
         return {
@@ -2715,7 +2715,7 @@ export async function updateServerSettingsAction(
         if (difficulty && isDifficulty(difficulty)) {
             await recordDifficulty(parsed.data.installedAppId, difficulty, user.id);
         }
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return memory ?? {};
     } catch (caught) {
         return {
@@ -2792,7 +2792,7 @@ export async function setMemoryPlanAction(
             targetId: parsed.data.installedAppId,
             metadata: { mode: parsed.data.mode, ceilingMb: parsed.data.ceilingMb }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return await readMemoryPlanAction(parsed.data.installedAppId);
     } catch (caught) {
         return {

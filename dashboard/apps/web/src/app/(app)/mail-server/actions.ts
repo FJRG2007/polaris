@@ -1,0 +1,791 @@
+"use server";
+
+/**
+ * Everything the mail server screens ask for and change.
+ *
+ * Each action resolves the session, asks for `mailserver.manage`, validates its
+ * input against the shared schema and resolves the server through `requireServer`
+ * (which applies the owner or organization check) before it touches anything.
+ * A refusal comes back as a sentence rather than a throw, so a dialog can show it
+ * where it happened.
+ */
+
+import { z } from "zod";
+import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
+import { revalidatePath } from "next/cache";
+import * as dns from "@/lib/mail-server/dns";
+import { findApp } from "@/lib/apps/catalog";
+import * as relay from "@/lib/mail-server/relay";
+import * as setup from "@/lib/mail-server/setup";
+import { recordAudit } from "@/lib/audit-service";
+import * as health from "@/lib/mail-server/health";
+import * as backup from "@/lib/mail-server/backup";
+import * as ops from "@/lib/mail-server/operations";
+import { addAccount } from "@/lib/mailbox/accounts";
+import * as inbound from "@/lib/mail-server/inbound";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import * as dmarc from "@/lib/mail-server/dmarc-report";
+import { installApp } from "@/lib/apps/install-service";
+import * as appInstall from "@/lib/mail-server/app-install";
+import { defaultInstallInput } from "@/lib/apps/install-defaults";
+import { MailServerUnreachable } from "@/lib/mail-server/transport";
+import { requireAdmin, requirePermission, sessionCan, type SessionUser } from "@/lib/session";
+import { reached, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
+import {
+    listServers,
+    MailServerAccessError,
+    requireServer,
+    type MailServerActor
+} from "@/lib/mail-server/access";
+import { getTranslations } from "@/lib/i18n/request";
+import { mailSchemaText } from "@/lib/mail-server/words";
+import { mailServerRefusalText } from "@/lib/mail-server/refusal-text";
+
+type Result<T = object> = { error: string } | ({ error?: undefined } & T);
+
+/** The sentence a failure is shown as. Only failures written for a reader are
+ *  passed on; anything else is logged and said generically. */
+async function failed(error: unknown): Promise<{ error: string }> {
+    const t = await getTranslations("mailServer");
+    if (
+        error instanceof MailServerAccessError ||
+        error instanceof setup.MailSetupRefusal ||
+        error instanceof MailServerUnreachable ||
+        error instanceof core.StalwartRefusal ||
+        error instanceof dmarc.DmarcUploadError ||
+        error instanceof core.DmarcReportError
+    ) {
+        return { error: mailServerRefusalText(t, error.message) };
+    }
+    console.error("polaris: mail server action failed:", error);
+    return { error: t("errors.generic") };
+}
+
+async function invalid(error: z.ZodError): Promise<{ error: string }> {
+    const t = await getTranslations("mailServer");
+    return { error: mailSchemaText(t, error.issues[0]?.message) ?? t("errors.invalid") };
+}
+
+/** A reply in the reader's language. */
+async function say(
+    key:
+        | "errors.notInCatalog"
+        | "errors.installFailed"
+        | "errors.uninstallFailed"
+        | "errors.setupRunning"
+): Promise<string> {
+    return (await getTranslations("mailServer"))(key);
+}
+
+/** Said by every action below once the app has been uninstalled under an open
+ *  screen: there is nothing left for it to act on. */
+const NOT_INSTALLED = "Mail server is not installed. Install it from Polaris apps first.";
+
+async function actor(): Promise<MailServerActor & { user: SessionUser }> {
+    const user = await requirePermission("mailserver.manage");
+    if (!(await appInstall.mailServerAppInstalled()))
+        throw new MailServerAccessError(NOT_INSTALLED);
+    return { id: user.id, isAdmin: user.isAdmin, user };
+}
+
+const serverIdSchema = z.string().uuid();
+
+async function server(id: unknown) {
+    const who = await actor();
+    const parsed = serverIdSchema.safeParse(id);
+    if (!parsed.success) throw new MailServerAccessError();
+    return { who, row: await requireServer(who, parsed.data) };
+}
+
+function refresh(serverId?: string): void {
+    revalidatePath("/mail-server");
+    if (serverId) revalidatePath(`/mail-server/${serverId}`);
+}
+
+// ---------------------------------------------------------------------------
+// The app itself
+// ---------------------------------------------------------------------------
+
+/** Everything that draws the app or reads whether it is here: this screen, the
+ *  marketplace, and the rail and search in the layout above both. */
+function refreshApp(): void {
+    revalidatePath("/", "layout");
+    revalidatePath("/mail-server");
+    revalidatePath("/apps/marketplace");
+    revalidatePath("/admin/apps");
+}
+
+/**
+ * Install the app from its own screen, the same install the marketplace makes.
+ * Admin-only, like installing any Polaris app. Runs nothing: the engine is only
+ * pulled when a server is set up.
+ */
+export async function installMailServerAppAction(): Promise<Result> {
+    const user = await requireAdmin();
+    try {
+        const manifest = findApp(appInstall.MAIL_SERVER_APP);
+        if (!manifest) return { error: await say("errors.notInCatalog") };
+        const installedAppId =
+            (await appInstall.adoptMailServerApp()) ??
+            (await installApp(user.id, user.id, defaultInstallInput(manifest))).installedAppId;
+        await recordAudit({
+            actorId: user.id,
+            action: "apps.install",
+            targetType: "installedApp",
+            targetId: installedAppId
+        });
+        refreshApp();
+        return {};
+    } catch (error) {
+        // Somebody installed it in the same moment, which leaves it installed -
+        // what was asked for.
+        if ((await appInstall.adoptMailServerApp().catch(() => null)) !== null) {
+            refreshApp();
+            return {};
+        }
+        console.error("polaris: installing Mail server failed:", error);
+        return { error: await say("errors.installFailed") };
+    }
+}
+
+/** Uninstall the app for the whole Polaris. Refused while any mail server is
+ *  still set up - see `uninstallMailServerApp`. */
+export async function uninstallMailServerAppAction(): Promise<Result> {
+    const user = await requireAdmin();
+    try {
+        const removed = await appInstall.uninstallMailServerApp({
+            id: user.id,
+            isAdmin: user.isAdmin
+        });
+        for (const id of removed) {
+            await recordAudit({
+                actorId: user.id,
+                action: "apps.uninstall",
+                targetType: "installedApp",
+                targetId: id
+            });
+        }
+        refreshApp();
+        return {};
+    } catch (error) {
+        if (error instanceof appInstall.MailServerAppRefusal) return { error: error.message };
+        console.error("polaris: uninstalling Mail server failed:", error);
+        return { error: await say("errors.uninstallFailed") };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Servers
+// ---------------------------------------------------------------------------
+
+export interface MailServerSummary {
+    readonly id: string;
+    readonly hostname: string;
+    readonly primaryDomain: string;
+    readonly status: string;
+    readonly step: string;
+    readonly error: string | null;
+    readonly placement: string;
+    readonly placementName: string;
+    readonly createdAt: string;
+}
+
+/** The names of the machines servers run on, by placement. */
+async function placementNames(placements: readonly string[]): Promise<Map<string, string>> {
+    const ids = placements.filter((placement) => serverIdSchema.safeParse(placement).success);
+    const hosts =
+        ids.length > 0
+            ? await prisma.host.findMany({
+                  where: { id: { in: ids } },
+                  select: { id: true, name: true }
+              })
+            : [];
+    const t = await getTranslations("mailServer");
+    return new Map([
+        ["local", t("common.thisMachine")],
+        ...hosts.map((host) => [host.id, host.name] as [string, string])
+    ]);
+}
+
+export async function listServersAction(): Promise<Result<{ servers: MailServerSummary[] }>> {
+    try {
+        const who = await actor();
+        const rows = await listServers(who, await scopeOrgIdFor(who.id));
+        const names = await placementNames(rows.map((row) => row.placement));
+        const t = await getTranslations("mailServer");
+        return {
+            servers: rows.map((row) => ({
+                id: row.id,
+                hostname: row.hostname,
+                primaryDomain: row.primaryDomain,
+                status: row.status,
+                step: row.step,
+                error: row.error,
+                placement: row.placement,
+                placementName: names.get(row.placement) ?? t("common.placementGone"),
+                createdAt: row.createdAt.toISOString()
+            }))
+        };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Where a new server can run: this machine and every server the person enrolled. */
+export async function listPlacementsAction(): Promise<{ id: string; name: string }[]> {
+    const who = await actor();
+    const hosts = await prisma.host.findMany({
+        where: { ownerId: who.id },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" }
+    });
+    const t = await getTranslations("mailServer");
+    return [{ id: "local", name: t("common.thisMachine") }, ...hosts];
+}
+
+export async function startSetupAction(input: unknown): Promise<Result<{ id: string }>> {
+    const parsed = core.mailServerSetupSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const who = await actor();
+        const row = await setup.startSetup(who, parsed.data, await scopeOrgIdFor(who.id));
+        refresh();
+        return { id: row.id };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export interface MailServerDetail extends MailServerSummary {
+    readonly log: string;
+    readonly running: boolean;
+    readonly applicationId: string | null;
+    readonly projectId: string | null;
+    readonly steps: readonly { step: SetupStep; label: string; done: boolean }[];
+}
+
+export async function serverDetailAction(
+    serverId: string
+): Promise<Result<{ server: MailServerDetail }>> {
+    try {
+        const { row } = await server(serverId);
+        const names = await placementNames([row.placement]);
+        const t = await getTranslations("mailServer");
+        const app = row.applicationId
+            ? await prisma.application.findUnique({
+                  where: { id: row.applicationId },
+                  select: { environment: { select: { projectId: true } } }
+              })
+            : null;
+        return {
+            server: {
+                id: row.id,
+                hostname: row.hostname,
+                primaryDomain: row.primaryDomain,
+                status: row.status,
+                step: row.step,
+                error: row.error,
+                placement: row.placement,
+                placementName: names.get(row.placement) ?? t("common.placementGone"),
+                createdAt: row.createdAt.toISOString(),
+                log: row.log,
+                running: setup.isRunning(row.id),
+                applicationId: row.applicationId,
+                projectId: app?.environment.projectId ?? null,
+                steps: SETUP_STEPS.filter((step) => step !== "done").map((step) => ({
+                    step,
+                    label: t(`steps.${step === "recovery-off" ? "recoveryOff" : step}`),
+                    done: reached(row.step, step)
+                }))
+            }
+        };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const repairSchema = z.object({
+    serverId: z.string().uuid(),
+    from: z.enum(SETUP_STEPS).nullable()
+});
+
+/** Resume setup where it stopped, or run it again from a chosen step. */
+export async function resumeSetupAction(input: unknown): Promise<Result> {
+    const parsed = repairSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await setup.resumeSetup(who, row, parsed.data.from ?? undefined);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/**
+ * Stop managing a server here. The Deploy service, its volumes and every
+ * mailbox in them stay where they are - removing those is Deploy's delete, on
+ * purpose, because it destroys mail that cannot be got back.
+ */
+export async function removeServerAction(serverId: string): Promise<Result> {
+    try {
+        const { who, row } = await server(serverId);
+        if (setup.isRunning(row.id)) return { error: await say("errors.setupRunning") };
+        await prisma.mailServer.delete({ where: { id: row.id } });
+        await recordAudit({
+            actorId: who.id,
+            action: "mailserver.remove",
+            targetType: "mail-server",
+            targetId: row.id,
+            orgId: row.orgId ?? undefined
+        });
+        refresh();
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+export async function healthAction(
+    serverId: string
+): Promise<Result<{ health: health.MailHealth }>> {
+    try {
+        const { row } = await server(serverId);
+        return { health: await health.mailHealth(row) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function storedHealthAction(
+    serverId: string
+): Promise<Result<{ ports: health.PortReport | null; dns: ReturnType<typeof dns.storedDns> }>> {
+    try {
+        const { row } = await server(serverId);
+        return { ports: health.storedPorts(row), dns: dns.storedDns(row) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Domains and DNS
+// ---------------------------------------------------------------------------
+
+export async function listDomainsAction(
+    serverId: string
+): Promise<Result<{ domains: ops.MailDomainView[] }>> {
+    try {
+        const { row } = await server(serverId);
+        return { domains: await ops.listDomains(row) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function addDomainAction(input: unknown): Promise<Result<{ id: string }>> {
+    const parsed = core.mailDomainSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        const id = await ops.addDomain(who, row, parsed.data.name);
+        refresh(row.id);
+        return { id };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const domainRefSchema = z.object({
+    serverId: z.string().uuid(),
+    domainId: z.string().trim().min(1).max(64)
+});
+
+export async function removeDomainAction(input: unknown): Promise<Result> {
+    const parsed = domainRefSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.removeDomain(who.id, row, parsed.data.domainId);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function setCatchAllAction(input: unknown): Promise<Result> {
+    const parsed = core.mailCatchAllSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.setCatchAll(who.id, row, parsed.data.domainId, parsed.data.address);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function scanDnsAction(
+    serverId: string
+): Promise<Result<{ reports: dns.DomainDnsReport[]; at: string }>> {
+    try {
+        const { row } = await server(serverId);
+        const reports = await dns.scanDns(row);
+        return { reports, at: new Date().toISOString() };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function planDnsAction(input: unknown): Promise<Result<{ plan: dns.DnsPlan }>> {
+    const parsed = domainRefSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        return { plan: await dns.planDns(who, row, parsed.data.domainId) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const applySchema = domainRefSchema.extend({ replaceConflicts: z.boolean() });
+
+export async function applyDnsAction(
+    input: unknown
+): Promise<Result<{ results: dns.ApplyResult[] }>> {
+    const parsed = applySchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        const results = await dns.applyDns(
+            who,
+            row,
+            parsed.data.domainId,
+            parsed.data.replaceConflicts
+        );
+        return { results };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mailboxes and forwards
+// ---------------------------------------------------------------------------
+
+export async function listMailboxesAction(
+    serverId: string
+): Promise<Result<{ mailboxes: ops.MailboxView[]; domains: ops.MailDomainView[] }>> {
+    try {
+        const { row } = await server(serverId);
+        const [mailboxes, domains] = await Promise.all([
+            ops.listMailboxes(row),
+            ops.listDomains(row)
+        ]);
+        return { mailboxes, domains };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/**
+ * Create a mailbox, and - when asked - add it to the creator's own Mail app in
+ * the same step, with the servers and the password already filled in. The
+ * mailbox is made either way; a Mail app that could not connect yet (no
+ * certificate, no DNS) is said as a warning, not a failure.
+ */
+export async function createMailboxAction(
+    input: unknown
+): Promise<Result<{ id: string; address: string; warning: string | null }>> {
+    const parsed = core.mailboxCreateSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        const created = await ops.createMailbox(who.id, row, parsed.data);
+        const t = await getTranslations("mailServer");
+        let warning: string | null = null;
+        if (parsed.data.addToMyMail) {
+            if (!(await sessionCan(who.user, "mail.use"))) {
+                warning = t("boxes.warnNoMail");
+            } else {
+                const setupInput = core.mailAccountSetupSchema.safeParse({
+                    address: created.address,
+                    auth: "password",
+                    password: parsed.data.password,
+                    imap: { host: row.hostname, port: 993, security: "tls" },
+                    smtp: { host: row.hostname, port: 465, security: "tls" }
+                });
+                if (!setupInput.success) {
+                    warning = t("boxes.warnNotAdded");
+                } else {
+                    await addAccount(who.id, setupInput.data, row.orgId).catch((error: unknown) => {
+                        warning =
+                            error instanceof Error && error.message
+                                ? t("boxes.warnNoConnectWhy", { reason: error.message })
+                                : t("boxes.warnNoConnect");
+                    });
+                }
+            }
+        }
+        refresh(row.id);
+        return { ...created, warning };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function setMailboxPasswordAction(input: unknown): Promise<Result> {
+    const parsed = core.mailboxPasswordSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.setMailboxPassword(who.id, row, parsed.data.accountId, parsed.data.password);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function setMailboxQuotaAction(input: unknown): Promise<Result> {
+    const parsed = core.mailboxQuotaSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.setMailboxQuota(who.id, row, parsed.data.accountId, parsed.data.quotaMb);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function setMailboxAliasesAction(input: unknown): Promise<Result> {
+    const parsed = core.mailAliasesSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.setMailboxAliases(who.id, row, parsed.data.accountId, parsed.data.aliases);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const accountRefSchema = z.object({
+    serverId: z.string().uuid(),
+    accountId: z.string().trim().min(1).max(64)
+});
+
+export async function deleteMailboxAction(input: unknown): Promise<Result> {
+    const parsed = accountRefSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.deleteMailbox(who.id, row, parsed.data.accountId);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function listForwardsAction(
+    serverId: string
+): Promise<Result<{ forwards: ops.ForwardView[]; domains: ops.MailDomainView[] }>> {
+    try {
+        const { row } = await server(serverId);
+        const [forwards, domains] = await Promise.all([
+            ops.listForwards(row),
+            ops.listDomains(row)
+        ]);
+        return { forwards, domains };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function createForwardAction(input: unknown): Promise<Result<{ id: string }>> {
+    const parsed = core.mailForwardSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        const id = await ops.createForward(who.id, row, parsed.data);
+        refresh(row.id);
+        return { id };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const forwardRefSchema = z.object({
+    serverId: z.string().uuid(),
+    forwardId: z.string().trim().min(1).max(64)
+});
+
+export async function deleteForwardAction(input: unknown): Promise<Result> {
+    const parsed = forwardRefSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await ops.deleteForward(who.id, row, parsed.data.forwardId);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sending
+// ---------------------------------------------------------------------------
+
+export async function relayAction(
+    serverId: string
+): Promise<Result<{ relay: relay.RelaySetting | null }>> {
+    try {
+        const { row } = await server(serverId);
+        return { relay: relay.storedRelay(row) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function setRelayAction(input: unknown): Promise<Result> {
+    const parsed = core.mailRelaySchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await relay.setRelay(who.id, row, parsed.data);
+        refresh(row.id);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rules on incoming mail
+// ---------------------------------------------------------------------------
+
+export async function listRulesAction(
+    serverId: string
+): Promise<Result<{ rules: inbound.InboundRuleView[] }>> {
+    try {
+        const { row } = await server(serverId);
+        return { rules: await inbound.listRules(row) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function createRuleAction(
+    input: unknown
+): Promise<Result<{ rule: inbound.InboundRuleView }>> {
+    const parsed = core.mailInboundRuleSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        const rule = await inbound.createRule(who.id, row, parsed.data);
+        return { rule };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const ruleUpdateSchema = core.mailInboundRuleSchema.extend({ ruleId: z.string().uuid() });
+
+export async function updateRuleAction(input: unknown): Promise<Result> {
+    const parsed = ruleUpdateSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await inbound.updateRule(who.id, row, parsed.data.ruleId, parsed.data);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const ruleRefSchema = z.object({ serverId: z.string().uuid(), ruleId: z.string().uuid() });
+
+export async function deleteRuleAction(input: unknown): Promise<Result> {
+    const parsed = ruleRefSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { who, row } = await server(parsed.data.serverId);
+        await inbound.deleteRule(who.id, row, parsed.data.ruleId);
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DMARC reports and backups
+// ---------------------------------------------------------------------------
+
+const rangeSchema = z.object({
+    serverId: z.string().uuid(),
+    days: z.union([z.literal(7), z.literal(30), z.literal(90)])
+});
+
+export async function dmarcAction(
+    input: unknown
+): Promise<Result<{ overview: dmarc.DmarcOverview }>> {
+    const parsed = rangeSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { row } = await server(parsed.data.serverId);
+        return { overview: await dmarc.dmarcOverview(row, parsed.data.days) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Read the report mailbox now rather than at the next scheduled pass. */
+export async function collectReportsAction(
+    serverId: string
+): Promise<Result<{ filed: number; messages: number }>> {
+    try {
+        const { row } = await server(serverId);
+        const result = await dmarc.collectReports(row);
+        const fresh = await prisma.mailServer.findUnique({
+            where: { id: row.id },
+            select: { reportsError: true }
+        });
+        if (fresh?.reportsError) return { error: fresh.reportsError };
+        return { filed: result.filed, messages: result.messages };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function backupsAction(
+    serverId: string
+): Promise<Result<{ backups: backup.MailBackupView }>> {
+    try {
+        const { row } = await server(serverId);
+        return { backups: await backup.mailBackups(row) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+export async function protectAction(serverId: string): Promise<Result<{ resourceId: string }>> {
+    try {
+        const { who, row } = await server(serverId);
+        const resourceId = await backup.protectMailServer(who.id, row);
+        return { resourceId };
+    } catch (error) {
+        return failed(error);
+    }
+}

@@ -17,7 +17,7 @@
  *   `https://<vpn host>/register/<auth id>` in the browser. Headscale's own page
  *   there tells the reader to run a command, and Polaris's session cookie lives
  *   on the dashboard's hostname, not this one, so the edge sends that path to
- *   the dashboard's page for it instead (`/apps/vpn/register/<auth id>`), where
+ *   the dashboard's page for it instead (`/vpn/register/<auth id>`), where
  *   the person signed in adds the device with one press.
  *
  * Every write goes through `writeDynamicFile`, and the file is rendered by a
@@ -71,7 +71,7 @@ export function renderVpnEdge(input: VpnEdgeInput): string {
         "      redirectRegex:",
         // Only an id in the shape Headscale mints; anything else stays where it is.
         `        regex: "^https?://[^/]+/register/(hskey-authreq-[A-Za-z0-9_-]{24})$"`,
-        `        replacement: "${base}/apps/vpn/register/\${1}"`,
+        `        replacement: "${base}/vpn/register/\${1}"`,
         "        permanent: false",
         ""
     ].join("\n");

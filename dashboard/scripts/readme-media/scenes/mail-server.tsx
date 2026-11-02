@@ -5,9 +5,9 @@ import { Chrome } from "../runtime/chrome";
 import { ago, id } from "../fixtures/people";
 import { defineScene } from "../runtime/scene";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { MailServersView } from "@/app/(app)/apps/mail-server/mail-servers-view";
+import { MailServersView } from "@/app/(app)/mail-server/mail-servers-view";
 
-/** The page `/apps/mail-server` draws once the app is installed. */
+/** The page `/mail-server` draws once the app is installed. */
 function MailServer() {
     const t = useTranslations("mailServer");
     return (
@@ -20,7 +20,7 @@ function MailServer() {
 
 export const mailServer = defineScene({
     id: "mail-server",
-    path: "/apps/mail-server",
+    path: "/mail-server",
     actions: (ctx) => ({
         listServersAction: () => ({
             servers: [

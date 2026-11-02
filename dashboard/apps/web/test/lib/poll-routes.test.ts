@@ -235,7 +235,7 @@ vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     sessionChoicesAction: actions.sessionChoicesAction,
     sessionChangesAction: actions.sessionChangesAction
 }));
-vi.mock("@/app/(app)/apps/network-filter/actions", () => ({
+vi.mock("@/app/(app)/network-filter/actions", () => ({
     dnsInsightsAction: actions.dnsInsightsAction,
     dnsTailAction: actions.dnsTailAction
 }));
@@ -256,7 +256,7 @@ vi.mock("@/app/(app)/admin/inbox/actions", () => ({
     listAgentsAction: actions.listAgentsAction,
     listContactsAction: actions.listContactsAction
 }));
-vi.mock("@/app/(app)/apps/mail-server/actions", () => ({
+vi.mock("@/app/(app)/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction,
     planDnsAction: actions.planDnsAction,
     listPlacementsAction: actions.listPlacementsAction
@@ -685,8 +685,8 @@ const servers = () =>
         "@/app/(app)/apps/servers/servers-polls"
     );
 const dns = () =>
-    actual<typeof import("@/app/(app)/apps/network-filter/dns-blocker-polls")>(
-        "@/app/(app)/apps/network-filter/dns-blocker-polls"
+    actual<typeof import("@/app/(app)/network-filter/dns-blocker-polls")>(
+        "@/app/(app)/network-filter/dns-blocker-polls"
     );
 const inbox = () =>
     actual<typeof import("@/app/(app)/admin/inbox/inbox-polls")>(
@@ -884,8 +884,8 @@ const CASES: Case[] = [
         path: "/api/mail-server/detail",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/mail-server/mail-server-polls")>(
-                    "@/app/(app)/apps/mail-server/mail-server-polls"
+                await actual<typeof import("@/app/(app)/mail-server/mail-server-polls")>(
+                    "@/app/(app)/mail-server/mail-server-polls"
                 )
             ).serverDetail("mail-1"),
         action: "serverDetailAction",
@@ -2333,8 +2333,8 @@ const CASES: Case[] = [
         path: "/api/mail-server/dns-plan",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/mail-server/mail-server-polls")>(
-                    "@/app/(app)/apps/mail-server/mail-server-polls"
+                await actual<typeof import("@/app/(app)/mail-server/mail-server-polls")>(
+                    "@/app/(app)/mail-server/mail-server-polls"
                 )
             ).dnsPlan({ kind: "sample" }),
         action: "planDnsAction",
@@ -2345,8 +2345,8 @@ const CASES: Case[] = [
         path: "/api/mail-server/placements",
         ask: async () =>
             (
-                await actual<typeof import("@/app/(app)/apps/mail-server/mail-server-polls")>(
-                    "@/app/(app)/apps/mail-server/mail-server-polls"
+                await actual<typeof import("@/app/(app)/mail-server/mail-server-polls")>(
+                    "@/app/(app)/mail-server/mail-server-polls"
                 )
             ).placements(),
         action: "listPlacementsAction",

@@ -22,11 +22,17 @@
  */
 
 import { prisma } from "@polaris/db";
-import { findApp } from "@/lib/apps/catalog";
+import { findApp, installedAppHref } from "@/lib/apps/catalog";
 import { visibleProjectIds } from "@/lib/deploy-service";
 import type { Consumption } from "@/app/(app)/admin/consumption/types";
 import { localDockerDriver, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
-import { attribute, subjectHash, type Claim, type ClaimBucket, type ClaimIndex } from "@/lib/consumption";
+import {
+    attribute,
+    subjectHash,
+    type Claim,
+    type ClaimBucket,
+    type ClaimIndex
+} from "@/lib/consumption";
 import {
     cachedSamples,
     oldestSampleAt,
@@ -224,7 +230,7 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
             name: install.name,
             owner: owners.get(install.ownerId) ?? null,
             group: "apps",
-            href: `/apps/installed/${install.id}`
+            href: installedAppHref(install)
         };
 
         // An internal install is not something somebody installed: it is what an
@@ -269,7 +275,7 @@ function appBucket(
         detail: "",
         owner,
         group: "apps",
-        href: manifest?.opensAt ?? `/apps/installed/${install.id}`
+        href: manifest?.opensAt ?? installedAppHref(install)
     };
 }
 

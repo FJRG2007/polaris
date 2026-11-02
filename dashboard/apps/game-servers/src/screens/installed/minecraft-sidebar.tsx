@@ -450,7 +450,7 @@ export function MinecraftSidebar({
                                 ? t("sidebar.callVarsLinked")
                                 : t("sidebar.callVarsUnlinked")}{" "}
                             <a
-                                href={`/apps/installed/${installedAppId}/chat`}
+                                href={`/game-servers/${installedAppId}/chat`}
                                 className="font-medium text-foreground underline-offset-2 hover:underline"
                             >
                                 {state.callLinked

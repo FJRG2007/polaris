@@ -9,9 +9,9 @@ import { reachableApps } from "@/lib/app-access";
 import { APP_SECTIONS, POLARIS_APPS, resolveActiveApp, resolveSubapp } from "@/lib/apps";
 
 const APPS = [
-    ["vpn", "/apps/vpn", "/apps/vpn/devices"],
-    ["router", "/apps/router", "/apps/router"],
-    ["dns-blocker", "/apps/network-filter", "/apps/network-filter/lists"]
+    ["vpn", "/vpn", "/vpn/devices"],
+    ["router", "/router", "/router"],
+    ["dns-blocker", "/network-filter", "/network-filter/lists"]
 ] as const;
 
 describe.each(APPS)("the %s app", (id, href, inner) => {

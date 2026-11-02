@@ -371,6 +371,18 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // The mail server: an envelope on the machine that holds it.
+    "mail-server": {
+        palette: ["#C4B5FD", "#7C3AED", "#5B21B6"],
+        draw: ({ base, face }) => (
+            <>
+                <rect x="5" y="5" width="22" height="14" rx="3" fill={base} />
+                <path d="M6 7.5l10 6.5 10-6.5" {...LINE} stroke={face} strokeWidth={2.2} />
+                <rect x="5" y="21.5" width="22" height="6" rx="2" fill={base} />
+                <circle cx="9.5" cy="24.5" r="1.4" fill={face} />
+            </>
+        )
+    },
     // The router: a box with two antennas and its lights on.
     router: {
         palette: ["#6EE7B7", "#059669", "#065F46"],

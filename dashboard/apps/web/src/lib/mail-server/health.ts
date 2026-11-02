@@ -349,7 +349,7 @@ export async function sweepMailServers(): Promise<{ checked: number; changed: nu
                 ? t("notices.answeringAgain", { host: server.hostname })
                 : t("notices.stopped", { host: server.hostname }),
             body: up ? null : (mailNoteText(t, engine.note) ?? t("notices.notAnswering")),
-            href: `/apps/mail-server/${server.id}`,
+            href: `/mail-server/${server.id}`,
             shelf: { orgId: server.orgId }
         });
     }

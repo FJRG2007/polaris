@@ -239,7 +239,7 @@ export async function createGameServerAction(
             targetId: created.installedAppId,
             metadata: createMetadata(parsed.data)
         });
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return { installedAppId: created.installedAppId, hostname: created.hostname };
     } catch (caught) {
         return {
@@ -303,7 +303,7 @@ export async function saveServerAsTemplateAction(
                 targetId: installedAppId,
                 metadata: { name: name.trim() }
             });
-            revalidatePath("/apps/games");
+            revalidatePath("/game-servers");
         }
         return saved;
     } catch (caught) {
@@ -320,7 +320,7 @@ export async function deleteServerTemplateAction(id: string): Promise<{ error?: 
     try {
         const user = await requirePermission("games.manage");
         await deleteServerTemplate(user.id, id);
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return {};
     } catch (caught) {
         return {
@@ -347,7 +347,7 @@ export async function setGameServerPrefAction(
     try {
         const { user } = await requireGameServer("games.read", installedAppId);
         await setGameServerPref(user.id, installedAppId, patch);
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return {};
     } catch (caught) {
         return {
@@ -367,7 +367,7 @@ export async function setGameServerRunningAction(
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await setServerRunning(user, access, running);
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return {};
     } catch (caught) {
         return {
@@ -392,7 +392,7 @@ export async function redeployGameServerAction(
         // same unwritten minutes a stop does - and used to take them silently.
         await flushGameWorld(access.ownerId, installedAppId);
         await deployApplication(access.install.applicationId, access.ownerId, user.id);
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return {};
     } catch (caught) {
         return {
@@ -440,7 +440,7 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
             targetType: "installedApp",
             targetId: installedAppId
         });
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return {};
     } catch (caught) {
         return {
@@ -559,7 +559,7 @@ export async function duplicateGameServerAction(
             targetId: created.installedAppId,
             metadata: { from: parsed.data.installedAppId }
         });
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return { installedAppId: created.installedAppId };
     } catch (caught) {
         return {
@@ -578,7 +578,7 @@ export async function retryDuplicateAction(copyId: string): Promise<{ error?: st
         if (!(await duplicateService.claimRetry(access.ownerId, copyId)))
             throw new Error((await gameWords("games"))("duplicate.nothingToRetry"));
         after(() => duplicateService.runDuplicate(access.ownerId, user.id, copyId));
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         return {};
     } catch (caught) {
         return {
@@ -603,7 +603,7 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
             targetType: "installedApp",
             targetId: installedAppId
         });
-        revalidatePath("/apps/games");
+        revalidatePath("/game-servers");
         revalidatePath("/apps/marketplace");
         revalidatePath("/admin/apps");
         return {};

@@ -17,6 +17,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { SearchResource } from "@/lib/search/entries";
 import { userHasManage } from "@/lib/session";
 import { listInstalledApps } from "@/lib/apps/install-service";
+import { installedAppHref } from "@/lib/apps/catalog";
 import { listRunnerPools } from "@/lib/runners/runner-service";
 import { listSnippetsForOwner } from "@/lib/snippet-service";
 
@@ -80,7 +81,7 @@ export async function GET(): Promise<Response> {
                 kind: "installed",
                 label: app.name,
                 context: `Installed app - ${app.status}`,
-                href: `/apps/installed/${app.id}`
+                href: installedAppHref(app)
             });
         }
     }

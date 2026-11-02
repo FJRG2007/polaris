@@ -119,7 +119,7 @@ export async function restartGameNowAction(installedAppId: string): Promise<{ er
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await restartServerNow(user, access);
-        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath(`/game-servers/${installedAppId}`);
         return {};
     } catch (caught) {
         return {

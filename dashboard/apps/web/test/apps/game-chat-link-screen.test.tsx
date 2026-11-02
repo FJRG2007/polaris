@@ -67,12 +67,10 @@ vi.mock("@polaris/app-host/client", () => ({
     }
 }));
 
-const { MinecraftChatLink } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-chat-link"
-);
-const { MinecraftSidebar } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-sidebar"
-);
+const { MinecraftChatLink } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-chat-link");
+const { MinecraftSidebar } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-sidebar");
 
 beforeEach(() => {
     fake.saved = [];
@@ -133,7 +131,7 @@ describe("the side panel", () => {
     it("no longer chooses the group, and points at Linked chat instead", async () => {
         render(<MinecraftSidebar installedAppId="s1" canManage />);
         const link = await screen.findByRole("link", { name: "Change it in Linked chat" });
-        expect(link.getAttribute("href")).toBe("/apps/installed/s1/chat");
+        expect(link.getAttribute("href")).toBe("/game-servers/s1/chat");
         expect(screen.queryByLabelText("Chat group whose call is shown")).toBeNull();
     });
 
@@ -144,6 +142,6 @@ describe("the side panel", () => {
             (await screen.findByRole("link", { name: "Link one in Linked chat" })).getAttribute(
                 "href"
             )
-        ).toBe("/apps/installed/s1/chat");
+        ).toBe("/game-servers/s1/chat");
     });
 });

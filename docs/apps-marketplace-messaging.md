@@ -247,7 +247,7 @@ is one and marks the row removed; two apps need more than that, handled by
   game server, or a row still under the old per-game manager id, as the app
   being present (`IMPLIED_BY` in `lib/apps/install-presence.ts`), so its
   `requiresApp`-gated rail entry does not disappear under an instance that has
-  not opened `/apps/games` since `adoptGameServersApp` last ran.
+  not opened `/game-servers` since `adoptGameServersApp` last ran.
 
 ### Messaging domain model (normalized)
 
@@ -378,7 +378,7 @@ follows.
 
 **The marketplace installs one app for every game, not a server and not one app
 per game.** `game-servers` is a builtin app: installing it runs nothing and turns
-`/apps/games` into a real page for every game Polaris knows. Servers are created
+`/game-servers` into a real page for every game Polaris knows. Servers are created
 there, from internal manifests (`minecraft`, `minecraft-bedrock`, `ark`) the
 marketplace never offers - which is why the catalog has an `internal` flag at all.
 Each server is still an ordinary install underneath, and a game's own runtime is
@@ -389,7 +389,7 @@ Polaris used to install a manager per game (`minecraft-manager`, `ark-manager`).
 Those manifests remain, flagged `legacy`, so installs that already carry one still
 resolve to a name; `adoptGameServersApp` turns the oldest of them into
 `game-servers` - keeping its id, and therefore its grants - and retires the rest,
-the next time their owner opens either `/apps/games` or the marketplace. Which
+the next time their owner opens either `/game-servers` or the marketplace. Which
 games need a DNS wildcard is derived from the servers that exist rather than from
 what is installed (`game-zones`), so turning the app on does not ask an operator
 for a record they will never use.

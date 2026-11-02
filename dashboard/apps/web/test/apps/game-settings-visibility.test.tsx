@@ -57,14 +57,13 @@ vi.mock("@/app/(app)/apps/installed/[id]/installed-app-dashboard", () => ({
     InstalledAppDashboard: () => null
 }));
 
-const { default: InstalledAppPage } = await import(
-    "@/app/(app)/apps/installed/[id]/[[...tab]]/page"
-);
+const { InstalledAppScreen } = await import("@/app/(app)/apps/installed/[id]/installed-screen");
 
 /** The keys the page hands the dashboard, for a viewer holding `held.value`. */
 async function sentKeys(): Promise<string[]> {
-    const page = (await InstalledAppPage({
-        params: Promise.resolve({ id: "install-1" })
+    const page = (await InstalledAppScreen({
+        params: Promise.resolve({ id: "install-1" }),
+        gameRoute: true
     })) as ReactElement<{ children: ReactElement<{ settings?: { key: string }[] }>[] }>;
     const dashboard = page.props.children.find((child) => child.props.settings);
     return dashboard!.props.settings!.map((setting) => setting.key);

@@ -126,7 +126,7 @@ export async function saveAnnouncementTemplateAction(
             targetId: parsed.data.installedAppId,
             metadata: { id, name: parsed.data.name }
         });
-        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        revalidatePath(`/game-servers/${parsed.data.installedAppId}`);
         return { templates, id };
     } catch (caught) {
         return {

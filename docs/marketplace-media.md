@@ -41,8 +41,8 @@ and mobile), taken on an install with sample data.
 | Tools            | `tools`            | `tools`, `tools-convert`           | `/tools` with the list of tools, then one conversion in progress (an image resized or a video trimmed)                |
 | CRM              | `crm`              | `crm`, `crm-deal`                  | `/crm` pipeline board with deals in several stages, then one company with its people and deals                         |
 | Status pages     | `status-pages`     | `status-pages`, `status-page-public` | `/status-pages` list of pages, then a public status page with its services and whether each is up                        |
-| Mail server      | `mail-server`      | `mail-server`, `mail-server-dns`   | `/apps/mail-server` with a domain and its mailboxes, then the DNS records it wrote, each checked                       |
-| Network filter   | `dns-blocker`      | `dns-blocker`                      | `/apps/network-filter` on a network in use, showing what it blocked                             |
+| Mail server      | `mail-server`      | `mail-server`, `mail-server-dns`   | `/mail-server` with a domain and its mailboxes, then the DNS records it wrote, each checked                       |
+| Network filter   | `dns-blocker`      | `dns-blocker`                      | `/network-filter` on a network in use, showing what it blocked                             |
 | OpenClaw         | `openclaw`         | -                                  | Coming soon: nothing to capture until it can be installed                                                             |
 | Hermes           | `hermes`           | -                                  | Coming soon: nothing to capture until it can be installed                                                             |
 
