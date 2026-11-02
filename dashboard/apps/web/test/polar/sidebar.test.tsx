@@ -253,8 +253,7 @@ describe("the row menu", () => {
             "Rename",
             "Pin",
             "Share",
-            "Export as Markdown",
-            "Export as JSON",
+            "Export",
             "Archive",
             "Delete",
             "Move to project"
@@ -379,8 +378,7 @@ describe("the right-click menu", () => {
             "Rename",
             "Pin",
             "Share",
-            "Export as Markdown",
-            "Export as JSON",
+            "Export",
             "Archive",
             "Delete",
             "Move to project"

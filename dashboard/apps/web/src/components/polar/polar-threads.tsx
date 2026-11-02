@@ -29,7 +29,11 @@ import {
     type ReactNode
 } from "react";
 import {
+    FileCode,
     FileDown,
+    FileImage,
+    FileSpreadsheet,
+    FileText,
     FileJson,
     Archive,
     ArchiveRestore,
@@ -84,6 +88,7 @@ import {
     DropdownMenuSub,
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
+    useToast,
     DropdownMenuTrigger,
     Input,
     keepFocusOnClose,
@@ -1057,6 +1062,18 @@ function SelectionMenuItems({
     );
 }
 
+const EXPORT_FILES = [
+    { format: "html", label: "HTML", Icon: FileCode }, // i18n-ignore
+    { format: "markdown", label: "Markdown", Icon: FileDown }, // i18n-ignore
+    { format: "text", label: "Text", Icon: FileText }, // i18n-ignore
+    { format: "json", label: "JSON", Icon: FileJson }, // i18n-ignore
+    { format: "csv", label: "CSV", Icon: FileSpreadsheet } // i18n-ignore
+] as const;
+
+/** Kept in step with `lib/polar/export-picture`, which is loaded when one is chosen. */
+const PICTURE_FORMATS = ["png", "jpg", "webp", "svg", "pdf"] as const;
+type PictureFormat = (typeof PICTURE_FORMATS)[number];
+
 function RowMenuItems({
     parts,
     row,
@@ -1074,7 +1091,29 @@ function RowMenuItems({
 }) {
     const t = useTranslations("polar");
     const { Item, Separator, Sub, SubTrigger, SubContent } = parts;
+    const toast = useToast();
     const pinned = row.pinnedAt !== null;
+
+    /** Drawn here, not on the server: see `export-picture`. */
+    async function exportPicture(chat: PolarThreadRow, format: PictureFormat): Promise<void> {
+        const response = await fetch(`/api/polar/threads/${chat.id}/export?format=html`).catch(
+            () => null
+        );
+        try {
+            if (!response?.ok) throw new Error("No export.");
+            const { pictureOf } = await import("@/lib/polar/export-picture");
+            const blob = await pictureOf(await response.text(), format);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${chat.title.replace(/[^\p{L}\p{N}]+/gu, "-") || "chat"}.${format}`;
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (caught) {
+            const tall = (caught as Error).name === "PictureTooTall";
+            toast.show({ title: t(tall ? "export.tooTall" : "export.failed") });
+        }
+    }
     const PinIcon = pinned ? PinOff : Pin;
     return (
         <>
@@ -1110,18 +1149,29 @@ function RowMenuItems({
                 <Share2 />
                 {t("history.share")}
             </Item>
-            <Item asChild>
-                <a href={`/api/polar/threads/${row.id}/export?format=markdown`} download>
+            <Sub>
+                <SubTrigger>
                     <FileDown />
-                    {t("export.markdown")}
-                </a>
-            </Item>
-            <Item asChild>
-                <a href={`/api/polar/threads/${row.id}/export?format=json`} download>
-                    <FileJson />
-                    {t("export.json")}
-                </a>
-            </Item>
+                    {t("export.title")}
+                </SubTrigger>
+                <SubContent>
+                    {EXPORT_FILES.map(({ format, label, Icon }) => (
+                        <Item key={format} asChild>
+                            <a href={`/api/polar/threads/${row.id}/export?format=${format}`} download>
+                                <Icon />
+                                {label}
+                            </a>
+                        </Item>
+                    ))}
+                    <Separator />
+                    {PICTURE_FORMATS.map((format) => (
+                        <Item key={format} onSelect={take(() => void exportPicture(row, format))}>
+                            {format === "pdf" ? <FileText /> : <FileImage />}
+                            {format.toUpperCase()}
+                        </Item>
+                    ))}
+                </SubContent>
+            </Sub>
             <Separator />
             <Item onSelect={() => actions.onArchive(row)}>
                 <Archive />

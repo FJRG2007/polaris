@@ -604,6 +604,16 @@ export async function deletePolarThreads(userId: string, ids: readonly string[])
     return removed;
 }
 
+/** Keep a temporary chat as an ordinary one, from now on listed and shareable. Its
+ *  placeholder title is the first message, and the next answer can replace it. */
+export async function keepPolarThread(userId: string, threadId: string): Promise<boolean> {
+    const kept = await prisma.polarThread.updateMany({
+        where: { id: threadId, userId, temporary: true },
+        data: { temporary: false }
+    });
+    return kept.count > 0;
+}
+
 /** How long a temporary chat outlives its last message when its tab never said
  *  it was done with it. */
 export const TEMPORARY_TTL_MS = 24 * 60 * 60 * 1000;

@@ -11,6 +11,7 @@
  * Server-only.
  */
 
+import { Marked } from "marked";
 import { prisma } from "@polaris/db";
 import { getTranslations } from "@/lib/i18n/request";
 import { compactionOf } from "@/lib/polar/compaction";
@@ -22,7 +23,7 @@ const EXPORT_MESSAGES_MOST = 5000;
 /** Chats the zip reads per query. */
 const EXPORT_THREADS_PAGE = 200;
 
-export type ExportFormat = "markdown" | "json";
+export type ExportFormat = "markdown" | "json" | "html" | "csv" | "text";
 
 export interface ExportMessage {
     id: string;
@@ -136,6 +137,91 @@ export function threadMarkdown(thread: ExportThread, names: ExportNames): string
         blocks.push(`## ${message.role === "user" ? names.user : names.assistant}`, body);
     }
     return `${blocks.join("\n\n")}\n`;
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+const SAFE_LINK = /^(https?:|mailto:)/i;
+
+/** A model's words are not trusted markup: raw HTML shows as text, and a link only
+ *  goes somewhere ordinary. */
+const exportMarked = new Marked({
+    gfm: true,
+    breaks: true,
+    renderer: {
+        html: (html) => escapeHtml(html),
+        image: (_href, _title, text) => escapeHtml(text),
+        link: (href, _title, text) =>
+            SAFE_LINK.test(href) ? `<a href="${escapeHtml(href)}">${text}</a>` : text
+    }
+});
+
+const EXPORT_STYLE = `.page,body{font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1a1c20;background:#fff}
+.page{box-sizing:border-box;width:100%;max-width:820px;margin:0 auto;padding:32px}
+h1{font-size:24px;line-height:1.25;margin:0 0 4px}
+.when{color:#667;font-size:13px;margin:0 0 24px}
+.turn{margin:0 0 20px}
+.who{font-weight:600;font-size:13px;color:#556;margin:0 0 4px}
+.user{background:#f2f4f7;border-radius:10px;padding:10px 14px}
+pre{background:#f2f4f7;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word;font-size:13px}
+code{font-family:ui-monospace,Consolas,monospace}
+blockquote{border-left:3px solid #d5d9e0;margin:8px 0;padding-left:12px;color:#556}
+table{border-collapse:collapse}td,th{border:1px solid #d5d9e0;padding:4px 8px}
+p{margin:0 0 8px;overflow-wrap:anywhere}`;
+
+/** One page that stands on its own and can run nothing. */
+export function threadHtml(thread: ExportThread, names: ExportNames): string {
+    const title = thread.title.replace(/\s+/g, " ").trim() || names.untitled;
+    const turns = visibleTurns(thread, names).map(({ role, body }) => {
+        const words = exportMarked.parse(body, { async: false }) as string;
+        const who = role === "user" ? names.user : names.assistant;
+        return `<section class="turn ${role === "user" ? "user" : ""}"><p class="who">${escapeHtml(who)}</p>${words}</section>`;
+    });
+    return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>${escapeHtml(title)}</title><style>${EXPORT_STYLE}</style></head>
+<body><div class="page"><h1>${escapeHtml(title)}</h1><p class="when">${escapeHtml(thread.createdAt)}</p>${
+        thread.truncated ? `<blockquote>${escapeHtml(names.truncated)}</blockquote>` : ""
+    }${turns.join("")}</div></body></html>
+`;
+}
+
+/** A cell a spreadsheet takes as text: one that starts like a formula would run as one. */
+function csvCell(value: string): string {
+    const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return `"${safe.replace(/"/g, '""')}"`;
+}
+
+/** One row per message, which is the part of a chat that is a table. */
+export function threadCsv(thread: ExportThread, names: ExportNames): string {
+    const rows = visibleTurns(thread, names).map(({ role, body, createdAt }) =>
+        [createdAt, role === "user" ? names.user : names.assistant, body].map(csvCell).join(",")
+    );
+    return `\uFEFF${["time,author,message", ...rows].join("\r\n")}\r\n`;
+}
+
+export function threadText(thread: ExportThread, names: ExportNames): string {
+    const title = thread.title.replace(/\s+/g, " ").trim() || names.untitled;
+    const turns = visibleTurns(thread, names).map(
+        ({ role, body }) => `${role === "user" ? names.user : names.assistant}:\n${body}`
+    );
+    return `${[title, ...turns].join("\n\n")}\n`;
+}
+
+/** The messages a reader would see, with something to show. */
+function visibleTurns(thread: ExportThread, names: ExportNames) {
+    return newestPath(thread.messages).flatMap(({ role, parts, createdAt, metadata }) => {
+        if (compactionOf({ role, metadata })) return [];
+        const body = partsMarkdown(parts, names);
+        return body ? [{ role, body, createdAt }] : [];
+    });
 }
 
 export function threadJson(thread: ExportThread): string {
