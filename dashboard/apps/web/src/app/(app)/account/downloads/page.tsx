@@ -25,6 +25,7 @@
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { listApiKeys } from "@polaris/auth";
+import { TvOffer } from "./tv-offer";
 import { Skeleton } from "@polaris/ui";
 import { DownloadsPage as DownloadsView } from "@polaris/ui/account-downloads/downloads-page";
 import { requireUser } from "@/lib/session";
@@ -86,39 +87,42 @@ export default async function DownloadsPage() {
     const repo = loadEnv().POLARIS_REPO;
 
     return (
-        <DownloadsView
-            repo={repo}
-            serverUrl={serverUrl}
-            webApp={<InstallAppOffer />}
-            extensionFiles={
-                <Suspense fallback={<FilesSkeleton />}>
-                    <ExtensionFiles repo={repo} />
-                </Suspense>
-            }
-            deck={
-                <StreamDeckSection
-                    decks={decks}
-                    repo={repo}
-                    address={serverUrl?.replace(/\/+$/, "") ?? null}
-                    pluginFile={
-                        <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                            <StreamDeckRelease repo={repo} />
-                        </Suspense>
-                    }
-                    moduleFile={
-                        <Suspense fallback={<Skeleton className="h-9 w-48" />}>
-                            <CompanionRelease repo={repo} />
-                        </Suspense>
-                    }
-                />
-            }
-            desktopFiles={
-                <NativeAppOffer>
+        <>
+            <DownloadsView
+                repo={repo}
+                serverUrl={serverUrl}
+                webApp={<InstallAppOffer />}
+                extensionFiles={
                     <Suspense fallback={<FilesSkeleton />}>
-                        <DesktopFiles repo={repo} />
+                        <ExtensionFiles repo={repo} />
                     </Suspense>
-                </NativeAppOffer>
-            }
-        />
+                }
+                deck={
+                    <StreamDeckSection
+                        decks={decks}
+                        repo={repo}
+                        address={serverUrl?.replace(/\/+$/, "") ?? null}
+                        pluginFile={
+                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                                <StreamDeckRelease repo={repo} />
+                            </Suspense>
+                        }
+                        moduleFile={
+                            <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                                <CompanionRelease repo={repo} />
+                            </Suspense>
+                        }
+                    />
+                }
+                desktopFiles={
+                    <NativeAppOffer>
+                        <Suspense fallback={<FilesSkeleton />}>
+                            <DesktopFiles repo={repo} />
+                        </Suspense>
+                    </NativeAppOffer>
+                }
+            />
+            <TvOffer />
+        </>
     );
 }

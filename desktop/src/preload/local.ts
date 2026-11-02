@@ -8,7 +8,7 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { StrokeInput } from "@/shared/annotate";
-import { CHANNELS, type PolarisLocal, type PushEvent } from "@/shared/bridge";
+import { CHANNELS, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
 
 const bridge: PolarisLocal = {
     connect: {
@@ -37,6 +37,16 @@ const bridge: PolarisLocal = {
             const handler = (_event: IpcRendererEvent, payload: PushEvent) => listener(payload);
             ipcRenderer.on(CHANNELS.pushEvent, handler);
             return () => ipcRenderer.removeListener(CHANNELS.pushEvent, handler);
+        }
+    },
+    tv: {
+        state: () => ipcRenderer.invoke(CHANNELS.tvState),
+        find: () => ipcRenderer.invoke(CHANNELS.tvFind),
+        start: (input) => ipcRenderer.invoke(CHANNELS.tvStart, input),
+        onState: (listener) => {
+            const handler = (_event: IpcRendererEvent, state: TvInstallState) => listener(state);
+            ipcRenderer.on(CHANNELS.tvEvent, handler);
+            return () => ipcRenderer.removeListener(CHANNELS.tvEvent, handler);
         }
     },
     overlay: {

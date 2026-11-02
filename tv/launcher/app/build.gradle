@@ -17,6 +17,16 @@ android {
         versionName '3.3'
     }
 
+    signingConfigs {
+        // Polaris's own release key, from CI only: updates install over a build only if the key is the same.
+        polaris {
+            storeFile file(System.getenv('TV_KEYSTORE_PATH') ?: 'unset')
+            storePassword System.getenv('TV_KEYSTORE_PASSWORD')
+            keyAlias System.getenv('TV_KEY_ALIAS')
+            keyPassword System.getenv('TV_KEYSTORE_PASSWORD')
+        }
+    }
+
     buildTypes {
         release {
             // R8 strips and optimises the code (AndroidX included): smaller APK, faster start on a slow TV CPU.
@@ -24,7 +34,7 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // Sideloaded over ADB, never published: sign with the debug key so it installs over a debug build.
-            signingConfig signingConfigs.debug
+            signingConfig System.getenv('TV_KEYSTORE_PATH') ? signingConfigs.polaris : signingConfigs.debug
         }
     }
 

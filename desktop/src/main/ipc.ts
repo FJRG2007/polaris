@@ -21,6 +21,7 @@ import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
 import { installTool } from "./install-tool";
 import * as vpn from "./vpn";
+import { openTvInstall, registerTvInstall } from "./tv-install";
 import { browserFromName, installRequestSchema, type InstallResult } from "@/shared/install-tools";
 import {
     type AddressCheck,
@@ -300,6 +301,13 @@ export function registerIpc(host: IpcHost): void {
     });
 
     // Takes a name from a list and nothing else; see `install-tools`.
+    registerTvInstall();
+    ipcMain.handle(CHANNELS.tvOpen, (event): boolean => {
+        if (!fromPolaris(event)) return false;
+        openTvInstall();
+        return true;
+    });
+
     ipcMain.handle(CHANNELS.installTool, async (event, raw: unknown): Promise<InstallResult> => {
         const request = installRequestSchema.safeParse(raw);
         const window = BrowserWindow.fromWebContents(event.sender);

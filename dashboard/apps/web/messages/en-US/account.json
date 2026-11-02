@@ -1404,6 +1404,14 @@
                     "use": "Start Polaris and sign in to your server."
                 }
             }
+        },
+        "tv": {
+            "title": "Polaris TV",
+            "description": "A clean Home screen for your TV. It works on its own, and shows your account here if you connect it.",
+            "install": "Install on a TV",
+            "needsApp": "Installing takes the Polaris desktop app on a computer on the same network as the TV.",
+            "updateApp": "Update this app to install on a TV.",
+            "supported": "Android TV and Google TV only. Samsung, LG, Roku, Vizio and VIDAA sets cannot run it."
         }
     },
     "cli": {

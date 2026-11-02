@@ -15,6 +15,7 @@
  * back is a press, not typing.
  */
 
+import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
@@ -400,6 +401,7 @@ function start(): void {
                 });
             },
             openApiKeys: () => showPolaris("/account/api-keys"),
+            installOnTv: openTvInstall,
             openInBrowser: () => {
                 if (current) void shell.openExternal(current);
             }

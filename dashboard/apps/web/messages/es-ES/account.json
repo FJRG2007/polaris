@@ -1404,6 +1404,14 @@
                     "use": "Abre Polaris e inicia sesión en tu servidor."
                 }
             }
+        },
+        "tv": {
+            "title": "Polaris TV",
+            "description": "Una pantalla de inicio limpia para tu TV. Funciona por sí sola, y muestra tu cuenta si la conectas.",
+            "install": "Instalar en una TV",
+            "needsApp": "Para instalarla hace falta la app de escritorio de Polaris en un equipo de la misma red que la TV.",
+            "updateApp": "Actualiza esta app para instalar en una TV.",
+            "supported": "Solo Android TV y Google TV. Las TV Samsung, LG, Roku, Vizio y VIDAA no pueden usarla."
         }
     },
     "cli": {

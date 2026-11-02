@@ -6,6 +6,7 @@ on:
   push:
     branches: [main]
     paths: ["tv/**", ".github/workflows/tv.yml"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -52,3 +53,54 @@ jobs:
           name: polaris-tv-launcher
           path: tv/launcher/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+  release:
+    name: Publish the signed APK
+    # Runs on main only, and does nothing until the signing key exists: a key made per run would stop
+    # every later version installing over the one before it.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [tools, launcher]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TV_KEYSTORE_BASE64: ${{ secrets.TV_KEYSTORE_BASE64 }}
+      TV_KEYSTORE_PASSWORD: ${{ secrets.TV_KEYSTORE_PASSWORD }}
+      TV_KEY_ALIAS: ${{ secrets.TV_KEY_ALIAS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Decide
+        id: decide
+        run: |
+          version=$(sed -n "s/^ *versionName '\(.*\)'/\1/p" tv/launcher/app/build.gradle)
+          echo "tag=tv-v$version" >> "$GITHUB_OUTPUT"
+          if [ -z "$TV_KEYSTORE_BASE64" ]; then
+            echo "::notice::No TV signing key yet, so nothing is published."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "tv-v$version" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        if: steps.decide.outputs.publish == 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        if: steps.decide.outputs.publish == 'true'
+        with:
+          packages: platforms;android-34 build-tools;34.0.0
+      - name: Build and publish
+        if: steps.decide.outputs.publish == 'true'
+        run: |
+          export TV_KEYSTORE_PATH="$RUNNER_TEMP/tv.keystore"
+          printf '%s' "$TV_KEYSTORE_BASE64" | base64 -d > "$TV_KEYSTORE_PATH"
+          (cd tv/launcher && chmod +x gradlew && ./gradlew --no-daemon assembleRelease)
+          rm -f "$TV_KEYSTORE_PATH"
+          mkdir out
+          cp tv/launcher/app/build/outputs/apk/release/app-release.apk out/polaris-tv.apk
+          (cd out && sha256sum polaris-tv.apk > SHA256SUMS)
+          gh release create "${{ steps.decide.outputs.tag }}" out/polaris-tv.apk out/SHA256SUMS \
+            --title "Polaris TV ${{ steps.decide.outputs.tag }}" --notes "Android TV and Google TV." --latest=false
