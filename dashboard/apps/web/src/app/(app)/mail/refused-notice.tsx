@@ -15,13 +15,14 @@ import { Button, cn } from "@polaris/ui";
 import { useState } from "react";
 import { AlertTriangle, Info } from "lucide-react";
 import { syncAccountAction } from "./actions";
+import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { refusalCause, refusedMailboxHref } from "@/lib/mailbox/refusals";
 
 type NoticeAccount = Pick<
     MailAccountView,
-    "id" | "address" | "auth" | "state" | "imapHost" | "lastOkAt"
+    "id" | "address" | "auth" | "state" | "imapHost" | "lastOkAt" | "refusedSince" | "lastRefusedAt"
 >;
 
 /** One thing to say about the refused mailboxes, in rail order. */
@@ -77,14 +78,22 @@ function Notice({ notice, onNavigate }: { notice: RefusedNotice; onNavigate?: ()
     const t = useTranslations("mail");
     const [pending, setPending] = useState(false);
     const [retried, setRetried] = useState(false);
+    const [error, setError] = useState("");
     const fix = notice.cause === "password" || notice.cause === "authorization";
     const Icon = fix ? AlertTriangle : Info;
 
     async function retry(): Promise<void> {
         setPending(true);
-        await Promise.all(notice.accountIds.map((id) => syncAccountAction(id)));
+        setError("");
+        const results = await runAction<{ error?: string }[]>(
+            () => Promise.all(notice.accountIds.map((id) => syncAccountAction(id))),
+            setError
+        );
         setPending(false);
+        if (!results) return;
         setRetried(true);
+        const refused = results.find((result) => result.error);
+        if (refused?.error) setError(refused.error);
     }
 
     return (
@@ -113,6 +122,7 @@ function Notice({ notice, onNavigate }: { notice: RefusedNotice; onNavigate?: ()
             <p className="text-muted-foreground">
                 {t(`refused.${notice.cause}Body`, { count: notice.accountIds.length })}
             </p>
+            {error ? <p className="text-danger">{error}</p> : null}
             <div className="flex flex-wrap gap-1.5">
                 {notice.cause === "server" || notice.cause === "recent" ? (
                     <Button size="xs" variant="outline" disabled={pending} onClick={retry}>

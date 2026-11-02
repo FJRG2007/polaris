@@ -21,6 +21,7 @@ import { prisma } from "@polaris/db";
 import { syncAccount } from "./sync";
 import * as core from "@polaris/core";
 import { MailAuthError } from "./credentials";
+import { REFUSAL_ENDED } from "./refusals";
 import { settleRefusalNotices } from "./refused";
 import { removeAccountUploads } from "./uploads";
 import { recordAudit } from "@/lib/audit-service";
@@ -54,6 +55,8 @@ export interface MailAccountView {
     readonly lastSyncAt: string | null;
     /** The last time the server accepted it, which says why it may be refused now. */
     readonly lastOkAt: string | null;
+    readonly refusedSince: string | null;
+    readonly lastRefusedAt: string | null;
     readonly notify: boolean;
     readonly unified: boolean;
     readonly appendToSent: boolean;
@@ -102,6 +105,8 @@ export function accountView(row: AccountRow): MailAccountView {
         stateDetail: row.stateDetail,
         lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
         lastOkAt: row.lastOkAt?.toISOString() ?? null,
+        refusedSince: row.refusedSince?.toISOString() ?? null,
+        lastRefusedAt: row.lastRefusedAt?.toISOString() ?? null,
         notify: row.notify,
         unified: row.unified,
         appendToSent: row.appendToSent,
@@ -402,7 +407,8 @@ export async function updateAccount(
             // refusal. The next refusal after this is news again.
             state: "ok",
             stateDetail: "",
-            lastOkAt: new Date()
+            lastOkAt: new Date(),
+            ...REFUSAL_ENDED
         }
     });
     await settleRefusalNotices(account.userId, accountId);
@@ -589,7 +595,7 @@ export async function recordAccountState(
         state,
         stateDetail: detail,
         lastSyncAt: now,
-        ...(state === "ok" ? { lastOkAt: now, refusalAnnouncedAt: null } : {})
+        ...(state === "ok" ? { lastOkAt: now, ...REFUSAL_ENDED } : {})
     };
     if (state === "ok") {
         const steady = await prisma.mailAccount.updateMany({

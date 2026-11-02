@@ -1065,7 +1065,7 @@ function SelectionMenuItems({
 const EXPORT_FILES = [
     { format: "html", label: "HTML", Icon: FileCode }, // i18n-ignore
     { format: "markdown", label: "Markdown", Icon: FileDown }, // i18n-ignore
-    { format: "text", label: "Text", Icon: FileText }, // i18n-ignore
+    { format: "text", label: null, Icon: FileText },
     { format: "json", label: "JSON", Icon: FileJson }, // i18n-ignore
     { format: "csv", label: "CSV", Icon: FileSpreadsheet } // i18n-ignore
 ] as const;
@@ -1159,7 +1159,7 @@ function RowMenuItems({
                         <Item key={format} asChild>
                             <a href={`/api/polar/threads/${row.id}/export?format=${format}`} download>
                                 <Icon />
-                                {label}
+                                {label ?? t("export.text")}
                             </a>
                         </Item>
                     ))}

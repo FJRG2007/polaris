@@ -487,6 +487,10 @@
         "used": "Used {name}",
         "truncated": "Only the newest {most} messages of this chat are included.",
         "title": "Export",
+        "text": "Text",
+        "columnTime": "time",
+        "columnAuthor": "author",
+        "columnMessage": "message",
         "tooTall": "This chat is too long for one image. Export it as PDF.",
         "failed": "Couldn't export the chat. Try again."
     },

@@ -89,6 +89,8 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
         stateDetail: "The mail server refused this account's credentials.",
         lastSyncAt: null,
         lastOkAt: null,
+        refusedSince: null,
+        lastRefusedAt: null,
         notify: true,
         unified: true,
         appendToSent: true,

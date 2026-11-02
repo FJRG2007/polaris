@@ -1308,7 +1308,8 @@ export function PolarChat({
         if (!response?.ok) return void toast.show({ title: t("temporary.keepFailed") });
         setTemporary(false);
         toast.show({ title: t("temporary.kept") });
-    }, [t, toast]);
+        if (showHistory) sidebar.refresh(true);
+    }, [showHistory, sidebar.refresh, t, toast]);
     useEffect(() => {
         window.addEventListener("pagehide", discardTemporary);
         return () => {

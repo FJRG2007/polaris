@@ -4,8 +4,8 @@
  * Here rather than on the server because the server image carries no fonts: what it
  * drew would be boxes for most of the world's writing, while the reader's browser has
  * theirs. The exported HTML is laid out in a shadow root to measure it, wrapped in an
- * SVG, and drawn on a canvas. A PDF is that drawing cut into A4 pages, so its text
- * can't be selected: there is no PDF writer in Polaris, and the HTML is the export to
+ * SVG, and drawn on a canvas. A PDF is that drawing cut into A4 pages between lines, so
+ * its text can't be selected: there is no PDF writer in Polaris, and the HTML is the export to
  * reach for to copy from.
  *
  * Browser-only.
@@ -36,9 +36,66 @@ const MIME: Record<"png" | "jpg" | "webp", string> = {
     webp: "image/webp"
 };
 
+/** Characters XML 1.0 forbids, which HTML lets through: a terminal's escape codes pasted
+ *  into a chat are enough to make the whole drawing unreadable. */
+const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|\p{Cs}/gu;
+
+/** The span one line of text takes on the drawing, in CSS pixels. */
+interface LineSpan {
+    readonly top: number;
+    readonly bottom: number;
+}
+
 interface Drawing {
     readonly svg: string;
     readonly height: number;
+    readonly lines: readonly LineSpan[];
+}
+
+/** Where each line of laid-out text sits, measured from the top of `body`. */
+function linesOf(body: HTMLElement): LineSpan[] {
+    const origin = body.getBoundingClientRect().top;
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    const lines: LineSpan[] = [];
+    while (walker.nextNode()) {
+        if (!walker.currentNode.textContent?.trim()) continue;
+        range.selectNodeContents(walker.currentNode);
+        for (const rect of Array.from(range.getClientRects())) {
+            lines.push({ top: rect.top - origin, bottom: rect.bottom - origin });
+        }
+    }
+    return lines;
+}
+
+/**
+ * Where each PDF page starts: at the top of the last line that fits, so no line is cut
+ * through. Only a stretch taller than a page with no gap in it is cut where it falls.
+ */
+export function pageTops(
+    lines: readonly LineSpan[],
+    height: number,
+    pageHeight = PAGE_HEIGHT
+): number[] {
+    const gaps: number[] = [];
+    let reached = 0;
+    for (const line of [...lines].sort((left, right) => left.top - right.top)) {
+        if (line.top >= reached) gaps.push(Math.floor(line.top));
+        reached = Math.max(reached, line.bottom);
+    }
+    const tops = [0];
+    let top = 0;
+    let index = 0;
+    while (top + pageHeight < height) {
+        const limit = top + pageHeight;
+        let next = limit;
+        for (; index < gaps.length && (gaps[index] as number) <= limit; index += 1) {
+            if ((gaps[index] as number) > top) next = gaps[index] as number;
+        }
+        top = next;
+        tops.push(top);
+    }
+    return tops;
 }
 
 /** The export's page as an SVG. Pictures are left out: one from elsewhere would never
@@ -61,11 +118,13 @@ function drawingOf(html: string): Drawing {
     root.append(sheet, body);
     document.body.append(host);
     const height = Math.ceil(body.getBoundingClientRect().height);
+    const lines = linesOf(body);
     host.remove();
-    const xhtml = new XMLSerializer().serializeToString(body);
+    const xhtml = new XMLSerializer().serializeToString(body).replace(NOT_XML, "");
     const css = sheet.outerHTML.replace("<style>", '<style xmlns="http://www.w3.org/1999/xhtml">');
     return {
         height,
+        lines,
         svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${css}${xhtml}</div></foreignObject></svg>`
     };
 }
@@ -159,10 +218,15 @@ export function pdfOfJpegs(
     return new Blob(chunks as BlobPart[], { type: "application/pdf" });
 }
 
-async function pdfOf(image: HTMLImageElement, height: number): Promise<Blob> {
+async function pdfOf(
+    image: HTMLImageElement,
+    height: number,
+    lines: readonly LineSpan[]
+): Promise<Blob> {
     const pages = [];
-    for (let top = 0; top < height; top += PAGE_HEIGHT) {
-        const drawn = Math.min(PAGE_HEIGHT, height - top);
+    const tops = pageTops(lines, height);
+    for (const [index, top] of tops.entries()) {
+        const drawn = (tops[index + 1] ?? height) - top;
         const canvas = slice(image, top, drawn);
         const jpeg = new Uint8Array(await (await canvasBlob(canvas, MIME.jpg)).arrayBuffer());
         pages.push({ jpeg, width: canvas.width, height: canvas.height, drawn });
@@ -172,10 +236,10 @@ async function pdfOf(image: HTMLImageElement, height: number): Promise<Blob> {
 
 /** The file for one format, from the chat's HTML export. */
 export async function pictureOf(html: string, format: PictureFormat): Promise<Blob> {
-    const { svg, height } = drawingOf(html);
+    const { svg, height, lines } = drawingOf(html);
     if (format === "svg") return new Blob([svg], { type: "image/svg+xml" });
     const image = await imageOf(svg);
-    if (format === "pdf") return pdfOf(image, height);
+    if (format === "pdf") return pdfOf(image, height, lines);
     if (height * SCALE > CANVAS_MOST) throw new PictureTooTall();
     return canvasBlob(slice(image, 0, height), MIME[format]);
 }

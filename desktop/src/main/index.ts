@@ -325,8 +325,9 @@ function start(): void {
             connectState: () => ({ address: current, error: loadError, servers: servers() }),
             preferences: () => ({ openAtLogin: settings.openAtLogin(), version: app.getVersion() }),
             setOpenAtLogin: (open) => {
+                if (!setOpenAtLogin(open)) return false;
                 settings.rememberOpenAtLogin(open);
-                setOpenAtLogin(open);
+                return true;
             },
             connectSubmit,
             connectCheck,

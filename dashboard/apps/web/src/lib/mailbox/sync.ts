@@ -193,9 +193,8 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         // Unreachable while refused says nothing about the credential, so it
         // stays refused: flipping to unreachable and back would announce the
         // same refusal a second time.
-        else if (account.state === "auth") {
-            await recordCredentialRefusal(accountId, account.stateDetail);
-        } else if (failureIsNews(account)) await recordAccountState(accountId, "unreachable");
+        else if (account.state === "auth") await recordAccountAttempt(accountId);
+        else if (failureIsNews(account)) await recordAccountState(accountId, "unreachable");
         else await recordAccountAttempt(accountId);
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
@@ -1691,6 +1690,7 @@ export async function accountsToSync(): Promise<string[]> {
             state: true,
             lastSyncAt: true,
             lastOkAt: true,
+            refusedSince: true,
             createdAt: true
         },
         orderBy: { lastSyncAt: { sort: "asc", nulls: "first" } },

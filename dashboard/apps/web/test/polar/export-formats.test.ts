@@ -13,7 +13,8 @@ const NAMES = {
     file: (name: string) => `File: ${name}`,
     used: (name: string) => `Used ${name}`,
     truncated: "Cut",
-    compacted: () => "Compacted"
+    compacted: () => "Compacted",
+    columns: ["when", "who", "what"] as const
 };
 
 function thread(text: string): exports.ExportThread {
@@ -57,6 +58,10 @@ describe("the HTML export", () => {
 });
 
 describe("the CSV export", () => {
+    it("heads its columns in the reader's words", () => {
+        expect(exports.threadCsv(thread("Hi"), NAMES)).toContain(`"when","who","what"\r\n`);
+    });
+
     it("keeps a cell from running as a formula, and quotes it", () => {
         const csv = exports.threadCsv(thread('=HYPERLINK("x")'), NAMES);
         expect(csv).toContain(`"'=HYPERLINK(""x"")"`);

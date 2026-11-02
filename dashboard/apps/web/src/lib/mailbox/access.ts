@@ -70,6 +70,8 @@ export const ACCOUNT_COLUMNS = {
     stateDetail: true,
     lastSyncAt: true,
     lastOkAt: true,
+    refusedSince: true,
+    lastRefusedAt: true,
     pollSeconds: true,
     notify: true,
     unified: true,

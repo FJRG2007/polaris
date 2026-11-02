@@ -126,8 +126,9 @@ export function refusedMailboxHref(accountId: string): string {
 
 /** Mailboxes on one server refused this close together were refused by the server. */
 export const REFUSED_TOGETHER_MS = 15 * 60 * 1000;
-/** How long a refusal of a mailbox that was working stays a question. Long enough for
- *  the backoff below to have tried it again. */
+/** How far apart the first and the latest refusal of a mailbox that was working have to
+ *  be before it stops being a question. Long enough for the backoff below to have
+ *  tried it again. */
 export const REFUSAL_CONFIRMED_MS = 60 * 60 * 1000;
 /** A password can be shared, so mailboxes refused together are not a server's fault
  *  for ever: past this they are read one by one again. */
@@ -140,7 +141,18 @@ export interface RefusalState {
     readonly state: string;
     readonly imapHost: string;
     readonly lastOkAt: Date | string | null;
+    /** The first refusal of the one running now. */
+    readonly refusedSince: Date | string | null;
+    /** The server's latest refusal: a failed connection does not move it. */
+    readonly lastRefusedAt: Date | string | null;
 }
+
+/** What a mailbox that works again stops carrying, so its next refusal is news. */
+export const REFUSAL_ENDED = {
+    refusalAnnouncedAt: null,
+    refusedSince: null,
+    lastRefusedAt: null
+} as const;
 
 /**
  * Why a mailbox is refused, as far as anybody can tell.
@@ -148,8 +160,9 @@ export interface RefusalState {
  * A server says the same "authentication failed" for a changed password and for its
  * own login service misbehaving, so the words cannot decide. What can: several
  * mailboxes on one server that all worked and were all refused within minutes did
- * not all have their passwords changed, and one that worked minutes ago may recover
- * on the next try. Only what is left is called a password.
+ * not all have their passwords changed, and a first refusal may recover on the next
+ * try. Only what is left is called a password: the server has gone on refusing it, or
+ * it has never been accepted at all.
  */
 export type RefusalCause = "authorization" | "server" | "recent" | "password";
 
@@ -163,21 +176,23 @@ export function refusalCause(
     now = Date.now()
 ): RefusalCause {
     if (account.auth === "oauth") return "authorization";
-    const worked = time(account.lastOkAt);
-    if (worked === null) return "password";
+    const began = time(account.refusedSince) ?? time(account.lastOkAt);
+    if (began === null || account.lastOkAt === null) return "password";
     const together = others.some((other) => {
-        const when = time(other.lastOkAt);
+        const when = time(other.refusedSince) ?? time(other.lastOkAt);
         return (
             other.id !== account.id &&
             other.auth !== "oauth" &&
             other.state === "auth" &&
             other.imapHost === account.imapHost &&
+            other.lastOkAt !== null &&
             when !== null &&
-            Math.abs(when - worked) <= REFUSED_TOGETHER_MS
+            Math.abs(when - began) <= REFUSED_TOGETHER_MS
         );
     });
-    if (together && now - worked < SERVER_FAULT_MAX_MS) return "server";
-    return now - worked < REFUSAL_CONFIRMED_MS ? "recent" : "password";
+    if (together && now - began < SERVER_FAULT_MAX_MS) return "server";
+    const latest = time(account.lastRefusedAt) ?? began;
+    return latest - began < REFUSAL_CONFIRMED_MS ? "recent" : "password";
 }
 
 /** The shortest wait before a refused mailbox is tried again. */
@@ -193,6 +208,8 @@ export interface MailPassState {
     readonly lastSyncAt: Date | null;
     /** The last time the server accepted it. */
     readonly lastOkAt: Date | null;
+    /** When this refusal began. */
+    readonly refusedSince?: Date | null;
     readonly createdAt: Date;
 }
 
@@ -209,7 +226,7 @@ export interface MailPassState {
  * that never noticed would be the same silence this exists to end.
  */
 export function refusedRetryDelayMs(account: MailPassState): number {
-    const since = (account.lastOkAt ?? account.createdAt).getTime();
+    const since = (account.refusedSince ?? account.lastOkAt ?? account.createdAt).getTime();
     const tried = (account.lastSyncAt ?? account.createdAt).getTime();
     const refusedFor = Math.max(0, tried - since);
     return Math.min(REFUSED_RETRY_MAX_MS, Math.max(REFUSED_RETRY_MIN_MS, refusedFor / 2));

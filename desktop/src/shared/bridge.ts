@@ -187,7 +187,8 @@ export interface PolarisLocal {
         remove(origin: string): Promise<Outcome>;
         /** The program's own settings, kept with the servers. */
         preferences(): Promise<{ readonly openAtLogin: boolean; readonly version: string; } | null>;
-        setOpenAtLogin(open: boolean): Promise<void>;
+        /** Whether it took: the switch goes back when it did not. */
+        setOpenAtLogin(open: boolean): Promise<boolean>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;

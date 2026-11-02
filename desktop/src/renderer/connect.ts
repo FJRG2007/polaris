@@ -262,9 +262,18 @@ byId("remove-confirm").addEventListener("click", () => {
     if (server) void act(() => window.polarisLocal.connect.remove(server.origin));
 });
 openAtLogin.addEventListener("change", () => {
-    void window.polarisLocal.connect.setOpenAtLogin(openAtLogin.checked);
+    const wanted = openAtLogin.checked;
+    say(failure, null);
+    void window.polarisLocal.connect
+        .setOpenAtLogin(wanted)
+        .catch(() => false)
+        .then((applied) => {
+            if (applied) return;
+            openAtLogin.checked = !wanted;
+            say(failure, "Polaris could not change this on this computer.");
+        });
 });
-void window.polarisLocal.connect.preferences().then((preferences) => {
+void window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
     if (!preferences) return;
     openAtLogin.checked = preferences.openAtLogin;
     byId("version").textContent = `Polaris ${preferences.version}`;
@@ -283,18 +292,20 @@ form.addEventListener("submit", (event) => {
     busy = true;
     submit.textContent = "Checking...";
     check();
+    let added = false;
     void window.polarisLocal.connect
         .submit(input.value)
         .then((result) => {
+            added = result.ok;
             if (!result.ok) say(failure, result.error);
         })
         .catch(() => say(failure, "Something went wrong. Try again."))
-        .finally(() => {
+        .finally(async () => {
             busy = false;
             submit.textContent = "Open";
             check();
-            void refresh();
-            if (known) showForm(false);
+            await refresh();
+            if (added && known) showForm(false);
         });
 });
 

@@ -5,6 +5,7 @@
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { runAction } from "@/lib/run-action";
 import * as actions from "./actions";
 import {
     Button,
@@ -31,6 +32,7 @@ export function GroupNameDialog({
     const t = useTranslations("chat");
     const [name, setName] = useState("");
     const [error, setError] = useState("");
+    const [saving, setSaving] = useState(false);
     useEffect(() => {
         if (!open) return;
         setName(channel.name);
@@ -38,7 +40,15 @@ export function GroupNameDialog({
     }, [open, channel.name]);
 
     async function save(): Promise<void> {
-        const result = await actions.renameGroupAction({ channelId: channel.id, name });
+        if (saving) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(
+            () => actions.renameGroupAction({ channelId: channel.id, name }),
+            setError
+        );
+        setSaving(false);
+        if (!result) return;
         // Closed only once it worked: a dialog that closes on a refusal takes the
         // typed name with it and leaves the reader looking at an unchanged group.
         if (result.error) return setError(result.error);
@@ -69,7 +79,7 @@ export function GroupNameDialog({
                         {t("channelHeader.cancel")}
                     </Button>
                     {/* The name it already has is nothing to save. */}
-                    <Button size="sm" disabled={!isDirty(channel.name, name)} onClick={() => void save()}>
+                    <Button size="sm" disabled={saving || !isDirty(channel.name, name)} onClick={() => void save()}>
                         {t("channelHeader.save")}
                     </Button>
                 </DialogFooter>

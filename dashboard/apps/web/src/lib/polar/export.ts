@@ -13,6 +13,7 @@
 
 import { Marked } from "marked";
 import { prisma } from "@polaris/db";
+import { escapeHtml } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { compactionOf } from "@/lib/polar/compaction";
 import { isVisualPart, visualPartMarkdown } from "@/lib/polar/visuals";
@@ -54,6 +55,8 @@ export interface ExportNames {
     used: (name: string) => string;
     truncated: string;
     compacted: (auto: boolean) => string;
+    /** A spreadsheet's column headings: when, who, what. */
+    columns: readonly [string, string, string];
 }
 
 export async function exportNames(): Promise<ExportNames> {
@@ -66,7 +69,8 @@ export async function exportNames(): Promise<ExportNames> {
         file: (name) => t("export.file", { name }),
         used: (name) => t("export.used", { name }),
         truncated: t("export.truncated", { most: EXPORT_MESSAGES_MOST }),
-        compacted: (auto) => t(auto ? "compact.dividerAuto" : "compact.divider")
+        compacted: (auto) => t(auto ? "compact.dividerAuto" : "compact.divider"),
+        columns: [t("export.columnTime"), t("export.columnAuthor"), t("export.columnMessage")]
     };
 }
 
@@ -139,14 +143,6 @@ export function threadMarkdown(thread: ExportThread, names: ExportNames): string
     return `${blocks.join("\n\n")}\n`;
 }
 
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
-
 const SAFE_LINK = /^(https?:|mailto:)/i;
 
 /** A model's words are not trusted markup: raw HTML shows as text, and a link only
@@ -204,7 +200,7 @@ export function threadCsv(thread: ExportThread, names: ExportNames): string {
     const rows = visibleTurns(thread, names).map(({ role, body, createdAt }) =>
         [createdAt, role === "user" ? names.user : names.assistant, body].map(csvCell).join(",")
     );
-    return `\uFEFF${["time,author,message", ...rows].join("\r\n")}\r\n`;
+    return `\uFEFF${[names.columns.map(csvCell).join(","), ...rows].join("\r\n")}\r\n`;
 }
 
 export function threadText(thread: ExportThread, names: ExportNames): string {

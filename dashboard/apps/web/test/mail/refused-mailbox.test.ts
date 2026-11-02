@@ -28,6 +28,8 @@ interface Row {
     stateDetail: string;
     lastSyncAt: Date | null;
     lastOkAt: Date | null;
+    refusedSince: Date | null;
+    lastRefusedAt: Date | null;
 }
 
 interface Notice {
@@ -47,13 +49,19 @@ const state = {
     noticeReads: 0
 };
 
-type Where = { id?: string; connectionId?: string; state?: string | { not: string } };
+type Where = {
+    id?: string;
+    connectionId?: string;
+    state?: string | { not: string };
+    refusedSince?: null;
+};
 
 function matches(row: Row, where: Where): boolean {
     if (where.id !== undefined && row.id !== where.id) return false;
     if (where.connectionId !== undefined && row.connectionId !== where.connectionId) return false;
     if (typeof where.state === "string" && row.state !== where.state) return false;
     if (typeof where.state === "object" && row.state === where.state.not) return false;
+    if (where.refusedSince === null && row.refusedSince !== null) return false;
     return true;
 }
 
@@ -130,6 +138,8 @@ vi.mock("@/lib/mailbox/credentials", () => ({
 const { recordCredentialRefusal, retryRefusedMailboxes } = await import("@/lib/mailbox/refused");
 const { recordAccountState } = await import("@/lib/mailbox/accounts");
 
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000);
+
 function mailbox(overrides: Partial<Row> = {}): Row {
     const row: Row = {
         id: "0190c1d2-0000-7000-8000-000000000001",
@@ -141,6 +151,8 @@ function mailbox(overrides: Partial<Row> = {}): Row {
         stateDetail: "",
         lastSyncAt: new Date("2026-09-10T08:00:00Z"),
         lastOkAt: new Date("2026-09-10T08:00:00Z"),
+        refusedSince: null,
+        lastRefusedAt: null,
         ...overrides
     };
     state.rows = [row];
@@ -171,7 +183,7 @@ function notice(accountId: string, overrides: Partial<Notice> = {}): Notice {
 
 describe("a mailbox the server stops accepting", () => {
     it("is paused and its owner is told, with the way to fix it", async () => {
-        const row = mailbox();
+        const row = mailbox({ refusedSince: hoursAgo(2) });
         await recordCredentialRefusal(row.id, "The mail server refused this account's credentials.");
 
         expect(row.state).toBe("auth");
@@ -184,7 +196,7 @@ describe("a mailbox the server stops accepting", () => {
     });
 
     it("is announced once, however often it is refused", async () => {
-        const row = mailbox();
+        const row = mailbox({ refusedSince: hoursAgo(2) });
         const before = row.lastSyncAt?.getTime() ?? 0;
         await recordCredentialRefusal(row.id, "refused");
         await recordCredentialRefusal(row.id, "refused");
@@ -202,15 +214,18 @@ describe("a mailbox the server stops accepting", () => {
     });
 
     it("starts over once the credential works again", async () => {
-        const row = mailbox();
+        const row = mailbox({ refusedSince: hoursAgo(2) });
         await recordCredentialRefusal(row.id, "refused");
         await recordAccountState(row.id, "ok");
         expect(row.state).toBe("ok");
         expect(state.notified).toHaveLength(1);
 
-        row.lastOkAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        expect(row.refusedSince).toBeNull();
         await recordCredentialRefusal(row.id, "refused");
         expect(row.state).toBe("auth");
+        expect(state.notified).toHaveLength(1);
+        row.refusedSince = hoursAgo(2);
+        await recordCredentialRefusal(row.id, "refused");
         expect(state.notified).toHaveLength(2);
     });
 
@@ -221,10 +236,17 @@ describe("a mailbox the server stops accepting", () => {
         expect(row.state).toBe("auth");
         expect(state.notified).toHaveLength(0);
 
-        row.lastOkAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        row.refusedSince = hoursAgo(2);
         await recordCredentialRefusal(row.id, "refused");
         await recordCredentialRefusal(row.id, "refused");
         expect(state.notified).toHaveLength(1);
+    });
+
+    it("counts a lone refusal from when it happened, however long ago the mailbox worked", async () => {
+        const row = mailbox({ lastOkAt: hoursAgo(48) });
+        await recordCredentialRefusal(row.id, "refused");
+        expect(state.notified).toHaveLength(0);
+        expect(row.refusedSince).not.toBeNull();
     });
 
     it("takes the notice off the bell once a pass works again, and only that mailbox's", async () => {

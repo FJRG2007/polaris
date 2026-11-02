@@ -28,9 +28,7 @@ function setLinux(open: boolean): void {
     );
 }
 
-/** Only an installed app: a development run has no business starting with the computer. */
-export function setOpenAtLogin(open: boolean): void {
-    if (!app.isPackaged) return;
+function apply(open: boolean): void {
     if (process.platform === "linux") return setLinux(open);
     if (process.platform === "win32") {
         app.setLoginItemSettings({
@@ -42,4 +40,20 @@ export function setOpenAtLogin(open: boolean): void {
         return;
     }
     app.setLoginItemSettings({ openAtLogin: open });
+}
+
+/**
+ * Only an installed app: a development run has no business starting with the computer.
+ * Answers whether it took. A preference that could not be written never stops the app
+ * opening: an autostart folder can be read-only.
+ */
+export function setOpenAtLogin(open: boolean): boolean {
+    if (!app.isPackaged) return true;
+    try {
+        apply(open);
+        return true;
+    } catch (caught) {
+        console.error("polaris: opening with the computer could not be set:", caught);
+        return false;
+    }
 }

@@ -36,8 +36,12 @@ const REFUSED_EVENT = "mail.account.refused";
 export async function recordCredentialRefusal(accountId: string, detail: string): Promise<void> {
     const now = new Date();
     await prisma.mailAccount.updateMany({
+        where: { id: accountId, refusedSince: null },
+        data: { refusedSince: now }
+    });
+    await prisma.mailAccount.updateMany({
         where: { id: accountId },
-        data: { state: "auth", stateDetail: detail, lastSyncAt: now }
+        data: { state: "auth", stateDetail: detail, lastSyncAt: now, lastRefusedAt: now }
     });
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
@@ -50,13 +54,23 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
             state: true,
             imapHost: true,
             lastOkAt: true,
+            refusedSince: true,
+            lastRefusedAt: true,
             refusalAnnouncedAt: true
         }
     });
     if (!account || account.refusalAnnouncedAt) return;
     const others = await prisma.mailAccount.findMany({
         where: { userId: account.userId, imapHost: account.imapHost, state: "auth" },
-        select: { id: true, auth: true, state: true, imapHost: true, lastOkAt: true },
+        select: {
+            id: true,
+            auth: true,
+            state: true,
+            imapHost: true,
+            lastOkAt: true,
+            refusedSince: true,
+            lastRefusedAt: true
+        },
         take: 200
     });
     const cause = refusalCause(account, others, now.getTime());
