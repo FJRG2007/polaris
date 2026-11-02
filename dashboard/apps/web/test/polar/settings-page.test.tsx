@@ -157,6 +157,19 @@ describe("tools by MCP server", () => {
         expect(screen.getByRole("button", { name: /Polaris/ })).toBeTruthy();
     });
 
+    it("counts a server's whole list while searching, and still folds it", async () => {
+        kept.set("polar.toolsOff", JSON.stringify(["delete_task"]));
+        page();
+        const search = await screen.findByRole("searchbox", { name: "Search tools" });
+        fireEvent.change(search, { target: { value: "read" } });
+        const polaris = screen.getByRole("button", { name: /Polaris/ });
+        expect(polaris.textContent).toContain("1 of 2 on");
+        expect(screen.getByRole("switch", { name: "Read tasks" })).toBeTruthy();
+        fireEvent.click(polaris);
+        expect(polaris.getAttribute("aria-expanded")).toBe("false");
+        expect(screen.queryByRole("switch", { name: "Read tasks" })).toBeNull();
+    });
+
     it("shows each server with its switch and a count, and its tools behind a disclosure", async () => {
         kept.set("polar.toolsOff", JSON.stringify(["delete_task"]));
         page();

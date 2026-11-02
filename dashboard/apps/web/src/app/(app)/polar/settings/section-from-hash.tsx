@@ -4,13 +4,15 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { settingsSection } from "@/lib/polar/settings-path";
 
 export function SectionFromHash({ ids }: { ids: readonly string[] }) {
     const router = useRouter();
     useEffect(() => {
         const section = window.location.hash.slice(1);
-        if (ids.includes(section)) router.replace(settingsSection(section));
+        if (!ids.includes(section)) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set("section", section);
+        router.replace(`${url.pathname}${url.search}`);
     }, [ids, router]);
     return null;
 }

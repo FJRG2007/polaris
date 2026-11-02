@@ -30,3 +30,22 @@ export function serverFromSlug<T extends NamedServer>(servers: readonly T[], slu
         null
     );
 }
+
+/**
+ * What an address in Watch means, and the address it should read as. `machine` is
+ * the box Polaris runs on, whether or not it has a row; `here` is every row that
+ * turned out to be it and `remote` every other. A `host` of null is the machine.
+ */
+export function addressedServer<T extends NamedServer>(
+    slug: string,
+    reserved: string,
+    machine: NamedServer,
+    here: readonly T[],
+    remote: readonly T[]
+): { host: T | null; address: string } | null {
+    const servers = [machine, ...remote];
+    const found = slug === reserved ? machine : (serverFromSlug(servers, slug) ?? serverFromSlug(here, slug));
+    if (!found) return null;
+    const host = remote.find(({ id }) => id === found.id) ?? null;
+    return { host, address: serverSlug(servers, host ?? machine, reserved) };
+}

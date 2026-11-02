@@ -424,8 +424,8 @@
             "serverOff": "Desactivado",
             "serverToggle": "Usar {server}",
             "offNote": "Todas sus herramientas siguen apagadas mientras {server} lo esté. Lo que elijas abajo se guarda.",
-            "search": "Buscar tools",
-            "noMatch": "Ninguna tool coincide."
+            "search": "Buscar",
+            "noMatch": "Ninguna herramienta coincide."
         },
         "data": {
             "title": "Tus chats",

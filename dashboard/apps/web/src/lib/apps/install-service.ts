@@ -41,7 +41,8 @@ import {
 } from "@/lib/apps/app-lifecycle";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { isPluginServer, purgeInstallFiles } from "@/lib/app-extensions/registry";
-import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
+import { getOrCreateHostTarget, getOrCreateLocalTarget, targetLabel } from "@/lib/deploy-target-service";
+import { localServerName } from "@/lib/local-server";
 import {
     createApplication,
     createProject,
@@ -532,7 +533,7 @@ export async function getInstalledApp(
     const target = row.targetId
         ? await prisma.deployTarget.findFirst({
               where: { id: row.targetId },
-              select: { name: true }
+              select: { name: true, kind: true }
           })
         : null;
     return {
@@ -547,7 +548,7 @@ export async function getInstalledApp(
         catalogName: manifest?.name ?? row.catalogId,
         dashboardKind: manifest?.dashboard ?? "generic",
         applicationStatus: application?.desiredState ?? null,
-        serverName: target?.name ?? null
+        serverName: target ? targetLabel(target, await localServerName()) : null
     };
 }
 

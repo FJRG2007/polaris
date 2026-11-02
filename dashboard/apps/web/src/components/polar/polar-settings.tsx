@@ -452,6 +452,7 @@ function ServerMark({ group }: { group: ToolServerGroup }) {
 /** One MCP server: its switch, and its tools behind a disclosure. */
 function ServerRow({
     group,
+    shown,
     on,
     off,
     searching,
@@ -459,6 +460,8 @@ function ServerRow({
     onTool
 }: {
     group: ToolServerGroup;
+    /** The tools listed: all of them, or the ones a search found. */
+    shown: ToolServerGroup["tools"];
     /** Results are shown open: finding a tool and then hunting for it would be no use. */
     searching: boolean;
     on: boolean;
@@ -468,7 +471,9 @@ function ServerRow({
 }) {
     const t = useTranslations("polar");
     const [opened, setOpen] = useState(false);
-    const open = opened || searching;
+    const [folded, setFolded] = useState(false);
+    if (folded && !searching) setFolded(false);
+    const open = searching ? !folded : opened;
     const listId = useId();
     const name = group.kind === "polaris" ? t("settings.tools.polaris") : group.name;
     const total = group.tools.length;
@@ -480,7 +485,7 @@ function ServerRow({
                     type="button"
                     aria-expanded={open}
                     aria-controls={listId}
-                    onClick={() => setOpen(!opened)}
+                    onClick={() => (searching ? setFolded(!folded) : setOpen(!opened))}
                     className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChevronRight
@@ -519,7 +524,7 @@ function ServerRow({
                         </p>
                     ) : null}
                     <ul className="flex flex-col divide-y divide-border">
-                        {group.tools.map((tool) => (
+                        {shown.map((tool) => (
                             <ToolRow
                                 key={tool.name}
                                 label={tool.title}
@@ -576,9 +581,9 @@ export function ToolSettings({
     );
     const found = groups.flatMap((group) => {
         const name = group.kind === "polaris" ? t("settings.tools.polaris") : group.name;
-        if (!wanted || matches(name)) return [group];
+        if (!wanted || matches(name)) return [{ group, shown: group.tools }];
         const hits = group.tools.filter((tool) => matches(tool.title) || matches(tool.name));
-        return hits.length > 0 ? [{ ...group, tools: hits }] : [];
+        return hits.length > 0 ? [{ group, shown: hits }] : [];
     });
     const showWeb = matches(t("web.toggle"));
     const showPage = matches(t("settings.tools.sharePage"));
@@ -619,10 +624,11 @@ export function ToolSettings({
                         onChange={onPage}
                     />
                 ) : null}
-                {found.map((group) => (
+                {found.map(({ group, shown }) => (
                     <ServerRow
                         key={group.id}
                         group={group}
+                        shown={shown}
                         on={!serversOff.includes(group.id)}
                         off={prefs.toolsOff}
                         searching={wanted !== ""}

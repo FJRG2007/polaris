@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { serverFromSlug, serverSlug } from "@/lib/watch/server-route";
+import { addressedServer, serverFromSlug, serverSlug } from "@/lib/watch/server-route";
 
 vi.mock("@polaris/ssh", () => ({ execCommand: vi.fn(), openSshClient: vi.fn() }));
 vi.mock("@/lib/host-service", () => ({ getHostConnectionUnscoped: vi.fn() }));
@@ -60,5 +60,70 @@ describe("a server's address", () => {
         expect(serverFromSlug(servers, "LIRIO-0")?.id).toBe("1");
         expect(serverFromSlug(servers, "2")?.id).toBe("2");
         expect(serverFromSlug(servers, "nobody")).toBeNull();
+    });
+
+    describe("the machine Polaris runs on", () => {
+        const remote = [{ id: "r1", name: "edge" }];
+        const unenrolled = { id: "local", name: "lirio-0" };
+        const enrolled = { id: "h1", name: "lirio-0" };
+        const second = { id: "h2", name: "lirio-copy" };
+
+        it("reads as its name with no row of its own", () => {
+            expect(addressedServer("local", "local", unenrolled, [], remote)).toEqual({
+                host: null,
+                address: "lirio-0"
+            });
+            expect(addressedServer("lirio-0", "local", unenrolled, [], remote)).toEqual({
+                host: null,
+                address: "lirio-0"
+            });
+        });
+
+        it("keeps the reserved word when its name cannot stand in", () => {
+            const named = { id: "local", name: "My box" };
+            expect(addressedServer("local", "local", named, [], remote)?.address).toBe("local");
+            const clash = { id: "local", name: "edge" };
+            expect(addressedServer("local", "local", clash, [], remote)?.address).toBe("local");
+        });
+
+        it("sends a second row of the same box to the machine", () => {
+            for (const slug of ["h2", "lirio-copy", "h1"]) {
+                expect(addressedServer(slug, "local", enrolled, [enrolled, second], remote)).toEqual({
+                    host: null,
+                    address: "lirio-0"
+                });
+            }
+        });
+
+        it("is never a remote server called by the reserved word", () => {
+            const taken = [{ id: "r2", name: "local" }];
+            expect(addressedServer("local", "local", unenrolled, [], taken)?.host).toBeNull();
+            expect(addressedServer("r2", "local", unenrolled, [], taken)).toEqual({
+                host: taken[0],
+                address: "r2"
+            });
+        });
+
+        it("answers a remote server by id, reading as its name, and nothing else", () => {
+            expect(addressedServer("r1", "local", unenrolled, [], remote)).toEqual({
+                host: remote[0],
+                address: "edge"
+            });
+            expect(addressedServer("nobody", "local", unenrolled, [], remote)).toBeNull();
+        });
+
+        it("settles on an address that resolves to itself", () => {
+            for (const [machine, here] of [
+                [unenrolled, []],
+                [{ id: "local", name: "My box" }, []],
+                [enrolled, [enrolled]],
+                [{ id: "h1", name: "My box" }, [{ id: "h1", name: "My box" }]]
+            ] as const) {
+                const first = addressedServer("local", "local", machine, here, remote)!;
+                expect(addressedServer(first.address, "local", machine, here, remote)?.address).toBe(
+                    first.address
+                );
+            }
+        });
     });
 });

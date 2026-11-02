@@ -29,6 +29,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { targetLabel } from "@/lib/deploy-target-service";
+import { localServerName } from "@/lib/local-server";
 import * as core from "@polaris/core";
 import { getCapabilities } from "@polaris/config";
 import {
@@ -877,7 +879,7 @@ export async function privateNetworkView(
         })(),
         prisma.application.findMany({
             where: { environmentId: service.environment.id, id: { not: service.id } },
-            select: { id: true, name: true, target: { select: { id: true, name: true } } },
+            select: { id: true, name: true, target: { select: { id: true, name: true, kind: true } } },
             orderBy: { name: "asc" },
             take: 200
         })
@@ -892,11 +894,12 @@ export async function privateNetworkView(
             .map((link) => link.source)
     );
     const callers = peers.filter((peer) => mode !== "links" || linking.has(peer.id));
+    const machine = await localServerName();
     const asPeer = (peer: (typeof peers)[number]): PrivateNetworkPeer => ({
         id: peer.id,
         kind: "application",
         name: peer.name,
-        serverName: peer.target.name
+        serverName: targetLabel(peer.target, machine)
     });
 
     const port =
@@ -911,7 +914,7 @@ export async function privateNetworkView(
         family,
         status,
         takenBy: clashes.get(name) ?? null,
-        serverName: service.target.name,
+        serverName: targetLabel(service.target, machine),
         port,
         portless:
             enabled &&

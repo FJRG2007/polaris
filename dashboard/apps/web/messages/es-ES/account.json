@@ -1543,7 +1543,8 @@
             "unreachable": "El servidor no respondió. Revisa la dirección o reinténtalo más tarde.",
             "signInFailed": "No se completó el acceso. Pulsa Entrar otra vez."
         },
-        "search": "Buscar conectores"
+        "search": "Buscar conectores",
+        "noMatch": "Ningún conector coincide."
     },
     "streamdeck": {
         "page": {

@@ -19,7 +19,7 @@ import { inFlightDeployments } from "./deploy-service";
 import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import { LOCAL_SERVER_ID, localServerName } from "./local-server";
 import { serverSlug } from "./watch/server-route";
-import { hostRouteId, LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
+import { LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
 import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
 import {
     hostDockerDriver,
@@ -172,7 +172,9 @@ export async function getWatchServers(ownerId: string): Promise<WatchCard[]> {
 async function buildServers(ownerId: string, alarms: Map<string, number>): Promise<WatchCard[]> {
     const now = Date.now();
     const { local, remote } = await watchHosts(ownerId);
-    const everyHost = local ? [local, ...remote] : remote;
+    const name = await localServerName(local?.name);
+    const machine = { id: local?.id ?? LOCAL_SERVER_ID, name };
+    const servers = [machine, ...remote];
 
     const ids = [LOCAL_HOST_SUBJECT, ...remote.map((host) => host.id)];
     const series = await sparklines("host", ids, now);
@@ -181,7 +183,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
         {
             id: LOCAL_HOST_SUBJECT,
             kind: "server",
-            name: await localServerName(local?.name),
+            name,
             detail: local
                 ? `${local.username}@${local.address} - the machine Polaris runs on`
                 : "The machine Polaris runs on",
@@ -189,7 +191,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
             alarms: local ? (alarms.get(local.id) ?? 0) : 0,
             // Addressed as the machine, not as the reserved subject its samples
             // are filed under.
-            href: `/watch/server/${local ? serverSlug(everyHost, local, LOCAL_SERVER_ID) : hostRouteId(LOCAL_HOST_SUBJECT)}`
+            href: `/watch/server/${serverSlug(servers, machine, LOCAL_SERVER_ID)}`
         },
         ...remote.map((host) => ({
             id: host.id,
@@ -198,7 +200,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
             detail: `${host.username}@${host.address}`,
             ...readingsFor(series.get(host.id), now),
             alarms: alarms.get(host.id) ?? 0,
-            href: `/watch/server/${host.id}`
+            href: `/watch/server/${serverSlug(servers, host, LOCAL_SERVER_ID)}`
         }))
     ];
 }
