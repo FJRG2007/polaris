@@ -35,6 +35,7 @@ import { lookupDomain } from "@/lib/integrations/virustotal";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { knownReputation, rememberReputation, type Verdict } from "@/lib/reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { resetLookupBudget, takeLookup } from "@/lib/reputation-budget";
 
 export const LINK_SAFETY_PROVIDERS = ["virustotal", "dymo"] as const;
@@ -163,7 +164,7 @@ async function dymoOpinion(link: string): Promise<Verdict | null> {
     if (known) return known;
     return once(`dymo:${url}`, async () => {
         const apiKey = await getIntegrationSecret("dymo");
-        if (!apiKey || !takeLookup("dymo", CHAT_SHARE)) return null;
+        if (!apiKey || !(await takeServedLookup("dymo", CHAT_SHARE))) return null;
         try {
             const { fraud } = await verifyUrl(apiKey, url);
             const remembered: Verdict = {

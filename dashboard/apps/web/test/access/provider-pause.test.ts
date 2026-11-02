@@ -28,8 +28,15 @@ vi.mock("@/lib/connections/attention", () => ({
     }
 }));
 
-const { ProviderPaused, clearProviderPause, pauseReasonFor, providerPaused, whileServing } =
-    await import("@/lib/integrations/provider-pause");
+const {
+    ProviderPaused,
+    clearProviderPause,
+    pauseReasonFor,
+    providerPaused,
+    takeServedLookup,
+    whileServing
+} = await import("@/lib/integrations/provider-pause");
+const { LOOKUP_BUDGET, resetLookupBudget, takeLookup } = await import("@/lib/reputation-budget");
 
 /** A failure the way axios reports one. */
 const httpFailure = (status: number) => Object.assign(new Error("failed"), { response: { status } });
@@ -38,6 +45,7 @@ beforeEach(() => {
     settings = new Map();
     recorded.length = 0;
     cleared.length = 0;
+    resetLookupBudget();
     vi.useRealTimers();
 });
 
@@ -101,6 +109,26 @@ describe("asking a paid provider", () => {
         expect(ask.mock.calls.length).toBeLessThanOrEqual(48);
     });
 
+    it.each([400, 404, 422])("keeps serving others after a %i about one value", async (status) => {
+        await whileServing("dymo", "Dymo API", () => Promise.reject(httpFailure(status))).catch(
+            () => undefined
+        );
+        expect(await providerPaused("dymo")).toBe(false);
+        expect(recorded).toEqual([]);
+    });
+
+    it("spends no budget while paused, so a top-up finds it whole", async () => {
+        await whileServing("dymo", "Dymo API", () => Promise.reject(httpFailure(402))).catch(
+            () => undefined
+        );
+        for (let hit = 0; hit < LOOKUP_BUDGET.dymo.perMinute + 5; hit += 1) {
+            expect(await takeServedLookup("dymo")).toBe(false);
+        }
+        await clearProviderPause("dymo");
+        expect(await takeServedLookup("dymo")).toBe(true);
+        expect(takeLookup("dymo")).toBe(true);
+    });
+
     it("keeps one provider's pause from another", async () => {
         await whileServing("dymo", "Dymo API", () => Promise.reject(httpFailure(402))).catch(
             () => undefined
@@ -123,7 +151,10 @@ describe("reading a failure", () => {
         [401, "key"],
         [403, "key"],
         [429, "busy"],
-        [500, "unavailable"]
+        [500, "unavailable"],
+        [400, null],
+        [404, null],
+        [422, null]
     ])("takes %i for %s", (status, reason) => {
         expect(pauseReasonFor(httpFailure(status))).toBe(reason);
     });

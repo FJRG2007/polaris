@@ -22,6 +22,7 @@
 
 import { prisma } from "@polaris/db";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { resolveCondition } from "@/lib/notification-service";
 import { findConnectionProvider } from "@polaris/core";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import {
@@ -42,6 +43,12 @@ const PLAIN_HREF = "/admin/integrations";
 /** Where an alert about this service points: its own setup, opened on arrival. */
 export function attentionHref(provider: string): string {
     return `${PLAIN_HREF}?configure=${provider}`;
+}
+
+/** A service out of service stays that way until it answers: one notice per reader,
+ *  rewritten by every retry, ended when it recovers. */
+function outageCondition(provider: string): string {
+    return `${EVENT}:${provider}:out-of-service`;
 }
 
 /** How often one service may raise this. */
@@ -158,6 +165,7 @@ export async function recordConnectionFailure(
                 body: t("connections.refusedBody", { name, reason })
             }),
             ...notice,
+            ...(kind === "out-of-service" ? { condition: outageCondition(provider) } : {}),
             href: attentionHref(provider),
             level: "warning",
             actionRequired: true
@@ -183,6 +191,7 @@ export async function clearConnectionFailure(
         delete config[FAILURE];
         await upsertIntegration(provider, { config });
         await answerAlerts(provider);
+        if (failure.kind === "out-of-service") await resolveCondition(outageCondition(provider));
         return true;
     } catch (error) {
         console.error("polaris: could not clear the connection failure:", error);

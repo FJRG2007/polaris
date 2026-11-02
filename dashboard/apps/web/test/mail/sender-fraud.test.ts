@@ -42,6 +42,8 @@ vi.mock("@/lib/reputation", () => ({
     forgetReputation: async () => 0
 }));
 
+vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null }));
+
 vi.mock("@/lib/integrations/virustotal", () => ({
     lookupDomain: async () => ({ kind: "unknown" as const })
 }));

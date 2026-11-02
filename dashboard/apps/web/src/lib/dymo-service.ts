@@ -12,7 +12,7 @@
  * visit.
  */
 
-import { takeLookup } from "@/lib/reputation-budget";
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
@@ -35,7 +35,7 @@ export async function dymoIpAllowed(ip: string | undefined): Promise<{ allowed: 
             : { allowed: false, reason: remembered.reason ?? "flagged" };
     }
 
-    if (!takeLookup("dymo")) return { allowed: true };
+    if (!(await takeServedLookup("dymo"))) return { allowed: true };
 
     try {
         const { allow, reasons } = await verifyIp(apiKey, ip, config.deny);

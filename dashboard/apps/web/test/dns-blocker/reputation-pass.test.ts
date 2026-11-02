@@ -8,11 +8,18 @@
 import * as dns from "@/lib/dns-blocker/settings";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state: { cursor: unknown; refused: Set<string>; asked: string[]; log: string } = {
+const state: {
+    cursor: unknown;
+    refused: Set<string>;
+    asked: string[];
+    log: string;
+    pause: string | null;
+} = {
     cursor: null,
     refused: new Set(),
     asked: [],
-    log: ""
+    log: "",
+    pause: null
 };
 
 const line = (domain: string) =>
@@ -51,6 +58,7 @@ vi.mock("@/lib/dns-blocker/service", () => ({
     }
 }));
 vi.mock("@/lib/reputation-budget", () => ({ takeLookup: () => true }));
+vi.mock("@/lib/setting-store", () => ({ getSetting: async () => state.pause }));
 vi.mock("@/lib/dns-blocker/engine-files", () => ({ writeEngineFiles: async () => false }));
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async () => ({ enabled: true }),
@@ -84,6 +92,7 @@ beforeEach(() => {
     state.cursor = null;
     state.refused = new Set();
     state.asked = [];
+    state.pause = null;
     findMany.mockClear();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
@@ -105,6 +114,12 @@ describe("the reputation pass", () => {
         await service.runReputationPass();
         expect(state.asked).toEqual(["a.example", "b.example", "c.example"]);
         expect(state.cursor).toMatchObject({ offset: 0 });
+    });
+
+    it("asks nothing while Dymo is paused", async () => {
+        state.pause = JSON.stringify({ until: Date.now() + 60_000, reason: "credits" });
+        expect(await service.recheckDomain("bad.example")).toBe("failed");
+        expect(state.asked).toEqual([]);
     });
 
     it("says Dymo failed on a recheck, rather than the budget", async () => {

@@ -15,9 +15,15 @@
  */
 
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { takeLookup, type BudgetedProvider } from "@/lib/reputation-budget";
 
 /** Why a provider stopped. The first two need the operator, the others pass. */
 export type PauseReason = "credits" | "key" | "busy" | "unavailable";
+
+/** A refusal of the one value asked about, not of the account or the service. Mail
+ *  senders are chosen by strangers, so pausing on these would let one crafted value
+ *  switch every check off. The lookup budget is what bounds them. */
+const REFUSED_SUBJECT = new Set([400, 404, 422]);
 
 /** Long enough to cost nothing, short enough that topping up works on its own. */
 const NEEDS_OPERATOR_MS = 60 * 60 * 1000;
@@ -59,6 +65,18 @@ export async function providerPaused(provider: string): Promise<boolean> {
     return pause !== null && pause.until > Date.now();
 }
 
+/**
+ * Take a lookup from the provider's budget, unless it is paused. Nothing is sent
+ * during a pause, and budget spent on nothing would outlast it, refusing the checks
+ * that should resume once the provider is back.
+ */
+export async function takeServedLookup(
+    provider: BudgetedProvider,
+    share?: number
+): Promise<boolean> {
+    return !(await providerPaused(provider)) && takeLookup(provider, share);
+}
+
 /** The HTTP status of a failure, from an axios error or a plain one carrying it. */
 function failureStatus(caught: unknown): number | undefined {
     if (!caught || typeof caught !== "object") return undefined;
@@ -73,9 +91,11 @@ function describe(caught: unknown): string {
     return String(failureStatus(caught) ?? (caught instanceof Error ? caught.name : "unknown"));
 }
 
-/** What a failure means for the next request. */
-export function pauseReasonFor(caught: unknown): PauseReason {
+/** What a failure means for the next request, or null when it says nothing about
+ *  any request but this one. */
+export function pauseReasonFor(caught: unknown): PauseReason | null {
     const status = failureStatus(caught);
+    if (status !== undefined && REFUSED_SUBJECT.has(status)) return null;
     if (status === 402) return "credits";
     if (status === 401 || status === 403) return "key";
     if (status === 429) return "busy";
@@ -97,6 +117,10 @@ export async function whileServing<T>(
         return answer;
     } catch (caught) {
         const reason = pauseReasonFor(caught);
+        if (!reason) {
+            console.error(`polaris: ${name} refused a request:`, describe(caught));
+            throw caught;
+        }
         const needsOperator = reason === "credits" || reason === "key";
         const wait = needsOperator ? NEEDS_OPERATOR_MS : PASSES_ON_ITS_OWN_MS;
         console.error(`polaris: ${name} paused (${reason}):`, describe(caught));
@@ -109,8 +133,8 @@ export async function whileServing<T>(
     }
 }
 
-/** The alert and the card's notice. Held and throttled by the attention record, so
- *  the hourly retry does not raise it again. */
+/** The alert and the card's notice. An out-of-service failure is one ongoing
+ *  condition, so the hourly retry rewrites its notice instead of raising another. */
 async function tellOperators(
     provider: string,
     name: string,
@@ -125,8 +149,8 @@ async function tellOperators(
         // i18n-ignore the fallback; each operator reads `say` in their language
         body:
             reason === "credits"
-                ? `${name} is out of credits, so Polaris stopped asking it. Visitors and mail are not being checked until it has credits again.`
-                : `${name} refused the key, so Polaris stopped asking it. Visitors and mail are not being checked until the key works.`,
+                ? `${name} is out of credits, so Polaris stopped asking it. Its checks are off until it has credits again.`
+                : `${name} refused the key, so Polaris stopped asking it. Its checks are off until the key works.`,
         say: (t) => ({
             title: t("connections.stoppedTitle", { name }),
             body:

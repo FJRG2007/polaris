@@ -132,10 +132,11 @@ export async function dismissConnectionFailureAction(
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
-    if (typeof provider !== "string" || !findConnectionProvider(provider))
-        return { error: t("integrations.errors.unknownService") };
+    if (typeof provider !== "string") return { error: t("integrations.errors.unknownService") };
 
     const failure = await connectionFailure(provider).catch(() => null);
+    if (!failure && !findConnectionProvider(provider))
+        return { error: t("integrations.errors.unknownService") };
     if (!(await markConnectionFailureSeen(provider)))
         return { error: t("integrations.errors.notSaved") };
     // A Google API turned off is what Integrations counts; seen here, it is
@@ -677,7 +678,11 @@ export async function saveDymoAction(input: {
 
     await upsertIntegration(provider, {
         enabled: input.enabled,
-        config: { verifyAccessIp: input.verifyAccessIp, deny: deny.length > 0 ? deny : ["FRAUD"] },
+        config: {
+            ...existing?.config,
+            verifyAccessIp: input.verifyAccessIp,
+            deny: deny.length > 0 ? deny : ["FRAUD"]
+        },
         secret: newKey,
         installedById: user.id
     });

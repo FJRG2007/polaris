@@ -20,8 +20,8 @@ import { verifyIp } from "@/lib/integrations/dymo";
 import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { providerPaused, whileServing } from "@/lib/integrations/provider-pause";
-import { takeLookup, type BudgetedProvider } from "@/lib/reputation-budget";
+import type { BudgetedProvider } from "@/lib/reputation-budget";
+import { providerPaused, takeServedLookup, whileServing } from "@/lib/integrations/provider-pause";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -237,7 +237,7 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
                 });
                 break;
             }
-            if (!takeLookup(provider.slug, SWEEP_SHARE)) continue;
+            if (!(await takeServedLookup(provider.slug, SWEEP_SHARE))) continue;
             try {
                 asked += 1;
                 const { allow, reasons } = await provider.check(ip);
