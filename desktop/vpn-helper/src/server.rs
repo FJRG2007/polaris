@@ -51,7 +51,7 @@ enum Order {
     Status,
     Key,
     Down,
-    Up(UpRequest),
+    Up(Box<UpRequest>),
 }
 
 #[derive(Deserialize)]
@@ -185,12 +185,15 @@ mod tests {
                      "allowedIps": ["0.0.0.0/0"], "mtu": 1320 }
         });
         let order = read_order(&line(body), SECRET, "nonce");
-        assert!(matches!(order, Ok(Order::Up(UpRequest { own: Some(_), .. }))));
+        assert!(matches!(order, Ok(Order::Up(ref up)) if up.own.is_some()));
     }
 
     #[test]
     fn refuses_what_is_not_an_order() {
-        assert!(matches!(read_order("nonsense", SECRET, "nonce"), Err("badRequest")));
+        assert!(matches!(
+            read_order("nonsense", SECRET, "nonce"),
+            Err("badRequest")
+        ));
         let order = read_order(&line(json!({ "order": "format" })), SECRET, "nonce");
         assert!(matches!(order, Err("badRequest")));
     }
@@ -202,6 +205,6 @@ mod tests {
             "nodePublicKey": "k", "endpoint": "198.51.100.1", "port": 51820
         });
         let order = read_order(&line(body), SECRET, "nonce");
-        assert!(matches!(order, Ok(Order::Up(UpRequest { port: 51820, .. }))));
+        assert!(matches!(order, Ok(Order::Up(ref up)) if up.port == 51820));
     }
 }

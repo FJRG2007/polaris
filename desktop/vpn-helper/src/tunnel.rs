@@ -64,7 +64,11 @@ pub fn parse(request: &UpRequest) -> Result<Target, Refusal> {
         .map(|key| Key::from_str(key).map_err(|_| "badRequest"))
         .transpose()?;
     let allowed_ips = match own {
-        Some(own) => own.allowed_ips.iter().map(|ip| network(ip)).collect::<Result<_, _>>()?,
+        Some(own) => own
+            .allowed_ips
+            .iter()
+            .map(|ip| network(ip))
+            .collect::<Result<_, _>>()?,
         None => vec![network("0.0.0.0/0")?, network("::/0")?],
     };
     let dns = request
@@ -108,7 +112,11 @@ fn start(
     api.create_interface()?;
     api.configure_interface(&InterfaceConfiguration {
         name: INTERFACE.to_owned(),
-        prvkey: target.private_key.as_deref().unwrap_or(private_key).to_owned(),
+        prvkey: target
+            .private_key
+            .as_deref()
+            .unwrap_or(private_key)
+            .to_owned(),
         addresses: target.addresses.clone(),
         port: 0,
         peers: vec![peer.clone()],
@@ -121,7 +129,9 @@ fn start(
 
 fn server_answered(api: &WGApi<Backend>) -> bool {
     api.read_interface_data().is_ok_and(|host| {
-        host.peers.values().any(|peer| peer.last_handshake.is_some_and(|at| at > UNIX_EPOCH))
+        host.peers
+            .values()
+            .any(|peer| peer.last_handshake.is_some_and(|at| at > UNIX_EPOCH))
     })
 }
 
@@ -131,7 +141,9 @@ fn discard(mut api: WGApi<Backend>) {
         // The library stops at a system with no DNS manager, before the interface
         // goes. A tunnel left behind would carry on holding the routes.
         #[cfg(target_os = "linux")]
-        let _ = std::process::Command::new("ip").args(["link", "delete", INTERFACE]).status();
+        let _ = std::process::Command::new("ip")
+            .args(["link", "delete", INTERFACE])
+            .status();
     }
 }
 

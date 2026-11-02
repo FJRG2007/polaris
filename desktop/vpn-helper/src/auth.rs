@@ -20,7 +20,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 fn unhex(text: &str) -> Option<Vec<u8>> {
-    if text.len() % 2 != 0 {
+    if !text.len().is_multiple_of(2) {
         return None;
     }
     (0..text.len())
@@ -37,7 +37,9 @@ pub fn verify(secret: &str, nonce: &str, answer: &str) -> bool {
 /// What proves this is the service to an app that sent `theirs`. Its own label
 /// keeps it from ever passing as the app's answer to the same nonce.
 pub fn prove(secret: &str, nonce: &str, theirs: &str) -> String {
-    hex(&signer(secret, &format!("service\n{nonce}\n{theirs}")).finalize().into_bytes())
+    hex(&signer(secret, &format!("service\n{nonce}\n{theirs}"))
+        .finalize()
+        .into_bytes())
 }
 
 /// A secret the app wrote: 64 hex characters, nothing else.
@@ -72,7 +74,10 @@ mod tests {
         assert_ne!(proof, prove(SECRET, "nonce", "other"));
         assert_ne!(proof, prove("other", "nonce", "theirs"));
         assert_ne!(proof, respond(SECRET, "nonce"));
-        assert_eq!(proof, "2865656d4a1a945e17feecd85db6dfefd819b0f11a884a3f9503bf36fb1e3814");
+        assert_eq!(
+            proof,
+            "2865656d4a1a945e17feecd85db6dfefd819b0f11a884a3f9503bf36fb1e3814"
+        );
     }
 
     #[test]

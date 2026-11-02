@@ -37,7 +37,11 @@ export const profileSchema = z.object({
     mtu: z.number().int().min(MIN_MTU).max(MAX_MTU).nullable(),
     publicKey: key,
     presharedKey: key.nullable(),
-    endpoint: z.string().min(1).max(255).refine((host) => isIP(host) !== 0 || HOSTNAME.test(host)),
+    endpoint: z
+        .string()
+        .min(1)
+        .max(255)
+        .refine((host) => isIP(host) !== 0 || HOSTNAME.test(host)),
     port: z.number().int().min(1).max(65535),
     allowedIps: z.array(network).min(1).max(MAX_ALLOWED)
 });
@@ -45,7 +49,10 @@ export const profileSchema = z.object({
 export type Profile = z.infer<typeof profileSchema>;
 
 function list(value: string | undefined): string[] {
-    return (value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+    return (value ?? "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 }
 
 /** `host:port`, with an IPv6 host in brackets. */
@@ -105,6 +112,9 @@ export function parseProfile(text: string): Profile | null {
 
 /** What to call a file's tunnel: its name without the extension. */
 export function profileName(fileName: string): string {
-    const base = fileName.replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "").trim();
+    const base = fileName
+        .replace(/^.*[\\/]/, "")
+        .replace(/\.[^.]*$/, "")
+        .trim();
     return base.slice(0, 80) || "VPN";
 }

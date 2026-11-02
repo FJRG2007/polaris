@@ -13,7 +13,13 @@ import {
 const ORIGIN = "https://polaris.example.com";
 const NODE = { id: "node-1", name: "Madrid" };
 const NOW = 1_800_000_000;
-const LOGIN = { username: "u.1", password: "p", expiresAt: NOW + 3600, host: "vpn.example.com", port: 443 };
+const LOGIN = {
+    username: "u.1",
+    password: "p",
+    expiresAt: NOW + 3600,
+    host: "vpn.example.com",
+    port: 443
+};
 
 function stored<T>(value: T) {
     const box = { value };
@@ -29,14 +35,21 @@ function stored<T>(value: T) {
 type Listener = (details: object, callback: (answer: object) => void) => void;
 
 function harness(
-    options: { perRequest?: boolean; send?: typeof fetch; control?: string; everySite?: boolean } = {}
+    options: {
+        perRequest?: boolean;
+        send?: typeof fetch;
+        control?: string;
+        everySite?: boolean;
+    } = {}
 ) {
     const route = stored<VpnRoute | null>(null);
     const login = stored<VpnLogin | null>(null);
     const settings = {
         set: vi.fn(async () => undefined),
         clear: vi.fn(async () => undefined),
-        get: vi.fn(async () => ({ levelOfControl: options.control ?? "controllable_by_this_extension" }))
+        get: vi.fn(async () => ({
+            levelOfControl: options.control ?? "controllable_by_this_extension"
+        }))
     };
     const webRtc = { set: vi.fn(async () => undefined), clear: vi.fn(async () => undefined) };
     let auth: Listener = () => undefined;
@@ -48,7 +61,10 @@ function harness(
     };
     const api = {
         permissions,
-        proxy: { settings, onRequest: { addListener: (listener: typeof request) => (request = listener) } },
+        proxy: {
+            settings,
+            onRequest: { addListener: (listener: typeof request) => (request = listener) }
+        },
         webRequest: { onAuthRequired: { addListener: (listener: Listener) => (auth = listener) } },
         privacy: { network: { webRTCIPHandlingPolicy: webRtc } }
     } as unknown as VpnApi;
@@ -110,7 +126,9 @@ describe("what stays outside the tunnel", () => {
 describe("readNodes", () => {
     it("drops what is not a server and reads an unknown exit as direct", () => {
         expect(
-            readNodes({ nodes: [{ id: "a", name: "A", exit: "x", browser: true }, { id: 1 }, null] })
+            readNodes({
+                nodes: [{ id: "a", name: "A", exit: "x", browser: true }, { id: 1 }, null]
+            })
         ).toEqual([{ id: "a", name: "A", exit: "direct", browser: true }]);
         expect(readNodes(null)).toEqual([]);
     });
@@ -130,7 +148,10 @@ describe("connecting on Chromium", () => {
                 }
             }
         });
-        expect(webRtc.set).toHaveBeenCalledWith({ value: "disable_non_proxied_udp", scope: "regular" });
+        expect(webRtc.set).toHaveBeenCalledWith({
+            value: "disable_non_proxied_udp",
+            scope: "regular"
+        });
         expect(route.box.value?.nodeName).toBe("Madrid");
         expect(login.box.value?.password).toBe("p");
         expect(login.box.value).not.toHaveProperty("host");
@@ -189,19 +210,27 @@ describe("connecting on Chromium", () => {
 });
 
 describe("the proxy asking for a login", () => {
-    const challenge = { requestId: "1", isProxy: true, challenger: { host: "vpn.example.com", port: 443 } };
+    const challenge = {
+        requestId: "1",
+        isProxy: true,
+        challenger: { host: "vpn.example.com", port: 443 }
+    };
 
     it("leaves a website's own login prompt alone", async () => {
         const { vpn, ask } = harness();
         await vpn.connect(NODE);
         expect(await ask({ requestId: "2", isProxy: false })).toEqual({});
-        expect(await ask({ requestId: "3", isProxy: true, challenger: { host: "other", port: 1 } })).toEqual({});
+        expect(
+            await ask({ requestId: "3", isProxy: true, challenger: { host: "other", port: 1 } })
+        ).toEqual({});
     });
 
     it("answers with the held login", async () => {
         const { vpn, ask } = harness();
         await vpn.connect(NODE);
-        expect(await ask(challenge)).toEqual({ authCredentials: { username: "u.1", password: "p" } });
+        expect(await ask(challenge)).toEqual({
+            authCredentials: { username: "u.1", password: "p" }
+        });
     });
 
     it("fetches a new login when the held one ran out", async () => {
@@ -209,7 +238,9 @@ describe("the proxy asking for a login", () => {
         await vpn.connect(NODE);
         login.box.value = { username: "old", password: "old", expiresAt: NOW - 1 };
         vi.mocked(send).mockClear();
-        expect(await ask(challenge)).toEqual({ authCredentials: { username: "u.1", password: "p" } });
+        expect(await ask(challenge)).toEqual({
+            authCredentials: { username: "u.1", password: "p" }
+        });
         expect(send).toHaveBeenCalledOnce();
     });
 
@@ -315,7 +346,9 @@ describe("Firefox when a login cannot be renewed", () => {
 
 describe("state", () => {
     it("is unavailable on a Polaris too old to answer", async () => {
-        const send = vi.fn(async () => new Response("", { status: 404 })) as unknown as typeof fetch;
+        const send = vi.fn(
+            async () => new Response("", { status: 404 })
+        ) as unknown as typeof fetch;
         const { vpn } = harness({ send });
         expect(await vpn.state()).toEqual({ available: false, nodes: [], active: null });
     });

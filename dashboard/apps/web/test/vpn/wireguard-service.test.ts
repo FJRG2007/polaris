@@ -15,7 +15,13 @@ const db = vi.hoisted(() => ({
         delete: vi.fn(),
         update: vi.fn()
     },
-    vpnPeer: { count: vi.fn(), create: vi.fn(), delete: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() }
+    vpnPeer: {
+        count: vi.fn(),
+        create: vi.fn(),
+        delete: vi.fn(),
+        findMany: vi.fn(),
+        findUnique: vi.fn()
+    }
 }));
 const script = vi.hoisted(() => ({ run: vi.fn(), setting: vi.fn(), taken: vi.fn() }));
 
@@ -67,9 +73,9 @@ beforeEach(() => {
 
 describe("who may add a device", () => {
     it("refuses somebody with no access while the VPN is not open", async () => {
-        await expect(service.connectClient(person, device)).rejects.toMatchObject(
-            { code: "noAccess" }
-        );
+        await expect(service.connectClient(person, device)).rejects.toMatchObject({
+            code: "noAccess"
+        });
     });
 
     it("lets everybody in once it is open", async () => {
@@ -88,7 +94,9 @@ describe("who may add a device", () => {
 
 describe("a device", () => {
     it("looks again when two take one address at once", async () => {
-        db.vpnPeer.create.mockRejectedValueOnce(Object.assign(new Error("taken"), { code: "P2002" }));
+        db.vpnPeer.create.mockRejectedValueOnce(
+            Object.assign(new Error("taken"), { code: "P2002" })
+        );
         const made = await service.connectClient(admin, device);
         expect(db.vpnPeer.create).toHaveBeenCalledTimes(2);
         expect(made.deviceId).toBe("peer");
@@ -116,7 +124,12 @@ describe("removing a node", () => {
 describe("the browser route on a node's edge", () => {
     const { publicKey } = node;
     const FILE = "polaris-vpn-proxy.yml";
-    const change = { name: "n", endpoint: "vpn.example.test", port: 51820, exit: "direct" as const };
+    const change = {
+        name: "n",
+        endpoint: "vpn.example.test",
+        port: 51820,
+        exit: "direct" as const
+    };
 
     /** A machine answering the setup, with an edge or without one. */
     function machine(edge: boolean) {
@@ -124,8 +137,10 @@ describe("the browser route on a node's edge", () => {
         script.run.mockImplementation(async (_client, _command, options) => {
             const input = options.input as string;
             sent.push(input);
-            if (input.includes("public-key=")) options.onStdout(Buffer.from(`public-key=${publicKey}\n`));
-            if (edge && input.includes("polaris-traefik")) options.onStdout(Buffer.from("edge=ready\n"));
+            if (input.includes("public-key="))
+                options.onStdout(Buffer.from(`public-key=${publicKey}\n`));
+            if (edge && input.includes("polaris-traefik"))
+                options.onStdout(Buffer.from("edge=ready\n"));
             return { code: 0 };
         });
         return sent;
@@ -289,18 +304,32 @@ describe("an app connecting", () => {
     it("gives the same device back and spends no slot reconnecting", async () => {
         script.setting.mockResolvedValue("true");
         db.vpnPeer.count.mockResolvedValue(5);
-        db.vpnPeer.findUnique.mockResolvedValue({ id: "peer", userId: person.id, hostIndex: 7, nodeId: NODE_ID });
+        db.vpnPeer.findUnique.mockResolvedValue({
+            id: "peer",
+            userId: person.id,
+            hostIndex: 7,
+            nodeId: NODE_ID
+        });
         expect((await service.connectClient(person, input)).deviceId).toBe("peer");
         expect(db.vpnPeer.create).not.toHaveBeenCalled();
     });
 
     it("will not hand over somebody else's device", async () => {
         script.setting.mockResolvedValue("true");
-        db.vpnPeer.findUnique.mockResolvedValue({ id: "peer", userId: "other", hostIndex: 7, nodeId: NODE_ID });
-        await expect(service.connectClient(person, input)).rejects.toMatchObject({ code: "notFound" });
+        db.vpnPeer.findUnique.mockResolvedValue({
+            id: "peer",
+            userId: "other",
+            hostIndex: 7,
+            nodeId: NODE_ID
+        });
+        await expect(service.connectClient(person, input)).rejects.toMatchObject({
+            code: "notFound"
+        });
     });
 
     it("refuses something that is not a key", async () => {
-        await expect(service.connectClient(admin, { ...input, publicKey: "x\nrm -rf" })).rejects.toMatchObject({ code: "notFound" });
+        await expect(
+            service.connectClient(admin, { ...input, publicKey: "x\nrm -rf" })
+        ).rejects.toMatchObject({ code: "notFound" });
     });
 });

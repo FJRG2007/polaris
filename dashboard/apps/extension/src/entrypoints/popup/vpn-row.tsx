@@ -72,10 +72,7 @@ export function VpnRow(): React.JSX.Element | null {
             {open ? (
                 <div className="section-text" style={{ padding: "4px 12px 8px", gap: 6 }}>
                     {active ? (
-                        <button
-                            disabled={busy}
-                            onClick={() => send({ kind: "vpnDisconnect" })}
-                        >
+                        <button disabled={busy} onClick={() => send({ kind: "vpnDisconnect" })}>
                             {t("vpn.disconnect")}
                         </button>
                     ) : null}

@@ -40,7 +40,9 @@ export function profilesOf(userId: string) {
 async function placeOf(profile: Profile): Promise<{ country: string | null; city: string | null }> {
     const nowhere = { country: null, city: null };
     const place = async () => {
-        const ip = isIP(profile.endpoint) ? profile.endpoint : (await lookup(profile.endpoint)).address;
+        const ip = isIP(profile.endpoint)
+            ? profile.endpoint
+            : (await lookup(profile.endpoint)).address;
         const { countryCode, city } = await resolveGeo(ip);
         return { country: countryCode, city };
     };

@@ -73,13 +73,8 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             .join(", ");
     const places = useMemo<MapPlace[]>(
         () =>
-            [
-                ...nodes.filter((node) => node.exit !== "tor"),
-                ...profiles
-            ].flatMap((place) =>
-                place.country
-                    ? [{ id: place.id, country: place.country, label: place.name }]
-                    : []
+            [...nodes.filter((node) => node.exit !== "tor"), ...profiles].flatMap((place) =>
+                place.country ? [{ id: place.id, country: place.country, label: place.name }] : []
             ),
         [nodes, profiles]
     );
@@ -271,7 +266,10 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                         </ui.Button>
                     ) : null}
                     {chosenProfile && chosenProfile.id !== active ? (
-                        <ui.Button disabled={pending} onClick={() => connectProfile(chosenProfile.id)}>
+                        <ui.Button
+                            disabled={pending}
+                            onClick={() => connectProfile(chosenProfile.id)}
+                        >
                             <Power />
                             {t(active ? "connect.switchTo" : "connect.connectTo", {
                                 name: chosenProfile.name
@@ -279,10 +277,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                         </ui.Button>
                     ) : null}
                     {chosen && chosen.id !== active ? (
-                        <ui.Button
-                            disabled={pending || !!blocked}
-                            onClick={() => connect(chosen)}
-                        >
+                        <ui.Button disabled={pending || !!blocked} onClick={() => connect(chosen)}>
                             <Power />
                             {t(active ? "connect.switchTo" : "connect.connectTo", {
                                 name: chosen.name
@@ -326,7 +321,10 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                     key={device.id}
                                     className="flex min-w-0 flex-wrap items-center gap-2 text-sm"
                                 >
-                                    <span className="min-w-0 truncate font-medium" title={device.name}>
+                                    <span
+                                        className="min-w-0 truncate font-medium"
+                                        title={device.name}
+                                    >
                                         {device.name}
                                     </span>
                                     <ui.Badge variant={online ? "success" : "neutral"}>

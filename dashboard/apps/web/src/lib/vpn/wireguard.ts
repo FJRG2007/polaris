@@ -82,7 +82,11 @@ export const clientConnectSchema = z.object({
 });
 
 /** The block of one node, from a number no two nodes share. */
-export function nodeSubnet(index: number): { base: [number, number]; cidr: string; gateway: string } {
+export function nodeSubnet(index: number): {
+    base: [number, number];
+    cidr: string;
+    gateway: string;
+} {
     const second = 128 + Math.floor(index / 16);
     const third = (index % 16) * 16;
     if (second > 255) throw new Error("No node block left");
@@ -164,10 +168,7 @@ export function renderNodeRules(node: NodePlan): string {
         "        type filter hook forward priority filter - 1; policy accept;",
         `        iifname "${DEVICE}" oifname "${DEVICE}" drop`,
         ...(tor
-            ? [
-                  `        iifname "${DEVICE}" drop`,
-                  `        oifname "${DEVICE}" drop`
-              ]
+            ? [`        iifname "${DEVICE}" drop`, `        oifname "${DEVICE}" drop`]
             : [
                   `        iifname "${DEVICE}" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } drop`
               ]),
@@ -275,7 +276,10 @@ function file(path: string, content: string): string {
 
 /** The peers the node lets in. Keys are checked here as well as where they are made,
  *  since this text ends up in a script run as root. */
-export function renderPeers(node: NodePlan, peers: readonly { publicKey: string; host: number }[]): string {
+export function renderPeers(
+    node: NodePlan,
+    peers: readonly { publicKey: string; host: number }[]
+): string {
     const blocks = peers.map(({ publicKey, host }) => {
         if (!isWireGuardKey(publicKey)) throw new Error("Not a WireGuard key");
         return `[Peer]\nPublicKey = ${publicKey}\nAllowedIPs = ${deviceAddress(node.index, host)}/32\n`;
@@ -304,9 +308,9 @@ export function renderNodeApply(
         "set -eu",
         "umask 077",
         'need=""',
-        "command -v wg >/dev/null 2>&1 || need=\"$need wireguard-tools\"",
-        "command -v python3 >/dev/null 2>&1 || need=\"$need python3\"",
-        "command -v nft >/dev/null 2>&1 || need=\"$need nftables\"",
+        'command -v wg >/dev/null 2>&1 || need="$need wireguard-tools"',
+        'command -v python3 >/dev/null 2>&1 || need="$need python3"',
+        'command -v nft >/dev/null 2>&1 || need="$need nftables"',
         ...(tor ? ['command -v tor >/dev/null 2>&1 || need="$need tor"'] : []),
         'if [ -n "$need" ]; then',
         "    command -v apt-get >/dev/null 2>&1 || { echo unsupported-system; exit 3; }",
@@ -355,7 +359,15 @@ export function renderPeerSync(
     node: NodePlan,
     peers: readonly { publicKey: string; host: number }[]
 ): string {
-    return ["#!/bin/sh", "set -eu", "umask 077", "mkdir -p /etc/wireguard", file(`${VPN_DIR}/peers.sh`, renderPeers(node, peers)), `sh ${VPN_DIR}/peers.sh`, ""].join("\n");
+    return [
+        "#!/bin/sh",
+        "set -eu",
+        "umask 077",
+        "mkdir -p /etc/wireguard",
+        file(`${VPN_DIR}/peers.sh`, renderPeers(node, peers)),
+        `sh ${VPN_DIR}/peers.sh`,
+        ""
+    ].join("\n");
 }
 
 export const NODE_REMOVE = `#!/bin/sh
@@ -385,7 +397,11 @@ export function parsePeerCounters(output: string): PeerCounters[] {
     return output.split("\n").flatMap((line) => {
         const [publicKey, , , , handshake, received, sent] = line.trim().split("\t");
         if (!publicKey || !isWireGuardKey(publicKey)) return [];
-        if (!/^\d+$/.test(handshake ?? "") || !/^\d+$/.test(received ?? "") || !/^\d+$/.test(sent ?? "")) {
+        if (
+            !/^\d+$/.test(handshake ?? "") ||
+            !/^\d+$/.test(received ?? "") ||
+            !/^\d+$/.test(sent ?? "")
+        ) {
             return [];
         }
         const seconds = Number(handshake);
@@ -408,5 +424,7 @@ export function counterGrowth(now: bigint, before: bigint): bigint {
 
 export function isPublicEndpoint(endpoint: string): boolean {
     if (!IPV4.test(endpoint)) return true;
-    return !/^(10\.|127\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(endpoint);
+    return !/^(10\.|127\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(
+        endpoint
+    );
 }

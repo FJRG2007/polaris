@@ -271,9 +271,8 @@ async function settleTunnels(
     hostId: string,
     before: Awaited<ReturnType<typeof tunnelsWithin>>
 ): Promise<string[]> {
-    const { moveTunnel, retireTunnels, tunnelsWithin } = await import(
-        "@/lib/deploy/wireguard/tunnel-service"
-    );
+    const { moveTunnel, retireTunnels, tunnelsWithin } =
+        await import("@/lib/deploy/wireguard/tunnel-service");
     const t = await readerWords("tunnels");
     const staying = new Set((await tunnelsWithin(ownerId, { hostId })).map((row) => row.id));
     const warnings: string[] = [];

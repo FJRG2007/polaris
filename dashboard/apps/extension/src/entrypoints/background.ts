@@ -3728,7 +3728,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 const node = (await vpn.state()).nodes.find((one) => one.id === request.nodeId);
                 if (!node?.browser) return { ok: false, error: await say("vpn.refused.notReady") };
                 const outcome = await vpn.connect(node);
-                if (!outcome.ok) return { ok: false, error: await say(`vpn.refused.${outcome.code}`) };
+                if (!outcome.ok)
+                    return { ok: false, error: await say(`vpn.refused.${outcome.code}`) };
                 return { ok: true, vpn: await vpn.state() };
             }
 

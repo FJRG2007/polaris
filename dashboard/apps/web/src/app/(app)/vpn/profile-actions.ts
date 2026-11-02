@@ -24,7 +24,10 @@ async function failed(error: unknown): Promise<{ error: string }> {
         return { error: t(`connect.own.errors.${error.code}`, { limit: MAX_PROFILES }) };
     }
     if (error instanceof z.ZodError) return { error: t("connect.own.errors.unreadable") };
-    console.error("polaris: a VPN profile action failed:", error instanceof Error ? error.name : "unknown");
+    console.error(
+        "polaris: a VPN profile action failed:",
+        error instanceof Error ? error.name : "unknown"
+    );
     return { error: t("errors.generic") };
 }
 

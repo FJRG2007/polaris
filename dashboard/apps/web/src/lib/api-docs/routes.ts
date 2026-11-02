@@ -378,19 +378,17 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
             ["start", "started"],
             ["stop", "stopped"]
         ] as const
-    ).map(
-        ([action, done]): DocumentedRoute => ({
-            method: "POST",
-            path: `/api/v1/deploy/services/{id}/${action}`,
-            file: `api/v1/deploy/services/[id]/${action}/route.ts`,
-            tag: "Deploy",
-            summary: `${action[0]!.toUpperCase()}${action.slice(1)} a service`,
-            changes: true,
-            params: serviceId,
-            query: formatQuery,
-            responses: { 200: ok(z.object({ [done]: z.literal(true) })) }
-        })
-    ),
+    ).map(([action, done]): DocumentedRoute => ({
+        method: "POST",
+        path: `/api/v1/deploy/services/{id}/${action}`,
+        file: `api/v1/deploy/services/[id]/${action}/route.ts`,
+        tag: "Deploy",
+        summary: `${action[0]!.toUpperCase()}${action.slice(1)} a service`,
+        changes: true,
+        params: serviceId,
+        query: formatQuery,
+        responses: { 200: ok(z.object({ [done]: z.literal(true) })) }
+    })),
     ...variableRoutes("/api/v1/deploy/services/{id}", "api/v1/deploy/services/[id]", serviceId),
     ...variableRoutes(
         "/api/v1/deploy/environments/{id}",

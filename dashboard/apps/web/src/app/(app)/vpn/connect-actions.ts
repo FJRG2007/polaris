@@ -16,7 +16,8 @@ type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
 async function failed(error: unknown): Promise<{ error: string }> {
     const t = await getTranslations("vpn");
-    if (error instanceof service.WireGuardRefusal) return { error: t(`connect.errors.${error.code}`) };
+    if (error instanceof service.WireGuardRefusal)
+        return { error: t(`connect.errors.${error.code}`) };
     if (error instanceof z.ZodError) return { error: t("connect.errors.invalid") };
     console.error("polaris: a VPN action failed:", error);
     return { error: t("errors.generic") };
@@ -157,7 +158,8 @@ export async function updateVpnNodeAction(input: unknown): Promise<Result> {
     const parsed = nodeChangeSchema.safeParse(input);
     if (!parsed.success) return failed(parsed.error);
     const { id, ...change } = parsed.data;
-    if (!(await service.ownsNode(id, user.id))) return failed(new service.WireGuardRefusal("notFound"));
+    if (!(await service.ownsNode(id, user.id)))
+        return failed(new service.WireGuardRefusal("notFound"));
     return audited(user.id, "vpn.node.update", id, () => service.updateNode(id, change));
 }
 

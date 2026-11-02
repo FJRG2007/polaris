@@ -90,9 +90,7 @@ export default defineConfig({
             "contextMenus",
             "proxy",
             "privacy",
-            ...(browser === "firefox"
-                ? []
-                : ["tabGroups", "webRequest", "webRequestAuthProvider"])
+            ...(browser === "firefox" ? [] : ["tabGroups", "webRequest", "webRequestAuthProvider"])
         ],
         // Filling from the keyboard, without going through the toolbar. The
         // browser owns the binding - somebody can change or remove it in its own

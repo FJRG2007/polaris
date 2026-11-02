@@ -27,14 +27,18 @@ fn must(program: &str, args: &[&str]) -> io::Result<()> {
 fn place_files(home: &Path) -> io::Result<PathBuf> {
     fs::create_dir_all(home)?;
     let source = std::env::current_exe()?;
-    let name = source.file_name().ok_or_else(|| io::Error::other("no file name"))?;
+    let name = source
+        .file_name()
+        .ok_or_else(|| io::Error::other("no file name"))?;
     let target = home.join(name);
     if source != target {
         fs::copy(&source, &target)?;
     }
     #[cfg(windows)]
     {
-        let folder = source.parent().ok_or_else(|| io::Error::other("no folder"))?;
+        let folder = source
+            .parent()
+            .ok_or_else(|| io::Error::other("no folder"))?;
         let drivers = Path::new("resources-windows").join("binaries");
         fs::create_dir_all(home.join(&drivers))?;
         for dll in ["wireguard-amd64.dll", "wireguard-arm64.dll"] {
@@ -59,14 +63,23 @@ fn lock_folder(home: &Path) -> io::Result<()> {
     let path = home.to_string_lossy();
     must(
         "icacls.exe",
-        &[&path, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F"],
+        &[
+            &path,
+            "/inheritance:r",
+            "/grant:r",
+            "*S-1-5-18:(OI)(CI)F",
+            "*S-1-5-32-544:(OI)(CI)F",
+        ],
     )
 }
 
 #[cfg(windows)]
 fn start(binary: &Path) -> io::Result<()> {
     let command = format!("\"{}\" serve", binary.display());
-    must("sc.exe", &["create", SERVICE, "binPath=", &command, "start=", "auto"])?;
+    must(
+        "sc.exe",
+        &["create", SERVICE, "binPath=", &command, "start=", "auto"],
+    )?;
     must("sc.exe", &["start", SERVICE])
 }
 
@@ -185,7 +198,11 @@ mod windows {
         if let Err(error) = crate::server::serve() {
             eprintln!("polaris-vpn: {error}");
         }
-        report(&handle, ServiceState::Stopped, ServiceControlAccept::empty());
+        report(
+            &handle,
+            ServiceState::Stopped,
+            ServiceControlAccept::empty(),
+        );
     }
 
     pub fn dispatch() -> io::Result<()> {

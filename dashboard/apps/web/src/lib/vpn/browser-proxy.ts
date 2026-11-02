@@ -49,7 +49,10 @@ export function edgeIsReady(output: string): boolean {
 /** Each line is a person and what they have used since the proxy started. */
 export function parseProxyUsage(output: string): { userId: string; used: bigint }[] {
     return output.split("\n").flatMap((line) => {
-        const match = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) (\d{1,20})$/.exec(line.trim());
+        const match =
+            /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) (\d{1,20})$/.exec(
+                line.trim()
+            );
         return match?.[1] && match[2] ? [{ userId: match[1], used: BigInt(match[2]) }] : [];
     });
 }

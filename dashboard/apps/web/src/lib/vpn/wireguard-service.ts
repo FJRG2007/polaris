@@ -110,7 +110,10 @@ const OPEN: Omit<wg.VpnAccess, "usedBytes"> = {
 
 /** What a person may do, or null for no access. An administrator always has it, unless
  *  somebody gave them limits of their own. */
-export async function accessOf(user: { id: string; isAdmin: boolean }): Promise<wg.VpnAccess | null> {
+export async function accessOf(user: {
+    id: string;
+    isAdmin: boolean;
+}): Promise<wg.VpnAccess | null> {
     const row = await prisma.vpnAccess.findUnique({ where: { userId: user.id } });
     if (row) {
         return {
@@ -140,8 +143,7 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
     return peers.flatMap(({ publicKey, hostIndex, user }) => {
         const row = user.vpnAccess;
         if (!row) return user.isAdmin || open ? [{ publicKey, host: hostIndex }] : [];
-        const allowed =
-            wg.accessStanding(row, now) === "active" && wg.mayUseNode(row, nodeId);
+        const allowed = wg.accessStanding(row, now) === "active" && wg.mayUseNode(row, nodeId);
         return allowed ? [{ publicKey, host: hostIndex }] : [];
     });
 }
@@ -194,7 +196,11 @@ async function deployNode(node: NodeRow): Promise<NodeRow> {
 
 function sealedProxyKey(key: string) {
     const blob = encryptSecret(key, loadEnv().POLARIS_MASTER_KEY);
-    return { encryptedProxyKey: blob.ciphertext, proxyKeyNonce: blob.nonce, proxyKeyId: blob.keyId };
+    return {
+        encryptedProxyKey: blob.ciphertext,
+        proxyKeyNonce: blob.nonce,
+        proxyKeyId: blob.keyId
+    };
 }
 
 /**
@@ -423,7 +429,10 @@ export async function devicesOf(userId: string) {
  *  index refuses the second, which then looks again. */
 async function claimAddress(nodeId: string, userId: string, name: string, publicKey: string) {
     for (let attempt = 0; ; attempt += 1) {
-        const taken = await prisma.vpnPeer.findMany({ where: { nodeId }, select: { hostIndex: true } });
+        const taken = await prisma.vpnPeer.findMany({
+            where: { nodeId },
+            select: { hostIndex: true }
+        });
         const hostIndex = wg.freeHost(taken.map((row) => row.hostIndex));
         if (hostIndex === null) throw new WireGuardRefusal("nodeFull");
         try {
@@ -541,7 +550,9 @@ async function placeNode(node: NodeRow): Promise<void> {
 export async function runVpnPass(): Promise<void> {
     const nodes = await prisma.vpnNode.findMany({ where: { publicKey: { not: null } } });
     const now = new Date();
-    const accesses = await prisma.vpnAccess.findMany({ select: { userId: true, periodStart: true } });
+    const accesses = await prisma.vpnAccess.findMany({
+        select: { userId: true, periodStart: true }
+    });
     for (const { userId, periodStart } of accesses) {
         if (monthPassed(periodStart, now)) {
             await prisma.vpnAccess.update({

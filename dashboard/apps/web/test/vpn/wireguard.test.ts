@@ -1,7 +1,13 @@
 import { execFileSync } from "node:child_process";
 import * as wg from "@/lib/vpn/wireguard";
 import { describe, expect, it } from "vitest";
-import { PROXY_PROOF_HOST, edgeIsReady, parseProxyUsage, renderProxyEdge, renderProxyScript } from "@/lib/vpn/browser-proxy";
+import {
+    PROXY_PROOF_HOST,
+    edgeIsReady,
+    parseProxyUsage,
+    renderProxyEdge,
+    renderProxyScript
+} from "@/lib/vpn/browser-proxy";
 
 const access = {
     nodes: [],
@@ -128,6 +134,8 @@ describe("the browser proxy", () => {
 
     it("reads only ids that are ids", () => {
         const id = "11111111-1111-4111-8111-111111111112";
-        expect(parseProxyUsage(`${id} 5\n${"-".repeat(36)} 9\n`)).toEqual([{ userId: id, used: 5n }]);
+        expect(parseProxyUsage(`${id} 5\n${"-".repeat(36)} 9\n`)).toEqual([
+            { userId: id, used: 5n }
+        ]);
     });
 });

@@ -53,12 +53,7 @@ export interface VpnState {
 }
 
 export type VpnRefusal =
-    | "noSites"
-    | "noAccess"
-    | "notReady"
-    | "unreachable"
-    | "blocked"
-    | "noTraffic";
+    "noSites" | "noAccess" | "notReady" | "unreachable" | "blocked" | "noTraffic";
 
 export type VpnOutcome = { readonly ok: true } | { readonly ok: false; readonly code: VpnRefusal };
 
@@ -99,7 +94,9 @@ export interface VpnApi {
         };
     };
     readonly privacy?: {
-        readonly network?: { readonly webRTCIPHandlingPolicy?: Pick<ProxySetting, "set" | "clear"> };
+        readonly network?: {
+            readonly webRTCIPHandlingPolicy?: Pick<ProxySetting, "set" | "clear">;
+        };
     };
     readonly permissions?: {
         contains(detail: { origins: string[] }): Promise<boolean>;
@@ -243,7 +240,8 @@ export class BrowserVpn {
         const route = await this.deps.route.getValue();
         if (!route) return null;
         const held = await this.deps.login.getValue();
-        if (!fresh && held && held.expiresAt - LOGIN_MARGIN_SECONDS > this.nowSeconds()) return held;
+        if (!fresh && held && held.expiresAt - LOGIN_MARGIN_SECONDS > this.nowSeconds())
+            return held;
         this.renewing ??= this.renewLogin(route.nodeId).finally(() => {
             this.renewing = null;
         });
@@ -347,9 +345,10 @@ export class BrowserVpn {
     private async guardWebRtc(on: boolean): Promise<void> {
         const policy = this.deps.api.privacy?.network?.webRTCIPHandlingPolicy;
         if (!policy) return;
-        await (on
-            ? policy.set({ value: "disable_non_proxied_udp", scope: "regular" })
-            : policy.clear({ scope: "regular" })
+        await (
+            on
+                ? policy.set({ value: "disable_non_proxied_udp", scope: "regular" })
+                : policy.clear({ scope: "regular" })
         ).catch(() => undefined);
     }
 

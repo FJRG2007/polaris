@@ -25,9 +25,7 @@ export function defaultZone<Zone extends { label: string; host?: string; primary
     zones: readonly Zone[]
 ): string | undefined {
     const primary = zones.find((zone) => zone.primary) ?? zones[0];
-    const parent = zones.find(
-        ({ host }) => host && primary?.host?.endsWith(`.${host}`)
-    );
+    const parent = zones.find(({ host }) => host && primary?.host?.endsWith(`.${host}`));
     return (parent ?? primary)?.label;
 }
 /**

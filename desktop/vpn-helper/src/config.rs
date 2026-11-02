@@ -36,8 +36,14 @@ pub fn load() -> io::Result<Config> {
 /// Keeps the key across a reinstall: a new key would be a new device on the list.
 pub fn store_secret(secret: &str) -> io::Result<()> {
     let private_key = load().map_or_else(|_| Key::generate().to_string(), |old| old.private_key);
-    let config = Config { secret: secret.to_owned(), private_key };
-    fs::write(file(), serde_json::to_vec(&config).map_err(io::Error::other)?)?;
+    let config = Config {
+        secret: secret.to_owned(),
+        private_key,
+    };
+    fs::write(
+        file(),
+        serde_json::to_vec(&config).map_err(io::Error::other)?,
+    )?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

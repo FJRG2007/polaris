@@ -131,7 +131,11 @@ export function VpnAdminSettings() {
                                     size="icon"
                                     variant="ghost"
                                     aria-label={t("nodes.edit")}
-                                    title={mine.has(node.hostId) ? t("nodes.edit") : t("nodes.notYours")}
+                                    title={
+                                        mine.has(node.hostId)
+                                            ? t("nodes.edit")
+                                            : t("nodes.notYours")
+                                    }
                                     disabled={!mine.has(node.hostId)}
                                     onClick={() => setNodeDialog(node)}
                                 >
@@ -141,7 +145,11 @@ export function VpnAdminSettings() {
                                     size="icon"
                                     variant="ghost"
                                     aria-label={t("nodes.remove")}
-                                    title={mine.has(node.hostId) ? t("nodes.remove") : t("nodes.notYours")}
+                                    title={
+                                        mine.has(node.hostId)
+                                            ? t("nodes.remove")
+                                            : t("nodes.notYours")
+                                    }
                                     disabled={!mine.has(node.hostId)}
                                     onClick={() => setRemoving(node)}
                                 >
@@ -361,7 +369,9 @@ function NodeDialog({
                         </label>
                     </div>
                     {endpoint.trim() !== "" && !isPublicEndpoint(endpoint.trim()) ? (
-                        <p className="text-xs text-warning">{t("nodes.privateEndpoint", { port })}</p>
+                        <p className="text-xs text-warning">
+                            {t("nodes.privateEndpoint", { port })}
+                        </p>
                     ) : (
                         <p className="text-xs text-muted-foreground">
                             {t("nodes.portHint", { port })}
@@ -468,7 +478,9 @@ function AccessDialog({
                             <ui.Input
                                 inputMode="numeric"
                                 value={devices}
-                                onChange={(event) => setDevices(event.target.value.replace(/\D/g, ""))}
+                                onChange={(event) =>
+                                    setDevices(event.target.value.replace(/\D/g, ""))
+                                }
                             />
                         </label>
                         <label className="flex min-w-0 flex-col gap-1 text-sm font-medium">
@@ -495,12 +507,17 @@ function AccessDialog({
                                 {chosen.length === 0 ? t("people.allNodes") : null}
                             </p>
                             {nodes.map((node) => (
-                                <label key={node.id} className="flex min-w-0 items-center gap-2 text-sm">
+                                <label
+                                    key={node.id}
+                                    className="flex min-w-0 items-center gap-2 text-sm"
+                                >
                                     <ui.Checkbox
                                         checked={chosen.includes(node.id)}
                                         onChange={(event) => toggle(node.id, event.target.checked)}
                                     />
-                                    <span className="min-w-0 truncate" title={node.name}>{node.name}</span>
+                                    <span className="min-w-0 truncate" title={node.name}>
+                                        {node.name}
+                                    </span>
                                 </label>
                             ))}
                         </fieldset>
