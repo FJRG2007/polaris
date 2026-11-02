@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { isOfflinePage } from "../../src/main/reachability";
+import { finishedLoad, isOfflinePage } from "../../src/main/reachability";
 
 const OFFLINE_PAGE = join(__dirname, "../../../dashboard/apps/web/public/offline.html");
 
@@ -14,6 +14,13 @@ describe("the page a gone Polaris's worker answers with", () => {
     it("is not confused with a page of the Polaris", () => {
         expect(isOfflinePage("Polaris")).toBe(false);
         expect(isOfflinePage("")).toBe(false);
+    });
+
+    it("tells a recovery from any other finished load", () => {
+        expect(finishedLoad("Polaris is not reachable", false)).toBe("offline");
+        expect(finishedLoad("Polaris is not reachable", true)).toBe("offline");
+        expect(finishedLoad("Polaris", true)).toBe("recovered");
+        expect(finishedLoad("Polaris", false)).toBe("online");
     });
 
     it("keeps the titles the desktop app looks for", () => {
