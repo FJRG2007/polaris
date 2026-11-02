@@ -61,11 +61,7 @@ import type {
     ChatPage,
     MessageDelivery
 } from "@/lib/chat/messages";
-import type {
-    ChatChannelView,
-    ChatElsewhere,
-    ChatMemberView
-} from "@/lib/chat/chat-service";
+import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/chat-service";
 import { requirePostable, searchForConversation } from "@/lib/chat/access";
 
 const CHAT_PATH = "/chat";
