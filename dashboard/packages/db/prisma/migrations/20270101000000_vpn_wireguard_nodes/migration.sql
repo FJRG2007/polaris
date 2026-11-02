@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "VpnNode" (
+CREATE TABLE IF NOT EXISTS "VpnNode" (
     "id" UUID NOT NULL,
     "hostId" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE "VpnNode" (
 );
 
 -- CreateTable
-CREATE TABLE "VpnPeer" (
+CREATE TABLE IF NOT EXISTS "VpnPeer" (
     "id" UUID NOT NULL,
     "nodeId" UUID NOT NULL,
     "userId" UUID NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE "VpnPeer" (
 );
 
 -- CreateTable
-CREATE TABLE "VpnAccess" (
+CREATE TABLE IF NOT EXISTS "VpnAccess" (
     "userId" UUID NOT NULL,
     "nodes" UUID[],
     "deviceLimit" INTEGER NOT NULL DEFAULT 5,
@@ -47,25 +47,28 @@ CREATE TABLE "VpnAccess" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VpnNode_hostId_key" ON "VpnNode"("hostId");
+CREATE UNIQUE INDEX IF NOT EXISTS "VpnNode_hostId_key" ON "VpnNode"("hostId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VpnNode_subnetIndex_key" ON "VpnNode"("subnetIndex");
+CREATE UNIQUE INDEX IF NOT EXISTS "VpnNode_subnetIndex_key" ON "VpnNode"("subnetIndex");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VpnPeer_publicKey_key" ON "VpnPeer"("publicKey");
+CREATE UNIQUE INDEX IF NOT EXISTS "VpnPeer_publicKey_key" ON "VpnPeer"("publicKey");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VpnPeer_nodeId_hostIndex_key" ON "VpnPeer"("nodeId", "hostIndex");
+CREATE UNIQUE INDEX IF NOT EXISTS "VpnPeer_nodeId_hostIndex_key" ON "VpnPeer"("nodeId", "hostIndex");
 
 -- CreateIndex
-CREATE INDEX "VpnPeer_userId_createdAt_idx" ON "VpnPeer"("userId", "createdAt");
+CREATE INDEX IF NOT EXISTS "VpnPeer_userId_createdAt_idx" ON "VpnPeer"("userId", "createdAt");
 
 -- AddForeignKey
+ALTER TABLE "VpnPeer" DROP CONSTRAINT IF EXISTS "VpnPeer_nodeId_fkey";
 ALTER TABLE "VpnPeer" ADD CONSTRAINT "VpnPeer_nodeId_fkey" FOREIGN KEY ("nodeId") REFERENCES "VpnNode"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "VpnPeer" DROP CONSTRAINT IF EXISTS "VpnPeer_userId_fkey";
 ALTER TABLE "VpnPeer" ADD CONSTRAINT "VpnPeer_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "VpnAccess" DROP CONSTRAINT IF EXISTS "VpnAccess_userId_fkey";
 ALTER TABLE "VpnAccess" ADD CONSTRAINT "VpnAccess_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

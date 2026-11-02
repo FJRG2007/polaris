@@ -26,6 +26,8 @@ const DEVICE = "polaris-vpn";
 const TOR_TRANS_PORT = 9040;
 const TOR_DNS_PORT = 5353;
 const DOCKER_CHAIN = "POLARIS-VPN";
+/** Docker's bridges, the only way into the browser proxy: its edge comes from there. */
+const EDGE_TO_PROXY = `from 172.16.0.0/12 to any port ${PROXY_PORT} proto tcp`;
 export const DEFAULT_PORT = 51820;
 export const MAX_NODES = 64;
 /** How many devices one node can address: a /20 less its network, gateway and broadcast. */
@@ -71,6 +73,13 @@ export const deviceNameSchema = z.string().trim().min(1).max(40);
 export function isWireGuardKey(key: string): boolean {
     return KEY.test(key);
 }
+
+/** What an app sends to connect a device: only the public half of its key. */
+export const clientConnectSchema = z.object({
+    nodeId: z.string().uuid(),
+    name: deviceNameSchema,
+    publicKey: z.string().refine(isWireGuardKey)
+});
 
 /** The block of one node, from a number no two nodes share. */
 export function nodeSubnet(index: number): { base: [number, number]; cidr: string; gateway: string } {
@@ -213,7 +222,10 @@ if iptables -w -n -L DOCKER-USER >/dev/null 2>&1; then
     iptables -w -A ${DOCKER_CHAIN} -i ${DEVICE} -j ACCEPT
     iptables -w -A ${DOCKER_CHAIN} -o ${DEVICE} -j ACCEPT
 fi
-! command -v ufw >/dev/null 2>&1 || ! ufw status 2>/dev/null | grep -q 'Status: active' || ufw allow ${node.port}/udp >/dev/null
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
+    ufw allow ${node.port}/udp >/dev/null
+    ufw allow ${EDGE_TO_PROXY} >/dev/null
+fi
 sysctl -q -w net.ipv4.ip_forward=1
 `;
 }
@@ -347,6 +359,7 @@ export function renderPeerSync(
 }
 
 export const NODE_REMOVE = `#!/bin/sh
+! command -v ufw >/dev/null 2>&1 || ufw delete allow ${EDGE_TO_PROXY} >/dev/null 2>&1
 systemctl disable --now polaris-vpn-proxy.service polaris-vpn-tor.service polaris-vpn.service >/dev/null 2>&1
 rm -f /etc/systemd/system/polaris-vpn.service /etc/systemd/system/polaris-vpn-tor.service /etc/systemd/system/polaris-vpn-proxy.service ${PROXY_SCRIPT} ${PROXY_KEY}
 userdel ${PROXY_USER} >/dev/null 2>&1

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import * as wg from "@/lib/vpn/wireguard";
 import { describe, expect, it } from "vitest";
+import { PROXY_PROOF_HOST, edgeIsReady, parseProxyUsage, renderProxyEdge, renderProxyScript } from "@/lib/vpn/browser-proxy";
 
 const access = {
     nodes: [],
@@ -94,7 +95,39 @@ describe("the scripts sent to a node", () => {
         expect(wg.NODE_REMOVE).toContain("/etc/wireguard/polaris-vpn.conf");
     });
 
+    it("let the edge through a firewall that denies by default", () => {
+        const rule = "ufw allow from 172.16.0.0/12 to any port 51821 proto tcp";
+        expect(wg.renderNodeApply(direct, [])).toContain(rule);
+        expect(wg.NODE_REMOVE).toContain("ufw delete allow from 172.16.0.0/12");
+    });
+
     it("do not let the package manager choose a kernel", () => {
         expect(wg.renderNodeApply(direct, [])).toContain("--no-install-recommends");
+    });
+});
+
+describe("the browser proxy", () => {
+    it("holds its route to the one protocol it speaks", () => {
+        const edge = renderProxyEdge("vpn.example.test");
+        expect(edge).toContain("options: polaris-vpn-proxy");
+        expect(edge).toContain("alpnProtocols: [http/1.1]");
+    });
+
+    it("answers the extension's proof by itself, behind the login", () => {
+        const script = renderProxyScript({ tor: false });
+        const login = script.indexOf("if device is None");
+        const proof = script.indexOf(`http://${PROXY_PROOF_HOST}/`);
+        expect(proof).toBeGreaterThan(login);
+        expect(proof).toBeLessThan(script.indexOf('if method == "CONNECT"'));
+    });
+
+    it("trusts only the probe's own line", () => {
+        expect(edgeIsReady("welcome\nedge=ready\n")).toBe(true);
+        expect(edgeIsReady("said edge=ready once\n")).toBe(false);
+    });
+
+    it("reads only ids that are ids", () => {
+        const id = "11111111-1111-4111-8111-111111111112";
+        expect(parseProxyUsage(`${id} 5\n${"-".repeat(36)} 9\n`)).toEqual([{ userId: id, used: 5n }]);
     });
 });

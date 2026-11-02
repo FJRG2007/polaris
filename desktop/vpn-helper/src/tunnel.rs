@@ -135,6 +135,23 @@ fn discard(mut api: WGApi<Backend>) {
     }
 }
 
+/// Takes down a tunnel this process did not make. A service that was stopped leaves
+/// Linux's interface and routes in place, and nothing here would know about them:
+/// the status would say off while they held the computer's traffic. Elsewhere the
+/// interface ends with the process.
+pub fn clear_leftover() {
+    #[cfg(target_os = "linux")]
+    {
+        let found = std::process::Command::new("ip")
+            .args(["link", "show", INTERFACE])
+            .output()
+            .is_ok_and(|shown| shown.status.success());
+        if found && let Ok(api) = WGApi::<Backend>::new(INTERFACE.to_owned()) {
+            discard(api);
+        }
+    }
+}
+
 impl Tunnel {
     pub fn node_id(&self) -> Option<&str> {
         self.node_id.as_deref()

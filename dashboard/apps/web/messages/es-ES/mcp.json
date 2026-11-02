@@ -53,6 +53,7 @@
         "vault_use": "Sincronizar la bóveda (sigue cifrada)",
         "notes_use": "Leer y escribir tus notas",
         "office_use": "Leer y escribir documentos",
+        "vpn_use": "Conectar un dispositivo a la VPN",
         "mail_use": "Leer y enviar correo",
         "mail_read": "Leer y buscar en tu correo",
         "mail_send": "Enviar correo por ti",

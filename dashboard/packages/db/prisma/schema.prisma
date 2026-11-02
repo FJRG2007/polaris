@@ -295,6 +295,7 @@ model User {
     vpnPeers            VpnPeer[]
     vpnAccess           VpnAccess?
     vpnProfiles         VpnProfile[]
+    vpnProxyUsage       VpnProxyUsage[]
     apiKeys             ApiKey[]
     oauthGrants         OAuthGrant[]
     twoFactors          TwoFactor[]
@@ -2242,6 +2243,7 @@ model Host {
     agentSessions AgentSession[]
     cloudServer   CloudServer?
     templateAssignments HostTemplateAssignment[]
+    vpnNode       VpnNode?
     // Database connections tunnelled through this server, directly or as a jump.
     dataTunnels   DataConnection[] @relation("DataConnectionSshHost")
     dataJumps     DataConnection[] @relation("DataConnectionSshJump")
@@ -16067,6 +16069,7 @@ model AnnouncementDismissal {
 model VpnNode {
     id          String    @id @default(uuid(7)) @db.Uuid
     hostId      String    @unique @db.Uuid
+    host        Host      @relation(fields: [hostId], references: [id], onDelete: Cascade)
     name        String
     /// Where devices reach it: a public address or name.
     endpoint    String
@@ -16088,16 +16091,20 @@ model VpnNode {
     subnetIndex Int       @unique
     createdAt   DateTime  @default(now())
     peers       VpnPeer[]
+    proxyUsage  VpnProxyUsage[]
 }
 
 /// What a person has used through a node's browser proxy, as last read: its counter
 /// starts over with the proxy, so only what grew counts.
 model VpnProxyUsage {
-    nodeId String @db.Uuid
-    userId String @db.Uuid
-    seen   BigInt @default(0)
+    nodeId String  @db.Uuid
+    node   VpnNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+    userId String  @db.Uuid
+    user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    seen   BigInt  @default(0)
 
     @@id([nodeId, userId])
+    @@index([userId])
 }
 
 /// One person's device on a node. Its private key was handed over once and not kept.

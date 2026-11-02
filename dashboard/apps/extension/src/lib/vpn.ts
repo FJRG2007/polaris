@@ -9,10 +9,16 @@
  * `storage.session` because it is a credential. A login that ran out is fetched
  * again when the proxy asks, so nothing has to keep running to renew it.
  *
+ * Either way the browser only hands over requests to sites the extension may
+ * reach, so connecting takes access to every site: without it Firefox would send
+ * the rest straight out while the popup said connected.
+ *
  * The Polaris server stays outside the tunnel, or a login that ran out could not
  * be renewed through the proxy it is for. So do local addresses: a printer or
  * this Polaris on the home network stay reachable while connected.
  */
+
+import { EVERY_SITE } from "@/lib/injection";
 
 /** A server this account may leave through. */
 export interface VpnNode {
@@ -46,7 +52,13 @@ export interface VpnState {
     readonly active: { readonly nodeId: string; readonly nodeName: string } | null;
 }
 
-export type VpnRefusal = "noAccess" | "notReady" | "unreachable" | "blocked" | "noTraffic";
+export type VpnRefusal =
+    | "noSites"
+    | "noAccess"
+    | "notReady"
+    | "unreachable"
+    | "blocked"
+    | "noTraffic";
 
 export type VpnOutcome = { readonly ok: true } | { readonly ok: false; readonly code: VpnRefusal };
 
@@ -89,6 +101,12 @@ export interface VpnApi {
     readonly privacy?: {
         readonly network?: { readonly webRTCIPHandlingPolicy?: Pick<ProxySetting, "set" | "clear"> };
     };
+    readonly permissions?: {
+        contains(detail: { origins: string[] }): Promise<boolean>;
+        readonly onRemoved?: {
+            addListener(listener: (removed: { origins?: string[] }) => void): void;
+        };
+    };
 }
 
 export interface VpnDeps {
@@ -110,6 +128,12 @@ export interface VpnDeps {
 const TIMEOUT_MS = 15_000;
 /** Answers with nothing, from a host that exists everywhere: whether traffic flows. */
 const PROBE_URL = "https://www.gstatic.com/generate_204";
+/** Answered by the proxy alone and by nothing on the internet, so a reply proves this
+ *  browser's requests really reach it. `PROXY_PROOF_HOST` on the server. */
+const PROOF_URL = "http://polaris-vpn-proof.invalid/";
+/** Where Firefox is sent while connected with no login to hand: nothing listens, so
+ *  requests fail instead of leaving on the real address. */
+const NO_WAY_OUT = { type: "http", host: "127.0.0.1", port: 1 };
 /** A login this close to its end is replaced rather than sent. */
 const LOGIN_MARGIN_SECONDS = 60;
 /** After this many tries the proxy is refusing the login, not asking for one. */
@@ -173,6 +197,8 @@ function readLogin(value: unknown): (VpnLogin & { host: string; port: number }) 
 
 export class BrowserVpn {
     private readonly tries = new Map<string, number>();
+    /** The renewal under way, shared by the many requests of one page. */
+    private renewing: Promise<VpnLogin | null> | null = null;
 
     constructor(private readonly deps: VpnDeps) {}
 
@@ -218,7 +244,14 @@ export class BrowserVpn {
         if (!route) return null;
         const held = await this.deps.login.getValue();
         if (!fresh && held && held.expiresAt - LOGIN_MARGIN_SECONDS > this.nowSeconds()) return held;
-        const { login, refused } = await this.fetchLogin(route.nodeId);
+        this.renewing ??= this.renewLogin(route.nodeId).finally(() => {
+            this.renewing = null;
+        });
+        return this.renewing;
+    }
+
+    private async renewLogin(nodeId: string): Promise<VpnLogin | null> {
+        const { login, refused } = await this.fetchLogin(nodeId);
         if (login) {
             await this.deps.login.setValue(login);
             return login;
@@ -247,13 +280,17 @@ export class BrowserVpn {
         })().catch(() => callback({ cancel: true }));
     }
 
-    /** Firefox's question, once per request. */
+    /**
+     * Firefox's question, once per request. Only an ended connection goes direct: a
+     * login that could not be renewed must not leave on the address somebody chose
+     * to hide while the toolbar still says VPN.
+     */
     private async answerRequest(info: { url: string }): Promise<unknown> {
         const direct = { type: "direct" };
         const route = await this.deps.route.getValue();
         if (!route || staysOutside(info.url, await this.deps.origins())) return direct;
         const login = await this.currentLogin(false);
-        if (!login) return direct;
+        if (!login) return (await this.deps.route.getValue()) ? NO_WAY_OUT : direct;
         return {
             type: "https",
             host: route.host,
@@ -272,6 +309,11 @@ export class BrowserVpn {
         try {
             if (this.deps.perRequest) {
                 api.proxy?.onRequest?.addListener((info) => this.answerRequest(info), all);
+                api.permissions?.onRemoved?.addListener(({ origins }) => {
+                    if (origins?.some((origin) => EVERY_SITE.some((site) => site === origin))) {
+                        void this.disconnectIfConnected();
+                    }
+                });
                 return;
             }
             api.webRequest?.onAuthRequired?.addListener(
@@ -329,8 +371,22 @@ export class BrowserVpn {
         return true;
     }
 
+    private async mayReachEverySite(): Promise<boolean> {
+        const { permissions } = this.deps.api;
+        if (!permissions) return false;
+        return permissions.contains({ origins: [...EVERY_SITE] }).catch(() => false);
+    }
+
+    /** The server's own answer through the proxy, then a site past it. */
+    private async trafficFlows(): Promise<boolean> {
+        const proof = await this.send(PROOF_URL, { cache: "no-store" });
+        if (proof?.status !== 204) return false;
+        return (await this.send(PROBE_URL, { mode: "no-cors", cache: "no-store" })) !== null;
+    }
+
     /** Connected means traffic came back through the server, so that is tried first. */
     async connect(node: Pick<VpnNode, "id" | "name">): Promise<VpnOutcome> {
+        if (!(await this.mayReachEverySite())) return { ok: false, code: "noSites" };
         const { origin } = await this.deps.link();
         const { login, refused } = await this.fetchLogin(node.id);
         if (!origin || !login) return { ok: false, code: refused ?? "unreachable" };
@@ -344,13 +400,16 @@ export class BrowserVpn {
             return { ok: false, code: "blocked" };
         }
         await this.guardWebRtc(true);
-        const probe = await this.send(PROBE_URL, { mode: "no-cors", cache: "no-store" });
-        if (probe === null) {
+        if (!(await this.trafficFlows())) {
             await this.disconnect();
             return { ok: false, code: "noTraffic" };
         }
         await this.deps.changed();
         return { ok: true };
+    }
+
+    private async disconnectIfConnected(): Promise<void> {
+        if (await this.isConnected()) await this.disconnect();
     }
 
     async disconnect(): Promise<void> {

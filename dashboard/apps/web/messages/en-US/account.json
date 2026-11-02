@@ -335,6 +335,7 @@
                 "vault": "Vault",
                 "notes": "Notes",
                 "office": "Office",
+                "vpn": "VPN",
                 "mail": "Mail",
                 "calendar": "Calendar",
                 "chat": "Chat",
@@ -401,6 +402,14 @@
                 "postMcp": {
                     "summary": "Model Context Protocol endpoint",
                     "description": "JSON-RPC 2.0 over streamable HTTP: one message or a batch of up to 20. The tools offered follow the key's scopes."
+                },
+                "getVpnConnect": {
+                    "summary": "List VPN nodes",
+                    "description": "The nodes this key's owner may use. Needs the vpn.use scope."
+                },
+                "postVpnConnect": {
+                    "summary": "Connect a device to the VPN",
+                    "description": "Send only the public half of the device's WireGuard key. The same key gets the same device back. Needs the vpn.use scope."
                 },
                 "getDeployProjects": {
                     "summary": "List projects"

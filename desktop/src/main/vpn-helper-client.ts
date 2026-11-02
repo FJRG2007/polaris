@@ -1,13 +1,14 @@
 /**
  * Talking to the VPN service (`desktop/vpn-helper`): one order per connection on
- * the loopback address, proved by answering its challenge. The secret never
- * crosses the socket, so whatever holds the port learns nothing from the knock.
- * No Electron here, so it can be tested against a real socket.
+ * the loopback address. Each side proves the secret by answering the other's
+ * challenge, the service first: an order can carry a private key, so nothing is
+ * sent until whatever holds the port has shown it is the service. The secret never
+ * crosses the socket. No Electron here, so it can be tested against a real socket.
  */
 
 import { z } from "zod";
 import { connect } from "node:net";
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const HELPER_PORT = 51898;
 /** The service version this app speaks; an older one is replaced. */
@@ -17,6 +18,7 @@ const TIMEOUT_MS = 20_000;
 const MAX_REPLY = 4096;
 
 const challengeSchema = z.object({ nonce: z.string().min(1).max(128) });
+const proofSchema = z.object({ proof: z.string().regex(/^[0-9a-f]{64}$/) });
 
 export const replySchema = z.object({
     ok: z.boolean(),
@@ -31,7 +33,17 @@ export function answerFor(secret: string, nonce: string): string {
     return createHmac("sha256", secret).update(nonce).digest("hex");
 }
 
-/** Sends one order. Null when no service answered it. */
+/** What the service answers with. Its own label keeps it from ever being mistaken
+ *  for the app's answer to the same nonce. */
+export function serviceProof(secret: string, nonce: string, ours: string): string {
+    return createHmac("sha256", secret).update(`service\n${nonce}\n${ours}`).digest("hex");
+}
+
+function sameProof(proof: string, wanted: string): boolean {
+    return timingSafeEqual(Buffer.from(proof), Buffer.from(wanted));
+}
+
+/** Sends one order. Null when no service answered it, or it was not the service. */
 export function askHelper(
     order: Record<string, unknown> & { readonly order: string; },
     secret: string,
@@ -40,7 +52,9 @@ export function askHelper(
     return new Promise((resolve) => {
         const socket = connect({ host: "127.0.0.1", port });
         let buffer = "";
-        let challenged = false;
+        const ours = randomBytes(32).toString("hex");
+        let nonce: string | null = null;
+        let sent = false;
         const finish = (reply: HelperReply | null): void => {
             socket.destroy();
             resolve(reply);
@@ -51,26 +65,36 @@ export function askHelper(
         socket.on("data", (chunk) => {
             buffer += chunk.toString("utf8");
             if (buffer.length > MAX_REPLY) return finish(null);
-            const end = buffer.indexOf("\n");
-            if (end < 0) return undefined;
-            const line = buffer.slice(0, end);
-            buffer = buffer.slice(end + 1);
-            let parsed: unknown = null;
-            try {
-                parsed = JSON.parse(line);
-            } catch {
-                return finish(null);
+            for (;;) {
+                const end = buffer.indexOf("\n");
+                if (end < 0) return undefined;
+                const line = buffer.slice(0, end);
+                buffer = buffer.slice(end + 1);
+                let parsed: unknown = null;
+                try {
+                    parsed = JSON.parse(line);
+                } catch {
+                    return finish(null);
+                }
+                if (sent) {
+                    const reply = replySchema.safeParse(parsed);
+                    return finish(reply.success ? reply.data : null);
+                }
+                if (nonce === null) {
+                    const challenge = challengeSchema.safeParse(parsed);
+                    if (!challenge.success) return finish(null);
+                    nonce = challenge.data.nonce;
+                    socket.write(`${JSON.stringify({ nonce: ours })}\n`);
+                    continue;
+                }
+                const proof = proofSchema.safeParse(parsed);
+                if (!proof.success) return finish(null);
+                if (!sameProof(proof.data.proof, serviceProof(secret, nonce, ours))) {
+                    return finish(null);
+                }
+                sent = true;
+                socket.write(`${JSON.stringify({ ...order, answer: answerFor(secret, nonce) })}\n`);
             }
-            if (challenged) {
-                const reply = replySchema.safeParse(parsed);
-                return finish(reply.success ? reply.data : null);
-            }
-            const challenge = challengeSchema.safeParse(parsed);
-            if (!challenge.success) return finish(null);
-            challenged = true;
-            const answer = answerFor(secret, challenge.data.nonce);
-            socket.write(`${JSON.stringify({ ...order, answer })}\n`);
-            return undefined;
         });
     });
 }

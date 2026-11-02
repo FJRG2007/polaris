@@ -1,16 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const NODE_ID = "11111111-1111-4111-8111-111111111111";
+const tx = vi.hoisted(() => ({ $executeRaw: vi.fn(async () => 1) }));
 const db = vi.hoisted(() => ({
+    $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
+    user: { findMany: vi.fn() },
+    vpnProxyUsage: { findUnique: vi.fn(), upsert: vi.fn() },
     vpnAccess: { findUnique: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() },
-    vpnNode: { findUnique: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
+    vpnNode: {
+        create: vi.fn(),
+        findFirst: vi.fn(),
+        findUnique: vi.fn(),
+        findMany: vi.fn(),
+        delete: vi.fn(),
+        update: vi.fn()
+    },
     vpnPeer: { count: vi.fn(), create: vi.fn(), delete: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() }
 }));
-const script = vi.hoisted(() => ({ run: vi.fn(), setting: vi.fn() }));
+const script = vi.hoisted(() => ({ run: vi.fn(), setting: vi.fn(), taken: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: script.setting, setSetting: vi.fn() }));
 vi.mock("@/lib/deploy/server-edge", () => ({ edgeLauncher: () => "sh" }));
+vi.mock("@/lib/app-edge", () => ({ edgeHostnameTaken: script.taken }));
+vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
+vi.mock("@polaris/storage", () => ({
+    decryptSecret: vi.fn(),
+    encryptSecret: () => ({ ciphertext: "c", nonce: "n", keyId: "i" })
+}));
 vi.mock("@/lib/host-service", () => ({
     getHostConnectionUnscoped: async () => ({ username: "root", address: "host", port: 22 })
 }));
@@ -44,6 +61,8 @@ beforeEach(() => {
     db.vpnPeer.create.mockImplementation(async ({ data }) => ({ id: "peer", ...data }));
     script.setting.mockResolvedValue(null);
     script.run.mockResolvedValue({ code: 0 });
+    script.taken.mockResolvedValue(false);
+    db.vpnNode.update.mockImplementation(async ({ data }) => ({ ...node, ...data }));
 });
 
 describe("who may add a device", () => {
@@ -91,6 +110,134 @@ describe("removing a node", () => {
         expect(db.vpnNode.delete).not.toHaveBeenCalled();
         await service.removeNode(NODE_ID, true);
         expect(db.vpnNode.delete).toHaveBeenCalledOnce();
+    });
+});
+
+describe("the browser route on a node's edge", () => {
+    const { publicKey } = node;
+    const FILE = "polaris-vpn-proxy.yml";
+    const change = { name: "n", endpoint: "vpn.example.test", port: 51820, exit: "direct" as const };
+
+    /** A machine answering the setup, with an edge or without one. */
+    function machine(edge: boolean) {
+        const sent: string[] = [];
+        script.run.mockImplementation(async (_client, _command, options) => {
+            const input = options.input as string;
+            sent.push(input);
+            if (input.includes("public-key=")) options.onStdout(Buffer.from(`public-key=${publicKey}\n`));
+            if (edge && input.includes("polaris-traefik")) options.onStdout(Buffer.from("edge=ready\n"));
+            return { code: 0 };
+        });
+        return sent;
+    }
+    const proxyHost = () => db.vpnNode.update.mock.calls.at(-1)?.[0].data.proxyHost;
+
+    beforeEach(() => {
+        db.vpnNode.update.mockImplementation(async ({ data }) => ({ ...node, ...data }));
+    });
+
+    it("is published on a machine with an edge", async () => {
+        const sent = machine(true);
+        await service.updateNode(NODE_ID, change);
+        expect(proxyHost()).toBe("vpn.example.test");
+        expect(sent.some((one) => one.includes("mv -f") && one.includes(FILE))).toBe(true);
+    });
+
+    it("is not claimed on a machine with no edge", async () => {
+        const sent = machine(false);
+        await service.updateNode(NODE_ID, change);
+        expect(proxyHost()).toBeNull();
+        expect(sent.at(-1)).toContain(`rm -f`);
+        expect(sent.at(-1)).toContain(FILE);
+    });
+
+    it("leaves a name another site answers on alone, tunnel included", async () => {
+        script.taken.mockResolvedValue(true);
+        const sent = machine(true);
+        await service.updateNode(NODE_ID, change);
+        expect(proxyHost()).toBeNull();
+        expect(sent.some((one) => one.includes("mv -f") && one.includes(FILE))).toBe(false);
+    });
+
+    it("is taken back when the endpoint becomes an address", async () => {
+        const sent = machine(true);
+        await service.updateNode(NODE_ID, { ...change, endpoint: "198.51.100.7" });
+        expect(proxyHost()).toBeNull();
+        expect(sent.at(-1)).toContain(FILE);
+    });
+
+    it("goes with the node", async () => {
+        const sent = machine(true);
+        await service.removeNode(NODE_ID);
+        expect(sent[0]).toContain(`rm -f`);
+        expect(sent[0]).toContain(FILE);
+        expect(sent[0]).toContain("polaris-vpn-proxy.service");
+    });
+});
+
+describe("writing a node's peer list", () => {
+    it("reads the list inside the node's lock", async () => {
+        const order: string[] = [];
+        tx.$executeRaw.mockImplementationOnce(async () => {
+            order.push("lock");
+            return 1;
+        });
+        db.vpnPeer.findMany.mockImplementation(async ({ select }) => {
+            if (select.user) order.push("read");
+            return [];
+        });
+        script.run.mockImplementation(async () => {
+            order.push("write");
+            return { code: 0 };
+        });
+        await service.connectClient(admin, device);
+        expect(order).toEqual(["lock", "read", "write"]);
+    });
+});
+
+describe("who may change a node", () => {
+    it("asks for a node on a machine of theirs", async () => {
+        db.vpnNode.findFirst.mockResolvedValue(null);
+        expect(await service.ownsNode(NODE_ID, "other")).toBe(false);
+        expect(db.vpnNode.findFirst.mock.calls[0]?.[0].where).toEqual({
+            id: NODE_ID,
+            host: { ownerId: "other" }
+        });
+    });
+});
+
+describe("a machine leaving Polaris", () => {
+    it("says when its node could not be taken down", async () => {
+        script.run.mockResolvedValue({ code: 1 });
+        expect(await service.removeNodeOn("host")).toBe(false);
+        expect(db.vpnNode.delete).not.toHaveBeenCalled();
+    });
+
+    it("has nothing to do without a node", async () => {
+        db.vpnNode.findUnique.mockResolvedValue(null);
+        expect(await service.removeNodeOn("host")).toBe(true);
+    });
+});
+
+describe("the proxy's counters", () => {
+    it("skips somebody who no longer exists", async () => {
+        const known = "11111111-1111-4111-8111-111111111112";
+        const gone = "11111111-1111-4111-8111-111111111113";
+        db.vpnNode.findMany.mockResolvedValue([node]);
+        db.vpnAccess.findMany = vi.fn(async () => []);
+        db.vpnAccess.updateMany = vi.fn(async () => undefined);
+        db.vpnPeer.findMany.mockResolvedValue([]);
+        db.user.findMany.mockResolvedValue([{ id: known }]);
+        db.vpnProxyUsage.findUnique.mockResolvedValue(null);
+        script.run.mockImplementation(async (_client, _command, options) => {
+            if ((options.input as string).includes("/usage")) {
+                options.onStdout(Buffer.from(`${known} 5\n${gone} 9\n`));
+            }
+            return { code: 0 };
+        });
+        await service.runVpnPass();
+        expect(db.vpnProxyUsage.upsert).toHaveBeenCalledOnce();
+        expect(db.vpnProxyUsage.upsert.mock.calls[0]?.[0].create.userId).toBe(known);
     });
 });
 

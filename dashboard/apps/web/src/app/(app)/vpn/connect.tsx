@@ -193,7 +193,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                             <p>{t("connect.noNodes")}</p>
                             {isAdmin ? (
                                 <Link
-                                    href="/admin/vpn/settings"
+                                    href="/admin/apps/vpn/settings"
                                     className="w-fit text-primary hover:underline"
                                 >
                                     {t("connect.setUp")}
@@ -204,7 +204,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                         <div
                             role="radiogroup"
                             aria-label={t("connect.locations")}
-                            className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto"
+                            className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto overscroll-contain"
                         >
                             {nodes.map((node) => (
                                 <button
@@ -229,7 +229,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                         ) : null}
                                     </span>
                                     {node.exit === "tor" ? (
-                                        <ui.Badge variant="neutral">Tor</ui.Badge>
+                                        <ui.Badge variant="neutral">{t("connect.tor")}</ui.Badge>
                                     ) : null}
                                     {node.id === active ? (
                                         <ui.Badge variant="success">{t("connect.online")}</ui.Badge>
@@ -336,7 +336,7 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
                                         {device.node.name}
                                     </span>
                                     {device.node.exit === "tor" ? (
-                                        <ui.Badge variant="neutral">Tor</ui.Badge>
+                                        <ui.Badge variant="neutral">{t("connect.tor")}</ui.Badge>
                                     ) : null}
                                     <ui.Button
                                         size="icon"

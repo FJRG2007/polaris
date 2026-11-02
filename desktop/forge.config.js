@@ -10,7 +10,6 @@
 const path = require("node:path");
 const { FusesPlugin } = require("@electron-forge/plugin-fuses");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
-const { existsSync } = require("node:fs");
 const { LINUX_LAUNCHER } = require("./build/linux-launcher.cjs");
 const { chmodSync, existsSync, renameSync, writeFileSync } = require("node:fs");
 

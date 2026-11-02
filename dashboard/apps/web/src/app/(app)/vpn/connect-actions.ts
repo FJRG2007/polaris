@@ -157,6 +157,7 @@ export async function updateVpnNodeAction(input: unknown): Promise<Result> {
     const parsed = nodeChangeSchema.safeParse(input);
     if (!parsed.success) return failed(parsed.error);
     const { id, ...change } = parsed.data;
+    if (!(await service.ownsNode(id, user.id))) return failed(new service.WireGuardRefusal("notFound"));
     return audited(user.id, "vpn.node.update", id, () => service.updateNode(id, change));
 }
 
@@ -171,6 +172,7 @@ export async function removeVpnNodeAction(
     if (!parsed.success) return failed(parsed.error);
     const { id, anyway } = parsed.data;
     try {
+        if (!(await service.ownsNode(id, user.id))) throw new service.WireGuardRefusal("notFound");
         await service.removeNode(id, anyway);
         await recordAudit({
             actorId: user.id,

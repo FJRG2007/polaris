@@ -1,12 +1,12 @@
 -- The browser extension's way in.
-ALTER TABLE "VpnNode" ADD COLUMN "encryptedProxyKey" BYTEA;
-ALTER TABLE "VpnNode" ADD COLUMN "proxyKeyNonce" BYTEA;
-ALTER TABLE "VpnNode" ADD COLUMN "proxyKeyId" TEXT;
-ALTER TABLE "VpnNode" ADD COLUMN "proxyHost" TEXT;
-ALTER TABLE "VpnNode" ADD COLUMN "country" TEXT;
-ALTER TABLE "VpnNode" ADD COLUMN "city" TEXT;
+ALTER TABLE "VpnNode" ADD COLUMN IF NOT EXISTS "encryptedProxyKey" BYTEA;
+ALTER TABLE "VpnNode" ADD COLUMN IF NOT EXISTS "proxyKeyNonce" BYTEA;
+ALTER TABLE "VpnNode" ADD COLUMN IF NOT EXISTS "proxyKeyId" TEXT;
+ALTER TABLE "VpnNode" ADD COLUMN IF NOT EXISTS "proxyHost" TEXT;
+ALTER TABLE "VpnNode" ADD COLUMN IF NOT EXISTS "country" TEXT;
+ALTER TABLE "VpnNode" ADD COLUMN IF NOT EXISTS "city" TEXT;
 
-CREATE TABLE "VpnProxyUsage" (
+CREATE TABLE IF NOT EXISTS "VpnProxyUsage" (
     "nodeId" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "seen" BIGINT NOT NULL DEFAULT 0,
@@ -15,7 +15,7 @@ CREATE TABLE "VpnProxyUsage" (
 );
 
 -- A VPN a person brought with them.
-CREATE TABLE "VpnProfile" (
+CREATE TABLE IF NOT EXISTS "VpnProfile" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -29,7 +29,8 @@ CREATE TABLE "VpnProfile" (
     CONSTRAINT "VpnProfile_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "VpnProfile_userId_name_idx" ON "VpnProfile"("userId", "name");
+CREATE INDEX IF NOT EXISTS "VpnProfile_userId_name_idx" ON "VpnProfile"("userId", "name");
 
+ALTER TABLE "VpnProfile" DROP CONSTRAINT IF EXISTS "VpnProfile_userId_fkey";
 ALTER TABLE "VpnProfile" ADD CONSTRAINT "VpnProfile_userId_fkey"
     FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

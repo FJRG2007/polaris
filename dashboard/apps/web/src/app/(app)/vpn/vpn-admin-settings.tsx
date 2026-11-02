@@ -74,6 +74,7 @@ export function VpnAdminSettings() {
     }
 
     const used = new Set(data?.nodes.map(({ hostId }) => hostId));
+    const mine = new Set(data?.machines.map(({ id }) => id));
     const free = data?.machines.filter(({ id, root }) => root && !used.has(id)) ?? [];
 
     return (
@@ -130,7 +131,8 @@ export function VpnAdminSettings() {
                                     size="icon"
                                     variant="ghost"
                                     aria-label={t("nodes.edit")}
-                                    title={t("nodes.edit")}
+                                    title={mine.has(node.hostId) ? t("nodes.edit") : t("nodes.notYours")}
+                                    disabled={!mine.has(node.hostId)}
                                     onClick={() => setNodeDialog(node)}
                                 >
                                     <Pencil />
@@ -139,7 +141,8 @@ export function VpnAdminSettings() {
                                     size="icon"
                                     variant="ghost"
                                     aria-label={t("nodes.remove")}
-                                    title={t("nodes.remove")}
+                                    title={mine.has(node.hostId) ? t("nodes.remove") : t("nodes.notYours")}
+                                    disabled={!mine.has(node.hostId)}
                                     onClick={() => setRemoving(node)}
                                 >
                                     <Trash2 />

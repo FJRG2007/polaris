@@ -21,6 +21,7 @@ export const PERMISSIONS = [
     "vault.use",
     "notes.use",
     "office.use",
+    "vpn.use",
     "mail.use",
     "mailserver.manage",
     "calendar.use",
@@ -115,6 +116,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "vault.use",
         "notes.use",
         "office.use",
+        "vpn.use",
         "mail.use",
         "calendar.use",
         "crm.use",
@@ -224,6 +226,7 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "vault.use": { area: "Vault", label: "Keep a password vault and connect a client to it" },
     "notes.use": { area: "Notes", label: "Keep private notes" },
     "office.use": { area: "Office", label: "Write documents, spreadsheets, slides and diagrams" },
+    "vpn.use": { area: "VPN", label: "Connect a device to the VPN through an API key" },
     "mail.use": { area: "Mail", label: "Link mailboxes and read mail here" },
     // Not granted to members by default, and not implied by deploying: a mail
     // server opens port 25 to the internet and sends as whole domains, and one

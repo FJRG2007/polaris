@@ -130,19 +130,7 @@ jobs:
           TARGET: ${{ matrix.os == 'macos-latest' && (matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin') || matrix.os == 'ubuntu-latest' && 'x86_64-unknown-linux-musl' || '' }}
         run: |
           [ "$RUNNER_OS" != Linux ] || sudo apt-get install -y musl-tools
-          rustup toolchain install 1.97.1 --profile minimal
-          [ -z "$TARGET" ] || rustup target add "$TARGET" --toolchain 1.97.1
-          (cd vpn-helper && cargo +1.97.1 test --locked)
-          (cd vpn-helper && cargo +1.97.1 build --release --locked ${TARGET:+--target "$TARGET"})
-          if [ "$RUNNER_OS" = Windows ]; then
-            driver="$RUNNER_TEMP/wireguard-nt.zip"
-            curl -fsSL -o "$driver" https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip
-            echo "dceb30a9bc4be48cce0f74160fc88a585a2c2627366e8f846fc6658f9038dace  $driver" | sha256sum -c -
-            unzip -q "$driver" -d "$RUNNER_TEMP/wireguard-nt"
-            node vpn-helper/stage.mjs "$TARGET" "$RUNNER_TEMP/wireguard-nt/wireguard-nt"
-          else
-            node vpn-helper/stage.mjs "$TARGET"
-          fi
+          bash vpn-helper/build.sh --test
 
       - name: Which signing secrets exist
         id: signing
@@ -237,7 +225,7 @@ jobs:
     runs-on: windows-latest
     # Above the sum of its steps' timeouts: a step that times out fails, which the
     # release falls back from, and GitHub does not document what this one reports.
-    timeout-minutes: 190
+    timeout-minutes: 210
     defaults:
       run:
         working-directory: desktop
@@ -253,6 +241,12 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
         timeout-minutes: 10
+
+      # The same service the ordinary Windows build carries. Forge leaves out what
+      # is not staged, so a package without this would ship no VPN.
+      - name: VPN service
+        timeout-minutes: 20
+        run: bash vpn-helper/build.sh
 
       # Windows through SignPath, in two rounds, because Squirrel packs the app
       # into the installer: the packaged app is signed first and the installer
@@ -293,7 +287,9 @@ jobs:
       - name: Make the installer from the signed app
         timeout-minutes: 20
         run: |
-          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/polaris.exe').Status -ne 'Valid') { Write-Error 'polaris.exe came back without a valid signature.'; exit 1 }"
+          for file in polaris.exe resources/vpn-helper/polaris-vpn-helper.exe; do
+            powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/$file').Status -ne 'Valid') { Write-Error '$file came back without a valid signature.'; exit 1 }"
+          done
           rm -rf "out/Polaris-win32-x64"
           mv out/signed-app "out/Polaris-win32-x64"
           npx electron-forge make --skip-package --arch=x64

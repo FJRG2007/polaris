@@ -84,8 +84,8 @@ fn stop_previous() {
 #[cfg(target_os = "linux")]
 fn start(binary: &Path) -> io::Result<()> {
     let unit = format!(
-        "[Unit]\nDescription=Polaris VPN\nAfter=network.target\n\n[Service]\nExecStart={} serve\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n",
-        binary.display()
+        "[Unit]\nDescription=Polaris VPN\nAfter=network.target\n\n[Service]\nExecStart={binary} serve\nExecStopPost={binary} cleanup\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n",
+        binary = binary.display()
     );
     fs::write(format!("/etc/systemd/system/{SERVICE}.service"), unit)?;
     must("systemctl", &["daemon-reload"])?;

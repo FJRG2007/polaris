@@ -13,6 +13,7 @@
  */
 
 import { z, type ZodTypeAny } from "zod";
+import { clientConnectSchema } from "@/lib/vpn/wireguard";
 import * as schemas from "@/lib/deploy/api/schemas";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
@@ -466,6 +467,56 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         params: uuidParam,
         query: formatQuery,
         responses: { 200: ok(z.object({ removed: z.string() })) }
+    },
+    {
+        method: "GET",
+        path: "/api/v1/vpn/connect",
+        file: "api/v1/vpn/connect/route.ts",
+        tag: "Account",
+        summary: "List VPN nodes",
+        description: "The nodes this key's owner may use. Needs the vpn.use scope.",
+        changes: false,
+        responses: {
+            200: ok(
+                z.object({
+                    nodes: z.array(
+                        z.object({
+                            id: z.string(),
+                            name: z.string(),
+                            exit: z.string(),
+                            country: z.string().nullable(),
+                            city: z.string().nullable(),
+                            browser: z.boolean()
+                        })
+                    )
+                }),
+                false
+            )
+        }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/vpn/connect",
+        file: "api/v1/vpn/connect/route.ts",
+        tag: "Account",
+        summary: "Connect a device to the VPN",
+        description:
+            "Send only the public half of the device's WireGuard key. The same key gets the same device back. Needs the vpn.use scope.",
+        changes: true,
+        body: clientConnectSchema,
+        responses: {
+            200: ok(
+                z.object({
+                    deviceId: z.string(),
+                    address: z.string(),
+                    dns: z.array(z.string()),
+                    nodePublicKey: z.string(),
+                    endpoint: z.string(),
+                    port: z.number().int()
+                }),
+                false
+            )
+        }
     }
 ];
 

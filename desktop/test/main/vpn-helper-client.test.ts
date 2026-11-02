@@ -6,6 +6,7 @@ import {
     deviceNameFrom,
     elevatedInstall,
     joinSchema,
+    serviceProof,
     tailscalePath
 } from "@/main/vpn-helper-client";
 
@@ -14,12 +15,20 @@ let server: Server | null = null;
 
 afterEach(() => server?.close());
 
-/** A stand-in for the service: a challenge, then a reply built from what came back. */
-async function helper(reply: (order: Record<string, unknown>) => string): Promise<number> {
+/** A stand-in for the service: a challenge, its proof, then a reply built from what
+ *  came back. `prove` is what a program squatting on the port would have to forge. */
+async function helper(
+    reply: (order: Record<string, unknown>) => string,
+    prove: (nonce: string) => string = (ours) => serviceProof(SECRET, "abc", ours)
+): Promise<number> {
     server = createServer((socket) => {
+        let proved = false;
         socket.write(`${JSON.stringify({ nonce: "abc" })}\n`);
         socket.on("data", (chunk) => {
-            socket.write(`${reply(JSON.parse(chunk.toString()) as Record<string, unknown>)}\n`);
+            const message = JSON.parse(chunk.toString()) as Record<string, unknown>;
+            if (proved) return void socket.write(`${reply(message)}\n`);
+            proved = true;
+            socket.write(`${JSON.stringify({ proof: prove(String(message.nonce)) })}\n`);
         });
     });
     await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
@@ -40,6 +49,26 @@ describe("askHelper", () => {
         });
         expect(seen.answer).toBe(answerFor(SECRET, "abc"));
         expect(JSON.stringify(seen)).not.toContain(SECRET);
+    });
+
+    it("tells nothing to a program that cannot prove it is the service", async () => {
+        let leaked = false;
+        const port = await helper(
+            () => {
+                leaked = true;
+                return "{}";
+            },
+            () => "0".repeat(64)
+        );
+        const order = { order: "up", own: { privateKey: "provider key" } };
+        expect(await askHelper(order, SECRET, port)).toBeNull();
+        expect(leaked).toBe(false);
+    });
+
+    it("computes the same proof as the service", () => {
+        expect(serviceProof("secret", "nonce", "theirs")).toBe(
+            "2865656d4a1a945e17feecd85db6dfefd819b0f11a884a3f9503bf36fb1e3814"
+        );
     });
 
     it("is null when nothing listens", async () => {

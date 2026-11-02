@@ -226,7 +226,10 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would both stop, or both start, the same container.
             "service-sleep",
             "task-reminders",
-            "task-trackers"
+            "task-trackers",
+            // Two passes would count the same traffic twice, and each would rewrite
+            // a node's peer list under the other.
+            "vpn-nodes"
         ]);
     });
 

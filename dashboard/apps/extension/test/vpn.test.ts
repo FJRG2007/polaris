@@ -28,7 +28,9 @@ function stored<T>(value: T) {
 
 type Listener = (details: object, callback: (answer: object) => void) => void;
 
-function harness(options: { perRequest?: boolean; send?: typeof fetch; control?: string } = {}) {
+function harness(
+    options: { perRequest?: boolean; send?: typeof fetch; control?: string; everySite?: boolean } = {}
+) {
     const route = stored<VpnRoute | null>(null);
     const login = stored<VpnLogin | null>(null);
     const settings = {
@@ -39,18 +41,25 @@ function harness(options: { perRequest?: boolean; send?: typeof fetch; control?:
     const webRtc = { set: vi.fn(async () => undefined), clear: vi.fn(async () => undefined) };
     let auth: Listener = () => undefined;
     let request: (info: { url: string }) => Promise<unknown> = async () => undefined;
+    let removed: (detail: { origins?: string[] }) => void = () => undefined;
+    const permissions = {
+        contains: vi.fn(async () => options.everySite ?? true),
+        onRemoved: { addListener: (listener: typeof removed) => (removed = listener) }
+    };
     const api = {
+        permissions,
         proxy: { settings, onRequest: { addListener: (listener: typeof request) => (request = listener) } },
         webRequest: { onAuthRequired: { addListener: (listener: Listener) => (auth = listener) } },
         privacy: { network: { webRTCIPHandlingPolicy: webRtc } }
     } as unknown as VpnApi;
     const send =
         options.send ??
-        (vi.fn(async (address: string) =>
-            address.includes("generate_204")
+        (vi.fn(async (address: string) => {
+            if (address.includes("proof.invalid")) return new Response(null, { status: 204 });
+            return address.includes("generate_204")
                 ? new Response(null, { status: 200 })
-                : Response.json(LOGIN)
-        ) as unknown as typeof fetch);
+                : Response.json(LOGIN);
+        }) as unknown as typeof fetch);
     const changed = vi.fn();
     const deps: VpnDeps = {
         api,
@@ -74,7 +83,8 @@ function harness(options: { perRequest?: boolean; send?: typeof fetch; control?:
         changed,
         send,
         ask: (details: object) => new Promise<object>((resolve) => auth(details, resolve)),
-        decide: (url: string) => request({ url })
+        decide: (url: string) => request({ url }),
+        lose: (origins: string[]) => removed({ origins })
     };
 }
 
@@ -130,6 +140,7 @@ describe("connecting on Chromium", () => {
 
     it("takes everything back when no traffic comes through", async () => {
         const send = vi.fn(async (address: string) => {
+            if (address.includes("proof.invalid")) return new Response(null, { status: 204 });
             if (address.includes("generate_204")) throw new Error("proxy failed");
             return Response.json(LOGIN);
         }) as unknown as typeof fetch;
@@ -139,6 +150,23 @@ describe("connecting on Chromium", () => {
         expect(login.box.value).toBeNull();
         expect(settings.clear).toHaveBeenCalled();
         expect(webRtc.clear).toHaveBeenCalled();
+    });
+
+    it("will not call it connected when requests did not reach the proxy", async () => {
+        const send = vi.fn(async (address: string) => {
+            if (address.includes("proof.invalid")) throw new TypeError("no such name");
+            return address.includes("generate_204") ? new Response(null) : Response.json(LOGIN);
+        }) as unknown as typeof fetch;
+        const { vpn, route } = harness({ perRequest: true, send });
+        expect(await vpn.connect(NODE)).toEqual({ ok: false, code: "noTraffic" });
+        expect(route.box.value).toBeNull();
+    });
+
+    it("asks for every site before anything else", async () => {
+        const { vpn, send, route } = harness({ everySite: false });
+        expect(await vpn.connect(NODE)).toEqual({ ok: false, code: "noSites" });
+        expect(send).not.toHaveBeenCalled();
+        expect(route.box.value).toBeNull();
     });
 
     it("refuses when another extension holds the proxy", async () => {
@@ -196,6 +224,7 @@ describe("the proxy asking for a login", () => {
     it("takes the browser off the proxy once access is gone", async () => {
         let allowed = true;
         const send = vi.fn(async (address: string) => {
+            if (address.includes("proof.invalid")) return new Response(null, { status: 204 });
             if (address.includes("generate_204")) return new Response(null);
             return allowed ? Response.json(LOGIN) : new Response("{}", { status: 403 });
         }) as unknown as typeof fetch;
@@ -226,6 +255,61 @@ describe("Firefox, request by request", () => {
     it("goes direct while disconnected", async () => {
         const { decide } = harness({ perRequest: true });
         expect(await decide("https://example.org/")).toEqual({ type: "direct" });
+    });
+});
+
+describe("Firefox when a login cannot be renewed", () => {
+    function failing(status: number | null) {
+        let up = true;
+        const send = vi.fn(async (address: string) => {
+            if (address.includes("proof.invalid")) return new Response(null, { status: 204 });
+            if (address.includes("generate_204")) return new Response(null);
+            if (up) return Response.json(LOGIN);
+            if (status === null) throw new Error("offline");
+            return new Response("{}", { status });
+        }) as unknown as typeof fetch;
+        return { send, fail: () => (up = false) };
+    }
+
+    it.each([[null], [500], [503]])("never goes direct on %s", async (status) => {
+        const { send, fail } = failing(status);
+        const { vpn, decide, login } = harness({ perRequest: true, send });
+        await vpn.connect(NODE);
+        fail();
+        login.box.value = { username: "old", password: "old", expiresAt: NOW - 1 };
+        expect(await decide("https://example.org/")).toEqual({
+            type: "http",
+            host: "127.0.0.1",
+            port: 1
+        });
+    });
+
+    it("goes direct once access is gone, which ends the connection", async () => {
+        const { send, fail } = failing(403);
+        const { vpn, decide, login, route } = harness({ perRequest: true, send });
+        await vpn.connect(NODE);
+        fail();
+        login.box.value = { username: "old", password: "old", expiresAt: NOW - 1 };
+        expect(await decide("https://example.org/")).toEqual({ type: "direct" });
+        expect(route.box.value).toBeNull();
+    });
+
+    it("renews once for a page's many requests", async () => {
+        const { vpn, decide, login, send } = harness({ perRequest: true });
+        await vpn.connect(NODE);
+        login.box.value = { username: "old", password: "old", expiresAt: NOW - 1 };
+        vi.mocked(send).mockClear();
+        await Promise.all([decide("https://a.example/"), decide("https://b.example/")]);
+        expect(send).toHaveBeenCalledOnce();
+    });
+
+    it("disconnects when every site is taken away", async () => {
+        const { vpn, route, lose } = harness({ perRequest: true });
+        await vpn.connect(NODE);
+        lose(["https://polaris.example.com/*"]);
+        await vi.waitFor(() => expect(route.box.value).not.toBeNull());
+        lose(["https://*/*"]);
+        await vi.waitFor(() => expect(route.box.value).toBeNull());
     });
 });
 

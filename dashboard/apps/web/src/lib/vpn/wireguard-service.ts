@@ -9,12 +9,13 @@ import { lookup } from "node:dns/promises";
 import { resolveGeo } from "@/lib/geo-service";
 import * as wg from "./wireguard";
 import { prisma } from "@polaris/db";
+import { edgeHostnameTaken } from "@/lib/app-edge";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
 import { loadEnv } from "@polaris/config";
 import * as proxy from "@/lib/vpn/browser-proxy";
 import { proxyLogin, type ProxyLogin } from "@/lib/vpn/browser-proxy-login";
-import { remoteWriteScript } from "@/lib/deploy/router-remote";
+import { remoteClearScript, remoteWriteScript } from "@/lib/deploy/router-remote";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -75,6 +76,9 @@ async function connectionOf(hostId: string): Promise<HostConnection> {
 }
 
 const PROXY_EDGE_FILE = "polaris-vpn-proxy.yml";
+/** A peer list changes in moments; setting a machine up may install packages. */
+const SYNC_WAIT_MS = 60_000;
+const DEPLOY_WAIT_MS = 10 * 60_000;
 
 const PEER_FIELDS = { id: true, userId: true, publicKey: true, hostIndex: true } as const;
 
@@ -142,17 +146,34 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
     });
 }
 
+/**
+ * One writer at a time on a node's peer list. The list is read inside the lock, so
+ * the last write always holds every device already recorded and a device added
+ * meanwhile cannot be overwritten by a list read before it existed. The transaction
+ * only holds the lock: the work reads through its own connection.
+ */
+function onNode<T>(nodeId: string, timeout: number, work: () => Promise<T>): Promise<T> {
+    return prisma.$transaction(
+        async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`polaris.vpn.node:${nodeId}`}))`;
+            return work();
+        },
+        { timeout }
+    );
+}
+
 async function syncNode(node: NodeRow): Promise<void> {
     const connection = await connectionOf(node.hostId);
-    await runAsRoot(connection, wg.renderPeerSync(planOf(node), await allowedPeers(node.id)));
+    await onNode(node.id, SYNC_WAIT_MS, async () =>
+        runAsRoot(connection, wg.renderPeerSync(planOf(node), await allowedPeers(node.id)))
+    );
 }
 
 /** Install or update a node, and keep the key it answers with. */
 async function deployNode(node: NodeRow): Promise<NodeRow> {
     const connection = await connectionOf(node.hostId);
-    const said = await runAsRoot(
-        connection,
-        wg.renderNodeApply(planOf(node), await allowedPeers(node.id))
+    const said = await onNode(node.id, DEPLOY_WAIT_MS, async () =>
+        runAsRoot(connection, wg.renderNodeApply(planOf(node), await allowedPeers(node.id)))
     ).catch((error: unknown) => {
         if (error instanceof WireGuardRefusal) throw error;
         console.error("polaris: a VPN node could not be set up:", error);
@@ -177,20 +198,31 @@ function sealedProxyKey(key: string) {
 }
 
 /**
- * Hand the edge the proxy's route. A browser only accepts a certificate for a name, so a
- * node reached by bare address has none: its tunnel still works from the desktop app,
- * and its extension row says why it cannot be picked.
+ * Hand the edge the proxy's route, or take it back where it cannot be held. A browser
+ * only accepts a certificate for a name, so a node reached by bare address has none; a
+ * name something else already answers on would lose its site to this route, which
+ * outranks it; and a machine with no edge has nothing to carry it. In all three the
+ * tunnel still works from the desktop app, and the extension's row says why it cannot
+ * be picked.
  */
 async function publishProxy(connection: HostConnection, endpoint: string): Promise<string | null> {
-    if (isIP(endpoint)) return null;
     try {
-        const script = remoteWriteScript(proxy.renderProxyEdge(endpoint), undefined, PROXY_EDGE_FILE);
-        await runAsRoot(connection, script);
-        return endpoint;
+        const usable =
+            !isIP(endpoint) &&
+            !(await edgeHostnameTaken(endpoint)) &&
+            proxy.edgeIsReady(await runAsRoot(connection, proxy.PROXY_EDGE_PROBE));
+        if (usable) {
+            await runAsRoot(
+                connection,
+                remoteWriteScript(proxy.renderProxyEdge(endpoint), undefined, PROXY_EDGE_FILE)
+            );
+            return endpoint;
+        }
+        await runAsRoot(connection, remoteClearScript(PROXY_EDGE_FILE));
     } catch (error) {
         console.error("polaris: the VPN proxy route could not be published:", error);
-        return null;
     }
+    return null;
 }
 
 /** A login for the extension. It lasts an hour; the extension asks again before that. */
@@ -244,6 +276,16 @@ function freeIndex(taken: readonly number[]): number {
     return index;
 }
 
+/** Whether a node stands on a machine this person owns: the root scripts changing or
+ *  removing it run there, so that is who may ask for them. */
+export async function ownsNode(nodeId: string, userId: string): Promise<boolean> {
+    const node = await prisma.vpnNode.findFirst({
+        where: { id: nodeId, host: { ownerId: userId } },
+        select: { id: true }
+    });
+    return node !== null;
+}
+
 export async function addNode(input: wg.NodeInput): Promise<void> {
     const taken = await prisma.vpnNode.findMany({ select: { subnetIndex: true } });
     if (taken.length >= wg.MAX_NODES) throw new WireGuardRefusal("tooManyNodes");
@@ -275,12 +317,24 @@ export async function removeNode(id: string, anyway = false): Promise<void> {
     const node = await nodeRow(id);
     if (!node) return;
     try {
-        await runAsRoot(await connectionOf(node.hostId), wg.NODE_REMOVE);
+        const script = [remoteClearScript(PROXY_EDGE_FILE), wg.NODE_REMOVE].join("\n");
+        await runAsRoot(await connectionOf(node.hostId), script);
     } catch (error) {
         console.error("polaris: a VPN node could not be taken down:", error);
         if (!anyway) throw new WireGuardRefusal("unreachable");
     }
     await prisma.vpnNode.delete({ where: { id } });
+}
+
+/** A machine leaving Polaris takes its node off first, while it can still be reached.
+ *  False when it could not be: the row goes with the machine, the software stays. */
+export async function removeNodeOn(hostId: string): Promise<boolean> {
+    const node = await prisma.vpnNode.findUnique({ where: { hostId }, select: { id: true } });
+    if (!node) return true;
+    return removeNode(node.id).then(
+        () => true,
+        () => false
+    );
 }
 
 export async function grantAccess(input: wg.AccessInput): Promise<void> {
@@ -511,7 +565,14 @@ export async function runVpnPass(): Promise<void> {
 }
 
 async function recordProxyUsage(nodeId: string, output: string): Promise<void> {
-    for (const { userId, used } of proxy.parseProxyUsage(output)) {
+    const read = proxy.parseProxyUsage(output);
+    const people = await prisma.user.findMany({
+        where: { id: { in: read.map(({ userId }) => userId) } },
+        select: { id: true }
+    });
+    const known = new Set(people.map(({ id }) => id));
+    for (const { userId, used } of read) {
+        if (!known.has(userId)) continue;
         const key = { nodeId_userId: { nodeId, userId } };
         const row = await prisma.vpnProxyUsage.findUnique({ where: key });
         const grew = wg.counterGrowth(used, row?.seen ?? 0n);

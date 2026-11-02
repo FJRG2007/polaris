@@ -13,7 +13,8 @@ Free code signing provided by [SignPath.io](https://signpath.io), certificate by
 Only what is built from this repository by its release workflow,
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), on GitHub
 Actions from a `desktop-v*` tag or a run by hand on `main`: the app's
-`polaris.exe` and the `Polaris-Setup.exe` installer. Nothing built on a personal
+`polaris.exe`, the VPN service `polaris-vpn-helper.exe` and the `Polaris-Setup.exe`
+installer. Nothing built on a personal
 computer is signed. Upstream components shipped inside the installer, such as
 the Electron runtime libraries and Squirrel's updater, are left as their
 projects publish them.

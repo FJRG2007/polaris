@@ -16,8 +16,12 @@ fn main() -> ExitCode {
     let outcome = match arguments.as_slice() {
         ["serve"] => service::run_service(),
         ["install", secret_file] => service::install(secret_file),
+        ["cleanup"] => {
+            tunnel::clear_leftover();
+            Ok(())
+        }
         _ => {
-            eprintln!("usage: polaris-vpn-helper serve | install <secret-file>");
+            eprintln!("usage: polaris-vpn-helper serve | install <secret-file> | cleanup");
             return ExitCode::from(2);
         }
     };

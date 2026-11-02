@@ -18,6 +18,9 @@ const DOCKER_HOST_GATEWAY = "172.17.0.1";
 /** Tor's local entrance for what the proxy sends. Not 9050: that may be the machine's own. */
 export const TOR_SOCKS_PORT = 9052;
 export const PROXY_TOKEN_SECONDS = 3600;
+/** A name that resolves nowhere, answered by the proxy alone: the extension reaching
+ *  it proves its requests really go through. Spelled the same in its `lib/vpn.ts`. */
+export const PROXY_PROOF_HOST = "polaris-vpn-proof.invalid";
 /** Where the proxy writes what each device has used, for the counters. */
 export const PROXY_USAGE_FILE = "/run/polaris-vpn-proxy/usage";
 /** Outside the node's private folder: the proxy runs as nobody in particular. */
@@ -30,15 +33,30 @@ cat ${PROXY_USAGE_FILE} 2>/dev/null
 exit 0
 `;
 
+/** Whether a machine's edge takes pushed routes, so it can carry this one. */
+export const PROXY_EDGE_PROBE = `#!/bin/sh
+if [ "$(docker inspect -f '{{.State.Running}}' polaris-traefik 2>/dev/null)" = true ] &&
+    docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'providers.file.directory'; then
+    echo edge=ready
+fi
+exit 0
+`;
+
+export function edgeIsReady(output: string): boolean {
+    return /^edge=ready$/m.test(output);
+}
+
 /** Each line is a person and what they have used since the proxy started. */
 export function parseProxyUsage(output: string): { userId: string; used: bigint }[] {
     return output.split("\n").flatMap((line) => {
-        const match = /^([0-9a-f-]{36}) (\d{1,20})$/.exec(line.trim());
+        const match = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) (\d{1,20})$/.exec(line.trim());
         return match?.[1] && match[2] ? [{ userId: match[1], used: BigInt(match[2]) }] : [];
     });
 }
 
-/** The edge's route: TLS ends there and the bytes go on to the proxy on the machine. */
+/** The edge's route: TLS ends there and the bytes go on to the proxy on the machine.
+ *  Held to HTTP/1.1, the only language the proxy speaks: left to its default the edge
+ *  offers HTTP/2 first and a browser would take it. */
 export function renderProxyEdge(hostname: string): string {
     if (!/^[a-z0-9.-]+$/i.test(hostname)) throw new Error("Not a hostname");
     return [
@@ -51,11 +69,16 @@ export function renderProxyEdge(hostname: string): string {
         "      service: polaris-vpn-proxy",
         "      tls:",
         "        certResolver: letsencrypt",
+        "        options: polaris-vpn-proxy",
         "  services:",
         "    polaris-vpn-proxy:",
         "      loadBalancer:",
         "        servers:",
         `          - address: "${DOCKER_HOST_GATEWAY}:${PROXY_PORT}"`,
+        "tls:",
+        "  options:",
+        "    polaris-vpn-proxy:",
+        "      alpnProtocols: [http/1.1]",
         ""
     ].join("\n");
 }
@@ -179,6 +202,9 @@ async def serve(reader, writer):
         device = login_valid(headers.get("proxy-authorization", ""))
         if device is None:
             await answer(writer, 'HTTP/1.1 407 Login Required\r\nProxy-Authenticate: Basic realm="Polaris"\r\nContent-Length: 0')
+            return
+        if target == "http://${PROXY_PROOF_HOST}/":
+            await answer(writer, "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *")
             return
         if method == "CONNECT":
             host, port = split_target(target, 443)

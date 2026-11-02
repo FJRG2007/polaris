@@ -11,8 +11,9 @@ import * as actions from "./profile-actions";
 import { Trash2, Upload } from "lucide-react";
 import type { ConnectAnswer } from "./connect-actions";
 import { MAX_PROFILES } from "@/lib/vpn/profile-limits";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 type Profile = ConnectAnswer["profiles"][number];
 
@@ -29,12 +30,18 @@ interface OwnVpnsProps {
 export function OwnVpns(props: OwnVpnsProps) {
     const { profiles, selected, active, where, onSelect, onChanged, onError } = props;
     const t = useTranslations("vpn");
-    const input = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [removing, setRemoving] = useState<Profile | null>(null);
     const [pending, startTransition] = useTransition();
 
-    function importFiles(list: FileList | null): void {
-        const chosen = [...(list ?? [])].slice(0, MAX_PROFILES);
+    async function importFiles(): Promise<void> {
+        const picked = await chooseFiles({
+            accept: ".conf",
+            multiple: true,
+            title: t("connect.own.import"),
+            onFailed: onError
+        });
+        const chosen = picked.slice(0, MAX_PROFILES);
         if (chosen.length === 0) return;
         onError(null);
         startTransition(async () => {
@@ -42,7 +49,6 @@ export function OwnVpns(props: OwnVpnsProps) {
                 chosen.map(async (file) => ({ name: file.name, text: await file.text() }))
             );
             const result = await actions.importProfilesAction(files);
-            if (input.current) input.current.value = "";
             if (result.error !== undefined) return onError(result.error);
             if (result.added > 0) toast.success(t("connect.own.added", { count: result.added }));
             if (result.rejected.length > 0) {
@@ -70,20 +76,12 @@ export function OwnVpns(props: OwnVpnsProps) {
                     size="sm"
                     variant="outline"
                     disabled={pending}
-                    onClick={() => input.current?.click()}
+                    onClick={() => void importFiles()}
                 >
                     <Upload />
                     {t("connect.own.import")}
                 </ui.Button>
-                <input
-                    ref={input}
-                    type="file"
-                    multiple
-                    accept=".conf"
-                    hidden
-                    aria-label={t("connect.own.import")}
-                    onChange={(event) => importFiles(event.target.files)}
-                />
+                {chooser}
             </div>
             {profiles.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("connect.own.hint")}</p>
@@ -91,7 +89,7 @@ export function OwnVpns(props: OwnVpnsProps) {
                 <div
                     role="radiogroup"
                     aria-label={t("connect.own.title")}
-                    className="flex max-h-64 min-w-0 flex-col gap-1 overflow-y-auto"
+                    className="flex max-h-64 min-w-0 flex-col gap-1 overflow-y-auto overscroll-contain"
                 >
                     {profiles.map((profile) => (
                         <div

@@ -5,6 +5,7 @@
 
 import { useWords } from "./words";
 import { useEffect, useState } from "react";
+import { EVERY_SITE } from "@/lib/injection";
 import type { VpnNode, VpnState } from "@/lib/vpn";
 import { askBackground, type Request } from "@/lib/messages";
 
@@ -29,6 +30,20 @@ export function VpnRow(): React.JSX.Element | null {
             if (reply.ok && "vpn" in reply) setState(reply.vpn);
             else setError(reply.ok ? t("errors.serverSilent") : reply.error);
         });
+    };
+
+    /** The grant has to be asked for here, inside the click: the worker cannot. */
+    const connect = (nodeId: string): void => {
+        setBusy(true);
+        setError(null);
+        void browser.permissions
+            .request({ origins: [...EVERY_SITE] })
+            .catch(() => false)
+            .then((granted) => {
+                if (granted) return send({ kind: "vpnConnect", nodeId });
+                setBusy(false);
+                return setError(t("vpn.refused.noSites"));
+            });
     };
 
     if (!state || (!state.available && !state.active)) return null;
@@ -69,7 +84,7 @@ export function VpnRow(): React.JSX.Element | null {
                             key={node.id}
                             disabled={busy || !node.browser || node.id === active?.nodeId}
                             title={node.browser ? undefined : t("vpn.noBrowserRoute")}
-                            onClick={() => send({ kind: "vpnConnect", nodeId: node.id })}
+                            onClick={() => connect(node.id)}
                         >
                             {label(node)}
                         </button>

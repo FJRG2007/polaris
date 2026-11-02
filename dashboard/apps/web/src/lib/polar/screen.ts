@@ -36,6 +36,7 @@ export const SCREEN_RECORDS: readonly ScreenRecord[] = [
     { route: "/account/api-keys/[keyId]/usage", kind: "api key", id: "keyId" },
     { route: "/account/api-keys/[keyId]", kind: "api key", id: "keyId" },
     { route: "/account/organizations/[slug]/[[...section]]", kind: "organization", id: "slug" },
+    { route: "/admin/apps/[appId]/settings", kind: "marketplace app", id: "appId" },
     { route: "/admin/apps/[appId]", kind: "marketplace app", id: "appId" },
     { route: "/admin/users/[id]", kind: "user", id: "id" },
     { route: "/announcements/[id]", kind: "announcement", id: "id" },

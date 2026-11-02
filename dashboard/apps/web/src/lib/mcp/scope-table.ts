@@ -65,6 +65,7 @@ export const PERMISSION_CATEGORIES: Readonly<Record<Permission, McpCategory>> = 
     "vault.use": "account",
     "notes.use": "productivity",
     "office.use": "productivity",
+    "vpn.use": "account",
     "mail.use": "mail",
     "mailserver.manage": "mail",
     "calendar.use": "calendar",

@@ -1,6 +1,7 @@
-//! The orders the app sends, one per connection on the loopback address. A line of
-//! JSON each way: a challenge, the proved order, its answer. Orders run one at a
-//! time, which is all a single tunnel can use.
+//! The orders the app sends, one per connection on the loopback address. Lines of
+//! JSON, taking turns: a challenge, the app's challenge back, this service's proof,
+//! the proved order, its answer. Orders run one at a time, which is all a single
+//! tunnel can use.
 
 use crate::{auth, config, tunnel::Tunnel};
 use defguard_wireguard_rs::key::Key;
@@ -17,6 +18,7 @@ pub const PORT: u16 = 51898;
 /// Reported to the app, which reinstalls a service older than it expects.
 pub const VERSION: u32 = 1;
 const MAX_LINE: u64 = 16 * 1024;
+const MAX_NONCE: usize = 128;
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Deserialize)]
@@ -53,6 +55,11 @@ enum Order {
 }
 
 #[derive(Deserialize)]
+struct Hello {
+    nonce: String,
+}
+
+#[derive(Deserialize)]
 struct Envelope {
     answer: String,
     #[serde(flatten)]
@@ -77,6 +84,15 @@ fn run(order: Order, tunnel: &mut Tunnel, private_key: &str) -> Value {
     }
 }
 
+/// Proves this service to the app, from the line carrying its challenge.
+fn proof_for(line: &str, secret: &str, nonce: &str) -> Result<Value, &'static str> {
+    let hello: Hello = serde_json::from_str(line).map_err(|_| "badRequest")?;
+    if hello.nonce.is_empty() || hello.nonce.len() > MAX_NONCE {
+        return Err("badRequest");
+    }
+    Ok(json!({ "proof": auth::prove(secret, nonce, &hello.nonce) }))
+}
+
 /// Reads the order on a line, after checking it proves the secret.
 fn read_order(line: &str, secret: &str, nonce: &str) -> Result<Order, &'static str> {
     let envelope: Envelope = serde_json::from_str(line).map_err(|_| "badRequest")?;
@@ -92,8 +108,15 @@ fn serve_one(stream: TcpStream, tunnel: &mut Tunnel, config: &config::Config) ->
     let mut writer = stream.try_clone()?;
     let nonce = Key::generate().to_lower_hex();
     writeln!(writer, "{}", json!({ "nonce": nonce }))?;
+    let mut reader = BufReader::new(stream.take(MAX_LINE));
     let mut line = String::new();
-    BufReader::new(stream.take(MAX_LINE)).read_line(&mut line)?;
+    reader.read_line(&mut line)?;
+    match proof_for(&line, &config.secret, &nonce) {
+        Ok(proof) => writeln!(writer, "{proof}")?,
+        Err(code) => return writeln!(writer, "{}", json!({ "ok": false, "code": code })),
+    }
+    line.clear();
+    reader.read_line(&mut line)?;
     let reply = match read_order(&line, &config.secret, &nonce) {
         Ok(order) => run(order, tunnel, &config.private_key),
         Err(code) => json!({ "ok": false, "code": code }),
@@ -105,6 +128,7 @@ fn serve_one(stream: TcpStream, tunnel: &mut Tunnel, config: &config::Config) ->
 pub fn serve() -> io::Result<()> {
     let config = config::load()?;
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, PORT))?;
+    crate::tunnel::clear_leftover();
     let mut tunnel = Tunnel::default();
     for stream in listener.incoming() {
         if let Err(error) = stream.and_then(|one| serve_one(one, &mut tunnel, &config)) {
@@ -124,6 +148,20 @@ mod tests {
         let mut value = body;
         value["answer"] = json!(auth::respond(SECRET, "nonce"));
         value.to_string()
+    }
+
+    #[test]
+    fn proves_itself_to_the_challenge_it_was_sent() {
+        let proof = proof_for(r#"{"nonce":"theirs"}"#, SECRET, "nonce").unwrap();
+        assert_eq!(proof["proof"], auth::prove(SECRET, "nonce", "theirs"));
+    }
+
+    #[test]
+    fn refuses_a_challenge_it_cannot_read() {
+        assert!(proof_for("nonsense", SECRET, "nonce").is_err());
+        assert!(proof_for(r#"{"nonce":""}"#, SECRET, "nonce").is_err());
+        let long = json!({ "nonce": "a".repeat(MAX_NONCE + 1) }).to_string();
+        assert!(proof_for(&long, SECRET, "nonce").is_err());
     }
 
     #[test]

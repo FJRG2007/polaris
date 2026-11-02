@@ -407,8 +407,9 @@
         "on": "Saliendo por {name}",
         "disconnect": "Desconectar",
         "throughTor": "{name} (Tor)",
-        "noBrowserRoute": "Un servidor sin nombre de dominio no se puede usar desde el navegador.",
+        "noBrowserRoute": "Este servidor no tiene una ruta que pueda usar un navegador.",
         "refused": {
+            "noSites": "La VPN necesita acceso a todos los sitios para llevar el tráfico de este navegador. Permítelo e inténtalo de nuevo.",
             "noAccess": "Esta cuenta no puede usar ese servidor.",
             "notReady": "Ese servidor aún no está listo para navegadores.",
             "unreachable": "Polaris no respondió. Inténtalo de nuevo en un momento.",

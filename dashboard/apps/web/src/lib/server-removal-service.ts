@@ -161,6 +161,10 @@ export async function removeServer(
 
     if (input.mode === "move" || input.mode === "clean") {
         warnings.push(...(await tearDown(ownerId, hostId)));
+        const { removeNodeOn } = await import("@/lib/vpn/wireguard-service");
+        if (!(await removeNodeOn(hostId))) {
+            warnings.push((await readerWords("vpn"))("nodes.leftRunning"));
+        }
         warnings.push(...(await revokeLogin(ownerId, hostId)));
     }
 

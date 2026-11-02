@@ -5,12 +5,6 @@ import { prisma } from "@polaris/db";
 import * as wg from "@/lib/vpn/wireguard";
 import * as service from "@/lib/vpn/wireguard-service";
 
-const connectSchema = z.object({
-    nodeId: z.string().uuid(),
-    name: wg.deviceNameSchema,
-    publicKey: z.string().refine(wg.isWireGuardKey)
-});
-
 const STATUS: Partial<Record<service.WireGuardRefusalCode, number>> = {
     noAccess: 403,
     notFound: 404,
@@ -46,7 +40,7 @@ export async function listForClient(userId: string): Promise<Response> {
 export async function connectForClient(userId: string, request: Request): Promise<Response> {
     const person = await personOf(userId);
     if (!person) return Response.json({ error: "unauthorized" }, { status: 401 });
-    const body = connectSchema.safeParse(await request.json().catch(() => null));
+    const body = wg.clientConnectSchema.safeParse(await request.json().catch(() => null));
     if (!body.success) return Response.json({ error: "invalid" }, { status: 400 });
     try {
         return Response.json(await service.connectClient(person, body.data));
