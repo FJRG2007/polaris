@@ -21,11 +21,12 @@ import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import type { BudgetedProvider } from "@/lib/reputation-budget";
-import { providerPaused, takeServedLookup, whileServing } from "@/lib/integrations/provider-pause";
+import { providerPaused, takeServedLookup } from "@/lib/integrations/provider-pause";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
-import { checkCriminalIp, readCriminalIpConfig } from "@/lib/integrations/criminalip";
+import { checkCriminalIp } from "@/lib/integrations/criminalip";
+import { readCriminalIpConfig } from "@/lib/integrations/criminalip-rules";
 import {
     buildWafIntel,
     isCarrierGradeNat,
@@ -174,10 +175,7 @@ async function reputationProviders(): Promise<ReputationProvider[]> {
             providers.push({
                 slug: "criminalip",
                 deny: config.deny,
-                check: (ip) =>
-                    whileServing("criminalip", "Criminal IP", () =>
-                        checkCriminalIp(apiKey, ip, config.deny)
-                    )
+                check: (ip) => checkCriminalIp(apiKey, ip, config.deny)
             });
         }
     }

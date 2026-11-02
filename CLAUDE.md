@@ -320,6 +320,26 @@ modded content never sets back, kicks or freezes a player.
   heartbeat (`chat/call-seat.ts`) is the model, and a 410 from it re-seats the
   tab instead of giving up.
 
+## A service billed per request
+
+Dymo, VirusTotal, Criminal IP and whatever joins them are paid for per call, and
+a timer in this process never stops on its own. A loop that retried a failed
+lookup every thirty seconds emptied a paid plan in days
+(`dashboard/docs/bugs/a-failed-lookup-was-bought-again-every-thirty-seconds.md`).
+
+- **Every request to one goes through `whileServing`**
+  (`apps/web/src/lib/integrations/provider-pause.ts`): one failure pauses the
+  provider everywhere, and it holds the daily ceiling that survives a restart.
+  The one exception is a key test an operator pressed.
+- **A new provider** is added to `BUDGETED_PROVIDERS`, and its module to
+  `apps/web/test/access/metered-gate.test.ts`, which calls every function it
+  exports against a refusing service and allows one request.
+- **Remember the answer, and remember the failure.** Anything that runs on a
+  timer asks about what it has not asked yet, never about what failed last time.
+- **Turn off an SDK's retries.** Each one is billed.
+- **Read a third party's flag by comparing it**, never by typing it strictly: a
+  paid answer rejected by a schema is paid for and then bought again.
+
 ## One address for this server
 
 A server can hold two addresses on the same LAN at once - cable and Wi-Fi is

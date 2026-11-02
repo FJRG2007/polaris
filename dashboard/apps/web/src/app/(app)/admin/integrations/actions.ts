@@ -20,7 +20,7 @@ import { STEAM_PROVIDER } from "@/lib/connections/steam";
 import { connectionFailure, markConnectionFailureSeen } from "@/lib/connections/attention";
 import { dismissAdminWaiting } from "@/lib/admin-waiting";
 import { verifyKey } from "@/lib/integrations/virustotal";
-import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
+import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip-rules";
 import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
@@ -624,10 +624,11 @@ export async function saveVirusTotalAction(input: {
 
     await upsertIntegration(provider, {
         enabled: input.enabled,
-        config: { scanDropPoints: input.scanDropPoints, onDetection },
+        config: { ...existing?.config, scanDropPoints: input.scanDropPoints, onDetection },
         secret: newKey,
         installedById: user.id
     });
+    await clearProviderPause(provider);
     await recordAudit({
         actorId: user.id,
         action: "integration.configure",

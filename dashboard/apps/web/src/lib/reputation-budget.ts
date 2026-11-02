@@ -9,7 +9,7 @@
  * the provider's own refusal would have come to anyway.
  *
  * VirusTotal's figures are its free Public API's: four a minute and 500 a day.
- * A paid key allows more and simply never meets them. Dymo's quota depends on
+ * A paid key allows more but is held to them all the same. Dymo's quota depends on
  * the plan and is not something Polaris can read, so its ceiling here is
  * Polaris's own guard against one busy channel spending the month's quota in an
  * afternoon, not the provider's limit.

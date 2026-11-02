@@ -17,7 +17,7 @@ import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
+import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip-rules";
 import {
     use,
     useMemo,
@@ -458,7 +458,6 @@ function GoogleApisHealth() {
     // Checked once, when the dialog opens; "Check again" is the reader's.
     useEffect(() => {
         void load(false);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
@@ -812,7 +811,9 @@ function AttentionNotice({
                     {stopped
                         ? failure.reason === "credits"
                             ? t("integrations.attention.stoppedCredits", { name })
-                            : t("integrations.attention.stoppedKey", { name })
+                            : failure.reason === "budget"
+                              ? t("integrations.attention.stoppedBudget", { name })
+                              : t("integrations.attention.stoppedKey", { name })
                         : apiOff
                           ? t("integrations.attention.apiOffReason", { reason: failure.reason })
                           : t("integrations.attention.reason", { name, reason: failure.reason })}

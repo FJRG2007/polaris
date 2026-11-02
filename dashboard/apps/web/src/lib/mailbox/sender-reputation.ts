@@ -27,7 +27,6 @@
 
 import * as core from "@polaris/core";
 import { lookupDomain } from "@/lib/integrations/virustotal";
-import { takeLookup } from "@/lib/reputation-budget";
 import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { knownReputation, rememberReputation } from "@/lib/reputation";
 import { MAIL_DENY_RULES, verifyDomain, verifyEmail } from "@/lib/integrations/dymo";
@@ -215,7 +214,7 @@ async function domainOpinion(domain: string): Promise<ReputationFinding | null> 
     if (known) return fromVerdict("domain", domain, known);
 
     const apiKey = await getIntegrationSecret(VIRUSTOTAL);
-    if (!apiKey || !takeLookup(VIRUSTOTAL)) return null;
+    if (!apiKey || !(await takeServedLookup(VIRUSTOTAL))) return null;
 
     const verdict = await lookupDomain(apiKey, domain);
     // An error or an unknown domain is remembered as nothing at all: writing it

@@ -15,6 +15,12 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async (key: string, value: string | null) => {
         if (value === null) settings.delete(key);
         else settings.set(key, value);
+    },
+    swapSetting: async (key: string, expected: string | null, value: string) => {
+        await Promise.resolve();
+        if ((settings.get(key) ?? null) !== expected) return false;
+        settings.set(key, value);
+        return true;
     }
 }));
 vi.mock("@/lib/connections/attention", () => ({
@@ -126,6 +132,54 @@ describe("asking a paid provider", () => {
         await clearProviderPause("dymo");
         expect(await takeServedLookup("dymo")).toBe(true);
         expect(takeLookup("dymo")).toBe(true);
+    });
+
+    it("stops at the day's budget, and a restart does not give it back", async () => {
+        const ask = vi.fn().mockResolvedValue("answer");
+        settings.set(
+            "integration.spent.dymo",
+            JSON.stringify({
+                day: new Date().toISOString().slice(0, 10),
+                count: LOOKUP_BUDGET.dymo.perDay - 1
+            })
+        );
+        await whileServing("dymo", "Dymo API", ask);
+        await expect(whileServing("dymo", "Dymo API", ask)).rejects.toBeInstanceOf(ProviderPaused);
+        expect(ask).toHaveBeenCalledTimes(1);
+    });
+
+    it("loses no count to requests sent at the same moment", async () => {
+        const ask = vi.fn().mockResolvedValue("answer");
+        const left = 5;
+        settings.set(
+            "integration.spent.dymo",
+            JSON.stringify({
+                day: new Date().toISOString().slice(0, 10),
+                count: LOOKUP_BUDGET.dymo.perDay - left
+            })
+        );
+        await Promise.allSettled(
+            Array.from({ length: 40 }, () => whileServing("dymo", "Dymo API", ask))
+        );
+        expect(ask).toHaveBeenCalledTimes(left);
+    });
+
+    it("tells the operator the day is spent, and clears it on the next day's answer", async () => {
+        vi.useFakeTimers({ now: new Date("2026-03-01T12:00:00Z") });
+        const ask = vi.fn().mockResolvedValue("answer");
+        settings.set(
+            "integration.spent.dymo",
+            JSON.stringify({ day: "2026-03-01", count: LOOKUP_BUDGET.dymo.perDay })
+        );
+        await expect(whileServing("dymo", "Dymo API", ask)).rejects.toMatchObject({
+            reason: "budget"
+        });
+        expect(recorded).toEqual([{ provider: "dymo", reason: "budget", kind: "out-of-service" }]);
+        expect(await providerPaused("dymo")).toBe(true);
+
+        vi.setSystemTime(new Date("2026-03-02T00:00:01Z"));
+        await expect(whileServing("dymo", "Dymo API", ask)).resolves.toBe("answer");
+        expect(cleared).toEqual(["dymo"]);
     });
 
     it("keeps one provider's pause from another", async () => {

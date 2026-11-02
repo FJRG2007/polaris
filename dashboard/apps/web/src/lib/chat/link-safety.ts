@@ -36,7 +36,7 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { knownReputation, rememberReputation, type Verdict } from "@/lib/reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { takeServedLookup } from "@/lib/integrations/provider-pause";
-import { resetLookupBudget, takeLookup } from "@/lib/reputation-budget";
+import { resetLookupBudget } from "@/lib/reputation-budget";
 
 export const LINK_SAFETY_PROVIDERS = ["virustotal", "dymo"] as const;
 export type LinkSafetyProvider = (typeof LINK_SAFETY_PROVIDERS)[number];
@@ -142,7 +142,7 @@ async function virusTotalOpinion(host: string): Promise<Verdict | null> {
     if (known) return known;
     return once(`virustotal:${host}`, async () => {
         const apiKey = await getIntegrationSecret("virustotal");
-        if (!apiKey || !takeLookup("virustotal", CHAT_SHARE)) return null;
+        if (!apiKey || !(await takeServedLookup("virustotal", CHAT_SHARE))) return null;
         const verdict = await lookupDomain(apiKey, host);
         if (verdict.kind === "error" || verdict.kind === "unknown") return null;
         const flagged = verdict.kind === "malicious" || verdict.kind === "suspicious";

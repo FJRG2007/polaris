@@ -11,7 +11,7 @@ import { getRunnerAccess } from "@/lib/github-runners";
 import { connectionProven } from "@/lib/connections/proven";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { readConnectionFailure } from "@/lib/connections/attention";
-import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
+import { readCriminalIpConfig } from "@/lib/integrations/criminalip-rules";
 import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";

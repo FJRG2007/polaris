@@ -16,7 +16,14 @@ import { prisma } from "@polaris/db";
 import type { StorageDriver } from "@polaris/storage";
 import { getIntegrationState, getIntegrationSecret } from "@/lib/integration-service";
 import { readVirusTotalConfig, type ScanAction } from "@/lib/integrations/registry";
-import { lookupBySha256, uploadAndScan, VT_MAX_UPLOAD_BYTES, type VtVerdict } from "@/lib/integrations/virustotal";
+import {
+    lookupBySha256,
+    SCAN_SHARE,
+    uploadAndScan,
+    VT_MAX_UPLOAD_BYTES,
+    type VtVerdict
+} from "@/lib/integrations/virustotal";
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -34,6 +41,14 @@ export interface ScanOutcome {
 }
 
 const SKIPPED: ScanOutcome = { scanned: false, blocked: false, verdict: "skipped", action: "none" };
+
+/** Paused, or past the part of the budget scans may use. The file is kept. */
+const NOT_ASKED: VtVerdict = {
+    kind: "unknown",
+    malicious: 0,
+    suspicious: 0,
+    detail: "VirusTotal is not taking requests right now"
+};
 
 export interface ScanRequest {
     driver: StorageDriver;
@@ -81,6 +96,26 @@ async function hashStream(
     return { sha256: hash.digest("hex"), bytes };
 }
 
+/** The hash lookup, then an upload if the file is unknown and small enough. */
+async function askVirusTotal(
+    apiKey: string,
+    sha256: string,
+    bytes: Uint8Array | null
+): Promise<VtVerdict> {
+    if (!(await takeServedLookup("virustotal", SCAN_SHARE))) return NOT_ASKED;
+    const known = await lookupBySha256(apiKey, sha256);
+    if (known) return known;
+    if (!bytes)
+        return {
+            kind: "unknown",
+            malicious: 0,
+            suspicious: 0,
+            detail: "File exceeds the 32 MB scan limit"
+        };
+    if (!(await takeServedLookup("virustotal", SCAN_SHARE))) return NOT_ASKED;
+    return uploadAndScan(apiKey, bytes, sha256);
+}
+
 /** Move a flagged file into the connection's quarantine folder; returns its new path. */
 async function quarantine(driver: StorageDriver, storedPath: string): Promise<string> {
     const target = normalizeRelPath(`${QUARANTINE_DIR}/${baseName(storedPath)}`);
@@ -117,7 +152,8 @@ function buildAlert(
                   : t("scan.kept");
         return {
             level: verdict.kind === "malicious" ? "danger" : "warning",
-            title: verdict.kind === "malicious" ? t("scan.maliciousTitle") : t("scan.suspiciousTitle"),
+            title:
+                verdict.kind === "malicious" ? t("scan.maliciousTitle") : t("scan.suspiciousTitle"),
             body: t("scan.flagged", { ...where, engines, tail })
         };
     }
@@ -148,25 +184,33 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
     const apiKey = await getIntegrationSecret("virustotal");
     if (!apiKey) return SKIPPED;
 
-    let verdict: VtVerdict;
     try {
         const collect = request.size <= VT_MAX_UPLOAD_BYTES;
-        const { sha256, bytes } = await hashStream(await request.driver.readStream(request.storedPath), collect);
-        const known = await lookupBySha256(apiKey, sha256);
-        if (known) verdict = known;
-        else if (bytes) verdict = await uploadAndScan(apiKey, bytes, sha256);
-        else verdict = { kind: "unknown", malicious: 0, suspicious: 0, detail: "File exceeds the 32 MB scan limit" };
+        const { sha256, bytes } = await hashStream(
+            await request.driver.readStream(request.storedPath),
+            collect
+        );
+        const verdict = await askVirusTotal(apiKey, sha256, bytes);
         return await enforce(request, verdict, config.onDetection, sha256);
     } catch (caught) {
         // Scanner failure: fail open, but still tell the owner it did not complete.
         const detail = caught instanceof Error ? caught.message : "scan failed";
-        await recordScan(request, { kind: "error", malicious: 0, suspicious: 0, detail }, "none", null);
+        await recordScan(
+            request,
+            { kind: "error", malicious: 0, suspicious: 0, detail },
+            "none",
+            null
+        );
         const t = await wordsFor(request.ownerId, "notices");
         await notify({
             userId: request.ownerId,
             event: "scan.error",
             title: t("scan.failedTitle"),
-            body: t("scan.notScanned", { file: request.fileName, dropPoint: request.dropPointTitle, detail }),
+            body: t("scan.notScanned", {
+                file: request.fileName,
+                dropPoint: request.dropPointTitle,
+                detail
+            }),
             href: "/drive/drop-points",
             metadata: { connectionId: request.connectionId, submissionId: request.submissionId }
         });
@@ -214,7 +258,12 @@ async function enforce(
     // Alert the owner on anything actionable - a detection or a scan that could not
     // complete - but stay quiet on a clean pass so drop points do not spam the bell.
     if (verdict.kind !== "clean") {
-        const alert = buildAlert(await wordsFor(request.ownerId, "notices"), request, verdict, action);
+        const alert = buildAlert(
+            await wordsFor(request.ownerId, "notices"),
+            request,
+            verdict,
+            action
+        );
         // One event covers every non-clean verdict; the verdict itself rides in
         // the metadata and sets the severity, so a rule is "tell me when a drop
         // point catches something" rather than one rule per verdict word.
