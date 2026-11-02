@@ -546,6 +546,10 @@ flowchart LR
     C -- no update command --> X[501: not available]
 ```
 
+### When Polaris cannot be reached
+
+[What to check](docs/features/troubleshooting.md) when a screen says Polaris is not reachable. None of it needs a terminal.
+
 ### A request through the edge
 
 Every router has an explicit priority, highest first. Routes with firewall rules pass through the guard before reaching the app.

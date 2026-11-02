@@ -430,6 +430,10 @@ flowchart LR
     C -- sin comando de actualización --> X[501: no disponible]
 ```
 
+### Cuando no se puede acceder a Polaris
+
+[Qué comprobar](docs/features/troubleshooting.es.md) cuando una pantalla dice que no se puede acceder a Polaris. Nada de esto necesita una terminal.
+
 ### Una petición a través del edge
 
 Cada router tiene una prioridad explícita, de mayor a menor. Las rutas con reglas de firewall pasan por el guard antes de llegar a la app.
