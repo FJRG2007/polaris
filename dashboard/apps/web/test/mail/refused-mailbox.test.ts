@@ -208,9 +208,23 @@ describe("a mailbox the server stops accepting", () => {
         expect(row.state).toBe("ok");
         expect(state.notified).toHaveLength(1);
 
+        row.lastOkAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
         await recordCredentialRefusal(row.id, "refused");
         expect(row.state).toBe("auth");
         expect(state.notified).toHaveLength(2);
+    });
+
+    it("waits to mention a password until a mailbox that was working stays refused", async () => {
+        const row = mailbox();
+        row.lastOkAt = new Date(Date.now() - 5 * 60 * 1000);
+        await recordCredentialRefusal(row.id, "refused");
+        expect(row.state).toBe("auth");
+        expect(state.notified).toHaveLength(0);
+
+        row.lastOkAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        await recordCredentialRefusal(row.id, "refused");
+        await recordCredentialRefusal(row.id, "refused");
+        expect(state.notified).toHaveLength(1);
     });
 
     it("takes the notice off the bell once a pass works again, and only that mailbox's", async () => {

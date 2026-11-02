@@ -124,6 +124,62 @@ export function refusedMailboxHref(accountId: string): string {
     return `/mail/settings/accounts?edit=${encodeURIComponent(accountId)}`;
 }
 
+/** Mailboxes on one server refused this close together were refused by the server. */
+export const REFUSED_TOGETHER_MS = 15 * 60 * 1000;
+/** How long a refusal of a mailbox that was working stays a question. Long enough for
+ *  the backoff below to have tried it again. */
+export const REFUSAL_CONFIRMED_MS = 60 * 60 * 1000;
+/** A password can be shared, so mailboxes refused together are not a server's fault
+ *  for ever: past this they are read one by one again. */
+export const SERVER_FAULT_MAX_MS = 24 * 60 * 60 * 1000;
+
+/** What deciding why a mailbox was refused needs off its row. */
+export interface RefusalState {
+    readonly id: string;
+    readonly auth: string;
+    readonly state: string;
+    readonly imapHost: string;
+    readonly lastOkAt: Date | string | null;
+}
+
+/**
+ * Why a mailbox is refused, as far as anybody can tell.
+ *
+ * A server says the same "authentication failed" for a changed password and for its
+ * own login service misbehaving, so the words cannot decide. What can: several
+ * mailboxes on one server that all worked and were all refused within minutes did
+ * not all have their passwords changed, and one that worked minutes ago may recover
+ * on the next try. Only what is left is called a password.
+ */
+export type RefusalCause = "authorization" | "server" | "recent" | "password";
+
+function time(value: Date | string | null): number | null {
+    return value === null ? null : new Date(value).getTime();
+}
+
+export function refusalCause(
+    account: RefusalState,
+    others: readonly RefusalState[],
+    now = Date.now()
+): RefusalCause {
+    if (account.auth === "oauth") return "authorization";
+    const worked = time(account.lastOkAt);
+    if (worked === null) return "password";
+    const together = others.some((other) => {
+        const when = time(other.lastOkAt);
+        return (
+            other.id !== account.id &&
+            other.auth !== "oauth" &&
+            other.state === "auth" &&
+            other.imapHost === account.imapHost &&
+            when !== null &&
+            Math.abs(when - worked) <= REFUSED_TOGETHER_MS
+        );
+    });
+    if (together && now - worked < SERVER_FAULT_MAX_MS) return "server";
+    return now - worked < REFUSAL_CONFIRMED_MS ? "recent" : "password";
+}
+
 /** The shortest wait before a refused mailbox is tried again. */
 export const REFUSED_RETRY_MIN_MS = 30 * 60 * 1000;
 /** The longest. Once a day is quiet enough that no provider locks an account

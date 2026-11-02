@@ -12,6 +12,7 @@ import { withMessages } from "../../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+vi.mock("@/app/(app)/mail/actions", () => ({ syncAccountAction: async () => ({}) }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined })
 }));
@@ -36,7 +37,7 @@ describe("the notice for a mailbox that stopped signing in", () => {
 
     it("says what happened and offers the fix in Spanish", () => {
         const markup = notice("password");
-        expect(markup).toContain("ana@example.com ha dejado de aceptar su contraseña");
+        expect(markup).toContain("Contraseña rechazada");
         expect(markup).toContain("Cambiar contraseña");
         expect(markup).not.toContain("Update password");
     });

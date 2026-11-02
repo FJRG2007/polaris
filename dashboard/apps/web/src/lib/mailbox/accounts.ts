@@ -52,6 +52,8 @@ export interface MailAccountView {
     readonly state: string;
     readonly stateDetail: string;
     readonly lastSyncAt: string | null;
+    /** The last time the server accepted it, which says why it may be refused now. */
+    readonly lastOkAt: string | null;
     readonly notify: boolean;
     readonly unified: boolean;
     readonly appendToSent: boolean;
@@ -99,6 +101,7 @@ export function accountView(row: AccountRow): MailAccountView {
         state: row.state,
         stateDetail: row.stateDetail,
         lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
+        lastOkAt: row.lastOkAt?.toISOString() ?? null,
         notify: row.notify,
         unified: row.unified,
         appendToSent: row.appendToSent,
@@ -586,7 +589,7 @@ export async function recordAccountState(
         state,
         stateDetail: detail,
         lastSyncAt: now,
-        ...(state === "ok" ? { lastOkAt: now } : {})
+        ...(state === "ok" ? { lastOkAt: now, refusalAnnouncedAt: null } : {})
     };
     if (state === "ok") {
         const steady = await prisma.mailAccount.updateMany({

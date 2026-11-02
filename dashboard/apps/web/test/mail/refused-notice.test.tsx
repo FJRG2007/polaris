@@ -88,6 +88,7 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
         state: "auth",
         stateDetail: "The mail server refused this account's credentials.",
         lastSyncAt: null,
+        lastOkAt: null,
         notify: true,
         unified: true,
         appendToSent: true,
@@ -110,7 +111,8 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
 describe("the notice", () => {
     it("names the mailbox and offers the fix", () => {
         render(<RefusedMailboxes accounts={[account()]} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("ana@example.com stopped accepting its password")).toBeTruthy();
+        expect(screen.getByText("Password refused")).toBeTruthy();
+        expect(screen.getByText("ana@example.com")).toBeTruthy();
         const button = screen.getByRole("link", { name: "Update password" });
         expect(button.getAttribute("href")).toBe(
             "/mail/settings/accounts?edit=0190c1d2-0000-7000-8000-000000000001"
@@ -119,7 +121,7 @@ describe("the notice", () => {
 
     it("says reconnect for an authorized mailbox", () => {
         render(<RefusedMailboxes accounts={[account({ auth: "oauth" })]} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("ana@example.com stopped accepting its authorization")).toBeTruthy();
+        expect(screen.getByText("Needs reconnecting")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Reconnect" })).toBeTruthy();
     });
 

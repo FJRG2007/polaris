@@ -7,16 +7,19 @@
  *
  * - **Stop.** The row moves to `auth`, and every pass after that waits out the
  *   backoff in `refusals.ts` instead of logging in again on the next tick.
- * - **Say so once.** The owner is told the moment the row moves, and only then:
- *   the conditional update is the lock, so a mailbox refused on every retry for
- *   a week is one notification, and two passes landing together are still one.
+ * - **Say so once, when it is true.** The owner is told when `refusalCause` calls it
+ *   their credential, which for a mailbox that was working means a retry was
+ *   refused too: a server's bad few minutes is on the screen as that and never
+ *   rings the bell about a password. The conditional update on `refusalAnnouncedAt`
+ *   is the lock, so a mailbox refused for a week is one notification, and two
+ *   passes landing together are still one.
  * - **Pick up again.** A pass that works puts the row back to `ok`
  *   (`recordAccountState`), the notice is answered, and the next refusal after
  *   that is news again.
  */
 
 import { prisma } from "@polaris/db";
-import { refusedMailboxHref } from "./refusals";
+import { refusalCause, refusedMailboxHref } from "./refusals";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { translatorFor } from "@/lib/i18n/translate";
 
@@ -32,24 +35,37 @@ const REFUSED_EVENT = "mail.account.refused";
  */
 export async function recordCredentialRefusal(accountId: string, detail: string): Promise<void> {
     const now = new Date();
-    const moved = await prisma.mailAccount.updateMany({
-        where: { id: accountId, state: { not: "auth" } },
+    await prisma.mailAccount.updateMany({
+        where: { id: accountId },
         data: { state: "auth", stateDetail: detail, lastSyncAt: now }
     });
-    if (moved.count === 0) {
-        // Already refused and already announced. Only the clock moves.
-        await prisma.mailAccount.updateMany({
-            where: { id: accountId },
-            data: { stateDetail: detail, lastSyncAt: now }
-        });
-        return;
-    }
-
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
-        select: { userId: true, address: true, auth: true, orgId: true }
+        select: {
+            id: true,
+            userId: true,
+            address: true,
+            auth: true,
+            orgId: true,
+            state: true,
+            imapHost: true,
+            lastOkAt: true,
+            refusalAnnouncedAt: true
+        }
     });
-    if (!account) return;
+    if (!account || account.refusalAnnouncedAt) return;
+    const others = await prisma.mailAccount.findMany({
+        where: { userId: account.userId, imapHost: account.imapHost, state: "auth" },
+        select: { id: true, auth: true, state: true, imapHost: true, lastOkAt: true },
+        take: 200
+    });
+    const cause = refusalCause(account, others, now.getTime());
+    if (cause === "server" || cause === "recent") return;
+    const claimed = await prisma.mailAccount.updateMany({
+        where: { id: accountId, refusalAnnouncedAt: null },
+        data: { refusalAnnouncedAt: now }
+    });
+    if (claimed.count === 0) return;
     const authorized = account.auth === "oauth";
     try {
         // Reached only on the one call that announces something. The sync and

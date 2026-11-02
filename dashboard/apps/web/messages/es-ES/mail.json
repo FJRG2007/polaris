@@ -351,10 +351,18 @@
     },
     "refused": {
         "label": "Buzones que necesitan atención",
-        "authorization": "{address} ha dejado de aceptar su autorización",
-        "password": "{address} ha dejado de aceptar su contraseña",
         "reconnect": "Reconectar",
-        "updatePassword": "Cambiar contraseña"
+        "updatePassword": "Cambiar contraseña",
+        "passwordTitle": "Contraseña rechazada",
+        "passwordBody": "El servidor la rechaza desde hace más de una hora. Seguramente cambió.",
+        "authorizationTitle": "Hay que reconectar",
+        "authorizationBody": "Su autorización dejó de funcionar.",
+        "serverTitle": "Fallo del servidor",
+        "serverBody": "Se rechazaron {count} buzones a la vez, así que seguramente es el servidor y no tus contraseñas. Polaris sigue probando.",
+        "recentTitle": "Acceso rechazado",
+        "recentBody": "Funcionaba hace minutos, así que puede ser el servidor. Polaris reintenta solo.",
+        "retry": "Probar ya",
+        "stillRefused": "Reintentar"
     },
     "delivery": {
         "accepted": "Tu servidor de salida lo aceptó a las {time} y desde entonces no ha vuelto nada. Es todo lo que Polaris puede saber de un mensaje una vez entregado.",
@@ -617,7 +625,8 @@
         "renameHint": "Se cambia en el servidor de correo, así que todos los programas con los que leas este buzón lo siguen.",
         "unreachable": "Polaris no puede contactar con este servidor de correo.",
         "needsConnecting": "Este buzón necesita volver a conectarse.",
-        "passwordRefused": "Este buzón ha dejado de aceptar su contraseña."
+        "passwordRefused": "Este buzón ha dejado de aceptar su contraseña.",
+        "serverMayBeFailing": "El servidor lo rechazó, seguramente por un fallo suyo. Polaris sigue probando."
     },
     "palette": {
         "indigo": "Añil",
