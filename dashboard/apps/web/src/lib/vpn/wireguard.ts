@@ -8,6 +8,15 @@
  */
 
 import { z } from "zod";
+import {
+    PROXY_KEY,
+    PROXY_PORT,
+    PROXY_SCRIPT,
+    PROXY_USER,
+    PROXY_UNIT,
+    TOR_SOCKS_PORT,
+    renderProxyScript
+} from "@/lib/vpn/browser-proxy";
 
 export const VPN_DIR = "/etc/polaris-vpn";
 /** Ubuntu confines `wg` so it can only read inside this folder, whoever runs it. */
@@ -166,6 +175,7 @@ export function renderNodeRules(node: NodePlan): string {
               ]
             : []),
         `        iifname "${DEVICE}" drop`,
+        `        tcp dport ${PROXY_PORT} ip saddr != { 127.0.0.0/8, 172.16.0.0/12 } drop`,
         "    }",
         "    chain forward {",
         "        type filter hook forward priority filter - 1; policy accept;",
@@ -201,7 +211,7 @@ export function renderNodeRules(node: NodePlan): string {
 export function renderTorConfig(node: NodePlan): string {
     const { gateway } = nodeSubnet(node.index);
     return [
-        "SocksPort 0",
+        `SocksPort 127.0.0.1:${TOR_SOCKS_PORT}`,
         `TransPort ${gateway}:${TOR_TRANS_PORT} IsolateClientAddr`,
         `DNSPort ${gateway}:${TOR_DNS_PORT}`,
         "VirtualAddrNetworkIPv4 10.64.0.0/10",
@@ -309,6 +319,7 @@ export function renderNodeApply(
         "umask 077",
         'need=""',
         "command -v wg >/dev/null 2>&1 || need=\"$need wireguard-tools\"",
+        "command -v python3 >/dev/null 2>&1 || need=\"$need python3\"",
         "command -v nft >/dev/null 2>&1 || need=\"$need nftables\"",
         ...(tor ? ['command -v tor >/dev/null 2>&1 || need="$need tor"'] : []),
         'if [ -n "$need" ]; then',
@@ -317,6 +328,10 @@ export function renderNodeApply(
         "    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends $need >/dev/null",
         "fi",
         `mkdir -p ${VPN_DIR} /etc/wireguard`,
+        `id -u ${PROXY_USER} >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin ${PROXY_USER}`,
+        `[ -s ${PROXY_KEY} ] || head -c 32 /dev/urandom | base64 > ${PROXY_KEY}`,
+        `chown root:${PROXY_USER} ${PROXY_KEY}`,
+        `chmod 640 ${PROXY_KEY}`,
         `[ -s ${VPN_DIR}/private.key ] || wg genkey > ${VPN_DIR}/private.key`,
         file(`${VPN_DIR}/rules.nft`, renderNodeRules(node)),
         file(`${VPN_DIR}/up.sh`, renderUp(node)),
@@ -325,11 +340,15 @@ export function renderNodeApply(
         ...(tor ? [file(`${VPN_DIR}/torrc`, renderTorConfig(node))] : []),
         `nft -c -f ${VPN_DIR}/rules.nft`,
         "umask 022",
+        file(PROXY_SCRIPT, renderProxyScript({ tor })),
+        file("/etc/systemd/system/polaris-vpn-proxy.service", PROXY_UNIT),
         file("/etc/systemd/system/polaris-vpn.service", UNIT),
         ...(tor ? [file("/etc/systemd/system/polaris-vpn-tor.service", TOR_UNIT)] : []),
         "systemctl daemon-reload",
         "systemctl enable polaris-vpn.service >/dev/null 2>&1",
         "systemctl restart polaris-vpn.service",
+        "systemctl enable polaris-vpn-proxy.service >/dev/null 2>&1",
+        "systemctl restart polaris-vpn-proxy.service",
         ...(tor
             ? [
                   "systemctl enable polaris-vpn-tor.service >/dev/null 2>&1",
@@ -339,6 +358,7 @@ export function renderNodeApply(
                   "systemctl disable --now polaris-vpn-tor.service >/dev/null 2>&1 || true",
                   "rm -f /etc/systemd/system/polaris-vpn-tor.service"
               ]),
+        `echo "proxy-key=$(cat ${PROXY_KEY})"`,
         `echo "public-key=$(wg pubkey < ${VPN_DIR}/private.key)"`,
         ""
     ].join("\n");
@@ -353,8 +373,9 @@ export function renderPeerSync(
 }
 
 export const NODE_REMOVE = `#!/bin/sh
-systemctl disable --now polaris-vpn-tor.service polaris-vpn.service >/dev/null 2>&1
-rm -f /etc/systemd/system/polaris-vpn.service /etc/systemd/system/polaris-vpn-tor.service
+systemctl disable --now polaris-vpn-proxy.service polaris-vpn-tor.service polaris-vpn.service >/dev/null 2>&1
+rm -f /etc/systemd/system/polaris-vpn.service /etc/systemd/system/polaris-vpn-tor.service /etc/systemd/system/polaris-vpn-proxy.service ${PROXY_SCRIPT} ${PROXY_KEY}
+userdel ${PROXY_USER} >/dev/null 2>&1
 systemctl daemon-reload
 rm -rf ${VPN_DIR} /var/lib/polaris-vpn-tor ${WG_CONFIG}
 echo removed
