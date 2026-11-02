@@ -458,7 +458,6 @@ function GoogleApisHealth() {
     // Checked once, when the dialog opens; "Check again" is the reader's.
     useEffect(() => {
         void load(false);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

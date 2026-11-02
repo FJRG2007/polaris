@@ -34,10 +34,16 @@ function failed(detail: string, status: number): Error {
 /** The verdict for a request that was not answered or never sent. */
 function noOpinion(caught: unknown, fallback: string): VtVerdict {
     if (caught instanceof ProviderPaused && caught.reason === "budget") {
-        return { kind: "error", malicious: 0, suspicious: 0, detail: "VirusTotal used up today's requests" };
+        return {
+            kind: "error",
+            malicious: 0,
+            suspicious: 0,
+            detail: "VirusTotal used up today's requests"
+        };
     }
     const status = (caught as { status?: unknown } | null)?.status;
-    const detail = typeof status === "number" && caught instanceof Error ? caught.message : fallback;
+    const detail =
+        typeof status === "number" && caught instanceof Error ? caught.message : fallback;
     return { kind: "error", malicious: 0, suspicious: 0, detail };
 }
 /** Public API file-upload ceiling. Larger files can only be looked up by hash. */
@@ -89,14 +95,25 @@ export async function verifyKey(apiKey: string): Promise<{ ok: boolean; error?: 
             signal: AbortSignal.timeout(15000)
         });
         if (response.status === 401 || response.status === 403)
-            return { ok: false, error: (await readerWords("api"))("refusals.virusTotal.invalidKey") };
+            return {
+                ok: false,
+                error: (await readerWords("api"))("refusals.virusTotal.invalidKey")
+            };
         if (response.status >= 500)
-            return { ok: false, error: (await readerWords("api"))("refusals.virusTotal.unavailable", { status: response.status }) };
+            return {
+                ok: false,
+                error: (await readerWords("api"))("refusals.virusTotal.unavailable", {
+                    status: response.status
+                })
+            };
         return { ok: true };
     } catch (caught) {
         return {
             ok: false,
-            error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.virusTotal.unreachable")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await readerWords("api"))("refusals.virusTotal.unreachable")
         };
     }
 }

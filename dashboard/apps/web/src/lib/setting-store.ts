@@ -19,7 +19,11 @@ export async function setSetting(key: string, value: string | null): Promise<voi
         await prisma.setting.deleteMany({ where: { key } });
         return;
     }
-    await prisma.setting.upsert({ where: { key }, create: { key, value, scope: "global" }, update: { value } });
+    await prisma.setting.upsert({
+        where: { key },
+        create: { key, value, scope: "global" },
+        update: { value }
+    });
 }
 
 /**
@@ -27,7 +31,11 @@ export async function setSetting(key: string, value: string | null): Promise<voi
  * answer whether it did. Whoever loses a race reads again, so a count kept here
  * loses nothing to two writers at once.
  */
-export async function swapSetting(key: string, expected: string | null, value: string): Promise<boolean> {
+export async function swapSetting(
+    key: string,
+    expected: string | null,
+    value: string
+): Promise<boolean> {
     if (expected === null) {
         const { count } = await prisma.setting.createMany({
             data: [{ key, value, scope: "global" }],
@@ -35,6 +43,9 @@ export async function swapSetting(key: string, expected: string | null, value: s
         });
         return count === 1;
     }
-    const { count } = await prisma.setting.updateMany({ where: { key, value: expected }, data: { value } });
+    const { count } = await prisma.setting.updateMany({
+        where: { key, value: expected },
+        data: { value }
+    });
     return count === 1;
 }
