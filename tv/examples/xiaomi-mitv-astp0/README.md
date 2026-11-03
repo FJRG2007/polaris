@@ -76,13 +76,13 @@ Tested on Xiaomi MiTV-ASTP0 (`mulan`), Android 9, firmware `23.2.15.1886`.
 
 On this firmware, setting `app.polaris.tv` as the default Home activity returned success, but Android continued resolving Home to `com.mitv.tvhome/.MainActivityUserMode`.
 
-Building CleanYourTV with an alternative application ID resolved the issue:
+Building Polaris TV with an alternative application ID resolved the issue:
 
 ```bash
 ./gradlew assembleDebug -PlauncherApplicationId=com.ts.launcher --no-daemon
 ```
 
-After installing the APK, the following command successfully assigned CleanYourTV as the default Home application:
+After installing the APK, the following command successfully assigned Polaris TV as the default Home application:
 
 ```bash
 adb shell cmd package set-home-activity --user 0 com.ts.launcher/app.polaris.tv.MainActivity

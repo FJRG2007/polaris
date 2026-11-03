@@ -1,8 +1,8 @@
 # Sony K-85XR70 (`BRAVIA 4K AE2`, China): a 1080p UI, and a density that comes back as 640
 
 Two reports from the same owner of the same set: the launcher compatibility report in
-[#29](https://github.com/Gathin23/cleanyourtv/issues/29) (closed) and the display-density report in
-[#590](https://github.com/Gathin23/cleanyourtv/issues/590). There is no debloat list here and this is
+#29 (closed) and the display-density report in
+#590. There is no debloat list here and this is
 not an `examples/` entry - it is the display half of the picture, which is worth its own note because
 the symptom (an enlarged, clipped UI) reads like a broken launcher grid.
 
@@ -13,7 +13,7 @@ the symptom (an enlarged, clipped UI) reads like a broken launcher grid.
 | Retail model | Sony K-85XR70 |
 | Android model | `BRAVIA 4K AE2` / `BRAVIA_AE2` |
 | Android / SDK | Android 14 / 34, China firmware, no GMS |
-| Build id | `114.602.170.1` (China/CNA), from [#29](https://github.com/Gathin23/cleanyourtv/issues/29) |
+| Build id | `114.602.170.1` (China/CNA), from #29 |
 | Panel | 3840×2160, reported physical density 320 |
 | UI resolution | 1920×1080 |
 | Stock HOME | `com.dangbei.TVHomeLauncher/com.dangbei.leard.leradlauncher.ui.sony.main.MainActivity` |
@@ -21,14 +21,14 @@ the symptom (an enlarged, clipped UI) reads like a broken launcher grid.
 
 ## The 1080p UI is the firmware, not a setting you broke
 
-From [#29](https://github.com/Gathin23/cleanyourtv/issues/29): the panel is 4K but the Android UI runs
+From #29: the panel is 4K but the Android UI runs
 at 1920×1080, and asking for a 4K UI changed nothing. The firmware says so in its own properties:
 `ro.surface_flinger.max_graphics_width=1920`, `ro.surface_flinger.max_graphics_height=1080` and
 `ro.vendor.mtk.ui.resolution=2K`. That is the normal state of this model, so a 1080p UI is not
 evidence of damage and not something to "fix" on a set you don't own. Video playback and HDMI input
 are separate paths and #29 makes no claim about them.
 
-The [#590](https://github.com/Gathin23/cleanyourtv/issues/590) follow-up is a different problem in the
+The #590 follow-up is a different problem in the
 same place: the logical size stayed 1920×1080 and the runtime density went to 640, **twice the
 intended size**.
 

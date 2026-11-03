@@ -87,7 +87,7 @@ com.android.printspooler
 # com.google.android.youtube.tv        # optional: disable when using SmartTube (org.smarttube.stable)
 # com.netflix.ninja                    # optional: disable if unused
 
-# Remote shortcut handler on Mi Box S 2nd gen; disable when using CleanYourTV app_keys + InputKeyService
+# Remote shortcut handler on Mi Box S 2nd gen; disable when using Polaris TV app_keys + InputKeyService
 # (see README.md, build 683). Safe on 737 when you do not rely on app_keys.
 # com.xiaomi.android.tvsetup.partnercustomizer
 

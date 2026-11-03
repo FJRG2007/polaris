@@ -41,7 +41,7 @@ a job that mails on 1 alone stays quiet while the check never ran; mail on anyth
 well, and a weekly job on a home server or a Pi is enough to hear about it:
 
 ```bash
-0 9 * * 1 cd ~/cleanyourtv && TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/check.py examples/<your tv>/debloat.txt
+0 9 * * 1 cd ~/polaris/tv && TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/check.py examples/<your tv>/debloat.txt
 ```
 
 `TV_HOST` is read before any of that: a run that leaves it unset stops in `tools/tv.py` with its own

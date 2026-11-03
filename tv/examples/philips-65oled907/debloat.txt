@@ -26,7 +26,7 @@
 # What this list deliberately does NOT do, and why:
 #   * com.google.android.tvlauncher is NOT listed. launcher/build-and-install.sh disabled the stock
 #     launcher as part of the Home handover, and recorded its own restore snippet
-#     (~/cleanyourtv-handover-<host>.txt). Adding it here would make tools/restore.sh record it as
+#     (~/polaris-tv-handover-<host>.txt). Adding it here would make tools/restore.sh record it as
 #     "already disabled" and refuse to bring it back.
 #   * The streaming apps stay: com.netflix.ninja, com.amazon.amazonvideo.livingroom,
 #     com.google.android.youtube.tv and com.google.android.youtube.tvmusic. The 50PUS8517 and 65OLED706

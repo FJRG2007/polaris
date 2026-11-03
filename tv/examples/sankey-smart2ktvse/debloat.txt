@@ -50,7 +50,7 @@ com.mirakulo.astrotv.service   # Ginga interactive TV for ISDB-Tb broadcasts; di
 com.droidlogic.updater         # OTA updater
 com.droidlogic.appinstall      # App installer service
 
-# Stock launcher (disabled after CleanYourTV launcher is installed)
+# Stock launcher (disabled after Polaris TV launcher is installed)
 com.whaletv.launcher           # Original Whale TV launcher
 
 # Notes:

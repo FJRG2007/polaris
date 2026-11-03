@@ -36,7 +36,7 @@
 #     launcher removes them. What this list buys is the telemetry, the push channel, the persistent
 #     network poller, the ad SDK processes and the leftover preloads.
 #   * Everything is DISABLED (pm disable-user --user 0), never uninstalled. tools\disable.ps1 records
-#     each package's original state under %USERPROFILE%\.cleanyourtv\ before touching it, so
+#     each package's original state under %USERPROFILE%\.polaris-tv\ before touching it, so
 #     tools\restore.ps1 with this same file puts it all back.
 #   * Apply in batches, reboot after each one, and confirm the TV boots, the remote works, the input
 #     panel switches to HDMI and Wi-Fi is still up. A batch can take something load-bearing with it

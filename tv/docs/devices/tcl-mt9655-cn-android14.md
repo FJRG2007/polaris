@@ -1,7 +1,7 @@
 # TCL / FFalcon MT9655 China (Android 14): debloat works, launcher and sideloading do not
 
-Checked on a real TV in one session on 2026-10-21, using upstream
-`Gathin23/cleanyourtv` at the commit cloned that day (launcher 2.4 built from source).
+Checked on a real TV in one session on 2026-10-21, using the
+repository at the commit cloned that day (launcher 2.4 built from source).
 The debloat list lives in [`examples/tcl-mt9655-cn-android14/`](../../examples/tcl-mt9655-cn-android14/debloat.txt).
 
 ## Identify the firmware, not the brand

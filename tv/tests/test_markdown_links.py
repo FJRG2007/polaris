@@ -251,7 +251,7 @@ class AnchorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "note.md").write_text(
-                "[issue](https://github.com/Gathin23/cleanyourtv/issues/795#issuecomment-1)\n"
+                "issue\n"
                 "[top](#)\n",
                 encoding="utf-8")
             self.assertEqual([], dangling_anchors(root))

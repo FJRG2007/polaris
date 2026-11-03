@@ -39,7 +39,7 @@
 # Both mappings need HOME_KEY_SERVICE=1. With it bound, a held volume key moves one step instead of
 # ramping (the trade in docs/devices/tcl-55p71b-g09-key-repeat.md); consume_volume_keys did not help,
 # because the window policy applies the volume before the helper sees it. The owner kept the buttons.
-# Home here was Cosy Home (SHOWCASE.md); the CleanYourTV launcher stayed installed for its helper.
+# Home here was Cosy Home (SHOWCASE.md); the Polaris TV launcher stayed installed for its helper.
 #
 # Already disabled before this list (by the firmware or an earlier owner), left as they were:
 # azan.android.av.sharp.co.jp, jp.co.sharp.av.android.tw.sharpcocorovision, fusion.android.tv.demosem,

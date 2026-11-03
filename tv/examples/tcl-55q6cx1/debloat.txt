@@ -13,7 +13,7 @@
 # app.polaris.tv as native default Home). Live TV / HDMI app: com.tcl.tv. Inputs: com.tcl.tvinput.
 #
 # TESTING, honestly:
-# Tested on a live unit in Germany and lived with. Verified across reboots: CleanYourTV reference launcher is the default
+# Tested on a live unit in Germany and lived with. Verified across reboots: Polaris TV reference launcher is the default
 # Home on boot and Home key press; HDMI inputs 1-3 switch normally; DVB Live TV / tuner works; TV Picture and
 # Sound settings open; screensaver and sleep timers start; casting (AirPlay, Chromecast, Miracast) works.
 # The recovery record tools/disable.sh writes was kept, and the restore path was tested.

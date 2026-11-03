@@ -1,6 +1,6 @@
 # Xiaomi Laser Cinema 2 4K (`nemo`): the launcher installs, Home stays with PatchWall
 
-Report for [#2415](https://github.com/Gathin23/cleanyourtv/issues/2415), one unit, same-day checks plus
+Report for #2415, one unit, same-day checks plus
 a reboot. This is a device note, not a debloat list anyone should copy: the packages below are one
 owner's choices on one firmware build. The debloat half of a run works here; replacing Home does not,
 and the reason is in the firmware rather than in the launcher.
@@ -138,6 +138,6 @@ set can say which of these they still want off after living with it.
 - No OTA was observed, so whether an update changes `ro.formovie.launcher_type` (and with it the HOME
   filter) is unknown.
 - The existing Formovie records are other products on other platforms — `MiProjM05` (`eva`, Amlogic,
-  [#928](https://github.com/Gathin23/cleanyourtv/pull/928)) and `Theater`/`hanlla` (Android TV 14,
-  [#1932](https://github.com/Gathin23/cleanyourtv/pull/1932)) — and none of them validates this
+  #928) and `Theater`/`hanlla` (Android TV 14,
+  #1932) — and none of them validates this
   `nemo`/PatchWall build.

@@ -1,6 +1,6 @@
 # JVC 4K Smart TV (KTC, elliniko), Google TV 14
 
-Tested on build `UKN4.250714.142` for a week with `debloat.txt` applied and the CleanYourTV launcher as Home.
+Tested on build `UKN4.250714.142` for a week with `debloat.txt` applied and the Polaris TV launcher as Home.
 
 ## Remote keys
 

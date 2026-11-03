@@ -4,7 +4,7 @@ TCL 55C745, device `G08`, model "Smart TV Pro", product `G08_4K_GB`, firmware `U
 MediaTek `tcl9618`, about 2.4 GB RAM. The same firmware build as examples/tcl-q7c-google-tv and
 examples/tcl-85rm7l-google-tv, and the same G08 board as the C755, QM6K and 75T7 (US) lists. Set up on
 Ethernet; a France/UK household (French and UK catch-up apps alongside Stremio and a third-party YouTube
-client). Both halves work on this set: the debloat list and the Clean Your TV launcher as Home.
+client). Both halves work on this set: the debloat list and the Polaris TV launcher as Home.
 
 Not every 65C745 is a G08: a 65C745 from France reports `G05_4K_GB` (Google TV 11, build `AR2101`). Check
 `ro.product.name` first; a G05 set belongs with examples/tcl-65c735.
@@ -75,5 +75,5 @@ TV_HOST=<tv-ip> tools/theme.sh --reset
 ## Second unit: 65Q6C, Ethernet
 
 TCL 65Q6C, model "Smart TV Pro", device `G08`, product `G08_4K_GB`, the same `UTT2.250416.001 AU02`, on
-Ethernet. Owner report from 28 October 2026: the debloat and the Clean Your TV launcher worked, Home stayed on
+Ethernet. Owner report from 28 October 2026: the debloat and the Polaris TV launcher worked, Home stayed on
 `app.polaris.tv` after a reboot, and the Home and Settings keys worked.

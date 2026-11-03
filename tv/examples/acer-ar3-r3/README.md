@@ -72,7 +72,7 @@ normally, and `tile_menu`'s Move still works (hold OK, arrow keys carry the tile
 ### Bluetooth Connect add-on (optional, personal choice)
 
 The launcher has no built-in Bluetooth pill. On the tested unit the
-[Bluetooth Connect](../../addons/bluetooth-connect/) add-on (`com.gathin.btconnect`) was installed
+[Bluetooth Connect](../../addons/bluetooth-connect/) add-on (`app.polaris.tv.btconnect`) was installed
 as a personal convenience, purely by the owner's own choice and not part of the debloat or launcher
 steps above: it lists paired speakers with their connection state, and OK connects or disconnects.
 Skip this section entirely if you have no need for it; nothing else in this list or `config.json`
@@ -85,7 +85,7 @@ TV_HOST=<tv ip> addons/bluetooth-connect/install.sh
 
 (On Windows, without a POSIX shell: build with `addons/bluetooth-connect`'s own `gradlew`, then
 `tools/b64push.py` the APK, `pm install -r` it over `tools/tv.py`, and grant
-`BLUETOOTH_CONNECT` with `pm grant com.gathin.btconnect android.permission.BLUETOOTH_CONNECT`.)
+`BLUETOOTH_CONNECT` with `pm grant app.polaris.tv.btconnect android.permission.BLUETOOTH_CONNECT`.)
 
 ### YouTube remote button: hardware-level, cannot be remapped
 
@@ -118,4 +118,4 @@ TV_HOST=<tv ip> tools/theme.sh --reset
 Uninstall the launcher (`pm uninstall app.polaris.tv`) to give the Home button back to the stock
 launcher (`pm enable --user 0 com.google.android.tvlauncher` first, since it was disabled as part of
 the handover). If you installed the optional Bluetooth Connect add-on, `pm uninstall
-com.gathin.btconnect` removes it too; it is unrelated to the rest of the undo.
+app.polaris.tv.btconnect` removes it too; it is unrelated to the rest of the undo.

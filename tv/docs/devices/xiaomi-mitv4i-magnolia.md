@@ -5,7 +5,7 @@ This is a launcher-only record; no debloat list was applied.
 
 ## Launcher and inputs
 
-CleanYourTV was installed from this repository and confirmed as the Home launcher.
+Polaris TV was installed from this repository and confirmed as the Home launcher.
 The Inputs menu showed HDMI 1–3 and AV, and YouTube was available.
 
 ## Configured layout

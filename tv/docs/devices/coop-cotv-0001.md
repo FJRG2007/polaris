@@ -1,7 +1,7 @@
 # COOP COTV-0001 (Realtek rtd298x, Android 4.4.2, Argentina)
 
 Report for a KitKat-era set sold by Cooperativa RENACER (Ushuaia) as "TV LED HD SMART". Source:
-issue [#795](https://github.com/Gathin23/cleanyourtv/issues/795). The first report ended with the
+issue #795. The first report ended with the
 cause unknown and the set written off; the same reporter then isolated the cause, recovered the TV and
 re-applied the list in batches. That second half is why this note exists — the merged bullet in
 `docs/TROUBLESHOOTING.md` had said a set stuck this way was unrecoverable.

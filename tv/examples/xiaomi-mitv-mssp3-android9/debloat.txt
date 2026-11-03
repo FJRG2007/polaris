@@ -53,7 +53,7 @@
 #   com.google.android.backdrop/.Backdrop, which this list already disables.
 # - The older Android TV home is still installed and enabled next to tvlauncher, and its receiver runs at
 #   every boot: com.google.android.leanbacklauncher and com.google.android.leanbacklauncher.recommendations.
-#   Both disabled here with the CleanYourTV launcher as Home, and Home kept resolving to it.
+#   Both disabled here with the Polaris TV launcher as Home, and Home kept resolving to it.
 # - The voice assistant stayed disabled across a power cycle on this build (pm list packages -d a minute
 #   after boot), unlike PI.7524 above.
 # - After 7 days of uptime MemAvailable was about 740 MB and adbd stalled; a minute after a cold boot with

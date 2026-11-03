@@ -2,7 +2,7 @@
 
 EU set, firmware `UKN6.260116.152` (MediaTek, CVTE-family board), 1080p panel with the UI rendered at
 1280x720 (`wm size` override is the factory default here). Both halves work on this set: the debloat
-list and the Clean Your TV launcher as Home. Tested on 23 October 2026 on one set, including two
+list and the Polaris TV launcher as Home. Tested on 23 October 2026 on one set, including two
 reboots, with the real remote.
 
 | File | What it is |

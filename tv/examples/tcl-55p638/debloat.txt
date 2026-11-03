@@ -1,6 +1,6 @@
 # TCL 55P638 (reports "Smart TV", device BeyondTV4), Android TV 11.
 # Build RP1A.200622.001 release-keys.
-# Package persistence and CleanYourTV Home verified after reboot on 2026-10-21.
+# Package persistence and Polaris TV Home verified after reboot on 2026-10-21.
 # BrowseHere was disabled afterward; the owner confirmed normal TV operation.
 #
 # Apply: TV_HOST=<tv ip> tools/disable.sh examples/tcl-55p638/debloat.txt

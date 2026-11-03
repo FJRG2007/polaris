@@ -36,7 +36,7 @@ is not installed is simply skipped.
 ## Self-navigation with the remote's batteries out
 
 The reporter saw the TV navigate on its own, with the remote's batteries removed and after two or
-three factory resets, and did not attribute it to CleanYourTV or to HDMI. A set that moves by itself
+three factory resets, and did not attribute it to Polaris TV or to HDMI. A set that moves by itself
 with no remote in play is almost always another device sending key presses, not the TV:
 
 - **HDMI-CEC from a source device.** Switch HDMI-CEC off in the TV's settings, or unplug HDMI devices

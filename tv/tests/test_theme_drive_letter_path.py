@@ -2,7 +2,7 @@
 
 Under Git Bash, coding agents and people often pass the theme folder as C:/Users/.../themes/aurora, which the
 Windows Python opens as typed. theme.sh only took /... as absolute, so it joined C:/... onto the caller's folder
-and stopped with "no config.json in C:/Users/me/cleanyourtv/C:/Users/me/themes/aurora". A drive-letter path now
+and stopped with "no config.json in C:/Users/me/polaris/tv/C:/Users/me/themes/aurora". A drive-letter path now
 goes through the same branch as /c/Users/...: cd and pwd -W resolve it, or it is kept as typed.
 
 Linux and macOS have no drives, so a folder named Q: stands in for one. Nothing named Q: is in the caller's

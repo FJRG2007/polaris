@@ -1,7 +1,7 @@
 # Dangbei DBBOXH3 (当贝盒子 H3, Rockchip `rk356x_box`)
 
 Android 11 (API 30), build `RD2A.211001.002`, stock launcher `com.dangbei.leard.leradlauncher`. One
-session, reported in [#2286](https://github.com/Gathin23/cleanyourtv/issues/2286); no debloat list was
+session, reported in #2286; no debloat list was
 kept. The note is here for one package: its name reads like a promo downloader any list would drop, and
 on this firmware dropping it takes `system_server` with it.
 

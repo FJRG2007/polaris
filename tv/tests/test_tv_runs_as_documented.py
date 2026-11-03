@@ -29,7 +29,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "tv.py"
 # tv.py sets this before it starts the venv's Python, so a venv without adb_shell does not start itself again.
-MARK = "CLEANYOURTV_TV_PY_VENV"
+MARK = "POLARIS_TV_TV_PY_VENV"
 MAKE_VENV = (r"python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt"
              if os.name == "nt" else
              "python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt")

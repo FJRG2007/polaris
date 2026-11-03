@@ -2,7 +2,7 @@
 
 An owner report from 2026-10-28, with a read-back of every button on the physical remote. It is not a debloat
 list and not a launcher option. It extends the Android 12 note for the VH22
-([sony-bravia-4k-vh22-settings-key.md](sony-bravia-4k-vh22-settings-key.md), [#1680](https://github.com/Gathin23/cleanyourtv/issues/1680))
+([sony-bravia-4k-vh22-settings-key.md](sony-bravia-4k-vh22-settings-key.md), #1680)
 in two ways: it covers the remote's five app buttons as well as Settings, and it records what changes on
 **Android 14**, where that note's selection step silently does nothing.
 
@@ -17,7 +17,7 @@ in two ways: it covers the remote's five app buttons as well as Settings, and it
 | Firmware build | `BRAVIA_AE2_EU-user 14 UKN4.250422.001 603100 release-keys` |
 | Remote | `SONY TV VRC 001`, vendor `054c`, product `0x0eae` (Bluetooth), `KeyboardType: 1` in `dumpsys input` |
 
-The launcher is CleanYourTV v3.1 as Home. `launcherx` and `setupwraith` are disabled, no accessibility
+The launcher is Polaris TV v3.1 as Home. `launcherx` and `setupwraith` are disabled, no accessibility
 service is bound, and `setupwraith` did not own the saved Wi-Fi network (`cname=android.uid.system`).
 
 ## The problem

@@ -4,8 +4,7 @@
 # com.amazon.franktvinput and com.amazon.hedwig sit under its Live tab and inputs.
 #
 # FIRE OS: DEBLOAT ONLY with the stock repo. Amazon's launcher is a protected package and keeps Home. To replace what
-# Home looks like on this set, see https://github.com/jeanbuntu/cleanyourtv/tree/fire-tv-launcher (a launcher plus a
-# Home watcher, kept in its own fork).
+# Home looks like on this set takes a launcher plus a Home watcher, which this repository does not ship.
 #
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/insignia-ns42f201na22/debloat.txt
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/insignia-ns42f201na22/debloat.txt com.amazon.tv.launcher

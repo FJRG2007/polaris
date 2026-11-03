@@ -3,7 +3,7 @@
 Checked on one physical Android TV set-top box on 2026-10-21. The box already had
 a working replacement Home and owner-chosen package disables. This report covers
 an in-place update to upstream main
-[`3e996739`](https://github.com/Gathin23/cleanyourtv/commit/3e996739ce0b470b51c1c438bf5d0559d1c9e7eb),
+`3e996739`,
 including a reboot. It does not supply a package-disable list or establish the
 initial carrier-launcher handover on factory firmware.
 
@@ -18,14 +18,14 @@ initial carrier-launcher handover on factory firmware.
 | Security patch | `2025-06-05` |
 
 The device and firmware details were previously shared in
-[discussion #254](https://github.com/Gathin23/cleanyourtv/discussions/254).
+discussion #254.
 Earlier launcher validation is recorded in
-[PR #412](https://github.com/Gathin23/cleanyourtv/pull/412); the checks below
+PR #412; the checks below
 describe the newer, unmodified upstream application source.
 
 ## Carrier-update takeover during earlier setup
 
-As recorded in [discussion #254](https://github.com/Gathin23/cleanyourtv/discussions/254),
+As recorded in discussion #254,
 the carrier update installed DIRECTV interface `34.4.9.255`, took back the Home
 preference and restarted the box after earlier Home/reboot checks had passed.
 The observed updater and installer were `com.att.ngc.swdl.service` and

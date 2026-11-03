@@ -192,7 +192,7 @@ class ThisRepositoryTest(unittest.TestCase):
         self.assertEqual(readme, examples)
         self.assertEqual(readme, sorted(readme, key=str.casefold))
 
-    @unittest.skipUnless(os.environ.get("CLEANYOURTV_STRICT"), "tables are generated on merge; strict on main only")
+    @unittest.skipUnless(os.environ.get("POLARIS_TV_STRICT"), "tables are generated on merge; strict on main only")
     def test_the_committed_tables_are_sorted(self):
         # What main shows a reader, not only what the script would write.
         for path, header, cell in (("README.nl.md", "| TV | OS |", 1), ("examples/README.md", "| Folder |", 2)):
@@ -233,7 +233,7 @@ class GeneratorTest(unittest.TestCase):
             self.assertEqual(section(examples, "tv-table")[-1],
                              "| `tcl-c/` | TCL C | Android TV 11 | `com.tcl.ads` disabled |")
             self.assertEqual(section(readme, "tv-brands"), GRID_HEAD + [
-                "| [TCL](https://cleanyour.tv/tvs?q=TCL) · 2 | [Sony](https://cleanyour.tv/tvs?q=Sony) · 1 "
+                "| TCL · 2 | Sony · 1 "
                 "|  |  |  |  |"])
             self.assertIn('"3 TV models · 2 brands · 3 languages · 1 KB launcher"', readme)
             self.assertIn("| **3 languages** | yes |", readme)
@@ -263,7 +263,7 @@ class GeneratorTest(unittest.TestCase):
             # brands with more than one list, then single-list brands, then the projector makers. BenQ also
             # makes TVs, so it stays off the projector line.
             self.assertEqual(section(readme, "tv-brands"), GRID_HEAD + [
-                "| [Sony](https://cleanyour.tv/tvs?q=Sony) · 3 | [BenQ](https://cleanyour.tv/tvs?q=BenQ) · 2 "
+                "| Sony · 3 | BenQ · 2 "
                 "|  |  |  |  |",
                 "<details>",
                 "<summary>+2 more brands and 2 projector brands</summary>",

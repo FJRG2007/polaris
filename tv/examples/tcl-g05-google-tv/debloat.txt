@@ -80,7 +80,7 @@ com.google.android.videos              # Google TV / Play Movies storefront
 # com.tubitv
 # com.plexapp.android
 
-# For the Clean Your TV launcher (see "Replacing the launcher" above). disable.sh skips it while it owns
+# For the Polaris TV launcher (see "Replacing the launcher" above). disable.sh skips it while it owns
 # the saved Wi-Fi network; launcherx goes later, in launcher/build-and-install.sh.
 com.google.android.tungsten.setupwraith
 

@@ -2,7 +2,7 @@
 
 Toptech + Zeasn board on a Realtek RTK2842P (`rtd285o`). Android reports the model as `AT_SmartScreen`, panel
 `13AT204V10_PAS`, firmware `AT_SmartScreen-userdebug 9 RTK2842P eng.arge.20220324.112716`. Tested in Italy in
-October 2026: the debloat list and the Clean Your TV launcher as Home.
+October 2026: the debloat list and the Polaris TV launcher as Home.
 
 | File | What it is |
 |---|---|

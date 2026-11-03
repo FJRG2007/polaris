@@ -118,7 +118,7 @@ class ReaderTest(unittest.TestCase):
         self.assertTrue(HOME_FOLDER.search("JAVA_HOME=/Users/someone/jdk17"))
         self.assertFalse(HOME_FOLDER.search("sdk.dir=C:/Users/<user name>/AppData/Local/Android/Sdk"))
         self.assertFalse(HOME_FOLDER.search(r"$env:JAVA_HOME='<path to JDK 17>'"))
-        self.assertFalse(HOME_FOLDER.search("/Users/Shared/cleanyourtv"))
+        self.assertFalse(HOME_FOLDER.search("/Users/Shared/polaris"))
 
 
 class DocAddressesTest(unittest.TestCase):

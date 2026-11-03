@@ -1,7 +1,7 @@
 # BenQ GV32 (Google TV 14 portable projector)
 
 SDMC-built board (product `BenQ_GV01`, device `himalaya`, MediaTek m7332, 1.8 GB RAM), firmware
-UKNV.260626.001. Both halves work: the debloat list and the Clean Your TV launcher as Home. Tested on
+UKNV.260626.001. Both halves work: the debloat list and the Polaris TV launcher as Home. Tested on
 21 October 2026.
 
 | File | What it is |

@@ -1,6 +1,6 @@
 # TCL 55P71B Pro (G09, Google TV 12): a bound key helper costs remote key auto-repeat
 
-Owner report: [#763](https://github.com/Gathin23/cleanyourtv/issues/763). One unit, one session: TCL
+Owner report: #763. One unit, one session: TCL
 55P71B Pro "Smart TV Pro", device `G09`, Android 12 (Google TV), firmware `STT2.230203.001.AS23`,
 Amlogic.
 
@@ -80,7 +80,7 @@ the buttons and the volume ramp cannot both be had, because both need the same f
 
 ## The same trade on a Xiaomi MediaTek set
 
-A second owner reported it on [#944](https://github.com/Gathin23/cleanyourtv/issues/944): Xiaomi
+A second owner reported it on #944: Xiaomi
 MiTV-MOSR4 (`irobot`, MediaTek), Google TV / Android 11 (SDK 30), firmware `RTM5.220609.003.1265`.
 Holding volume up with `InputKeyService` and `HomeKeyService` bound moves it one step, and
 `InputKeyService` alone is still one step; `dumpsys accessibility` lists the bound service with
@@ -215,7 +215,7 @@ for, and with 800 set that action still fired 400 ms after the down, before and 
 
 A version the sections above do not have: Xiaomi Mi TV 4A (MiTV-MOOQ1, `tarzan`, MediaTek), Android TV 10
 (SDK 29), firmware `QTG3.200305.006.6148`, stock Xiaomi Bluetooth remote, launcher built from a `main`
-download of 2026-10-28 ([#2446](https://github.com/Gathin23/cleanyourtv/issues/2446)).
+download of 2026-10-28 (#2446).
 `com.google.android.tvlauncher` was disabled by `launcher/build-and-install.sh`, and the two buttons this
 owner wanted reach the stock launcher by name rather than through a vendor keycode:
 
@@ -241,7 +241,7 @@ owner wanted reach the stock launcher by name rather than through a vendor keyco
 | `''`, with `accessibility_enabled 0` | ramps continuously |
 | `InputKeyService` written back | one step per press again |
 
-The third row is the measurement [#944](https://github.com/Gathin23/cleanyourtv/issues/944) could not take.
+The third row is the measurement #944 could not take.
 Clearing the list kills both buttons here too, so it is a test and not a configuration to stay in, but it was
 run to see the ramp come back - which is why the sentence above no longer rests on the G09 alone.
 `consume_volume_keys` was not tried, and `HomeKeyService` alone was not tried either, so this set gives one

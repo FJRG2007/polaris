@@ -1,7 +1,7 @@
 # TCL Smart TV, G06 (Google TV 11, US firmware)
 
 MediaTek MT9221 board (device `G06`, product `G06_2K_US`), build AR2101 / AR38, TCL software
-V8-T221T04-LF1V122. Both halves work: the debloat list and the Clean Your TV launcher as Home, with
+V8-T221T04-LF1V122. Both halves work: the debloat list and the Polaris TV launcher as Home, with
 Google TV's home kept behind it for the remote's app buttons. Tested on 31 October 2026.
 
 | File | What it is |

@@ -1,6 +1,6 @@
 # Hisense VIDAA_TV / NOVA72691 (70V1F-S, Android 9): the stock launcher holds HOME and boot
 
-Owner-observed note, measured on 2026-10-28/29. CleanYourTV's no-root flow **cannot** take HOME on this set.
+Owner-observed note, measured on 2026-10-28/29. Polaris TV's no-root flow **cannot** take HOME on this set.
 This note is deliberately long: the failure modes on this firmware are non-obvious, and most of them look like
 "the tool is broken" when they are actually the firmware refusing to let a third-party window become the home.
 

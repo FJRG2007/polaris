@@ -63,7 +63,7 @@ and are about 61 MB free, not 24 MB.
 A third-party Home is a background process between app launches, so on a 890 MB
 set it sits right inside that band. Protecting the Home process from outside the
 launcher fixed it; the launcher itself needs no change, and nothing here suggests
-this is a CleanYourTV bug, since the stock launcher was killed the same way.
+this is a Polaris TV bug, since the stock launcher was killed the same way.
 Anyone running a third-party Home on an Mstar CHiQ OS set with 1 GB of RAM should
 expect this and should not read it as the launcher misbehaving.
 

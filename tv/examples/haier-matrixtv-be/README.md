@@ -4,7 +4,7 @@ One Haier MatrixTV BE on firmware `UKNV.260313.001` was checked from 31 October 
 1 November 2026. This was a short trial with one reboot, not a multi-day soak.
 The owner reported that Home, streaming, Live TV, HDMI, Wi-Fi and the physical
 remote buttons used below were working after the cleanup. The package list and
-the CleanYourTV launcher both worked on this set.
+the Polaris TV launcher both worked on this set.
 
 | File | Purpose |
 |---|---|
@@ -36,7 +36,7 @@ The last line pushes the example dock and key mappings. A pushed theme replaces
 the previous theme; the owner used a private copy of `themes/scenes` with these
 mappings and `dock_glass: true` for the final look.
 
-To restore the recorded package and Home state, turn off CleanYourTV's
+To restore the recorded package and Home state, turn off Polaris TV's
 InputKeyService under the TV's Accessibility settings, then run:
 
 ```bash
@@ -58,7 +58,7 @@ two buttons have the same Android scancode but different Android keycodes.
 | Button | Raw event on this set | Android key | Tested result |
 |---|---|---|---|
 | TV | `MSC_SCAN 000c006f`, Linux `KEY_BRIGHTNESSUP` / scan 225 | Scan 225 in the launcher mapping | Opens `com.mediatek.wwtv.tvcenter` (Live TV) |
-| Settings gear | `MSC_SCAN 000c009f`, Linux `KEY_UNKNOWN` | `KEYCODE_NOTIFICATION` (83), scan 240 | Opens CleanYourTV's quick settings panel |
+| Settings gear | `MSC_SCAN 000c009f`, Linux `KEY_UNKNOWN` | `KEYCODE_NOTIFICATION` (83), scan 240 | Opens Polaris TV's quick settings panel |
 | Three-line button | `MSC_SCAN 000c0071`, Linux `KEY_UNKNOWN` | `KEYCODE_3D_MODE` (206), scan 240 | Distinct from gear; leave unmapped here |
 
 Do **not** map Android scan 240 to Settings or Live TV: both gear and

@@ -1,4 +1,4 @@
-# HY320 Projector — CleanYourTV Setup
+# HY320 Projector — Polaris TV Setup
 
 ## Device
 - **Model**: HY320 projector (t950s_be311, Google-certified Android TV)

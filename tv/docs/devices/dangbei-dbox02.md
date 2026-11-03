@@ -1,6 +1,6 @@
 # Dangbei DBOX02 (Mars Pro 2): initial Android TV 11 setup
 
-This note records the owner's [single-session report and follow-up](https://github.com/Gathin23/cleanyourtv/issues/2162), not a several-day tested debloat list. The device runs Android TV 11 (SDK 30), firmware `RTM9.241015.060`. The reference launcher was built from source. The owner checked Home, the remote and package state after a reboot, then turned debugging off and confirmed the ADB port was closed after another reboot.
+This note records the owner's single-session report and follow-up, not a several-day tested debloat list. The device runs Android TV 11 (SDK 30), firmware `RTM9.241015.060`. The reference launcher was built from source. The owner checked Home, the remote and package state after a reboot, then turned debugging off and confirmed the ADB port was closed after another reboot.
 
 Do not apply another projector's list just because it also has MediaTek components. The ten packages below describe this owner's choices on this firmware; they are not a ready-to-apply list.
 

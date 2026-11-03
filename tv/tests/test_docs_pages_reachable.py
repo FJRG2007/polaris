@@ -115,7 +115,7 @@ class CheckerTest(unittest.TestCase):
 
     def test_an_address_of_the_page_elsewhere_is_not_a_link_into_the_tree(self):
         root = self.tree({
-            "README.md": "https://github.com/Gathin23/cleanyourtv/blob/main/docs/lost.md\n",
+            "README.md": "https://example.com/tv/blob/main/docs/lost.md\n",
             "docs/lost.md": "# lost\n",
         })
         self.assertEqual(["docs/lost.md"], unlinked_docs(root))

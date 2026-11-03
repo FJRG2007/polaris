@@ -36,7 +36,7 @@ The Linux AAPT2 that the Android Gradle plugin downloads is built for x86-64 onl
 the image as `linux/amd64` whatever the computer is; Docker Desktop runs it under Rosetta (turn on "Use Rosetta for
 x86_64/amd64 emulation" in its settings) or QEMU, and Colima needs
 `colima start --vm-type vz --vz-rosetta`. On an M-series Mac the first build took about 7 minutes and
-later ones well under a minute (an owner report). Before this, an
+later ones well under a minute (#2941). Before this, an
 arm64 image stopped at `:app:mergeReleaseResources` with `AAPT2 aapt2-8.5.2-11315950-linux Daemon #0: Daemon
 startup failed` or `rosetta error: failed to open elf at /lib64/ld-linux-x86-64.so.2`. If an older copy of the
 script left that arm64 image behind, remove it once so the next run builds the right one:

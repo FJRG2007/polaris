@@ -40,7 +40,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-MARKER = "CLEANYOURTV_TRACE_PY_VENV"
+MARKER = "POLARIS_TV_TRACE_PY_VENV"
 
 # tools/venv/bin/python, as the tests make it: it records what it was started with and stops there. A
 # re-exec that never happened leaves no file, which is how "the venv was not started" is checked.

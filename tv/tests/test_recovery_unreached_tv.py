@@ -145,7 +145,7 @@ class Tree:
                               timeout=120)
 
     def record(self):
-        files = list((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        files = list((self.home / ".polaris-tv").glob("recovery-*.json"))
         return json.loads(files[0].read_text()) if files else None
 
 
@@ -172,8 +172,8 @@ class UnreachedTvTest(unittest.TestCase):
         result = tree.run("--save", str(tree.list_path), host="127.0.0.1", port=1)
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("refused the connection: nothing listens for ADB there", result.stderr)
-        self.assertIn("cleanyour.tv/not-android", result.stderr,
-                      "the page for a set with no ADB is part of tv.py's sentence")
+        self.assertIn("There's no ADB to connect to", result.stderr,
+                      "the line for a set with no ADB is part of tv.py's sentence")
         self.assertIn(NOTHING, result.stderr)
         self.assertNotIn("Traceback", result.stderr)
         self.assertEqual("", result.stdout)

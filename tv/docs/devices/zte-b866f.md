@@ -1,7 +1,7 @@
 # ZTE ZXV10 B866F V1.1 (Amlogic `oppen`, Android TV 14): disabling every system launcher triggers a factory reset on the next boot
 
 Android TV 14 (SDK 34), build `EBS.UKG3.250115.001` on the ZTE `oppen` board, reported in
-[#2318](https://github.com/Gathin23/cleanyourtv/pull/2318). This is a hazard note, not an `examples/`
+#2318. This is a hazard note, not an `examples/`
 list: on this box, disabling every `FLAG_SYSTEM` launcher makes ZTE's `com.control.device` watchdog
 broadcast `android.intent.action.FACTORY_RESET` about a minute after the next boot.
 

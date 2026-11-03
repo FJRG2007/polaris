@@ -1,6 +1,6 @@
 # Xiaomi Mi Box S 2nd gen (MiTV-AFKR0) — validated variants
 
-Stock list: [`debloat.txt`](debloat.txt) (disable `launcherx` and `setupwraith` only after CleanYourTV owns Home).
+Stock list: [`debloat.txt`](debloat.txt) (disable `launcherx` and `setupwraith` only after Polaris TV owns Home).
 
 ## RTT0.211222.001.683 (EU remote map)
 
@@ -12,7 +12,7 @@ for YouTube; on **683** the same remote uses **scancodes** instead — do not co
 
 | Package | Why |
 | --- | --- |
-| `com.xiaomi.android.tvsetup.partnercustomizer` | Stock shortcut handler; disable when using CleanYourTV `app_keys` with **InputKeyService** / **HomeKeyService** |
+| `com.xiaomi.android.tvsetup.partnercustomizer` | Stock shortcut handler; disable when using Polaris TV `app_keys` with **InputKeyService** / **HomeKeyService** |
 | `com.google.android.youtube.tv` | Optional: disable when using SmartTube (`org.smarttube.stable`) |
 | `com.netflix.ninja` | Optional: disable if unused |
 

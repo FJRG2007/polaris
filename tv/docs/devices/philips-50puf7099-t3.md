@@ -46,7 +46,7 @@ while it lives it can put the BestV launcher back and wipe the whole debloat lis
 
 The list disables all three. **The price is system OTA**: firmware updates have to be sideloaded by
 hand from then on. If you want OTA, drop `tv.fun.tvupgrade` from the list, but know that the set may
-then restore its own launcher over the CleanYourTV home.
+then restore its own launcher over the Polaris TV home.
 
 ## The screensaver had to be pointed somewhere
 

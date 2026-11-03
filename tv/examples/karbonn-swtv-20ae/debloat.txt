@@ -18,10 +18,10 @@
 #   settings put global transition_animation_scale 0.5
 #   settings put global animator_duration_scale 0.5
 #   settings put global background_process_limit 2
-# Set reduced_motion: true in your theme's config.json for the CleanYourTV launcher.
+# Set reduced_motion: true in your theme's config.json for the Polaris TV launcher.
 #
 # Unit 2 (Motorola SWTV-20AE), applied 2026-10-23 in batches with a screenshot after each, then the
-# CleanYourTV launcher with HomeKeyService; Home, helpers and every disable held over two reboots.
+# Polaris TV launcher with HomeKeyService; Home, helpers and every disable held over two reboots.
 # Seen on that unit:
 # - com.google.android.tvrecommendations froze system_server's main thread for 2 s every 32 s
 #   (logcat: "Slow dispatch took 2002ms ... AlarmManager", just before its ForegroundActivityTrackerJobService).

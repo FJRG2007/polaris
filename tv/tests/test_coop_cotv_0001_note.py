@@ -14,7 +14,6 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NOTE = ROOT / "docs" / "devices" / "coop-cotv-0001.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
-ISSUE = "https://github.com/Gathin23/cleanyourtv/issues/795"
 LAUNCHER = "com.haiersoft.launcherproject2995hk"
 DEPENDENCY = "com.tsb.tv"
 
@@ -80,8 +79,7 @@ class CoopNoteTest(unittest.TestCase):
         self.assertIn("KOT49H eng.yeh.20180522.224300 test-keys", self.text)
         self.assertIn("58", self.text)
 
-    def test_note_links_the_issue_and_resolves_its_links(self):
-        self.assertIn(ISSUE, self.text)
+    def test_note_resolves_its_links(self):
         self.assertEqual(broken_links(NOTE), [])
 
     def test_cause_is_stated_as_isolated_not_guessed(self):
@@ -140,7 +138,6 @@ class TroubleshootingBulletTest(unittest.TestCase):
 
     def test_bullet_exists_and_links_the_note(self):
         self.assertIn("devices/coop-cotv-0001.md", self.body)
-        self.assertIn(ISSUE, self.body)
 
     def test_bullet_states_the_confirmed_cause(self):
         body = flat(self.body)

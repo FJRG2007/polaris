@@ -3,7 +3,7 @@
 TCL Q7C QD-Mini LED, device `G08`, model "Smart TV Pro", product `G08_4K_GB`, firmware `UTT2.250416.001 AU02`,
 MediaTek `tcl9618`, about 2.4 GB RAM. The same firmware build as the 85RM7L list and the same G08 board as the
 C755, QM6K and 75T7 (US) lists. Set up on Ethernet in Austria. Both halves work on this set: the debloat list and the
-Clean Your TV launcher as Home.
+Polaris TV launcher as Home.
 
 | File | What it is |
 |---|---|
@@ -404,7 +404,7 @@ was added to `debloat.txt` beyond a header line naming this unit; the deltas are
 
 One `Smart TV Pro`, device `G08`, product `G08_4K_GB`, Android TV 14 (SDK 34), build
 `tcl9618-user 14 UTT2.250416.001 AU02 release-keys`. The retail model was not confirmed. The owner tested
-launcher 2.7 from macOS on 2026-10-23; [issue #1292](https://github.com/Gathin23/cleanyourtv/issues/1292)
+launcher 2.7 from macOS on 2026-10-23; issue #1292
 records the result.
 
 With `com.google.android.apps.tv.launcherx` disabled, the real remote's Netflix (`4062`), Prime Video (`4099`)
@@ -427,7 +427,7 @@ repeat together. The two settings for this mode were:
 - Leave `com.google.android.apps.tv.launcherx` enabled, unlike the standard install above. Google TV's native
   receiver handles the app buttons; `app_keys` in a key-filtering helper is not what restores them here.
 - Enable only `app.polaris.tv/.HomeKeyService`, with `InputKeyService` off. The Home helper observes window
-  changes without filtering keys. Android still resolves Google TV as Home; the helper opens Clean Your TV.
+  changes without filtering keys. Android still resolves Google TV as Home; the helper opens Polaris TV.
 - Allow `AUTO_START` for `app.polaris.tv` and persist it with `appops write-settings`, as in
   [TclAppBoot after a reboot](#tclappboot-after-a-reboot).
 - On this unit setupwraith stayed disabled after the owner forgot and rejoined Wi-Fi in Settings. The saved
@@ -435,7 +435,7 @@ repeat together. The two settings for this mode were:
 
 ### Verification and limits
 
-The owner pressed Home, Netflix, Prime Video and YouTube on the physical remote: Home returned to Clean Your TV,
+The owner pressed Home, Netflix, Prime Video and YouTube on the physical remote: Home returned to Polaris TV,
 the three apps opened, and held volume changed continuously.
 
 After a reboot, before injecting navigation keys, the focused app was `app.polaris.tv/.MainActivity`.
@@ -559,7 +559,7 @@ this firmware's own volume handling, not the helper trade described in the G09 n
 
 Applied on 2026-10-24. Same build as the Q7C above: `ro.product.model` `Smart TV Pro`, Android 14 (SDK 34), `tcl9618-user 14 UTT2.250416.001 AU02 release-keys`. 21 packages were disabled by hand with `adb shell pm disable-user --user 0`
 
-The Clean Your TV launcher was not installed, so launcherx & setupwraith are untouched
+The Polaris TV launcher was not installed, so launcherx & setupwraith are untouched
 
 ### Notes for this unit
 

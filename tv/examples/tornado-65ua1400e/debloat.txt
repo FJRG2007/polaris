@@ -56,7 +56,7 @@
 #   :passport and :AppMetrica processes; used PSS 739 MB -> 679 MB. Undo: `cmd appops reset <pkg>`.
 #
 # Unit 2 (realme Smart TV), applied 2026-10-28 in five batches with a screenshot after each, then the
-# CleanYourTV launcher, two reboots and several days of daily use. Every disable held across both reboots.
+# Polaris TV launcher, two reboots and several days of daily use. Every disable held across both reboots.
 # Seen on that unit:
 # - com.smartdevice.speedchannels is installed there and is not in unit 1's list: Coocaa's recommendation
 #   channels (TvRecommendationMainActivity), with a notification-listener service and Coocaa's dataer and

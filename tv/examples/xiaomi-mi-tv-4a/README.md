@@ -98,7 +98,7 @@ com.xiaomi.mimusic2
   names only `com.mediatek.tvinput`, `com.mediatek.tv.service` and the preview inputs of
   `com.google.android.videos` and `com.vk.tv`. When this unit was cleaned, `tools/disable.sh` still skipped both
   ("neither a requested nor a granted permission block"), so they were disabled with `TVINPUT_ALLOW=1` once HDMI
-  showed a picture after the reboot. Since the fix for [#2398](https://github.com/Gathin23/cleanyourtv/issues/2398),
+  showed a picture after the reboot. Since the fix for #2398,
   the script reads a package like these as one that asks for nothing on Android 6 and newer, and the list applies in
   full without `TVINPUT_ALLOW`.
 - Only `com.google.android.tvlauncher` and `com.android.tv.settings/.system.FallbackHome` claim HOME, as on

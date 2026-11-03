@@ -44,7 +44,7 @@ Unable to launch app com.xiaomi.android.tvsetup.partnercustomizer/1000 for broad
 ```
 
 Which of them die is a build difference, so read logcat before installing anything. On
-build `RTM5.220609.003.1493` (launcher 3.0, [#1983](https://github.com/Gathin23/cleanyourtv/issues/1983))
+build `RTM5.220609.003.1493` (launcher 3.0, #1983)
 only the YouTube button was dead: the Netflix and Prime Video buttons still opened their apps with
 no helper installed. The YouTube press stopped in the firmware's own key handler -
 `WindowManager: interceptKeyTq keycode=190` and
@@ -68,7 +68,7 @@ not to overseaservice. The mic button keeps working.
 
 Both helpers cost the remote's live key repeat on this set: holding volume up or down moves one step
 per press, with `InputKeyService` alone as well as with both, and `dumpsys accessibility` shows the bound
-service at `capabilities=8` (`CAPABILITY_CAN_FILTER_KEY_EVENTS`) - [#944](https://github.com/Gathin23/cleanyourtv/issues/944).
+service at `capabilities=8` (`CAPABILITY_CAN_FILTER_KEY_EVENTS`) - #944.
 The bisect, the ways back to either behaviour and the way the repeat is lost are in
 [the G09 note](tcl-55p71b-g09-key-repeat.md). The empty-list control was not tried here: clearing the
 list unhooks the buttons this section installs the helpers for, so "the ramp returns with nothing bound"

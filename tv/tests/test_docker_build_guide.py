@@ -42,7 +42,7 @@ INSTALL_PS1 = ROOT / "launcher" / "build-and-install.ps1"
 TABLE_HEADER = re.compile(r"^\|\s*Variable\s*\|\s*Default\s*\|\s*What it changes\s*\|\s*$", re.M)
 # A separator row: pipes, dashes and the odd colon, and nothing that names a setting.
 SEPARATOR = re.compile(r"^[\s|:-]+$")
-# IMAGE="${IMAGE:-cleanyourtv-android-build}" - an empty fallback is a variable the twin reads but
+# IMAGE="${IMAGE:-polaris-tv-android-build}" - an empty fallback is a variable the twin reads but
 # leaves unset (HOST_KEY_DIR), so the reader keeps the name and drops the empty default.
 SH_DEFAULT = re.compile(r'^(?P<name>[A-Z][A-Z0-9_]*)="\$\{(?P=name):-(?P<value>[^}]*)\}"', re.M)
 PS1_DEFAULT = re.compile(r"\$(?P<var>\w+) = if \(\$env:(?P<name>[A-Z][A-Z0-9_]*)\) "

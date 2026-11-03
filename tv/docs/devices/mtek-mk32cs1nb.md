@@ -82,4 +82,4 @@ device plugged in.
 - AV, YPbPr and VGA are not in the Inputs menu. The Live TV row opens the TV screen, whose SOURCE key
   lists them.
 
-Recorded from [#1664](https://github.com/Gathin23/cleanyourtv/issues/1664).
+Recorded from #1664.

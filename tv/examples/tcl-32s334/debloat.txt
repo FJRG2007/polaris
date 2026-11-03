@@ -1,11 +1,11 @@
 # TCL 32S334 (Android product BeyondTV5, device BeyondTV; North American variant, Realtek RTD2851 / rtd285o),
 # Android TV 9 (API 28), build PPR1.180610.011 AP13, security patch 2020-11-01.
-# Tested on two identical units. The owner reports several days of use without issues; CleanYourTV Home
+# Tested on two identical units. The owner reports several days of use without issues; Polaris TV Home
 # and the receiver add-ons were still running after a reboot. The retail model number was supplied by the owner.
 #
 # Apply: TV_HOST=<tv ip> tools/disable.sh examples/tcl-32s334/debloat.txt
 # Undo:  TV_HOST=<tv ip> tools/restore.sh examples/tcl-32s334/debloat.txt
-# Stock launcher: com.google.android.tvlauncher; disable only after CleanYourTV is confirmed as Home.
+# Stock launcher: com.google.android.tvlauncher; disable only after Polaris TV is confirmed as Home.
 # Live TV app: com.tcl.tv. Leave the tuner, HDMI passthrough, source menu, remote, Bluetooth,
 # keyboard, Play Store, and Play Services packages enabled.
 # Already disabled before setup on both units: com.tcl.bootadservice and uk.co.freeview.systemdistributor.

@@ -30,7 +30,7 @@ launcher's HOME filter stays at 0 because Fire OS ignores priority from an app i
 `launcher/build-and-install.sh` does not apply here: the stock launcher keeps Home and the hero banner at the
 top of it, which is the launcher's own feed. The recommendation rows under that banner are gone once
 `media.recommendations` and `kso.blackbird` are off. Launchers that put themselves *on top* of Amazon's Home
-with an Accessibility service are a fork's job and live in [the showcase](https://github.com/Gathin23/cleanyourtv/blob/main/SHOWCASE.md),
+with an Accessibility service are a fork's job and live in the showcase,
 not in this list.
 
 ## Apply and undo

@@ -60,24 +60,24 @@ From repo root (on same Wi-Fi as TV):
 # Probe/verify
 TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py --probe
 
-# Apply debloat (backs up to ~/.cleanyourtv/)
+# Apply debloat (backs up to ~/.polaris-tv/)
 TV_HOST=<tv ip> tools/disable.sh examples/skyworth-swtv-22ae-fhd/debloat.txt
 
 # Restore to original (uses backup + stock launcher)
 TV_HOST=<tv ip> tools/restore.sh examples/skyworth-swtv-22ae-fhd/debloat.txt com.google.android.apps.tv.launcherx
 
-# Build/install CleanYourTV launcher and set as Home
+# Build/install Polaris TV launcher and set as Home
 STOCK_LAUNCHER=com.google.android.apps.tv.launcherx TV_HOST=<tv ip> launcher/build-and-install.sh
 ```
 
 ## Verified
 - Debloat applied cleanly
-- CleanYourTV launcher (`app.polaris.tv`) installed and set as default HOME
+- Polaris TV launcher (`app.polaris.tv`) installed and set as default HOME
 - Stock `com.google.android.apps.tv.launcherx` disabled
 
 ## Additional SWTV-22SA-FHD units (28 October 2026)
 
-Owner report: [#2726](https://github.com/Gathin23/cleanyourtv/issues/2726).
+Owner report: #2726.
 
 The similar **SWTV-22SA-FHD** model also reports `umeda` and product `SW7_B`.
 Two separate units were inspected during setup; this was not an Android 11-to-14

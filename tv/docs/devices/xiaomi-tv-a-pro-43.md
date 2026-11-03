@@ -17,16 +17,16 @@ an initial compatibility report, not a multi-day debloat list.
 ## Original report (#1285 / #1401)
 
 The observations in this section and the package list below are from `doriel1243`'s
-[original report](https://github.com/Gathin23/cleanyourtv/issues/1285), merged in
-[PR #1401](https://github.com/Gathin23/cleanyourtv/pull/1401). That report did not establish the retail model year.
+original report, merged in
+PR #1401. That report did not establish the retail model year.
 
 ### Setup wizard and Home
 
-CleanYourTV Setup left the stock Home screen alone and reported that the setup wizard owned the saved
+Polaris TV Setup left the stock Home screen alone and reported that the setup wizard owned the saved
 Wi-Fi network. The owner had already forgotten Wi-Fi and connected Ethernet, but the warning remained.
 ADB inspection showed `com.google.android.tungsten.setupwraith` as the Wi-Fi config owner. After
 Ethernet was confirmed as the active default network, the setup wizard was disabled; the launcher
-build-and-install script installed and started CleanYourTV, made it Home, and only then disabled the
+build-and-install script installed and started Polaris TV, made it Home, and only then disabled the
 stock launcher. After one reboot, Home still resolved to `app.polaris.tv/.MainActivity`.
 
 Do not disable the setup wizard while the TV is still relying on its saved Wi-Fi network. Confirm
@@ -82,8 +82,8 @@ The Android model alone does not establish its retail year or screen size.
 | Display state, observed rather than changed for this report | Physical 3840x2160; existing override 1920x1080; density 320 |
 | Resolved Home | `app.polaris.tv/.MainActivity` |
 
-The [55-inch second-unit report](https://github.com/Gathin23/cleanyourtv/pull/1971) has the same full
-build string, while the 75-inch report in [issue #90](https://github.com/Gathin23/cleanyourtv/issues/90)
+The 55-inch second-unit report has the same full
+build string, while the 75-inch report in issue #90
 has `V816.0.25.3.10`. Shared identifiers or firmware do not prove that panels, tuners, remote behavior,
 Home handling or middleware are interchangeable. No 55- or 75-inch hardware was available for a direct
 comparison. Do not apply their full list blindly to this 43-inch unit.

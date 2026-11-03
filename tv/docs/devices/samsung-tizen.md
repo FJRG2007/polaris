@@ -5,11 +5,11 @@
 > the Home button still opened Samsung Home and a long-press restart returned to HDMI.
 > Standby resume worked in one sequence; it is not a system launcher replacement.
 > No safe system-app removal or full restorable backup was established.
-> To turn off the tracking on a Samsung (or LG, Roku) TV with the remote instead, see
-> [cleanyour.tv/not-android](https://cleanyour.tv/not-android).
+> Turning off the tracking on a Samsung (or LG, Roku) TV is done with the remote, in the TV's own
+> privacy settings.
 
 One owner's reconnaissance from a Mac on the same network, not a port and not a tested list. It was
-reported in [#441](https://github.com/Gathin23/cleanyourtv/issues/441) on 2026-10-20 by
+reported in #441 on 2026-10-20 by
 [@csmith1133](https://github.com/csmith1133), with nothing changed on the TV. Nothing in `tools/`
 speaks Tizen: `tools/tv.py` drives `adb`, and this set has no `adb` to connect to.
 
@@ -250,7 +250,7 @@ the name given to the TV; leave those out of anything you publish.
 
 A fourth owner's read-only check on a fourth set, a year on from the AU8000 and in a different
 region, with nothing changed on the TV and Developer Mode off, reported in
-[#441](https://github.com/Gathin23/cleanyourtv/issues/441) on 2026-10-24 by
+#441 on 2026-10-24 by
 [@niepiekm](https://github.com/niepiekm). Only `GET /api/v2/` on 8001 and 8002, TCP connections on
 the eight ports already documented, and one SSDP probe were used. Nothing here checks a second
 Q67BA or a post-reboot state, and the set was one unit, one session, one read pass.

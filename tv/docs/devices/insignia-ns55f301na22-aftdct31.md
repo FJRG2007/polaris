@@ -51,7 +51,7 @@ window and starts the replacement. What was measured:
   not be shown from the shell. It was not confirmed with the real remote either.
 - Reinstalling the app, or `am force-stop`, clears `enabled_accessibility_services`; it has to be set again with
   `settings put secure enabled_accessibility_services <pkg>/<service>` and `accessibility_enabled 1`.
-- It is a background service, so it does not belong in the CleanYourTV launcher. Treat it as a note, not a feature.
+- It is a background service, so it does not belong in the Polaris TV launcher. Treat it as a note, not a feature.
 
 ### Settings on Fire OS 7
 

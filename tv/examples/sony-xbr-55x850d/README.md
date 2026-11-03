@@ -13,7 +13,7 @@ No packages from this list needed re-enabling during that window.
 
 ## Home and input configuration
 
-The tested build was CleanYourTV **v2.3**, built from commit
+The tested build was Polaris TV **v2.3**, built from commit
 `6bcd649bfd6fb4ed0e448c369a258b672a0a1a0b`. Only device-specific launcher config
 was changed; no launcher Java code was changed:
 

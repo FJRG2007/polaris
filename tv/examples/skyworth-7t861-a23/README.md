@@ -19,7 +19,7 @@ Tested on Skyworth 7T861_A23 (MediaTek MT9638 / mt5872, Android 10, build `eng.n
 > Switching the TV to **办公模式 (Office Mode)** in the native system settings shuts off all video streaming feeds, banner advertisements, and background cloud preloading directly from the source.
 >
 > In `debloat.txt`, only `com.skyworth.device` is active by default; the rest are commented out:
-> - **Zero native loading screens**: Cold boot seamlessly transitions into CleanYourTV without intermediate "正在准备..." loading screens or network preloading delay.
+> - **Zero native loading screens**: Cold boot seamlessly transitions into Polaris TV without intermediate "正在准备..." loading screens or network preloading delay.
 > - **Zero brick risk**: All system packages remain untouched (`pm list packages -d` is empty), ensuring 100% firmware stability and OTA update safety.
 
 ## Applying the debloat list (Optional)

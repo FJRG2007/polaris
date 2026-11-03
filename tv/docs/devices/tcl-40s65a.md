@@ -1,6 +1,6 @@
 # TCL 40S65A (Android TV 9): a compatibility note, no list yet
 
-One owner's report (#1862), tested with CleanYourTV v3.0.0. Android reports model `40S65A`,
+One owner's report (#1862), tested with Polaris TV v3.0.0. Android reports model `40S65A`,
 Android TV 9, build `PPR2.180905.006.A1 release-keys`. The report is a compatibility write-up
 rather than a list: it does not name the packages that were disabled on this set, so there is no
 `examples/` folder to file from it yet, and the issue stays open for the reporter's list.

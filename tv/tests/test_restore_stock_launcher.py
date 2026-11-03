@@ -123,7 +123,7 @@ class RestoreStockLauncherTest(unittest.TestCase):
         self.tv(installed=["com.example.ads", STOCK, recovery.CUSTOM_LAUNCHER], disabled=[STOCK],
                 home=home)
         self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
-        path = next((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        path = next((self.home / ".polaris-tv").glob("recovery-*.json"))
         record = json.loads(path.read_text())
         record["packages"].pop(STOCK)
         path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")

@@ -1,4 +1,4 @@
-001.jpg is an original illustration drawn for CleanYourTV and released CC0 1.0, no photo and no third-party
+001.jpg is an original illustration drawn for Polaris TV and released CC0 1.0, no photo and no third-party
 material. The other wallpapers are photos from Wikimedia Commons, each under its own licence (CC0, public domain, CC BY or CC BY-SA), not the
 repository's MIT licence. Changes made to every photo (002-008): cropped to 16:9 with the subject moved up and to the right,
 where Home leaves the picture uncovered, resized to 1920x1080, colour-graded toward a night look (cooler shadows on

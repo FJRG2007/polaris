@@ -1,7 +1,7 @@
 # Epson LS800 (Android TV 14 laser projector)
 
 Epson's Android TV module HA90 (built by Askey, board `sti6202d101`, Amlogic), firmware
-UKG3.250826.001 (`u-2.05-U-0`, June 2026). Both halves work: the debloat list and the Clean Your TV
+UKG3.250826.001 (`u-2.05-U-0`, June 2026). Both halves work: the debloat list and the Polaris TV
 launcher as Home. Tested on 21 October 2026.
 
 | File | What it is |
@@ -66,7 +66,7 @@ TV_HOST=<projector-ip> tools/tv.py 'settings delete secure tv_input_custom_label
 
 `tools/restore.sh` leaves the new launcher installed, as it does for every list; take it off from the
 projector's Settings → Apps if you want it gone. A list folder ships no script of its own: the folders
-that carried one were trimmed to the shared tools ([#1717](https://github.com/Gathin23/cleanyourtv/pull/1717)).
+that carried one were trimmed to the shared tools (#1717).
 
 ## Change the dock or the wallpaper
 

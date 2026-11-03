@@ -2,7 +2,7 @@
 
 Tested on one MiTV-MOOR2, Google TV / Android 11, firmware
 `RTM5.220609.003.1300`, on 24 October 2026. Launcher v2.7 was built from
-[`c965ef4b`](https://github.com/Gathin23/cleanyourtv/commit/c965ef4b11acc0ab34d6964f1dda745904111a46).
+`c965ef4b`.
 This is a one-session Home-routing report; the `.2674` package list in
 [`debloat.txt`](debloat.txt) was not tested on this firmware.
 
@@ -25,14 +25,14 @@ permission were added.
 On the tested revision, installing with `STOCK_LAUNCHER=none` installed the APK but
 failed the registered-HOME check. After confirming the installed launcher opened,
 the Home button service was enabled manually; no Home guard was overridden.
-Android still resolves Google TV as HOME. Window-state events bring CleanYourTV
+Android still resolves Google TV as HOME. Window-state events bring Polaris TV
 forward when stock Home appears, so check the visible screen as well as resolution.
 
 ## Checks and access to Google TV
 
 - Home from Settings, YouTube and Netflix: 15/15 injected checks, five per app;
   the owner also confirmed the requested physical Home checks.
-- Three ADB restarts: CleanYourTV was the focused window automatically, without a
+- Three ADB restarts: Polaris TV was the focused window automatically, without a
   manual Home press or launcher start after boot.
 - Two physical sleep/wake cycles, Input from a streaming app, app shortcuts,
   held-volume repeat and real streaming playback: passed by owner report.

@@ -27,7 +27,7 @@ Before `tools/disable.sh` changes anything it writes down what the TV looked lik
 - which component owned Home;
 - the three animation scales.
 
-That record lives in `~/.cleanyourtv/`, one file per TV and list.
+That record lives in `~/.polaris-tv/`, one file per TV and list.
 
 - The file is named after the address the TV was reached at, so `TV_HOST` is what picks the record:
   a run without it stops with tv.py's line and sends nothing to the TV, rather than falling back to

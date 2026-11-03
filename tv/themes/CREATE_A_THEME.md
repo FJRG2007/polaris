@@ -9,7 +9,7 @@ complete example.
 
 ## 0. Before you start
 
-- The Clean Your TV launcher is installed and is Home on the TV.
+- The Polaris TV launcher is installed and is Home on the TV.
 - `TV_HOST` points at the TV, and `tools/theme.sh` (or `tools/theme.ps1`) works.
 - Read [`themes/README.md`](README.md). Every key is optional, and every key in the examples below is one
   the Keys table there lists; a key it does not list is ignored, so a broken `config.json` never breaks Home.

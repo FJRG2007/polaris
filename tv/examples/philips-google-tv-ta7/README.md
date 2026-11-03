@@ -1,7 +1,7 @@
 # Philips Google TV TA7 (Brazil)
 
 Philips Google TV TA7 (TPV, PH3M_AL_T32, MediaTek), Google TV 14, build UTT1.250308.001, about 1.9 GB RAM.
-Debloated and given the Clean Your TV launcher on 2026-10-20.
+Debloated and given the Polaris TV launcher on 2026-10-20.
 
 | File | What it is |
 |---|---|
@@ -80,7 +80,7 @@ again. All keys are in [themes/README.md](../../themes/README.md).
 TV_HOST=<tv ip> tools/restore.sh examples/philips-google-tv-ta7/debloat.txt com.google.android.apps.tv.launcherx
 ```
 
-This works from the state recorded before the first change (`~/.cleanyourtv/`). The apps that
+This works from the state recorded before the first change (`~/.polaris-tv/`). The apps that
 were already disabled before 2026-10-20 (Aptoide, VS Cine, Viki, the ambient screensaver and the
 others listed at the top of `debloat.txt`) stay disabled. Re-enable them one by one as above.
 

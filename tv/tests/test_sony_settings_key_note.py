@@ -129,7 +129,7 @@ class SonySettingsKeyNoteTest(unittest.TestCase):
 
     def test_bullet_names_the_model_and_links_the_report(self):
         self.assertIn("BRAVIA_VU3", self.note)
-        self.assertIn("[#2131](https://github.com/Gathin23/cleanyourtv/issues/2131)", self.note)
+        self.assertIn("#2131", self.note)
 
     def test_bullet_links_resolve(self):
         self.assertEqual([target for target in LINK.findall(self.note)

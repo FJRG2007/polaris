@@ -1,6 +1,6 @@
 # TCL 75QM751G (QM7, 2024): the QM6K list on the same G08 board
 
-One owner's report ([#453](https://github.com/Gathin23/cleanyourtv/issues/453)), applied and
+One owner's report (#453), applied and
 checked on the same day and **not** lived with for several days, so this is not a list of its own.
 Run [`examples/tcl-qm6k-google-tv/debloat.txt`](../../examples/tcl-qm6k-google-tv/debloat.txt) —
 same `G08` board, same `AU14` build — and read the deltas and the two traps below. A second owner

@@ -3,7 +3,7 @@
 Notes from the second unit, a **TCL 55C655** (2024, Italy) on the same build as the 55P7K:
 `G10_4K_GB`, `STT2.230203.001 AS16`, Realtek RTD2875P, Bluetooth remote `BT_RC833_U1` (vendor `0x0417`, product
 `0x0304`). It ran `debloat.txt` with the streaming apps, Alexa and T-Solo kept, plus the extras at the end, for a
-day and two reboots, with the Clean Your TV launcher as Home and `HomeKeyService` on
+day and two reboots, with the Polaris TV launcher as Home and `HomeKeyService` on
 (`launcher/build-and-install.sh` with `HOME_KEY_SERVICE=1`).
 
 ## Order that worked

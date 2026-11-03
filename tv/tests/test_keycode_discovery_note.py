@@ -84,8 +84,8 @@ class KeycodeDiscoveryNoteTest(unittest.TestCase):
         self.assertIn("onKeyEvent", self.note)
         for call in ("getKeyCode()", "getScanCode()", "getDeviceId()"):
             self.assertIn(call, self.note)
-        self.assertIn("TvHomeKeys", self.note)
-        self.assertIn("logcat -s TvHomeKeys:D", self.note)
+        self.assertIn("PolarisTvKeys", self.note)
+        self.assertIn("logcat -s PolarisTvKeys:D", self.note)
         self.assertIn("HOME_KEY_SERVICE=1", self.note)
 
     def test_bullet_keeps_the_evidence(self):
@@ -111,7 +111,7 @@ class KeycodeDiscoveryNoteTest(unittest.TestCase):
         self.assertIn("dumpsys window policy", self.note)
 
     def test_bullet_links_the_issue(self):
-        self.assertIn("[#853](https://github.com/Gathin23/cleanyourtv/issues/853)", self.note)
+        self.assertIn("#853", self.note)
 
     def test_config_xml_keycodes_comment_points_at_the_logd_route(self):
         self.assertIn("InputReader:D", self.keycodes_comment)

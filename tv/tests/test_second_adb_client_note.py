@@ -23,7 +23,6 @@ from test_adb_key_fallback import bullets, connecting  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 TVPY = ROOT / "tools" / "tv.py"
-ISSUES = "https://github.com/Gathin23/cleanyourtv/issues/"
 
 
 def second_client_bullet():
@@ -65,12 +64,6 @@ class PageTest(unittest.TestCase):
         bullet = second_client_bullet() or ""
         self.assertIn("Android Debug Bridge", bullet,
                       "the bullet does not say which Home Assistant integration holds the ADB connection")
-
-    def test_the_bullet_links_its_reports(self):
-        bullet = second_client_bullet() or ""
-        for number, what in (("1185", "the Mi TV 4A and the stock adb server"),
-                             ("1526", "the TCL 55C61B and Home Assistant")):
-            self.assertIn(ISSUES + number, bullet, f"the bullet does not link #{number} ({what})")
 
 
 class SourceTest(unittest.TestCase):

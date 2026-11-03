@@ -16,7 +16,7 @@ from pathlib import Path
 
 pictures = Path(os.environ["FAKE_PICTURES"])
 stage = Path(os.environ["FAKE_STAGE"])
-uri = "content://com.gathin.photodream.files/pictures/"
+uri = "content://app.polaris.tv.photodream.files/pictures/"
 if Path(__file__).name == "b64push.py":
     source, target = sys.argv[1:]
     shutil.copyfile(source, stage / Path(target).name)

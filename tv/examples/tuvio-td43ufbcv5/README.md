@@ -52,7 +52,7 @@ confirm `dumpsys activity activities | grep mFocusedApp`, then reboot and check 
 
 ## Optional TD50 launcher layout
 
-![The Clean Your TV launcher on the TD50UFBCV5, with Inputs, Wi-Fi, app library, Settings and a four-app dock](home.png)
+![The Polaris TV launcher on the TD50UFBCV5, with Inputs, Wi-Fi, app library, Settings and a four-app dock](home.png)
 
 Once the launcher is installed, apply the layout with the TV's address (the address below is an
 example, not the tested unit's address):
