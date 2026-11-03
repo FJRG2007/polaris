@@ -796,6 +796,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         }
     },
     {
+        key: "dead-containers",
+        // Hourly, and first a minute or so after boot: a sidecar left behind is
+        // memory and, for a tunnel, a public address still pointing at this box.
+        everyMs: Number(process.env.POLARIS_DEAD_CONTAINERS_MS) || HOUR,
+        // Leased: two runners would list the same machine and race to remove the
+        // same containers.
+        leaseMs: 2 * HOUR,
+        run: async () => (await import("@/lib/deploy/dead-containers")).reapDeadContainers()
+    },
+    {
         key: "leftover-volumes",
         // A week is the grace, so a day is plenty: nothing here is urgent, and a
         // pass lists every volume and measures them.

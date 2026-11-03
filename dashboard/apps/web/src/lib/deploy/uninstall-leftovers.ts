@@ -84,6 +84,24 @@ export function routeIdsIn(yaml: string): string[] {
     return [...new Set([...yaml.matchAll(ROUTE_NAME)].map((match) => match[1]!))];
 }
 
+/** How far an unattended clean-up reaches, past what a person pressing the
+ *  button would take. */
+export interface LeftoverScope {
+    /** Only containers made before this moment, in epoch milliseconds: a service
+     *  being created may be listed by the daemon before its row is read. */
+    readonly createdBefore?: number;
+    /** False leaves the service folders, which may hold its bind-mounted data. */
+    readonly dirs?: boolean;
+}
+
+/** Whether a container is old enough for the scope. No creation time is no
+ *  proof it is old. */
+function settled(entry: LiveContainer, scope: LeftoverScope): boolean {
+    if (scope.createdBefore === undefined) return true;
+    const made = entry.createdAt ? Date.parse(entry.createdAt) : NaN;
+    return Number.isFinite(made) && made < scope.createdBefore;
+}
+
 /** Whether a compose project is an application's and that application is gone. */
 function removedProject(project: string | null, known: KnownState): project is string {
     if (!project || !APP_PROJECT.test(project)) return false;
@@ -97,9 +115,13 @@ function removedProject(project: string | null, known: KnownState): project is s
  * is itself a leftover - those go first in the same clean-up, so the network is
  * empty by the time it is removed, and the daemon refuses it otherwise.
  */
-export function findLeftovers(live: LiveResources, known: KnownState): Leftovers {
+export function findLeftovers(
+    live: LiveResources,
+    known: KnownState,
+    scope: LeftoverScope = {}
+): Leftovers {
     const containers = live.containers
-        .filter((entry) => removedProject(entry.project, known))
+        .filter((entry) => removedProject(entry.project, known) && settled(entry, scope))
         .map(({ networks: _networks, ...entry }) => entry as LeftoverContainer)
         .sort((left, right) => left.name.localeCompare(right.name));
     const leaving = new Set(containers.map((entry) => entry.id));
@@ -116,7 +138,8 @@ export function findLeftovers(live: LiveResources, known: KnownState): Leftovers
           )
         : [];
 
-    const dirs = (live.dirs ?? []).filter((dir) => removedProject(dir, known));
+    const dirs =
+        scope.dirs === false ? [] : (live.dirs ?? []).filter((dir) => removedProject(dir, known));
 
     const domains = known.domainIds;
     const routes = domains
@@ -183,8 +206,16 @@ async function readJson(daemon: HostdClient, path: string): Promise<unknown[] | 
  *  an empty answer from a database that did not answer would make every
  *  application on the machine look removed. */
 export async function knownAppProjects(): Promise<Set<string> | null> {
+    const projects = await appProjectIds();
+    return projects ? new Set(projects.keys()) : null;
+}
+
+/** Every application's compose project and the application it is, or null when
+ *  they cannot be read. The project is a hash of the id, so this is the one way
+ *  back from a project to its service. */
+export async function appProjectIds(): Promise<Map<string, string> | null> {
     const apps = await prisma.application.findMany({ select: { id: true } }).catch(() => null);
-    return apps ? new Set(apps.map((app) => `polaris-${shortHash(app.id, 8)}`)) : null;
+    return apps ? new Map(apps.map((app) => [`polaris-${shortHash(app.id, 8)}`, app.id])) : null;
 }
 
 /** What is on this machine, read through the daemon and the edge's file. Null
@@ -228,9 +259,9 @@ async function knownState(): Promise<KnownState | null> {
 }
 
 /** The leftovers on this machine, or null when it or Polaris would not say. */
-export async function hostLeftovers(): Promise<Leftovers | null> {
+export async function hostLeftovers(scope: LeftoverScope = {}): Promise<Leftovers | null> {
     const [live, known] = await Promise.all([liveResources(), knownState()]);
-    return live && known ? findLeftovers(live, known) : null;
+    return live && known ? findLeftovers(live, known, scope) : null;
 }
 
 /** What a clean-up did, and what it could not. */
@@ -245,8 +276,8 @@ export interface LeftoverCleanup {
  * Containers first (never their volumes), then the networks they emptied, then
  * the directories, then the edge's file rewritten from what Polaris holds.
  */
-export async function cleanLeftovers(): Promise<LeftoverCleanup | null> {
-    const found = await hostLeftovers();
+export async function cleanLeftovers(scope: LeftoverScope = {}): Promise<LeftoverCleanup | null> {
+    const found = await hostLeftovers(scope);
     if (!found) return null;
     const daemon = new HostdClient();
     const removed = { containers: 0, networks: 0, dirs: 0, routes: 0 };

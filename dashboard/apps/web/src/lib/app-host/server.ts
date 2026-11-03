@@ -135,6 +135,7 @@ const load = {
     deployDial: once(() => import("@/lib/deploy/dial")),
     deployReleases: once(() => import("@/lib/deploy/releases")),
     deployRuntime: once(() => import("@/lib/deploy/runtime")),
+    sidecarSwitch: once(() => import("@/lib/sidecar-switch")),
     deployService: once(() => import("@/lib/deploy-service")),
     domainDns: once(() => import("@/lib/domain-dns")),
     appEdge: once(() => import("@/lib/app-edge")),
@@ -399,6 +400,10 @@ export const serverHost = {
     },
     deployRuntime: {
         getPorts: later(load.deployRuntime, "getPorts")
+    },
+    sidecarSwitch: {
+        turnOffSidecar: later(load.sidecarSwitch, "turnOffSidecar"),
+        turnOffAllowed: later(load.sidecarSwitch, "turnOffAllowed")
     },
     deployService: {
         deployApplication: later(load.deployService, "deployApplication"),

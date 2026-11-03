@@ -2829,6 +2829,15 @@ export async function deleteApplication(
             throw error;
         }
     } else await teardown.catch(() => undefined);
+    // Its ngrok and named tunnels are sidecars of their own too, and nothing else
+    // would ever take them down once the row is gone. The quick tunnel goes with
+    // the deployment above. Best-effort: the dead-container pass catches a miss.
+    const [ngrok, named] = await Promise.all([
+        import("@/lib/deploy/ngrok-tunnel-service"),
+        import("@/lib/deploy/named-tunnel-service")
+    ]);
+    await ngrok.stopNgrokTunnel(applicationId, ownerId).catch(() => undefined);
+    await named.stopNamedTunnel(applicationId, ownerId).catch(() => undefined);
     await prisma.deployment.deleteMany({
         where: { deployableType: "application", deployableId: applicationId }
     });

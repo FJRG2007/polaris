@@ -6,6 +6,7 @@
  * screen: what reaches the browser never names a host path or a daemon error.
  */
 
+import { host } from "@polaris/app-host";
 import * as schemas from "../model/schemas";
 import { ScanFailure } from "../lib/runner";
 import { requireSecurityUser } from "../lib/access";
@@ -85,7 +86,38 @@ export async function serverImagesAction(input: unknown) {
     await requireSecurityUser();
     const parsed = schemas.targetInput.safeParse(input);
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
-    return run(async () => (await service()).serverImages(parsed.data.targetId));
+    return run(async () => {
+        const found = await (await service()).serverImages(parsed.data.targetId);
+        const allowed = new Set(
+            await host.sidecarSwitch
+                .turnOffAllowed(found.images.flatMap((image) => image.sidecars))
+                .catch(() => [])
+        );
+        return {
+            ...found,
+            images: found.images.map((image) => ({
+                ...image,
+                sidecars: image.sidecars.map((sidecar) => ({
+                    ...sidecar,
+                    canTurnOff: allowed.has(sidecar.project)
+                }))
+            }))
+        };
+    });
+}
+
+/** Turn off the Polaris feature that started a sidecar, through that feature's
+ *  own switch - which checks, again, that the caller may. */
+export async function turnOffSidecarAction(input: unknown) {
+    await requireSecurityUser();
+    const parsed = schemas.sidecarInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    const result = await host.sidecarSwitch
+        .turnOffSidecar(parsed.data.feature, parsed.data.project)
+        .catch(() => ({ ok: false }));
+    return result.ok
+        ? ({ ok: true, data: null } as const)
+        : ({ ok: false, error: "sidecarRefused" } as const);
 }
 
 export async function scanServerImageAction(input: unknown) {

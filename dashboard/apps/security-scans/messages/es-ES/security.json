@@ -102,7 +102,23 @@
         "noApps": "Aún no hay apps en este servidor.",
         "open": "Abrir",
         "openOwn": "Abrir en Gestión",
-        "openDeploy": "Abrir en Deploy"
+        "openDeploy": "Abrir en Deploy",
+        "startedBy": "Lo inició {feature}",
+        "turnOff": "Apagar",
+        "turnOffTitle": "¿Apagar {feature}?",
+        "turnOffQuestion": "{feature} se detiene y se quita su contenedor.",
+        "turnOffDenied": "Solo quien gestiona esta función puede apagarla.",
+        "tunnelKind": "túnel",
+        "turnOffBody": "Vuelve a activarlo desde su propia página.",
+        "feature": {
+            "tunnel-ngrok": "Túnel de ngrok",
+            "tunnel-cloudflare": "Túnel de Cloudflare",
+            "share-tunnel": "Túnel de enlaces",
+            "backup-tunnel": "Túnel de respaldo",
+            "app-tunnel-named": "Túnel fijo de servicio",
+            "app-tunnel-quick": "Túnel rápido de servicio",
+            "app-tunnel-ngrok": "ngrok de un servicio"
+        }
     },
     "history": "Recientes",
     "noScans": "Aún no hay análisis.",
@@ -135,7 +151,8 @@
         "imageMissing": "La imagen que ejecuta esta app ya no está en el servidor. Vuelve a desplegar la app y analiza de nuevo.",
         "noRoom": "No hay espacio libre suficiente en el servidor para comprobar esta imagen. Libera espacio e inténtalo de nuevo.",
         "scannerFailed": "El analizador de vulnerabilidades se detuvo con un error. Inténtalo de nuevo.",
-        "reportUnreadable": "No se pudo leer el informe del analizador. Actualiza Polaris desde Ajustes y vuelve a analizar."
+        "reportUnreadable": "No se pudo leer el informe del analizador. Actualiza Polaris desde Ajustes y vuelve a analizar.",
+        "sidecarRefused": "No se pudo apagar. Prueba desde su propia página."
     },
     "alerts": {
         "title": "{count, plural, one {Una vulnerabilidad grave nueva en {app}} other {# vulnerabilidades graves nuevas en {app}}}",

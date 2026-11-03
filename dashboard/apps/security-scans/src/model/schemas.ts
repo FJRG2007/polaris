@@ -50,6 +50,24 @@ export const filesInput = z.object({
 
 export const imageInput = z.object({ targetId: id, applicationId: id });
 
+/** A sidecar on the image list, and the feature the screen says started it. */
+export const sidecarInput = z.object({
+    feature: z.enum([
+        "tunnel-ngrok",
+        "tunnel-cloudflare",
+        "share-tunnel",
+        "backup-tunnel",
+        "app-tunnel-named",
+        "app-tunnel-quick",
+        "app-tunnel-ngrok"
+    ]),
+    project: z
+        .string()
+        .trim()
+        .max(64)
+        .regex(/^polaris-[a-z0-9-]{1,48}$/)
+});
+
 /** One image a server runs, by its id. */
 export const serverImageInput = z.object({
     targetId: id,

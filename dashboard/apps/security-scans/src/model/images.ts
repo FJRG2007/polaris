@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { sidecarOf, type Sidecar } from "@polaris/deploy";
 
 export type ImageSource = "polaris" | "app" | "agent" | "other";
 
@@ -34,6 +35,9 @@ export interface ServerImage {
     readonly applicationIds: readonly string[];
     /** The app a part of Polaris runs as, when this image is one (see `groupImages`). */
     readonly part?: string;
+    /** The Polaris features that started a container from it - a tunnel, say -
+     *  one per compose project, so the screen can name each and turn it off. */
+    readonly sidecars: readonly Sidecar[];
 }
 
 export const IMAGE_ID = /^sha256:[0-9a-f]{64}$/;
@@ -128,6 +132,8 @@ export function canonicalRef(ref: string): string {
 /** Who put a container there. */
 export function sourceOf(container: ListedContainer): ImageSource {
     if (container.project && OWN_PROJECTS.has(container.project)) return "polaris";
+    // A tunnel Polaris started for one of its features, a service's among them.
+    if (sidecarOf(container.project, container.ref)) return "polaris";
     if (AGENT_LABELS.some((key) => key in container.labels)) return "agent";
     if (container.project && APP_PROJECT.test(container.project)) return "app";
     return "other";
@@ -157,6 +163,7 @@ export function groupImages(
             users: Set<string>;
             apps: Set<string>;
             parts: Set<string>;
+            sidecars: Map<string, Sidecar>;
         }
     >();
     for (const container of containers) {
@@ -173,6 +180,7 @@ export function groupImages(
                   : container.name;
         const appId = listed === "app" && project ? appIds.get(project) : undefined;
         const partId = part ? appId : undefined;
+        const sidecar = sidecarOf(container.project, container.ref);
         const entry = byId.get(container.imageId);
         if (!entry) {
             byId.set(container.imageId, {
@@ -181,12 +189,15 @@ export function groupImages(
                 source,
                 users: new Set([user]),
                 apps: new Set(appId ? [appId] : []),
-                parts: new Set(partId ? [partId] : [])
+                parts: new Set(partId ? [partId] : []),
+                sidecars: new Map(sidecar ? [[sidecar.project, sidecar]] : [])
             });
             continue;
         }
         if (appId && entry.apps.size < MAX_USERS) entry.apps.add(appId);
         if (partId && entry.parts.size < MAX_USERS) entry.parts.add(partId);
+        if (sidecar && entry.sidecars.size < MAX_USERS)
+            entry.sidecars.set(sidecar.project, sidecar);
         if (rank[source] < rank[entry.source]) entry.source = source;
         if (entry.refs.size < MAX_USERS) entry.refs.add(container.ref);
         // A ref someone typed reads better than the bare id a container may show.
@@ -202,6 +213,9 @@ export function groupImages(
             source: entry.source,
             users: [...entry.users].filter(Boolean).sort(),
             applicationIds: [...entry.apps].sort(),
+            sidecars: [...entry.sidecars.values()].sort((a, b) =>
+                a.project.localeCompare(b.project)
+            ),
             ...(entry.parts.size > 0 ? { part: [...entry.parts].sort()[0] } : {})
         }))
         .sort((a, b) => rank[a.source] - rank[b.source] || a.ref.localeCompare(b.ref));

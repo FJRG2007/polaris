@@ -501,5 +501,23 @@
         "movedTitle": "Polaris está ahora en {to}",
         "movedBody": "La dirección de este servidor en tu red cambió de {from} a {to}. Ábrelo en https://{to} o https://polaris.local; los enlaces a {from} ya no funcionan. Para conservarla, reserva {to} para este servidor en los ajustes DHCP del router.",
         "movedBodyDns": "La dirección de este servidor en tu red cambió de {from} a {to}. Ábrelo en https://{to} o https://polaris.local; los enlaces a {from} ya no funcionan. El filtro de red también se movió: los dispositivos que usan {from} como servidor DNS necesitan {to} ahora. Para conservarla, reserva {to} para este servidor en los ajustes DHCP del router."
+    },
+    "deadContainers": {
+        "title": "{count, plural, one {Polaris quitó un contenedor que no servía} other {Polaris quitó # contenedores que no servían}}",
+        "line": "{name} - {feature}, {reason}",
+        "leftovers": "{count, plural, one {# contenedor de un servicio borrado} other {# contenedores de servicios borrados}}",
+        "reason": {
+            "owner-gone": "su servicio ya no está",
+            "feature-off": "la función está apagada"
+        },
+        "feature": {
+            "tunnel-ngrok": "Túnel de ngrok",
+            "tunnel-cloudflare": "Túnel de Cloudflare",
+            "share-tunnel": "Túnel de enlaces",
+            "backup-tunnel": "Túnel de respaldo",
+            "app-tunnel-named": "Túnel fijo de servicio",
+            "app-tunnel-quick": "Túnel rápido de servicio",
+            "app-tunnel-ngrok": "ngrok de un servicio"
+        }
     }
 }
