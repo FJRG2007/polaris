@@ -269,7 +269,6 @@ export function openOverlayWindow(bounds: { readonly x: number; readonly y: numb
     return window;
 }
 
-/** A window showing one of this app's own pages. */
 /** A local page laid over a window as a sheet rather than given a window of its own. */
 export interface LocalSheet {
     focus(): void;
@@ -320,6 +319,7 @@ export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed:
     return { focus: () => contents.focus(), close, isDestroyed: () => closed };
 }
 
+/** A window showing one of this app's own pages. */
 export function openLocalWindow(
     kind: Exclude<WindowKind, "polaris" | "overlay">,
     options: { readonly title: string; readonly width: number; readonly height: number; readonly parent?: BrowserWindow; }

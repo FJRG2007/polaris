@@ -604,6 +604,14 @@ button.icon svg {
     background: rgb(5 6 8 / 0.55);
 }
 
+.sheet::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: 48px;
+    app-region: drag;
+}
+
 .sheet .panel {
     width: min(540px, 100%);
     max-height: calc(100vh - 80px);

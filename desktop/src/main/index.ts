@@ -198,8 +198,9 @@ function openMain(url: string): void {
         if (!isMainFrame || code === -3 || !current || !isServerUrl(url, current)) return;
         offline = false;
         loadError = describeNetError(netErrorCode(description), new URL(current).host);
-        openConnect();
+        if (main === window) main = null;
         window.close();
+        openConnect();
     });
     // The Polaris's own worker answers for it when it is gone, so this load succeeded.
     // The window stays for its Try again; the servers window is the way to the others.
