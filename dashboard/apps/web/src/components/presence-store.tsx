@@ -14,6 +14,12 @@
  * feature must not do. So an answer is refreshed on an interval while anything
  * is watching, and the whole thing is dropped when nothing is.
  *
+ * Tabs hand each other what they were told (lib/tab-answers), so a face drawn
+ * in two windows is asked about once: a tab takes the answers another tab got
+ * for the people it is drawing, and leaves them out of its next refresh. A
+ * hidden tab refreshes nothing - nobody is looking at its dots - and catches up
+ * the moment it is looked at again.
+ *
  * Absent from the map means "not asked yet", which is what makes the first paint
  * quiet: a face draws with no dot rather than with a grey one that turns green,
  * because a dot that changes colour on arrival reads as somebody's status
@@ -31,6 +37,8 @@ import {
     useState,
     type ReactNode
 } from "react";
+import { useSessionScope } from "@/components/session-scope";
+import { heardRecently, openTabAnswers, spreadDelay, type TabAnswers } from "@/lib/tab-answers";
 
 export type { Presence };
 
@@ -92,6 +100,19 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     /** Ids that arrived since the last request went out. */
     const fresh = useRef(new Set<string>());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** When another tab last told this one about each person. */
+    const heard = useRef(new Map<string, number>());
+    const answers = useRef<TabAnswers<Record<string, PresenceOf>> | null>(null);
+    const scope = useSessionScope();
+
+    const take = useCallback((answered: ReadonlyArray<readonly [string, PresenceOf]>) => {
+        if (answered.length === 0) return;
+        setPeople((current) => {
+            const next = new Map(current);
+            for (const [id, where] of answered) next.set(id, where);
+            return next;
+        });
+    }, []);
 
     const ask = useCallback(async (ids: readonly string[]) => {
         if (ids.length === 0) return;
@@ -105,16 +126,30 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
             const body = (await response.json()) as { people?: Record<string, PresenceOf> };
             const answered = Object.entries(body.people ?? {});
             if (answered.length === 0) return;
-            setPeople((current) => {
-                const next = new Map(current);
-                for (const [id, where] of answered) next.set(id, where);
-                return next;
-            });
+            take(answered);
+            answers.current?.post(Object.fromEntries(answered), Date.now());
         } catch {
             // Offline, or a request that went away with the page. The dots keep
             // whatever they had, which is the right way to be wrong.
         }
-    }, []);
+    }, [take]);
+
+    // Answers other tabs were given. Only the people drawn here are taken; the
+    // rest would be a map of faces nobody on this tab is looking at.
+    useEffect(() => {
+        const channel = openTabAnswers<Record<string, PresenceOf>>("presence", scope, (value) => {
+            if (typeof value !== "object" || value === null) return;
+            const now = Date.now();
+            const drawn = Object.entries(value).filter(([id]) => watched.current.has(id));
+            for (const [id] of drawn) heard.current.set(id, now);
+            take(drawn);
+        });
+        answers.current = channel;
+        return () => {
+            channel?.close();
+            if (answers.current === channel) answers.current = null;
+        };
+    }, [scope, take]);
 
     const watch = useCallback(
         (id: string) => {
@@ -134,11 +169,30 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
     // Everything on screen, again, while anything is on screen. A dot that was
     // right when the page loaded and never moved is worse than no dot.
+    // Only while this tab is on screen, and only the faces no other tab was
+    // just told about.
     useEffect(() => {
-        const beat = setInterval(() => {
-            void ask([...watched.current]);
-        }, REFRESH_MS);
-        return () => clearInterval(beat);
+        const due = (): string[] =>
+            [...watched.current].filter((id) => !heardRecently(heard.current.get(id) ?? 0, REFRESH_MS));
+        // A chain of spread waits rather than an interval: two tabs opened
+        // together would otherwise keep asking in the same instant, each too
+        // early to have heard the other.
+        let beat: ReturnType<typeof setTimeout> | null = null;
+        const next = (): void => {
+            beat = setTimeout(() => {
+                if (document.visibilityState === "visible") void ask(due());
+                next();
+            }, spreadDelay(REFRESH_MS));
+        };
+        next();
+        const onVisibility = (): void => {
+            if (document.visibilityState === "visible") void ask(due());
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            if (beat !== null) clearTimeout(beat);
+            document.removeEventListener("visibilitychange", onVisibility);
+        };
     }, [ask]);
 
     const refresh = useCallback(() => {
