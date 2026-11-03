@@ -2166,6 +2166,10 @@
             "chat": {
                 "name": "Chat",
                 "hint": "A qué pueden llegar las conversaciones y las llamadas de aquí."
+            },
+            "translation": {
+                "name": "Traducción",
+                "hint": "Los servicios a los que la app Traductor puede enviar texto."
             }
         },
         "catalog": {
@@ -2462,6 +2466,28 @@
                 "links": {
                     "0": {
                         "label": "Obtener tu token"
+                    }
+                }
+            },
+            "deepl": {
+                "summary": "Traduce texto con DeepL.",
+                "description": "Permite que la app Traductor envíe texto a DeepL con tu clave. Sirven claves Free y Pro. La clave se queda en este servidor; DeepL factura el uso.",
+                "apiKeyLabel": "Clave de autenticación",
+                "apiKeyHelp": "En tu cuenta de DeepL -> Claves de API. Una clave que acaba en :fx es Free.",
+                "links": {
+                    "0": {
+                        "label": "Consigue tu clave de API"
+                    }
+                }
+            },
+            "googleTranslate": {
+                "summary": "Traduce texto con Google Cloud Translation.",
+                "description": "Permite que la app Traductor envíe texto a Google Cloud Translation con tu clave de API. La clave se queda en este servidor; Google Cloud factura el uso.",
+                "apiKeyLabel": "Clave de API",
+                "apiKeyHelp": "Activa la API Cloud Translation en el proyecto y limita la clave a ella.",
+                "links": {
+                    "0": {
+                        "label": "Crea una clave de API"
                     }
                 }
             }

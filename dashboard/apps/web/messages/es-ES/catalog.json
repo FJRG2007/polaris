@@ -131,6 +131,10 @@
             "summary": "Páginas públicas que muestran si tus servicios funcionan.",
             "description": "Publica una página que muestra si tus servicios funcionan, con 90 días de disponibilidad a partir de pruebas HTTP, TCP, DNS y de latencia que hace el propio Polaris. Publica incidencias según avanzan y programa mantenimientos con antelación. Apunta las pruebas a tus apps desplegadas o a cualquier dirección. Al desinstalarla se detienen las pruebas y se conservan todas las páginas."
         },
+        "translate": {
+            "summary": "Traduce texto entre idiomas, en el navegador o con tus propias claves.",
+            "description": "Escribe o pega texto y léelo en otro idioma mientras escribes, con el idioma detectado por ti. La traducción se hace en el navegador cuando se puede, con el modelo de Polar, o con DeepL y Google Cloud usando tus claves, y la pantalla siempre dice cuál respondió. Tus traducciones recientes se guardan solo para ti. Al desinstalarla no queda nada en marcha."
+        },
         "crm": {
             "summary": "Empresas, personas y los tratos que llevas, en un solo embudo.",
             "description": "Guarda las empresas con las que trabajas, las personas que hay en ellas y cada oportunidad desde la primera llamada hasta el trato firmado, en tablas que se editan en el sitio y con totales bajo cada columna. Un CRM personal para ti, o uno compartido para una organización con sus propios roles. Instalarlo no ejecuta nada; desinstalarlo conserva cada registro para cuando vuelva."

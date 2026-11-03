@@ -24,7 +24,7 @@ export type { FreeTier } from "@/lib/integrations/model-providers";
  * server at Steam.
  */
 export type IntegrationCategory =
-    "Security" | "OAuth apps" | "Networking" | "Games" | "Chat" | "Models";
+    "Security" | "OAuth apps" | "Networking" | "Games" | "Chat" | "Translation" | "Models";
 
 /** The order the screen shows them in, and the line under each heading. Security
  *  first because it is the one group that is about refusing things rather than
@@ -51,7 +51,9 @@ export const INTEGRATION_CATEGORIES: ReadonlyArray<{ name: IntegrationCategory; 
         hint: "The stores and accounts a game server needs to install, update and let people in."
     },
     // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
-    { name: "Chat", hint: "What conversations and calls here can reach." }
+    { name: "Chat", hint: "What conversations and calls here can reach." },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+    { name: "Translation", hint: "The services the Translate app can send text to." }
 ];
 
 /**
@@ -935,6 +937,52 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
             "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network.",
         // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "Your gateway's model", slug: "openai-compatible/byok" }
+    },
+
+    // Text translation for the Translate app, billed per character by the
+    // provider. Every request goes through the paid-request gate
+    // (`provider-pause.ts`), see `deepl.ts` and `google-translate.ts`.
+    {
+        slug: "deepl",
+        name: "DeepL", // i18n-ignore a product's own name
+        category: "Translation",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+        summary: "Translate text with DeepL.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Lets the Translate app send text to DeepL with your key. Free and Pro keys both work. The key stays on this server; usage is billed by DeepL.",
+        docsUrl: "https://developers.deepl.com/docs/getting-started/intro",
+        setupLinks: [
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            { label: "Get your API key", url: "https://www.deepl.com/your-account/keys" }
+        ],
+        requiresApiKey: true,
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+        apiKeyLabel: "Authentication key",
+        apiKeyHelp:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "From your DeepL account -> API keys. A key ending in :fx is a Free key."
+    },
+    {
+        slug: "google-translate",
+        name: "Google Cloud Translation", // i18n-ignore a product's own name
+        category: "Translation",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+        summary: "Translate text with Google Cloud Translation.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Lets the Translate app send text to Google Cloud Translation with your API key. The key stays on this server; usage is billed by Google Cloud.",
+        docsUrl: "https://docs.cloud.google.com/translate/docs/basic/translating-text",
+        setupLinks: [
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            { label: "Create an API key", url: "https://console.cloud.google.com/apis/credentials" }
+        ],
+        requiresApiKey: true,
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+        apiKeyLabel: "API key",
+        apiKeyHelp:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Enable the Cloud Translation API on the project, then restrict the key to it."
     },
 
     // The rest of the model providers, from the table that also decides what a

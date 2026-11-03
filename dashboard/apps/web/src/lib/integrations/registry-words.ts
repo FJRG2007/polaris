@@ -60,6 +60,7 @@ const CATEGORY_KEY: Readonly<Record<IntegrationCategory, string>> = {
     Networking: "networking",
     Games: "games",
     Chat: "chat",
+    Translation: "translation",
     Models: "models"
 };
 

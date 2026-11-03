@@ -36,6 +36,7 @@ model User {
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
     polarUsage        PolarUsage[]
+    translateHistory  TranslateHistory[]
     polarToolGrants   PolarToolGrant[]
     polarConnectors   PolarConnector[]
     polarAttachments  PolarAttachment[]
@@ -16163,4 +16164,24 @@ model VpnAccess {
     usedBytes   BigInt    @default(0)
     periodStart DateTime  @default(now())
     createdAt   DateTime  @default(now())
+}
+
+// One translation somebody made in the Translate app, kept for them alone so
+// they can find it again. Bounded per person (the app keeps the newest ones and
+// drops the rest on every write), and gone with the account.
+model TranslateHistory {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    sourceText String
+    targetText String
+    // BCP 47 codes; `from` is what the engine detected when it was asked to.
+    fromLang   String
+    toLang     String
+    // Which engine answered: browser, polar, deepl or google.
+    engine     String
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    @@index([userId, createdAt])
 }

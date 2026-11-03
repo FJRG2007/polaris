@@ -1,0 +1,19 @@
+-- The Translate app's history: each person's recent translations, theirs alone.
+CREATE TABLE IF NOT EXISTS "TranslateHistory" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "sourceText" TEXT NOT NULL,
+    "targetText" TEXT NOT NULL,
+    "fromLang" TEXT NOT NULL,
+    "toLang" TEXT NOT NULL,
+    "engine" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TranslateHistory_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "TranslateHistory_userId_createdAt_idx" ON "TranslateHistory"("userId", "createdAt");
+
+ALTER TABLE "TranslateHistory" DROP CONSTRAINT IF EXISTS "TranslateHistory_userId_fkey";
+ALTER TABLE "TranslateHistory" ADD CONSTRAINT "TranslateHistory_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

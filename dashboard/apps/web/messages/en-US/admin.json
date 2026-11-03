@@ -2166,6 +2166,10 @@
             "chat": {
                 "name": "Chat",
                 "hint": "What conversations and calls here can reach."
+            },
+            "translation": {
+                "name": "Translation",
+                "hint": "The services the Translate app can send text to."
             }
         },
         "catalog": {
@@ -2462,6 +2466,28 @@
                 "links": {
                     "0": {
                         "label": "Get your token"
+                    }
+                }
+            },
+            "deepl": {
+                "summary": "Translate text with DeepL.",
+                "description": "Lets the Translate app send text to DeepL with your key. Free and Pro keys both work. The key stays on this server; usage is billed by DeepL.",
+                "apiKeyLabel": "Authentication key",
+                "apiKeyHelp": "From your DeepL account -> API keys. A key ending in :fx is a Free key.",
+                "links": {
+                    "0": {
+                        "label": "Get your API key"
+                    }
+                }
+            },
+            "googleTranslate": {
+                "summary": "Translate text with Google Cloud Translation.",
+                "description": "Lets the Translate app send text to Google Cloud Translation with your API key. The key stays on this server; usage is billed by Google Cloud.",
+                "apiKeyLabel": "API key",
+                "apiKeyHelp": "Enable the Cloud Translation API on the project, then restrict the key to it.",
+                "links": {
+                    "0": {
+                        "label": "Create an API key"
                     }
                 }
             }
