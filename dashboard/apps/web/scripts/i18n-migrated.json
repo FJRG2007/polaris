@@ -2473,6 +2473,16 @@
         "web/src/lib/integrations/deepl.ts",
         "web/src/lib/integrations/google-translate.ts",
         "web/src/lib/translate/provider-codes.ts",
-        "web/src/lib/translate/server-engines.ts"
+        "web/src/lib/translate/server-engines.ts",
+        "web/src/app/(app)/deploy-target-options-actions.ts",
+        "web/src/app/(app)/server-options-actions.ts",
+        "web/src/app/api/backups/targets/route.ts",
+        "web/src/components/deploy-target-picker.tsx",
+        "web/src/components/server-picker.tsx",
+        "web/src/lib/backup-access/service.ts",
+        "web/src/lib/deploy-target-options.ts",
+        "web/src/lib/deploy-target-options-schema.ts",
+        "web/src/lib/server-options.ts",
+        "web/src/lib/server-options-schema.ts"
     ]
 }

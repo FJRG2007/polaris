@@ -33,10 +33,14 @@ export type ServerFilter = z.infer<typeof serverFilterSchema>;
  *  without it being enrolled. */
 export const LOCAL_SERVER_OPTION = "local";
 
+/** Where the next page starts, as the last page handed it out. Room for the
+ *  longest name escaped and base64-encoded with its id. */
+export const pageCursorSchema = z.string().max(2048).nullable().default(null);
+
 export const serverOptionsRequestSchema = z
     .object({
         query: z.string().trim().max(120).default(""),
-        cursor: z.string().max(400).nullable().default(null),
+        cursor: pageCursorSchema,
         limit: z.number().int().min(1).max(SERVER_OPTIONS_MAX_PAGE).default(SERVER_OPTIONS_PAGE),
         /** Read these servers back by id - how a picker names what is chosen. */
         ids: z

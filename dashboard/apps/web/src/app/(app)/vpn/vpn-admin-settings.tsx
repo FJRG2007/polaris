@@ -3,7 +3,7 @@
 /** The VPN's settings: the machines people connect through, and who may use them. */
 
 import * as ui from "@polaris/ui";
-import { ServerPicker } from "@/components/server-picker";
+import { dropServerOptions, ServerPicker } from "@/components/server-picker";
 import { useVpnRead } from "./use-vpn-read";
 import * as actions from "./connect-actions";
 import { VpnOverviewSection } from "./overview";
@@ -57,6 +57,7 @@ export function VpnAdminSettings() {
         startTransition(async () => {
             const result = await actions.removeVpnNodeAction({ id: node.id, anyway: unreachable });
             if (result.error === undefined) {
+                dropServerOptions();
                 closeRemoval();
                 read.reload();
                 return;
@@ -311,7 +312,10 @@ function NodeDialog({
                 ? await actions.updateVpnNodeAction({ ...fields, id: node.id })
                 : await actions.addVpnNodeAction({ ...fields, hostId: hostId ?? "" });
             if (result.error !== undefined) setError(result.error);
-            else onDone();
+            else {
+                dropServerOptions();
+                onDone();
+            }
         });
     }
 

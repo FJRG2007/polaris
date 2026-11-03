@@ -14,6 +14,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { QuickEnroll } from "./quick-enroll";
 import { createHostAction } from "./actions";
+import { dropServerOptions } from "@/components/server-picker";
 import { useState, type FormEvent } from "react";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -87,6 +88,7 @@ export function HostDialog() {
             setError(result.error);
             return;
         }
+        dropServerOptions();
         setOpen(false);
         router.refresh();
     }

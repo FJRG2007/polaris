@@ -5,11 +5,15 @@
  */
 
 import { z } from "zod";
-import { SERVER_OPTIONS_MAX_PAGE, SERVER_OPTIONS_PAGE } from "@/lib/server-options-schema";
+import {
+    pageCursorSchema,
+    SERVER_OPTIONS_MAX_PAGE,
+    SERVER_OPTIONS_PAGE
+} from "@/lib/server-options-schema";
 
 const pageFields = {
     query: z.string().trim().max(120).default(""),
-    cursor: z.string().max(400).nullable().default(null),
+    cursor: pageCursorSchema,
     limit: z.number().int().min(1).max(SERVER_OPTIONS_MAX_PAGE).default(SERVER_OPTIONS_PAGE),
     /** Read these back by id - how a picker names what is chosen. */
     ids: z.array(z.string().uuid()).min(1).max(50).optional()

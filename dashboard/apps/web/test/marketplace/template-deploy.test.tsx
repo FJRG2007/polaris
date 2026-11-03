@@ -20,10 +20,23 @@ const deploy = vi.hoisted(() => ({
             environments: [{ id: "env-1", name: "production", isDefault: true }]
         }
     ]),
-    listDeployServersAction: vi.fn(async () => [
-        { id: "local", name: "This server", kind: "local" as const }
-    ]),
     createApplicationAction: vi.fn(async () => ({}))
+}));
+const serverOptions = vi.hoisted(() => ({
+    listServerOptionsAction: vi.fn(async () => ({
+        items: [
+            {
+                id: "local",
+                name: "This server",
+                address: "",
+                os: null,
+                environment: "local",
+                root: true,
+                online: true
+            }
+        ],
+        next: null
+    }))
 }));
 
 vi.mock("next/navigation", () => ({
@@ -32,6 +45,7 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams()
 }));
 vi.mock("@/app/(app)/apps/deploy/actions", () => deploy);
+vi.mock("@/app/(app)/server-options-actions", () => serverOptions);
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     installAppAction: vi.fn(),
     listInstallTargetsAction: vi.fn(async () => []),
@@ -63,7 +77,11 @@ describe("deploying a template from the marketplace", () => {
         expect(name).toBeTruthy();
         // The heading names this template, so the form offers no way to swap it.
         expect(within(dialog).queryByRole("button", { name: "Other templates" })).toBeNull();
-        await waitFor(() => expect(deploy.listDeployServersAction).toHaveBeenCalledWith("env-1"));
+        await waitFor(() =>
+            expect(serverOptions.listServerOptionsAction).toHaveBeenCalledWith(
+                expect.objectContaining({ environmentId: "env-1", ids: ["local"] })
+            )
+        );
         fireEvent.click(within(dialog).getByRole("button", { name: /^\s*Deploy\s*$/ }));
 
         await waitFor(() =>

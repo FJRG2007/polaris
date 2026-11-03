@@ -5,7 +5,7 @@
  */
 
 import { localServerName } from "@/lib/local-server";
-import { requirePermission, requireUser } from "@/lib/session";
+import { requirePermission, requireUser, sessionCan, type SessionUser } from "@/lib/session";
 import { requireEnvironmentAccess } from "@/lib/deploy-project-access";
 import { getTranslations } from "@/lib/i18n/request";
 import {
@@ -14,6 +14,12 @@ import {
     type ServerOption
 } from "@/lib/server-options-schema";
 import { readServerOptions, type ServerOptionsPage } from "@/lib/server-options";
+
+/** The screens that pick among one's own servers: databases read under
+ *  `deploy.read`, runners and the rest of the server tools under `system.manage`. */
+async function mayPickServers(user: SessionUser): Promise<boolean> {
+    return (await sessionCan(user, "deploy.read")) || sessionCan(user, "system.manage");
+}
 
 export async function listServerOptionsAction(
     input: unknown
@@ -25,6 +31,7 @@ export async function listServerOptionsAction(
     const user = environmentId ? await requirePermission("deploy.manage") : await requireUser();
     const t = await getTranslations("components");
     if (!parsed.success) return { error: t("asyncSelect.failed") };
+    if (!environmentId && !(await mayPickServers(user))) return { error: t("asyncSelect.failed") };
     const request = parsed.data;
     try {
         const ownerId = environmentId

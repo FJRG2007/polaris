@@ -8,7 +8,6 @@
 
 import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { z } from "zod";
-import { localServerName } from "@/lib/local-server";
 import { domainPrivateInputSchema } from "@/lib/deploy/private-domain";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -366,31 +365,6 @@ export interface TemplateTarget {
 export async function listTemplateTargetsAction(): Promise<TemplateTarget[]> {
     const user = await requirePermission("deploy.manage");
     return deployService.listProjectTargets(user.id, await scopeOrgIdFor(user.id));
-}
-
-/**
- * Servers a service can deploy to: the local host (where Polaris runs) plus any
- * connected SSH hosts. The local option is always present and first, so a
- * single-server setup has an obvious default.
- */
-export async function listDeployServersAction(
-    environmentId?: string
-): Promise<{ id: string; name: string; kind: "local" | "host" }[]> {
-    const user = await requirePermission("deploy.manage");
-    // The servers a service could run on belong to whoever owns the project, not
-    // to whoever is looking at it: a collaborator's own machines are not this
-    // project's to deploy to, and a target created under them would leave the
-    // project's services on a box its owner cannot reach.
-    // Reading the list is only reading: adding a service and moving one are
-    // separate grants, and both are checked where they happen.
-    const owner = environmentId
-        ? (await requireEnvironmentAccess(environmentId, user.id, "project.read")).ownerId
-        : user.id;
-    const hosts = await listHosts(owner);
-    return [
-        { id: "local", name: await localServerName(), kind: "local" },
-        ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
-    ];
 }
 
 export async function createApplicationAction(input: {

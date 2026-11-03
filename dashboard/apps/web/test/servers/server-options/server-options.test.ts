@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findMany = vi.fn();
+const sessionCan = vi.fn(async (..._args: unknown[]) => true);
 vi.mock("@polaris/db", () => ({ prisma: { host: { findMany: (...args: unknown[]) => findMany(...args) } } }));
 vi.mock("@/lib/session", () => ({
     requireUser: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111" })),
-    requirePermission: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111" }))
+    requirePermission: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111" })),
+    sessionCan: (...args: unknown[]) => sessionCan(...args)
 }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/local-server", () => ({ localServerName: async () => "This machine" }));
@@ -41,6 +43,8 @@ const lastQuery = () => findMany.mock.calls.at(-1)![0] as { where: Where; take: 
 beforeEach(() => {
     findMany.mockReset();
     requireEnvironmentAccess.mockReset();
+    sessionCan.mockReset();
+    sessionCan.mockResolvedValue(true);
 });
 
 describe("listServerOptionsAction", () => {
@@ -103,6 +107,35 @@ describe("listServerOptionsAction", () => {
         });
         if ("error" in second) throw new Error(second.error);
         expect(second.next).toBeNull();
+    });
+
+    it("pages on past the longest name a server may have, in any script", async () => {
+        const longest = [
+            "\u{1F5A5}".repeat(120),
+            "端".repeat(120),
+            "\u0001".repeat(120),
+            "\\".repeat(120)
+        ];
+        for (const name of longest) {
+            const last = { ...host(1), name };
+            findMany.mockResolvedValue([last]);
+            const result = await listServerOptionsAction({ cursor: encodeServerCursor(name, last.id) });
+            expect(result).not.toHaveProperty("error");
+            expect(lastQuery().where.AND).toContainEqual({
+                OR: [{ name: { gt: name } }, { name, id: { gt: last.id } }]
+            });
+        }
+    });
+
+    it("lists nothing for somebody with no server tool to pick for", async () => {
+        sessionCan.mockResolvedValue(false);
+        const result = await listServerOptionsAction({});
+        expect(result).toEqual({ error: "asyncSelect.failed" });
+        expect(findMany).not.toHaveBeenCalled();
+        expect(sessionCan.mock.calls.map(([, permission]) => permission)).toEqual([
+            "deploy.read",
+            "system.manage"
+        ]);
     });
 
     it("treats a hand-made cursor as the top rather than an error", async () => {
