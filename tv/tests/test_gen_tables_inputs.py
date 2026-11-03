@@ -1,10 +1,9 @@
-"""tools/gen_tables.py refuses a path it cannot read instead of dying in a traceback, the way it refuses a font.
+"""tools/gen_tables.py refuses a path it cannot read instead of dying in a traceback.
 
 Exit 1 is what main's "README tables" job reads as "the tables are out of date", so the run that never read a
 byte must not come back as 1: `--root` on a folder that is not a checkout, and `--adopt` on a patch that is not
 there, both ended in a FileNotFoundError traceback - exit 1 - before, which is the same answer a stale README.md
-gives. The script's own docstring names 2 for "what it was given cannot be read", and `--font` on a path that is
-not there already exits 2 through ap.error, so this is one rule applied to its other two paths.
+gives. The script's own docstring names 2 for "what it was given cannot be read".
 
 Every test runs the real script in a subprocess, since the exit status and the line on stderr are what a
 maintainer sees; the trees come from tests/test_gen_tables.py, so a valid checkout is built the same way there.
@@ -33,7 +32,7 @@ def run(*args, cwd=None):
 
 
 def valid(tmp):
-    """The small checkout tests/test_gen_tables.py builds: examples/ with two folders and the three files."""
+    """The small checkout tests/test_gen_tables.py builds: examples/ with two folders and the two files."""
     return tree(tmp, [("tcl-a", tv("TCL A", "TCL")), ("sony-b", tv("Sony B", "Sony"))])
 
 
@@ -71,7 +70,7 @@ class RootTest(unittest.TestCase):
             root.mkdir()
             code, out, err = run("--root", str(root), "--check")
             self.assertEqual(code, 2, err)
-            for name in ("examples/", "README.md", "examples/README.md", "tools/readme_stats.py"):
+            for name in ("examples/", "README.md", "examples/README.md"):
                 with self.subTest(missing=name):
                     self.assertIn(name, err)
             self.assertEqual(out, "")
@@ -79,11 +78,11 @@ class RootTest(unittest.TestCase):
     def test_one_missing_file_is_named_and_the_others_are_not(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = valid(tmp)
-            (root / "tools" / "readme_stats.py").unlink()
+            (root / "README.md").unlink()
             code, out, err = run("--root", str(root), "--check")
             self.assertEqual(code, 2, err)
-            self.assertIn("no tools/readme_stats.py in it", err)
-            # The other four paths must not be named as missing: pin the phrase, not a bare "examples/",
+            self.assertIn("no README.md in it", err)
+            # The other paths must not be named as missing: pin the phrase, not a bare "examples/",
             # since the line also carries the root, whose path a runner could one day spell with it.
             self.assertNotIn("no examples/", err)
 
