@@ -3425,7 +3425,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (servers.serverNameProblem(name)) {
                     return {
                         ok: false,
-                        error: await say("errors.serverNameTooLong", { max: servers.SERVER_NAME_MAX })
+                        error: await say("errors.serverNameTooLong", {
+                            max: servers.SERVER_NAME_MAX
+                        })
                     };
                 }
                 // Checked, never requested - the popup asked, from the press.

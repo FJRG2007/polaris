@@ -46,10 +46,11 @@ beforeEach(() => {
     sent = [];
     vi.stubGlobal(
         "fetch",
-        vi.fn(async () =>
-            new Response(JSON.stringify({ product: "polaris", protocol: 1 }), {
-                headers: { "content-type": "application/json" }
-            })
+        vi.fn(
+            async () =>
+                new Response(JSON.stringify({ product: "polaris", protocol: 1 }), {
+                    headers: { "content-type": "application/json" }
+                })
         )
     );
     vi.stubGlobal("browser", {
@@ -98,20 +99,28 @@ describe("adding a host", () => {
     it("sends the name typed with a new address, tidied", async () => {
         openAdd();
         fireEvent.change(address(), { target: { value: "lab.example.com" } });
-        fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "  Home   lab " } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+            target: { value: "  Home   lab " }
+        });
         await act(() => vi.advanceTimersByTimeAsync(1_000));
         expect(addButton().getAttribute("aria-disabled")).toBe("false");
         await act(async () => {
             fireEvent.click(addButton());
             await vi.advanceTimersByTimeAsync(0);
         });
-        expect(sent).toContainEqual({ kind: "addServer", typed: "lab.example.com", name: "Home lab" });
+        expect(sent).toContainEqual({
+            kind: "addServer",
+            typed: "lab.example.com",
+            name: "Home lab"
+        });
     });
 
     it("keeps Add off while the name is too long", async () => {
         openAdd();
         fireEvent.change(address(), { target: { value: "long.example.com" } });
-        fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "x".repeat(41) } });
+        fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+            target: { value: "x".repeat(41) }
+        });
         await act(() => vi.advanceTimersByTimeAsync(1_000));
         expect(screen.getByText("A name can be up to 40 characters.")).toBeTruthy();
         expect(addButton().getAttribute("aria-disabled")).toBe("true");

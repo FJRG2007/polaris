@@ -309,7 +309,10 @@ function AddServer({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                aria-invalid={Boolean(already) || (check.kind !== "incomplete" && check.kind !== "checking" && !addable(check))}
+                aria-invalid={
+                    Boolean(already) ||
+                    (check.kind !== "incomplete" && check.kind !== "checking" && !addable(check))
+                }
                 onChange={(event) => setTyped(event.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === "Enter") void add();
