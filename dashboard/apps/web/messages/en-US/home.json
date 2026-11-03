@@ -29,7 +29,6 @@
         "width": "Width",
         "clearHistory": "Clear history",
         "hide": "Hide card",
-        "remove": "Remove {name}",
         "removeCard": "Remove card",
         "removed": "{name} removed. Bring it back from Customize.",
         "undo": "Put back"

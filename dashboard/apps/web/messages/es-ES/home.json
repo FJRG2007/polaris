@@ -29,7 +29,6 @@
         "width": "Ancho",
         "clearHistory": "Borrar historial",
         "hide": "Ocultar",
-        "remove": "Quitar {name}",
         "removeCard": "Quitar tarjeta",
         "removed": "Tarjeta quitada: {name}. Recupérala desde Personalizar.",
         "undo": "Deshacer"
