@@ -19,9 +19,10 @@ import { syncAppRoutes } from "../deploy-service";
 import type { ComposeSpec } from "@polaris/deploy";
 import { newestUrl, tunnelReachable } from "./tunnel-url";
 import { parseStoredTunnel, type StoredTunnel } from "./quick-tunnel-store";
+import { CLOUDFLARED_IMAGE } from "@/lib/tunnel-images";
 
 const PROXY_NETWORK = "polaris-proxy";
-const IMAGE = "cloudflare/cloudflared:latest";
+const IMAGE = CLOUDFLARED_IMAGE;
 /** trycloudflare.com quick-tunnel hostname, printed by cloudflared on startup. */
 const URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
 
@@ -92,9 +93,8 @@ function tunnelSpec(project: string, service: string, origin: string, hostHeader
             {
                 name: service,
                 image: IMAGE,
-                // Same reason as the named connector: a floating tag compose never
-                // re-resolves leaves an agent the edge has moved on from.
-                pullPolicy: "always",
+                // Pinned by digest, as every tunnel sidecar is (tunnel-images.ts).
+                pullPolicy: "missing",
                 env: {},
                 ports: [],
                 volumes: [],

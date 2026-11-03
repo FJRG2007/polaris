@@ -19,9 +19,10 @@ import type { ComposeSpec } from "@polaris/deploy";
 import { connectorOrigin } from "../deploy-service";
 import { connectorNetworks } from "./service-networks";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
+import { NGROK_IMAGE } from "../tunnel-images";
 
 const PROXY_NETWORK = "polaris-proxy";
-const IMAGE = "ngrok/ngrok:latest";
+const IMAGE = NGROK_IMAGE;
 /** ngrok public hostnames (free `.ngrok-free.app`, paid `.ngrok.app`, legacy `.ngrok.io`). */
 const URL_PATTERN = /https:\/\/[a-z0-9-]+\.ngrok(?:-free)?\.(?:app|io)/i;
 
@@ -68,9 +69,8 @@ function tunnelSpec(
             {
                 name: service,
                 image: IMAGE,
-                // Same reason as the cloudflared sidecar: a floating tag that is
-                // never re-resolved leaves an agent the service can no longer use.
-                pullPolicy: "always",
+                // Pinned by digest, as every tunnel sidecar is (tunnel-images.ts).
+                pullPolicy: "missing",
                 env: { NGROK_AUTHTOKEN: token },
                 ports: [],
                 volumes: [],

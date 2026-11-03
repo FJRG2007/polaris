@@ -22,6 +22,7 @@ import { connectorOrigin } from "../deploy-service";
 import { connectorNetworks } from "./service-networks";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { requireCloudflareAccount } from "../integrations/cloudflare-account-service";
+import { CLOUDFLARED_IMAGE } from "@/lib/tunnel-images";
 import {
     createTunnel,
     deleteDnsRecord,
@@ -34,7 +35,7 @@ import {
 } from "../integrations/cloudflare-api";
 
 const PROXY_NETWORK = "polaris-proxy";
-const IMAGE = "cloudflare/cloudflared:latest";
+const IMAGE = CLOUDFLARED_IMAGE;
 
 export interface NamedTunnelStatus {
     running: boolean;
@@ -153,10 +154,9 @@ function tunnelSpec(project: string, service: string, token: string, networks: s
             {
                 name: service,
                 image: IMAGE,
-                // A sidecar on a floating tag is still a registry image: without
-                // this it keeps running whatever copy the host first fetched, and
-                // a connector that has fallen behind the edge fails silently.
-                pullPolicy: "always",
+                // Pinned by digest, so the copy the host holds is the right one
+                // and a start never waits on the registry.
+                pullPolicy: "missing",
                 env: { TUNNEL_TOKEN: token },
                 ports: [],
                 volumes: [],
