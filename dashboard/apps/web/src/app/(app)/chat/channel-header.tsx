@@ -25,6 +25,8 @@ import { ActivityLine } from "@/components/activity-card";
 import { PersonName, PersonRealName } from "@/components/person-name";
 import { LeaveDialog } from "./leave-dialog";
 import { NicknameDialog } from "./nickname-dialog";
+import { TranslationDialog } from "./translation-dialog";
+import { useTextTranslator } from "@/components/text-translation/provider";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { ChatPictureDialog } from "./picture-dialog";
@@ -40,6 +42,7 @@ import {
     Hash,
     House,
     Image as ImageIcon,
+    Languages,
     Link2,
     LogOut,
     Lock,
@@ -126,6 +129,10 @@ export function ChannelHeader({
     const [picturing, setPicturing] = useState(false);
     const [settings, setSettings] = useState(false);
     const [naming, setNaming] = useState(false);
+    const [translating, setTranslating] = useState(false);
+    /** Live translation is offered only where the reader has an app that
+     *  translates. */
+    const translator = useTextTranslator();
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [error, setError] = useState("");
@@ -423,6 +430,12 @@ export function ChannelHeader({
                                     {t("channelHeader.starredMessages")}
                                 </Link>
                             </DropdownMenuItem>
+                            {translator && (
+                                <DropdownMenuItem onSelect={() => setTranslating(true)}>
+                                    <Languages className="size-3.5" />
+                                    {t("translation.settings")}
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <MuteOptions
                                 channel={channel}
@@ -611,6 +624,14 @@ export function ChannelHeader({
                     {error}
                 </p>
             )}
+
+            <TranslationDialog
+                open={translating}
+                onOpenChange={setTranslating}
+                channelId={channel.id}
+                current={channel.translation}
+                onSaved={onChanged}
+            />
 
             <NicknameDialog
                 open={naming}
