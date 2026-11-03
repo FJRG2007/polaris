@@ -1301,8 +1301,9 @@ function TotpCell({
  * The whole line is the button rather than an icon at the end of it: at 360
  * pixels a row of four labelled buttons is most of the width, and the thing
  * somebody wants is almost always "give me that value". A password is shown as
- * dots - it is copied, never read off the screen - and a login with no username
- * says so rather than drawing an empty line that looks pressable and is not.
+ * dots here - reading it off the screen is `PasswordField`'s eye - and a login
+ * with no username says so rather than drawing an empty line that looks
+ * pressable and is not.
  */
 function Field({
     copyLabel,
@@ -1363,30 +1364,44 @@ function PasswordField({
     /** Whether the password was just copied. */
     done: boolean;
     onCopy: () => void;
-    /** Why the password could not be shown, in the popup's note line. */
-    onRefused: (why: string) => void;
+    /** The popup's note line: why the password could not be shown, or `null` once it was. */
+    onNote: (note: string | null) => void;
 }): React.JSX.Element {
     const t = useWords();
     const [value, setValue] = useState<string | null>(null);
     const hiding = useRef<number | null>(null);
+    const mounted = useRef(true);
+    const asking = useRef(false);
 
     const stopTimer = (): void => {
         if (hiding.current !== null) window.clearTimeout(hiding.current);
         hiding.current = null;
     };
-    useEffect(() => stopTimer, []);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            stopTimer();
+        };
+    }, []);
 
     const toggle = async (): Promise<void> => {
+        if (asking.current) return;
         stopTimer();
         if (value !== null) {
             setValue(null);
             return;
         }
-        const reply = await askBackground({ kind: "copy", id, field: "password" });
+        asking.current = true;
+        const reply = await askBackground({ kind: "copy", id, field: "password" }).finally(() => {
+            asking.current = false;
+        });
+        if (!mounted.current) return;
         if (!reply.ok || !("value" in reply)) {
-            if (!reply.ok) onRefused(reply.error);
+            if (!reply.ok) onNote(reply.error);
             return;
         }
+        onNote(null);
         setValue(reply.value);
         hiding.current = window.setTimeout(() => setValue(null), REVEAL_FOR_MS);
     };
@@ -1930,7 +1945,7 @@ function Items({
                     id={item.id}
                     done={copied === `${item.id}:password`}
                     onCopy={() => void copy(item, "password")}
-                    onRefused={setNote}
+                    onNote={setNote}
                 />
                 {item.totp ? (
                     <TotpCell
