@@ -1393,7 +1393,9 @@ function PasswordField({
 
     const shown = value !== null;
     return (
-        <div className="secret">
+        // Shown, it wraps rather than ending in an ellipsis: a password cut short
+        // is one nobody can type in from the screen.
+        <div className={shown ? "secret revealed" : "secret"}>
             <Field
                 copyLabel={t("popup.items.copyPassword")}
                 shown={value ?? "••••••••••"}
@@ -1404,7 +1406,6 @@ function PasswordField({
             <button
                 type="button"
                 className="icon small"
-                aria-pressed={shown}
                 aria-label={shown ? t("generator.hidePassword") : t("generator.showPassword")}
                 title={shown ? t("generator.hidePassword") : t("generator.showPassword")}
                 onClick={() => void toggle()}

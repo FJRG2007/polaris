@@ -432,6 +432,11 @@ li {
     max-width: 100%;
 }
 
+.secret.revealed .shown {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 button.icon.small {
     width: 22px;
     height: 22px;
