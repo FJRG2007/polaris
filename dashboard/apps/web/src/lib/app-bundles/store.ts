@@ -259,13 +259,29 @@ export async function unpack(bytes: Buffer, id: string, target: string): Promise
  */
 export async function dropOthers(id: string): Promise<void> {
     const dir = join(bundleRoot(), id);
-    const state = await readBundleState(id);
+    // A build being brought up here is unpacked and then named in the state, so
+    // until it is named it is not one to drop: wait for it, and read the state
+    // and the folder again if one started while they were being read.
+    let state: BundleState | null;
+    let entries: string[];
+    for (;;) {
+        await inflight.get(id)?.catch(() => undefined);
+        state = await readBundleState(id);
+        entries = await readdir(dir).catch(() => [] as string[]);
+        if (!inflight.has(id)) break;
+    }
     const keep = new Set([STATE_FILE]);
     for (const pin of [state?.current, state?.previous]) if (pin) keep.add(hexOf(pin.digest));
-    const entries = await readdir(dir).catch(() => [] as string[]);
+    // An unpack this process is still writing; one left by another is debris.
+    const writing = `.partial-${process.pid}-`;
     await Promise.all(
         entries
-            .filter((entry) => !keep.has(entry) && !entry.startsWith(`${STATE_FILE}.`))
+            .filter(
+                (entry) =>
+                    !keep.has(entry) &&
+                    !entry.startsWith(`${STATE_FILE}.`) &&
+                    !entry.includes(writing)
+            )
             .map((entry) => rm(join(dir, entry), { recursive: true, force: true }))
     );
 }

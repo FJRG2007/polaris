@@ -14,6 +14,9 @@ import { Button, cn } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { DOCUMENT_MAX_BYTES } from "../model/media";
 import { DocumentError, openDocument, translatedName, type DocumentFormat } from "./documents";
+import { hostUi } from "@polaris/app-host/client";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 /** Paragraphs sent at once: small enough for the progress to move. */
 const BATCH = 40;
@@ -75,7 +78,7 @@ export function DocumentMode({
     to: string;
 }) {
     const t = useTranslateT();
-    const input = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const running = useRef<AbortController | null>(null);
     const [phase, setPhase] = useState<Phase>({ kind: "idle" });
     const [error, setError] = useState<string | null>(null);
@@ -142,23 +145,21 @@ export function DocumentMode({
         setPhase({ kind: "idle" });
     };
 
+    const pick = () =>
+        void chooseFiles({
+            accept: ".docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.srt,.vtt",
+            onFailed: setError
+        }).then(([file]) => {
+            if (file) void open(file);
+        });
+
     return (
         <div className="flex min-w-0 flex-col gap-3">
-            <input
-                ref={input}
-                type="file"
-                accept=".docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.srt,.vtt"
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void open(file);
-                }}
-            />
+            {chooser}
             {phase.kind === "idle" ? (
                 <button
                     type="button"
-                    onClick={() => input.current?.click()}
+                    onClick={pick}
                     onDragOver={(event) => {
                         event.preventDefault();
                         setDragging(true);

@@ -20,6 +20,9 @@ import {
     type ImageLine,
     type Reads
 } from "./reads";
+import { hostUi } from "@polaris/app-host/client";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 type View = "overlay" | "side";
 
@@ -33,7 +36,7 @@ export function ImageMode({
     manager: boolean;
 }) {
     const t = useTranslateT();
-    const input = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const picture = useRef<HTMLImageElement>(null);
     const [url, setUrl] = useState<string | null>(null);
     const [lines, setLines] = useState<ImageLine[] | null>(null);
@@ -135,23 +138,21 @@ export function ImageMode({
     const translation = (translated ?? []).join("\n");
     const boxed = (lines ?? []).some((line) => line.box);
 
+    const pick = () =>
+        void chooseFiles({
+            accept: "image/png,image/jpeg,image/webp,image/gif",
+            onFailed: setError
+        }).then(([file]) => {
+            if (file) void open(file);
+        });
+
     return (
         <div className="flex min-w-0 flex-col gap-3">
-            <input
-                ref={input}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void open(file);
-                }}
-            />
+            {chooser}
             {!url ? (
                 <button
                     type="button"
-                    onClick={() => input.current?.click()}
+                    onClick={pick}
                     onDragOver={(event) => {
                         event.preventDefault();
                         setDragging(true);
@@ -186,12 +187,7 @@ export function ImageMode({
                                 ]}
                             />
                         ) : null}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="ml-auto"
-                            onClick={() => input.current?.click()}
-                        >
+                        <Button variant="outline" size="sm" className="ml-auto" onClick={pick}>
                             {t("image.choose")}
                         </Button>
                         <Button

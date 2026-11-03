@@ -22,6 +22,9 @@ import {
     type ImageLine,
     type Reads
 } from "./reads";
+import { hostUi } from "@polaris/app-host/client";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 /** How often a frame is read: the device's detector is quick, the server's model is not. */
 const LOCAL_EVERY_MS = 2000;
@@ -83,7 +86,7 @@ export function CameraMode({
 }) {
     const t = useTranslateT();
     const video = useRef<HTMLVideoElement>(null);
-    const fileInput = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const stream = useRef<MediaStream | null>(null);
     const fileUrl = useRef<string | null>(null);
     const busy = useRef(false);
@@ -221,19 +224,14 @@ export function CameraMode({
 
     const translation = (translated ?? []).filter(Boolean).join("\n");
 
+    const pick = () =>
+        void chooseFiles({ accept: "video/*", onFailed: setError }).then(([file]) => {
+            if (file) void startFile(file);
+        });
+
     return (
         <div className="flex min-w-0 flex-col gap-3">
-            <input
-                ref={fileInput}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void startFile(file);
-                }}
-            />
+            {chooser}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {running ? (
                     <>
@@ -261,7 +259,7 @@ export function CameraMode({
                         {t("camera.start")}
                     </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
+                <Button variant="outline" size="sm" onClick={pick}>
                     <Film className="size-4 shrink-0" aria-hidden />
                     {t("camera.video")}
                 </Button>

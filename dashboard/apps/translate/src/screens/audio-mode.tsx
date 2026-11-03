@@ -19,6 +19,9 @@ import { useTranslateLocale, useTranslateT } from "./i18n";
 import { Button, CopyButton, Skeleton, cn } from "@polaris/ui";
 import { FileAudio, Mic, Square, Trash2, Volume2 } from "lucide-react";
 import { AUDIO_MAX_BYTES, AUDIO_MAX_SECONDS, sniffAudio } from "../model/media";
+import { hostUi } from "@polaris/app-host/client";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 interface Turn {
     id: number;
@@ -92,7 +95,7 @@ export function AudioMode({
 }) {
     const t = useTranslateT();
     const locale = useTranslateLocale();
-    const fileInput = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const counter = useRef(0);
     const recognition = useRef<Recognition | null>(null);
     const recorder = useRef<MediaRecorder | null>(null);
@@ -269,19 +272,14 @@ export function AudioMode({
         return code ? languageName(code, locale) : t("lang.auto");
     };
 
+    const pick = () =>
+        void chooseFiles({ accept: "audio/*", onFailed: setError }).then(([file]) => {
+            if (file) void openFile(file);
+        });
+
     return (
         <div className="flex min-w-0 flex-col gap-3">
-            <input
-                ref={fileInput}
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void openFile(file);
-                }}
-            />
+            {chooser}
             {!reads.audio && !native ? <ReadsNotice kind="audio" manager={manager} /> : null}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {(["a", "b"] as const).map((side) => (
@@ -314,7 +312,7 @@ export function AudioMode({
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => fileInput.current?.click()}
+                        onClick={pick}
                         disabled={busy || listening !== null}
                     >
                         <FileAudio className="size-4 shrink-0" aria-hidden />
