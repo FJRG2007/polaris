@@ -145,6 +145,7 @@
             "dahua-other": "Any Dahua camera",
             "generic-other": "Something else",
             "hikvision-other": "Any Hikvision camera",
+            "matter-other": "Any Matter camera or doorbell",
             "onvif-other": "Any ONVIF camera",
             "reolink-other": "Any Reolink camera",
             "tapo-other": "Another Tapo camera",
@@ -331,6 +332,11 @@
         "hikvision": {
             "label": "Hikvision"
         },
+        "matter": {
+            "label": "Matter camera or doorbell",
+            "method": "Matter",
+            "note": "For a camera or video doorbell that works with Matter. Polaris joins it as one more app, with the pairing code the camera's own app shares, so that app keeps working as before."
+        },
         "onvif": {
             "label": "Any ONVIF camera",
             "note": "Polaris asks the camera what it streams. Most cameras made in the last ten years answer."
@@ -452,7 +458,12 @@
         "keepForHint": "Days. Anything you pin survives this.",
         "enabled": "Switched on",
         "enabledHint": "Off means Polaris does not connect to it at all.",
-        "addCamera": "Add camera"
+        "addCamera": "Add camera",
+        "matterCode": "Pairing code",
+        "matterCodeHint": "In the camera's own app, share it with another app (Matter). Type the 11-digit code it shows.",
+        "matterAdded": "Added. To pair it again, remove the camera and add it with a new code.",
+        "matterCodeFormat": "Type the 11-digit code, or the one starting with MT:",
+        "matterCodeCheck": "A digit is wrong. Check the code against the camera's app"
     },
     "activity": {
         "none": "No detector has reported on this camera. If you have just saved it, give it a minute - the worker asks for its cameras every half minute.",
@@ -733,6 +744,16 @@
         "cameraOff": "This camera is switched off",
         "cameraPrivate": "This camera is private",
         "relayStarting": "The camera relay is still starting",
+        "matterBridgeSilent": "The Matter bridge was installed but is not answering yet",
+        "matterBridgeStarting": "The Matter bridge is still starting",
+        "matterCodeMissing": "Type the pairing code the camera's app shared",
+        "matterNotAdded": "This Matter camera has not been added yet",
+        "matterCodeInvalid": "That pairing code is not one a Matter camera gives",
+        "matterCodeRefused": "The camera refused that pairing code. Share it again from the camera's app",
+        "matterNoAnswer": "The camera did not answer. Share it again from its app and add it within a few minutes",
+        "matterNotCertified": "The camera could not prove it is a certified Matter device",
+        "matterNotCamera": "That pairing code belongs to a Matter device that is not a camera",
+        "matterAddFailed": "The camera could not be added. Share it again from its app and try once more",
         "relayNotAnswering": "The camera relay is not answering",
         "relayNoVoice": "The camera relay would not take a voice",
         "relayUpdating": "The camera relay is updating so it can carry your voice. Try again in a minute",

@@ -235,6 +235,14 @@ export const CAMERA_MODELS: readonly CameraModel[] = [
         search: ["generic", "any", "other"]
     },
     {
+        // Any make: a Matter camera is reached the same way whoever built it.
+        id: "matter-other",
+        name: "Any Matter camera or doorbell",
+        brand: "Other",
+        connections: ["matter"],
+        search: ["matter", "doorbell", "video doorbell", "thread", "any", "other"]
+    },
+    {
         id: "generic-other",
         name: "Something else",
         brand: "Other",

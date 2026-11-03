@@ -135,11 +135,11 @@ describe("whether a relay can take a voice", () => {
 });
 
 describe("which cameras can talk", () => {
-    it("is a Tapo over its own protocol, and only that", () => {
+    it("is a Tapo over its own protocol always, any other make when its relay says", () => {
         expect(talkSupport("tapo-cloud")).toBe("yes");
         expect(talkSupport("tapo-battery")).toBe("yes");
         expect(talkSupport("tapo")).toBe("rtsp");
-        expect(talkSupport("reolink")).toBe("no");
+        expect(talkSupport("reolink")).toBe("probe");
     });
 });
 

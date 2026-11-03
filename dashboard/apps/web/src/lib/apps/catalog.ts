@@ -48,6 +48,7 @@ export type AppCapability =
     | "game-manager"
     | "game-server"
     | "camera-hub"
+    | "matter-bridge"
     | "mqtt-broker"
     | "home-hub"
     | "mail-server"
@@ -1425,6 +1426,38 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             ],
             volumes: [{ name: "config", mountPath: "/config", label: "Relay configuration" }], // i18n-ignore
             ports: [{ container: 1984, protocol: "http", label: "Relay API" }] // i18n-ignore
+        }
+    },
+    {
+        // The Matter controller cameras are added to. Never offered on its own:
+        // Places installs it the first time somebody adds a Matter camera, on the
+        // machine that camera is reached from, beside that machine's relay.
+        id: "matter-bridge",
+        name: "Matter bridge",
+        internal: true,
+        ownedBy: "home",
+        category: "Home",
+        icon: Video,
+        summary: "Adds Matter cameras and doorbells, and lets the relay watch them.",
+        description:
+            "A Matter controller for cameras. It joins a Matter camera or video doorbell with the code its own app shares, and hands its live video, its sound and its speaker to the camera relay, so it is watched, recorded and talked through like every other camera.", // i18n-ignore
+        docsUrl: "https://github.com/matter-js/matterjs-server",
+        installMethod: "compose-template",
+        capabilities: ["matter-bridge"],
+        dashboard: "generic",
+        template: {
+            // Published by CI (.github/workflows/dashboard-publish.yml, `matter`
+            // job) from dashboard/services/matter-bridge.
+            image: "ghcr.io/fjrg2007/polaris-matter-bridge:latest",
+            build: "dashboard/services/matter-bridge",
+            env: [
+                { key: "BRIDGE_USERNAME", label: "API account", default: "polaris" }, // i18n-ignore
+                // Minted at install and never shown, as the relay's is.
+                { key: "BRIDGE_PASSWORD", label: "API password", generated: true } // i18n-ignore
+            ],
+            // The fabric itself: losing it is every Matter camera added again.
+            volumes: [{ name: "data", mountPath: "/data", label: "Matter fabric" }], // i18n-ignore
+            ports: [{ container: 5590, protocol: "http", label: "Bridge API" }] // i18n-ignore
         }
     },
     {

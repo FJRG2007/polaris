@@ -38,6 +38,8 @@ import * as cameras from "../lib/cameras";
 import * as privacy from "../lib/privacy";
 import * as tapoControls from "../lib/tapo-controls";
 import * as talk from "../lib/talk";
+import * as matter from "../lib/matter-bridge";
+import { MATTER_VENDOR, leavesMatterBridge } from "../lib/matter-code";
 import { tapoCommandSchema, type TapoControls } from "../lib/camera-control-kinds";
 import * as cameraSets from "../lib/camera-sets";
 import {
@@ -620,9 +622,14 @@ export async function saveCameraAction(
             if (!allowed.has(parsed.data.storageTarget))
                 throw new Error("That storage is not one of yours");
         }
-        return id
-            ? cameras.updateCamera(install.id, id, parsed.data)
-            : cameras.createCamera(install.id, parsed.data);
+        if (!id) return cameras.createCamera(install.id, parsed.data);
+        const before = await cameras.getCamera(install.id, id);
+        const saved = await cameras.updateCamera(install.id, id, parsed.data);
+        if (before && leavesMatterBridge(before, saved)) {
+            const bridge = await matter.matterBridge(relay.relayServerFor(before.reachVia));
+            if (bridge) await matter.forgetMatter(bridge, before.mainPath);
+        }
+        return saved;
     });
     if (result.error || !result.value)
         return { error: result.error ?? (await say("actions.cameraNotSaved")) };
@@ -645,13 +652,20 @@ export async function startCameraAction(id: string): Promise<{ error?: string }>
         const camera = await cameras.getCamera(install.id, id);
         if (!camera) throw new Error("Camera not found");
         if (!camera.enabled) return;
-        const target = await cameras.cameraTarget(install.id, id);
+        let target = await cameras.cameraTarget(install.id, id);
         if (!target) throw new Error("Camera not found");
         const endpoint = await relay.ensureRelay(
             install.ownerId,
             user.id,
             relay.relayServerFor(camera.reachVia)
         );
+        if (camera.vendor === MATTER_VENDOR) {
+            // Added to the bridge once, with the code the camera's app shared;
+            // after that the camera is where the bridge keeps it.
+            await matter.addMatterCamera(install.id, install.ownerId, user.id, target);
+            target = await cameras.cameraTarget(install.id, id);
+            if (!target) throw new Error("Camera not found");
+        }
         await relay.publishCamera(endpoint, target, camera.vendor, {
             warm: relay.keepsWarm(camera)
         });
@@ -679,8 +693,15 @@ export async function deleteCameraAction(id: string): Promise<{ error?: string }
         if (!camera) throw new Error("Camera not found");
         // Told to stop serving it first: a relay that keeps a stream for a camera
         // nobody can open again holds a connection to it forever.
-        const endpoint = await relay.relayEndpoint(relay.relayServerFor(camera.reachVia));
+        const serverId = relay.relayServerFor(camera.reachVia);
+        const endpoint = await relay.relayEndpoint(serverId);
         if (endpoint) await relay.unpublishCamera(endpoint, id);
+        if (camera.vendor === MATTER_VENDOR && camera.mainPath.startsWith("/cameras/")) {
+            // Off the fabric too, so the camera stops counting Polaris among the
+            // apps it is shared with.
+            const bridge = await matter.matterBridge(serverId);
+            if (bridge) await matter.forgetMatter(bridge, camera.mainPath);
+        }
         await cameras.deleteCamera(install.id, id);
     });
     if (result.error) return { error: result.error };
@@ -1227,6 +1248,15 @@ export async function startTalkAction(
         targetId: id.data
     });
     return { talkId: result.value };
+}
+
+/** Whether this camera's speaker can be reached now: the Talk button shows
+ *  only where it can. */
+export async function talkAvailableAction(cameraId: string): Promise<{ available: boolean }> {
+    const { install } = await requireHome("home.control");
+    const id = cameraIdSchema.safeParse(cameraId);
+    if (!id.success) return { available: false };
+    return { available: await talk.talkAvailable(install.id, id.data) };
 }
 
 export async function stopTalkAction(

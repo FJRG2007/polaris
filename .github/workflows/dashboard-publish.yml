@@ -43,6 +43,7 @@ on:
       - "dashboard/services/edge-guard/**"
       - "dashboard/services/hytale/**"
       - "dashboard/services/camera-relay/**"
+      - "dashboard/services/matter-bridge/**"
       - "dashboard/services/mqtt-broker/**"
       - "dashboard/services/dns-blocker/**"
       - "dashboard/services/vpn/**"
@@ -126,6 +127,7 @@ jobs:
       guard: ${{ steps.filter.outputs.guard }}
       hytale: ${{ steps.filter.outputs.hytale }}
       relay: ${{ steps.filter.outputs.relay }}
+      matter: ${{ steps.filter.outputs.matter }}
       broker: ${{ steps.filter.outputs.broker }}
       dnsblock: ${{ steps.filter.outputs.dnsblock }}
       vpn: ${{ steps.filter.outputs.vpn }}
@@ -145,7 +147,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
           # Measured from the last run that published, not from the push before
           # this one. A run that failed its suites or was cancelled built nothing
           # that got tagged, so its changes are still unpublished - and measured
@@ -227,6 +229,8 @@ jobs:
           has '^dashboard/services/hytale/' && out hytale true || out hytale false
           # The relay is go2rtc plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
+          # The Matter bridge is the pinned Matter.js server plus its signalling door.
+          has '^dashboard/services/matter-bridge/' && out matter true || out matter false
           # The broker is Mosquitto plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/mqtt-broker/' && out broker true || out broker false
           # The network filter is Blocky plus an entrypoint; nothing else feeds it.
@@ -743,6 +747,45 @@ jobs:
           provenance: false
           sbom: false
 
+  # The Matter bridge: the Matter.js server behind an account, with the door
+  # the camera relay dials to watch a Matter camera. Published so a house does not
+  # build a Matter controller the first time somebody adds one.
+  matter:
+    needs: changes
+    if: ${{ needs.changes.outputs.matter == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: dashboard
+          file: dashboard/services/matter-bridge/Dockerfile
+          # The bridge runs beside the relay, so it follows the same machines.
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-matter-bridge,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
+
   # The local device broker: Mosquitto with one account, which the stock image
   # has no way to arrive with. Published so a house does not build a broker the
   # first time somebody links a lock.
@@ -941,7 +984,7 @@ jobs:
   # the extension does run dashboard-ci, so this runs and tags nothing - every
   # step below is guarded on its own image's result, and all of them were skipped.
   tag:
-    needs: [dashboard-ci, web, bridge, guard, hytale, relay, broker, dnsblock, vpn, vision, face]
+    needs: [dashboard-ci, web, bridge, guard, hytale, relay, matter, broker, dnsblock, vpn, vision, face]
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -994,6 +1037,11 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-camera-relay:latest \
             ghcr.io/fjrg2007/polaris-camera-relay@${{ needs.relay.outputs.digest }}
+      - name: Tag the Matter bridge
+        if: ${{ env.PUBLISH == 'true' && needs.matter.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-matter-bridge:latest \
+            ghcr.io/fjrg2007/polaris-matter-bridge@${{ needs.matter.outputs.digest }}
       - name: Tag the local device broker
         if: ${{ env.PUBLISH == 'true' && needs.broker.result == 'success' }}
         run: |

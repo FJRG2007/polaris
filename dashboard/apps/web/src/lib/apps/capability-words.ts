@@ -13,6 +13,7 @@ export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">>
     "game-manager": "capabilities.gameManager",
     "game-server": "capabilities.gameServer",
     "camera-hub": "capabilities.cameraHub",
+    "matter-bridge": "capabilities.matterBridge",
     "mqtt-broker": "capabilities.mqttBroker",
     "home-hub": "capabilities.homeHub",
     "mail-server": "capabilities.mailServer",

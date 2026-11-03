@@ -1,0 +1,12 @@
+{
+    "name": "polaris-matter-bridge",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "The Matter.js server and WebSocket library the Matter bridge image runs.",
+    "license": "AGPL-3.0-only",
+    "dependencies": {
+        "matter-server": "1.5.5",
+        "ws": "8.22.0"
+    }
+}

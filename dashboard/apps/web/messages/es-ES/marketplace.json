@@ -6,6 +6,7 @@
         "gameManager": "Hosting juegos",
         "gameServer": "Servidor de juegos",
         "cameraHub": "Cámaras",
+        "matterBridge": "Matter",
         "mqttBroker": "Bróker local",
         "homeHub": "Hogar",
         "mailServer": "Correo",

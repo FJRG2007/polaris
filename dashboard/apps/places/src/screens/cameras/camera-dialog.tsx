@@ -30,6 +30,12 @@ import {
     vendorNote
 } from "../../lib/vendors";
 import { usePlacesT } from "../use-places-t";
+import {
+    MATTER_VENDOR,
+    leavesMatterBridge,
+    matterCodeIssue,
+    parseMatterPath
+} from "../../lib/matter-code";
 import { usePlaceRooms } from "../use-place-rooms";
 import type { PlacesTranslator } from "../../lib/i18n";
 import {
@@ -233,7 +239,15 @@ export function CameraDialog({
     // A make with its own protocol has no paths and no account to fill in: the
     // password is the whole credential. Showing the fields anyway is how somebody
     // ends up typing a camera account into a form that ignores it.
-    const usesRtsp = !vendor.nativeScheme;
+    const usesRtsp = !vendor.nativeScheme && vendorId !== MATTER_VENDOR;
+    /** A Matter camera is added with the code its own app shares, once; after
+     *  that it is where the bridge keeps it and the code is never asked again. */
+    const matter = vendorId === MATTER_VENDOR;
+    const matterAdded =
+        matter &&
+        parseMatterPath(form.mainPath) !== null &&
+        !(camera && leavesMatterBridge(camera, { vendor: vendorId, reachVia: form.reachVia }));
+    const codeIssue = matter && !matterAdded ? matterCodeIssue(form.password) : null;
     /** Whether this camera could ever report its own movement. */
     const ownAlerts = reportsOwnAlerts(form.vendor);
     /** Whether this one is asked how it is powered at all. */
@@ -339,7 +353,9 @@ export function CameraDialog({
      *  there is no account name beside it - so an empty one cannot connect and
      *  is not worth a round trip to find that out. Unless there is one to
      *  inherit, in which case empty is the answer rather than an omission. */
-    const needsPassword = !usesRtsp && !form.password && !camera?.hasPassword && !inheritsPassword;
+    const needsPassword = matter
+        ? !matterAdded && codeIssue !== null
+        : !usesRtsp && !form.password && !camera?.hasPassword && !inheritsPassword;
     const incomplete = !form.name.trim() || !form.address.trim() || needsPassword;
 
     /** What a save sends for a form, and so what decides whether there is one. */
@@ -670,26 +686,58 @@ export function CameraDialog({
                                     />
                                 </Field>
                             ) : null}
-                            <Field
-                                label={usesRtsp ? t("dialog.password") : t("dialog.tapoPassword")}
-                                required={!usesRtsp && !inheritsPassword}
-                                hint={
-                                    camera?.hasPassword
-                                        ? t("dialog.passwordStored")
-                                        : inheritsPassword
-                                          ? t("dialog.passwordInherited")
-                                          : usesRtsp
-                                            ? undefined
-                                            : // The question everybody asks at this
-                                              // field, answered at it: the camera
-                                              // checks the password by itself and
-                                              // never asks who is presenting it,
-                                              // so there is no address to give and
-                                              // its absence is not a missing step.
-                                              t("dialog.passwordTapo")
-                                }
-                            >
-                                {/* enigma:allow-no-breach-check - nothing is being
+                            {matter ? (
+                                <Field
+                                    label={t("dialog.matterCode")}
+                                    required={!matterAdded}
+                                    hint={
+                                        matterAdded
+                                            ? t("dialog.matterAdded")
+                                            : t("dialog.matterCodeHint")
+                                    }
+                                    error={
+                                        codeIssue === "format"
+                                            ? t("dialog.matterCodeFormat")
+                                            : codeIssue === "check"
+                                              ? t("dialog.matterCodeCheck")
+                                              : undefined
+                                    }
+                                >
+                                    <Input
+                                        value={form.password}
+                                        onChange={(event) => set("password", event.target.value)}
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                        disabled={matterAdded}
+                                        placeholder="3497-0112-332"
+                                        aria-invalid={
+                                            codeIssue === "format" || codeIssue === "check"
+                                        }
+                                    />
+                                </Field>
+                            ) : (
+                                <Field
+                                    label={
+                                        usesRtsp ? t("dialog.password") : t("dialog.tapoPassword")
+                                    }
+                                    required={!usesRtsp && !inheritsPassword}
+                                    hint={
+                                        camera?.hasPassword
+                                            ? t("dialog.passwordStored")
+                                            : inheritsPassword
+                                              ? t("dialog.passwordInherited")
+                                              : usesRtsp
+                                                ? undefined
+                                                : // The question everybody asks at this
+                                                  // field, answered at it: the camera
+                                                  // checks the password by itself and
+                                                  // never asks who is presenting it,
+                                                  // so there is no address to give and
+                                                  // its absence is not a missing step.
+                                                  t("dialog.passwordTapo")
+                                    }
+                                >
+                                    {/* enigma:allow-no-breach-check - nothing is being
                                     chosen here. This is the password the camera
                                     already has, set in its own app or on its own
                                     web page; refusing it for being weak would
@@ -698,37 +746,42 @@ export function CameraDialog({
                                     enigma:allow-identity-password - and it
                                     belongs to a device, so there is no account
                                     identity for it to resemble. */}
-                                <Input
-                                    type="password"
-                                    value={form.password}
-                                    onChange={(event) => set("password", event.target.value)}
-                                    autoComplete="off"
-                                    placeholder={camera?.hasPassword ? t("dialog.unchanged") : ""}
-                                />
-                            </Field>
+                                    <Input
+                                        type="password"
+                                        value={form.password}
+                                        onChange={(event) => set("password", event.target.value)}
+                                        autoComplete="off"
+                                        placeholder={
+                                            camera?.hasPassword ? t("dialog.unchanged") : ""
+                                        }
+                                    />
+                                </Field>
+                            )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={test}
-                                disabled={testing || incomplete}
-                            >
-                                {testing ? (
-                                    <Loader2 className="size-4 shrink-0 animate-spin" />
-                                ) : (
-                                    <Sparkles className="size-4 shrink-0" />
-                                )}
-                                {t("dialog.ask")}
-                            </Button>
-                            {tested ? (
-                                <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
-                                    <CircleCheck className="size-3.5 shrink-0 text-success" />
-                                    {tested}
-                                </span>
-                            ) : null}
-                        </div>
+                        {matter ? null : (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={test}
+                                    disabled={testing || incomplete}
+                                >
+                                    {testing ? (
+                                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="size-4 shrink-0" />
+                                    )}
+                                    {t("dialog.ask")}
+                                </Button>
+                                {tested ? (
+                                    <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
+                                        <CircleCheck className="size-3.5 shrink-0 text-success" />
+                                        {tested}
+                                    </span>
+                                ) : null}
+                            </div>
+                        )}
                         {usesRtsp ? (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <Field label={t("dialog.mainPath")} hint={t("dialog.mainPathHint")}>
@@ -1071,11 +1124,14 @@ function Section({
 function Field({
     label,
     hint,
+    error,
     required,
     children
 }: {
     label: string;
     hint?: string;
+    /** What is wrong with the value, shown in place of the hint. */
+    error?: string;
     required?: boolean;
     children: React.ReactNode;
 }) {
@@ -1086,7 +1142,11 @@ function Field({
                 {required ? <span className="text-danger"> *</span> : null}
             </span>
             {children}
-            {hint ? <span className="text-[0.6875rem] text-foreground-subtle">{hint}</span> : null}
+            {error ? (
+                <span className="text-[0.6875rem] text-danger">{error}</span>
+            ) : hint ? (
+                <span className="text-[0.6875rem] text-foreground-subtle">{hint}</span>
+            ) : null}
         </label>
     );
 }

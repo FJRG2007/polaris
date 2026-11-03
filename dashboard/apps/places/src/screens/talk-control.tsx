@@ -34,6 +34,11 @@ const SEND_TIMEOUT_MS = 5000;
  *  voice heard seconds late is worse than a gap. */
 const MAX_QUEUED_BYTES = TALK_RATE * 2;
 
+/** The relay only knows a camera's backchannel once it is connected to the
+ *  stream, which can take seconds after the viewer opens; asked again until
+ *  then. */
+const PROBE_DELAYS_MS = [0, 2000, 4000, 8000, 15000, 30000] as const;
+
 interface Live {
     readonly talkId: string;
     readonly stream: MediaStream;
@@ -78,6 +83,31 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
     const toast = useToast();
     const key = `places-talk-${cameraId}`;
     const [state, setState] = useState<"idle" | "starting" | "live">("idle");
+    // Every make but a Tapo has a speaker only when the relay says so; the
+    // button stays away until it has.
+    const [available, setAvailable] = useState(support !== "probe");
+    useEffect(() => {
+        if (support !== "probe") return;
+        let current = true;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const probe = (attempt: number) => {
+            void actions
+                .talkAvailableAction(cameraId)
+                .then((answer) => answer.available)
+                .catch(() => false)
+                .then((answer) => {
+                    if (!current) return;
+                    if (answer) return setAvailable(true);
+                    if (attempt + 1 >= PROBE_DELAYS_MS.length) return;
+                    timer = setTimeout(() => probe(attempt + 1), PROBE_DELAYS_MS[attempt + 1]);
+                });
+        };
+        probe(0);
+        return () => {
+            current = false;
+            if (timer) clearTimeout(timer);
+        };
+    }, [cameraId, support]);
     const live = useRef<Live | null>(null);
     const mounted = useRef(true);
 
@@ -190,6 +220,7 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
         setState("live");
     }, [cameraId, flush, key, t, toast]);
 
+    if (!available) return null;
     if (support === "rtsp")
         return (
             <ViewerControl

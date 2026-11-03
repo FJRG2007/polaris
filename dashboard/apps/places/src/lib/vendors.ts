@@ -185,6 +185,14 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         ptz: true
     },
     {
+        // A Matter camera or video doorbell. Added with the code its own app
+        // shares and watched through the Matter bridge; its main path is where
+        // the bridge keeps it, set once it has been added.
+        id: "matter",
+        mainPath: "",
+        noOnvif: true
+    },
+    {
         id: "generic",
         mainPath: ""
     }
@@ -350,12 +358,15 @@ export function hasNativePrivacy(vendorId: string): boolean {
 
 /**
  * Whether Polaris can play a voice on this camera's speaker. "yes" for a Tapo
- * reached over its own protocol, which carries the speaker; "rtsp" for one
- * reached over RTSP, which has no way in to it; "no" for every other make.
+ * reached over its own protocol, which always carries the speaker; "rtsp" for a
+ * Tapo reached over RTSP, which has no way in to it; "probe" for every other
+ * make, whose speaker is there exactly when the relay's connection to it offers
+ * a way back (an RTSP backchannel, ONVIF Profile T, a Matter camera's WebRTC
+ * audio) - which only the relay can say, so the screen asks it.
  */
-export type TalkSupport = "yes" | "rtsp" | "no";
+export type TalkSupport = "yes" | "rtsp" | "probe" | "no";
 
 export function talkSupport(vendorId: string): TalkSupport {
     if (cameraVendor(vendorId).nativeScheme === "tapo") return "yes";
-    return vendorId === "tapo" ? "rtsp" : "no";
+    return vendorId === "tapo" ? "rtsp" : "probe";
 }
