@@ -12,8 +12,8 @@
 # is the last thing that should change under it without anybody choosing to.
 FROM ghcr.io/0xerr0r/blocky:v0.35.0 AS blocky
 
-FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata \
+FROM alpine:3.24
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata \
     && mkdir -p /app/cache /logs \
     && chown -R 100:100 /app /logs
 COPY --from=blocky /app/blocky /app/blocky

@@ -277,10 +277,22 @@ ENV NODE_ENV=production \
 # the user never has to install or run smbclient on the host.
 # git + tar let the Deploy app build applications from a public git repository
 # (clone + tar the context, then build it on the target).
+#
+# Then git's Perl and its manual go. Debian makes git depend on Perl for the few
+# commands written in it (send-email, svn, the old interactive add), and none of
+# them runs here: this image only clones, fetches, checks out and reads HEAD,
+# which are all compiled. Perl and its libraries were a share of the image's
+# reported vulnerabilities, none with a fix. perl-base stays - Debian itself
+# needs it. Removed through dpkg so the package list the scanners read agrees
+# they are gone; nothing installs a package in this image afterwards. libcurl
+# (git's https transport) and smbclient's libraries stay: cloning and listing
+# shares run on them.
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends openssl ca-certificates smbclient git tar \
-    && rm -rf /var/lib/apt/lists/*
+    && dpkg --purge --force-depends git-man liberror-perl perl libperl5.40 perl-modules-5.40 \
+    && git --version \
+    && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/*
 
 # Prisma CLI, pinned to the version used by @polaris/db, so `migrate deploy`
 # in the entrypoint matches the generated client and committed migrations.

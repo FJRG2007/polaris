@@ -17,10 +17,11 @@ import { dashboardOrigin } from "./domain-edge";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
 import { PUBLIC_TUNNEL_PROJECT } from "./polaris-parts";
+import { CLOUDFLARED_IMAGE } from "./tunnel-images";
 
 const PROJECT = PUBLIC_TUNNEL_PROJECT;
 const SERVICE = "ptunnel";
-const IMAGE = "cloudflare/cloudflared:latest";
+const IMAGE = CLOUDFLARED_IMAGE;
 const URL_KEY = "polaris.ptunnel.url";
 const URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
 
@@ -44,9 +45,8 @@ function tunnelSpec(): ComposeSpec {
             {
                 name: SERVICE,
                 image: IMAGE,
-                // Same reason as every other sidecar on a floating tag: compose
-                // would otherwise keep the copy the host first fetched.
-                pullPolicy: "always",
+                // Pinned by digest, as every tunnel sidecar is (tunnel-images.ts).
+                pullPolicy: "missing",
                 env: {},
                 ports: [],
                 volumes: [],

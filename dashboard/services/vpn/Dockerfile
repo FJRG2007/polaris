@@ -12,14 +12,14 @@
 # tracking latest: every device on the tailnet talks to this server, and the
 # control protocol is the last thing that should change under them without
 # anybody choosing to.
-FROM alpine:3.20
+FROM alpine:3.24
 ARG TARGETARCH
 ARG HEADSCALE_VERSION=0.29.6
 # From https://github.com/juanfont/headscale/releases/download/v0.29.6/checksums.txt
 ARG HEADSCALE_SHA256_AMD64=7477c374949eea6fb7cf3cbff14dbef49e4d118d9a33557d6764a77ece617e53
 ARG HEADSCALE_SHA256_ARM64=7b3c792ebe10e1a81a0c8d9674aee8eb540e7dbb7ccb80a98b71024da4c72a48
 RUN set -eu; \
-    apk add --no-cache ca-certificates tzdata; \
+    apk upgrade --no-cache; apk add --no-cache ca-certificates tzdata; \
     case "$TARGETARCH" in \
         amd64) sum="$HEADSCALE_SHA256_AMD64" ;; \
         arm64) sum="$HEADSCALE_SHA256_ARM64" ;; \

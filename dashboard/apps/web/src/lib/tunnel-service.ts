@@ -14,6 +14,7 @@ import { TUNNEL_PROJECT } from "./polaris-parts";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
 import { getIntegrationSecret, getIntegrationState } from "./integration-service";
+import { NGROK_IMAGE, CLOUDFLARED_IMAGE } from "./tunnel-images";
 
 const PROJECT = TUNNEL_PROJECT;
 const SERVICE = "polaris-tunnel";
@@ -84,10 +85,10 @@ function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string): Compos
         : { NGROK_AUTHTOKEN: token };
     const service = {
         name: SERVICE,
-        image: isCloudflare ? "cloudflare/cloudflared:latest" : "ngrok/ngrok:latest",
-        // Both are floating tags from a registry, so compose has to re-resolve
-        // them rather than reuse the copy the host happens to hold.
-        pullPolicy: "always" as const,
+        image: isCloudflare ? CLOUDFLARED_IMAGE : NGROK_IMAGE,
+        // Both are pinned by digest (tunnel-images.ts), so the copy the host
+        // holds is the right one and a start never waits on the registry.
+        pullPolicy: "missing" as const,
         env,
         ports: [],
         volumes: [],

@@ -25,6 +25,7 @@ WORKDIR /data
 # `tini` reaps what the JVM leaves behind and passes signals through, so a stop
 # from the dashboard is a clean shutdown rather than a kill after ten seconds.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends tini \
     && rm -rf /var/lib/apt/lists/*
 

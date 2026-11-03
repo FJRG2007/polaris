@@ -19,9 +19,10 @@ import type { ComposeSpec } from "@polaris/deploy";
 import { connectorOrigin } from "../deploy-service";
 import { connectorNetworks } from "./service-networks";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
+import { NGROK_IMAGE } from "../tunnel-images";
 
 const PROXY_NETWORK = "polaris-proxy";
-const IMAGE = "ngrok/ngrok:latest";
+const IMAGE = NGROK_IMAGE;
 /** ngrok public hostnames (free `.ngrok-free.app`, paid `.ngrok.app`, legacy `.ngrok.io`). */
 const URL_PATTERN = /https:\/\/[a-z0-9-]+\.ngrok(?:-free)?\.(?:app|io)/i;
 
@@ -68,9 +69,8 @@ function tunnelSpec(
             {
                 name: service,
                 image: IMAGE,
-                // Same reason as the cloudflared sidecar: a floating tag that is
-                // never re-resolved leaves an agent the service can no longer use.
-                pullPolicy: "always",
+                // Pinned by digest, as every tunnel sidecar is (tunnel-images.ts).
+                pullPolicy: "missing",
                 env: { NGROK_AUTHTOKEN: token },
                 ports: [],
                 volumes: [],
@@ -88,9 +88,13 @@ function tunnelSpec(
 async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<string | null> {
     let buffer = "";
     try {
-        await ports.logs(service, (chunk) => {
-            buffer += chunk.toString("utf8");
-        }, { tail: 200, follow: false });
+        await ports.logs(
+            service,
+            (chunk) => {
+                buffer += chunk.toString("utf8");
+            },
+            { tail: 200, follow: false }
+        );
     } catch {
         return null;
     }
@@ -126,7 +130,13 @@ export async function startNgrokTunnel(appId: string, ownerId: string): Promise<
     try {
         await ports.composeDown(project).catch(() => undefined);
         await ports.composeUp(
-            tunnelSpec(project, service, origin, token, await connectorNetworks(appId, PROXY_NETWORK))
+            tunnelSpec(
+                project,
+                service,
+                origin,
+                token,
+                await connectorNetworks(appId, PROXY_NETWORK)
+            )
         );
 
         let url: string | null = null;
@@ -155,7 +165,10 @@ export async function stopNgrokTunnel(appId: string, ownerId: string): Promise<v
 }
 
 /** Whether the tunnel is up and its current public URL. Best-effort. */
-export async function getNgrokTunnelStatus(appId: string, ownerId: string): Promise<NgrokTunnelStatus> {
+export async function getNgrokTunnelStatus(
+    appId: string,
+    ownerId: string
+): Promise<NgrokTunnelStatus> {
     const app = await prisma.application.findFirst({
         where: { id: appId, environment: { project: { ownerId } } },
         select: { id: true }
@@ -181,7 +194,10 @@ export async function getNgrokTunnelStatus(appId: string, ownerId: string): Prom
 }
 
 async function getStoredUrl(appId: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: urlKey(appId) },
+        select: { value: true }
+    });
     return row?.value ?? null;
 }
 
@@ -191,5 +207,9 @@ async function setStoredUrl(appId: string, url: string | null): Promise<void> {
         await prisma.setting.deleteMany({ where: { key } });
         return;
     }
-    await prisma.setting.upsert({ where: { key }, create: { key, value: url, scope: "global" }, update: { value: url } });
+    await prisma.setting.upsert({
+        where: { key },
+        create: { key, value: url, scope: "global" },
+        update: { value: url }
+    });
 }
