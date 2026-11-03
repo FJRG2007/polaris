@@ -101,7 +101,7 @@ class NoteKeepsTheListOutOfExamplesTest(unittest.TestCase):
 
     def test_the_note_says_why(self):
         self.assertIn("not an `examples/` list", NOTE)
-        self.assertIn("CONTRIBUTING.md", NOTE)
+        self.assertIn("docs/workflows/tv-list.md", NOTE)
         self.assertIn("one day", NOTE.lower())
 
     def test_limits_section_is_honest(self):

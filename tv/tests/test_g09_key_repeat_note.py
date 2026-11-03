@@ -20,7 +20,6 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NOTE = ROOT / "docs" / "devices" / "tcl-55p71b-g09-key-repeat.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
-PROMPT = ROOT / "PROMPT.md"
 EXAMPLES = ROOT / "examples" / "README.md"
 G09_README = ROOT / "examples" / "tcl-g09-google-tv" / "README.md"
 INPUT_SERVICE = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv" / "InputKeyService.java"

@@ -152,7 +152,7 @@ class TheNotesClaimsAboutThisBoard(unittest.TestCase):
                       "the note should point at the board page it takes the route from")
 
     def test_the_factory_menu_rule_is_stated(self):
-        self.assertIn("AGENTS.md", self.body,
+        self.assertIn("factory-menu rule", self.body,
                       "the note should name the rule it is following for the factory menu")
         self.assertIn("test package", self.body,
                       "the note should say no test package in that menu is started")

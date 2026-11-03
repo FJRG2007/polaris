@@ -17,7 +17,6 @@ NOTE = ROOT / "docs" / "devices" / "tvision-hub.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 README = ROOT / "README.md"
 EXAMPLES_README = ROOT / "examples" / "README.md"
-PROMPT = ROOT / "PROMPT.md"
 FIRE_STICK = ROOT / "examples" / "amazon-fire-tv-stick-4k-2018" / "debloat.txt"
 
 PACKAGES = [

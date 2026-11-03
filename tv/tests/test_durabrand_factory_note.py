@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTE = ROOT / "docs" / "devices" / "durabrand-durat32isdb.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 EXAMPLES_README = ROOT / "examples" / "README.md"
-PROMPT = ROOT / "PROMPT.md"
 FACTORY = "com.cvte.tv.hkcfac"
 
 DISABLED = [

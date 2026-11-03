@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTE = ROOT / "docs" / "devices" / "sony-k85xr70-ae2.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 EXAMPLES_README = ROOT / "examples" / "README.md"
-PROMPT = ROOT / "PROMPT.md"
 
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 

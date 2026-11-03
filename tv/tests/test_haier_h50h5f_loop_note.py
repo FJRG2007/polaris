@@ -75,7 +75,7 @@ class HaierLoopBulletTest(unittest.TestCase):
         self.assertNotIn("`com.cltv.mal`**", self.loop, "the bold symptom must not name a cause")
 
     def test_bullet_says_the_list_may_be_the_backup(self):
-        self.assertIn("PROMPT.md", self.loop)
+        self.assertIn("the backup the tools", self.loop)
         self.assertIn("before changing anything", self.loop)
         self.assertIn("may be the TV's state before the debloat", self.loop)
 
