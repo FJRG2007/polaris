@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Settings } from "lucide-react";
-import { APPS_WITH_SETTINGS } from "@/lib/apps/app-settings";
+import { appSettingsHref } from "@/lib/apps/app-settings";
 import { requireAdmin } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { isNativeApp } from "@/lib/apps/native-apps";
@@ -29,11 +29,12 @@ export default async function PolarisAppPage({ params }: { params: Promise<{ app
     if (isNativeApp(app.id) && app.opensAt) redirect(app.opensAt);
     if (storeScope(app) !== "polaris") redirect(listingHref(app));
     const t = await getTranslations("marketplace");
+    const settings = appSettingsHref(app);
     return (
         <AppDetail appId={app.id}>
-            {APPS_WITH_SETTINGS.includes(app.id) ? (
+            {settings ? (
                 <Link
-                    href={`/admin/apps/${app.id}/settings`}
+                    href={settings}
                     className="text-primary inline-flex w-fit items-center gap-1 text-sm hover:underline"
                 >
                     <Settings className="size-4" />
