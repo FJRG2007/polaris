@@ -1,9 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { bryantParkLawn } from './landmarks.js';
 
-// js/cameras.js
-// Multi-camera system supporting Third-Person Chase (with mouse/touch orbit + zoom),
-// Low-Angle Action Cam, POV/Cockpit Cam, 7 Iconic NYC Architectural Cameras, and Auto-Director Drone.
+// Chase, action, cockpit, fixed-location and aerial cameras, with mouse/touch orbit and zoom.
 
 const CAMERA_PRESETS = [
   { id: 'chase',       category: 'follow', fov: 56 },
@@ -256,9 +254,9 @@ class CameraSystem {
       }
 
       case 'centralPark': {
-        // Inside Central Park South looking across The Pond, Gapstow Bridge, The Mall, Sheep Meadow & UWS/UES Skylines
+        // Above the southern canopy, looking across The Pond toward the park and skyline.
         const sway = Math.sin(elapsed * 0.22) * 3.5;
-        desiredPos.set(-70.0 + sway, 14.0, -1425.0);
+        desiredPos.set(-70.0 + sway, 26.0, -1425.0);
         desiredLook.set(-250.0, 6.5, -1690.0);
         break;
       }
@@ -346,7 +344,13 @@ class CameraSystem {
         this.followLookOffset.subVectors(this.currentLookAt, entity.position);
       }
       const k = 1 - Math.exp(-dt * 8.5);
-      this.followBaseY += (entity.position.y - this.followBaseY) * k;
+      // The helicopter's climb is eased as the continuous motion it is: the camera trails it by climb / 8.5 m at any
+      // frame time. Eased as a step per frame like a curb, the trail followed every uneven frame time, and the
+      // helicopter bobbed on screen as it climbed or levelled off
+      const climb = entity.type === 'helicopter' ? entity.verticalSpeed || 0 : 0;
+      const trail = climb / 8.5;
+      const lag = entity.position.y - this.followBaseY;
+      this.followBaseY = entity.position.y - trail - (lag - climb * dt - trail) * (1 - k);
       this.followOffset.lerp(desiredPos.sub(entity.position), k);
       this.followLookOffset.lerp(desiredLook.sub(entity.position), k);
       this.currentPos.set(entity.position.x, this.followBaseY, entity.position.z).add(this.followOffset);

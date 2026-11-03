@@ -16,7 +16,6 @@
             "modes": "Press 1 to 4 to walk, drive, cycle or fly.",
             "map": "Press M for the map, then click a street to go there.",
             "camera": "Press V to switch cameras.",
-            "boost": "Hold Shift to go faster.",
             "hud": "Press H to hide everything but the city.",
             "gamepad": "With a gamepad, Start opens the menu."
         },
@@ -25,6 +24,21 @@
             "look": "Drag anywhere else to look around, pinch to zoom.",
             "map": "Open the map and tap a street to go there.",
             "menu": "The menu button at the top has graphics and sound."
+        },
+        "failure": {
+            "graphics": {
+                "title": "Graphics could not start",
+                "text": "Turn on hardware acceleration in the browser, then reload."
+            },
+            "error": {
+                "title": "New York could not start",
+                "text": "Something stopped the city while it was loading. Reload to try again."
+            },
+            "lost": {
+                "title": "Graphics were reset",
+                "text": "The browser or the system reset the graphics. Reload to bring the city back."
+            },
+            "reload": "Reload"
         }
     },
     "view": "New York city view",
@@ -114,9 +128,7 @@
         "actions": "Hold to perform an action",
         "jump": "Jump",
         "ascend": "Ascend",
-        "descend": "Descend",
-        "boost": "Boost",
-        "sprint": "Sprint"
+        "descend": "Descend"
     },
     "map": {
         "label": "Street map",
@@ -146,29 +158,25 @@
         "person": {
             "move": "Walk",
             "turn": "Turn",
-            "boost": "Sprint",
             "up": "Jump",
             "orbit": "Look around"
         },
         "car": {
             "move": "Drive / Reverse",
             "turn": "Steer",
-            "boost": "Boost",
             "horn": "Horn",
             "orbit": "Look around"
         },
         "cyclist": {
             "move": "Pedal / Brake",
             "turn": "Turn",
-            "boost": "Sprint",
             "orbit": "Look around"
         },
         "helicopter": {
             "move": "Pitch",
             "turn": "Yaw",
             "up": "Ascend",
-            "down": "Descend",
-            "boost": "Boost"
+            "down": "Descend"
         },
         "drag": "Drag",
         "general": "Everywhere",
@@ -187,7 +195,6 @@
         "padThrottle": "Throttle and brake",
         "padLift": "Up and down",
         "padJump": "Jump",
-        "padBoost": "Boost",
         "padCamera": "Switch camera",
         "padModes": "Change mode",
         "padZoom": "Zoom",

@@ -1,7 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { SharedInstances } from './shared-instances.js';
 
-// js/scene-culling.js
 // Spatial culling for the island-wide static geometry. Most of Manhattan's street furniture and building massing is
 // built as a handful of instanced meshes spanning the whole island (bounding spheres ~7 km across), which three.js can
 // never cull: every frame the GPU transformed every lamp post, signal and facade box of the island three times (the
@@ -151,22 +150,44 @@ function setupSceneCulling(scene, roots, shadow = null) {
   scene.updateMatrixWorld(true);
   const culled = [];
 
-  // 1. Small props: chunked & distance culled
+  // 1. Small props & pre-chunked decals: chunked & distance culled
   const chunkable = [];
   const largeMeshes = [];
+  const pushCulled = (mesh, sphere, cullDist) => {
+    const maxDist = cullDist + sphere.radius;
+    culled.push({
+      mesh,
+      x: sphere.center.x,
+      y: sphere.center.y,
+      z: sphere.center.z,
+      r: sphere.radius,
+      d: cullDist,
+      maxDistSq: maxDist * maxDist
+    });
+  };
   for (const root of roots) {
     root.traverse((o) => {
-      if (!o.isInstancedMesh || !isStaticMesh(o) || o.count < 64 || o.count !== o.instanceMatrix.count) return;
-      if (o.count * triangleCount(o.geometry) < 40000) return;
+      if (!isStaticMesh(o)) return;
+      if (!o.isInstancedMesh) {
+        if (o.userData.cullDistance > 0) {
+          if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+          const sphere = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld);
+          pushCulled(o, sphere, o.userData.cullDistance);
+        }
+        return;
+      }
+      if (o.count < 32 || o.count !== o.instanceMatrix.count) return;
+      if (o.count * triangleCount(o.geometry) < 8000) return;
       if (!o.boundingSphere) o.computeBoundingSphere();
-      if (o.boundingSphere.radius < 1500) return;
+      if (o.boundingSphere.radius < 800) return;
       chunkable.push(o);
     });
   }
   for (const mesh of chunkable) {
-    // unlit (glowing) props, like signal lenses & lamp bulbs, read from much further away at night
+    // unlit (glowing) props, like signal lenses & lamp bulbs, read from much further away at night; a mesh may also
+    // set its own (userData.cullDistance)
     const glow = mesh.material.isMeshBasicNodeMaterial || mesh.material.type === 'MeshBasicNodeMaterial' ? 3 : 1;
-    const cullDist = Math.max(CULL_MIN, instanceSize(mesh) * CULL_PER_METRE * glow);
+    const cullDist = mesh.userData.cullDistance ?? Math.max(CULL_MIN, instanceSize(mesh) * CULL_PER_METRE * glow);
     if (cullDist > CULL_MAX) {
       largeMeshes.push(mesh);
       continue;
@@ -174,7 +195,7 @@ function setupSceneCulling(scene, roots, shadow = null) {
     const cell = Math.min(600, Math.max(250, cullDist * 0.5));
     for (const chunk of replaceWithChunks(mesh, cell)) {
       const sphere = chunk.geometry.boundingSphere.clone().applyMatrix4(chunk.matrixWorld);
-      culled.push({ mesh: chunk, x: sphere.center.x, y: sphere.center.y, z: sphere.center.z, r: sphere.radius, d: cullDist });
+      pushCulled(chunk, sphere, cullDist);
     }
   }
 
@@ -215,8 +236,15 @@ function setupSceneCulling(scene, roots, shadow = null) {
       root.traverse((o) => {
         if (!o.castShadow || !isStaticMesh(o) || o.isSharedInstances || !proxyableMaterial(o.material)) return;
         if (o.isInstancedMesh && o.count !== o.instanceMatrix.count) return;
+        // Opt-ins (userData.shadowStandIn: true, or a coarser BufferGeometry to cast with): pre-chunked casters
+        // (building-footprints.js) are big together, but each chunk falls under the size limits; and thin props
+        // (street-details.js) cast the same shadow with far fewer triangles
+        if (o.userData.shadowStandIn) {
+          sources.push(o);
+          return;
+        }
         const tris = triangleCount(o.geometry) * (o.isInstancedMesh ? o.count : 1);
-        if (tris < 20000) return;
+        if (tris < 8000) return;
         let radius;
         if (o.isInstancedMesh) {
           if (!o.boundingSphere) o.computeBoundingSphere();
@@ -225,13 +253,13 @@ function setupSceneCulling(scene, roots, shadow = null) {
           if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
           radius = o.geometry.boundingSphere.radius * o.matrixWorld.getMaxScaleOnAxis();
         }
-        if (radius > 600) sources.push(o);
+        if (radius > 350) sources.push(o);
       });
     }
 
     for (const o of sources) {
       const side = sideOf(o.material);
-      const geo = o.geometry;
+      const geo = o.userData.shadowStandIn?.isBufferGeometry ? o.userData.shadowStandIn : o.geometry;
       if (o.isInstancedMesh) {
         const pos = geo.attributes.position;
         if (!geo.boundingBox) geo.computeBoundingBox();
@@ -319,7 +347,7 @@ function updateSceneCulling(cameraPosition) {
     const dx = c.x - x;
     const dy = c.y - y;
     const dz = c.z - z;
-    c.mesh.visible = Math.sqrt(dx * dx + dy * dy + dz * dz) - c.r < c.d;
+    c.mesh.visible = dx * dx + dy * dy + dz * dz < c.maxDistSq;
   }
 }
 

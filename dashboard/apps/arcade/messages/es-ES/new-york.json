@@ -16,7 +16,6 @@
             "modes": "Pulsa del 1 al 4 para andar, conducir, ir en bici o volar.",
             "map": "Pulsa M para ver el mapa y haz clic en una calle para ir allí.",
             "camera": "Pulsa V para cambiar de cámara.",
-            "boost": "Mantén Mayús para ir más rápido.",
             "hud": "Pulsa H para ocultarlo todo menos la ciudad.",
             "gamepad": "Con un mando, Start abre el menú."
         },
@@ -25,6 +24,21 @@
             "look": "Arrastra en cualquier otro sitio para mirar y pellizca para acercar.",
             "map": "Abre el mapa y toca una calle para ir allí.",
             "menu": "El botón de menú de arriba tiene gráficos y sonido."
+        },
+        "failure": {
+            "graphics": {
+                "title": "Sin gráficos",
+                "text": "Activa la aceleración por hardware en el navegador y recarga."
+            },
+            "error": {
+                "title": "Nueva York no pudo iniciarse",
+                "text": "Algo detuvo la ciudad mientras cargaba. Recarga para volver a intentarlo."
+            },
+            "lost": {
+                "title": "Gráficos reiniciados",
+                "text": "El navegador o el sistema reinició los gráficos. Recarga para recuperar la ciudad."
+            },
+            "reload": "Recargar"
         }
     },
     "view": "Vista de Nueva York",
@@ -114,9 +128,7 @@
         "actions": "Mantén pulsado para actuar",
         "jump": "Saltar",
         "ascend": "Subir",
-        "descend": "Bajar",
-        "boost": "Turbo",
-        "sprint": "Correr"
+        "descend": "Bajar"
     },
     "map": {
         "label": "Callejero",
@@ -146,29 +158,25 @@
         "person": {
             "move": "Andar",
             "turn": "Girar",
-            "boost": "Correr",
             "up": "Saltar",
             "orbit": "Mirar"
         },
         "car": {
             "move": "Avanzar / Atrás",
             "turn": "Girar",
-            "boost": "Turbo",
             "horn": "Claxon",
             "orbit": "Mirar"
         },
         "cyclist": {
             "move": "Pedalear / Frenar",
             "turn": "Girar",
-            "boost": "Correr",
             "orbit": "Mirar"
         },
         "helicopter": {
             "move": "Cabeceo",
             "turn": "Rotar",
             "up": "Subir",
-            "down": "Bajar",
-            "boost": "Turbo"
+            "down": "Bajar"
         },
         "drag": "Ratón",
         "general": "Siempre",
@@ -187,7 +195,6 @@
         "padThrottle": "Acelerar y frenar",
         "padLift": "Subir y bajar",
         "padJump": "Saltar",
-        "padBoost": "Turbo",
         "padCamera": "Cambiar cámara",
         "padModes": "Cambiar modo",
         "padZoom": "Zoom",

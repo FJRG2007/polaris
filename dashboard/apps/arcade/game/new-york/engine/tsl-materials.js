@@ -45,6 +45,8 @@ import {
   normalize,
   reflect,
   pow,
+  log2,
+  exp2,
   sign,
   fwidth,
   texture,
@@ -65,15 +67,7 @@ import {
   streetZ
 } from './city-config.js';
 
-// js/tsl-materials.js
-// Photorealistic TSL (Three.js Shading Language) procedural shaders for Three.js r186 WebGPURenderer
-// Incorporating techniques from three.js webgpu_generator_city.html:
-// - Mikkelsen Surface-Gradient Hardware Derivative Bump Mapping (bumpNormal)
-// - Filter-Width Anti-Aliased Procedural Markings & Mortar (lineAA & gridLine via fwidth)
-// - True 3D Slab Ray-Marched Room & Retail Storefront Interiors (walls, ceiling lamps, floors, rugs, doors, art, shelves, curtains)
-// - Window Air-Conditioner Units with Louver Relief & Grimy Soda-Lime Window Glazing
-// - Crown-Sphere Foliage Normal Relief, Radial Interior Canopy AO & Cast-Iron Tree Grate Shading
-// - Occlusion-Aware Urban Canyon Global Illumination (aoNode + Warm Terracotta/Limestone Bounce)
+// Procedural city materials: facades and interiors, vegetation, roads, water and lighting effects.
 
 // Shared live uniforms controlled by lighting / time-of-day presets
 const cityUniforms = {
@@ -160,6 +154,34 @@ const filteredPulse = Fn(([x, a, b, w]) => {
   return integral(p.add(hw)).sub(integral(p.sub(hw))).div(hw.mul(2.0));
 });
 
+// Share of [x - s, x + s] covered by the non-repeating interval [a, b].
+const boxCoverage = Fn(([x, a, b, s]) => {
+  const xv = float(x).toVar();
+  const sv = max(float(s), 0.001).toVar();
+  return clamp(min(xv.add(sv), b).sub(max(xv.sub(sv), a)).div(sv.mul(2.0)), 0.0, 1.0);
+});
+
+// Keep distant lit windows in 1–2 pixel clusters. Adjacent world-anchored scales cross-fade, and
+// the half-width inset leaves room for filtering at cell edges while preserving mean brightness.
+const distantWindowLight = Fn(([grid, fw, probability, seed, lod]) => {
+  const light = float(probability).toVar();
+  If(cityUniforms.uInteriorGlow.greaterThan(0.5).and(lod.greaterThan(0.0)), () => {
+    const level = log2(max(max(fw.x, fw.y).mul(4.0), 2.0)).toVar();
+    const scale = exp2(floor(level)).toVar();
+    const cluster = (size) => {
+      const p = grid.div(size).toVar();
+      const width = fw.div(size).toVar();
+      const lit = step(float(1.0).sub(probability), hash2D(floor(p).add(vec2(seed, 73.1))));
+      const coverage = filteredPulse(fract(p.x), 0.25, 0.75, width.x)
+        .mul(filteredPulse(fract(p.y), 0.25, 0.75, width.y));
+      return lit.mul(coverage).mul(4.0);
+    };
+    const clustered = mix(cluster(scale), cluster(scale.mul(2.0)), smoothstep(0.0, 1.0, fract(level)));
+    light.assign(mix(probability, clustered, smoothstep(0.5, 1.2, cityUniforms.uInteriorGlow)));
+  });
+  return light;
+});
+
 /**
  * Occlusion-Aware Urban Canyon Sky Visibility (aoNode)
  * Models how Manhattan street canyons occlude overhead sky irradiance near the street floor (y = 0..65m),
@@ -201,11 +223,11 @@ const facadeAlongZ = varying(
  *   set back behind the facade so neighbouring windows look into the same full-sized room.
  * - Includes left & right fabric drapes hung just inside the window frame (`winUV`) from a 6-swatch
  *   domestic palette that block interior glow (`emit = 0.20`) so drapes silhouette against lit rooms.
- * - Once windows shrink to a pixel or two (`fwNode`: pixel footprint in cells) rooms glow at the mean lit level (with
- *   a lit room's tint), drapes at their mean coverage & lamps fade out, so distant towers don't twinkle in motion.
+ * - Once windows shrink to a pixel or two (`fwNode`: pixel footprint in cells), lit rooms merge into filtered
+ *   clusters, drapes settle to their mean coverage & lamps fade out, so distant towers don't twinkle in motion.
  * - Returns `vec4(roomColor, litEmit)`.
  */
-const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, floorHNode, seedNode, warmthNode, litProbNode, fwNode]) => {
+const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, floorHNode, seedNode, warmthNode, litProbNode, fwNode, drapeFwNode]) => {
   const u = float(uCoord).toVar();
   const v = float(vCoord).toVar();
   const wUV = vec2(winUV).toVar();
@@ -330,7 +352,7 @@ const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, 
   const lw = sL.mul(sL).mul(0.48); // Left drape width (0..48% of window width)
   const rw = sR.mul(sR).mul(0.48); // Right drape width (0..48% of window width)
   // Drape edges widen to the pixel footprint & pleats fade to their mean shade once they'd shrink below a few pixels
-  const cFw = fwidth(cUVx).toVar();
+  const cFw = float(drapeFwNode).toVar();
   const drapeAA = cFw.add(0.015).toVar();
   const inLeftDrape = smoothstep(lw.add(drapeAA), lw.sub(drapeAA), cUVx).mul(step(0.03, lw));
   const inRightDrape = smoothstep(float(1.0).sub(rw).sub(drapeAA), float(1.0).sub(rw).add(drapeAA), cUVx).mul(step(0.03, rw));
@@ -358,34 +380,48 @@ const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, 
   const roomWarmth = mix(vec3(1.0), lightCol, lit.mul(0.85));
   const finalRoomCol = bestCol.mul(roomWarmth).mul(mix(float(0.85), float(1.35), lit));
 
-  return vec4(finalRoomCol, mix(litRoom, litProbNode, lod).mul(bestEmit));
+  const distantLit = distantWindowLight(vec2(gridU, v.div(fH)), fwNode, litProbNode, seedNode, lod);
+  return vec4(finalRoomCol, mix(litRoom, distantLit, lod).mul(bestEmit));
+});
+
+// Pixel footprint of the drapes' parallax-shifted coordinate (`cUVx` above). Derivatives need uniform control flow, so
+// it is taken before the branch in apartmentInteriorBehind().
+const interiorDrapeFootprint = Fn(([winUV]) => {
+  const rayWorld = normalize(positionWorld.sub(cameraPosition));
+  const tSign = mix(sign(facadeWorldNormal.z).negate(), sign(facadeWorldNormal.x), facadeAlongZ);
+  const dirX = dot(rayWorld, vec3(facadeWorldNormal.z.negate(), 0.0, facadeWorldNormal.x).mul(tSign));
+  const dirZ = max(abs(dot(rayWorld, facadeWorldNormal)), 0.05);
+  return fwidth(clamp(vec2(winUV).x.add(dirX.div(dirZ).mul(0.06)), 0.0, 1.0));
 });
 
 /**
- * Treatment of each wall of a box-local facade box (createFacadeBoxes `faces`, read by facadeCell). shop: street front
- * with storefronts on the ground floor; entry: residential street front, windows down to the ground floor and one
- * entrance door; rear: yard, court & air-shaft walls, plain common brick with windows on every floor; lotLine:
- * windowless lot-line (party) wall, common brick or grey parging; blankStone: windowless wall in the facade's stone.
+ * The apartment interior, raycast only where `coverage` (the share of the pixel that is glazing) is non-zero. Walls,
+ * frames, spandrels and roofs skip it: their outputs weight the interior by that coverage, or by a narrower mask.
  */
-const WALL_KINDS = { shop: 0, entry: 1, rear: 2, lotLine: 3, blankStone: 4 };
+function apartmentInteriorBehind(coverage, uCoord, vCoord, winUV, cellId, winW, floorH, seed, warmth, litProb, fw) {
+  const drapeFootprint = interiorDrapeFootprint(winUV);
+  return Fn(() => {
+    // Both derivative-based inputs are evaluated here, outside the branch
+    const fwv = vec2(fw).toVar();
+    const drapeFw = float(drapeFootprint).toVar();
+    const room = vec4(0.0).toVar();
+    If(coverage.greaterThan(0.0), () => {
+      room.assign(evaluateApartmentInterior(uCoord, vCoord, winUV, cellId, winW, floorH, seed, warmth, litProb, fwv, drapeFw));
+    });
+    return room;
+  })();
+}
+
+// Street fronts may have shops; courtyard walls have windows and shared lot-line walls are solid masonry.
+const WALL_KINDS = { shop: 0, front: 1, rear: 2, lotLine: 3 };
 
 /**
- * Facade cell coordinates shared by the curtain-wall & pre-war materials: wall UV (u runs along whichever horizontal
- * axis the wall faces, v is world height), window cell id/UV, bay width, pixel footprint in cells (`fw`, for
- * filtering) and roof/ground-floor masks.
- * World-space by default. With `boxLocal` the mesh must come from createFacadeBoxes: u then starts at each wall's
- * corner and every wall fits a whole number of bays, so no window straddles a corner. `cornerPier` (m, box-local only)
- * keeps a solid band of wall at both ends of every wall (masonry corners): the bays fill the width between the piers
- * and `solid` is 1 inside the piers above the ground floor, where callers suppress windows, sills & AC units.
- * Box-local walls also read their treatment from the per-instance `faces` attribute (see WALL_KINDS / createFacadeBoxes):
- * `isGroundFloor` is 1 only on storefront ground floors, `door` marks the entrance bay of residential fronts, `back`
- * the plain common-brick rear & lot-line walls (tinted by the building's `tone`) and `blank` the windowless ones
- * (folded into `solid`); `wallS`, `wallW`, `wallH`, `fromTop` & `boxSeed` place things on the wall (painted signs).
- * Plain JS (not Fn) so it inlines into each node graph exactly like hand-written code.
+ * Shared facade coordinates and masks. World-space by default; createFacadeBoxes and createBuildingFootprints
+ * supply wall dimensions to fit whole window bays between the corners. `cornerPier` reserves solid masonry
+ * at each end above the ground-floor shops. Partial storeys and the coping remain solid at each wall's top.
  */
-function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0) {
-  // Box-local walls are told apart by the box's own normals (createFacadeBoxes instances may be turned about +y to
-  // follow a non-grid street); world-space walls by the world normal
+function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0, footprintLocal = false) {
+  // Local walls use geometry normals; world-space walls use the stable facade frame.
   const nWall = boxLocal ? normalGeometry : facadeWorldNormal;
   const nW = abs(nWall);
   const isRoof = step(0.75, nW.y);
@@ -394,53 +430,45 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0) {
   let bayWidth = float(windowWidth);
   let gridU = uCoord.div(bayWidth);
   let inPier = float(0.0);
-  let kind = float(WALL_KINDS.shop);
+  let kind = float(WALL_KINDS.front);
   let tone = float(0.5);
-  let bayIdx = float(0.0); // bay index along the wall (0 at its corner; -1 / bays inside the corner piers)
-  let bays = float(1.0);
-  // Box-local wall frame: metres along the wall (from its left end, seen facing it), its width & height, metres
-  // below the box's top
   let wallS = float(0.0);
   let wallW = float(1.0);
   let wallH = float(1.0);
+  let exposedHeight = float(1.0);
   let fromTop = float(0.0);
   let boxSeed = float(0.0);
 
   if (boxLocal) {
-    const box = attribute('box', 'vec4'); // width, height, depth, seed (+ the building's tone in its fraction)
-    const faces = attribute('faces', 'vec4'); // WALL_KINDS of the -x, +x, -z & +z walls
-    const wallWidth = mix(box.x, box.z, alongZ);
-    // The box-local normal's sign tells which wall this is
-    kind = mix(
-      mix(faces.z, faces.w, step(0.0, nWall.z)),
-      mix(faces.x, faces.y, step(0.0, nWall.x)),
-      alongZ
-    );
+    const box = attribute('box', 'vec4'); // width, height, depth (exposed height for footprints), seed + tone
+    // Merged footprints carry normalized distance along each wall, metres below its top, and its WALL_KINDS treatment.
+    const wall = footprintLocal ? attribute('facadeWall', 'vec3') : null;
+    const wallWidth = footprintLocal ? box.x : mix(box.x, box.z, alongZ);
+    if (footprintLocal) kind = wall.z;
     // The seed's fraction (0.1..0.9, never near an integer so floor() is stable on inexact varyings) is the tone
     tone = fract(box.w).sub(0.1).div(0.8);
     boxSeed = floor(box.w);
     // Whole-bay offset per wall so walls don't repeat each other's windows
     const wallSeed = floor(box.w.add(dot(nWall, vec3(17.0, 0.0, 37.0))));
-    const along = mix(positionGeometry.x, positionGeometry.z, alongZ).add(0.5); // 0..1 from the wall's corner
+    const along = footprintLocal ? wall.x : mix(positionGeometry.x, positionGeometry.z, alongZ).add(0.5); // 0..1 along the wall
     wallW = wallWidth;
-    // Reading left to right for someone facing the wall
+    // Read painted signs left to right when facing the wall.
     const flip = mix(step(nWall.z, 0.0), step(0.0, nWall.x), alongZ);
     wallS = mix(along, float(1.0).sub(along), flip).mul(wallWidth);
     wallH = box.y;
-    fromTop = float(0.5).sub(positionGeometry.y).mul(box.y);
+    exposedHeight = footprintLocal ? box.z : box.y;
+    fromTop = footprintLocal ? wall.y : float(0.5).sub(positionGeometry.y).mul(box.y);
     if (cornerPier > 0) {
       const pier = min(float(cornerPier), wallWidth.mul(0.2));
       const inner = wallWidth.sub(pier.mul(2.0));
-      bays = max(floor(inner.div(windowWidth).add(0.5)), 1.0);
+      const bays = max(floor(inner.div(windowWidth).add(0.5)), 1.0);
       const s = along.mul(wallWidth); // metres from the wall's corner
       bayWidth = inner.div(bays);
-      bayIdx = floor(s.sub(pier).div(bayWidth));
       gridU = s.sub(pier).div(bayWidth).add(wallSeed);
       inPier = float(1.0).sub(step(pier, s).mul(step(s, wallWidth.sub(pier))));
     } else {
-      bays = max(floor(wallWidth.div(windowWidth).add(0.5)), 1.0);
+      const bays = max(floor(wallWidth.div(windowWidth).add(0.5)), 1.0);
       bayWidth = wallWidth.div(bays);
-      bayIdx = floor(along.mul(bays));
       gridU = along.mul(bays).add(wallSeed);
     }
     uCoord = gridU.mul(bayWidth);
@@ -452,15 +480,14 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0) {
   const cellUV = vec2(fract(gridU), fract(gridV));
   const fw = vec2(fwidth(gridU), fwidth(gridV));
 
-  // Ground floor is strictly floor index 0 (gridV < 1.0) so floor 1 is never sliced in half!
-  const floor0 = float(1.0).sub(step(1.0, gridV));
+  // Ground floor is strictly floor index 0 (0.0 <= gridV < 1.0) so floor 1 is never sliced in half
+  // and below-grade skirt/foundation vertices (gridV < 0) do not render ground-floor storefronts!
+  const floor0 = step(0.0, gridV).mul(float(1.0).sub(step(1.0, gridV)));
   const wall = float(1.0).sub(isRoof);
   const isGroundFloor = floor0.mul(float(1.0).sub(step(WALL_KINDS.shop + 0.5, kind)));
   const blank = step(WALL_KINDS.lotLine - 0.5, kind).mul(wall);
-  const back = step(WALL_KINDS.rear - 0.5, kind).mul(float(1.0).sub(step(WALL_KINDS.blankStone - 0.5, kind))).mul(wall);
-  // One entrance per residential front, in a bay picked by the building's tone
-  const isEntry = step(WALL_KINDS.entry - 0.5, kind).mul(float(1.0).sub(step(WALL_KINDS.entry + 0.5, kind)));
-  const door = floor0.mul(isEntry).mul(wall).mul(step(abs(bayIdx.sub(min(floor(tone.mul(bays)), bays.sub(1.0)))), 0.5));
+  const back = step(WALL_KINDS.rear - 0.5, kind).mul(wall);
+  const baseWall = floor0.sub(isGroundFloor).mul(float(1.0).sub(back)).mul(wall);
   // A box that isn't a whole number of storeys (landmark tiers) ends in a solid parapet instead of slicing a row of
   // windows, and starts with one above the roof it stands on; every wall is capped by a coping at its top
   let partial = float(0.0);
@@ -468,14 +495,193 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0) {
   if (boxLocal) {
     const top = vCoord.add(fromTop);
     const floorBase = floor(gridV).mul(floorHeight);
-    const whole = step(top.sub(wallH).sub(0.05), floorBase).mul(step(floorBase.add(floorHeight), top.add(0.05)));
+    const belowTop = step(floorBase.add(floorHeight), top.add(0.05));
+    // Surveyed walls start at the sidewalk; only stacked boxes need a bottom cutoff.
+    const whole = footprintLocal ? belowTop : step(top.sub(wallH).sub(0.05), floorBase).mul(belowTop);
     partial = float(1.0).sub(whole).mul(wall);
     coping = float(1.0).sub(step(0.32, fromTop)).mul(wall);
   }
-  const solid = max(max(inPier.mul(float(1.0).sub(isGroundFloor)), blank), partial);
+  const solid = max(max(inPier.mul(float(1.0).sub(isGroundFloor)), blank), max(partial, baseWall));
   return {
-    isRoof, uCoord, vCoord, gridV, cellId, cellUV, fw, bayWidth, isGroundFloor, solid, floor0, back, blank, door, tone,
-    wallS, wallW, wallH, fromTop, boxSeed, partial, coping
+    isRoof, uCoord, vCoord, gridV, cellId, cellUV, fw, bayWidth, isGroundFloor, solid, back, blank, tone,
+    wallS, wallW, wallH, exposedHeight, fromTop, boxSeed, partial, coping, kind
+  };
+}
+
+let _storefrontSignTexture;
+
+function getStorefrontSignTexture() {
+  if (_storefrontSignTexture) return _storefrontSignTexture;
+  const labels = ['CORNER MARKET', 'COFFEE & BAKERY', 'BOOKS & RECORDS', 'NEIGHBORHOOD DELI',
+    'CLEANERS', 'FLOWERS', 'HARDWARE', 'PIZZA'];
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.font = '600 32px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  labels.forEach((label, i) => ctx.fillText(label, 256, i * 64 + 32, 464));
+  _storefrontSignTexture = new THREE.CanvasTexture(canvas);
+  return _storefrontSignTexture;
+}
+
+// Shops span several upstairs bays; every material output shares their glazing and door layout.
+function createStorefront(facade, seed, local) {
+  const { wallS, wallW, boxSeed, uCoord, vCoord, isGroundFloor, isRoof, solid, coping } = facade;
+  const width = local ? wallW.div(max(floor(wallW.div(7.5).add(0.5)), 1)) : float(7.5);
+  const horizontal = local ? wallS : uCoord.mul(mix(sign(facadeWorldNormal.z), sign(facadeWorldNormal.x).negate(), facadeAlongZ));
+  const grid = horizontal.div(width);
+  const x = fract(grid).mul(width), y = vCoord;
+  const fw = vec2(fwidth(grid).mul(width), fwidth(y)).toVar();
+  const mask = isGroundFloor.mul(float(1).sub(max(max(solid, isRoof), coping))).mul(step(2.4, width));
+  const id = vec2(floor(grid), boxSeed.add(seed));
+  const choice = hash2D(id.add(vec2(3.1, 17.2)));
+  const lit = step(0.28, hash2D(id.add(vec2(37.1, 9.8))));
+  const band = (p, a, b, w) => boxCoverage(p, a, b, w.mul(0.5));
+  const doorX = mix(float(0.24), width.sub(1.36), step(0.5, choice));
+  const door = band(x, doorX, doorX.add(1.12), fw.x);
+  const doorPane = band(x, doorX.add(0.06), doorX.add(1.06), fw.x).mul(band(y, 0.32, 2.42, fw.y));
+  const display = band(x, 0.18, width.sub(0.18), fw.x).mul(band(y, 0.58, 2.88, fw.y));
+  const transom = band(y, 2.46, 2.52, fw.y);
+  const glass = max(display.mul(float(1).sub(max(door, transom))), doorPane)
+    .add(display.mul(door).mul(band(y, 2.52, 2.88, fw.y))).clamp(0, 1);
+  const handle = band(x, doorX.add(0.85), doorX.add(0.89), fw.x).mul(band(y, 1.05, 1.46, fw.y));
+  const kickplate = door.mul(band(y, 0.23, 0.32, fw.y));
+  const metal = max(handle, kickplate);
+  const glazing = glass.mul(float(1).sub(handle));
+  const paint = mix(mix(color(0x263831), color(0x463b30), step(0.38, choice)), color(0x242a32), step(0.72, choice));
+  const signWidth = min(width.mul(0.82), 5.5);
+  const signUV = vec2(x.sub(width.mul(0.5)).div(signWidth).add(0.5), y.sub(2.96).div(0.6));
+  const signLod = log2(max(fw.x.mul(512).div(signWidth), fw.y.mul(64 / 0.6)));
+  const signMask = band(signUV.x, 0, 1, fw.x.div(signWidth))
+    .mul(band(signUV.y, 0, 1, fw.y.div(0.6))).mul(float(1).sub(smoothstep(4, 6, signLod)));
+  const signInk = Fn(() => {
+    const ink = float(0).toVar();
+    If(mask.mul(signMask).greaterThan(0.001), () => {
+      const atlasUV = vec2(signUV.x.clamp(0, 1), float(1).sub(floor(choice.mul(8)).add(float(1).sub(signUV.y.clamp(0, 1))).div(8)));
+      ink.assign(texture(getStorefrontSignTexture(), atlasUV).level(signLod.clamp(0, 5)).a.mul(signMask));
+    });
+    return ink;
+  })().toVar();
+  const frame = mix(mix(paint, color(0x92958d), metal), color(0xe0d7bb), signInk);
+
+  const interior = Fn(() => {
+    const result = vec4(0).toVar();
+    If(mask.greaterThan(0.001), () => {
+      const light = mix(color(0xffd49a), color(0xe0edee), step(0.58, choice));
+      const room = color(0x343330).toVar();
+      const fixture = float(0).toVar();
+      // Fine displays disappear before becoming subpixel; distant shops keep their average light level.
+      const detail = float(1).sub(smoothstep(0.06, 0.20, max(fw.x, fw.y)));
+      If(detail.greaterThan(0.001).and(glazing.greaterThan(0.001)), () => {
+        const ray = positionWorld.sub(cameraPosition);
+        const normal = facadeWorldNormal;
+        const inward = max(abs(dot(ray, normal)), 0.1);
+        const dx = dot(ray, vec3(normal.z, 0, normal.x.negate())).div(inward);
+        const dy = ray.y.div(inward);
+        const ox = x.sub(width.mul(0.5)), oy = y.sub(1.55);
+        const tx = width.mul(0.5).sub(ox.mul(sign(dx))).div(max(abs(dx), 0.001));
+        const ty = float(1.55).sub(oy.mul(sign(dy))).div(max(abs(dy), 0.001));
+        const depth = min(min(tx, ty), 3.6);
+        const px = x.add(dx.mul(depth)), py = y.add(dy.mul(depth));
+        const onSide = step(tx, min(ty, 3.6));
+        const onHorizontal = step(ty, min(tx, 3.6));
+        const ceiling = onHorizontal.mul(step(0, dy));
+        const floorMask = onHorizontal.mul(float(1).sub(step(0, dy)));
+        const back = float(1).sub(max(onSide, onHorizontal));
+        const roomFw = fw.mul(float(1).add(float(3.6).div(inward)));
+        const shelfY = py.div(0.55);
+        const shelves = filteredPulse(fract(shelfY), 0.05, 0.13, roomFw.y.div(0.55))
+          .mul(band(py, 0.5, 2.3, roomFw.y)).mul(band(px, 0.3, width.sub(0.3), roomFw.x)).mul(back);
+        const goodsX = px.div(0.28);
+        const goodsSeed = hash2D(vec2(floor(goodsX), floor(shelfY)).add(choice.mul(31)));
+        const goods = filteredPulse(fract(goodsX), 0.12, 0.88, roomFw.x.div(0.28))
+          .mul(filteredPulse(fract(shelfY), 0.14, goodsSeed.mul(0.28).add(0.5), roomFw.y.div(0.55)))
+          .mul(band(py, 0.5, 2.3, roomFw.y)).mul(back).mul(step(0.3, choice));
+        const wall = mix(color(0x716557), color(0x596462), choice);
+        const shell = mix(mix(wall, color(0x33302b), floorMask), color(0x9b9689), ceiling);
+        const stock = mix(color(0x88654a), color(0x617b80), goodsSeed);
+        const stocked = mix(mix(shell, stock, goods), color(0x30251b), shelves);
+        // A counter sits nearer the glass than the rear shelves, so they shift at different rates as we pass.
+        const displayX = x.add(dx.mul(1.3)), displayY = y.add(dy.mul(1.3));
+        const counter = band(displayY, 0.65, 1.10, fw.y.mul(1.5))
+          .mul(band(displayX, 0.2, width.sub(0.2), fw.x.mul(1.5))).mul(step(1.3, depth)).mul(float(1).sub(door));
+        const furnished = mix(stocked, color(0x453a2d), counter.mul(0.82));
+        const edgeShade = smoothstep(0, 0.5, min(px, width.sub(px))).mul(0.35).add(0.65);
+        room.assign(mix(room, furnished.mul(edgeShade).mul(mix(0.58, 1, lit)), detail));
+        const lamp = band(px, width.mul(0.18), width.mul(0.82), roomFw.x)
+          .mul(band(depth, 0.65, 0.82, roomFw.y)).mul(ceiling);
+        const backLight = band(py, 2.45, 2.52, roomFw.y).mul(back)
+          .mul(band(px, 0.5, width.sub(0.5), roomFw.x));
+        fixture.assign(max(lamp, backLight).mul(detail));
+      });
+      const view = normalize(cameraPosition.sub(positionWorld));
+      const fresnel = pow(clamp(float(1).sub(abs(dot(view, facadeWorldNormal))), 0, 1), 2);
+      const glassColor = mix(room.mul(light).mul(mix(0.35, 0.95, lit)), cityUniforms.uSkyHorizonColor, fresnel.mul(0.65).add(0.10));
+      result.assign(vec4(mix(glassColor, light, fixture.mul(lit)), lit.mul(float(0.55).add(fixture.mul(2.2))).mul(float(1).sub(fresnel.mul(0.8)))));
+    });
+    return result;
+  })().toVar();
+
+  return {
+    mask,
+    color: mix(frame, interior.rgb, glazing),
+    emissive: interior.rgb.mul(interior.a).mul(glazing).add(color(0xe0d7bb).mul(signInk).mul(lit).mul(0.12)).mul(cityUniforms.uInteriorGlow),
+    roughness: mix(float(0.58), float(0.14).add(float(1).sub(smoothstep(0.3, 0.9, y)).mul(0.16)), glazing),
+    relief: float(1).sub(glazing).mul(0.008).add(handle.mul(0.004))
+  };
+}
+
+// Entrances share the facade surface, including its lighting, shadows and distance filtering.
+function createBuildingEntrance(facade, trim, local, modern = false) {
+  const { wallS, wallW, wallH, fromTop, boxSeed, uCoord, vCoord, back, isRoof, coping, kind } = facade;
+  const width = local ? wallW.div(max(floor(wallW.div(28).add(0.5)), 1)) : float(28);
+  const horizontal = local ? wallS : uCoord.mul(mix(sign(facadeWorldNormal.z), sign(facadeWorldNormal.x).negate(), facadeAlongZ));
+  const grid = horizontal.div(width);
+  const x = fract(grid).sub(0.5).mul(width), y = vCoord.sub(0.22);
+  const fw = vec2(fwidth(horizontal), fwidth(vCoord)).toVar();
+  const band = (p, a, b, w) => boxCoverage(p, a, b, w.mul(0.5));
+  const doubleDoor = step(modern ? 5 : 18, width);
+  const halfWidth = min(mix(0.56, 0.95, doubleDoor), width.mul(0.5).sub(0.28));
+  const height = local ? min(2.48, vCoord.add(fromTop).sub(0.74)) : float(2.48);
+  const grounded = local ? float(1).sub(step(0.35, vCoord.add(fromTop).sub(wallH))) : float(1);
+  const mask = band(x, halfWidth.add(0.20).negate(), halfWidth.add(0.20), fw.x)
+    .mul(band(y, 0, height.add(0.20), fw.y)).mul(grounded).mul(step(WALL_KINDS.shop + 0.5, kind))
+    .mul(float(1).sub(max(max(back, isRoof), coping))).mul(step(1.3, width)).mul(step(1.7, height)).toVar();
+  const recess = band(x, halfWidth.add(0.07).negate(), halfWidth.add(0.07), fw.x)
+    .mul(band(y, 0.06, height.add(0.07), fw.y));
+  const leaf = band(x, halfWidth.negate(), halfWidth, fw.x).mul(band(y, 0.10, height, fw.y));
+  const leafX = mix(x, abs(x).sub(halfWidth.mul(0.5)), doubleDoor);
+  const leafWidth = mix(halfWidth, halfWidth.mul(0.5), doubleDoor);
+  const inset = band(leafX, leafWidth.sub(0.10).negate(), leafWidth.sub(0.10), fw.x);
+  const glass = inset.mul(band(y, height.mul(0.48), height.sub(0.16), fw.y)).mul(leaf);
+  const panel = inset.mul(band(y, 0.25, height.mul(0.40), fw.y)).mul(leaf);
+  const handleX = mix(halfWidth.sub(0.13), float(0.12), doubleDoor);
+  const handle = band(mix(x, abs(x), doubleDoor), handleX.sub(0.02), handleX.add(0.02), fw.x)
+    .mul(band(y, 0.98, 1.34, fw.y)).mul(leaf);
+  const seam = band(x, -0.018, 0.018, fw.x).mul(doubleDoor).mul(leaf);
+  const glazing = glass.mul(float(1).sub(max(handle, seam)));
+  const colorNode = Fn(() => {
+    const result = vec3(0).toVar();
+    If(mask.greaterThan(0.001), () => {
+      const choice = hash2D(vec2(boxSeed, floor(grid)));
+      const paint = modern ? color(0x282d32) : mix(color(0x49372a), color(0x263d33), step(0.5, choice));
+      const door = mix(mix(paint, paint.mul(0.62), panel), color(0x14191c), seam);
+      const view = normalize(cameraPosition.sub(positionWorld));
+      const fresnel = pow(float(1).sub(abs(dot(view, facadeWorldNormal))).clamp(0, 1), 2);
+      const glassColor = mix(color(0x23302c), cityUniforms.uSkyHorizonColor, fresnel.mul(0.5).add(0.10));
+      const doorColor = mix(mix(door, glassColor, glazing), color(0xa6a69b), handle);
+      result.assign(mix(mix(trim.mul(0.85), color(0x101515), recess), doorColor, leaf));
+    });
+    return result;
+  })();
+  return {
+    mask,
+    color: colorNode,
+    emissive: color(0xffd6a0).mul(glazing).mul(0.09).mul(cityUniforms.uInteriorGlow),
+    roughness: mix(mix(0.72, 0.43, leaf), 0.16, max(glazing, handle)),
+    relief: recess.mul(-0.025).add(leaf.mul(0.009)).sub(panel.mul(0.004)).add(handle.mul(0.012))
   };
 }
 
@@ -483,7 +689,7 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0) {
  * Curtain-Wall Glass Skyscraper TSL Material
  * Features:
  * - Mikkelsen `bumpNormal` 3D Mullion Relief & Per-Pane Thermal Glass Warble
- * - Fast 3D Apartment/Upper-Level Interior Mapping (2D Glazing on Ground-Floor Shops)
+ * - Interior mapping for apartments and ground-floor shops
  * - Urban Canyon Global Illumination (`aoNode` + warm bounce)
  */
 function createCurtainWallMaterial(opts = {}) {
@@ -498,10 +704,11 @@ function createCurtainWallMaterial(opts = {}) {
     warmth = 0.62,
     reflectivity = 0.92,
     seed = 1.0,
-    boxLocal = false
+    boxLocal = false,
+    footprintLocal = false
   } = opts;
 
-  const cacheKey = `${glassTint}_${frameTint}_${windowWidth}_${floorHeight}_${litProbability}_${warmth}_${reflectivity}_${seed}_${boxLocal}`;
+  const cacheKey = `${glassTint}_${frameTint}_${windowWidth}_${floorHeight}_${litProbability}_${warmth}_${reflectivity}_${seed}_${boxLocal}_${footprintLocal}`;
   if (_curtainWallCache.has(cacheKey)) {
     return _curtainWallCache.get(cacheKey);
   }
@@ -520,16 +727,15 @@ function createCurtainWallMaterial(opts = {}) {
   const uWarmth = uniform(warmth);
   const uReflectivity = uniform(reflectivity);
   const uSeed = uniform(seed);
-  const cWarmLight = color(0xffe1a6);
   const cCanyonBounce = color(0xe89c68);
 
   mat.aoNode = canyonSkyAONode();
 
   // The facade cell and the apartment behind each pane are built once and shared by every output below, so the
   // shader carries a single copy of them (and evaluates the interior mapping once per pixel)
-  const facade = facadeCell(uWindowWidth, uFloorHeight, boxLocal);
-  const { isRoof, uCoord, vCoord, gridV, cellId, cellUV, fw, bayWidth, isGroundFloor, blank, tone, partial, coping } = facade;
-  // Pane UV inside the mullions & spandrel, the 3D apartment behind it and whether the ground-floor shop is lit
+  const facade = facadeCell(uWindowWidth, uFloorHeight, boxLocal || footprintLocal, 0, footprintLocal);
+  const { isRoof, uCoord, vCoord, gridV, cellId, cellUV, fw, bayWidth, solid, coping } = facade;
+  // Pane UV inside the mullions and spandrel.
   const winUV = clamp(
     vec2(
       cellUV.x.sub(mullionThickness).div(max(0.01, 1.0 - 2.0 * mullionThickness)),
@@ -538,17 +744,17 @@ function createCurtainWallMaterial(opts = {}) {
     vec2(0.0),
     vec2(1.0)
   );
-  const aptRoom = evaluateApartmentInterior(uCoord, vCoord, winUV, cellId, bayWidth, uFloorHeight, uSeed, uWarmth, uLitProbability.mul(0.65), fw);
-  const shopLit = step(0.24, hash2D(cellId.add(vec2(uSeed, 19.4))));
+  // Solid walls and coping have no glazing. The emissive pane mask below lies inside this one.
+  const isGlassPane = filteredPulse(cellUV.x, mullionThickness * 0.5, 1.0 - mullionThickness * 0.5, fw.x)
+    .mul(filteredPulse(cellUV.y, spandrelRatio + 0.015, 1.0 - mullionThickness * 0.5, fw.y))
+    .mul(float(1.0).sub(isRoof)).mul(float(1.0).sub(solid)).mul(float(1.0).sub(coping));
+  const aptRoom = apartmentInteriorBehind(isGlassPane, uCoord, vCoord, winUV, cellId, bayWidth, uFloorHeight, uSeed, uWarmth, uLitProbability.mul(0.65), fw);
+  const storefront = createStorefront(facade, uSeed, boxLocal || footprintLocal);
+  const entrance = createBuildingEntrance(facade, cFrame, boxLocal || footprintLocal, true);
   const floorIdx = floor(gridV);
   const isMechFloor = float(1.0).sub(step(1.0, mod(floorIdx.add(uSeed), 16.0))).mul(step(4.0, floorIdx));
 
   mat.colorNode = Fn(() => {
-    // No glass in a storey the box cuts short (solid spandrel instead) nor behind the coping
-    const isGlassPane = filteredPulse(cellUV.x, mullionThickness * 0.5, 1.0 - mullionThickness * 0.5, fw.x)
-      .mul(filteredPulse(cellUV.y, spandrelRatio + 0.015, 1.0 - mullionThickness * 0.5, fw.y))
-      .mul(float(1.0).sub(isRoof)).mul(float(1.0).sub(partial)).mul(float(1.0).sub(coping));
-
     const louverStripes = sin(vCoord.mul(22.0)).mul(0.5).add(0.5);
 
     // Per-Pane Thermal/Wind Glass Warble & Pillow Distortion
@@ -584,15 +790,10 @@ function createCurtainWallMaterial(opts = {}) {
     const envReflection = mix(skyReflect, reflectedBuildingCol, inReflectedTower.mul(0.62));
     const sunSpec = pow(max(dot(reflectDir, sunDir), 0.0), 48.0).mul(1.25);
 
-    // Upper levels use 3D apartment interior mapping; ground-floor shops use 2D glass
+    // Interior mapping behind the upper-floor glazing.
     const pooledDirt = float(1.0).sub(smoothstep(spandrelRatio, spandrelRatio + 0.22, cellUV.y)).mul(0.32);
     const grime = float(0.56).add(pooledDirt).clamp(0.0, 0.92);
-    const shopShelves = float(1.0).sub(step(0.78, fract(winUV.y.mul(3.0))).mul(0.35));
-    const shopTransomGlow = step(0.76, winUV.y).mul(0.35).add(0.65);
-    const shopInterior = cWarmLight.mul(shopShelves).mul(shopTransomGlow).mul(mix(float(0.28), float(0.88), shopLit));
-    const shopBase = mix(cGlass, shopInterior, float(0.56).mul(float(1.0).sub(pooledDirt)));
-    const upperGlazed = mix(aptRoom.xyz.mul(color(0xb6c6bf)), cGlass, grime);
-    const glazedBase = mix(upperGlazed, shopBase, isGroundFloor);
+    const glazedBase = mix(aptRoom.xyz.mul(color(0xb6c6bf)), cGlass, grime);
 
     const glassColor = mix(glazedBase, envReflection, fresnel.mul(uReflectivity).add(0.18))
       .add(cityUniforms.uSunColor.mul(sunSpec));
@@ -610,15 +811,11 @@ function createCurtainWallMaterial(opts = {}) {
     const mechCol = mix(cFrame.mul(0.36), cFrame.mul(0.76), louverStripes);
     const finalWall = mix(facadeCol, mechCol, isMechFloor.mul(float(1.0).sub(isRoof)));
 
-    // Windowless lot-line walls: weathered precast concrete panels, a panel per bay & storey
-    const panelJoint = max(filteredPulse(cellUV.x, 0.0, 0.025, fw.x), filteredPulse(cellUV.y, 0.0, 0.03, fw.y));
-    const panelStain = noise2D(vec2(uCoord.mul(0.9), vCoord.mul(0.04))).mul(float(1.0).sub(smoothstep(0.4, 1.2, fwidth(uCoord))));
-    const panelCol = mix(color(0x8a867e), color(0xaaa59b), tone).mul(panelStain.mul(0.16).add(0.9)).mul(float(1.0).sub(panelJoint.mul(0.3)));
-    const withBlank = mix(finalWall, panelCol.add(canyonGlow), blank);
     // Brushed-aluminium coping capping every wall
-    const withCap = mix(withBlank, mix(cFrame, color(0xc9ced3), 0.45), coping);
+    const withCap = mix(finalWall, mix(cFrame, color(0xc9ced3), 0.45), coping);
 
-    return mix(withCap, roofColor, isRoof);
+    const surface = mix(mix(withCap, roofColor, isRoof), storefront.color, storefront.mask);
+    return mix(surface, entrance.color, entrance.mask);
   })();
 
   mat.roughnessNode = Fn(() => {
@@ -626,12 +823,10 @@ function createCurtainWallMaterial(opts = {}) {
       filteredPulse(cellUV.x, mullionThickness, 1.0 - mullionThickness, fw.x).mul(filteredPulse(cellUV.y, spandrelRatio, 1.0, fw.y))
     );
     const sillDirt = float(1.0).sub(smoothstep(spandrelRatio, spandrelRatio + 0.18, cellUV.y)).mul(0.18);
-    const glassOrFrame = mix(float(0.05).add(sillDirt), float(0.54), max(max(isFrame, isRoof), partial));
-    return mix(mix(glassOrFrame, float(0.36), coping), float(0.88), blank);
+    const glassOrFrame = mix(float(0.05).add(sillDirt), float(0.54), max(max(isFrame, isRoof), solid));
+    const surface = mix(mix(glassOrFrame, float(0.36), coping), storefront.roughness, storefront.mask);
+    return mix(surface, entrance.roughness, entrance.mask);
   })();
-
-  // Glass & metal, but the concrete lot-line walls aren't
-  mat.metalnessNode = mix(float(0.72), float(0.0), blank);
 
   // Hardware derivative bumpNormal for raised curtain-wall mullions & spandrel channels (ramps >= 2px, see pre-war)
   mat.normalNode = Fn(() => {
@@ -642,31 +837,29 @@ function createCurtainWallMaterial(opts = {}) {
     const ramp = fw.mul(2.0).max(0.02);
     const inPane = filteredPulse(cellUV.x, mullionThickness + 0.01, 0.99 - mullionThickness, ramp.x)
       .mul(filteredPulse(cellUV.y, spandrelRatio + 0.01, 0.99 - mullionThickness, ramp.y))
-      .mul(float(1.0).sub(partial)).mul(float(1.0).sub(coping));
-    const mullionRelief = float(1.0).sub(inPane).mul(0.014).mul(float(1.0).sub(blank)).add(coping.mul(0.01));
+      .mul(float(1.0).sub(solid)).mul(float(1.0).sub(coping));
+    const mullionRelief = float(1.0).sub(inPane).mul(0.014).add(coping.mul(0.01));
 
-    return bumpNormal(mullionRelief.mul(detailFade));
+    const relief = mix(mullionRelief, storefront.relief, storefront.mask);
+    return bumpNormal(mix(relief, entrance.relief, entrance.mask).mul(detailFade));
   })();
 
   mat.emissiveNode = Fn(() => {
     const inPane = filteredPulse(cellUV.x, mullionThickness + 0.015, 1.0 - mullionThickness - 0.015, fw.x)
       .mul(filteredPulse(cellUV.y, spandrelRatio + 0.02, 1.0 - mullionThickness * 0.5, fw.y));
-    const paneMask = inPane.mul(float(1.0).sub(isRoof)).mul(float(1.0).sub(isMechFloor)).mul(float(1.0).sub(blank))
-      .mul(float(1.0).sub(partial)).mul(float(1.0).sub(coping));
-
-    const shopShelves = float(1.0).sub(step(0.78, fract(winUV.y.mul(3.0))).mul(0.32));
-    const shopEmit = cWarmLight.mul(shopLit).mul(shopShelves).mul(0.62);
-    const emitCol = mix(aptRoom.xyz.mul(aptRoom.w), shopEmit, isGroundFloor);
+    const paneMask = inPane.mul(float(1.0).sub(isRoof)).mul(float(1.0).sub(isMechFloor))
+      .mul(float(1.0).sub(solid)).mul(float(1.0).sub(coping));
 
     const viewDir = normalize(cameraPosition.sub(positionWorld));
     const fresnel = pow(clamp(float(1.0).sub(abs(dot(viewDir, normalWorldGeometry))), 0.0, 1.0), 2.0);
     const transmission = float(1.0).sub(fresnel.mul(0.75));
 
-    return emitCol
+    const emission = aptRoom.xyz.mul(aptRoom.w)
       .mul(transmission)
       .mul(paneMask)
       .mul(cityUniforms.uInteriorGlow)
       .mul(0.72);
+    return mix(mix(emission, storefront.emissive, storefront.mask), entrance.emissive, entrance.mask);
   })();
 
   _curtainWallCache.set(cacheKey, mat);
@@ -697,10 +890,11 @@ function createPreWarBuildingMaterial(opts = {}) {
     crownGlowColor = 0xffe0a3,
     seed = 42.0,
     boxLocal = false,
+    footprintLocal = false,
     cornerPier = 1.2 // solid masonry at both ends of every wall above the shopfronts (box-local mode)
   } = opts;
 
-  const cacheKey = `${stoneColor}_${trimColor}_${windowWidth}_${floorHeight}_${litProbability}_${warmth}_${crownGlowHeight}_${seed}_${boxLocal}_${cornerPier}`;
+  const cacheKey = `${stoneColor}_${trimColor}_${windowWidth}_${floorHeight}_${litProbability}_${warmth}_${crownGlowHeight}_${seed}_${boxLocal}_${footprintLocal}_${cornerPier}`;
   if (_preWarCache.has(cacheKey)) {
     return _preWarCache.get(cacheKey);
   }
@@ -722,8 +916,6 @@ function createPreWarBuildingMaterial(opts = {}) {
   const uCrownGlowHeight = uniform(crownGlowHeight);
   const uSeed = uniform(seed);
   const cSoot = color(0x4a4236);
-  const cWarmWindow = color(0xffcf86);
-  const cCoolWindow = color(0xcfe2ff);
   const cCanyonBounce = color(0xe89c68);
 
   const halfWinX = (1.0 - windowRatioX) * 0.5;
@@ -733,14 +925,14 @@ function createPreWarBuildingMaterial(opts = {}) {
 
   // The facade cell, the window opening and the apartment behind it are built once and shared by every output below,
   // so the shader carries a single copy of them (and evaluates the interior mapping once per pixel)
-  const facade = facadeCell(uWindowWidth, uFloorHeight, boxLocal, cornerPier);
-  const { isRoof, uCoord, vCoord, gridV, cellId, cellUV, fw, bayWidth, isGroundFloor, solid, back, blank, door, tone } = facade;
-  const { wallS, wallW, wallH, fromTop, boxSeed, coping } = facade;
-  const open = float(1.0).sub(solid).mul(float(1.0).sub(door)); // 0 in the corner piers, blank walls & doorways
-  const front = float(1.0).sub(back).sub(blank).max(0.0); // street fronts (band courses, sills under the band...)
-  const effHalfX = mix(float(halfWinX), float(0.11), isGroundFloor);
-  const effHalfY = mix(float(halfWinY), float(0.10), isGroundFloor);
-  // Glazing UV inside the window opening, the 3D apartment behind it and the storefront lighting
+  const facade = facadeCell(uWindowWidth, uFloorHeight, boxLocal || footprintLocal, cornerPier, footprintLocal);
+  const { isRoof, uCoord, vCoord, gridV, cellId, cellUV, fw, bayWidth, isGroundFloor, solid, back, blank, tone, coping } = facade;
+  const { wallS, wallW, wallH, exposedHeight, fromTop, boxSeed } = facade;
+  const open = float(1.0).sub(solid);
+  const front = float(1.0).sub(back);
+  const effHalfX = float(halfWinX);
+  const effHalfY = float(halfWinY);
+  // Glazing UV inside the apartment window opening.
   const winUV = clamp(
     vec2(
       cellUV.x.sub(effHalfX).div(max(0.01, float(1.0).sub(effHalfX.mul(2.0)))),
@@ -749,9 +941,12 @@ function createPreWarBuildingMaterial(opts = {}) {
     vec2(0.0),
     vec2(1.0)
   );
-  const aptRoom = evaluateApartmentInterior(uCoord, vCoord, winUV, cellId, bayWidth, uFloorHeight, uSeed, uWarmth, uLitProbability.mul(0.62), fw);
-  const shopLit = step(0.24, hash2D(cellId.add(vec2(uSeed, 19.4))));
-  const bulbCol = mix(cCoolWindow, cWarmWindow, step(float(1.0).sub(uWarmth), hash2D(cellId.add(vec2(uSeed.mul(1.9), 83.1)))));
+  // The window opening: the glass (colour) and the glow (emissive) masks below both lie inside it
+  const windowOpening = filteredPulse(cellUV.x, effHalfX, float(1.0).sub(effHalfX), fw.x).mul(open)
+    .mul(filteredPulse(cellUV.y, effHalfY, float(1.0).sub(effHalfY), fw.y)).mul(float(1.0).sub(isRoof));
+  const aptRoom = apartmentInteriorBehind(windowOpening, uCoord, vCoord, winUV, cellId, bayWidth, uFloorHeight, uSeed, uWarmth, uLitProbability.mul(0.62), fw);
+  const storefront = createStorefront(facade, uSeed, boxLocal || footprintLocal);
+  const entrance = createBuildingEntrance(facade, cTrim, boxLocal || footprintLocal);
   // Window AC units (~12% of upper-floor windows), none in the floor the band course covers
   const beltFloor = step(5.0, mod(floor(gridV), 6.0)).mul(front);
   const acRand = hash2D(cellId.add(vec2(uSeed.mul(1.3).add(7.1), 91.7)));
@@ -771,12 +966,10 @@ function createPreWarBuildingMaterial(opts = {}) {
       isGroundFloor.mul(filteredPulse(cellUV.y, 0.86, 1.0, fw.y))
     );
 
-    // Double-hung meeting rail on upper floors + storefront transom & mullions on ground floor
+    // Double-hung meeting rails.
     const sashBarY = lineAA(cellUV.y.sub(0.52), 0.012).mul(float(1.0).sub(isGroundFloor));
     const sashBarX = lineAA(cellUV.x.sub(0.50), 0.009).mul(float(1.0).sub(isGroundFloor)).mul(0.55);
-    const storeTransom = lineAA(cellUV.y.sub(0.70), 0.015).mul(isGroundFloor);
-    const storeMullion = lineAA(fract(cellUV.x.mul(2.0)).sub(0.5), 0.018).mul(isGroundFloor);
-    const sashMask = clamp(max(max(sashBarY, sashBarX), max(storeTransom, storeMullion)), 0.0, 1.0);
+    const sashMask = max(sashBarY, sashBarX);
 
     // Protruding Window Air-Conditioner Unit, sitting on the sill (see hasAC)
     const acMinX = float(0.31);
@@ -809,17 +1002,16 @@ function createPreWarBuildingMaterial(opts = {}) {
     const rowCoord = vCoord.div(brickH);
     const courseRow = floor(rowCoord);
     const colCoord = uCoord.div(brickL).add(mod(courseRow, 2.0).mul(0.5));
-    // Rear, court & lot-line walls are plain common brick (red-brown or buff by building); lot-line walls weather in
-    // patches of grey parging (worked out on those walls only), some are parged all over
+    // Courtyard and party walls use common brick, with weathered parging on some party walls.
     const backBrick = mix(
       mix(color(0x6c3d30), color(0x8a503e), fract(tone.mul(7.31))),
       mix(color(0x9a8669), color(0xb09a7a), fract(tone.mul(5.17))),
       step(0.58, tone)
     );
     const parged = float(0.0).toVar();
-    If(blank.mul(back).greaterThan(0.5), () => {
-      const pargePatch = smoothstep(0.6, 0.76, noise2D(vec2(uCoord.mul(0.11), vCoord.mul(0.07)).add(tone.mul(37.0))));
-      parged.assign(max(step(0.74, fract(tone.mul(3.7))), pargePatch.mul(0.85)));
+    If(blank.greaterThan(0.5), () => {
+      const patch = smoothstep(0.6, 0.76, noise2D(vec2(uCoord.mul(0.11), vCoord.mul(0.07)).add(tone.mul(37.0))));
+      parged.assign(max(step(0.74, fract(tone.mul(3.7))), patch.mul(0.85)));
     });
     const backTint = mix(backBrick, color(0x8f8b84), parged);
     const mortarJoint = max(
@@ -850,23 +1042,22 @@ function createPreWarBuildingMaterial(opts = {}) {
     const canyonBand = smoothstep(0.0, 14.0, vCoord).mul(float(1.0).sub(smoothstep(22.0, 75.0, vCoord)));
     const canyonGlow = cCanyonBounce.mul(canyonBand.mul(cityUniforms.uCanyonBounce).mul(0.22));
 
-    // Faded painted advertisement ("ghost sign") high on some lot-line walls: a panel with a line of tall block letters
-    // over a smaller one, flaking off the brick. The lettering is only worked out inside the panel.
-    const signW = min(wallW.sub(3.0), 18.0);
-    const signH = min(min(wallH.mul(0.3), signW.mul(0.42)), 6.5);
-    const hasSign = blank.mul(back).mul(float(1.0).sub(step(0.74, fract(tone.mul(3.7)))))
+    // Faded advertisements on broad party walls. Lettering is evaluated only within the painted panel.
+    const signW = max(min(wallW.sub(3.0), 18.0), 0.1);
+    const signH = max(min(min(min(wallH.mul(0.3), signW.mul(0.42)), 6.5), exposedHeight.sub(1.8)), 0.1);
+    const hasSign = blank.mul(float(1.0).sub(step(0.74, fract(tone.mul(3.7)))))
       .mul(step(0.8, fract(tone.mul(13.7).add(boxSeed.mul(0.618)))))
       .mul(step(5.0, signW)).mul(step(2.6, signH));
-    const su = wallS.sub(wallW.sub(signW).mul(0.5)).div(signW); // 0..1 across the panel
-    const sv = fromTop.sub(1.2).div(signH); // 0..1 down the panel
+    const su = wallS.sub(wallW.sub(signW).mul(0.5)).div(signW);
+    const sv = fromTop.sub(1.2).div(signH);
     const signFw = vec2(fwidth(su), fwidth(sv));
+    const panel = boxCoverage(su, 0.0, 1.0, signFw.x.mul(0.5)).mul(boxCoverage(sv, 0.0, 1.0, signFw.y.mul(0.5))).mul(hasSign);
     const signPaint = vec4(0.0).toVar();
-    If(hasSign.mul(step(0.0, su)).mul(step(su, 1.0)).mul(step(0.0, sv)).mul(step(sv, 1.0)).greaterThan(0.5), () => {
+    If(panel.greaterThan(0.001), () => {
       const pal = fract(tone.mul(29.3));
       const ground = mix(mix(color(0xd3c9ae), color(0x86392b), step(0.5, pal)), color(0x2b3340), step(0.8, pal));
       const ink = mix(mix(color(0x6b2a20), color(0xddd2b6), step(0.5, pal)), color(0xd5c086), step(0.8, pal));
       const border = float(1.0).sub(filteredPulse(su, 0.02, 0.98, signFw.x).mul(filteredPulse(sv, 0.045, 0.955, signFw.y)));
-      // Block letters: a vertical at the left (or middle) and maybe the right, bars at the top / middle / bottom
       const lettering = (v0, v1, line) => {
         const glyphW = signH.mul((v1 - v0) * 0.64);
         const n = floor(signW.mul(0.86).div(glyphW));
@@ -885,12 +1076,12 @@ function createPreWarBuildingMaterial(opts = {}) {
           max(filteredPulse(fy, 0.0, 0.17, wy).mul(step(0.35, fract(h1.mul(7.0)))), filteredPulse(fy, 0.42, 0.58, wy).mul(step(0.5, fract(h2.mul(5.0))))),
           filteredPulse(fy, 0.83, 1.0, wy).mul(step(0.4, fract(h1.mul(3.0))))
         ).mul(filteredPulse(fx, 0.1, 0.9, wx));
-        const inText = step(0.0, gx).mul(step(gx, n)).mul(step(0.0, fy)).mul(step(fy, 1.0)).mul(step(0.1, fract(h2.mul(11.0))));
+        const inText = boxCoverage(gx, 0.0, n, wx.mul(0.5)).mul(boxCoverage(fy, 0.0, 1.0, wy.mul(0.5))).mul(step(0.1, fract(h2.mul(11.0))));
         return max(verticals, bars).mul(inText);
       };
       const letters = max(lettering(0.14, 0.56, 0), lettering(0.66, 0.86, 1));
       const flake = smoothstep(0.5, 0.74, noise2D(vec2(wallS.mul(0.7), fromTop.mul(1.1)).add(tone.mul(31.0))));
-      const cover = mix(float(0.34), float(0.66), fract(tone.mul(7.7))).mul(float(1.0).sub(flake.mul(0.9)));
+      const cover = mix(float(0.34), float(0.66), fract(tone.mul(7.7))).mul(float(1.0).sub(flake.mul(0.9))).mul(panel);
       signPaint.assign(vec4(mix(ground, ink, max(letters, border)), cover));
     });
 
@@ -908,8 +1099,7 @@ function createPreWarBuildingMaterial(opts = {}) {
       .add(cityUniforms.uSunColor.mul(isSillTop.mul(0.24)))
       .add(canyonGlow);
 
-    // Upper apartment floors use 3D interior mapping behind grimy soda-lime glazing;
-    // ground-floor shops use 2D reflective storefront glass
+    // Upper apartment floors use interior mapping behind grimy soda-lime glazing.
     const pooledDirt = float(1.0).sub(smoothstep(0.0, 0.32, winUV.y)).mul(0.36);
     // Grimy soda-lime glazing film (SkyscraperGenerator.js line 1688): baseline haze so panes read as glass, not open holes
     const upperGrime = float(0.52).add(sootDirt.mul(0.35)).add(pooledDirt).clamp(0.0, 0.90);
@@ -919,11 +1109,7 @@ function createPreWarBuildingMaterial(opts = {}) {
     const recessShade = float(1.0).sub(max(lintelShadow, jambShadow));
 
     const upperGlassBase = mix(aptRoom.xyz.mul(color(0xb6c6bf)), cGlass, upperGrime);
-    const shopShelves = float(1.0).sub(step(0.76, fract(winUV.y.mul(3.0))).mul(0.34));
-    const shopInterior = bulbCol.mul(smoothstep(0.05, 0.92, winUV.y).mul(0.48).add(0.24)).mul(shopShelves).mul(shopLit);
-    const shopGlassBase = mix(cGlass, shopInterior, float(0.62).mul(float(1.0).sub(pooledDirt)));
-    const glassBase = mix(upperGlassBase, shopGlassBase, isGroundFloor);
-    const glassCol = mix(glassBase, cityUniforms.uSkyHorizonColor, fresnel.mul(0.52).add(0.08)).mul(recessShade);
+    const glassCol = mix(upperGlassBase, cityUniforms.uSkyHorizonColor, fresnel.mul(0.52).add(0.08)).mul(recessShade);
 
     const frameCol = masonryTint.mul(0.46).mul(recessShade);
     const roofNoise = noise2D(positionWorld.xz.mul(0.35));
@@ -932,26 +1118,8 @@ function createPreWarBuildingMaterial(opts = {}) {
     const wallOrRoof = mix(masonryWeathered, roofCol, isRoof);
     const withFrames = mix(wallOrRoof, frameCol, isWindowOpening.mul(sashMask));
     const withGlass = mix(withFrames, glassCol, isWindowGlass);
-    const withAC = mix(withGlass, acColor, inACBox);
-
-    // Entrance of a residential front: painted panel door under a glazed transom, in a stone surround (door bay only)
-    const finalCol = withAC.toVar();
-    If(door.greaterThan(0.5), () => {
-      const inDoorway = filteredPulse(cellUV.x, 0.27, 0.73, fw.x).mul(filteredPulse(cellUV.y, 0.065, 0.8, fw.y));
-      const surround = filteredPulse(cellUV.x, 0.21, 0.79, fw.x).mul(filteredPulse(cellUV.y, 0.0, 0.86, fw.y));
-      const transom = filteredPulse(cellUV.y, 0.67, 0.78, fw.y);
-      const doorRnd = fract(tone.mul(11.3));
-      const doorPaint = mix(
-        mix(color(0x1c1b1a), color(0x4c2018), step(0.35, doorRnd)),
-        mix(color(0x203528), color(0x6a4628), step(0.8, doorRnd)),
-        step(0.6, doorRnd)
-      );
-      // Meeting stiles & lock rail (box-filtered with the cell footprint: no derivatives in this branch)
-      const doorPanels = max(filteredPulse(cellUV.x, 0.494, 0.506, fw.x), filteredPulse(cellUV.y, 0.39, 0.41, fw.y));
-      const doorCol = mix(doorPaint.mul(float(1.0).sub(doorPanels.mul(0.5))), mix(cGlass, cityUniforms.uSkyHorizonColor, 0.18), transom);
-      finalCol.assign(mix(mix(withAC, cTrim.mul(0.85), surround), doorCol, inDoorway));
-    });
-    return finalCol;
+    const surface = mix(mix(withGlass, acColor, inACBox), storefront.color, storefront.mask);
+    return mix(surface, entrance.color, entrance.mask);
   })();
 
   mat.roughnessNode = Fn(() => {
@@ -965,7 +1133,8 @@ function createPreWarBuildingMaterial(opts = {}) {
     const glassRough = float(0.14).add(pooledRough);
 
     const stoneGrain = noise2D(vec2(uCoord.mul(8.0), vCoord.mul(8.0))).mul(0.12);
-    return mix(float(0.78).add(stoneGrain), glassRough, isWindow);
+    const surface = mix(mix(float(0.78).add(stoneGrain), glassRough, isWindow), storefront.roughness, storefront.mask);
+    return mix(surface, entrance.roughness, entrance.mask);
   })();
 
   // Hardware derivative bumpNormal for domed brickwork, stone courses, recessed windows & AC louvers. Edges ramp over
@@ -1006,13 +1175,14 @@ function createPreWarBuildingMaterial(opts = {}) {
     const wallHeight = brickDome.mul(float(1.0).sub(coping)).add(sillLedge).add(corniceLedge).add(coping.mul(0.024));
     const totalHeight = mix(wallHeight, acLouverHeight.mul(inACBox), isWindow);
 
-    return bumpNormal(totalHeight.mul(detailFade));
+    const relief = mix(totalHeight, storefront.relief, storefront.mask);
+    return bumpNormal(mix(relief, entrance.relief, entrance.mask).mul(detailFade));
   })();
 
   mat.emissiveNode = Fn(() => {
     // The glow stays a hair inside the glazing
-    const glowHalfX = mix(float(halfWinX + 0.015), float(0.12), isGroundFloor);
-    const glowHalfY = mix(float(halfWinY + 0.015), float(0.11), isGroundFloor);
+    const glowHalfX = float(halfWinX + 0.015);
+    const glowHalfY = float(halfWinY + 0.015);
 
     const inX = filteredPulse(cellUV.x, glowHalfX, float(1.0).sub(glowHalfX), fw.x).mul(open);
     const inY = filteredPulse(cellUV.y, glowHalfY, float(1.0).sub(glowHalfY), fw.y);
@@ -1023,9 +1193,7 @@ function createPreWarBuildingMaterial(opts = {}) {
 
     const sashBarY = lineAA(cellUV.y.sub(0.52), 0.014).mul(float(1.0).sub(isGroundFloor));
     const sashBarX = lineAA(cellUV.x.sub(0.50), 0.010).mul(float(1.0).sub(isGroundFloor)).mul(0.55);
-    const storeTransom = lineAA(cellUV.y.sub(0.70), 0.016).mul(isGroundFloor);
-    const storeMullion = lineAA(fract(cellUV.x.mul(2.0)).sub(0.5), 0.020).mul(isGroundFloor);
-    const sashMask = clamp(max(max(sashBarY, sashBarX), max(storeTransom, storeMullion)), 0.0, 1.0);
+    const sashMask = max(sashBarY, sashBarX);
 
     const inACBox = filteredPulse(cellUV.x, 0.31, 0.69, fw.x)
       .mul(filteredPulse(cellUV.y, glowHalfY, glowHalfY.add(0.22), fw.y))
@@ -1037,15 +1205,11 @@ function createPreWarBuildingMaterial(opts = {}) {
       .mul(float(1.0).sub(sashMask))
       .mul(float(1.0).sub(inACBox));
 
-    const shopShelves = float(1.0).sub(step(0.76, fract(winUV.y.mul(3.0))).mul(0.32));
-    const vertGrad = smoothstep(0.08, 0.92, winUV.y).mul(0.62).add(0.28);
-    const shopEmit = bulbCol.mul(shopLit).mul(vertGrad).mul(shopShelves).mul(0.58);
-
     const viewDir = normalize(cameraPosition.sub(positionWorld));
     const fresnel = pow(clamp(float(1.0).sub(abs(dot(viewDir, normalWorldGeometry))), 0.0, 1.0), 1.8);
     const transmission = float(1.0).sub(fresnel.mul(0.82));
 
-    const winEmit = mix(aptRoom.xyz.mul(aptRoom.w).mul(0.76), shopEmit, isGroundFloor)
+    const winEmit = aptRoom.xyz.mul(aptRoom.w).mul(0.76)
       .mul(transmission)
       .mul(isWindow)
       .mul(cityUniforms.uInteriorGlow);
@@ -1053,41 +1217,25 @@ function createPreWarBuildingMaterial(opts = {}) {
     const crownMask = smoothstep(uCrownGlowHeight, uCrownGlowHeight.add(26.0), vCoord).mul(float(1.0).sub(isRoof.mul(0.5)));
     const crownFlood = cCrown.mul(crownMask).mul(cityUniforms.uInteriorGlow).mul(0.55);
 
-    // Lit hallway behind the entrance transom
-    const transomGlow = door.mul(filteredPulse(cellUV.x, 0.27, 0.73, fw.x)).mul(filteredPulse(cellUV.y, 0.67, 0.78, fw.y));
-    const doorEmit = cWarmWindow.mul(transomGlow).mul(cityUniforms.uInteriorGlow).mul(0.32);
-
-    return winEmit.add(crownFlood).add(doorEmit);
+    const emission = mix(mix(winEmit, storefront.emissive, storefront.mask), entrance.emissive, entrance.mask);
+    return emission.add(crownFlood);
   })();
 
   _preWarCache.set(cacheKey, mat);
   return mat;
 }
 
-/**
- * Instanced unit boxes for the facade materials' `boxLocal` mode, one per { x, y, z, w, h, d, faces?, tone?, ry? }
- * (y = centre; ry: turn about +y, for blocks laid out along a non-grid street), with the per-instance `box` attribute
- * (size + a spread seed carrying the building's tone in its fraction) that lays each wall out in whole window bays,
- * and `faces`: the WALL_KINDS of the box's -x, +x, -z & +z walls (storefront fronts all round when omitted).
- */
+// Axis-aligned landmark boxes, with dimensions and a seed for whole-bay facade layouts.
 function createFacadeBoxes(material, boxes) {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const box = new THREE.InstancedBufferAttribute(new Float32Array(boxes.length * 4), 4);
-  const faces = new THREE.InstancedBufferAttribute(new Float32Array(boxes.length * 4), 4);
   geometry.setAttribute('box', box);
-  geometry.setAttribute('faces', faces);
 
   const mesh = new THREE.InstancedMesh(geometry, material, boxes.length);
   const matrix = new THREE.Matrix4();
-  const pos = new THREE.Vector3();
-  const quat = new THREE.Quaternion();
-  const scale = new THREE.Vector3();
-  const up = new THREE.Vector3(0, 1, 0);
   boxes.forEach((b, i) => {
-    if (b.ry) mesh.setMatrixAt(i, matrix.compose(pos.set(b.x, b.y, b.z), quat.setFromAxisAngle(up, b.ry), scale.set(b.w, b.h, b.d)));
-    else mesh.setMatrixAt(i, matrix.makeScale(b.w, b.h, b.d).setPosition(b.x, b.y, b.z));
-    box.setXYZW(i, b.w, b.h, b.d, ((i * 29) % 1000) + 0.1 + 0.8 * (b.tone ?? 0.5));
-    if (b.faces) faces.setXYZW(i, b.faces[0], b.faces[1], b.faces[2], b.faces[3]);
+    mesh.setMatrixAt(i, matrix.makeScale(b.w, b.h, b.d).setPosition(b.x, b.y, b.z));
+    box.setXYZW(i, b.w, b.h, b.d, ((i * 29) % 1000) + 0.5);
   });
   return mesh;
 }
@@ -1183,9 +1331,7 @@ function createChryslerCrownMaterial() {
   return mat;
 }
 
-/**
- * GTA 6-Style Metallic Clearcoat Vehicle Paint TSL Material
- */
+// Vehicle paint with Fresnel reflections and a sharp sun highlight.
 function createCarPaintMaterial(baseHex = 0xffc218) {
   if (_carPaintCache.has(baseHex)) return _carPaintCache.get(baseHex);
   const mat = new THREE.MeshStandardNodeMaterial({
@@ -1261,10 +1407,6 @@ const TREE_WIND = vec2(0.86, 0.51);
  * (shadows follow), branches bob and leaves flutter.
  */
 function createTreeMaterial(leafAtlas) {
-  // The alpha test is given as nodes (alphaTestNode on the scene pass, maskShadowNode in the shadow maps) rather than
-  // `alphaTest`: the shadow passes copy each caster's `alphaTest` onto one shared shadow material, and every switch
-  // between 0 and > 0 bumps its version, which made three.js re-hash the node graphs of all the casters' shadow render
-  // objects every frame (~10 ms of CPU). The trees were the only alpha-tested casters.
   const mat = new TreeNodeMaterial({
     side: THREE.DoubleSide,
     alphaToCoverage: true,
@@ -1303,8 +1445,7 @@ function createTreeMaterial(leafAtlas) {
 
   // Coverage: leaf cards from the atlas; bark is opaque from outside (its back faces are dropped)
   const alpha = mix(float(frontFacing), leaf.a, isLeaf);
-  mat.alphaTestNode = float(0.5);
-  mat.maskShadowNode = alpha.greaterThan(0.5);
+  mat.alphaTest = 0.5;
 
   mat.colorNode = Fn(() => {
     // Leaves: per-tree tint x atlas brightness, a share of sun-yellowed and of cooler leaves, brown twigs & stalks,
@@ -1480,24 +1621,30 @@ function createParkWallMaterial() {
 }
 
 /**
- * Black Cast-Iron Park Fence TSL Material for flat fence strips (alpha-tested pickets, posts & rails).
- * uv.x = metres along the fence, uv.y = 0 (ground) .. 1 (top). Sub-pixel pickets fade out with distance.
+ * Black Cast-Iron Park Fence TSL Material for flat fence strips.
+ * uv.x = metres along the fence, uv.y = 0 (ground) .. 1 (top). Filtered coverage keeps sub-pixel ironwork stable.
  */
 function createIronFenceMaterial() {
   const mat = new THREE.MeshStandardNodeMaterial({
     metalness: 0.55,
     roughness: 0.5,
-    side: THREE.DoubleSide
+    side: THREE.DoubleSide,
+    alphaToCoverage: true
   });
-  mat.alphaTest = 0.5;
 
   mat.colorNode = Fn(() => {
     const u = uv().x;
     const v = uv().y;
-    const picket = lineAA(fract(u.div(0.13)).sub(0.5), 0.1).mul(step(v, 0.985));
-    const post = lineAA(fract(u.div(2.6).add(0.5)).sub(0.5), 0.017);
-    const rails = max(lineAA(v.sub(0.9), 0.028), lineAA(v.sub(0.12), 0.022));
-    const alpha = clamp(max(max(picket, post), rails), 0.0, 1.0);
+    const fw = fwidth(uv()).max(0.0001).toVar();
+    const picketCoord = u.div(0.13);
+    const postCoord = u.div(2.6).add(0.5);
+    const picket = filteredPulse(fract(picketCoord), 0.4, 0.6, fw.x.div(0.13))
+      .mul(clamp(float(0.985).sub(v).div(fw.y).add(0.5), 0.0, 1.0));
+    const post = filteredPulse(fract(postCoord), 0.483, 0.517, fw.x.div(2.6));
+    const rails = filteredPulse(v, 0.872, 0.928, fw.y).add(filteredPulse(v, 0.098, 0.142, fw.y));
+    const vertical = clamp(picket.add(post), 0.0, 1.0);
+    // Keep fractional coverage for the multisampled scene pass; alpha testing would erase distant pickets.
+    const alpha = float(1.0).sub(float(1.0).sub(vertical).mul(float(1.0).sub(rails)));
     return vec4(color(0x171a17), alpha);
   })();
 
@@ -1649,11 +1796,118 @@ function roadWetMasks(field, drainage = 0.0) {
 }
 
 /**
- * Unified Manhattan Roadway Asphalt, Footprint-Filtered Aggregate `bumpNormal`, Scattered Manholes
- * & Post-Rain Wetness (upgraded with techniques from CityGenerator.js `createRoadMaterial`).
- * cityUniforms.uRoadWetness drives damp stains, a glossy wet film & standing puddles (roadWetMasks): bone dry at
- * midday, a few small pools at golden hour, slick & mirroring the lights at night. Water's Fresnel rides on metalness
- * (as for the rivers), so puddles reflect the street through SSR at grazing angles yet only darken seen from above.
+ * `detail()` where `active` holds, else `flat`, the value the detail's own fade settles to: texture that the pixel
+ * footprint or the distance has faded out is skipped instead of computed and multiplied by zero. Call inside a Fn, with
+ * every input that is shared with other code or takes derivatives already in a variable.
+ */
+function fadedDetail(active, flat, detail) {
+  const out = float(flat).toVar();
+  If(active, () => {
+    out.assign(detail());
+  });
+  return out;
+}
+
+// Distance from p to the nearest border of its jittered 3x3 Voronoi cell (in cell units, ~(F2 - F1) / 2)
+const voronoiBorder = Fn(([p]) => {
+  const pv = vec2(p).toVar();
+  const ip = floor(pv).toVar();
+  const fp = fract(pv).toVar();
+  const f1 = float(8.0).toVar();
+  const f2 = float(8.0).toVar();
+  for (let j = -1; j <= 1; j++) {
+    for (let i = -1; i <= 1; i++) {
+      const id = ip.add(vec2(i, j));
+      const site = vec2(i, j).add(vec2(hash2D(id), hash2D(id.add(vec2(37.1, 11.7)))).mul(0.8).add(0.1));
+      const d = length(fp.sub(site)).toVar();
+      f2.assign(min(f2, max(f1, d)));
+      f1.assign(min(f1, d));
+    }
+  }
+  return f2.sub(f1).mul(0.5);
+});
+
+/**
+ * Wear & repairs of the asphalt at world xz, `px` metres a pixel: x = hairline crack coverage (block & alligator
+ * cracking in worn stretches), y = signed distance to the edge of a rectangular utility-cut patch (m, < 0 inside),
+ * z = pothole depth (0 .. 1 at the bottom of the bowl), w = 1 where the 11 m cell has a patch.
+ * Cracks are only traced near the camera and in the worn stretches, where they can show, potholes only in their cells.
+ */
+const roadWear = Fn(([wxz, px]) => {
+  // Worn stretches: about a quarter of the roadway, in patches a block or so across
+  const worn = smoothstep(0.5, 0.78, noise2D(wxz.mul(0.045).add(71.0))).toVar();
+
+  const crack = float(0.0).toVar();
+  If(worn.greaterThan(0.001).and(px.lessThan(0.04)), () => {
+    const warp = vec2(noise2D(wxz.mul(2.7)), noise2D(wxz.mul(2.7).add(13.0))).sub(0.5).mul(0.35);
+    const cell = 0.55;
+    const border = voronoiBorder(wxz.div(cell).add(warp)).mul(cell);
+    const width = worn.mul(0.0016).add(0.0012);
+    const effWidth = max(width, px.mul(0.6));
+    crack.assign(float(1.0).sub(smoothstep(effWidth, effWidth.add(px), border)).mul(width.div(effWidth)).mul(worn)
+      .mul(smoothstep(0.04, 0.015, px)));
+  });
+
+  // Rectangular utility-cut patches (ConEd, water & sewer trenches): one 11 m cell in two, kept inside its cell. Some
+  // are squarish cuts, others long narrow trenches running along the avenue or across it
+  const pCell = floor(wxz.div(11.0));
+  const hasPatch = step(0.5, hash2D(pCell.add(vec2(3.7, 8.1))));
+  const trench = step(0.6, hash2D(pCell.add(vec2(2.9, 6.3))));
+  const alongX = step(0.5, hash2D(pCell.add(vec2(5.5, 9.9))));
+  const pCentre = pCell.add(0.5).add(vec2(hash2D(pCell.add(vec2(1.3, 5.9))), hash2D(pCell.add(vec2(9.2, 2.4)))).sub(0.5)
+    .mul(mix(float(0.4), float(0.08), trench))).mul(11.0);
+  const cutHalf = vec2(hash2D(pCell.add(vec2(4.4, 0.6))).mul(1.8).add(0.6), hash2D(pCell.add(vec2(7.8, 3.1))).mul(1.4).add(0.5));
+  const trenchLong = hash2D(pCell.add(vec2(0.7, 4.8))).mul(2.0).add(2.4);
+  const trenchNarrow = hash2D(pCell.add(vec2(6.6, 7.2))).mul(0.25).add(0.3);
+  const trenchHalf = mix(vec2(trenchNarrow, trenchLong), vec2(trenchLong, trenchNarrow), alongX);
+  const pHalf = mix(cutHalf, trenchHalf, trench);
+  const pq = abs(wxz.sub(pCentre)).sub(pHalf);
+  const patchDist = max(pq.x, pq.y);
+
+  // Potholes, mostly in the worn stretches: a ragged bowl a hand or two across
+  const hCell = floor(wxz.div(7.0)).toVar();
+  const hCentre = hCell.add(vec2(hash2D(hCell.add(vec2(2.2, 7.7))), hash2D(hCell.add(vec2(6.1, 1.9)))).mul(0.6).add(0.2)).mul(7.0);
+  const pothole = float(0.0).toVar();
+  If(hash2D(hCell.add(vec2(8.8, 0.3))).greaterThanEqual(float(0.975).sub(worn.mul(0.12))), () => {
+    const hRadius = hash2D(hCell.add(vec2(5.3, 4.2))).mul(0.24).add(0.12);
+    const hDist = length(wxz.sub(hCentre)).mul(noise2D(wxz.mul(6.0)).sub(0.5).mul(0.5).add(1.0));
+    pothole.assign(smoothstep(hRadius.add(px), hRadius.mul(0.35), hDist));
+  });
+
+  return vec4(crack.mul(float(1.0).sub(step(patchDist, 0.0).mul(hasPatch))), patchDist, pothole, hasPatch);
+});
+
+/**
+ * "Tar snakes" at world xz, `px` metres a pixel: the meandering 3-5 cm bands of black crack sealant the city pours over
+ * the wider cracks, in a broken network of ~2.4 m cells across sealed stretches of the roadway. Wide enough to read
+ * from the car, so they are traced further than the hairline cracks, thinning out before they shrink below a pixel.
+ */
+const roadTarSnakes = Fn(([wxz, px]) => {
+  const zone = smoothstep(0.3, 0.48, noise2D(wxz.mul(0.03).add(17.0))).toVar();
+  const snake = float(0.0).toVar();
+  If(zone.greaterThan(0.001).and(px.lessThan(0.12)), () => {
+    const warp = vec2(noise2D(wxz.mul(0.9)), noise2D(wxz.mul(0.9).add(31.0))).sub(0.5).mul(0.6);
+    const cell = 2.4;
+    const border = voronoiBorder(wxz.div(cell).add(warp)).mul(cell);
+    // Only some cracks were sealed: the network breaks up into runs a few metres long
+    const keep = smoothstep(0.38, 0.5, noise2D(wxz.mul(0.6).add(5.0)));
+    const width = noise2D(wxz.mul(1.7).add(9.0)).mul(0.012).add(0.014);
+    const effWidth = max(width, px.mul(0.6));
+    snake.assign(float(1.0).sub(smoothstep(effWidth, effWidth.add(px), border)).mul(width.div(effWidth)).mul(zone).mul(keep)
+      .mul(smoothstep(0.12, 0.06, px)));
+  });
+  return snake;
+});
+
+/**
+ * Unified Manhattan Roadway Asphalt, Footprint-Filtered Aggregate `bumpNormal`, Scattered Manholes, Wear & Repairs
+ * (block cracking, tar-sealed utility-cut patches & trenches, potholes, tar snakes, oil drips, exposed stone chips, a
+ * gentle swell of the paving; see roadWear & roadTarSnakes) & Post-Rain Wetness (upgraded with techniques from
+ * CityGenerator.js `createRoadMaterial`).
+ * cityUniforms.uRoadWetness drives damp stains, a faint wet sheen & standing puddles (roadWetMasks): bone dry at
+ * midday, a few small pools at golden hour, glossy stains & pools mirroring the lights at night. Water's Fresnel rides
+ * on metalness (as for the rivers), so puddles reflect the street through SSR at grazing angles yet only darken seen
+ * from above.
  * Lane markings are separate geometry built from the road network (js/road-paint.js).
  */
 function createRoadSurfaceMaterial() {
@@ -1662,18 +1916,58 @@ function createRoadSurfaceMaterial() {
     roughness: 0.48
   });
 
-  const cAsphaltDark = color(0x2b2e33);
-  const cAsphaltLight = color(0x464a51);
+  // Weathered, oxidised asphalt (fresh blacktop only in the newer patches)
+  const cAsphaltDark = color(0x3d3f43);
+  const cAsphaltLight = color(0x686a6e);
   const cManhole = color(0x4a433c);
+  const cOldPatch = color(0x77787a);
 
-  // Puddle field & wetness masks shared by every channel below (each node is generated once per fragment)
-  const puddleField = roadPuddleField(positionWorld.x, positionWorld.z);
+  // World size of a pixel: fine texture settles to its mean before it can alias at grazing angles or from the air
+  const pixelSize = length(fwidth(positionWorld.xz));
+  // Cracks, utility-cut patches & potholes, shared by every channel below (see roadWear)
+  const wear = roadWear(positionWorld.xz, pixelSize);
+  const crack = wear.x;
+  const patchDist = wear.y;
+  const pothole = wear.z;
+  const patchCover = smoothstep(pixelSize, pixelSize.negate(), patchDist).mul(wear.w);
+  // The tar sealing the saw-cut edge of each patch, a few centimetres wide
+  const sealWidth = max(float(0.022), pixelSize.mul(0.75));
+  const patchSeal = float(1.0).sub(smoothstep(sealWidth, sealWidth.add(pixelSize), abs(patchDist))).mul(float(0.022).div(sealWidth)).mul(wear.w);
+  // Fresh patches are darker & tighter than the roadway, old ones paler & greyer
+  const patchFresh = step(0.55, hash2D(floor(positionWorld.xz.div(11.0)).add(vec2(12.9, 6.6))));
+  // Exposed light stone chips in the worn surface, settling to their average where they shrink below a pixel
+  const chips = Fn(() => {
+    const px = float(pixelSize).toVar();
+    return fadedDetail(px.lessThan(0.03), 0.035, () =>
+      mix(float(0.035), smoothstep(0.72, 0.8, noise2D(positionWorld.xz.mul(30.0))), smoothstep(0.03, 0.012, px)));
+  })();
+  // Tar-snake crack sealant (none over the newer patches)
+  const tarSnake = roadTarSnakes(positionWorld.xz, pixelSize).mul(float(1.0).sub(patchCover));
+  // Oil & coolant drips from parked & idling cars: ragged dark blots a hand or two across, one 2.5 m cell in three
+  const oilDrip = Fn(() => {
+    const px = float(pixelSize).toVar();
+    const oilCell = floor(positionWorld.xz.div(2.5)).toVar();
+    return fadedDetail(hash2D(oilCell.add(vec2(7.7, 3.3))).greaterThanEqual(0.66), 0.0, () => {
+      const oilCentre = oilCell.add(vec2(hash2D(oilCell.add(vec2(4.1, 2.2))), hash2D(oilCell.add(vec2(8.3, 6.7)))).mul(0.6).add(0.2)).mul(2.5);
+      const oilDist = length(positionWorld.xz.sub(oilCentre)).mul(noise2D(positionWorld.xz.mul(5.0)).sub(0.5).mul(0.8).add(1.0));
+      const oilRadius = hash2D(oilCell.add(vec2(1.9, 9.4))).mul(0.25).add(0.1);
+      return smoothstep(oilRadius.add(px), oilRadius.mul(0.3), oilDist).mul(hash2D(oilCell.add(vec2(2.6, 5.1))).mul(0.6).add(0.4));
+    });
+  })();
+
+  // Circular cast-iron ConEd / NYC Sewer manhole covers scattered over the roadway (one 14 m cell in three)
+  const mhCell = floor(positionWorld.xz.div(14.0));
+  const mhCentre = mhCell.add(vec2(hash2D(mhCell.add(13.7)), hash2D(mhCell.add(29.1))).mul(0.6).add(0.2)).mul(14.0);
+  const mhDist = length(positionWorld.xz.sub(mhCentre));
+  const hasManhole = step(0.66, hash2D(mhCell));
+
+  // Puddle field & wetness masks shared by every channel below (each node is generated once per fragment); potholes
+  // hold water first
+  const puddleField = roadPuddleField(positionWorld.x, positionWorld.z).add(pothole.mul(0.45));
   const wet = roadWetMasks(puddleField);
   const damp = wet.x;
   const puddle = wet.y;
   const film = wet.z;
-  // World size of a pixel: fine texture settles to its mean before it can alias at grazing angles or from the air
-  const pixelSize = length(fwidth(positionWorld.xz));
   const viewDir = normalize(cameraPosition.sub(positionWorld));
   const waterFresnel = pow(float(1.0).sub(clamp(viewDir.y, 0.0, 1.0)), 5.0).mul(0.98).add(0.02);
 
@@ -1682,56 +1976,107 @@ function createRoadSurfaceMaterial() {
   mat.colorNode = Fn(() => {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
-    const camDist = length(positionWorld.sub(cameraPosition));
-    const detail = smoothstep(240.0, 22.0, camDist);
+    const px = float(pixelSize).toVar();
+    const camDist = length(positionWorld.sub(cameraPosition)).toVar();
+    const detail = smoothstep(240.0, 22.0, camDist).toVar();
 
     // Two-scale aggregate grit, patchwork pours, oily wear stains & tar crack seams
-    const microAggregate = mix(float(0.5), noise2D(vec2(wx.mul(16.0), wz.mul(16.0))), smoothstep(0.06, 0.02, pixelSize));
-    const fineGrain = mix(float(0.5), noise2D(vec2(wx.mul(3.2), wz.mul(3.2))), smoothstep(0.4, 0.12, pixelSize));
+    const microAggregate = fadedDetail(px.lessThan(0.06), 0.5, () =>
+      mix(float(0.5), noise2D(vec2(wx.mul(16.0), wz.mul(16.0))), smoothstep(0.06, 0.02, px)));
+    const fineGrain = fadedDetail(px.lessThan(0.4), 0.5, () =>
+      mix(float(0.5), noise2D(vec2(wx.mul(3.2), wz.mul(3.2))), smoothstep(0.4, 0.12, px)));
     const patchNoise = noise2D(vec2(wx.mul(0.18), wz.mul(0.18)));
-    const oilyStain = smoothstep(0.52, 0.84, noise2D(vec2(wx.mul(0.42), wz.mul(0.42)))).mul(detail);
+    const oilyStain = fadedDetail(camDist.lessThan(240.0), 0.0, () =>
+      smoothstep(0.52, 0.84, noise2D(vec2(wx.mul(0.42), wz.mul(0.42)))).mul(detail));
     const tarSeam = float(1.0).sub(smoothstep(0.0, 0.04, abs(patchNoise.sub(0.52)))).mul(0.42).mul(detail);
+    // Binder-rich (dark) & ravelled, aggregate-exposed (pale) mottling a stride or so across
+    const mottle = noise2D(vec2(wx.mul(0.9), wz.mul(0.9)).add(41.0)).mul(0.65).add(noise2D(vec2(wx.mul(2.3), wz.mul(2.3)).add(7.0)).mul(0.35));
 
     const baseAsphalt = mix(
       cAsphaltDark,
       cAsphaltLight,
-      fineGrain.mul(0.36).add(microAggregate.mul(0.22)).add(patchNoise.mul(0.26))
+      fineGrain.mul(0.3).add(microAggregate.mul(0.22)).add(patchNoise.mul(0.22)).add(smoothstep(0.3, 0.7, mottle).mul(0.26)).sub(0.04)
     )
       .mul(float(1.0).sub(oilyStain.mul(0.32)))
       .mul(float(1.0).sub(tarSeam));
 
-    // Circular cast-iron ConEd / NYC Sewer manhole covers scattered over the roadway (one 14 m cell in three)
-    const mhCell = floor(vec2(wx, wz).div(14.0));
-    const mhCentre = mhCell.add(vec2(hash2D(mhCell.add(13.7)), hash2D(mhCell.add(29.1))).mul(0.6).add(0.2)).mul(14.0);
-    const mhDist = length(vec2(wx, wz).sub(mhCentre));
-    const isManhole = float(1.0).sub(smoothstep(0.52, 0.60, mhDist)).mul(step(0.66, hash2D(mhCell))).mul(detail);
+    // Utility-cut patches with their tar-sealed edges, stone chips, tar snakes, oil drips, cracks & potholes
+    const patchCol = mix(mix(baseAsphalt, cOldPatch, 0.45).mul(1.08), color(0x2b2e33).mul(0.85), patchFresh);
+    const repaired = mix(baseAsphalt, patchCol, patchCover)
+      .mul(float(1.0).sub(patchSeal.mul(0.5)))
+      .add(chips.mul(0.08).mul(float(1.0).sub(patchCover.mul(patchFresh))))
+      .mul(float(1.0).sub(tarSnake.mul(0.62)))
+      .mul(float(1.0).sub(oilDrip.mul(0.45)))
+      .mul(float(1.0).sub(crack.mul(0.65)))
+      .mul(float(1.0).sub(pothole.mul(0.4)));
+
+    const isManhole = float(1.0).sub(smoothstep(0.52, 0.60, mhDist)).mul(hasManhole).mul(detail);
     const mhRings = sin(mhDist.mul(36.0)).mul(0.15).add(0.85);
 
     // Water filling the pores darkens the surface: damp stains & pools most, the overall wet film a little
     const wetDarkening = mix(mix(float(1.0), float(0.72), damp), float(0.6), puddle).mul(mix(float(1.0), float(0.8), film));
-    return mix(baseAsphalt, cManhole.mul(mhRings), isManhole).mul(wetDarkening);
+    return mix(repaired, cManhole.mul(mhRings), isManhole).mul(wetDarkening);
   })();
 
   mat.roughnessNode = Fn(() => {
-    const microRough = mix(float(0.04), noise2D(positionWorld.xz.mul(12.0)).mul(0.08), smoothstep(0.08, 0.03, pixelSize));
-    const wetRough = mix(float(0.90).add(microRough), float(0.38), max(film.mul(0.9), damp.mul(0.8)));
+    const px = float(pixelSize).toVar();
+    const microRough = fadedDetail(px.lessThan(0.08), 0.04, () =>
+      mix(float(0.04), noise2D(positionWorld.xz.mul(12.0)).mul(0.08), smoothstep(0.08, 0.03, px)));
+    // Tar sealant is glossier, oil satin, fresh patches a little tighter, potholes & cracks rougher
+    const dry = float(0.90).add(microRough)
+      .sub(patchSeal.mul(0.3))
+      .sub(tarSnake.mul(0.38))
+      .sub(oilDrip.mul(0.18))
+      .sub(patchCover.mul(patchFresh).mul(0.06))
+      .add(pothole.mul(0.06));
+    // The wet film only takes the edge off the asphalt's mattness (a soft sheen, too rough for SSR); real gloss is kept
+    // for the damp stains and the standing water
+    const filmed = mix(dry, float(0.68), film.mul(0.7));
+    const wetRough = mix(filmed, float(0.4), damp.mul(0.85));
     return mix(wetRough, float(0.1), puddle);
   })();
 
-  // Water's Fresnel (F0 = 0.02): weights SSR & trades diffuse for reflection in pools (fully) and the wet film (partly)
-  mat.metalnessNode = clamp(waterFresnel.mul(1.6), 0.0, 0.85).mul(max(puddle, film.mul(0.6)));
+  // Water's Fresnel (F0 = 0.02): weights SSR & trades diffuse for reflection in pools (fully), damp stains (partly) and
+  // the wet film (barely)
+  mat.metalnessNode = clamp(waterFresnel.mul(1.6), 0.0, 0.85).mul(max(puddle, max(damp.mul(0.35), film.mul(0.15))));
 
-  // Footprint-gated 3mm + 1.6mm asphalt aggregate relief via bumpNormal (from CityGenerator.js)
-  // Flattens to mirror-smooth 0.0 inside standing rainwater puddles so SSR reflections stay crisp!
+  // Footprint-gated asphalt relief via bumpNormal (from CityGenerator.js): a gentle swell & sag of the paving, shallow
+  // ruts & ripples, 6 mm ravelled coarse texture + 2.2 mm & 1.6 mm aggregate grit, stone chips, hairline cracks, raised
+  // patches with their tar seals, tar-snake beads, pothole bowls and the manhole covers' rims & rings. Steps ramp over
+  // >= 2 px so no edge sparkles; the finest relief fades before it shrinks to a pixel. Flattens to mirror-smooth 0.0
+  // inside standing rainwater puddles so SSR reflections stay crisp!
   mat.normalNode = Fn(() => {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
-    const coarseFade = smoothstep(0.08, 0.025, pixelSize);
-    const fineFade = smoothstep(0.02, 0.006, pixelSize).mul(float(1.0).sub(film.mul(0.6)));
+    const px = float(pixelSize).toVar();
+    const coarseFade = smoothstep(0.12, 0.035, px).toVar();
+    const midFade = smoothstep(0.035, 0.012, px).toVar();
+    const fineFade = smoothstep(0.02, 0.006, px).mul(float(1.0).sub(film.mul(0.6))).toVar();
+    const ramp = max(float(0.012), px.mul(2.0));
 
-    const coarseGrit = noise2D(vec2(wx.mul(8.5), wz.mul(8.5))).sub(0.5).mul(0.0032).mul(coarseFade);
-    const fineGrit = noise2D(vec2(wx.mul(36.0), wz.mul(36.0))).sub(0.5).mul(0.0016).mul(fineFade);
-    return bumpNormal(coarseGrit.add(fineGrit).mul(float(1.0).sub(puddle)));
+    const swell = noise2D(vec2(wx.mul(0.55), wz.mul(0.55)).add(23.0)).sub(0.5).mul(0.02)
+      .add(noise2D(vec2(wx.mul(1.9), wz.mul(1.9))).sub(0.5).mul(0.005));
+    const ripples = fadedDetail(px.lessThan(0.3), 0.0, () =>
+      noise2D(vec2(wx.mul(3.6), wz.mul(3.6)).add(61.0)).sub(0.5).mul(0.004).mul(smoothstep(0.3, 0.1, px)));
+    const coarseGrit = fadedDetail(px.lessThan(0.12), 0.0, () =>
+      noise2D(vec2(wx.mul(8.5), wz.mul(8.5))).sub(0.5).mul(0.006).mul(coarseFade));
+    const midGrit = fadedDetail(px.lessThan(0.035), 0.0, () =>
+      noise2D(vec2(wx.mul(19.0), wz.mul(19.0)).add(3.0)).sub(0.5).mul(0.0022).mul(midFade));
+    const fineGrit = fadedDetail(px.lessThan(0.02), 0.0, () =>
+      noise2D(vec2(wx.mul(36.0), wz.mul(36.0))).sub(0.5).mul(0.0016).mul(fineFade));
+    const chipRelief = chips.mul(0.0015).mul(midFade);
+    const snakeBead = tarSnake.mul(0.0018);
+    const crackGroove = crack.mul(0.003).mul(smoothstep(0.012, 0.004, px));
+    const patchStep = smoothstep(ramp, ramp.negate(), patchDist).mul(wear.w).mul(0.004);
+    const sealBead = float(1.0).sub(smoothstep(0.0, max(float(0.03), ramp), abs(patchDist))).mul(wear.w).mul(0.0015);
+    const bowl = pothole.mul(0.03);
+    const mhRim = float(1.0).sub(smoothstep(0.0, max(float(0.02), ramp), abs(mhDist.sub(0.58)))).mul(0.004);
+    const mhPattern = sin(mhDist.mul(36.0)).mul(0.0008).mul(step(mhDist, 0.54)).mul(smoothstep(0.01, 0.004, px));
+    const manhole = mhPattern.sub(mhRim).mul(hasManhole).mul(coarseFade);
+
+    const height = swell.add(ripples).add(coarseGrit).add(midGrit).add(fineGrit).add(chipRelief).add(snakeBead).sub(crackGroove)
+      .add(patchStep).add(sealBead).sub(bowl).add(manhole);
+    return bumpNormal(height.mul(float(1.0).sub(puddle)));
   })();
 
   mat.emissiveNode = Fn(() => {
@@ -1740,12 +2085,16 @@ function createRoadSurfaceMaterial() {
 
     const roadFresnel = pow(clamp(float(1.0).sub(abs(viewDir.y)), 0.0, 1.0), 2.3);
 
-    const skyMirror = mix(cityUniforms.uSkyHorizonColor, cityUniforms.uSkyTopColor, 0.40).mul(0.10);
+    const skyMirror = mix(cityUniforms.uSkyHorizonColor, cityUniforms.uSkyTopColor, 0.40).mul(0.10).toVar();
 
-    const tsDist = clamp(float(1.0).sub(length(vec2(wx.add(212.0), wz.add(45.0))).div(145.0)), 0.0, 1.0);
-    const neonPatch = noise2D(vec2(wx.mul(0.15), wz.mul(0.15)));
-    const neonCol = mix(color(0xff2a85), color(0x2ad4ff), neonPatch).mul(0.32);
-    const reflectCol = mix(skyMirror, neonCol, tsDist.mul(0.65));
+    // Neon tint only within reach of Times Square
+    const tsDist = clamp(float(1.0).sub(length(vec2(wx.add(212.0), wz.add(45.0))).div(145.0)), 0.0, 1.0).toVar();
+    const reflectCol = vec3(skyMirror).toVar();
+    If(tsDist.greaterThan(0.0), () => {
+      const neonPatch = noise2D(vec2(wx.mul(0.15), wz.mul(0.15)));
+      const neonCol = mix(color(0xff2a85), color(0x2ad4ff), neonPatch).mul(0.32);
+      reflectCol.assign(mix(skyMirror, neonCol, tsDist.mul(0.65)));
+    });
 
     return reflectCol.mul(max(puddle, film.mul(0.35))).mul(roadFresnel).mul(cityUniforms.uInteriorGlow).mul(0.07);
   })();
@@ -1759,7 +2108,10 @@ function createRoadSurfaceMaterial() {
  * Strips thinner than ~1.5 px are widened on screen and faded to match (phone-wire AA) and dashes are box-filtered,
  * so distant markings fade out smoothly instead of breaking up and flickering. Worn, and dark & glossy in puddles.
  */
+let _roadPaintMaterial = null;
+
 function createRoadPaintMaterial() {
+  if (_roadPaintMaterial) return _roadPaintMaterial;
   const mat = new THREE.MeshStandardNodeMaterial({
     vertexColors: true,
     transparent: true,
@@ -1774,9 +2126,9 @@ function createRoadPaintMaterial() {
 
   // How much to widen the strip so it is at least 1.5 px wide on screen (1 when it already is)
   const widen = Fn(() => {
-    const viewProjection = cameraProjectionMatrix.mul(cameraViewMatrix);
-    const edge = viewProjection.mul(vec4(positionGeometry, 1.0));
-    const centre = viewProjection.mul(vec4(positionGeometry.sub(sideOffset), 1.0));
+    const toClip = (p) => cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(p, 1.0)));
+    const edge = toClip(positionGeometry).toVar();
+    const centre = toClip(positionGeometry.sub(sideOffset)).toVar();
     const halfWidthPx = length(edge.xy.div(edge.w).sub(centre.xy.div(centre.w)).mul(screenSize).mul(0.5));
     const inFront = step(0.05, min(edge.w, centre.w));
     return clamp(float(0.75).div(max(halfWidthPx, 0.001)), 1.0, 16.0).mul(inFront).max(1.0);
@@ -1791,21 +2143,39 @@ function createRoadPaintMaterial() {
   const dashes = onSoFar(t.add(footprint.mul(0.5))).sub(onSoFar(t.sub(footprint.mul(0.5)))).div(footprint);
 
   const xz = positionWorld.xz;
-  const detail = smoothstep(70.0, 15.0, length(positionWorld.sub(cameraPosition)));
-  const wear = mix(float(0.5), noise2D(xz.mul(0.8)).mul(0.6).add(noise2D(xz.mul(2.3)).mul(0.4)), detail);
-  mat.opacityNode = dashes.mul(varying(float(1.0).div(widen))).mul(smoothstep(0.1, 0.6, wear).mul(0.4).add(0.55));
+  const camDist = length(positionWorld.sub(cameraPosition));
+  const detail = smoothstep(70.0, 15.0, camDist);
+  const distFade = smoothstep(1650.0, 1300.0, camDist);
+  const wear = Fn(() => {
+    const w = float(0.5).toVar();
+    If(detail.greaterThan(0.001), () => {
+      w.assign(mix(float(0.5), noise2D(xz.mul(0.8)).mul(0.6).add(noise2D(xz.mul(2.3)).mul(0.4)), detail));
+    });
+    return w;
+  })();
+  mat.opacityNode = dashes.mul(varying(float(1.0).div(widen))).mul(smoothstep(0.1, 0.6, wear).mul(0.4).add(0.55)).mul(distFade);
 
-  const wet = roadWetMasks(roadPuddleField(positionWorld.x, positionWorld.z)); // same pools & film as the asphalt
-  mat.colorNode = vec3(mix(float(1.0), float(0.72), wet.y).mul(mix(float(1.0), float(0.86), wet.z)));
-  mat.roughnessNode = mix(mix(float(0.62), float(0.42), wet.z), float(0.2), wet.y);
+  // Standing-water puddle mask is zero when uRoadWetness <= 0.1 (e.g. midday); evaluate once and share across channels
+  const puddle = Fn(() => {
+    const p = float(0.0).toVar();
+    If(cityUniforms.uRoadWetness.greaterThan(0.1), () => {
+      p.assign(roadWetMasks(roadPuddleField(positionWorld.x, positionWorld.z)).y);
+    });
+    return p;
+  })();
+  const film = smoothstep(0.2, 0.8, cityUniforms.uRoadWetness);
+  mat.colorNode = vec3(mix(float(1.0), float(0.72), puddle).mul(mix(float(1.0), float(0.86), film)));
+  mat.roughnessNode = mix(mix(float(0.62), float(0.42), film), float(0.2), puddle);
   mat.aoNode = canyonSkyAONode();
 
+  _roadPaintMaterial = mat;
   return mat;
 }
 
 /**
- * NYC Concrete Sidewalk Flagstones with Filter-Width Anti-Aliased 1.5m Scored Expansion Joints,
- * -12mm `bumpNormal` Groove Relief, Per-Flag Tone Variation & Post-Rain Damp Patches
+ * NYC Concrete Sidewalk Flags: 5 ft squares with filter-width anti-aliased 6 mm tooled joints (rounded `bumpNormal`
+ * grooves, trowelled margins & joint grime), per-flag tone, paler replacement flags, slightly heaved flags, hairline
+ * cracks, flattened chewing gum, weathering stains & Post-Rain Damp Patches
  * that follow cityUniforms.uRoadWetness like the roadway (better drained: fewer, smaller pools)
  * (Ported from SidewalkGenerator.js)
  */
@@ -1815,8 +2185,10 @@ function createSidewalkMaterial() {
     roughness: 0.88
   });
 
-  const cConcreteA = color(0x8e8d85);
-  const cConcreteB = color(0x73726b);
+  const cConcreteA = color(0xa7a197);
+  const cConcreteB = color(0x8e887e);
+  const cGumOld = color(0x77756f);
+  const cGumNew = color(0x34332f);
 
   // Damp patches & pools on the flags, shared by every channel below (own field; drains better than the roadway)
   const swField = noise2D(vec2(positionWorld.x.mul(0.14).add(7.4), positionWorld.z.mul(0.14).sub(13.1))).mul(0.65)
@@ -1826,51 +2198,125 @@ function createSidewalkMaterial() {
   const swFresnel = pow(float(1.0).sub(clamp(normalize(cameraPosition.sub(positionWorld)).y, 0.0, 1.0)), 5.0).mul(0.98).add(0.02);
   const pixelSize = length(fwidth(positionWorld.xz));
 
+  // 5 ft (1.524 m) flags poured in place: the flag, where in it (-0.5 .. 0.5) and how far to its tooled joints (m)
+  const FLAG = 1.524;
+  const wxz = positionWorld.xz;
+  const flagCoord = wxz.div(FLAG);
+  const flagId = floor(flagCoord);
+  const flagHash = hash2D(flagId);
+  const flagLocal = fract(flagCoord).sub(0.5);
+  const edgeDist = float(0.5).sub(max(abs(flagLocal.x), abs(flagLocal.y))).mul(FLAG);
+  // One flag in seven is a newer, paler replacement that hasn't collected the grime & gum of its neighbours yet
+  const replaced = step(0.86, flagHash);
+  // 6 mm tooled joints filled with dirt, the grime that collects either side of them and the smooth trowelled margin the
+  // jointing tool leaves beyond that (filter-width anti-aliased: each settles to its mean once below a pixel)
+  const gridBand = (halfWidth) => max(gridLine(positionWorld.x, FLAG, halfWidth), gridLine(positionWorld.z, FLAG, halfWidth));
+  const joints = gridBand(0.003);
+  const jointGrime = gridBand(0.018);
+  const tooledBand = gridBand(0.045).sub(jointGrime).max(0.0);
+
+  // Flattened chewing gum: a dark fresh blob here and there, grey ghosts of older ones, thickest on busy stretches.
+  // Only traced where blobs can show, and only the cells that have one
+  const gumCell = 0.32;
+  const gumCoord = wxz.div(gumCell);
+  const gumId = floor(gumCoord);
+  const gum = Fn(() => {
+    const px = float(pixelSize).toVar();
+    const notReplaced = float(1.0).sub(replaced.mul(0.8)).toVar();
+    const coord = vec2(gumCoord).toVar();
+    const id = vec2(gumId).toVar();
+    return fadedDetail(px.lessThan(0.04), 0.0, () => {
+      const gumDensity = smoothstep(0.3, 0.8, noise2D(wxz.mul(0.07).add(5.3))).mul(0.4).add(0.12).mul(notReplaced);
+      return fadedDetail(hash2D(id.add(vec2(7.7, 3.3))).greaterThanEqual(float(1.0).sub(gumDensity)), 0.0, () => {
+        const gumCentre = vec2(hash2D(id.add(vec2(11.3, 2.9))), hash2D(id.add(vec2(23.9, 17.4)))).mul(0.6).add(0.2);
+        const gumRadius = hash2D(id.add(vec2(4.1, 31.7))).mul(0.011).add(0.006);
+        const gumWobble = noise2D(coord.mul(9.0)).sub(0.5).mul(0.35).add(1.0);
+        const gumDist = length(fract(coord).sub(gumCentre)).mul(gumCell).mul(gumWobble);
+        const gumAA = max(px, 0.001);
+        return smoothstep(gumRadius.add(gumAA), gumRadius.sub(gumAA.mul(0.5)), gumDist).mul(smoothstep(0.04, 0.015, px));
+      });
+    });
+  })();
+  const gumAge = hash2D(gumId.add(vec2(19.1, 0.7)));
+
+  // Hairline settlement cracks across about one flag in eight, wandering a little
+  const crackAngle = hash2D(flagId.add(vec2(5.5, 1.3))).mul(Math.PI);
+  const crackOffset = hash2D(flagId.add(vec2(8.8, 6.2))).sub(0.5).mul(0.6);
+  const crackWander = noise2D(wxz.mul(7.0)).sub(0.5).mul(0.02).add(noise2D(wxz.mul(1.7).add(3.7)).sub(0.5).mul(0.07));
+  const crackDist = dot(flagLocal, vec2(cos(crackAngle), sin(crackAngle))).sub(crackOffset).mul(FLAG).add(crackWander);
+  const hasCrack = step(0.875, hash2D(flagId.add(vec2(41.7, 9.2)))).mul(float(1.0).sub(replaced));
+  const crack = lineAA(crackDist, 0.0012).mul(hasCrack).mul(smoothstep(0.004, 0.02, edgeDist));
+
   mat.aoNode = canyonSkyAONode();
 
   mat.colorNode = Fn(() => {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
-    const camDist = length(positionWorld.sub(cameraPosition));
-    const detail = smoothstep(190.0, 16.0, camDist);
+    const px = float(pixelSize).toVar();
+    const camDist = length(positionWorld.sub(cameraPosition)).toVar();
+    const detail = smoothstep(190.0, 16.0, camDist).toVar();
 
-    const panel = 1.5; // 5 ft NYC concrete sidewalk flags
-    const panelHash = hash2D(floor(vec2(wx.div(panel), wz.div(panel))));
+    // Pour-to-pour tone, broad traffic-worn & weathered stains, and fine exposed aggregate
     const tone = noise2D(vec2(wx.mul(0.48), wz.mul(0.48)));
-    const grit = noise2D(vec2(wx.mul(14.0), wz.mul(14.0))).sub(0.5).mul(0.08).mul(detail).mul(smoothstep(0.07, 0.02, pixelSize));
+    const stainField = noise2D(vec2(wx.mul(0.8), wz.mul(0.8)).add(17.0)).mul(0.65).add(noise2D(vec2(wx.mul(2.6), wz.mul(2.6))).mul(0.35));
+    const stain = smoothstep(0.52, 0.86, stainField).mul(mix(float(0.24), float(0.08), replaced));
+    const grit = fadedDetail(px.lessThan(0.07).and(camDist.lessThan(190.0)), 0.0, () =>
+      noise2D(vec2(wx.mul(14.0), wz.mul(14.0))).sub(0.5).mul(0.07).mul(detail).mul(smoothstep(0.07, 0.02, px)));
+    // Cloudy trowel & curing mottling a hand or two across
+    const mottle = fadedDetail(px.lessThan(0.15), 0.0, () =>
+      noise2D(vec2(wx.mul(3.1), wz.mul(3.1)).add(41.0)).mul(0.6).add(noise2D(vec2(wx.mul(7.3), wz.mul(7.3))).mul(0.4))
+        .sub(0.5).mul(0.12).mul(smoothstep(0.15, 0.05, px)));
+    const aggregate = fadedDetail(px.lessThan(0.02), 0.0, () =>
+      noise2D(vec2(wx.mul(55.0), wz.mul(55.0))).sub(0.5).mul(0.08).mul(smoothstep(0.02, 0.006, px)));
 
-    // Filter-width anti-aliased 1.5m scored joints
-    const joints = max(gridLine(wx, panel, 0.042), gridLine(wz, panel, 0.042)).mul(detail);
+    const flagTone = flagHash.sub(0.5).mul(0.2).add(1.0).mul(mix(float(1.0), float(1.1), replaced));
+    const concrete = mix(cConcreteB, cConcreteA, tone)
+      .mul(flagTone)
+      .mul(float(1.0).sub(stain))
+      .mul(mottle.add(1.0))
+      .add(grit.add(aggregate).mul(0.6))
+      .mul(tooledBand.mul(0.06).add(1.0))
+      .mul(float(1.0).sub(jointGrime.mul(0.18)));
+
+    const withGum = mix(concrete, mix(cGumNew, cGumOld, gumAge), gum.mul(mix(float(0.9), float(0.45), gumAge)));
+    const withJoints = withGum.mul(float(1.0).sub(joints.mul(0.55).mul(detail))).mul(float(1.0).sub(crack.mul(0.45)));
 
     // Post-rain damp patches, pools & the overall wet film darken the flags
-    const baseConcrete = mix(cConcreteB, cConcreteA, tone)
-      .mul(panelHash.sub(0.5).mul(0.16).add(1.0))
-      .add(grit)
+    return withJoints
       .mul(mix(float(1.0), float(0.72), max(swWet.x, swPuddle)))
       .mul(mix(float(1.0), float(0.8), swWet.z));
-
-    return baseConcrete.mul(float(1.0).sub(joints.mul(0.45)));
   })();
 
   mat.roughnessNode = Fn(() => {
-    const panelHash = hash2D(floor(vec2(positionWorld.x.div(1.5), positionWorld.z.div(1.5))));
-    const wetRough = mix(float(0.90).sub(panelHash.mul(0.06)), float(0.55), max(swWet.z, swWet.x.mul(0.7)));
+    const dry = float(0.9).sub(flagHash.mul(0.06)).sub(tooledBand.mul(0.1)).sub(gum.mul(0.25));
+    const wetRough = mix(dry, float(0.55), max(swWet.z, swWet.x.mul(0.7)));
     return mix(wetRough, float(0.2), swPuddle);
   })();
 
   // Water's Fresnel (F0 = 0.02) on pools & the wet film, as for the roadway
   mat.metalnessNode = clamp(swFresnel.mul(1.6), 0.0, 0.85).mul(max(swPuddle, swWet.z.mul(0.3)));
 
-  // Physical -12mm scored expansion joints + +3mm concrete aggregate grain via bumpNormal
+  // 6 mm tooled joint grooves with rounded edges, flags heaved a little out of true by tree roots & frost, hairline
+  // cracks, gum blobs and concrete grain via bumpNormal. Edges ramp over >= 2 px so nothing sparkles along the joints.
   mat.normalNode = Fn(() => {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
-    const camDist = length(positionWorld.sub(cameraPosition));
+    const px = float(pixelSize).toVar();
+    const camDist = length(positionWorld.sub(cameraPosition)).toVar();
     const detail = smoothstep(140.0, 14.0, camDist);
+    const rampPx = px.mul(2.0);
 
-    const joints = max(gridLine(wx, 1.5, 0.042), gridLine(wz, 1.5, 0.042));
-    const grain = noise2D(vec2(wx.mul(4.5), wz.mul(4.5))).sub(0.5).mul(0.003);
-    const height = grain.sub(joints.mul(0.012)).mul(detail).mul(float(1.0).sub(swPuddle));
+    const groove = float(1.0).sub(smoothstep(0.003, max(float(0.012), rampPx), edgeDist)).mul(0.006).mul(smoothstep(0.02, 0.006, px));
+    const tiltAngle = hash2D(flagId.add(vec2(2.3, 13.1))).mul(Math.PI * 2.0);
+    const tiltSlope = hash2D(flagId.add(vec2(29.3, 3.7))).mul(0.012).mul(float(1.0).sub(replaced));
+    const tilt = dot(flagLocal, vec2(cos(tiltAngle), sin(tiltAngle))).mul(FLAG).mul(tiltSlope)
+      .mul(smoothstep(0.0, max(float(0.06), px.mul(3.0)), edgeDist));
+    // The whole relief fades out with distance, so its grain is skipped beyond that
+    const grain = fadedDetail(camDist.lessThan(140.0), 0.0, () => noise2D(vec2(wx.mul(4.5), wz.mul(4.5))).sub(0.5).mul(0.003));
+    const pores = fadedDetail(px.lessThan(0.012), 0.0, () =>
+      noise2D(vec2(wx.mul(38.0), wz.mul(38.0))).sub(0.5).mul(0.0008).mul(smoothstep(0.012, 0.004, px)));
+    const height = grain.add(pores).add(tilt).sub(groove).sub(crack.mul(0.0015)).add(gum.mul(0.0008))
+      .mul(detail).mul(float(1.0).sub(swPuddle));
     return bumpNormal(height);
   })();
 
@@ -1893,14 +2339,15 @@ function createCurbMaterial() {
   mat.colorNode = Fn(() => {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
-    const camDist = length(positionWorld.sub(cameraPosition));
-    const detail = smoothstep(180.0, 16.0, camDist);
+    const camDist = length(positionWorld.sub(cameraPosition)).toVar();
+    const detail = smoothstep(180.0, 16.0, camDist).toVar();
 
     const tone = noise2D(vec2(wx.mul(0.6), wz.mul(0.6)));
-    const speckle = noise2D(vec2(wx.mul(18.0), wz.mul(18.0))).sub(0.5).mul(0.06).mul(detail);
+    const speckle = fadedDetail(camDist.lessThan(180.0), 0.0, () =>
+      noise2D(vec2(wx.mul(18.0), wz.mul(18.0))).sub(0.5).mul(0.06).mul(detail));
     const stone = mix(color(0x4c4c45), color(0x63635a), tone).add(speckle);
 
-    const joints = max(gridLine(wx, 1.5, 0.038), gridLine(wz, 1.5, 0.038)).mul(detail);
+    const joints = max(gridLine(wx, 1.5, 0.005), gridLine(wz, 1.5, 0.005)).mul(detail);
     const topFace = smoothstep(0.5, 0.85, normalWorldGeometry.y);
     const wetFilm = smoothstep(0.2, 0.8, cityUniforms.uRoadWetness); // rain-darkened granite, like the roadway's film
     return mix(stone.mul(0.68), stone, topFace).mul(float(1.0).sub(joints.mul(0.42))).mul(mix(float(1.0), float(0.78), wetFilm));
@@ -1911,10 +2358,10 @@ function createCurbMaterial() {
   mat.normalNode = Fn(() => {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
-    const camDist = length(positionWorld.sub(cameraPosition));
-    const detail = smoothstep(120.0, 12.0, camDist);
-    const grain = noise2D(vec2(wx.mul(5.5), wz.mul(5.5))).sub(0.5).mul(0.0022);
-    return bumpNormal(grain.mul(detail));
+    const camDist = length(positionWorld.sub(cameraPosition)).toVar();
+    const grain = fadedDetail(camDist.lessThan(120.0), 0.0, () =>
+      noise2D(vec2(wx.mul(5.5), wz.mul(5.5))).sub(0.5).mul(0.0022).mul(smoothstep(120.0, 12.0, camDist)));
+    return bumpNormal(grain);
   })();
 
   return mat;
@@ -2430,13 +2877,6 @@ function getWaterWaveTexture() {
   return tex;
 }
 
-// Share of the window [x - s, x + s] covered by the interval [a, b]: an exact box filter for bands & points of light
-const waterBoxCover = Fn(([x, a, b, s]) => {
-  const xv = float(x).toVar();
-  const sv = max(float(s), 0.001).toVar();
-  return clamp(min(xv.add(sv), b).sub(max(xv.sub(sv), a)).div(sv.mul(2.0)), 0.0, 1.0);
-});
-
 /**
  * Hudson River, East River, Upper Bay & Central Park Lakes: Physically Based Estuary Water TSL Material
  * - Wave normals (normalNode) from 4 rotated, scaled & drifting samples of the LEAN wave texture whose energy follows
@@ -2582,88 +3022,105 @@ function createWaterMaterial() {
   const CPB = CENTRAL_PARK_BOUNDS;
   const zSt = (n) => streetZ(n);
   mat.emissiveNode = Fn(() => {
+    const emit = vec3(0.0).toVar();
     const night = smoothstep(0.55, 1.35, cityUniforms.uInteriorGlow);
-    const P = positionWorld.xz;
-    const R = reflect(viewDir.negate(), waterNormal);
-    const horiz = max(length(R.xz), 0.001);
-    const dir = R.xz.div(horiz);
-    const tanEl = R.y.div(horiz);
-    const sgn = vec2(mix(float(-1.0), float(1.0), step(0.0, dir.x)), mix(float(-1.0), float(1.0), step(0.0, dir.y)));
-    const inv = sgn.div(max(abs(dir), vec2(0.0001))).toVar();
+    // Uniform time-of-day gate: skips reflection vector, derivatives & skyline raycast completely in daytime presets
+    If(night.greaterThan(0.0001), () => {
+      const P = positionWorld.xz;
+      // The analytic skyline only models the rivers along the detailed island: fade it out up the Hudson & Harlem River
+      // and down the Upper Bay, where its shorelines no longer match the boroughs
+      const region = smoothstep(IB.minZ - 400.0, IB.minZ - 100.0, P.y)
+        .mul(float(1.0).sub(smoothstep(IB.maxZ + 200.0, IB.maxZ + 600.0, P.y)));
+      const weight = night.mul(region);
 
-    // Nearest Manhattan face entered from outside
-    const tIsland = float(1e5).toVar();
-    for (const [x0, z0, x1, z1] of MANHATTAN_BOXES) {
-      const ta = vec2(x0, z0).sub(P).mul(inv);
-      const tb = vec2(x1, z1).sub(P).mul(inv);
-      const tn = max(min(ta.x, tb.x), min(ta.y, tb.y));
-      const tf = min(max(ta.x, tb.x), max(ta.y, tb.y));
-      tIsland.assign(min(tIsland, mix(float(1e5), tn, step(0.0, tn).mul(step(tn, tf)))));
-    }
-    // Across the rivers: the New Jersey waterfront to the west, Queens & Brooklyn to the east
-    const xWest = shoreAt(westShore, P.y).toVar();
-    const xEast = shoreAt(eastShore, P.y).toVar();
-    const tShoreRaw = mix(xWest, xEast, step(0.0, dir.x)).sub(P.x).mul(inv.x).toVar();
-    const tShore = mix(float(8000.0), clamp(tShoreRaw, 60.0, 8000.0), step(0.0, tShoreRaw)).toVar();
-    const onIsland = step(tIsland, tShore);
-    // Park lakes: the walls of buildings around Central Park's rectangle, seen from inside it
-    const ca = vec2(CPB.minX, CPB.minZ).sub(P).mul(inv);
-    const cb = vec2(CPB.maxX, CPB.maxZ).sub(P).mul(inv);
-    const tPark = clamp(min(max(ca.x, cb.x), max(ca.y, cb.y)), 60.0, 4200.0);
-    const lake = step(0.5, pond);
+      const R = reflect(viewDir.negate(), waterNormal);
+      const horiz = max(length(R.xz), 0.001);
+      const dir = R.xz.div(horiz).toVar();
+      const tanEl = R.y.div(horiz).toVar();
+      // Materialize derivatives in uniform control flow (.toVar() emits before the spatial region branch)
+      const fwPSum = fwidth(P.x.add(P.y)).toVar();
+      const fwDirSum = fwidth(dir.x.add(dir.y)).toVar();
+      const fwTanEl = fwidth(tanEl).toVar();
 
-    const tHit = mix(min(tIsland, tShore), tPark, lake).toVar();
-    const hit = P.add(dir.mul(tHit)).toVar();
-    const hRefl = tHit.mul(tanEl); // height up the facades that this reflection sees
-    const u = hit.x.add(hit.y); // runs along whichever face was hit
+      If(weight.greaterThan(0.0001), () => {
+        const sgn = vec2(mix(float(-1.0), float(1.0), step(0.0, dir.x)), mix(float(-1.0), float(1.0), step(0.0, dir.y)));
+        const inv = sgn.div(max(abs(dir), vec2(0.0001))).toVar();
 
-    // Skyline heights: Midtown (60th to 28th St) & the Financial District (south of Chambers St) stand tallest
-    const midtown = smoothstep(zSt(80), zSt(60), hit.y).mul(float(1.0).sub(smoothstep(zSt(28), zSt(14), hit.y)));
-    const manhattanS = mix(float(70.0), float(215.0), max(midtown, smoothstep(4400.0, 4950.0, hit.y)));
-    // Across the rivers: the Jersey City towers (Newport to Exchange Place) & Long Island City (opposite 60th-26th St)
-    const jerseyCity = smoothstep(3300.0, 3900.0, hit.y).mul(float(1.0).sub(smoothstep(6100.0, 6500.0, hit.y))).mul(step(hit.x, 0.0));
-    const lic = smoothstep(zSt(62), zSt(57), hit.y).mul(float(1.0).sub(smoothstep(zSt(30), zSt(25), hit.y))).mul(step(0.0, hit.x));
-    const S = mix(mix(mix(float(30.0), float(120.0), max(jerseyCity, lic)), manhattanS, onIsland), float(120.0), lake);
-    const brightness = mix(mix(float(0.6), float(1.0), onIsland), float(0.8), lake);
+        // Nearest Manhattan face entered from outside
+        const tIsland = float(1e5).toVar();
+        for (const [x0, z0, x1, z1] of MANHATTAN_BOXES) {
+          const ta = vec2(x0, z0).sub(P).mul(inv);
+          const tb = vec2(x1, z1).sub(P).mul(inv);
+          const tn = max(min(ta.x, tb.x), min(ta.y, tb.y));
+          const tf = min(max(ta.x, tb.x), max(ta.y, tb.y));
+          tIsland.assign(min(tIsland, mix(float(1e5), tn, step(0.0, tn).mul(step(tn, tf)))));
+        }
+        // Across the rivers: the New Jersey waterfront to the west, Queens & Brooklyn to the east
+        const xWest = shoreAt(westShore, P.y).toVar();
+        const xEast = shoreAt(eastShore, P.y).toVar();
+        const tShoreRaw = mix(xWest, xEast, step(0.0, dir.x)).sub(P.x).mul(inv.x).toVar();
+        const tShore = mix(float(8000.0), clamp(tShoreRaw, 60.0, 8000.0), step(0.0, tShoreRaw)).toVar();
+        const onIsland = step(tIsland, tShore);
+        // Park lakes: the walls of buildings around Central Park's rectangle, seen from inside it
+        const ca = vec2(CPB.minX, CPB.minZ).sub(P).mul(inv);
+        const cb = vec2(CPB.maxX, CPB.maxZ).sub(P).mul(inv);
+        const tPark = clamp(min(max(ca.x, cb.x), max(ca.y, cb.y)), 60.0, 4200.0);
+        const lake = step(0.5, pond);
 
-    // Footprint on the facades (m): unresolved slopes tilt the reflection ±2σ, laterally foreshortened at grazing views
-    const sigma2 = sqrt(variance).mul(2.0);
-    const sV = tHit.mul(sigma2).add(fwidth(hRefl)).add(0.5);
-    const sU = tHit.mul(sigma2).mul(max(viewDir.y, 0.05)).add(fwidth(u)).add(0.3);
+        const tHit = mix(min(tIsland, tShore), tPark, lake).toVar();
+        const hit = P.add(dir.mul(tHit)).toVar();
+        const hRefl = tHit.mul(tanEl); // height up the facades that this reflection sees
+        const u = hit.x.add(hit.y); // runs along whichever face was hit
 
-    // Lots 24 m wide with heights 0.3–1.3× the district skyline (averaged once a footprint spans several lots)
-    const lot = floor(u.div(24.0));
-    const r1 = hash2D(vec2(lot, 5.1));
-    const r2 = hash2D(vec2(lot, 9.7));
-    const r3 = hash2D(vec2(lot, 13.3));
-    const lotMix = smoothstep(5.0, 20.0, sU);
-    const upper = mix(waterBoxCover(hRefl, 4.5, S.mul(r1.mul(r1).add(0.3)), sV), waterBoxCover(hRefl, 4.5, S.mul(0.63), sV), lotMix);
-    const ground = waterBoxCover(hRefl, 0.0, 4.5, sV);
+        // Skyline heights: Midtown (60th to 28th St) & the Financial District (south of Chambers St) stand tallest
+        const midtown = smoothstep(zSt(80), zSt(60), hit.y).mul(float(1.0).sub(smoothstep(zSt(28), zSt(14), hit.y)));
+        const manhattanS = mix(float(70.0), float(215.0), max(midtown, smoothstep(4400.0, 4950.0, hit.y)));
+        // Across the rivers: the Jersey City towers (Newport to Exchange Place) & Long Island City (opposite 60th-26th St)
+        const jerseyCity = smoothstep(3300.0, 3900.0, hit.y).mul(float(1.0).sub(smoothstep(6100.0, 6500.0, hit.y))).mul(step(hit.x, 0.0));
+        const lic = smoothstep(zSt(62), zSt(57), hit.y).mul(float(1.0).sub(smoothstep(zSt(30), zSt(25), hit.y))).mul(step(0.0, hit.x));
+        const S = mix(mix(mix(float(30.0), float(120.0), max(jerseyCity, lic)), manhattanS, onIsland), float(120.0), lake);
+        const brightness = mix(mix(float(0.6), float(1.0), onIsland), float(0.8), lake);
 
-    // Lit windows (3.2 m bays × 3.6 m floors), resolving to each lot's mean occupancy, then the street's
-    const dens = mix(float(0.2), float(0.6), r2);
-    const bayF = u.div(3.2);
-    const floorF = hRefl.div(3.6);
-    const litWin = step(hash2D(floor(vec2(bayF, floorF)).add(lot.mul(0.731))), dens);
-    const pane = filteredPulse(fract(bayF), 0.16, 0.84, sU.div(3.2)).mul(filteredPulse(fract(floorF), 0.3, 0.88, sV.div(3.6)));
-    const winDetail = float(1.0).sub(smoothstep(0.7, 1.8, max(sU.div(3.2), sV.div(3.6))));
-    const windows = mix(mix(dens.mul(0.394), litWin.mul(pane), winDetail), float(0.4 * 0.394), lotMix);
-    const tint = mix(mix(color(0xffc58a), color(0xdde6ff), step(0.62, r3)), color(0xf6d3aa), lotMix);
-    const shopLit = mix(mix(float(0.1), float(1.0), step(0.35, r3)), float(0.7), lotMix);
+        // Footprint on the facades (m): unresolved slopes tilt the reflection ±2σ, laterally foreshortened at grazing views
+        const sigma2 = sqrt(variance).mul(2.0);
+        const fwH = tHit.mul(fwTanEl).add(abs(tanEl).mul(fwPSum));
+        const fwU = fwPSum.add(tHit.mul(fwDirSum));
+        const sV = tHit.mul(sigma2).add(fwH).add(0.5).toVar();
+        const sU = tHit.mul(sigma2).mul(max(viewDir.y, 0.05)).add(fwU).add(0.3).toVar();
 
-    // Riverside promenade / highway lamps every 30 m, heads at ~8.5 m
-    const lampDist = abs(fract(u.div(30.0)).sub(0.5)).mul(30.0);
-    const lampU = mix(waterBoxCover(lampDist, -0.45, 0.45, sU), float(0.9 / 30.0), smoothstep(5.0, 14.0, sU));
-    const lamps = lampU.mul(waterBoxCover(hRefl, 8.2, 8.8, sV)).mul(70.0);
+        // Lots 24 m wide with heights 0.3–1.3× the district skyline (averaged once a footprint spans several lots)
+        const lot = floor(u.div(24.0));
+        const r1 = hash2D(vec2(lot, 5.1));
+        const r2 = hash2D(vec2(lot, 9.7));
+        const r3 = hash2D(vec2(lot, 13.3));
+        const lotMix = smoothstep(5.0, 20.0, sU);
+        const upper = mix(boxCoverage(hRefl, 4.5, S.mul(r1.mul(r1).add(0.3)), sV), boxCoverage(hRefl, 4.5, S.mul(0.63), sV), lotMix);
+        const ground = boxCoverage(hRefl, 0.0, 4.5, sV);
 
-    const city = tint.mul(windows.mul(upper).mul(0.95))
-      .add(color(0xffcf9a).mul(ground.mul(shopLit).mul(0.4)))
-      .add(color(0xffd9b0).mul(lamps));
-    const treeline = mix(float(1.0), smoothstep(0.2, 0.42, tanEl), lake); // lake shores: only towers above the trees
-    // The analytic skyline only models the rivers along the detailed island: fade it out up the Hudson & Harlem River
-    // and down the Upper Bay, where its shorelines no longer match the boroughs
-    const region = smoothstep(IB.minZ - 400.0, IB.minZ - 100.0, P.y).mul(float(1.0).sub(smoothstep(IB.maxZ + 200.0, IB.maxZ + 600.0, P.y)));
-    return city.mul(brightness).mul(treeline).mul(fresnel).mul(night).mul(region);
+        // Lit windows (3.2 m bays × 3.6 m floors), resolving to each lot's mean occupancy, then the street's
+        const dens = mix(float(0.2), float(0.6), r2);
+        const bayF = u.div(3.2);
+        const floorF = hRefl.div(3.6);
+        const litWin = step(hash2D(floor(vec2(bayF, floorF)).add(lot.mul(0.731))), dens);
+        const pane = filteredPulse(fract(bayF), 0.16, 0.84, sU.div(3.2)).mul(filteredPulse(fract(floorF), 0.3, 0.88, sV.div(3.6)));
+        const winDetail = float(1.0).sub(smoothstep(0.7, 1.8, max(sU.div(3.2), sV.div(3.6))));
+        const windows = mix(mix(dens.mul(0.394), litWin.mul(pane), winDetail), float(0.4 * 0.394), lotMix);
+        const tint = mix(mix(color(0xffc58a), color(0xdde6ff), step(0.62, r3)), color(0xf6d3aa), lotMix);
+        const shopLit = mix(mix(float(0.1), float(1.0), step(0.35, r3)), float(0.7), lotMix);
+
+        // Riverside promenade / highway lamps every 30 m, heads at ~8.5 m
+        const lampDist = abs(fract(u.div(30.0)).sub(0.5)).mul(30.0);
+        const lampU = mix(boxCoverage(lampDist, -0.45, 0.45, sU), float(0.9 / 30.0), smoothstep(5.0, 14.0, sU));
+        const lamps = lampU.mul(boxCoverage(hRefl, 8.2, 8.8, sV)).mul(70.0);
+
+        const city = tint.mul(windows.mul(upper).mul(0.95))
+          .add(color(0xffcf9a).mul(ground.mul(shopLit).mul(0.4)))
+          .add(color(0xffd9b0).mul(lamps));
+        const treeline = mix(float(1.0), smoothstep(0.2, 0.42, tanEl), lake); // lake shores: only towers above the trees
+        emit.assign(city.mul(brightness).mul(treeline).mul(fresnel).mul(weight));
+      });
+    });
+    return emit;
   })();
 
   return mat;
@@ -3011,6 +3468,7 @@ function createCarFlareMaterial() {
 export {
   cityUniforms,
   WALL_KINDS,
+  filteredPulse,
   createCurtainWallMaterial,
   createPreWarBuildingMaterial,
   createFacadeBoxes,

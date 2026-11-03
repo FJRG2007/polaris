@@ -1,3 +1,5 @@
+import { polygonContains, polygonSegmentFraction } from './building-collision.js';
+
 // Cheap outdoor obstruction using the same static building bounds as movement. Nearby bounds are cached;
 // only audible voices trace them, a few times per second. This deliberately avoids mesh raycasts or audio-rate DSP.
 function thickness(c, ax, ay, az, bx, by, bz, allowEndInside = false) {
@@ -11,8 +13,10 @@ function thickness(c, ax, ay, az, bx, by, bz, allowEndInside = false) {
   }
   const minY = c.minY ?? 0, maxY = c.maxY;
   // A chase camera can briefly enter a conservative collision box. Do not silence the entire city in that case.
-  if (ax > minX && ax < maxX && az > minZ && az < maxZ && ay > minY && ay < maxY) return 0;
-  if (!allowEndInside && bx > minX && bx < maxX && bz > minZ && bz < maxZ && by > minY && by < maxY) return 0;
+  if (ax > minX && ax < maxX && az > minZ && az < maxZ && ay > minY && ay < maxY
+    && (!c.polygon || polygonContains(c.polygon, ax, az))) return 0;
+  if (!allowEndInside && bx > minX && bx < maxX && bz > minZ && bz < maxZ && by > minY && by < maxY
+    && (!c.polygon || polygonContains(c.polygon, bx, bz))) return 0;
   const dx = bx - ax, dy = by - ay, dz = bz - az;
   let enter = 0, exit = 1;
   if (Math.abs(dx) < 1e-7) {
@@ -33,7 +37,8 @@ function thickness(c, ax, ay, az, bx, by, bz, allowEndInside = false) {
     const a = (minY - ay) / dy, b = (maxY - ay) / dy;
     enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
   }
-  return Math.max(0, exit - enter) * Math.hypot(dx, dy, dz);
+  const fraction = c.polygon ? polygonSegmentFraction(c.polygon, ax, az, dx, dz, enter, exit) : Math.max(0, exit - enter);
+  return fraction * Math.hypot(dx, dy, dz);
 }
 
 class CityAcoustics {

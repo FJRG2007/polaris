@@ -229,6 +229,8 @@ body::after {
   overflow: hidden;
 }
 
+/* Filled through every start-up stage by engine/loading-screen.js (STAGES), as compositor transitions that keep moving
+   while a stage blocks the main thread */
 .loader-fill {
   position: absolute;
   inset: 0;
@@ -849,10 +851,6 @@ body.hud-minimized .icon-show {
   transition: transform 0.45s var(--ease-out), width 0.45s var(--ease-out);
 }
 
-.mode-switch.no-anim .mode-indicator {
-  transition: none;
-}
-
 .mode-btn {
   position: relative;
   z-index: 1;
@@ -981,7 +979,7 @@ body[data-mode='helicopter'] .gauge-alt {
   overflow: hidden;
 }
 
-/* Speed as a share of the mode's top speed; it turns taxi yellow on boost */
+/* Speed as a share of the mode's top speed */
 #hud-speed-meter {
   position: absolute;
   inset: 0;
@@ -989,11 +987,7 @@ body[data-mode='helicopter'] .gauge-alt {
   background: var(--text);
   transform-origin: left center;
   transform: scaleX(0);
-  transition: transform 0.25s linear, background-color 0.2s ease;
-}
-
-body.is-boosting #hud-speed-meter {
-  background: var(--taxi);
+  transition: transform 0.25s linear;
 }
 
 .camera-switch {
@@ -1417,8 +1411,7 @@ body.is-boosting #hud-speed-meter {
 }
 
 .touch-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 64px);
+  display: flex;
   gap: 10px;
   padding-bottom: 22px;
 }
@@ -1440,7 +1433,6 @@ body.is-boosting #hud-speed-meter {
   touch-action: none;
 }
 .touch-action > [aria-hidden] { font-size: 23px; line-height: 1; }
-.touch-boost { grid-column: 2; border-color: rgba(255, 194, 26, 0.65); color: var(--taxi); }
 .touch-action.is-pressed { color: var(--taxi-ink); background: var(--taxi); border-color: var(--taxi); }
 
 body.touch-enabled .controls-hint,
@@ -1744,4 +1736,71 @@ body.touch-enabled .pop-item { min-height: 44px; }
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A start-up failure or a lost graphics device: the bar and the tip give way to the explanation */
+#loading-overlay.is-failed .loader-steps,
+#loading-overlay.is-failed .loader-tip {
+  display: none;
+}
+
+#loading-overlay.is-failed .loader-status {
+  justify-content: center;
+  width: auto;
+  height: auto;
+  line-height: normal;
+}
+
+.loader-error-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: min(380px, calc(100vw - 32px));
+  margin-top: 12px;
+  padding: 16px 20px;
+  text-align: center;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow);
+}
+
+.loader-error-title {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--bad);
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.loader-error-desc {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.loader-reload-btn {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 8px 20px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.loader-reload-btn:hover {
+  background: var(--hover);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.loader-reload-btn:active {
+  transform: scale(0.97);
 }
