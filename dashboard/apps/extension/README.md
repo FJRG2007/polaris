@@ -118,8 +118,8 @@ one origin - no host permission is declared in the manifest, because a
 self-hosted server has no address known at build time and a wildcard would be
 asking to read every page you open.
 
-More than one Polaris is **Host**, in the account menu: the host in front is
-ticked, pressing another puts it in front, and **Manage hosts** adds one (the same
+More than one Polaris is **Server**, in the account menu: the server in front is
+ticked, pressing another puts it in front, and **Manage servers** adds one (the same
 address and permission as the first), renames one (a name of your own, up to 40
 characters, kept in this browser) or removes it. Each server keeps its own accounts, connection and
 vault session - switching sets the one in front aside rather than signing it out

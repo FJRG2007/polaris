@@ -34,8 +34,8 @@ describe("the popup's words", () => {
                 <Title />
             </WordsProvider>
         );
-        expect(screen.getByText("Manage hosts")).toBeTruthy();
+        expect(screen.getByText("Manage servers")).toBeTruthy();
         act(() => change("es-ES"));
-        expect(screen.getByText("Gestionar hosts")).toBeTruthy();
+        expect(screen.getByText("Gestionar servidores")).toBeTruthy();
     });
 });

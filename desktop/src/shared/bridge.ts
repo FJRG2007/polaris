@@ -219,6 +219,8 @@ export interface PolarisLocal {
         preferences(): Promise<{ readonly openAtLogin: boolean; readonly version: string; } | null>;
         /** Whether it took: the switch goes back when it did not. */
         setOpenAtLogin(open: boolean): Promise<boolean>;
+        /** Put the settings away. */
+        close(): Promise<void>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -350,6 +352,7 @@ export const CHANNELS = {
     connectRename: "local:connect-rename",
     connectRemove: "local:connect-remove",
     connectCheck: "local:connect-check",
+    connectClose: "local:connect-close",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

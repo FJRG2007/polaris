@@ -39,7 +39,7 @@ import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
-import { kindOf, openLocalWindow, openPolarisWindow } from "./windows";
+import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
 import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
 import { describeNetError, finishedLoad, netErrorCode } from "./reachability";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
@@ -50,6 +50,8 @@ const START = "/home";
 let current: string | null = null;
 let main: BrowserWindow | null = null;
 let connect: BrowserWindow | null = null;
+/** The settings laid over the Polaris window, when there is one to lay them on. */
+let sheet: LocalSheet | null = null;
 let loadError: string | null = null;
 
 /**
@@ -196,8 +198,9 @@ function openMain(url: string): void {
         if (!isMainFrame || code === -3 || !current || !isServerUrl(url, current)) return;
         offline = false;
         loadError = describeNetError(netErrorCode(description), new URL(current).host);
-        openConnect();
+        if (main === window) main = null;
         window.close();
+        openConnect();
     });
     // The Polaris's own worker answers for it when it is gone, so this load succeeded.
     // The window stays for its Try again; the servers window is the way to the others.
@@ -216,9 +219,24 @@ function openMain(url: string): void {
 }
 
 function openConnect(): void {
+    if (sheet && !sheet.isDestroyed()) {
+        sheet.focus();
+        return;
+    }
     if (connect && !connect.isDestroyed()) {
         connect.show();
         connect.focus();
+        return;
+    }
+    // Over Polaris when it is on screen; a window of its own on the first run, or
+    // when there is no Polaris window to lay it on.
+    if (main && !main.isDestroyed() && main.isVisible()) {
+        if (main.isMinimized()) main.restore();
+        main.focus();
+        const opened = openLocalSheet(main, "connect", () => {
+            if (sheet === opened) sheet = null;
+        });
+        sheet = opened;
         return;
     }
     const window = openLocalWindow("connect", { title: "Polaris", width: 560, height: 560 });
@@ -226,6 +244,12 @@ function openConnect(): void {
     window.on("closed", () => {
         if (connect === window) connect = null;
     });
+}
+
+/** Put the settings away, sheet or window. */
+function closeConnect(): void {
+    sheet?.close();
+    connect?.close();
 }
 
 /** Every answer about an address, kept briefly so typing it again asks nothing. */
@@ -288,13 +312,14 @@ async function connectSubmit(raw: unknown): Promise<Outcome> {
     loadError = null;
     refreshMenu();
     showPolaris();
-    connect?.close();
+    closeConnect();
     return { ok: true };
 }
 
 /** Every window on the instance in use goes: none of them may stay open on an
  *  origin the navigation rules no longer allow. */
 function leaveServer(): void {
+    sheet?.close();
     for (const window of BrowserWindow.getAllWindows()) if (window !== connect) window.close();
     main = null;
     updating = null;
@@ -334,9 +359,13 @@ function nameServer(origin: string, typed: string): Outcome {
  *  leaves the list open to pick another; its sign-in is not touched. */
 function removeServer(origin: string): Outcome {
     if (origin === current) {
+        // The sheet goes with the Polaris window, so the list comes back in a
+        // window of its own to pick another.
+        const listOpen = Boolean(sheet);
         setServerAddress(null);
         current = null;
         leaveServer();
+        if (listOpen) openConnect();
     }
     setSavedServers(withoutServer(savedServers(), origin));
     refreshMenu();
@@ -398,6 +427,7 @@ function start(): void {
             switchServer,
             nameServer,
             removeServer,
+            closeConnect,
             openServers: openConnect,
             updates
         });

@@ -63,8 +63,7 @@ import {
     MoreVertical,
     RefreshCw,
     Settings2,
-    Trash2,
-    X
+    Trash2
 } from "lucide-react";
 import {
     Button,
@@ -991,17 +990,6 @@ function WidgetMenu({
     const t = useTranslations("home");
     return (
         <>
-            {/* Faint until the card is hovered, like the grip; a touch screen has
-            the same thing in the menu. */}
-            <button
-                type="button"
-                onClick={onDismiss}
-                title={t("card.remove", { name: label })}
-                aria-label={t("card.remove", { name: label })}
-                className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-colors hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100 [@media(hover:none)]:hidden"
-            >
-                <X className="size-4" aria-hidden="true" />
-            </button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <button

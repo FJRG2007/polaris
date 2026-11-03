@@ -52,6 +52,8 @@ export interface IpcHost extends PushHost {
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
     readonly removeServer: (origin: string) => Outcome;
+    /** Put the settings away, from the page itself. */
+    readonly closeConnect: () => void;
     /** The window that adds, names, removes and switches servers. */
     readonly openServers: () => void;
     /** The update waiting for a restart, and the restart into it. */
@@ -408,6 +410,9 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectOpenAtLogin, (event, raw: unknown): boolean => {
         const open = z.boolean().safeParse(raw);
         return from(event, "connect") && open.success && host.setOpenAtLogin(open.data);
+    });
+    ipcMain.handle(CHANNELS.connectClose, (event) => {
+        if (from(event, "connect")) host.closeConnect();
     });
     ipcMain.handle(CHANNELS.connectRemove, (event, raw: unknown) => {
         const origin = listedSchema.safeParse(raw);
