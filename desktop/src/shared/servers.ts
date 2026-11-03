@@ -76,3 +76,8 @@ export function listServers(saved: readonly SavedServer[], active: string | null
 export function describeServer(server: Pick<ServerRow, "name" | "host">): string {
     return server.name ?? server.host;
 }
+
+/** What the field says when the address typed is a Polaris already listed under another one. */
+export function sameInstanceWords(server: Pick<ServerRow, "name" | "host">): string {
+    return `This is the same Polaris as ${describeServer(server)}, already on your list.`;
+}

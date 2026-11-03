@@ -265,7 +265,14 @@
             "available": "Versión {version} disponible",
             "store": "Tu navegador la instala",
             "auto": "Se instala sola en horas",
-            "manual": "Cómo actualizar"
+            "manual": "Cómo actualizar",
+            "check": "Buscar actualizaciones",
+            "checking": "Buscando...",
+            "storeDownloading": "Descargando la versión {version}",
+            "storeReady": "Versión {version} descargada",
+            "restart": "Reiniciar para actualizar",
+            "throttled": "Se comprobó hace un momento. Prueba en unos minutos.",
+            "failed": "No se pudo comprobar. Prueba más tarde."
         },
         "reach": {
             "local": "Usando la dirección de tu red local",
@@ -316,6 +323,7 @@
         "add": "Añadir host",
         "addButton": "Añadir",
         "already": "Ya está en tu lista como {name}.",
+        "sameInstance": "Es el mismo Polaris que {name}, que ya está en tu lista.",
         "newName": "Nombre",
         "newNameHint": "Opcional. Se muestra en la lista en vez de la dirección.",
         "removeTitle": "¿Quitar {name}?",

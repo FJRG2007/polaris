@@ -10,7 +10,7 @@
  * what the Deploy API accepts, and it can be revoked on its own.
  */
 
-import { createFailover, learnInstance, type Failover } from "../../../dashboard/packages/core/src/instance-fallback";
+import { createFailover, learnInstance, type Failover, type InstanceRecord } from "../../../dashboard/packages/core/src/instance-fallback";
 import { z } from "zod";
 import { join } from "node:path";
 import { app, net } from "electron";
@@ -47,15 +47,27 @@ function instancesFile(): string {
 const netFetch = (url: string, init?: RequestInit): Promise<Response> => net.fetch(url, init);
 
 /** Learn the server's identity and local addresses over its own address. Best-effort; an older Polaris has none. */
-export async function learnServer(server: string): Promise<void> {
+export async function learnServer(server: string): Promise<InstanceRecord | null> {
     const instance = await learnInstance(server, netFetch);
-    if (!instance) return;
+    if (!instance) return null;
     failovers.set(server, createFailover({ primary: server, instance, fetch: netFetch }));
     try {
         writeStoredInstance(instancesFile(), server, instance);
     } catch {
         // Kept in memory for this run; the next start learns it again.
     }
+    return instance;
+}
+
+/**
+ * Who a listed server is: the record kept on disk, or asked over its own address
+ * when there is none yet. Public, no key: a server added without one is still
+ * recognized when the same Polaris is typed under another name.
+ */
+export async function knownInstance(server: string): Promise<InstanceRecord | null> {
+    const stored = readStoredInstance(instancesFile(), server);
+    if (stored) return stored.record;
+    return learnServer(server).catch(() => null);
 }
 
 const asked = new Set<string>();

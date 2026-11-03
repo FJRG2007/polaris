@@ -103,7 +103,7 @@ interface UpdateState {
     readonly latest: string | null;
 }
 
-function useUpdate(): UpdateState {
+function useUpdate(): UpdateState & { readonly apply: (state: UpdateState) => void } {
     const [state, setState] = useState<UpdateState>({ notice: null, pending: null, latest: null });
     useEffect(() => {
         void (async () => {
@@ -116,7 +116,108 @@ function useUpdate(): UpdateState {
                 });
         })();
     }, []);
-    return state;
+    return { ...state, apply: setState };
+}
+
+type Checked =
+    | { readonly kind: "checking" }
+    | { readonly kind: "current" }
+    | { readonly kind: "storeDownloading"; readonly version: string | null }
+    | { readonly kind: "storeReady"; readonly version: string | null }
+    | { readonly kind: "throttled" }
+    | { readonly kind: "failed" };
+
+/**
+ * "Check for updates", next to the version. The worker asks the store where it
+ * installs this copy, and this Polaris for the version that is out; a newer one
+ * then shows up on this line the way the hourly check would have shown it.
+ */
+function CheckUpdates({
+    onChecked
+}: {
+    onChecked: (state: UpdateState) => void;
+}): React.JSX.Element {
+    const t = useWords();
+    const [checked, setChecked] = useState<Checked | null>(null);
+    const downloading = checked?.kind === "storeDownloading";
+    useEffect(() => {
+        if (!downloading) return;
+        const updates = (
+            browser.runtime as unknown as {
+                onUpdateAvailable?: {
+                    addListener: (listener: (details: { version?: unknown }) => void) => void;
+                    removeListener: (listener: (details: { version?: unknown }) => void) => void;
+                };
+            }
+        ).onUpdateAvailable;
+        if (!updates) return;
+        const ready = (details: { version?: unknown }): void =>
+            setChecked((now) => ({
+                kind: "storeReady",
+                version:
+                    typeof details.version === "string"
+                        ? details.version
+                        : now && "version" in now
+                          ? now.version
+                          : null
+            }));
+        updates.addListener(ready);
+        return () => updates.removeListener(ready);
+    }, [downloading]);
+    const press = async (): Promise<void> => {
+        if (checked?.kind === "checking") return;
+        setChecked({ kind: "checking" });
+        const reply = await askBackground({ kind: "checkUpdate" }).catch(() => null);
+        if (!reply || !reply.ok || !("checked" in reply)) {
+            setChecked({ kind: "failed" });
+            return;
+        }
+        onChecked({ notice: reply.update, pending: reply.pending, latest: reply.latest });
+        const { store, storeVersion, polaris } = reply.checked;
+        const running = browser.runtime.getManifest().version;
+        if (store === "update_available")
+            setChecked({ kind: "storeDownloading", version: storeVersion });
+        else if (reply.pending || (reply.update && reply.update.kind !== "desktop"))
+            setChecked(null);
+        else if (store === "throttled") setChecked({ kind: "throttled" });
+        else if (
+            store === "no_update" ||
+            (polaris && reply.latest && !isNewer(reply.latest, running))
+        )
+            setChecked({ kind: "current" });
+        else setChecked({ kind: "failed" });
+    };
+    return (
+        <span className="version-check" role="status" aria-live="polite">
+            {checked?.kind === "storeReady" ? (
+                <>
+                    <span>{t("popup.version.storeReady", { version: checked.version ?? "" })}</span>
+                    <button className="ghost" onClick={() => browser.runtime.reload()}>
+                        {t("popup.version.restart")}
+                    </button>
+                </>
+            ) : checked?.kind === "storeDownloading" ? (
+                <span>
+                    {t("popup.version.storeDownloading", { version: checked.version ?? "" })}
+                </span>
+            ) : (
+                <>
+                    {checked && checked.kind !== "checking" ? (
+                        <span>{t(`popup.version.${checked.kind}`)}</span>
+                    ) : null}
+                    <button
+                        className="ghost"
+                        aria-disabled={checked?.kind === "checking"}
+                        onClick={() => void press()}
+                    >
+                        {checked?.kind === "checking"
+                            ? t("popup.version.checking")
+                            : t("popup.version.check")}
+                    </button>
+                </>
+            )}
+        </span>
+    );
 }
 
 /** Where the steps for updating by hand are: this Polaris's downloads page, or
@@ -196,8 +297,12 @@ function VersionLine({
     notice,
     pending,
     latest,
-    server
-}: UpdateState & { server: string | null }): React.JSX.Element {
+    server,
+    apply
+}: UpdateState & {
+    server: string | null;
+    apply: (state: UpdateState) => void;
+}): React.JSX.Element {
     const t = useWords();
     const running = browser.runtime.getManifest().version;
     const newer = pending ?? (notice && notice.kind !== "desktop" ? notice.version : null);
@@ -220,6 +325,7 @@ function VersionLine({
             ) : latest && !isNewer(latest, running) ? (
                 <span>{t("popup.version.current")}</span>
             ) : null}
+            <CheckUpdates onChecked={apply} />
         </p>
     );
 }

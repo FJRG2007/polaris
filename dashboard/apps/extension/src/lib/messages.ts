@@ -378,6 +378,9 @@ export type Request =
      * changes a few times a year.
      */
     | { readonly kind: "updateStatus" }
+    /** Ask now, from a press: the browser store where it installs this copy,
+     *  and this Polaris for the version that is out. */
+    | { readonly kind: "checkUpdate" }
     /** Shut this extension out of the current site, or let it back in. `host`
      *  names a site from the settings list instead of the tab in front. */
     | { readonly kind: "setBlocked"; readonly blocked: boolean; readonly host?: string }
@@ -509,6 +512,19 @@ export type Reply =
           readonly update: UpdateNotice | null;
           readonly pending: string | null;
           readonly latest?: string | null;
+      }
+    | {
+          readonly ok: true;
+          /** What "Check for updates" found: the browser store (`requestUpdateCheck`,
+           *  null where there is none) and whether this Polaris answered. */
+          readonly checked: {
+              readonly store: "update_available" | "no_update" | "throttled" | null;
+              readonly storeVersion: string | null;
+              readonly polaris: boolean;
+          };
+          readonly update: UpdateNotice | null;
+          readonly pending: string | null;
+          readonly latest: string | null;
       }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }

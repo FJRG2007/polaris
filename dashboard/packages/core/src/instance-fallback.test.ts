@@ -3,6 +3,7 @@ import { generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import {
     challengeMessage,
     createFailover,
+    findSameInstance,
     isCertificateFailure,
     readInstance,
     USING_LOCAL_WORDS,
@@ -197,5 +198,62 @@ describe("isCertificateFailure", () => {
         });
         expect(isCertificateFailure(error)).toBe(true);
         expect(isCertificateFailure(new TypeError("fetch failed"))).toBe(false);
+    });
+});
+
+describe("findSameInstance", () => {
+    /** An address that describes itself as `claims` and signs with `key`. */
+    function answering(claims: InstanceRecord | null, key: KeyObject) {
+        const seen: Seen[] = [];
+        const fetchImpl = async (url: string, init: RequestInit = {}): Promise<Response> => {
+            const parsed = new URL(url);
+            seen.push({ url, authorization: new Headers(init.headers).get("authorization") });
+            if (parsed.origin === LAN) throw new TypeError("fetch failed");
+            if (parsed.pathname === "/api/instance") {
+                return claims ? Response.json(claims) : new Response("not found", { status: 404 });
+            }
+            const { nonce } = JSON.parse(String(init.body)) as { nonce: string };
+            const signature = sign(
+                null,
+                Buffer.from(challengeMessage(ID, parsed.origin, nonce)),
+                key
+            ).toString("base64url");
+            return Response.json({ id: ID, nonce, signature });
+        };
+        return { fetchImpl, seen };
+    }
+
+    const listed = [{ origin: PRIMARY, record }];
+
+    it("names the listed instance an address proves it is", async () => {
+        const { fetchImpl, seen } = answering(record, real.privateKey);
+        expect(await findSameInstance([LOCAL], listed, fetchImpl)).toEqual(listed[0]);
+        expect(seen.every((one) => one.authorization === null)).toBe(true);
+    });
+
+    it("refuses an address that repeats the public id and key but cannot sign", async () => {
+        const { fetchImpl } = answering(record, impostor.privateKey);
+        expect(await findSameInstance([LOCAL], listed, fetchImpl)).toBeNull();
+    });
+
+    it("finds nothing for another instance or one that does not describe itself", async () => {
+        const other = { ...record, id: "inst_another_instance" };
+        expect(
+            await findSameInstance([LOCAL], listed, answering(other, real.privateKey).fetchImpl)
+        ).toBeNull();
+        expect(
+            await findSameInstance([LOCAL], listed, answering(null, real.privateKey).fetchImpl)
+        ).toBeNull();
+    });
+
+    it("tries the next way of asking when the first does not answer", async () => {
+        const { fetchImpl } = answering(record, real.privateKey);
+        expect(await findSameInstance([LAN, LOCAL], listed, fetchImpl)).toEqual(listed[0]);
+    });
+
+    it("asks nothing when nothing is listed", async () => {
+        const { fetchImpl, seen } = answering(record, real.privateKey);
+        expect(await findSameInstance([LOCAL], [], fetchImpl)).toBeNull();
+        expect(seen).toHaveLength(0);
     });
 });

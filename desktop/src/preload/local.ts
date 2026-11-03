@@ -7,6 +7,7 @@
  */
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import { readUpdateCheck } from "@/shared/update-check";
 import type { StrokeInput } from "@/shared/annotate";
 import { CHANNELS, type PolarisLocal, type PushEvent, type TvInstallState } from "@/shared/bridge";
 
@@ -20,7 +21,10 @@ const bridge: PolarisLocal = {
         remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin),
         preferences: () => ipcRenderer.invoke(CHANNELS.connectPreferences),
         setOpenAtLogin: (open) => ipcRenderer.invoke(CHANNELS.connectOpenAtLogin, open),
-        close: () => ipcRenderer.invoke(CHANNELS.connectClose)
+        close: () => ipcRenderer.invoke(CHANNELS.connectClose),
+        checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectCheckUpdates)),
+        restartToUpdate: () => ipcRenderer.invoke(CHANNELS.connectRestart),
+        openUpdatePage: () => ipcRenderer.invoke(CHANNELS.connectUpdatePage)
     },
     apiKey: {
         state: () => ipcRenderer.invoke(CHANNELS.keyState),

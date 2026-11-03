@@ -145,6 +145,28 @@ export interface PolarisDesktop {
     onUpdateReady?(listener: (update: DesktopUpdate | null) => void): () => void;
     /** Restart the app into the waiting update. */
     installUpdate?(): Promise<DesktopOutcome>;
+    /** Ask for a newer version of the app now. Absent from an app older than
+     *  0.1.14; what it answers is read with `readDesktopUpdateCheck`. */
+    checkForUpdates?(): Promise<unknown>;
+}
+
+const updateCheckSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("current"), version: z.string().trim().min(1).max(40) }),
+    z.object({ kind: z.literal("downloading"), version: z.string().trim().min(1).max(40) }),
+    z.object({ kind: z.literal("ready"), version: z.string().trim().min(1).max(40) }),
+    z.object({ kind: z.literal("available"), version: z.string().trim().min(1).max(40) }),
+    z.object({ kind: z.literal("failed") }),
+    z.object({ kind: z.literal("unsupported") })
+]);
+
+/** What "Check for updates" found, as the desktop app answers it. */
+export type DesktopUpdateCheck = z.infer<typeof updateCheckSchema>;
+
+/** The app's answer as one of the known ones; anything else is a failed check.
+ *  The app's own reason is English-only and is not shown on the page. */
+export function readDesktopUpdateCheck(raw: unknown): DesktopUpdateCheck {
+    const parsed = updateCheckSchema.safeParse(raw);
+    return parsed.success ? parsed.data : { kind: "failed" };
 }
 
 /** An update of the desktop app that waits for a restart. */

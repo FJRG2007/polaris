@@ -1103,7 +1103,19 @@
         "installed": "You are using the installed app.",
         "install": "Install Polaris",
         "fromMenu": "Install it from your browser's menu: Install Polaris in Chrome and Edge, Add to Dock in Safari, or Add to Home Screen on your phone.",
-        "native": "There is also an app for Windows, macOS and Linux."
+        "native": "There is also an app for Windows, macOS and Linux.",
+        "checkUpdates": "Check for updates",
+        "checking": "Checking...",
+        "restart": "Restart to update",
+        "check": {
+            "current": "Polaris {version} is the newest version.",
+            "downloading": "Downloading Polaris {version}. It installs by itself.",
+            "ready": "Polaris {version} is installed. Restart to use it.",
+            "available": "Polaris {version} is out. Download it from this page.",
+            "failed": "Could not check for updates. Try again later.",
+            "unsupported": "This copy of Polaris does not update itself.",
+            "restartFailed": "Polaris could not restart. Close it and open it again."
+        }
     },
     "logViewer": {
         "search": "Search logs",

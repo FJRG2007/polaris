@@ -64,7 +64,13 @@
                 </span>
                 <input id="open-at-login" class="switch" type="checkbox" role="switch" />
             </label>
-            <p id="version" class="hint version"></p>
+            <div class="row version-row">
+                <p id="version" class="hint version"></p>
+                <button id="check-updates" class="ghost" type="button">Check for updates</button>
+                <button id="restart-update" class="primary" type="button" hidden>Restart now</button>
+                <button id="update-page" class="primary" type="button" hidden>Open download page</button>
+            </div>
+            <p id="update-status" class="hint" role="status" aria-live="polite"></p>
         </section>
         </div>
         <dialog id="confirm-remove" aria-labelledby="remove-title" aria-describedby="remove-body">

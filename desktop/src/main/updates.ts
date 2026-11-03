@@ -32,6 +32,8 @@ import { replaceAppImage } from "./appimage";
 import { repository } from "../../package.json";
 import { app, autoUpdater, net } from "electron";
 import { developerSigned } from "./mac-signature";
+import type { UpdateCheck } from "@/shared/update-check";
+import { describeNetError, netErrorCode } from "./reachability";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { appImageAsset, CHECKSUMS, macFeedName, newerRelease, parseChecksums, releaseSource, type Release } from "./releases";
 
@@ -85,16 +87,20 @@ export interface FirstCheck {
     readonly installing: Promise<string | null>;
     /** Whether that install finished, so the app can restart into it. */
     readonly installed: Promise<boolean>;
+    /** Ask now, from a press, and say what was found. Never throws. */
+    readonly checkNow: () => Promise<UpdateCheck>;
 }
 
 export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     let ready: () => void = () => undefined;
     let began: (version: string | null) => void = () => undefined;
     let ended: (installed: boolean) => void = () => undefined;
+    let checkNow: () => Promise<UpdateCheck> = async () => ({ kind: "unsupported" });
     const first: FirstCheck = {
         asked: new Promise((resolve) => (ready = resolve)),
         installing: new Promise((resolve) => (began = resolve)),
-        installed: new Promise((resolve) => (ended = resolve))
+        installed: new Promise((resolve) => (ended = resolve)),
+        checkNow: () => checkNow()
     };
     const source = releaseSource(repository);
     if (!source) {
@@ -107,6 +113,8 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     /** The version being downloaded or already installed, so it is fetched once. */
     let installing: string | null = null;
     let how: Promise<Installer> | null = null;
+    /** The version installed and waiting for a restart. */
+    let waiting: string | null = null;
 
     // The page is the way left: say it once for the version that failed.
     const fallBack = () => {
@@ -120,6 +128,7 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
     };
     const installed = (version: string, restart: () => void) => {
         announced = version;
+        waiting = version;
         found({ version, page: source.page(`desktop-v${version}`), restart });
         ended(true);
     };
@@ -155,7 +164,7 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
         });
     };
 
-    const check = async () => {
+    const check = async (): Promise<UpdateCheck> => {
         try {
             if (!how) {
                 how = installer().catch((): Installer => ({ kind: "page" }));
@@ -169,29 +178,39 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
                 cache: "no-store",
                 signal: AbortSignal.timeout(15_000)
             });
-            if (!response.ok) return;
+            if (!response.ok) return { kind: "failed", reason: `The list of releases answered with HTTP ${response.status}. Try again later.` };
             const release = newerRelease(await response.json(), app.getVersion());
-            if (!release || release.version === announced || release.version === installing) return;
+            if (!release) return waiting ? { kind: "ready", version: waiting } : { kind: "current", version: app.getVersion() };
+            if (release.version === waiting) return { kind: "ready", version: waiting };
+            if (release.version === installing) return { kind: "downloading", version: installing };
+            // Announced and neither installing nor installed: its page is the way.
+            if (release.version === announced) return { kind: "available", version: release.version };
             if (mode.kind === "page") {
                 announced = release.version;
                 found({ version: release.version, page: source.page(release.tag) });
-                return;
+                return { kind: "available", version: release.version };
             }
             installing = release.version;
             began(release.version);
             if (mode.kind === "appimage") {
                 void viaAppImage(release, mode.path).catch(fallBack);
-                return;
+                return { kind: "downloading", version: release.version };
             }
             try {
                 viaSquirrel(release);
             } catch {
                 fallBack();
+                return { kind: "available", version: release.version };
             }
-        } catch {
-            return;
+            return { kind: "downloading", version: release.version };
+        } catch (caught) {
+            const code = netErrorCode(String(caught));
+            return { kind: "failed", reason: code ? describeNetError(code, "github.com") : "The list of releases did not answer. Try again later." };
         }
     };
+    /** One question at a time: a second press waits for the answer in flight. */
+    let asking: Promise<UpdateCheck> | null = null;
+    checkNow = () => (asking ??= check().finally(() => (asking = null)));
 
     // Nothing began: settled here, and later rounds are nobody's start.
     const settle = () => {

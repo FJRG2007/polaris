@@ -10,6 +10,7 @@ import {
     normalizeServerName,
     readServers,
     renameServer,
+    sameInstanceWords,
     SERVERS_MAX,
     withoutServer,
     withServer
@@ -55,5 +56,16 @@ describe("the server list", () => {
         expect(rows[0]!.host).toBe("192.168.1.20:3000");
         expect(withoutServer(saved, WORK).map((s) => s.origin)).toEqual([HOME]);
         expect(normalizeServerName("   ")).toBeNull();
+    });
+});
+
+describe("sameInstanceWords", () => {
+    it("names the server already listed, by its name or its host", () => {
+        expect(sameInstanceWords({ name: null, host: "polaris.example.com" })).toBe(
+            "This is the same Polaris as polaris.example.com, already on your list."
+        );
+        expect(sameInstanceWords({ name: "Home", host: "polaris.example.com" })).toBe(
+            "This is the same Polaris as Home, already on your list."
+        );
     });
 });

@@ -16,6 +16,7 @@
 
 import { available, byId, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
+import { describeUpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
 
 const form = byId<HTMLFormElement>("form");
@@ -315,6 +316,49 @@ void window.polarisLocal.connect.preferences().catch(() => null).then((preferenc
     if (!preferences) return;
     openAtLogin.checked = preferences.openAtLogin;
     byId("version").textContent = `Polaris ${preferences.version}`;
+});
+
+const checkUpdates = byId<HTMLButtonElement>("check-updates");
+const restartUpdate = byId<HTMLButtonElement>("restart-update");
+const updatePage = byId<HTMLButtonElement>("update-page");
+const updateStatus = byId<HTMLParagraphElement>("update-status");
+checkUpdates.addEventListener("click", () => {
+    if (checkUpdates.getAttribute("aria-disabled") === "true") return;
+    available(checkUpdates, false);
+    restartUpdate.hidden = true;
+    updatePage.hidden = true;
+    updateStatus.className = "hint";
+    updateStatus.textContent = "Checking for updates...";
+    void window.polarisLocal.connect
+        .checkForUpdates()
+        .catch(() => ({ kind: "failed", reason: "Polaris did not answer." }) as const)
+        .then((found) => {
+            updateStatus.textContent = describeUpdateCheck(found);
+            updateStatus.className = found.kind === "failed" ? "error" : "hint";
+            restartUpdate.hidden = found.kind !== "ready";
+            updatePage.hidden = found.kind !== "available";
+            available(checkUpdates, true);
+        });
+});
+updatePage.addEventListener("click", () => {
+    void window.polarisLocal.connect
+        .openUpdatePage()
+        .catch(() => false)
+        .then((opened) => {
+            if (opened) return;
+            updateStatus.textContent = "The download page could not be opened. Check for updates again.";
+            updateStatus.className = "error";
+        });
+});
+restartUpdate.addEventListener("click", () => {
+    void window.polarisLocal.connect
+        .restartToUpdate()
+        .catch(() => ({ ok: false, error: "Polaris could not restart. Close it and open it again." }))
+        .then((outcome) => {
+            if (outcome.ok) return;
+            updateStatus.textContent = outcome.error ?? "Polaris could not restart. Close it and open it again.";
+            updateStatus.className = "error";
+        });
 });
 
 nameInput.maxLength = SERVER_NAME_MAX;

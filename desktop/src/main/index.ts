@@ -23,7 +23,7 @@ import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
-import { watchForUpdates, type Update } from "./updates";
+import { watchForUpdates, type FirstCheck, type Update } from "./updates";
 import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
@@ -33,7 +33,7 @@ import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
 import { serverAddressSchema } from "@/shared/server-address";
-import { listServers, normalizeServerName, renameServer, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
+import { listServers, normalizeServerName, renameServer, sameInstanceWords, SERVER_NAME_MAX, withoutServer } from "@/shared/servers";
 import { setOpenAtLogin } from "./login-item";
 import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
@@ -41,13 +41,16 @@ import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpda
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
 import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
-import { describeNetError, finishedLoad, netErrorCode } from "./reachability";
+import { describeNetError, finishedLoad, isCertificateError, netErrorCode } from "./reachability";
+import { sameInstanceAs } from "./same-instance";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
 
 /** Where the dashboard opens, the same as the installable app's start page. */
 const START = "/home";
 
 let current: string | null = null;
+/** The updater, once it is watching: what "Check for updates" asks. */
+let updateWatch: FirstCheck | null = null;
 let main: BrowserWindow | null = null;
 let connect: BrowserWindow | null = null;
 /** The settings laid over the Polaris window, when there is one to lay them on. */
@@ -264,9 +267,27 @@ function verdictWords(verdict: ServerVerdict, origin: string): string {
     return describeVerdict(verdict, host);
 }
 
+/**
+ * The sentence for an address that is a Polaris already listed under another
+ * name, or null. Asked for a Polaris that answered, and for an address whose
+ * certificate this computer does not trust - the usual reason a local name of
+ * the same Polaris fails - before that certificate is what gets said.
+ */
+async function alreadyListed(origin: string, verdict: ServerVerdict): Promise<string | null> {
+    const untrusted = verdict.kind === "unreachable" && isCertificateError(netErrorCode(verdict.cause ?? ""));
+    if (verdict.kind !== "polaris" && !untrusted) return null;
+    const saved = savedServers();
+    if (saved.some((server) => server.origin === origin)) return null;
+    const same = await sameInstanceAs(origin, saved, untrusted).catch(() => null);
+    const row = same ? listServers(saved, current).find((server) => server.origin === same) : undefined;
+    return row ? sameInstanceWords(row) : null;
+}
+
 /** Whether an address is a Polaris that can be opened now, and if not, why. */
 async function probe(origin: string): Promise<string | null> {
     const verdict = await serverCheck.check(origin);
+    const listed = await alreadyListed(origin, verdict);
+    if (listed) return listed;
     return verdict.kind === "polaris" ? null : verdictWords(verdict, origin);
 }
 
@@ -279,6 +300,9 @@ async function connectCheck(raw: unknown): Promise<AddressCheck> {
     checking = controller;
     try {
         const verdict = await serverCheck.check(parsed.data, controller.signal);
+        const listed = await alreadyListed(parsed.data, verdict);
+        if (controller.signal.aborted) return { ok: false, message: null };
+        if (listed) return { ok: false, message: listed };
         return { ok: verdict.kind === "polaris", message: verdictWords(verdict, parsed.data) };
     } catch {
         return { ok: false, message: null };
@@ -432,7 +456,15 @@ function start(): void {
             removeServer,
             closeConnect,
             openServers: openConnect,
-            updates
+            updates,
+            checkUpdates: () =>
+                updateWatch?.checkNow() ??
+                Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
+            openUpdatePage: () => {
+                if (!menuUpdate) return false;
+                menuUpdate.open();
+                return true;
+            }
         });
 
         installScreenShare(server);
@@ -489,7 +521,7 @@ function start(): void {
         };
         /** The update the app was about to restart into, unannounced until it opens. */
         let heldBack: Update | null = null;
-        const first = watchForUpdates((update) => {
+        const first = (updateWatch = watchForUpdates((update) => {
             menuUpdate = {
                 version: update.version,
                 open: () => void shell.openExternal(update.page),
@@ -503,7 +535,7 @@ function start(): void {
                 return;
             }
             announce(update);
-        });
+        }));
 
         void updateBeforeOpening(first, {
             attempted: updateAttempted,

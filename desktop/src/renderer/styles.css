@@ -471,6 +471,16 @@ label.setting {
     margin-top: 12px;
 }
 
+.version-row {
+    margin-top: 12px;
+}
+
+.version-row .version {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
 dialog {
     width: min(340px, calc(100vw - 32px));
     border: 1px solid var(--line);

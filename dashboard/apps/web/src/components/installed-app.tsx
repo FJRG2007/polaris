@@ -20,6 +20,7 @@
 import { Download } from "lucide-react";
 import { listenToWorker } from "@/lib/desktop-notify";
 import { useDesktopBridge } from "@/components/desktop-app";
+import { readDesktopUpdateCheck, type DesktopUpdateCheck } from "@/lib/desktop-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button } from "@polaris/ui";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -67,15 +68,90 @@ function runningInstalled(): boolean {
     return typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
 }
 
-/** What the page says inside the desktop app instead of offering to install it. */
+/**
+ * What the page says inside the desktop app instead of offering to install it,
+ * with "Check for updates" for an app new enough to answer it.
+ */
 function UsingDesktop({ version }: { version: string }) {
     const t = useTranslations("components");
+    const desktop = useDesktopBridge();
+    const [checking, setChecking] = useState(false);
+    const [found, setFound] = useState<DesktopUpdateCheck | null>(null);
+    const [restarting, setRestarting] = useState(false);
+    const [restartFailed, setRestartFailed] = useState(false);
+    const check = desktop?.checkForUpdates;
+
+    const run = async (): Promise<void> => {
+        if (!check) return;
+        setChecking(true);
+        setRestartFailed(false);
+        try {
+            setFound(readDesktopUpdateCheck(await check()));
+        } catch {
+            setFound({ kind: "failed" });
+        } finally {
+            setChecking(false);
+        }
+    };
+
+    const restart = async (): Promise<void> => {
+        if (!desktop?.installUpdate) return;
+        setRestarting(true);
+        setRestartFailed(false);
+        try {
+            const outcome = await desktop.installUpdate();
+            if (!outcome.ok) setRestartFailed(true);
+        } catch {
+            setRestartFailed(true);
+        } finally {
+            setRestarting(false);
+        }
+    };
+
     return (
-        <p className="text-sm">
-            {version
-                ? t("installApp.usingDesktopVersion", { version })
-                : t("installApp.usingDesktop")}
-        </p>
+        <div className="flex min-w-0 flex-col gap-3">
+            <p className="text-sm">
+                {version
+                    ? t("installApp.usingDesktopVersion", { version })
+                    : t("installApp.usingDesktop")}
+            </p>
+            {check ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={checking}
+                        onClick={() => void run()}
+                    >
+                        {checking ? t("installApp.checking") : t("installApp.checkUpdates")}
+                    </Button>
+                    {found?.kind === "ready" && desktop?.installUpdate ? (
+                        <Button size="sm" disabled={restarting} onClick={() => void restart()}>
+                            {t("installApp.restart")}
+                        </Button>
+                    ) : null}
+                    {restartFailed ? (
+                        <p className="min-w-0 text-sm text-destructive" role="alert">
+                            {t("installApp.check.restartFailed")}
+                        </p>
+                    ) : found ? (
+                        <p className="min-w-0 text-sm text-muted-foreground" role="status">
+                            {found.kind === "current"
+                                ? t("installApp.check.current", { version: found.version })
+                                : found.kind === "downloading"
+                                  ? t("installApp.check.downloading", { version: found.version })
+                                  : found.kind === "ready"
+                                    ? t("installApp.check.ready", { version: found.version })
+                                    : found.kind === "available"
+                                      ? t("installApp.check.available", { version: found.version })
+                                      : found.kind === "unsupported"
+                                        ? t("installApp.check.unsupported")
+                                        : t("installApp.check.failed")}
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
+        </div>
     );
 }
 

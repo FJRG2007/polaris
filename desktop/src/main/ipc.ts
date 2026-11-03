@@ -34,6 +34,7 @@ import {
 } from "@/shared/bridge";
 import type { ServerRow } from "@/shared/servers";
 import type { UpdateReadyState } from "./update-ready";
+import type { UpdateCheck } from "@/shared/update-check";
 import { readServerAddress } from "@/shared/server-address";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
@@ -59,6 +60,10 @@ export interface IpcHost extends PushHost {
     readonly openServers: () => void;
     /** The update waiting for a restart, and the restart into it. */
     readonly updates: Pick<UpdateReadyState, "current" | "install" | "offer">;
+    /** Ask for a newer version now, from a press. */
+    readonly checkUpdates: () => Promise<UpdateCheck>;
+    /** Open the download page of the version announced, if there is one. */
+    readonly openUpdatePage: () => boolean;
 }
 
 /** A server named by the list: an address in the one stored form. */
@@ -354,6 +359,11 @@ export function registerIpc(host: IpcHost): void {
         });
     });
 
+    ipcMain.handle(CHANNELS.checkUpdates, (event, ...args: unknown[]) => {
+        if (!fromPolaris(event) || !z.tuple([]).safeParse(args).success) return null;
+        return host.checkUpdates();
+    });
+
     ipcMain.handle(CHANNELS.updateCurrent, (event) => (fromPolaris(event) ? host.updates.current() : null));
 
     // Takes nothing: what is installed is what the app downloaded and checked
@@ -428,6 +438,11 @@ export function registerIpc(host: IpcHost): void {
         const open = z.boolean().safeParse(raw);
         return from(event, "connect") && open.success && host.setOpenAtLogin(open.data);
     });
+    ipcMain.handle(CHANNELS.connectCheckUpdates, (event) => (from(event, "connect") ? host.checkUpdates() : null));
+    // Takes nothing, as from the page: only into what the app installed itself.
+    ipcMain.handle(CHANNELS.connectRestart, (event) => (from(event, "connect") ? host.updates.install() : REFUSED));
+    // Takes nothing: only the page of the version the app itself announced.
+    ipcMain.handle(CHANNELS.connectUpdatePage, (event) => from(event, "connect") && host.openUpdatePage());
     ipcMain.handle(CHANNELS.connectClose, (event) => {
         if (from(event, "connect")) host.closeConnect();
     });

@@ -10,6 +10,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
 import { readUpdateReady } from "@/shared/update-ready";
+import { readUpdateCheck } from "@/shared/update-check";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
@@ -82,6 +83,7 @@ const bridge: PolarisDesktop = {
         };
     },
     installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate),
+    checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.checkUpdates)),
     vpn: {
         deviceName: () => ipcRenderer.invoke(CHANNELS.vpnDeviceName),
         key: () => ipcRenderer.invoke(CHANNELS.vpnKey),
