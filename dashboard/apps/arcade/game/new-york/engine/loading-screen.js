@@ -90,3 +90,43 @@ export function hideLoadingScreen() {
   clearInterval(tipTimer);
   overlay?.classList.add('hidden');
 }
+
+let failure = null;
+
+function drawFailure() {
+  const status = document.getElementById('loading-status');
+  if (!failure || !status) return;
+  const box = document.createElement('div');
+  box.className = 'loader-error-box';
+  box.setAttribute('role', 'alert');
+  const heading = document.createElement('div');
+  heading.className = 'loader-error-title';
+  heading.textContent = t(`loading.failure.${failure}.title`);
+  const text = document.createElement('div');
+  text.className = 'loader-error-desc';
+  text.textContent = t(`loading.failure.${failure}.text`);
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.className = 'loader-reload-btn';
+  reload.textContent = t('loading.failure.reload');
+  reload.addEventListener('click', () => location.reload());
+  box.append(heading, text, reload);
+  status.replaceChildren(box);
+  reload.focus({ preventScroll: true });
+}
+
+/**
+ * Puts the loading screen back with what went wrong and a Reload button, in place of a blank or frozen canvas:
+ * `graphics` when the graphics could not be set up, `error` when anything else stopped the load, `lost` when the
+ * browser or the system reset the graphics device.
+ */
+export function showFailure(kind) {
+  if (failure) return;
+  failure = kind;
+  clearInterval(tipTimer);
+  overlay?.classList.remove('hidden');
+  overlay?.classList.add('is-failed');
+  localeReady.then(drawFailure);
+}
+
+onLocaleChange(drawFailure);

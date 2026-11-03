@@ -25,6 +25,21 @@
             "look": "Drag anywhere else to look around, pinch to zoom.",
             "map": "Open the map and tap a street to go there.",
             "menu": "The menu button at the top has graphics and sound."
+        },
+        "failure": {
+            "graphics": {
+                "title": "Graphics could not start",
+                "text": "This browser could not start the graphics. Turn on hardware acceleration in its settings, then reload."
+            },
+            "error": {
+                "title": "New York could not start",
+                "text": "Something stopped the city while it was loading. Reload to try again."
+            },
+            "lost": {
+                "title": "Graphics were reset",
+                "text": "The browser or the system reset the graphics. Reload to bring the city back."
+            },
+            "reload": "Reload"
         }
     },
     "view": "New York city view",

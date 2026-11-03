@@ -48,7 +48,7 @@ any entry that does not fit these rules, and skips its own `id`.
 
 `GameFrame` (`src/screens/game-frame.tsx`) draws the frame, a loading line until
 the first `progress` (from then on the game's own loading screen is the one on
-screen), and the failure from `failed` until a `ready` replaces it. On `ready` it
+screen), and the failure from `failed` until a `ready` replaces it. A graphics device the browser resets after `ready` is the game's own to show: it stops drawing and puts its loading screen back with a Reload button, without a message to the host. On `ready` it
 moves the keyboard focus into the frame, unless the reader is in a field, dialog,
 menu or list elsewhere on the page; the first driving key does the same later. A game's
 catalog is the namespace named by its id in `messages/<locale>/`. A call screen that runs a game inside a

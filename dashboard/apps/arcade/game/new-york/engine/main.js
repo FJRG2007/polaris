@@ -1,5 +1,5 @@
 // First: the loading screen runs before any module that waits on the city data
-import { enterStage, hideLoadingScreen } from './loading-screen.js';
+import { enterStage, hideLoadingScreen, showFailure } from './loading-screen.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, vec4, smoothstep } from 'three/tsl';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
@@ -84,8 +84,29 @@ async function initApp() {
     await renderer.init();
   } catch (e) {
     reportFailure('graphics');
+    showFailure('graphics');
     throw e;
   }
+  // A graphics device the browser or the system resets stops the city where it stands: before the first frame the
+  // load reports a failure, after it the loop stops and the loading screen comes back with Reload. A device released
+  // on purpose (the page going away) is not a failure.
+  let graphicsLost = false;
+  const onGraphicsLost = () => {
+    graphicsLost = true;
+    reportFailure('graphics');
+    renderer.setAnimationLoop(null);
+    showFailure('lost');
+  };
+  renderer.backend.device?.lost?.then((info) => {
+    if (info.reason === 'destroyed') return;
+    console.error(`[gpu] device lost: ${info.message}`);
+    onGraphicsLost();
+  });
+  renderer.domElement.addEventListener('webglcontextlost', (event) => {
+    console.error('[gpu] WebGL context lost');
+    event.preventDefault();
+    onGraphicsLost();
+  });
   // From here on a draw whose pipeline is not built yet waits for it instead of stalling the frame (async-pipelines.js)
   const viewPosition = new THREE.Vector3();
   const pipelineGate = drawOnlyCompiled(renderer, { near: () => viewPosition });
@@ -786,6 +807,7 @@ async function initApp() {
     remotePlayers.update(dt, cameraSystem.camera);
   }
 
+  if (graphicsLost) return;
   renderer.setAnimationLoop((now) => {
     pipelineGate.beginFrame();
     const rawDt = (now - lastTime) * 0.001;
@@ -856,5 +878,6 @@ async function initApp() {
 
 initApp().catch((e) => {
   reportFailure('error');
+  showFailure('error');
   console.error(e);
 });

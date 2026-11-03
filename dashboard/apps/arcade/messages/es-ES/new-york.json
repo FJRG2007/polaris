@@ -25,6 +25,21 @@
             "look": "Arrastra en cualquier otro sitio para mirar y pellizca para acercar.",
             "map": "Abre el mapa y toca una calle para ir allí.",
             "menu": "El botón de menú de arriba tiene gráficos y sonido."
+        },
+        "failure": {
+            "graphics": {
+                "title": "No se pudieron iniciar los gráficos",
+                "text": "Este navegador no pudo iniciar los gráficos. Activa la aceleración por hardware en sus ajustes y recarga."
+            },
+            "error": {
+                "title": "Nueva York no pudo iniciarse",
+                "text": "Algo detuvo la ciudad mientras cargaba. Recarga para volver a intentarlo."
+            },
+            "lost": {
+                "title": "Se reiniciaron los gráficos",
+                "text": "El navegador o el sistema reinició los gráficos. Recarga para recuperar la ciudad."
+            },
+            "reload": "Recargar"
         }
     },
     "view": "Vista de Nueva York",
