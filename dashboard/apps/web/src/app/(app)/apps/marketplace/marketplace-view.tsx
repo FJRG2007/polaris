@@ -29,14 +29,14 @@ import { ArrowUpCircle, Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { appSettingsHref } from "@/lib/apps/app-settings";
-import { APP_CATEGORIES } from "@/lib/apps";
+import { APP_CATEGORIES, resolveActiveApp } from "@/lib/apps";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { BuiltInAlternativeNote } from "./built-in-alternative";
 import { UninstallDialog } from "./uninstall-dialog";
 import { appProvenance } from "@/lib/apps/provenance";
 import { appPreview, builtInPreview } from "@/lib/apps/app-screenshots";
-import { canUpdate, useAppUpdates } from "@/components/app-bundles/use-app-updates";
+import { canUpdate, newerBuild, useAppUpdates } from "@/components/app-bundles/use-app-updates";
 import {
     CardUpdateButton,
     CardUpdateNote,
@@ -48,6 +48,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
+import { NATIVE_APPS, NATIVE_APP_IDS } from "@/lib/apps/native-apps";
 import {
     POLARIS_APPS_PATH,
     STORE_SORTS,
@@ -202,23 +203,41 @@ export function MarketplaceView({
     // Polaris's own apps update on their own, and their cards say so the way a
     // phone's store does. Asked after the grid has painted, and only by a reader
     // the update action would answer.
-    const updates = useAppUpdates({ enabled: scope === "polaris" && canUpdateApps });
+    const asksUpdates = scope === "polaris" && canUpdateApps;
+    const updates = useAppUpdates({ enabled: asksUpdates });
+    const [retrying, startRetry] = useTransition();
     const listed = useMemo(() => new Set(all.map((app) => app.id)), [all]);
-    const updatable = (updates.rows ?? []).filter((row) => listed.has(row.id) && canUpdate(row));
+    const updatableIds = useMemo(
+        () => (asksUpdates ? new Set([...listed, ...NATIVE_APP_IDS]) : listed),
+        [asksUpdates, listed]
+    );
+    const updatable = (updates.rows ?? []).filter(
+        (row) => updatableIds.has(row.id) && canUpdate(row)
+    );
+    const updateState = (id: string): CardUpdateState => ({
+        loading: updates.rows === null && !updates.failed,
+        row: updates.rows?.find((row) => row.id === id) ?? null,
+        busy: updates.busy === id,
+        locked: updates.busy !== null,
+        refused: updates.refusals[id],
+        onUpdate: () => void updates.change(id, "update")
+    });
     const updateFor = (
         app: AppManifest,
         installs: StoreInstallRow[]
-    ): CardUpdateState | undefined => {
-        if (scope !== "polaris" || !canUpdateApps || installs.length === 0) return undefined;
-        return {
-            loading: updates.rows === null && !updates.failed,
-            row: updates.rows?.find((row) => row.id === app.id) ?? null,
-            busy: updates.busy === app.id,
-            locked: updates.busy !== null,
-            refused: updates.refusals[app.id],
-            onUpdate: () => void updates.change(app.id, "update")
-        };
-    };
+    ): CardUpdateState | undefined =>
+        asksUpdates && installs.length > 0 ? updateState(app.id) : undefined;
+    // Security scans and Cloud servers run inside a built-in app's screens, so
+    // their updates show on that app's card.
+    const nativeUpdatesFor = (entry: BuiltInListing): NativeUpdate[] =>
+        asksUpdates
+            ? NATIVE_APP_IDS.filter(
+                  (id) => resolveActiveApp(NATIVE_APPS[id] ?? "").id === entry.id
+              ).map((id) => {
+                  const app = findApp(id);
+                  return { id, name: app ? localize(app).name : id, state: updateState(id) };
+              })
+            : [];
 
     // The Polaris apps screen draws every app as a card, installed or not, so
     // its Installed rows are only for an install no card stands for: one of
@@ -357,11 +376,35 @@ export function MarketplaceView({
                         size="sm"
                         disabled={updates.busy !== null}
                         aria-busy={updates.busy !== null || undefined}
-                        onClick={() => void updates.updateAll(listed)}
+                        onClick={() => void updates.updateAll(updatableIds)}
                     >
                         {updates.busy !== null
                             ? tc("appUpdates.updating")
                             : tc("appUpdates.updateAll")}
+                    </Button>
+                </div>
+            )}
+
+            {asksUpdates && updates.failed && (
+                <div
+                    role="alert"
+                    className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-4 py-3"
+                >
+                    <p className="min-w-0 truncate text-sm text-danger">
+                        {tc("appUpdates.checkFailed")}
+                    </p>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={retrying}
+                        aria-busy={retrying || undefined}
+                        onClick={() =>
+                            startRetry(async () => {
+                                await updates.load(true);
+                            })
+                        }
+                    >
+                        {tc("appUpdates.check")}
                     </Button>
                 </div>
             )}
@@ -404,7 +447,10 @@ export function MarketplaceView({
                                         data-built-in={entry.id}
                                         className="min-w-0"
                                     >
-                                        <BuiltInCard entry={entry} />
+                                        <BuiltInCard
+                                            entry={entry}
+                                            updates={nativeUpdatesFor(entry)}
+                                        />
                                     </div>
                                 ))}
                         </div>
@@ -587,12 +633,41 @@ function shelvesWith(
     return [{ shelf: "polaris", apps: [] }, ...shelves];
 }
 
+/** A native app's update, on the built-in app whose screens it runs in. */
+interface NativeUpdate {
+    readonly id: string;
+    readonly name: string;
+    readonly state: CardUpdateState;
+}
+
+function NativeUpdateNote({ update }: { update: NativeUpdate }) {
+    const { row, busy, refused } = update.state;
+    if (!busy && !refused && !(row && (newerBuild(row) || row.checkFailed))) return null;
+    return (
+        <div data-native-update={update.id} className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <p className="truncate text-xs text-muted-foreground" title={update.name}>
+                    {update.name}
+                </p>
+                <CardUpdateNote state={update.state} />
+            </div>
+            {leadsWithUpdate(update.state) && <CardUpdateButton state={update.state} />}
+        </div>
+    );
+}
+
 /**
  * An app every Polaris comes with, on the same card as the ones an
  * administrator switches on. Nothing installs it, so nothing offers to remove
  * it: the card says it is built in, and opens it.
  */
-function BuiltInCard({ entry }: { entry: BuiltInListing }) {
+function BuiltInCard({
+    entry,
+    updates = []
+}: {
+    entry: BuiltInListing;
+    updates?: readonly NativeUpdate[];
+}) {
     const t = useTranslations("marketplace");
     const navLabel = useNavLabel();
     const locale = useLocale();
@@ -620,6 +695,15 @@ function BuiltInCard({ entry }: { entry: BuiltInListing }) {
             }
             byline={t("polaris.builtInBy")}
             summary={entry.summary}
+            note={
+                updates.length > 0 ? (
+                    <>
+                        {updates.map((update) => (
+                            <NativeUpdateNote key={update.id} update={update} />
+                        ))}
+                    </>
+                ) : undefined
+            }
             badges={<Badge>{navLabel(switcherCategory(entry.category))}</Badge>}
             status={<Badge>{t("polaris.builtIn")}</Badge>}
             actions={

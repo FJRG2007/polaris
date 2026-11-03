@@ -1636,6 +1636,7 @@
         "web/src/app/(app)/apps/marketplace/marketplace-view.tsx",
         "web/src/app/(app)/apps/marketplace/layout.tsx",
         "web/src/app/(app)/apps/marketplace/store-card.tsx",
+        "web/src/app/(app)/apps/marketplace/store-card-update.tsx",
         "web/src/app/(app)/apps/marketplace/[appId]/screenshot-gallery.tsx",
         "web/src/app/(app)/apps/marketplace/[appId]/app-detail.tsx",
         "web/src/app/(app)/watch/page.tsx",

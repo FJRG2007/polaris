@@ -127,6 +127,44 @@ describe("an app update on its card", () => {
         expect(screen.queryByRole("button", { name: "Update now" })).toBeNull();
     });
 
+    it("shows a native app's update on the built-in card it runs in, and updates it with the rest", async () => {
+        const native = { ...row(), id: "security-scans", name: "Security scans" } as AppUpdateRow;
+        vi.mocked(appUpdatesAction).mockResolvedValue([row(), native]);
+        vi.mocked(changeAppBuildAction).mockImplementation(async (id) => ({
+            rows: [
+                row({ newer: false }),
+                id === "security-scans" ? ({ ...native, available: null } as AppUpdateRow) : native
+            ]
+        }));
+        const { container } = renderGrid();
+
+        await screen.findByText("2 updates available");
+        const note = container.querySelector(
+            '[data-built-in="apps"] [data-native-update="security-scans"]'
+        );
+        expect(note?.textContent).toContain("Security scans");
+        expect(note?.textContent).toContain("1.1.0 (bbbbbbb) available");
+        expect(container.querySelector('[data-native-update="cloud-servers"]')).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Update all apps" }));
+        await waitFor(() => expect(changeAppBuildAction).toHaveBeenCalledTimes(2));
+        expect(changeAppBuildAction).toHaveBeenCalledWith("game-servers", "update");
+        expect(changeAppBuildAction).toHaveBeenCalledWith("security-scans", "update");
+    });
+
+    it("says when the updates could not be checked, and checks again on request", async () => {
+        vi.mocked(appUpdatesAction).mockRejectedValueOnce(new Error("down"));
+        vi.mocked(appUpdatesAction).mockResolvedValueOnce([row()]);
+        renderGrid();
+
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toContain("Could not check for updates");
+        fireEvent.click(screen.getByRole("button", { name: "Check for app updates" }));
+        expect(await screen.findByText("1.1.0 (bbbbbbb) available")).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(appUpdatesAction).toHaveBeenLastCalledWith(true);
+    });
+
     it("asks nothing for a reader the update action would refuse", async () => {
         renderGrid(false);
         await waitFor(() => expect(screen.getByLabelText("More for Game servers")).toBeTruthy());
