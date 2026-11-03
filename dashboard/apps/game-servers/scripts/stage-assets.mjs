@@ -4,7 +4,7 @@
  * and the manifests their pickers search.
  *
  * The Minecraft set is vendored in resources/mcicons and the ARK set in
- * resources/arkicons (see their READMEs), and the default player skins in
+ * resources/arkicons (see its README), and the default player skins in
  * resources/default-skins. Each manifest is derived here rather
  * than committed, so a list and the files behind it cannot drift apart. The ARK
  * one is the catalogue minus its blueprint paths: the server needs those and the

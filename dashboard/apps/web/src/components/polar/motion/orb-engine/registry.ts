@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // Mode key -> geometry builder. Kept separate from the presets so tree
 // shaking can in principle drop unused modes in custom builds.
 

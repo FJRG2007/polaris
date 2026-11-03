@@ -67,7 +67,7 @@ with your own key if you hand them out; the launcher pins its Show answer to the
 ## Credits
 
 Prayer icons: [Lucide](https://lucide.dev) (ISC) and [Feather](https://feathericons.com) (MIT). Font: Outfit
-(SIL Open Font License, `FONT-LICENSE-OFL.txt`).
+(SIL Open Font License).
 
 ## Tested on
 

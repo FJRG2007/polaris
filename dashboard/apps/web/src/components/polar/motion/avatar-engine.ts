@@ -1,6 +1,6 @@
 /**
- * The rig behind Polar's avatar, ported from Libraries.dev's bot avatars (MIT,
- * see LICENSE beside this file). A pose is a handful of numbers - head yaw,
+ * The rig behind Polar's avatar, ported from Libraries.dev's bot avatars
+ * (MIT). A pose is a handful of numbers - head yaw,
  * pitch and roll, a position, squash, the lids, where the eyes look - and blend
  * weights for the three states. A `Sim` advances a pose through time: each
  * state sets targets and wanders around them, runs its own events (a jump, a

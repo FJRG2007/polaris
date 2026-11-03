@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // Web: a constellation wires itself - the "connecting" state. Nodes drift
 // on the sphere under slow value noise; any pair closer than `thr` grows an
 // edge, and bright packets run along randomly re-picked node pairs.

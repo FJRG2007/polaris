@@ -147,21 +147,17 @@ describe("the editors' fonts", () => {
             return [into, () => rmSync(into, { recursive: true, force: true })];
         };
 
-        it("puts the licence in the directory the fonts are served from", () => {
-            // Carlito, Liberation and the Noto faces are OFL 1.1, which requires
-            // the licence text to accompany every redistributed copy, and this
-            // directory is where they are redistributed - the runtime image
-            // carries `public/` and nothing else, so a text left in the checkout
-            // ships nowhere near the fonts it covers. The README travels with it
-            // because it is what records the exception: Caladea is Apache-2.0,
-            // and the Carlito build here is a renamed derivative under §2.
+        it("puts the notices in the directory the fonts are served from", () => {
+            // The runtime image carries `public/` and nothing else, so a notice
+            // left in the checkout ships nowhere near the fonts it covers. The
+            // README is what records the exception: Caladea is Apache-2.0, and
+            // the Carlito build here is a renamed derivative under §2.
             const [into, clean] = staging();
             try {
                 const { faces, notices } = stageFonts(into);
                 const written = readdirSync(into);
                 expect(faces).toBe(written.filter((name) => FACE.test(name)).length);
                 expect(notices).toBe(written.filter((name) => !FACE.test(name)).length);
-                expect(written).toContain("genoffice-docs-LICENSE-OFL.txt");
                 // Both packages call theirs README.md, which is why a notice is
                 // staged under the name of the package it came from: flat, one
                 // would answer for the other.

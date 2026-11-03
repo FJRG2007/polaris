@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // Engine-level contracts shared by every mode implementation.
 
 import type { ModeOpts } from "./profiles";

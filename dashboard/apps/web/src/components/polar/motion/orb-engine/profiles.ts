@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // Density profiles + the multiplier machinery that scales them. The base
 // rows are inkform's `fine` profiles; each shipped preset (state x size)
 // applies count / radius multipliers on top, resolved once per mount.

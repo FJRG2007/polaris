@@ -30,7 +30,7 @@ The pictures' names, authors and licences are listed here and in `wallpapers/cap
 The launcher's Halloween icons (the jack-o'-lantern on the network pill, lit and dark, the bat on Inputs and in the
 first-Home flight, the ghost on Settings) are from Microsoft's Fluent Emoji 3D, MIT licence, Copyright (c)
 Microsoft Corporation: https://github.com/microsoft/fluentui-emoji. The lit and dark pumpkins are the same picture
-with the carved face recoloured; see `launcher/ICONS-LICENSE-FLUENT-EMOJI.txt`.
+with the carved face recoloured.
 
 `screenshot.jpg` is Home on a real TV with this theme pushed, cut to 1280x720 from the same capture as
 `docs/new-home-halloween.jpg` (1920x1080), on the Xiaomi Mi TV 4A (MiTV-MOOQ1, Android 10) that

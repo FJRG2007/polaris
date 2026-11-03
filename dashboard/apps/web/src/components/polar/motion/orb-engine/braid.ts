@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // Braid: three strands plait around the sphere - the "weaving" state.
 // Each strand runs pole to pole on a helix, and a radial breathing term
 // makes them trade places, reading as the over/under of a plait.

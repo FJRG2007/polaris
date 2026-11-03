@@ -2,7 +2,7 @@
 
 Source: fonts bundled with LibreOffice (`/Applications/LibreOffice.app/Contents/Resources/fonts/truetype`),
 freely redistributable with the app. Licenses: Carlito and Liberation are
-**SIL Open Font License 1.1** (see `LICENSE-OFL.txt`); Caladea is
+**SIL Open Font License 1.1**; Caladea is
 **Apache License 2.0** (copyright Huerta Tipografica).
 
 | Font             | License    | Metric-compatible Word counterpart |
@@ -92,8 +92,8 @@ included. All three derivatives are renamed because the upstream OFL notices
 reserve the name "Source"; "Noto" is the distribution family name, not the
 Reserved Font Name. Conjoining jamo keep native advances (shaping). Word
 counterpart line factors live in `lineHeightFactor()` of `line-metrics.ts`.
-The Sans/Che source copyright (Adobe 2014–2021 and Google LLC), Serif source
-copyright (Adobe 2017–2024), and full OFL 1.1 text are in `LICENSE-OFL.txt`.
+The Sans/Che source copyright is Adobe 2014–2021 and Google LLC, the Serif
+source copyright Adobe 2017–2024.
 
 ### GenOffice Gothic KR
 
@@ -111,8 +111,7 @@ Basic Latin/punctuation/fullwidth forms), advances **unmodified**
 (`tools/build-gothic-kr-font.py`) and checked in as
 `GenOfficeGothicKR-Regular-subset.woff2`. Renamed per OFL (the upstream
 Reserved Font Names include "Nanum" and "NanumGothic"; subsetting is a
-modification). The exact NHN copyright/Reserved Font Name notice and the full
-OFL 1.1 text are in `LICENSE-OFL.txt`.
+modification).
 
 ### GenOffice UI Kana JP
 

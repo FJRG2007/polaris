@@ -38,7 +38,7 @@ import { LOCALES, MEDIA_DIR, MOMENT, THEMES, VIEWPORTS, mediaName } from "./vari
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
 const site = join(here, "out", "site");
-/** The invented people's faces, by account id; see faces/LICENSE.md. */
+/** The invented people's faces, by account id. */
 const faces = join(here, "faces");
 /** Files the fixtures send - pictures, a clip's still, a space's emoji - by the
  *  fixture id the message names them by; see media/LICENSE.md. */

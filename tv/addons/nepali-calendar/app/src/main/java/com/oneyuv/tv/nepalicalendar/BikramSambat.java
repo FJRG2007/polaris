@@ -6,8 +6,8 @@ import java.time.LocalDate;
  * Offline Bikram Sambat (Nepali solar calendar) conversion.
  *
  * The month-length table and its encoding are copied from medic/bikram-sambat
- * (https://github.com/medic/bikram-sambat, java/lib/.../BsCalendar.java, Apache License 2.0,
- * see LICENSE-bikram-sambat). Changed here: java.time epoch days replace the string and
+ * (https://github.com/medic/bikram-sambat, java/lib/.../BsCalendar.java, Apache License 2.0).
+ * Changed here: java.time epoch days replace the string and
  * millisecond arithmetic, and dates outside the table return null instead of throwing.
  */
 final class BikramSambat {

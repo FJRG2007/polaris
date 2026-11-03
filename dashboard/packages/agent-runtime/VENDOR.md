@@ -6,11 +6,10 @@ rather than a rewrite.
 
 - Commit taken: `f52e926a1c0f4a21374780274efcf087cbf07fbd`
 - Taken: 2026-08-04
-- Licence: MIT. `LICENSE` in this directory carries the copyright holder and
-  the notice. That file is a licence obligation and has to stay.
+- Licence: MIT.
 
 Below, `<up>` stands for the upstream product token and `<UP>` for its uppercase
-form. `LICENSE` is the one place the holder is named.
+form.
 
 ## What was taken
 

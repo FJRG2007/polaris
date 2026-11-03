@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // The shipped tunings: nine states x two sizes, baked from the inkform
 // mini-page tuning session. `count`/`size` are multipliers over the base
 // fine profiles; `speed` multiplies the shared clock. Resolved once per

@@ -1,6 +1,6 @@
 /**
  * Polar's avatar on a 2D canvas, the renderer of Libraries.dev's bot avatars
- * (MIT, see LICENSE beside this file) with Polar's own mark as the body.
+ * (MIT) with Polar's own mark as the body.
  *
  * The body is a stack of copies of the bear's outline - the head and both
  * ears - spaced along a depth axis with a pillow profile; each copy is

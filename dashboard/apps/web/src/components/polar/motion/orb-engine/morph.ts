@@ -1,5 +1,4 @@
-// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT) - see
-// the LICENSE in the folder above.
+// Ported from thinking-orbs (github.com/Jakubantalik/Libraries.dev, MIT).
 // Morph: a dotted outline cycling circle -> triangle -> square -> circle -
 // the "shaping" state. Each shape is a continuous closed path
 // parameterised by arc length (top-centre start, clockwise). Every

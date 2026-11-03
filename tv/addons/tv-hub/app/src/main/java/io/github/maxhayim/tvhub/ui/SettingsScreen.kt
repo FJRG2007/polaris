@@ -49,7 +49,7 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
         row("Run setup again", "The first-launch steps for adding sources") {
             ctx.startActivity(Intent(ctx, OnboardingActivity::class.java))
         }
-        row("About and licences", "TV Hub ${BuildConfig.VERSION_NAME}, MIT licence") { about() }
+        row("About", "TV Hub ${BuildConfig.VERSION_NAME}, MIT licence") { about() }
     }
 
     private fun row(title: String, sub: String, onClick: () -> Unit) {
@@ -69,7 +69,7 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
     }
 
     private fun about() {
-        val text = ctx.assets.open("licenses.txt").bufferedReader().use { it.readText() }
+        val text = "MIT licence"
         AlertDialog.Builder(ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("TV Hub ${BuildConfig.VERSION_NAME}")
             .setView(ScrollView(ctx).apply {

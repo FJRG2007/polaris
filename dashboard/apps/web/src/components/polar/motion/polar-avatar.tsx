@@ -2,8 +2,8 @@
 
 /**
  * Polar's animated avatar: the bear from Polar's mark as a living 2D-canvas
- * figure, after Libraries.dev's bot avatars (MIT, see LICENSE beside this
- * file). Awake it looks around and now and then jumps; at work it hops; asleep
+ * figure, after Libraries.dev's bot avatars (MIT).
+ * Awake it looks around and now and then jumps; at work it hops; asleep
  * its head drops and its eyes close. The eyes follow the pointer, and a click
  * makes it hop. Reduced motion draws the state's still pose and nothing else.
  *
