@@ -13,7 +13,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import type { OverviewPreferences } from "@polaris/core";
 import type { AppWidgetKind } from "@/lib/overview/app-widgets";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ToastProvider } from "@polaris/ui";
 
 const saveLayout = vi.hoisted(() => vi.fn(async (_input: unknown) => ({})));
@@ -154,13 +154,21 @@ describe("a card taken off the Overview", () => {
         );
     }
 
-    const removeButton = (container: HTMLElement, key: string) =>
-        container.querySelector(`[data-widget="${key}"] button[aria-label^="Remove"]`)!;
+    /** Opens a card's menu and presses one of its items. */
+    function pick(container: HTMLElement, key: string, item: string): void {
+        const trigger = container.querySelector(
+            `[data-widget="${key}"] button[aria-label^="Arrange"]`
+        )!;
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+        fireEvent.click(screen.getByRole("menuitem", { name: item }));
+    }
+
+    const remove = (container: HTMLElement, key: string) => pick(container, key, "Remove card");
 
     it("is put back without undoing what was changed after it", async () => {
         const { container, getAllByRole } = drawWithToasts();
-        fireEvent.click(removeButton(container, "shortcuts"));
-        fireEvent.click(removeButton(container, "apps"));
+        remove(container, "shortcuts");
+        remove(container, "apps");
         expect(drawn(container)).toEqual(["app:card0001"]);
         const undo = getAllByRole("button", { name: "Put back" });
         await act(async () => fireEvent.click(undo[undo.length - 1]!));
@@ -176,21 +184,21 @@ describe("a card taken off the Overview", () => {
 
     it("leaves a second removed card off when only the first is put back", async () => {
         const { container, getByRole } = drawWithToasts();
-        fireEvent.click(removeButton(container, "shortcuts"));
+        remove(container, "shortcuts");
         const undo = getByRole("button", { name: "Put back" });
-        fireEvent.click(removeButton(container, "apps"));
+        remove(container, "apps");
         await act(async () => fireEvent.click(undo));
         expect(drawn(container)).toEqual(["shortcuts", "app:card0001"]);
     });
 
     it("keeps an app card's own change made while the note is up", async () => {
-        const { container, getAllByRole } = drawWithToasts();
-        fireEvent.click(removeButton(container, "app:card0001"));
-        fireEvent.click(removeButton(container, "apps"));
-        const undo = getAllByRole("button", { name: "Put back" });
-        await act(async () => fireEvent.click(undo[0]!));
-        expect(drawn(container)).toContain("app:card0001");
-        expect(drawn(container)).not.toContain("apps");
+        const { container, getByRole } = drawWithToasts();
+        remove(container, "apps");
+        const undo = getByRole("button", { name: "Put back" });
+        pick(container, "app:card0001", "Hide card");
+        await act(async () => fireEvent.click(undo));
+        expect(drawn(container)).toContain("apps");
+        expect(drawn(container)).not.toContain("app:card0001");
     });
 });
 
