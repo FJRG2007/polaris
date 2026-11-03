@@ -49,16 +49,3 @@ changes private, embedding Polaris in a closed-source product, or selling a
 hosted service built on it without publishing its source - a separate
 commercial license is available from the author. Contact the maintainer listed
 in [CITATION.cff](CITATION.cff).
-
-## Third-party code
-
-Parts of Polaris are ported from, or bundle, third-party projects. Those parts
-keep their own licenses and notices, recorded next to the code they cover (for
-example `dashboard/packages/agent-runtime/LICENSE`).
-
-Polar's motion - the thinking orbs, the voice glow, the composer's border beam
-and Polar's animated avatar (its rig, renderer and pointer tracking, from the
-`bot-avatars` package, drawn with Polar's own mark) - is ported from
-[Libraries.dev](https://github.com/Jakubantalik/Libraries.dev), Copyright (c)
-2026 Jakub Antalik, under the MIT License; the full notice is in
-`dashboard/apps/web/src/components/polar/motion/LICENSE`.
