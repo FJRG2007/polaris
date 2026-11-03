@@ -76,6 +76,10 @@
         "nobody": "Nobody"
     },
     "fields": {
+        "badges": {
+            "label": "Your badges",
+            "note": "Who sees the badges on your profile and how far you are with each. One badge can have its own rule, set on its row in Badges."
+        },
         "profile": {
             "label": "Who can see your profile",
             "note": "Your bio, links, pronouns and banner. Anybody else sees only your name and photo. Small servers are those with fewer than 200 members."

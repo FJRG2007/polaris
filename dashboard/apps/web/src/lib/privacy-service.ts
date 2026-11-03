@@ -69,6 +69,7 @@ const AUDIENCE_COLUMNS = {
     friendRequests: true,
     lastSeen: true,
     activity: true,
+    badges: true,
     forwarding: true,
     fileTransfers: true,
     calls: true,
@@ -841,4 +842,85 @@ async function realPeople(ids: readonly string[]): Promise<string[]> {
     });
     const real = new Set(found.map((person) => person.id));
     return wanted.filter((id) => real.has(id));
+}
+
+/** `assertOwnLists` for a rule kept outside the privacy settings themselves. */
+export async function assertOwnPrivacyLists(userId: string, listIds: readonly string[]): Promise<void> {
+    await assertOwnLists(userId, listIds);
+}
+
+/**
+ * Whether a rule somebody keeps outside their privacy settings lets this viewer
+ * through - a badge's own audience, for one.
+ *
+ * The same decision `allowedBy` makes, from the same facts: the audience is the
+ * rule's, and "in the list" is the rule's own people or the members of the
+ * saved list it names, which must belong to the subject.
+ */
+export async function ruleAllows(
+    viewer: PrivacyViewer,
+    subjectId: string,
+    rule: core.PrivacyRule
+): Promise<boolean> {
+    if (subjectId === viewer.id || viewer.isAdmin) return true;
+    const audience = rule.audience;
+    if (audience === "everyone") return true;
+    if (audience === "nobody") return false;
+    const anonymous = viewer.id === "";
+    if (anonymous) return core.audienceAllows(audience, ANONYMOUS_FACTS);
+
+    const needsFriends =
+        audience === "friends" ||
+        audience === "friendsExcept" ||
+        audience === "friendsOfFriends" ||
+        core.audienceNeedsSpaces(audience);
+    const [inList, friends, reach, shared, rooms] = await Promise.all([
+        core.audienceNeedsList(audience) ? ruleNamesViewer(viewer.id, subjectId, rule) : false,
+        needsFriends ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
+        core.audienceNeedsReach(audience) && audience !== "friendsOfFriends"
+            ? reachBetween(viewer.id, [subjectId])
+            : Promise.resolve({ subjectFollows: new Set<string>(), viewerFollows: new Set<string>() }),
+        audience === "friendsOfFriends"
+            ? sharingAFriend(viewer.id, [subjectId])
+            : Promise.resolve(new Set<string>()),
+        core.audienceNeedsSpaces(audience)
+            ? sharingASpace(viewer.id, [subjectId])
+            : Promise.resolve({ any: new Set<string>(), small: new Set<string>() })
+    ]);
+    return core.audienceAllows(audience, {
+        self: false,
+        friends: friends.has(subjectId),
+        viewerIsAdmin: false,
+        inList,
+        subjectFollowsViewer: reach.subjectFollows.has(subjectId),
+        viewerFollowsSubject: reach.viewerFollows.has(subjectId),
+        sharesAFriend: shared.has(subjectId),
+        sharesSpace: rooms.any.has(subjectId),
+        sharesSmallSpace: rooms.small.has(subjectId)
+    });
+}
+
+const ANONYMOUS_FACTS = {
+    self: false,
+    friends: false,
+    viewerIsAdmin: false,
+    inList: false,
+    subjectFollowsViewer: false,
+    viewerFollowsSubject: false,
+    sharesAFriend: false,
+    sharesSpace: false,
+    sharesSmallSpace: false
+} as const;
+
+async function ruleNamesViewer(
+    viewerId: string,
+    subjectId: string,
+    rule: core.PrivacyRule
+): Promise<boolean> {
+    if (rule.listId === null) return rule.people.includes(viewerId);
+    const member = await prisma.privacyListMember.findFirst({
+        where: { userId: viewerId, listId: rule.listId, list: { userId: subjectId } },
+        select: { listId: true }
+    });
+    return member !== null;
 }

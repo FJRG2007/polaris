@@ -76,6 +76,10 @@
         "nobody": "Nadie"
     },
     "fields": {
+        "badges": {
+            "label": "Tus insignias",
+            "note": "Quién ve las insignias de tu perfil y cuánto te falta en cada una. Una insignia puede tener su propia regla, desde su fila en Insignias."
+        },
         "profile": {
             "label": "Quién puede ver tu perfil",
             "note": "Tu biografía, enlaces, pronombres y banner. El resto solo ve tu nombre y tu foto. Un servidor pequeño tiene menos de 200 miembros."
