@@ -27,10 +27,7 @@ export function normalizeTerm(raw: string): string {
     return raw.normalize("NFC").replace(/\s+/g, " ").trim();
 }
 
-const term = z
-    .string()
-    .transform(normalizeTerm)
-    .pipe(z.string().min(1).max(TERM_MAX));
+const term = z.string().transform(normalizeTerm).pipe(z.string().min(1).max(TERM_MAX));
 
 export const glossaryEntry = z.object({ source: term, target: term });
 export type GlossaryEntry = z.infer<typeof glossaryEntry>;
@@ -42,22 +39,30 @@ function unique<T>(items: readonly T[], key: (item: T) => string): T[] {
     return [...seen.values()];
 }
 
-export const glossaryInput = z
-    .object({
-        name: z
-            .string()
-            .transform(normalizeTerm)
-            .pipe(z.string().min(1).max(NAME_MAX)),
-        from: languageCode,
-        to: languageCode,
-        isDefault: z.boolean(),
-        entries: z
-            .array(glossaryEntry)
-            .max(ENTRIES_MAX)
-            .transform((entries) => unique(entries, (entry) => entry.source))
-    })
-    .refine((value) => value.from !== value.to, { path: ["to"], message: "same" });
+const glossaryFields = z.object({
+    name: z.string().transform(normalizeTerm).pipe(z.string().min(1).max(NAME_MAX)),
+    from: languageCode,
+    to: languageCode,
+    isDefault: z.boolean(),
+    entries: z
+        .array(glossaryEntry)
+        .max(ENTRIES_MAX)
+        .transform((entries) => unique(entries, (entry) => entry.source))
+});
+
+const differentLanguages = (value: { from: string; to: string }) => value.from !== value.to;
+
+export const glossaryInput = glossaryFields.refine(differentLanguages, {
+    path: ["to"],
+    message: "same"
+});
 export type GlossaryInput = z.infer<typeof glossaryInput>;
+
+/** What the save action takes: a glossary, and the id of the one it replaces. */
+export const saveGlossaryInput = glossaryFields
+    .extend({ id: z.string().uuid().optional() })
+    .strict()
+    .refine(differentLanguages, { path: ["to"], message: "same" });
 
 export const keepInput = z
     .array(term)
@@ -122,15 +127,21 @@ const key = (text: string) => text.replace(/\s+/g, " ").toLocaleLowerCase();
  */
 export function protect(texts: readonly string[], terms: Terms): Protected {
     const rules = new Map<string, Slot>();
-    for (const entry of terms.entries) rules.set(key(entry.source), { kind: "entry", target: entry.target });
+    for (const entry of terms.entries)
+        rules.set(key(entry.source), { kind: "entry", target: entry.target });
     // A kept word wins over a glossary entry for the same term.
     for (const word of terms.keep) rules.set(key(word), { kind: "keep" });
     const found: string[] = [];
     const slots: Slot[] = [];
     const sources = [...rules.keys()].filter(Boolean).sort((a, b) => b.length - a.length);
     if (sources.length === 0) return { texts: [...texts], found, slots, used: false };
-    const alternatives = sources.map((source) => escapeRegExp(source).replace(/ /g, "\\s+")).join("|");
-    const pattern = new RegExp(String.raw`(?<![\p{L}\p{N}])(?:${alternatives})(?![\p{L}\p{N}])`, "giu");
+    const alternatives = sources
+        .map((source) => escapeRegExp(source).replace(/ /g, "\\s+"))
+        .join("|");
+    const pattern = new RegExp(
+        String.raw`(?<![\p{L}\p{N}])(?:${alternatives})(?![\p{L}\p{N}])`,
+        "giu"
+    );
     const out = texts.map((text) =>
         text.replace(pattern, (match) => {
             const slot = rules.get(key(match));
@@ -151,7 +162,8 @@ function wordingFor(found: string, slot: Slot): string {
     const first = Array.from(found)[0] ?? "";
     const capital = first !== first.toLocaleLowerCase() && first === first.toLocaleUpperCase();
     const letters = found.match(/\p{L}/gu) ?? [];
-    const allCaps = letters.length > 1 && letters.every((letter) => letter !== letter.toLocaleLowerCase());
+    const allCaps =
+        letters.length > 1 && letters.every((letter) => letter !== letter.toLocaleLowerCase());
     if (allCaps) return target.toLocaleUpperCase();
     if (capital) return target.charAt(0).toLocaleUpperCase() + target.slice(1);
     return target;
@@ -161,7 +173,9 @@ function wordingFor(found: string, slot: Slot): string {
 export function restore(texts: readonly string[], shielded: Protected): string[] {
     return texts.map((text) =>
         text.replace(PLACEHOLDER, (whole, digits: string) => {
-            const index = Number(digits.replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10)));
+            const index = Number(
+                digits.replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10))
+            );
             const slot = shielded.slots[index];
             const found = shielded.found[index];
             return slot && found !== undefined ? wordingFor(found, slot) : whole;

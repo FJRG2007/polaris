@@ -28,6 +28,7 @@ import {
     Languages,
     MessagesSquare,
     Ghost,
+    BookA,
     Mic,
     Paperclip,
     Settings2,
@@ -71,6 +72,8 @@ import {
 import type { Reads } from "./reads";
 import { PIECE_MAX } from "../model/chunk";
 import { runTranslation, translateReusing, type PieceCache, type Translate } from "./run";
+import { useGlossaries } from "./glossaries";
+import { withTerms } from "../model/glossary";
 import { useLanguageOptions } from "./language-options";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
@@ -163,6 +166,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [target, setTarget] = useState("");
     const [answeredBy, setAnsweredBy] = useState<EngineId | null>(null);
     const [detected, setDetected] = useState<string | null>(null);
+    // The language detection last named, for choosing a glossary before it names one again.
+    const lastDetected = useRef<string | null>(null);
+    useEffect(() => {
+        if (detected) lastDetected.current = detected;
+    }, [detected]);
+    const { termsFor } = useGlossaries();
+    // What the last translation applied: a glossary's name, the keep list, or nothing.
+    const [termsUsed, setTermsUsed] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [download, setDownload] = useState<number | null>(null);
@@ -259,25 +270,41 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 
     // Every mode translates through this: the chosen engine, or each usable
     // one in the administrator's order until one answers.
+    // The pair's default glossary and the never-translate list go with it.
     const translate = useCallback<Translate>(
-        (texts, signal, pair) => {
-            if (!engineId) return Promise.reject(new Error(t("errors.noEngineReader")));
+        async (texts, signal, pair) => {
+            if (!engineId) throw new Error(t("errors.noEngineReader"));
             const order = [engineId, ...usable.filter((id) => id !== engineId && chosen === null)];
-            return runTranslation(
-                texts,
-                {
-                    engines,
-                    order,
-                    from: pair ? pair.from : from === AUTO ? null : from,
-                    to: pair ? pair.to : targetLanguage,
-                    charLimit,
-                    fallback: t("errors.failed"),
-                    overLimit: (limit) => t("errors.overLimit", { limit })
-                },
-                signal
+            const fromLang = pair ? pair.from : from === AUTO ? null : from;
+            const toLang = pair ? pair.to : targetLanguage;
+            const applied = await termsFor(
+                fromLang ?? (pair ? null : lastDetected.current),
+                toLang
             );
+            const answer = await withTerms(texts, applied.terms, (shielded) =>
+                runTranslation(
+                    shielded,
+                    {
+                        engines,
+                        order,
+                        from: fromLang,
+                        to: toLang,
+                        charLimit,
+                        fallback: t("errors.failed"),
+                        overLimit: (limit) => t("errors.overLimit", { limit })
+                    },
+                    signal
+                )
+            );
+            const used = answer.glossaryUsed
+                ? applied.name
+                    ? t("glossary.used", { name: applied.name })
+                    : t("glossary.keepUsed")
+                : null;
+            if (!signal?.aborted) setTermsUsed(used);
+            return { texts: answer.texts, detected: answer.detected, engine: answer.engine };
         },
-        [engineId, usable, chosen, engines, from, targetLanguage, charLimit, t]
+        [engineId, usable, chosen, engines, from, targetLanguage, charLimit, termsFor, t]
     );
 
     // Translate on a pause in typing; a newer request cancels the older one.
@@ -294,6 +321,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         }
         loaded.current = null;
         if (!text.trim() || !engineId) {
+            setTermsUsed(null);
             setTarget("");
             setPending(false);
             setError(null);
@@ -623,6 +651,12 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         >
                             <Ghost className="size-4 shrink-0" aria-hidden />
                         </Button>
+                        <Button asChild variant="outline" size="sm">
+                            <Link href="/translate/glossaries">
+                                <BookA className="size-4 shrink-0" aria-hidden />
+                                {t("glossary.open")}
+                            </Link>
+                        </Button>
                         {manager ? (
                             <Button asChild variant="outline" size="sm">
                                 <Link href="/admin/apps/translate/settings">
@@ -733,6 +767,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                             </span>
                         ) : null}
                     </span>
+                    {termsUsed ? <GlossaryMark label={termsUsed} /> : null}
                     <Button variant="ghost" size="sm" onClick={() => setInput({ kind: "text" })}>
                         <X className="size-4 shrink-0" aria-hidden />
                         {t("input.backToText")}
@@ -771,12 +806,19 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     file={input.kind === "audio" ? input.file : null}
                 />
             ) : input.kind === "website" ? (
-                <WebsiteMode
-                    translate={translate}
-                    charLimit={charLimit}
-                    url={input.url}
-                    onClose={() => setInput({ kind: "text" })}
-                />
+                <>
+                    {termsUsed ? (
+                        <p className="mb-2 flex min-w-0">
+                            <GlossaryMark label={termsUsed} />
+                        </p>
+                    ) : null}
+                    <WebsiteMode
+                        translate={translate}
+                        charLimit={charLimit}
+                        url={input.url}
+                        onClose={() => setInput({ kind: "text" })}
+                    />
+                </>
             ) : null}
             <div
                 className={cn(
@@ -946,7 +988,10 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                             ) : download !== null && download < 1 ? (
                                 t("engine.downloading", { percent: Math.round(download * 100) })
                             ) : answeredBy && target ? (
-                                t("engine.answeredBy", { engine: t(ENGINE_KEY[answeredBy]) })
+                                <>
+                                    {t("engine.answeredBy", { engine: t(ENGINE_KEY[answeredBy]) })}
+                                    {termsUsed ? <GlossaryMark label={termsUsed} /> : null}
+                                </>
                             ) : null}
                         </span>
                         {canSpeak ? (
@@ -1047,5 +1092,18 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 onConfirm={() => void clearAll()}
             />
         </div>
+    );
+}
+
+/** Says a glossary or the never-translate list shaped the translation. */
+function GlossaryMark({ label }: { label: string }) {
+    return (
+        <span
+            className="ml-2 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+            title={label}
+        >
+            <BookA className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{label}</span>
+        </span>
     );
 }

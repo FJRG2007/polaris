@@ -3,14 +3,17 @@
 /**
  * What the Translate screen asks the server besides translating: the reader's
  * history, and the owner's settings. Each action validates its input first;
- * history is always the caller's own, settings need an administrator.
+ * history and glossaries are always the caller's own, settings need an
+ * administrator.
  */
 
 import { host } from "@polaris/app-host";
 import { translateT } from "../lib/i18n";
 import * as history from "../lib/history";
+import * as glossary from "../lib/glossary";
 import type { TranslateKey } from "../../messages";
 import { loadSettings, saveSettings } from "../lib/settings";
+import { keepInput, saveGlossaryInput } from "../model/glossary";
 import { idInput, rememberInput, settingsInput, type TranslateSettings } from "../model/schemas";
 
 export type Outcome<T> =
@@ -79,4 +82,65 @@ export async function saveSettingsAction(
         await saveSettings(parsed.data);
         return { settings: parsed.data };
     });
+}
+
+/** The caller's glossaries, without their terms, and their never-translate list. */
+export async function glossariesAction(): Promise<
+    Outcome<{ glossaries: glossary.GlossarySummary[]; keep: string[] }>
+> {
+    return settle(async (user) => {
+        const [glossaries, keep] = await Promise.all([
+            glossary.listGlossaries(user.id),
+            glossary.getKeepList(user.id)
+        ]);
+        return { glossaries, keep };
+    });
+}
+
+/** One of the caller's glossaries with its terms. */
+export async function glossaryAction(
+    input: unknown
+): Promise<Outcome<{ glossary: glossary.Glossary }>> {
+    const parsed = idInput.safeParse(input);
+    if (!parsed.success) return refuse("errors.invalid");
+    const found = await settle(async (user) => ({
+        glossary: await glossary.getGlossary(user.id, parsed.data.id)
+    }));
+    if (!found.ok) return found;
+    if (!found.glossary) return refuse("glossary.errors.missing");
+    return { ok: true, glossary: found.glossary };
+}
+
+/** A new glossary (no `id`), or one of the caller's changed. */
+export async function saveGlossaryAction(
+    input: unknown
+): Promise<Outcome<{ glossary: glossary.Glossary }>> {
+    const parsed = saveGlossaryInput.safeParse(input);
+    if (!parsed.success) return refuse("errors.invalid");
+    const { id, ...rest } = parsed.data;
+    const user = await host.session.requirePermission("translate.use");
+    try {
+        const saved = await glossary.saveGlossary(user.id, id ?? null, rest);
+        if (!saved) return refuse("glossary.errors.missing");
+        return { ok: true, glossary: saved };
+    } catch (caught) {
+        if (caught instanceof glossary.GlossaryLimitError) return refuse("glossary.errors.limit");
+        console.error("polaris: a glossary could not be saved:", caught);
+        return refuse("glossary.errors.saveFailed");
+    }
+}
+
+export async function deleteGlossaryAction(input: unknown): Promise<Outcome<object>> {
+    const parsed = idInput.safeParse(input);
+    if (!parsed.success) return refuse("errors.invalid");
+    return settle(async (user) => {
+        await glossary.deleteGlossary(user.id, parsed.data.id);
+        return {};
+    });
+}
+
+export async function saveKeepAction(input: unknown): Promise<Outcome<{ keep: string[] }>> {
+    const parsed = keepInput.safeParse(input);
+    if (!parsed.success) return refuse("errors.invalid");
+    return settle(async (user) => ({ keep: await glossary.saveKeepList(user.id, parsed.data) }));
 }
