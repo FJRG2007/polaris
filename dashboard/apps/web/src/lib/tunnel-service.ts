@@ -42,6 +42,12 @@ async function activeTunnel(): Promise<{
     return null;
 }
 
+/** Whether an account tunnel should be running at all: a provider is switched on
+ *  and has its token. What the reaper keeps `polaris-tunnel` for. */
+export async function accountTunnelWanted(): Promise<boolean> {
+    return (await activeTunnel()) !== null;
+}
+
 export async function getTunnelStatus(): Promise<TunnelStatus> {
     const active = await activeTunnel();
     return { provider: active?.provider ?? "none", running: await tunnelRunning() };

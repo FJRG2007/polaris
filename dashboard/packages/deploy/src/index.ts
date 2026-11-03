@@ -7,6 +7,14 @@
 
 export { slugify, shortHash, serviceName, imageTag } from "./naming.js";
 export {
+    ACCOUNT_TUNNEL_PROJECT,
+    BACKUP_TUNNEL_PROJECT,
+    SHARE_TUNNEL_PROJECT,
+    sidecarOf,
+    type Sidecar,
+    type SidecarFeature
+} from "./polaris-sidecars.js";
+export {
     RELEASE_LABEL,
     RELEASE_REPOSITORY,
     isReleaseImage,
