@@ -9,6 +9,9 @@
  * so it only disables the button; the reason something is not an address
  * appears once there is text. A well-formed address is then asked whether it
  * is a Polaris, 400 ms after typing pauses, and Open stays off until it is.
+ * An address already on the list says so at once and is never asked about:
+ * its row is the way to open it. The name is optional and kept with the
+ * address, so the row reads "Home" instead of the host.
  */
 
 import { available, byId, say } from "./dom";
@@ -17,6 +20,7 @@ import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } 
 
 const form = byId<HTMLFormElement>("form");
 const input = byId<HTMLInputElement>("address");
+const nameInput = byId<HTMLInputElement>("name");
 const submit = byId<HTMLButtonElement>("submit");
 const failure = byId<HTMLParagraphElement>("failure");
 const note = byId<HTMLSpanElement>("address-note");
@@ -35,6 +39,8 @@ const hint = note.textContent ?? "";
 let busy = false;
 /** How many servers are listed; null until the first answer. */
 let known: number | null = null;
+/** The hosts listed, so a typed address already among them is caught as it is typed. */
+let rows: readonly ServerRow[] = [];
 let removing: ServerRow | null = null;
 
 /** How long the field waits after the last keystroke before it asks. */
@@ -57,6 +63,14 @@ function check(): string | null {
         available(submit, false);
         return null;
     }
+    const listed = rows.find((row) => row.origin === parsed.data);
+    if (listed) {
+        input.setAttribute("aria-invalid", "true");
+        note.textContent = `Already on your list as ${describeServer(listed)}.`;
+        note.className = "error";
+        available(submit, false);
+        return null;
+    }
     const found = confirmed === parsed.data;
     available(submit, found && !busy);
     return found ? parsed.data : null;
@@ -68,6 +82,7 @@ function ask(): void {
     const ticket = (asked += 1);
     const parsed = serverAddressSchema.safeParse(input.value);
     if (!parsed.success || confirmed === parsed.data) return;
+    if (rows.some((row) => row.origin === parsed.data)) return;
     const origin = parsed.data;
     confirmed = null;
     input.setAttribute("aria-invalid", "false");
@@ -234,6 +249,7 @@ function showPage(general: boolean): void {
 function draw(servers: readonly ServerRow[]): void {
     const first = known === null;
     known = servers.length;
+    rows = servers;
     list.hidden = servers.length === 0;
     tabs.hidden = servers.length === 0;
     title.textContent = servers.length === 0 ? "Open your Polaris" : "Polaris";
@@ -247,6 +263,9 @@ function draw(servers: readonly ServerRow[]): void {
             return row;
         })
     );
+    // A host removed or added changes what the typed address is.
+    check();
+    ask();
 }
 
 async function refresh(): Promise<void> {
@@ -298,6 +317,7 @@ void window.polarisLocal.connect.preferences().catch(() => null).then((preferenc
     byId("version").textContent = `Polaris ${preferences.version}`;
 });
 
+nameInput.maxLength = SERVER_NAME_MAX;
 input.addEventListener("input", () => {
     say(failure, null);
     check();
@@ -313,7 +333,7 @@ form.addEventListener("submit", (event) => {
     check();
     let added = false;
     void window.polarisLocal.connect
-        .submit(input.value)
+        .submit(input.value, normalizeServerName(nameInput.value) ?? "")
         .then((result) => {
             added = result.ok;
             if (!result.ok) say(failure, result.error);
@@ -322,6 +342,12 @@ form.addEventListener("submit", (event) => {
         .finally(async () => {
             busy = false;
             submit.textContent = "Open";
+            // Emptied before the list comes back, so the address just added is
+            // not then read as one already on it.
+            if (added) {
+                input.value = "";
+                nameInput.value = "";
+            }
             check();
             await refresh();
             if (added && known) showForm(false);

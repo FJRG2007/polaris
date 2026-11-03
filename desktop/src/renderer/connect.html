@@ -22,13 +22,13 @@
             <h1 id="title">Open your Polaris</h1>
         </header>
         <nav id="tabs" class="tabs" role="tablist" aria-label="Settings" hidden>
-            <button id="tab-servers" type="button" role="tab" aria-selected="true" aria-controls="servers-page">Servers</button>
+            <button id="tab-servers" type="button" role="tab" aria-selected="true" aria-controls="servers-page">Hosts</button>
             <button id="tab-general" type="button" role="tab" aria-selected="false" aria-controls="general-page">General</button>
         </nav>
         <p id="failure" class="banner bad" role="alert" hidden></p>
         <section id="servers-page" role="tabpanel">
-            <ul id="server-list" class="server-list" aria-label="Your servers" hidden></ul>
-            <button id="show-add" class="ghost" type="button" hidden>Add a server</button>
+            <ul id="server-list" class="server-list" aria-label="Your hosts" hidden></ul>
+            <button id="show-add" class="ghost" type="button" hidden>Add a host</button>
             <form id="form" novalidate>
                 <label class="field-label">
                     <span id="address-label">The address you open Polaris at *</span>
@@ -44,6 +44,11 @@
                         autofocus
                     />
                     <span id="address-note" class="hint" aria-live="polite">https://, or http:// for an address on your own network.</span>
+                </label>
+                <label class="field-label">
+                    <span>Name</span>
+                    <input id="name" name="name" type="text" spellcheck="false" placeholder="Home, Work..." aria-describedby="name-note" />
+                    <span id="name-note" class="hint">Optional. Shown in the list instead of the address.</span>
                 </label>
                 <div class="row end">
                     <button id="hide-add" class="ghost" type="button" hidden>Cancel</button>
@@ -64,7 +69,7 @@
         </div>
         <dialog id="confirm-remove" aria-labelledby="remove-title" aria-describedby="remove-body">
             <p id="remove-title" class="name"></p>
-            <p id="remove-body" class="hint">It only leaves this list. The server and your account stay as they are.</p>
+            <p id="remove-body" class="hint">It only leaves this list. The host and your account stay as they are.</p>
             <div class="row end">
                 <button id="remove-cancel" class="ghost" type="button">Cancel</button>
                 <!-- enigma: a confirmation button, whose whole job is to be read. -->

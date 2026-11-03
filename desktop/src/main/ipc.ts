@@ -48,7 +48,7 @@ export interface IpcHost extends PushHost {
     readonly preferences: () => { openAtLogin: boolean; version: string };
     readonly setOpenAtLogin: (open: boolean) => boolean;
     readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
-    readonly connectSubmit: (raw: unknown) => Promise<Outcome>;
+    readonly connectSubmit: (raw: unknown, name?: string) => Promise<Outcome>;
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
     readonly switchServer: (origin: string) => Promise<Outcome>;
     readonly nameServer: (origin: string, name: string) => Outcome;
@@ -63,6 +63,9 @@ export interface IpcHost extends PushHost {
 
 /** A server named by the list: an address in the one stored form. */
 const listedSchema = z.unknown().transform(readServerAddress).pipe(z.string());
+/** An address to open, and the name to list it under. A bare string is what a
+ *  page from before names were asked for sends. */
+const submitSchema = z.union([z.string(), z.object({ address: z.string(), name: z.string().max(200).default("") })]);
 
 const noticeSchema = z.object({
     title: z.string().trim().min(1).max(200),
@@ -402,9 +405,13 @@ export function registerIpc(host: IpcHost): void {
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));
-    ipcMain.handle(CHANNELS.connectSubmit, (event, raw: unknown) =>
-        from(event, "connect") ? host.connectSubmit(raw) : REFUSED
-    );
+    ipcMain.handle(CHANNELS.connectSubmit, (event, raw: unknown) => {
+        const input = submitSchema.safeParse(raw);
+        if (!from(event, "connect") || !input.success) return REFUSED;
+        return typeof input.data === "string"
+            ? host.connectSubmit(input.data)
+            : host.connectSubmit(input.data.address, input.data.name);
+    });
     ipcMain.handle(CHANNELS.connectCheck, (event, raw: unknown) =>
         from(event, "connect") ? host.connectCheck(raw) : { ok: false, message: null }
     );

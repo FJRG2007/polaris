@@ -298,15 +298,18 @@ function goBack(): void {
     if (index !== null) history.goToIndex(index);
 }
 
-async function connectSubmit(raw: unknown): Promise<Outcome> {
+async function connectSubmit(raw: unknown, typedName = ""): Promise<Outcome> {
     const parsed = serverAddressSchema.safeParse(typeof raw === "string" ? raw : "");
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "That is not an address." };
+    const name = normalizeServerName(typedName);
+    if (name && name.length > SERVER_NAME_MAX) return { ok: false, error: `Use at most ${SERVER_NAME_MAX} characters.` };
     const origin = parsed.data;
     const problem = await probe(origin);
     if (problem) return { ok: false, error: problem };
 
     const changed = origin !== current;
     setServerAddress(origin);
+    if (name) setSavedServers(renameServer(savedServers(), origin, name));
     if (changed) leaveServer();
     current = origin;
     loadError = null;
@@ -333,7 +336,7 @@ function servers() {
  *  probed first and an unreachable one says why instead of opening a blank window. */
 function switchServer(origin: string): Promise<Outcome> {
     if (!savedServers().some((server) => server.origin === origin)) {
-        return Promise.resolve({ ok: false, error: "That server is not in the list any more." });
+        return Promise.resolve({ ok: false, error: "That host is not on the list any more." });
     }
     return connectSubmit(origin);
 }

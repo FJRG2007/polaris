@@ -1231,6 +1231,13 @@ button.copied {
     overflow-wrap: anywhere;
 }
 
+.add-name {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
 .problem.inline,
 .add-server .check {
     margin: 0;

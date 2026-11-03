@@ -169,7 +169,7 @@ export function ServersPanel({
             <AddServer
                 known={status.servers}
                 busy={busy}
-                onAdd={async (typed) => act({ kind: "addServer", typed })}
+                onAdd={async (typed, name) => act({ kind: "addServer", typed, name })}
                 onRefused={setRefused}
             />
             {removing ? (
@@ -258,18 +258,21 @@ function AddServer({
 }: {
     known: readonly ServerRef[];
     busy: boolean;
-    onAdd: (typed: string) => Promise<boolean>;
+    onAdd: (typed: string, name: string) => Promise<boolean>;
     onRefused: (error: string | null) => void;
 }): React.JSX.Element {
     const t = useWords();
     const [open, setOpen] = useState(false);
     const [typed, setTyped] = useState("");
+    const [typedName, setTypedName] = useState("");
+    const name = normalizeServerName(typedName);
+    const nameProblem = serverNameProblem(name);
     const origin = readOrigin(typed);
-    const already = origin !== null && known.some((one) => one.origin === origin);
+    const already = origin === null ? undefined : known.find((one) => one.origin === origin);
     // Asked live, so an address that is not a Polaris never reaches the
     // permission prompt: the button stays off and the line says why.
     const check = useAddressCheck(typed);
-    const usable = addable(check) && !already && !busy;
+    const usable = addable(check) && !already && nameProblem === null && !busy;
 
     const add = async (): Promise<void> => {
         if (!usable || !origin) return;
@@ -278,8 +281,9 @@ function AddServer({
             onRefused(t("errors.noPermission"));
             return;
         }
-        if (await onAdd(typed)) {
+        if (await onAdd(typed, name ?? "")) {
             setTyped("");
+            setTypedName("");
             setOpen(false);
         }
     };
@@ -305,7 +309,10 @@ function AddServer({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                aria-invalid={already || (check.kind !== "incomplete" && check.kind !== "checking" && !addable(check))}
+                aria-invalid={
+                    Boolean(already) ||
+                    (check.kind !== "incomplete" && check.kind !== "checking" && !addable(check))
+                }
                 onChange={(event) => setTyped(event.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === "Enter") void add();
@@ -313,9 +320,32 @@ function AddServer({
                 }}
             />
             {already ? (
-                <p className="problem inline">{t("servers.already")}</p>
+                <p className="problem inline">
+                    {t("servers.already", { name: describeServer(already) })}
+                </p>
             ) : (
                 <AddressNote check={check} />
+            )}
+            <label className="add-name">
+                <span className="muted small">{t("servers.newName")}</span>
+                <input
+                    value={typedName}
+                    aria-invalid={nameProblem !== null}
+                    autoCapitalize="words"
+                    spellCheck={false}
+                    onChange={(event) => setTypedName(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") void add();
+                        if (event.key === "Escape") setOpen(false);
+                    }}
+                />
+            </label>
+            {nameProblem ? (
+                <p className="problem inline">
+                    {t("errors.serverNameTooLong", { max: SERVER_NAME_MAX })}
+                </p>
+            ) : (
+                <p className="muted small">{t("servers.newNameHint")}</p>
             )}
             <div className="rename-acts">
                 <button className="ghost" onClick={() => setOpen(false)}>

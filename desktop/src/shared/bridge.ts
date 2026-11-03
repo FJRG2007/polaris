@@ -216,7 +216,8 @@ export interface PolarisLocal {
         /** The address in use, why it could not be opened if it could not, and
          *  every server kept. */
         state(): Promise<{ readonly address: string | null; readonly error: string | null; readonly servers: readonly ServerRow[]; }>;
-        submit(address: string): Promise<Outcome>;
+        /** Open an address, adding it to the list with the name given, if any. */
+        submit(address: string, name?: string): Promise<Outcome>;
         /** Whether a typed address is a Polaris, asked while it is typed. */
         check(address: string): Promise<AddressCheck>;
         /** Open a server from the list. */
