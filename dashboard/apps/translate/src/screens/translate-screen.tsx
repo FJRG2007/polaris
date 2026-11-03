@@ -41,6 +41,7 @@ import {
 import { createBrowserEngine, hasBrowserTranslator, type BrowserScope } from "./browser-engine";
 import {
     DEFAULT_SETTINGS,
+    readOrder,
     HISTORY_MAX,
     TEXT_MAX,
     type EngineId,
@@ -142,7 +143,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const settings = useMemo(
         () => ({
             ...DEFAULT_SETTINGS,
-            engines: { ...DEFAULT_SETTINGS.engines, browser: status?.browser ?? true }
+            engines: { ...DEFAULT_SETTINGS.engines, browser: status?.browser ?? true },
+            order: readOrder(status?.order)
         }),
         [status]
     );

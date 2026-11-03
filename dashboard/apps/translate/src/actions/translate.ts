@@ -61,7 +61,10 @@ export async function forgetAllAction(): Promise<Outcome<object>> {
     });
 }
 
+/** The settings as the administrator's page edits them; nobody else reads them here. */
 export async function settingsAction(): Promise<Outcome<{ settings: TranslateSettings }>> {
+    const user = await host.session.requirePermission("translate.use");
+    if (!user.isAdmin) return refuse("errors.adminOnly");
     return settle(async () => ({ settings: await loadSettings() }));
 }
 

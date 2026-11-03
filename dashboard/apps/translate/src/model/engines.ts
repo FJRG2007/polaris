@@ -1,14 +1,18 @@
 /**
  * One interface for every engine, and which one answers a request.
  *
- * The browser's own translator goes first when the owner allows it and the
- * reader's browser has it: it is free and the text never leaves the device.
- * Then the paid providers the owner added a key for, DeepL before Google, and
- * Polar's model last - it reads tone well but is the slowest and spends from
- * the same allowance as Polar's answers.
+ * Engines are tried in the order the administrator set (`settings.order`,
+ * by default the browser, DeepL, Google, then Polar's model), skipping any
+ * that is switched off, has no key, or - for the browser's own translator -
+ * is missing from the reader's browser.
  */
 
-import type { EngineId, ServerEngineId, TranslateSettings } from "./schemas";
+import {
+    SERVER_ENGINE_IDS,
+    type EngineId,
+    type ServerEngineId,
+    type TranslateSettings
+} from "./schemas";
 
 export interface EngineResult {
     texts: string[];
@@ -28,8 +32,9 @@ export interface TranslateEngine {
     detect(text: string, signal?: AbortSignal): Promise<string | null>;
 }
 
-/** Server engines in the order they are tried. */
-export const SERVER_ORDER: readonly ServerEngineId[] = ["deepl", "google", "polar"];
+function isServerEngine(id: EngineId): id is ServerEngineId {
+    return (SERVER_ENGINE_IDS as readonly string[]).includes(id);
+}
 
 export type ServerAvailability = Readonly<Record<ServerEngineId, boolean>>;
 
@@ -38,7 +43,9 @@ export function usableServerEngines(
     available: ServerAvailability,
     settings: TranslateSettings
 ): ServerEngineId[] {
-    return SERVER_ORDER.filter((id) => available[id] && settings.engines[id]);
+    return settings.order
+        .filter(isServerEngine)
+        .filter((id) => available[id] && settings.engines[id]);
 }
 
 /**
@@ -56,14 +63,15 @@ export function pickServerEngine(
     return usable[0] ?? null;
 }
 
-/** What the screen can choose from, the browser first when it is there. */
+/** What the screen can choose from, in the administrator's order. */
 export function usableEngines(input: {
     browser: boolean;
     available: ServerAvailability;
     settings: TranslateSettings;
 }): EngineId[] {
     const server = usableServerEngines(input.available, input.settings);
-    return input.browser && input.settings.engines.browser ? ["browser", ...server] : server;
+    const browser = input.browser && input.settings.engines.browser;
+    return input.settings.order.filter((id) => (id === "browser" ? browser : server.includes(id)));
 }
 
 /**

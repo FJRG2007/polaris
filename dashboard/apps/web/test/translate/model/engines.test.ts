@@ -58,6 +58,21 @@ describe("the screen's engines", () => {
         ).toEqual([]);
     });
 
+    it("follow the administrator's order, the browser included", () => {
+        const order = {
+            ...DEFAULT_SETTINGS,
+            order: ["polar", "google", "browser", "deepl"] as TranslateSettings["order"]
+        };
+        expect(usableEngines({ browser: true, available: ALL, settings: order })).toEqual([
+            "polar",
+            "google",
+            "browser",
+            "deepl"
+        ]);
+        expect(usableServerEngines(ALL, order)).toEqual(["polar", "google", "deepl"]);
+        expect(pickServerEngine({ ...ALL, polar: false }, order)).toBe("google");
+    });
+
     it("keep the reader's pick while it is usable, else the first", () => {
         expect(pickEngine(["browser", "deepl"], "deepl")).toBe("deepl");
         expect(pickEngine(["browser", "deepl"], "google")).toBe("browser");

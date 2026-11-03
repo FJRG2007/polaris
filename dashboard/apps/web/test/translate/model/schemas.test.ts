@@ -12,6 +12,7 @@ import {
     TOTAL_MAX,
     detectInput,
     readSettings,
+    settingsInput,
     translateInput
 } from "@polaris-app/translate/src/model/schemas";
 
@@ -54,8 +55,39 @@ describe("readSettings", () => {
             readSettings({ engines: { deepl: false, polar: "no" }, defaultTarget: "xx" })
         ).toEqual({
             engines: { browser: true, polar: true, deepl: false, google: true },
+            order: ["browser", "deepl", "google", "polar"],
             defaultTarget: "en"
         });
+    });
+
+    it("keeps a stored order, drops what it does not know, and appends what it lacks", () => {
+        expect(readSettings({ order: ["polar", "google"] }).order).toEqual([
+            "polar",
+            "google",
+            "browser",
+            "deepl"
+        ]);
+        expect(readSettings({ order: ["polar", "polar", "bing", 3] }).order).toEqual([
+            "polar",
+            "browser",
+            "deepl",
+            "google"
+        ]);
+    });
+
+    it("refuses an order that repeats or leaves out an engine", () => {
+        const base = { engines: DEFAULT_SETTINGS.engines, defaultTarget: "en" };
+        expect(
+            settingsInput.safeParse({ ...base, order: ["polar", "google", "deepl", "browser"] })
+                .success
+        ).toBe(true);
+        expect(
+            settingsInput.safeParse({ ...base, order: ["polar", "polar", "deepl", "browser"] })
+                .success
+        ).toBe(false);
+        expect(
+            settingsInput.safeParse({ ...base, order: ["polar", "deepl", "browser"] }).success
+        ).toBe(false);
     });
 });
 

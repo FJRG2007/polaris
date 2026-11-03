@@ -88,15 +88,39 @@ export const settingsInput = z
                 google: z.boolean()
             })
             .strict(),
+        /** Every engine once, the one tried first at the front. */
+        order: z
+            .array(engineId)
+            .length(ENGINE_IDS.length)
+            .refine((ids) => new Set(ids).size === ids.length, { message: "errors.invalid" }),
         defaultTarget: languageCode
     })
     .strict();
 
 export type TranslateSettings = z.infer<typeof settingsInput>;
 
+/**
+ * The order a Polaris that never set one tries the engines in: the browser
+ * first (free, and the text stays on the device), the paid providers next,
+ * Polar's model last (slowest, and it spends from Polar's allowance).
+ */
+export const DEFAULT_ORDER: readonly EngineId[] = ["browser", "deepl", "google", "polar"];
+
+/** A stored order, read leniently: known engines once each in the order kept,
+ *  then any it does not name (an engine added later) in the default order. */
+export function readOrder(raw: unknown): EngineId[] {
+    const kept: EngineId[] = [];
+    for (const value of Array.isArray(raw) ? raw : []) {
+        const id = engineId.safeParse(value);
+        if (id.success && !kept.includes(id.data)) kept.push(id.data);
+    }
+    return [...kept, ...DEFAULT_ORDER.filter((id) => !kept.includes(id))];
+}
+
 /** What a Polaris that never opened the settings runs with: everything on. */
 export const DEFAULT_SETTINGS: TranslateSettings = {
     engines: { browser: true, polar: true, deepl: true, google: true },
+    order: [...DEFAULT_ORDER],
     defaultTarget: "en"
 };
 
@@ -122,6 +146,7 @@ export function readSettings(raw: unknown): TranslateSettings {
             deepl: flag("deepl"),
             google: flag("google")
         },
+        order: readOrder(stored.order),
         defaultTarget: target.success ? target.data : DEFAULT_SETTINGS.defaultTarget
     };
 }
