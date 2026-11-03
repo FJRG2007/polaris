@@ -5,7 +5,11 @@ vi.mock("@/lib/app-extensions/installed", () => ({
         { id: "games" },
         {
             id: "translate",
-            textTranslation: () => ({ appId: "translate", endpoint: "/api/translate", page: "/translate" })
+            textTranslation: () => ({
+                appId: "translate",
+                endpoint: "/api/translate",
+                page: "/translate"
+            })
         }
     ]
 }));

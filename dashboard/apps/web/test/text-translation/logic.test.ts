@@ -20,13 +20,17 @@ describe("live translation decisions", () => {
         expect(translatesIncoming({ ...message, authorId: "me" }, "me", ON, "es")).toBe(false);
     });
     it("stays off when the reader did not turn it on", () => {
-        expect(translatesIncoming(message, "me", { incoming: false, outgoing: "de" }, "es")).toBe(false);
+        expect(translatesIncoming(message, "me", { incoming: false, outgoing: "de" }, "es")).toBe(
+            false
+        );
     });
     it("skips notices, tombstones, pending echoes and messages sent in the target", () => {
         expect(translatesIncoming({ ...message, kind: "system" }, "me", ON, "es")).toBe(false);
         expect(translatesIncoming({ ...message, deleted: true }, "me", ON, "es")).toBe(false);
         expect(translatesIncoming({ ...message, id: "pending:1" }, "me", ON, "es")).toBe(false);
-        expect(translatesIncoming({ ...message, translated: { to: "es" } }, "me", ON, "es")).toBe(false);
+        expect(translatesIncoming({ ...message, translated: { to: "es" } }, "me", ON, "es")).toBe(
+            false
+        );
     });
     it("sends in the chosen language, except an edit", () => {
         expect(outgoingTarget({ incoming: false, outgoing: "de" }, false)).toBe("de");
@@ -81,7 +85,10 @@ describe("cache", () => {
 describe("queue", () => {
     const offer = { appId: "translate", endpoint: "/api/translate", page: "/translate" };
     const json = (body: unknown, status = 200) =>
-        new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+        new Response(JSON.stringify(body), {
+            status,
+            headers: { "content-type": "application/json" }
+        });
 
     it("batches texts asked together into one request and caches the answers", async () => {
         const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
@@ -107,7 +114,9 @@ describe("queue", () => {
         const fetcher = vi.fn(async () => json({ charLimit: null }));
         const queue = new TranslationQueue(offer, fetcher, async () => "es", 0);
         expect(await queue.translate("ya está en español", "es")).toEqual({ kind: "same" });
-        expect(fetcher.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method)).toBe(false);
+        expect(
+            fetcher.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method)
+        ).toBe(false);
     });
 
     it("fails soft with the route's sentence", async () => {
@@ -115,15 +124,24 @@ describe("queue", () => {
             init?.method ? json({ message: "No engine" }, 409) : json({ charLimit: null })
         );
         const queue = new TranslationQueue(offer, fetcher, async () => null, 0);
-        expect(await queue.translate("hello", "es")).toEqual({ kind: "failed", message: "No engine" });
+        expect(await queue.translate("hello", "es")).toEqual({
+            kind: "failed",
+            message: "No engine"
+        });
     });
 });
 
 describe("stored shapes read whole", () => {
     it("reads anything unparsable as off", () => {
         expect(readChatTranslation(null)).toEqual({ incoming: false, outgoing: null });
-        expect(readChatTranslation({ incoming: "yes" })).toEqual({ incoming: false, outgoing: null });
-        expect(readChatTranslation({ incoming: true, outgoing: "de" })).toEqual({ incoming: true, outgoing: "de" });
+        expect(readChatTranslation({ incoming: "yes" })).toEqual({
+            incoming: false,
+            outgoing: null
+        });
+        expect(readChatTranslation({ incoming: true, outgoing: "de" })).toEqual({
+            incoming: true,
+            outgoing: "de"
+        });
         expect(readSentTranslation({ to: "de" })).toBeNull();
     });
 });

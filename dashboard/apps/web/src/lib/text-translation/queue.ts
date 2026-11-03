@@ -99,7 +99,9 @@ export class TranslationQueue {
     }
 
     private readStatus(): Promise<Status> {
-        this.status ??= this.fetcher(this.offer.endpoint, { headers: { accept: "application/json" } })
+        this.status ??= this.fetcher(this.offer.endpoint, {
+            headers: { accept: "application/json" }
+        })
             .then(async (response) => {
                 if (!response.ok) return { charLimit: null };
                 const body = (await response.json()) as { charLimit?: unknown };
@@ -136,7 +138,11 @@ export class TranslationQueue {
                 charLimit
             );
             for (const at of tooLong) this.finish(group[at]!, { kind: "failed", message: null });
-            for (const batch of batches) await this.send(to, batch.map((at) => group[at]!));
+            for (const batch of batches)
+                await this.send(
+                    to,
+                    batch.map((at) => group[at]!)
+                );
         }
     }
 

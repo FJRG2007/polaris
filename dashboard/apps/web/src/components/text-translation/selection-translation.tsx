@@ -48,7 +48,8 @@ export function SelectionTranslation({
 
     if (!translator) return null;
 
-    const shown = outcome?.kind === "translated" ? outcome.text : outcome?.kind === "same" ? text : "";
+    const shown =
+        outcome?.kind === "translated" ? outcome.text : outcome?.kind === "same" ? text : "";
 
     const copy = async () => {
         try {

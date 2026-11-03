@@ -35,10 +35,7 @@ import * as selectionMenu from "@/lib/selection-menu";
 import { usePolar } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TextTranslationOffer } from "@/lib/app-extensions/types";
-import {
-    TextTranslationProvider,
-    useTextTranslator
-} from "@/components/text-translation/provider";
+import { TextTranslationProvider, useTextTranslator } from "@/components/text-translation/provider";
 import {
     SelectionTranslation,
     type SelectionToTranslate

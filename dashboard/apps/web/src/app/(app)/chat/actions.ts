@@ -1366,9 +1366,7 @@ export async function setChannelNotifyAction(
 
 /** This reader's live translation of one conversation - see
  *  `chat.setChannelTranslation`. */
-export async function setChannelTranslationAction(
-    input: unknown
-): Promise<{ error?: string }> {
+export async function setChannelTranslationAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const result = await guard(() => chat.setChannelTranslation(me, input));
     if (!result.error) revalidatePath(CHAT_PATH);

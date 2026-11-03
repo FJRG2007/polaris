@@ -29,9 +29,10 @@ export function LanguageSelect({
     const locale = useLocale();
     const options = useMemo(
         () =>
-            TARGET_LANGUAGES.map((code) => ({ value: code, label: languageLabel(code, locale) })).sort(
-                (one, other) => String(one.label).localeCompare(String(other.label), locale)
-            ),
+            TARGET_LANGUAGES.map((code) => ({
+                value: code,
+                label: languageLabel(code, locale)
+            })).sort((one, other) => String(one.label).localeCompare(String(other.label), locale)),
         [locale]
     );
     return (
