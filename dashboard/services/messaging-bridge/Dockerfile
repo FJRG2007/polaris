@@ -41,7 +41,9 @@ COPY . .
 # @polaris/messaging must be built first (the bridge bundles from its dist).
 RUN npm run build -w @polaris/messaging && npm run build -w @polaris/messaging-bridge
 
-FROM node:22-bookworm-slim AS runner
+# Debian 13, patched at build: Chromium's system libraries on 12 carry
+# vulnerabilities it has no fix for.
+FROM node:22-trixie-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # Name lookups share libuv's four-thread pool by default; a dead internet line
@@ -50,7 +52,7 @@ ENV UV_THREADPOOL_SIZE=16
 # Use the system Chromium for whatsapp-web.js; never let Puppeteer download its own.
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         chromium ca-certificates fonts-liberation && \
     rm -rf /var/lib/apt/lists/*
 
@@ -64,6 +66,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /build/services/messaging-bridge/dist/index.js ./index.js
 RUN echo '{"type":"module"}' > package.json && \
     npm install --omit=dev discord.js@14.27.0 whatsapp-web.js@1.34.7 qrcode@1.5.4 && \
+    npm cache clean --force && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg && \
     mkdir -p /app/.sessions && chown -R node:node /app
 # That chown shares its RUN with the install that created the tree, so it costs
 # nothing: one layer either way. On its own it would be the mistake the vision

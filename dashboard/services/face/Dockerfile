@@ -10,7 +10,7 @@
 # downloads a few hundred megabytes the first time somebody walks past a camera
 # is a recognizer that misses that person, and one on a house network with no way
 # out never works at all.
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-trixie
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
@@ -19,9 +19,10 @@ ENV PYTHONUNBUFFERED=1 \
     FACE_DATA_DIR=/data
 
 # opencv is a hard dependency of the analysis library and wants a couple of
-# system libraries even when nothing is ever drawn on screen.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 ca-certificates && \
+# system libraries even when nothing is ever drawn on screen. Debian 13, patched
+# at build: its system libraries have fixes 12 lacks.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0t64 ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 COPY services/face/requirements.txt ./
