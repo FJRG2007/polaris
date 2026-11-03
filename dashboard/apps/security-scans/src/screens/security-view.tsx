@@ -33,7 +33,11 @@ import {
 } from "@polaris/ui";
 
 function useSecurityT(): SecurityTranslator {
-    return securityCatalogs.translator(hostUi.i18nProvider.useLocale(), "security", hostUi.i18nProvider.useClient());
+    return securityCatalogs.translator(
+        hostUi.i18nProvider.useLocale(),
+        "security",
+        hostUi.i18nProvider.useClient()
+    );
 }
 
 type Servers = Extract<Awaited<ReturnType<typeof actions.serversAction>>, { ok: true }>["data"];

@@ -25,7 +25,13 @@ import { useAdminWaiting } from "@/components/admin-waiting";
 import { tabWaiting } from "@/lib/waiting-counts";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { useDoNotDisturb } from "@/components/do-not-disturb";
-import { applyFavicon, currentFavicon, drawBadgeOverlay, drawFavicon, type FaviconLink } from "@/lib/favicon";
+import {
+    applyFavicon,
+    currentFavicon,
+    drawBadgeOverlay,
+    drawFavicon,
+    type FaviconLink
+} from "@/lib/favicon";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useClient } from "@/components/i18n/i18n-provider";
 import {
@@ -83,7 +89,8 @@ export function NotificationFavicon() {
         if (!setAppBadge) {
             // Installed from the browser's menu: the browser draws the count on
             // the installed app's icon itself, where it can.
-            if (client === "installed") installedAppBadge(badge ? (badge.kind === "dot" ? 0 : waiting) : null);
+            if (client === "installed")
+                installedAppBadge(badge ? (badge.kind === "dot" ? 0 : waiting) : null);
             return;
         }
         void setAppBadge({
@@ -96,7 +103,9 @@ export function NotificationFavicon() {
 
     useEffect(
         () => () => {
-            void desktop?.setAppBadge?.({ label: null, dot: false, count: 0, overlay: null }).catch(() => undefined);
+            void desktop
+                ?.setAppBadge?.({ label: null, dot: false, count: 0, overlay: null })
+                .catch(() => undefined);
         },
         [desktop]
     );

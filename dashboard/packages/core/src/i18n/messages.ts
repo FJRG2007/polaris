@@ -105,7 +105,8 @@ function reportOnce(problem: MessageProblem): void {
 export function lookupMessage(catalog: Catalog | undefined, key: string): string | undefined {
     let node: string | Catalog | undefined = catalog;
     for (const part of key.split(".")) {
-        if (node === undefined || typeof node === "string" || !Object.hasOwn(node, part)) return undefined;
+        if (node === undefined || typeof node === "string" || !Object.hasOwn(node, part))
+            return undefined;
         node = node[part];
     }
     return typeof node === "string" ? node : undefined;
@@ -124,13 +125,18 @@ export function formatMessage(
     key = message
 ): string {
     try {
-        const result = formatterFor(locale, message).format({ ...CLIENT_FALLBACK, ...params } as Record<
-            string,
-            PrimitiveType
-        >);
+        const result = formatterFor(locale, message).format({
+            ...CLIENT_FALLBACK,
+            ...params
+        } as Record<string, PrimitiveType>);
         return Array.isArray(result) ? result.join("") : String(result);
     } catch (caught) {
-        onProblem({ kind: "format", locale, key, detail: caught instanceof Error ? caught.message : undefined });
+        onProblem({
+            kind: "format",
+            locale,
+            key,
+            detail: caught instanceof Error ? caught.message : undefined
+        });
         return message;
     }
 }
@@ -143,13 +149,18 @@ function formatRich<R>(
     key: string
 ): (string | R)[] {
     try {
-        const result = formatterFor(locale, message).format<R>({ ...CLIENT_FALLBACK, ...params } as Record<
-            string,
-            PrimitiveType | R | RichTag<R>
-        >);
+        const result = formatterFor(locale, message).format<R>({
+            ...CLIENT_FALLBACK,
+            ...params
+        } as Record<string, PrimitiveType | R | RichTag<R>>);
         return Array.isArray(result) ? result : [result];
     } catch (caught) {
-        onProblem({ kind: "format", locale, key, detail: caught instanceof Error ? caught.message : undefined });
+        onProblem({
+            kind: "format",
+            locale,
+            key,
+            detail: caught instanceof Error ? caught.message : undefined
+        });
         return [message];
     }
 }
@@ -193,15 +204,28 @@ export function createTranslator<T extends Catalog>(
     const translate = ((key: string, params?: MessageParams) => {
         const message = resolve(key);
         if (message === undefined) return qualified(key);
-        return formatMessage(locale, message, surface ? { ...surface, ...params } : params, onProblem, qualified(key));
+        return formatMessage(
+            locale,
+            message,
+            surface ? { ...surface, ...params } : params,
+            onProblem,
+            qualified(key)
+        );
     }) as unknown as Translator<MessageKey<T>>;
 
     translate.rich = <R>(key: string, params: RichParams<R>) => {
         const message = resolve(key);
         if (message === undefined) return [qualified(key)];
-        return formatRich(locale, message, surface ? { ...surface, ...params } : params, onProblem, qualified(key));
+        return formatRich(
+            locale,
+            message,
+            surface ? { ...surface, ...params } : params,
+            onProblem,
+            qualified(key)
+        );
     };
-    translate.has = (key: string): key is MessageKey<T> => lookupMessage(catalog, key) !== undefined;
+    translate.has = (key: string): key is MessageKey<T> =>
+        lookupMessage(catalog, key) !== undefined;
     Object.defineProperty(translate, "locale", { value: locale, enumerable: true });
     return translate;
 }

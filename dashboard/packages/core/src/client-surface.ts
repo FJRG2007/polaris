@@ -65,11 +65,16 @@ export function isClient(value: unknown): value is Client {
  */
 export function clientFromUserAgent(userAgent: string | null | undefined): Client {
     if (!userAgent) return "browser";
-    return /\bElectron\/\d/.test(userAgent) && /\b(?:Polaris|polaris-desktop)\/\d/.test(userAgent) ? "desktop" : "browser";
+    return /\bElectron\/\d/.test(userAgent) && /\b(?:Polaris|polaris-desktop)\/\d/.test(userAgent)
+        ? "desktop"
+        : "browser";
 }
 
 /** The values every message is formatted with, so a catalog entry can choose
  *  its words by client without the screen passing anything. */
-export function clientMessageValues(client: Client): { readonly clientKind: Client; readonly surface: ClientHost } {
+export function clientMessageValues(client: Client): {
+    readonly clientKind: Client;
+    readonly surface: ClientHost;
+} {
     return { clientKind: client, surface: FACTS[client].host };
 }

@@ -224,7 +224,10 @@ function useSettledClient(served: Client): Client {
     const [client, setClient] = useState<Client>(served);
     useEffect(() => {
         if (desktopBridge()) setClient("desktop");
-        else if (served === "browser" && window.matchMedia?.("(display-mode: standalone)").matches) {
+        else if (
+            served === "browser" &&
+            window.matchMedia?.("(display-mode: standalone)").matches
+        ) {
             setClient("installed");
         } else setClient(served);
     }, [served]);

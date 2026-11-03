@@ -9,7 +9,13 @@
  */
 
 import { createContext, useContext, useMemo } from "react";
-import { createTranslator, DEFAULT_LOCALE, type Client, type Locale, type Namespaces } from "@polaris/core";
+import {
+    createTranslator,
+    DEFAULT_LOCALE,
+    type Client,
+    type Locale,
+    type Namespaces
+} from "@polaris/core";
 
 export interface I18nState {
     readonly locale: Locale;

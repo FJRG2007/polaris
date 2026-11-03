@@ -34,7 +34,9 @@ export type QualifiedKey<T extends Namespaces> = {
 
 /** The source locale's namespaces as they are, and every other locale's in the
  *  same shape - a missing key in a translation is a type error. */
-export type LocaleCatalogs<T extends Namespaces> = { readonly [SOURCE in typeof SOURCE_LOCALE]: T } & {
+export type LocaleCatalogs<T extends Namespaces> = {
+    readonly [SOURCE in typeof SOURCE_LOCALE]: T;
+} & {
     readonly [L in Exclude<Locale, typeof SOURCE_LOCALE>]: CatalogShape<T>;
 };
 
@@ -86,7 +88,8 @@ export function defineCatalogs<T extends Namespaces>(catalogs: LocaleCatalogs<T>
         const cut = key.indexOf(".");
         const namespace = key.slice(0, cut);
         const message = lookupMessage(namespaceOf(locale, namespace), key.slice(cut + 1));
-        if (message === undefined) return translator(locale, namespace)(key.slice(cut + 1) as never, params);
+        if (message === undefined)
+            return translator(locale, namespace)(key.slice(cut + 1) as never, params);
         return formatMessage(locale, message, params, undefined, key);
     }
 

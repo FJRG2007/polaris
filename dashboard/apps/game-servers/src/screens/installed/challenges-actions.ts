@@ -25,7 +25,11 @@ const serverId = z.string().uuid();
 type Answer = { view?: challenges.ChallengesView; error?: string };
 
 async function translator() {
-    return gameCatalogs.translator(await host.i18nRequest.getLocale(), "challenges", await host.i18nRequest.getClient());
+    return gameCatalogs.translator(
+        await host.i18nRequest.getLocale(),
+        "challenges",
+        await host.i18nRequest.getClient()
+    );
 }
 
 /** A redirect or a not-found from the framework passes through untouched. */

@@ -4,9 +4,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { clientFacts, clientFromUserAgent, clientMessageValues, createTranslator } from "../src/index.js";
+import {
+    clientFacts,
+    clientFromUserAgent,
+    clientMessageValues,
+    createTranslator
+} from "../src/index.js";
 
-const CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const CHROME =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const DESKTOP =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Polaris/0.1.11 Chrome/131.0.0.0 Electron/38.0.0 Safari/537.36";
 /** Another Electron app. Its user-agent is not the desktop app's. */
@@ -16,7 +22,9 @@ const OTHER_ELECTRON =
 describe("clientFromUserAgent", () => {
     it("knows the desktop app by its name and Electron together", () => {
         expect(clientFromUserAgent(DESKTOP)).toBe("desktop");
-        expect(clientFromUserAgent(DESKTOP.replace("Polaris/", "polaris-desktop/"))).toBe("desktop");
+        expect(clientFromUserAgent(DESKTOP.replace("Polaris/", "polaris-desktop/"))).toBe(
+            "desktop"
+        );
     });
 
     it("reads everything else as a browser", () => {
@@ -29,7 +37,11 @@ describe("clientFromUserAgent", () => {
 
 describe("clientFacts", () => {
     it("gives the desktop app system notices and an app icon", () => {
-        expect(clientFacts("desktop")).toEqual({ host: "app", notices: "system", badge: "app-icon" });
+        expect(clientFacts("desktop")).toEqual({
+            host: "app",
+            notices: "system",
+            badge: "app-icon"
+        });
     });
 
     it("leaves an installed web app's notices to the browser", () => {
@@ -63,6 +75,9 @@ describe("messages worded by client", () => {
     });
 
     it("hands the same two values to every message", () => {
-        expect(clientMessageValues("installed")).toEqual({ clientKind: "installed", surface: "app" });
+        expect(clientMessageValues("installed")).toEqual({
+            clientKind: "installed",
+            surface: "app"
+        });
     });
 });

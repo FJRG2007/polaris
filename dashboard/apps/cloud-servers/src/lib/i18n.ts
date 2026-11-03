@@ -11,5 +11,9 @@ export type CloudTranslator = Translator<CloudKey>;
 
 /** The translator for whoever is reading this request. */
 export async function cloudT(): Promise<CloudTranslator> {
-    return cloudCatalogs.translator(await host.i18nRequest.getLocale(), "cloudServers", await host.i18nRequest.getClient());
+    return cloudCatalogs.translator(
+        await host.i18nRequest.getLocale(),
+        "cloudServers",
+        await host.i18nRequest.getClient()
+    );
 }

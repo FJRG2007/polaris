@@ -10,5 +10,9 @@ import type { CrmTranslator } from "../lib/i18n";
 import { crmCatalogs } from "../../messages";
 
 export function useCrmT(): CrmTranslator {
-    return crmCatalogs.translator(hostUi.i18nProvider.useLocale(), "crm", hostUi.i18nProvider.useClient());
+    return crmCatalogs.translator(
+        hostUi.i18nProvider.useLocale(),
+        "crm",
+        hostUi.i18nProvider.useClient()
+    );
 }

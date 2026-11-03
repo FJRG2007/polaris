@@ -73,13 +73,19 @@ describe("copy about the reader's own browser or tab", () => {
     });
 
     it("is caught in the shapes it takes", () => {
-        const caught = ["This browser cannot record video.", "while you are on another tab", "Tab icon"];
+        const caught = [
+            "This browser cannot record video.",
+            "while you are on another tab",
+            "Tab icon"
+        ];
         for (const sample of caught) {
             expect(POINTS_AT_THE_READERS_CLIENT.some((pattern) => pattern.test(sample))).toBe(true);
         }
         const general = ["Visitors' browsers solve a short calculation.", "Browser extension"];
         for (const sample of general) {
-            expect(POINTS_AT_THE_READERS_CLIENT.some((pattern) => pattern.test(sample))).toBe(false);
+            expect(POINTS_AT_THE_READERS_CLIENT.some((pattern) => pattern.test(sample))).toBe(
+                false
+            );
         }
     });
 });

@@ -7,7 +7,11 @@ import { hostUi } from "@polaris/app-host/client";
 import type { StatusTranslator } from "../lib/i18n";
 
 export function useStatusT(): StatusTranslator {
-    return statusCatalogs.translator(hostUi.i18nProvider.useLocale(), "statusPages", hostUi.i18nProvider.useClient());
+    return statusCatalogs.translator(
+        hostUi.i18nProvider.useLocale(),
+        "statusPages",
+        hostUi.i18nProvider.useClient()
+    );
 }
 
 export function useStatusLocale(): string {

@@ -18,7 +18,11 @@ import { calendarCatalogs, type CalendarKey, type CalendarRuleKey } from "../../
 export type { CalendarKey };
 
 export function useCalendarT(): CalendarTranslator {
-    return calendarCatalogs.translator(hostUi.i18nProvider.useLocale(), "calendar", hostUi.i18nProvider.useClient());
+    return calendarCatalogs.translator(
+        hostUi.i18nProvider.useLocale(),
+        "calendar",
+        hostUi.i18nProvider.useClient()
+    );
 }
 
 /** The engine's view of the rule words: any key, checked by the catalog test. */
