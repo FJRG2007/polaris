@@ -217,11 +217,18 @@ export async function accountDeviceStanding(
  *   level only: a device let in by a device that was itself let in is judged on
  *   its own, so an approval cannot launder a wait down a chain.
  */
-export async function sessionDeviceStanding(userId: string, sessionId: string): Promise<DeviceStanding> {
+export async function sessionDeviceStanding(
+    userId: string,
+    sessionId: string
+): Promise<DeviceStanding> {
     return sessionStanding(userId, sessionId, true);
 }
 
-async function sessionStanding(userId: string, sessionId: string, followApproval: boolean): Promise<DeviceStanding> {
+async function sessionStanding(
+    userId: string,
+    sessionId: string,
+    followApproval: boolean
+): Promise<DeviceStanding> {
     const session = await prisma.session.findFirst({
         where: { id: sessionId, userId },
         select: {
@@ -232,10 +239,18 @@ async function sessionStanding(userId: string, sessionId: string, followApproval
     // A session that is not there describes nothing, which an account asking for
     // a wait treats as a device it cannot place - and an account asking for none
     // treats as the nothing it is.
-    const standing = await accountDeviceStanding(userId, session?.state?.userAgent ?? session?.userAgent);
+    const standing = await accountDeviceStanding(
+        userId,
+        session?.state?.userAgent ?? session?.userAgent
+    );
     if (standing.settled || !session) return standing;
 
-    const vouched = { settled: true, graceDays: standing.graceDays, settlesAt: null, firstSeenAt: standing.firstSeenAt };
+    const vouched = {
+        settled: true,
+        graceDays: standing.graceDays,
+        settlesAt: null,
+        firstSeenAt: standing.firstSeenAt
+    };
     if (session.state?.signInMethod === "passkey") return vouched;
 
     const approver = session.state?.authorizedBySessionId;
