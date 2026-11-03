@@ -139,7 +139,7 @@ vi.mock("@polaris/db", () => {
         user: { findMany: async () => [], findUnique: async () => null },
         $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(client)
     };
-    return { prisma: client };
+    return { prisma: client, Prisma: { DbNull: null } };
 });
 
 const { send, edit, react } = await import("@/lib/chat/messages");

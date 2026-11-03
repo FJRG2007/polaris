@@ -2294,7 +2294,7 @@ export function ChannelView({
                         }}
                         onCancelEdit={() => setEditing(null)}
                         onSend={send}
-                        translateOutgoing={channel.translation.outgoing}
+                        translateOutgoing={channel.translation?.outgoing ?? null}
                         canShareFromDrive
                         onSchedule={scheduleMessage}
                         onPoll={createPoll}

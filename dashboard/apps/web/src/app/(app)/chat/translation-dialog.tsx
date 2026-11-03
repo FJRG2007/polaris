@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { ChatTranslationPrefs } from "@polaris/core";
+import * as core from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -36,13 +36,14 @@ export function TranslationDialog({
     open,
     onOpenChange,
     channelId,
-    current,
+    current = core.NO_CHAT_TRANSLATION,
     onSaved
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     channelId: string;
-    current: ChatTranslationPrefs;
+    /** Absent on a channel read before translation existed: that is "off". */
+    current?: core.ChatTranslationPrefs;
     onSaved: () => void;
 }) {
     const t = useTranslations("chat");
@@ -63,7 +64,7 @@ export function TranslationDialog({
         setError("");
     }, [open, current.incoming, current.outgoing, own]);
 
-    const next: ChatTranslationPrefs = { incoming, outgoing: outgoing ? language : null };
+    const next: core.ChatTranslationPrefs = { incoming, outgoing: outgoing ? language : null };
     const changed = next.incoming !== current.incoming || next.outgoing !== current.outgoing;
 
     const save = async () => {
