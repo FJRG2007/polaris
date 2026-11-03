@@ -63,6 +63,9 @@ export function identityLabelKey(field: IdentityField): NamespaceKey<"vault"> {
 /** A hint only where the field's own name does not say what goes in it. */
 const HINTED: Partial<Record<IdentityField, NamespaceKey<"vault">>> = {
     title: "identity.hints.title",
+    // A middle name is a second given name; both Spanish surnames are the last name.
+    middleName: "identity.hints.middleName",
+    lastName: "identity.hints.lastName",
     address2: "identity.hints.address2"
 };
 
@@ -77,14 +80,17 @@ export function identityHintKey(field: IdentityField): NamespaceKey<"vault"> | u
  * everywhere else - and it is the difference between a record somebody can copy
  * into a form and a table they have to reassemble in their head.
  */
-export function addressLines(identity: Record<string, string>): string[] {
+export function addressLines(
+    identity: Record<string, string>,
+    country: (stored: string) => string = (stored) => stored
+): string[] {
     const town = [identity.postalCode, identity.city].filter(Boolean).join(" ");
     return [
         identity.address1 ?? "",
         identity.address2 ?? "",
         town,
         identity.state ?? "",
-        identity.country ?? ""
+        country(identity.country ?? "")
     ]
         .map((line) => line.trim())
         .filter((line) => line.length > 0);

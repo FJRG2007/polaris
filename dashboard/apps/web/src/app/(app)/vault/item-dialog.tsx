@@ -50,6 +50,7 @@ import {
     type VaultItem
 } from "./vault-model";
 import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
+import { CountryField, RegionField } from "./identity-place-fields";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
 import { accountIdentityAction } from "./vault-actions";
 import type { AccountIdentity } from "@/lib/vault/account-identity";
@@ -992,22 +993,51 @@ export function ItemDialog({
                                                 )}
                                             >
                                                 {t(identityLabelKey(field))}
-                                                <Input
-                                                    value={draft.identity[field] ?? ""}
-                                                    onChange={(event) =>
-                                                        patch({
-                                                            identity: {
-                                                                ...draft.identity,
-                                                                [field]: event.target.value
-                                                            }
-                                                        })
-                                                    }
-                                                    placeholder={(() => {
-                                                        const hint = identityHintKey(field);
-                                                        return hint ? t(hint) : undefined;
-                                                    })()}
-                                                    autoComplete="off"
-                                                />
+                                                {field === "country" ? (
+                                                    <CountryField
+                                                        value={draft.identity.country ?? ""}
+                                                        onChange={(country) =>
+                                                            patch({
+                                                                identity: {
+                                                                    ...draft.identity,
+                                                                    country,
+                                                                    // A region of the old country is not one of the new.
+                                                                    state:
+                                                                        country === draft.identity.country
+                                                                            ? (draft.identity.state ?? "")
+                                                                            : ""
+                                                                }
+                                                            })
+                                                        }
+                                                    />
+                                                ) : field === "state" ? (
+                                                    <RegionField
+                                                        value={draft.identity.state ?? ""}
+                                                        country={draft.identity.country ?? ""}
+                                                        onChange={(state) =>
+                                                            patch({
+                                                                identity: { ...draft.identity, state }
+                                                            })
+                                                        }
+                                                    />
+                                                ) : (
+                                                    <Input
+                                                        value={draft.identity[field] ?? ""}
+                                                        onChange={(event) =>
+                                                            patch({
+                                                                identity: {
+                                                                    ...draft.identity,
+                                                                    [field]: event.target.value
+                                                                }
+                                                            })
+                                                        }
+                                                        placeholder={(() => {
+                                                            const hint = identityHintKey(field);
+                                                            return hint ? t(hint) : undefined;
+                                                        })()}
+                                                        autoComplete="off"
+                                                    />
+                                                )}
                                                 {field === "email" && accountEmails.length > 1 ? (
                                                     <Select
                                                         value={

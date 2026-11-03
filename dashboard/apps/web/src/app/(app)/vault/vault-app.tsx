@@ -26,8 +26,9 @@ import { ShareItemDialog } from "./share-item-dialog";
 import { FolderDialog } from "./folder-dialog";
 import { useVaultSession } from "./vault-session";
 import { addressLines, IDENTITY_GROUPS, identityLabelKey } from "./identity-fields";
+import { countryText } from "./identity-places";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import {
     AmexMark,
@@ -191,6 +192,7 @@ type Filter =
 
 export function VaultApp() {
     const t = useTranslations("vault");
+    const locale = useLocale();
     const { key, lock, keyFor, vaultKeys, vaults } = useVaultSession();
     const [items, setItems] = useState<VaultItem[]>([]);
     const [folders, setFolders] = useState<VaultFolder[]>([]);
@@ -1232,7 +1234,9 @@ export function VaultApp() {
                                       // address is read; the rest are rows.
                                       const lines =
                                           group.id === "address"
-                                              ? addressLines(current.identity)
+                                              ? addressLines(current.identity, (stored) =>
+                                                    countryText(stored, locale)
+                                                )
                                               : [];
                                       const rows = group.fields.filter(
                                           ({ field }) => current.identity[field]
