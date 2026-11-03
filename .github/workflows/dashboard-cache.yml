@@ -60,6 +60,19 @@ jobs:
       # To delete main's older Next caches once the new one is saved.
       actions: write
     steps:
+      # The install and the web build outgrow the runner's free disk: a run died
+      # with "No space left on device" and a crashed runner fails the job even
+      # under continue-on-error - which is the one thing this job must not do.
+      # The preinstalled SDKs below are never used here and hold over 20 GB.
+      - name: Free disk space
+        continue-on-error: true
+        working-directory: .
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
+          df -h /
+
       - uses: actions/checkout@v7
         continue-on-error: true
 

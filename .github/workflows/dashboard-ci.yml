@@ -249,6 +249,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
+      # The same build that ran Dashboard cache's runner out of disk. The
+      # preinstalled SDKs below are never used here and hold over 20 GB.
+      - name: Free disk space
+        working-directory: .
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
+          df -h /
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
