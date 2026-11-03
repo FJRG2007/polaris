@@ -41,7 +41,8 @@ import { canRecordClip } from "./clip-recorder";
 import { holdReload } from "@/lib/reload-safety";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { plainExcerpt, plainText } from "@/components/rich-text/excerpt";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { translateMarkdown } from "@/components/rich-text/translate-markdown";
 import { useTextTranslator } from "@/components/text-translation/provider";
 import {
     OutgoingLanguageNote,
@@ -768,9 +769,9 @@ export function Composer({
                 if (shown?.phase === "failed") return;
                 const asked: OutgoingPreview = { source: text, to: outgoingTo, phase: "working" };
                 setPreview(asked);
-                const outcome = await translator
-                    .translate(plainText(text), outgoingTo)
-                    .catch(() => ({ kind: "failed" as const, message: null }));
+                const outcome = await translateMarkdown(text, (words) =>
+                    translator.translate(words, outgoingTo)
+                );
                 setPreview((now) => {
                     if (now !== asked) return now;
                     if (outcome.kind === "translated")

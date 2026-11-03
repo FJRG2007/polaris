@@ -10,6 +10,7 @@
 import { Button } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { Languages } from "lucide-react";
+import { plainText } from "@/components/rich-text/excerpt";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { languageLabel } from "@/components/text-translation/language-select";
 
@@ -89,7 +90,9 @@ export function OutgoingTranslationStrip({
                     data-testid="outgoing-translation"
                     className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-sm"
                 >
-                    {preview.text}
+                    {/* The Markdown that goes, read as the room reads it rather
+                        than with its asterisks and brackets showing. */}
+                    {plainText(preview.text)}
                 </p>
             )}
             {preview.phase === "failed" && (
