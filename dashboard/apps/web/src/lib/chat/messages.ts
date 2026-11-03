@@ -1572,10 +1572,17 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
 
     // The note as written, empty included: a space was here to get past the
     // blank-body rule, and it left a message whose text was one space.
-    return send(actor, { channelId: input.channelId, body: input.note, parentId: null }, [], {
-        messageId: input.messageId,
-        forwarded: true
-    });
+    // A note sent translated carries its record like any other message would.
+    const translation = input.note && input.translation ? { translation: input.translation } : {};
+    return send(
+        actor,
+        { channelId: input.channelId, body: input.note, parentId: null, ...translation },
+        [],
+        {
+            messageId: input.messageId,
+            forwarded: true
+        }
+    );
 }
 
 /**

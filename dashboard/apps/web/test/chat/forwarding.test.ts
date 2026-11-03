@@ -93,6 +93,8 @@ const forwarded = {
 };
 
 let created: number;
+/** What the last message written was written with. */
+let written: Record<string, unknown> | undefined;
 
 vi.mock("@polaris/db", () => {
     const client = {
@@ -125,8 +127,9 @@ vi.mock("@polaris/db", () => {
             findMany: async ({ where }: { where?: { id?: { in?: string[] } } }) =>
                 where?.id?.in?.includes(original.id) ? [original] : [],
             count: async () => 0,
-            create: async () => {
+            create: async ({ data }: { data?: Record<string, unknown> } = {}) => {
                 created += 1;
+                written = data;
                 return { id: "forwarded-1", createdAt: SENT };
             },
             update: async () => original
@@ -153,6 +156,7 @@ beforeEach(() => {
     refusing = [];
     reachable = ["channel-2"];
     created = 0;
+    written = undefined;
     original.deletedAt = null;
     original.authorId = "grace";
 });
@@ -166,6 +170,43 @@ describe("a message from somebody who allows it", () => {
     it("is forwarded", async () => {
         await forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" });
         expect(created).toBe(1);
+    });
+});
+
+describe("a note sent translated on top of a forward", () => {
+    const record = { from: "en", to: "es", original: "Look at this" };
+
+    it("carries what was typed, the way a message sent translated does", async () => {
+        await forward(ada, {
+            messageId: "message-1",
+            channelId: "channel-2",
+            note: "Mira esto",
+            translation: record
+        });
+        expect(written?.body).toBe("Mira esto");
+        expect(written?.translation).toEqual(record);
+    });
+
+    it("keeps the record through the check the action runs on what the browser sent", async () => {
+        const core = await import("@polaris/core");
+        const parsed = core.chatForwardSchema.parse({
+            messageId: "0190a1b2-0000-7000-8000-000000000001",
+            channelId: "0190a1b2-0000-7000-8000-000000000002",
+            note: "Mira esto",
+            translation: record
+        });
+        expect(parsed.translation).toEqual(record);
+    });
+
+    it("carries none when there is no note to have translated", async () => {
+        await forward(ada, {
+            messageId: "message-1",
+            channelId: "channel-2",
+            note: "",
+            translation: record
+        });
+        expect(written).toBeDefined();
+        expect(written?.translation).toBeUndefined();
     });
 });
 

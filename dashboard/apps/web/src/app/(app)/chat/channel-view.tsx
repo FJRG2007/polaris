@@ -1814,7 +1814,12 @@ export function ChannelView({
         const result = await runAction(
             () =>
                 elsewhere
-                    ? actions.forwardAction({ messageId: elsewhere, channelId, note: body })
+                    ? actions.forwardAction({
+                          messageId: elsewhere,
+                          channelId,
+                          note: body,
+                          translation
+                      })
                     : actions.sendAction({ channelId, body, replyToId: answering, translation }),
             setError
         );

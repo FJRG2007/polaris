@@ -585,7 +585,9 @@ export const chatForwardSchema = z.object({
     /** Where it goes. Proved against the reader like any other write. */
     channelId: z.string().uuid(),
     /** A line of their own on top of it, which is what a forward usually is. */
-    note: z.string().trim().max(MAX_CHAT_MESSAGE).default("")
+    note: z.string().trim().max(MAX_CHAT_MESSAGE).default(""),
+    /** The note went out in another language: what was typed, and in which. */
+    translation: chatSentTranslationSchema.optional()
 });
 
 export type ChatForwardInput = z.infer<typeof chatForwardSchema>;
