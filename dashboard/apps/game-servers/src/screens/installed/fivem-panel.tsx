@@ -582,7 +582,7 @@ function ConnectCard({
                                 {t("panel.inFivemPressF8And")}
                             </span>
                             <span className="flex min-w-0 items-center gap-1">
-                                <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
+                                <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-xs">
                                     {/* i18n-ignore: the console command, typed as it is */}
                                     connect {joined}
                                 </code>
@@ -1354,7 +1354,7 @@ function ConsolePasswordCard({
                         </Button>
                     ) : (
                         <span className="flex min-w-0 items-center gap-1">
-                            <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
+                            <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-xs">
                                 {shown || t("panel.thereIsNoneRecorded")}
                             </code>
                             {shown && (

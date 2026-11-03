@@ -159,7 +159,7 @@ export function MinecraftDomain({
                         <div className="flex items-center gap-2">
                             {address ? (
                                 <>
-                                    <code className="truncate font-mono text-sm" title={address}>
+                                    <code className="truncate font-mono text-xs" title={address}>
                                         {address}
                                     </code>
                                     <CopyButton

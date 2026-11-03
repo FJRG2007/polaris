@@ -227,7 +227,7 @@ export function KeyForm({
                 </div>
                 <Card>
                     <CardBody className="flex flex-col gap-3">
-                        <code className="break-all rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-sm">
+                        <code className="break-all rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
                             {issued}
                         </code>
                         <div className="flex flex-wrap justify-end gap-2">

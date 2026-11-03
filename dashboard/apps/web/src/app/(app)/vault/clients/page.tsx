@@ -71,7 +71,7 @@ export default async function VaultClientsPage() {
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm">
+                        <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs">
                             {serverUrl}
                         </code>
                         <CopyButton value={serverUrl} label={t("clients.serverAddressCopy")} />
