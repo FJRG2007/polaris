@@ -25,7 +25,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 The New York game in the Games app (dashboard/apps/arcade/game/new-york) is a port of
-Slop New York (github.com/mrdoob/slop-newyork), and includes code under the following licence:
+Slop New York (github.com/mrdoob/slop-newyork), including changes proposed to that repository by
+parveen0029 (start-up and graphics-device failure messages, pull request 1) and
+SadeekFarhan21 (landmark lots and colliders, helicopter camera, pull request 2),
+and includes code under the following licence:
 
 MIT License
 
