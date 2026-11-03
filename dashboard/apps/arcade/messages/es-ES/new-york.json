@@ -27,15 +27,15 @@
         },
         "failure": {
             "graphics": {
-                "title": "No se pudieron iniciar los gráficos",
-                "text": "Este navegador no pudo iniciar los gráficos. Activa la aceleración por hardware en sus ajustes y recarga."
+                "title": "Sin gráficos",
+                "text": "Los gráficos no pudieron arrancar aquí. Activa la aceleración por hardware y recarga."
             },
             "error": {
                 "title": "Nueva York no pudo iniciarse",
                 "text": "Algo detuvo la ciudad mientras cargaba. Recarga para volver a intentarlo."
             },
             "lost": {
-                "title": "Se reiniciaron los gráficos",
+                "title": "Gráficos reiniciados",
                 "text": "El navegador o el sistema reinició los gráficos. Recarga para recuperar la ciudad."
             },
             "reload": "Recargar"

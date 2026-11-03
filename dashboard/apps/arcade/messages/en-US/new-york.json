@@ -28,7 +28,7 @@
         "failure": {
             "graphics": {
                 "title": "Graphics could not start",
-                "text": "This browser could not start the graphics. Turn on hardware acceleration in its settings, then reload."
+                "text": "The graphics could not start here. Turn on hardware acceleration, then reload."
             },
             "error": {
                 "title": "New York could not start",
