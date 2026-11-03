@@ -17,11 +17,14 @@
 
 import type { PickedFile } from "./picked-file";
 import { DropZone } from "@/components/drop-zone";
+import { CameraCapture } from "./camera-capture";
+import { cameraAvailable, cameraKinds } from "./camera-kinds";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn, Button, Dialog, DialogContent, EmptyState, Input, Select } from "@polaris/ui";
 import {
     ArrowLeft,
+    Camera,
     Check,
     Clock,
     File as FileIcon,
@@ -35,7 +38,7 @@ import {
 } from "lucide-react";
 
 /** Where the dialog is looking. */
-export type FilePickerTab = "recent" | "mine" | "shared" | "upload" | "url";
+export type FilePickerTab = "recent" | "mine" | "shared" | "upload" | "camera" | "url";
 
 /** Each is named as `files.tabs.<id>`. */
 const TABS: readonly { id: FilePickerTab; icon: typeof Clock }[] = [
@@ -43,6 +46,7 @@ const TABS: readonly { id: FilePickerTab; icon: typeof Clock }[] = [
     { id: "mine", icon: HardDrive },
     { id: "shared", icon: Users },
     { id: "upload", icon: Upload },
+    { id: "camera", icon: Camera },
     { id: "url", icon: Link2 }
 ];
 
@@ -131,6 +135,21 @@ export function FilePickerDialog({
     const [chosen, setChosen] = useState<Record<string, Entry>>({});
     const [address, setAddress] = useState("");
     const file = useRef<HTMLInputElement | null>(null);
+    // The camera is offered only to a screen that takes pictures or video, and
+    // only on a device that has one; until that is known the tab stays hidden.
+    const kinds = useMemo(() => cameraKinds(accept, storageOnly), [accept, storageOnly]);
+    const [camera, setCamera] = useState<{ phone: boolean } | null>(null);
+    useEffect(() => {
+        if (!kinds.photo && !kinds.video) return;
+        let gone = false;
+        void cameraAvailable(window).then((available) => {
+            if (gone || !available) return;
+            setCamera({ phone: window.matchMedia?.("(pointer: coarse)").matches ?? false });
+        });
+        return () => {
+            gone = true;
+        };
+    }, [kinds]);
 
     // Which answer belongs to the listing on screen. A slow folder must not
     // overwrite the one somebody has since opened.
@@ -253,7 +272,7 @@ export function FilePickerDialog({
         onClose();
     }
 
-    function fromComputer(list: FileList | null): void {
+    function fromComputer(list: FileList | readonly File[] | null): void {
         const files = [...(list ?? [])];
         if (files.length === 0) return;
         onPick(
@@ -276,7 +295,9 @@ export function FilePickerDialog({
                         <nav className="w-40 shrink-0 space-y-0.5" aria-label={t("files.where")}>
                             {TABS.filter(
                                 (entry) =>
-                                    !storageOnly || (entry.id !== "upload" && entry.id !== "url")
+                                    (!storageOnly ||
+                                        (entry.id !== "upload" && entry.id !== "url")) &&
+                                    (entry.id !== "camera" || camera !== null)
                             ).map((entry) => (
                                 <button
                                     key={entry.id}
@@ -481,6 +502,12 @@ export function FilePickerDialog({
                                         onChange={(event) => fromComputer(event.target.files)}
                                     />
                                 </>
+                            ) : tab === "camera" && camera ? (
+                                <CameraCapture
+                                    kinds={kinds}
+                                    phone={camera.phone}
+                                    onFiles={(files) => fromComputer(files)}
+                                />
                             ) : (
                                 <div className="m-3 flex-1">
                                     <label className="block">

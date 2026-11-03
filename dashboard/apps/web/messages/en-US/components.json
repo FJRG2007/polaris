@@ -411,6 +411,7 @@
             "mine": "My files",
             "shared": "Shared with me",
             "upload": "Upload",
+            "camera": "Camera",
             "url": "By address"
         },
         "kinds": {
@@ -439,7 +440,17 @@
         "noneChosen": "Nothing chosen",
         "attach": "Attach",
         "fetching": "Fetching the file",
-        "fetchFailed": "That file could not be fetched."
+        "fetchFailed": "That file could not be fetched.",
+        "camera": {
+            "photo": "Take a photo",
+            "video": "Record a video",
+            "stop": "Stop recording",
+            "gallery": "Choose from gallery",
+            "preview": "Camera preview",
+            "starting": "Starting the camera",
+            "denied": "The camera is blocked. Allow it in the browser to use it here.",
+            "failed": "That could not be captured. Try again."
+        }
     },
     "transfers": {
         "label": "Transfers",
