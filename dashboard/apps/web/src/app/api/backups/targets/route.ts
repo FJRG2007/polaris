@@ -2,7 +2,9 @@
  * What a new destination could be built on: the storage connections and the
  * servers this account already has.
  *
- * Names and ids only. The dialog needs to offer a choice, not to know anything
+ * Names and ids only. Servers are the first one by name: the dialog only asks
+ * whether there is one and starts on it, and its picker reads the rest a page at
+ * a time. The dialog needs to offer a choice, not to know anything
  * about how either is reached. Admin-only. Node runtime for Prisma.
  */
 
@@ -27,7 +29,8 @@ export async function GET(): Promise<Response> {
         prisma.host.findMany({
             where: { ownerId: user.id },
             select: { id: true, name: true },
-            orderBy: { name: "asc" }
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: 1
         })
     ]);
     return Response.json({ connections, hosts });

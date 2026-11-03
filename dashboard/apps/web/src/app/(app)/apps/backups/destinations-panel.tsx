@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { ServerPicker } from "@/components/server-picker";
 import { formatBytes } from "@polaris/core";
 import type { DestinationSummary } from "./types";
 import { readJson, readReasonText, reasonFor } from "@/lib/read-json";
@@ -636,14 +637,11 @@ function DestinationDialog({
                                     {t("destinations.noServers")}
                                 </span>
                             ) : (
-                                <Select
-                                    value={hostId}
-                                    onValueChange={setHostId}
+                                <ServerPicker
+                                    value={hostId || null}
+                                    onValueChange={(id) => setHostId(id)}
+                                    selectedLabel={hosts.find((entry) => entry.id === hostId)?.name}
                                     aria-label={t("destinations.server")}
-                                    options={hosts.map((entry) => ({
-                                        value: entry.id,
-                                        label: entry.name
-                                    }))}
                                 />
                             )}
                         </label>

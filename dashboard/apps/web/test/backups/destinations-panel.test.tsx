@@ -9,6 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DestinationSummary } from "@/app/(app)/apps/backups/types";
 
+vi.mock("@/app/(app)/server-options-actions", () => ({
+    listServerOptionsAction: async () => ({ items: [], next: null })
+}));
 vi.mock("@/app/(app)/apps/backups/actions", () => ({
     createDestinationAction: vi.fn(),
     deleteDestinationAction: vi.fn(),
