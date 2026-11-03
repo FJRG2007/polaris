@@ -143,6 +143,8 @@ src/lib/unlock.ts        the master password, and why it did not open the vault
 src/lib/save.ts          what was typed for a new login, before it is encrypted
 src/lib/item.ts          the item to send back when only its password changes
 src/lib/fields.ts        which box is the username, which password is which, what the form is for
+src/lib/identity.ts      the identities a form is offered, and what each pick fills
+src/lib/place-match.ts   which country or region option is the one an identity holds
 src/lib/capture.ts       whether a submitted login is worth saving, replacing, or neither
 src/lib/breach.ts        whether a password being invented is already public
 src/lib/injection.ts     which granted sites the inline script may run on
@@ -176,6 +178,16 @@ Polaris also appears inside that site's own pages:
   confirmation with it,
 - the mark beside a one-time-code box, which types the code for the item you
   pick,
+- your identities on a sign-up, profile or address form. Each row shows what
+  that identity has for the box you are in - its email on an email box, its
+  street on an address box - so with a home and a work identity you pick the
+  address rather than the name. Picking one fills the empty boxes, replaces
+  the box you opened it on, and replaces the whole name or address when that
+  is where you opened it, so two addresses never end up mixed. Names are filled
+  whole or in parts, middle name and both Spanish surnames included; country
+  and region dropdowns are chosen in the page's language, waiting a moment for
+  a region list that follows the country. Dropdowns a site draws itself without
+  a real `<select>` behind them are left for you,
 - a warning while you invent a password that is already in a breach corpus,
 - and, when a form goes, an offer to save what was typed - or to replace the
   password on the login it belongs to.

@@ -32,6 +32,20 @@ export interface IdentityCard {
     readonly isDefault: boolean;
     /** Which vault it is in, as named in plain text, or null for their own. */
     readonly vault: string | null;
+    /** What it holds for the boxes a menu is opened on, so the menu can show
+     *  each identity's own email, phone or address before one is picked. Never
+     *  anything a sign-up form has no box for. */
+    readonly preview: IdentityPreview;
+}
+
+/** The few values of an identity its menu row can lead with. Empty where unset. */
+export interface IdentityPreview {
+    readonly email: string;
+    readonly phone: string;
+    /** The street line and the city, as one line. */
+    readonly address: string;
+    /** The whole name, given names first. */
+    readonly name: string;
 }
 
 /** The parts of an identity a sign-up form can ask for. Empty where unset. */

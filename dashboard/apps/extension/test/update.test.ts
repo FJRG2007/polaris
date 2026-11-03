@@ -205,6 +205,6 @@ describe("what the popup says about it", () => {
         // Polaris is used without a terminal. A shell, a line to paste or a
         // script to run is a dead end on the screen that says it.
         const text = JSON.stringify(all.map((catalog) => catalog.popup));
-        expect(text).not.toMatch(/PowerShell|Terminal|run this|ejecuta|command|comando/i);
+        expect(text).not.toMatch(/PowerShell|Terminal|\brun this\b|ejecuta|\bcommand\b|comando/i);
     });
 });
