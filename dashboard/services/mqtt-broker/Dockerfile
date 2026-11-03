@@ -9,7 +9,11 @@
 #
 # Pinned rather than tracking latest: a broker that moves under a running house
 # is how a door stops reporting on a Tuesday for no reason anybody can trace.
-FROM eclipse-mosquitto:2.0.20
+FROM eclipse-mosquitto:2.0.22
+
+# Its Alpine base is patched at build, so a rebuild carries the fixes released
+# since the tag was cut.
+RUN apk upgrade --no-cache
 
 COPY services/mqtt-broker/entrypoint.sh /polaris-entrypoint.sh
 RUN chmod +x /polaris-entrypoint.sh
