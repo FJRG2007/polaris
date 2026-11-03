@@ -12,6 +12,7 @@ import { translateT } from "./i18n";
 import { host } from "@polaris/app-host";
 import { loadSettings } from "./settings";
 import type { TranslateKey } from "../../messages";
+import { ENGINE_LIMITS, translateInChunks } from "../model/chunk";
 import { AUTO, normalizeDetected } from "../model/languages";
 import { pickServerEngine, usableServerEngines } from "../model/engines";
 import type {
@@ -22,14 +23,16 @@ import type {
 } from "../model/schemas";
 
 /** Why a request got no translation, as the route answers it. */
-export type ServeFailure = "noEngine" | "unavailable" | "limit" | "paused" | "failed";
+export type ServeFailure =
+    "noEngine" | "unavailable" | "limit" | "paused" | "failed" | "overLimit";
 
 const STATUS: Readonly<Record<ServeFailure, number>> = {
     noEngine: 409,
     unavailable: 409,
     limit: 429,
     paused: 503,
-    failed: 502
+    failed: 502,
+    overLimit: 413
 };
 
 const MESSAGE: Readonly<Record<ServeFailure, TranslateKey>> = {
@@ -37,7 +40,8 @@ const MESSAGE: Readonly<Record<ServeFailure, TranslateKey>> = {
     unavailable: "errors.engineUnavailable",
     limit: "errors.limit",
     paused: "errors.paused",
-    failed: "errors.failed"
+    failed: "errors.failed",
+    overLimit: "errors.overLimit"
 };
 
 /** What a reader who is not an administrator is told instead: nothing to set up. */
@@ -65,14 +69,18 @@ export async function serverStatus(userId: string): Promise<ServerStatus> {
  * administrator is told what to set up; anybody else, that the administrators
  * look after it.
  */
-export async function failureResponse(failure: ServeFailure, admin: boolean): Promise<Response> {
+export async function failureResponse(
+    failure: ServeFailure,
+    admin: boolean,
+    values?: Record<string, string | number>
+): Promise<Response> {
     const t = await translateT();
     const key = admin ? MESSAGE[failure] : (READER_MESSAGE[failure] ?? MESSAGE[failure]);
-    return Response.json({ error: failure, message: t(key) }, { status: STATUS[failure] });
+    return Response.json({ error: failure, message: t(key, values) }, { status: STATUS[failure] });
 }
 
 /** What an engine threw, as a failure code. Anything unexpected is logged. */
-function failureOf(caught: unknown): ServeFailure {
+export function failureOf(caught: unknown): ServeFailure {
     if (caught instanceof Error && caught.name === "EngineRefusal") {
         const code = (caught as Error & { code?: string }).code;
         if (code === "unavailable" || code === "limit" || code === "paused") return code;
@@ -82,14 +90,6 @@ function failureOf(caught: unknown): ServeFailure {
     return "failed";
 }
 
-async function engineFor(userId: string, asked?: ServerEngineId): Promise<ServerEngineId | null> {
-    const [settings, available] = await Promise.all([
-        loadSettings(),
-        host.translateEngines.serverEngineStatus(userId)
-    ]);
-    return pickServerEngine(available, settings, asked);
-}
-
 export type Served<T> =
     ({ ok: true; engine: ServerEngineId } & T) | { ok: false; failure: ServeFailure };
 
@@ -97,15 +97,26 @@ export async function translateOnServer(
     userId: string,
     input: TranslateInput
 ): Promise<Served<{ texts: string[]; detected: string | null }>> {
-    const engine = await engineFor(userId, input.engine);
+    const [settings, available] = await Promise.all([
+        loadSettings(),
+        host.translateEngines.serverEngineStatus(userId)
+    ]);
+    const total = input.texts.reduce((sum, text) => sum + text.length, 0);
+    if (settings.charLimit !== null && total > settings.charLimit) {
+        return { ok: false, failure: "overLimit" };
+    }
+    const engine = pickServerEngine(available, settings, input.engine);
     if (!engine) return { ok: false, failure: input.engine ? "unavailable" : "noEngine" };
     try {
-        const answer = await host.translateEngines.serverTranslate(
-            engine,
-            userId,
-            input.texts,
-            input.from === AUTO ? null : input.from,
-            input.to
+        // Cut to what this engine takes at once; the reader sees one answer.
+        const answer = await translateInChunks(input.texts, ENGINE_LIMITS[engine], (batch) =>
+            host.translateEngines.serverTranslate(
+                engine,
+                userId,
+                batch,
+                input.from === AUTO ? null : input.from,
+                input.to
+            )
         );
         return {
             ok: true,
