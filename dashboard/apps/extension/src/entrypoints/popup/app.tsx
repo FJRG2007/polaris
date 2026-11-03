@@ -11,7 +11,7 @@ import { localPermissions, type ReachStatus } from "@/lib/local-address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { Picker } from "./picker";
-import { CheckMark, CopyMark } from "./marks";
+import { CheckMark, CopyMark, EyeMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
 import { addable, AddressNote, useAddressCheck } from "./server-check";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
@@ -1340,6 +1340,81 @@ function Field({
     );
 }
 
+/** How long a password asked to be shown stays on screen before it is dots again. */
+const REVEAL_FOR_MS = 30_000;
+
+/**
+ * The password line, with an eye next to it for reading it instead of copying it.
+ *
+ * Somebody typing a password into a TV, a phone or another computer has nothing
+ * to paste it into, so copying alone left them with dots. The value is asked for
+ * only when the eye is pressed - through the same `copy` request the line uses,
+ * which a web page cannot send (see `FROM_PAGE`) - and goes back to dots on its
+ * own after `REVEAL_FOR_MS`, or when the popup closes, so a password is never
+ * left on a screen nobody is looking at.
+ */
+function PasswordField({
+    id,
+    done,
+    onCopy,
+    onRefused
+}: {
+    id: string;
+    /** Whether the password was just copied. */
+    done: boolean;
+    onCopy: () => void;
+    /** Why the password could not be shown, in the popup's note line. */
+    onRefused: (why: string) => void;
+}): React.JSX.Element {
+    const t = useWords();
+    const [value, setValue] = useState<string | null>(null);
+    const hiding = useRef<number | null>(null);
+
+    const stopTimer = (): void => {
+        if (hiding.current !== null) window.clearTimeout(hiding.current);
+        hiding.current = null;
+    };
+    useEffect(() => stopTimer, []);
+
+    const toggle = async (): Promise<void> => {
+        stopTimer();
+        if (value !== null) {
+            setValue(null);
+            return;
+        }
+        const reply = await askBackground({ kind: "copy", id, field: "password" });
+        if (!reply.ok || !("value" in reply)) {
+            if (!reply.ok) onRefused(reply.error);
+            return;
+        }
+        setValue(reply.value);
+        hiding.current = window.setTimeout(() => setValue(null), REVEAL_FOR_MS);
+    };
+
+    const shown = value !== null;
+    return (
+        <div className="secret">
+            <Field
+                copyLabel={t("popup.items.copyPassword")}
+                shown={value ?? "••••••••••"}
+                mono
+                done={done}
+                onCopy={onCopy}
+            />
+            <button
+                type="button"
+                className="icon small"
+                aria-pressed={shown}
+                aria-label={shown ? t("generator.hidePassword") : t("generator.showPassword")}
+                title={shown ? t("generator.hidePassword") : t("generator.showPassword")}
+                onClick={() => void toggle()}
+            >
+                <EyeMark struck={shown} />
+            </button>
+        </div>
+    );
+}
+
 /**
  * Replacing one login's password.
  *
@@ -1850,12 +1925,11 @@ function Items({
                     done={copied === `${item.id}:username`}
                     onCopy={item.username === null ? null : () => void copy(item, "username")}
                 />
-                <Field
-                    copyLabel={t("popup.items.copyPassword")}
-                    shown="••••••••••"
-                    mono
+                <PasswordField
+                    id={item.id}
                     done={copied === `${item.id}:password`}
                     onCopy={() => void copy(item, "password")}
+                    onRefused={setNote}
                 />
                 {item.totp ? (
                     <TotpCell
