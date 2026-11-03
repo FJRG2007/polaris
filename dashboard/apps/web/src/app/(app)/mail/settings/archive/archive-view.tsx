@@ -83,7 +83,7 @@ export function ArchiveView({
     });
     // A kept count whose fresh read failed is not known either: the line goes,
     // as it did when nothing was kept.
-    const exportCount = size.kept && size.stale !== null ? null : size.data;
+    const exportCount = size.firstFailed ? null : size.data;
 
     if (!account) {
         return (

@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpCircle, PackageX, RotateCw } from "lucide-react";
-import { Button, EmptyState, buttonVariants } from "@polaris/ui";
+import { Button, EmptyState, buttonVariants, pollWhileVisible } from "@polaris/ui";
 import { changeAppBuildAction, retryAppAction } from "@/lib/app-bundles/actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -52,8 +52,7 @@ export function AppUnavailable({
     // becomes the app the moment it is running.
     useEffect(() => {
         if (!updating) return;
-        const timer = setInterval(() => router.refresh(), 3_000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => router.refresh(), 3_000);
     }, [updating, router]);
 
     const updateHere = () =>

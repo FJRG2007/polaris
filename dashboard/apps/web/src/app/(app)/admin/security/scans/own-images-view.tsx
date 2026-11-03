@@ -10,6 +10,7 @@ import * as actions from "./actions";
 import { Loader2, Package } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, EmptyState, Skeleton } from "@polaris/ui";
 import type { ImageFindingRow, OwnImage } from "@/lib/security/image-findings";
@@ -27,19 +28,32 @@ export function OwnImagesView() {
     const t = useTranslations("imageScans");
     const admin = useTranslations("admin");
     const linked = useSearchParams()?.get("scan") ?? null;
-    const [images, setImages] = useState<OwnImage[] | null>(null);
-    const [failed, setFailed] = useState(false);
+    const [busy, setBusy] = useState(false);
     const [open, setOpen] = useState<string | null>(null);
     const [findings, setFindings] = useState<Findings | null>(null);
     const [pending, setPending] = useState<string | null>(null);
     const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
-    const load = useCallback(async () => {
+    // Read through the shared live read, so two admin tabs on this list ask
+    // once between them while a scan is running, and a revisit paints the rows
+    // it showed last straight away.
+    const read = useCallback(async () => {
         const result = await actions.ownImagesAction().catch(() => ({ error: "failed" }) as const);
-        if ("error" in result) return setFailed(true);
-        setFailed(false);
-        setImages(result.images);
+        if ("error" in result) throw new Error("failed");
+        return result.images;
     }, []);
+    const live = useLiveRead({
+        load: read,
+        cacheKey: "admin-own-images",
+        intervalMs: 8000,
+        // Polled only while a scan is waiting or running, as before.
+        paused: !busy
+    });
+    // A kept copy whose first read failed is a failed first read: the screen
+    // renders what it rendered before there was a kept copy at all.
+    const images = live.firstFailed ? null : live.data;
+    const failed = live.error !== null || live.firstFailed;
+    const load = live.refresh;
 
     const readFindings = useCallback(async (scanId: string) => {
         setFindings({ scanId, rows: null, failed: false });
@@ -52,10 +66,6 @@ export function OwnImagesView() {
                 : { scanId, rows: result.findings, failed: false }
         );
     }, []);
-
-    useEffect(() => {
-        void load();
-    }, [load]);
 
     // The image an alert linked to opens once the list has arrived, also when
     // a newer scan of it has replaced the linked one since.
@@ -84,12 +94,10 @@ export function OwnImagesView() {
         if (image.scan.state === "done") void readFindings(image.scan.id);
     }, [linkedRef, readFindings]);
 
-    const busy = images?.some((image) => scanBusy(image.scan));
+    const scanning = images?.some((image) => scanBusy(image.scan)) ?? false;
     useEffect(() => {
-        if (!busy) return;
-        const timer = setInterval(() => void load(), 8000);
-        return () => clearInterval(timer);
-    }, [busy, load]);
+        setBusy(scanning);
+    }, [scanning]);
 
     async function scanAgain(image: OwnImage) {
         setPending(image.ref);
@@ -103,7 +111,7 @@ export function OwnImagesView() {
             return;
         }
         setMessage({ text: t("queued"), error: false });
-        await load();
+        load();
     }
 
     function toggle(image: OwnImage) {

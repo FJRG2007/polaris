@@ -74,7 +74,8 @@ import {
     ScrollRow,
     SegmentedControl,
     Select,
-    DateInput
+    DateInput,
+    pollWhileVisible
 } from "@polaris/ui";
 import {
     Activity,
@@ -817,8 +818,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     // three seconds with nothing left to learn.
     useEffect(() => {
         if (!items?.some((item) => !isSettled(item))) return;
-        const timer = setInterval(reload, 3000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(reload, 3000);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items]);
 

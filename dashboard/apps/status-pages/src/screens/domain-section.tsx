@@ -11,7 +11,7 @@ import { unwrap, useStatusT } from "./i18n";
 import type { DomainStatus } from "../lib/manage";
 import { useEffect, useId, useState } from "react";
 import { CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
-import { Button, CopyButton, Input, useToast } from "@polaris/ui";
+import { Button, CopyButton, Input, useToast, pollWhileVisible } from "@polaris/ui";
 import { isCustomHostname, normalizeHostname } from "../model/schemas";
 import { checkCustomDomainAction, setCustomDomainAction } from "../actions/manage";
 
@@ -54,8 +54,7 @@ export function DomainSection({
     // says when it starts working without being refreshed.
     useEffect(() => {
         if (!domain || !status || status.state === "ready") return;
-        const timer = setInterval(check, RECHECK_MS);
-        return () => clearInterval(timer);
+        return pollWhileVisible(check, RECHECK_MS);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [domain, status?.state]);
 

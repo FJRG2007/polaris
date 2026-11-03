@@ -14,10 +14,10 @@ import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { ConnectChannelDialog } from "./connect-channel-dialog";
 import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as polls from "./inbox-polls";
 import * as adminPolls from "../admin-polls";
-import { useUnmountSignal } from "@/lib/poll-fetch";
 import { PLATFORM_LOGO, editablePeer, humanPeerId, peerHint, platformLabel } from "./platform-meta";
 import type {
     AgentView,
@@ -62,7 +62,6 @@ export function InboxView({
 }) {
     const t = useTranslations("admin");
     const [channels, setChannels] = useState(initialChannels);
-    const [conversations, setConversations] = useState(initialConversations);
     const [activeId, setActiveId] = useState<string | null>(initialConversations[0]?.id ?? null);
     const [connecting, setConnecting] = useState(false);
     const [newChat, setNewChat] = useState(false);
@@ -81,20 +80,18 @@ export function InboxView({
             .catch(() => undefined);
     }, []);
 
-    const signal = useUnmountSignal();
-    const refreshConversations = useCallback(async () => {
-        try {
-            setConversations(await polls.conversations(signal()));
-        } catch {
-            // Transient; the next poll retries.
-        }
-    }, []);
-
     // Poll the conversation list so new inbound threads appear without a reload.
-    useEffect(() => {
-        const timer = setInterval(refreshConversations, 5000);
-        return () => clearInterval(timer);
-    }, [refreshConversations]);
+    // Through the shared live read, so two tabs on the Inbox ask once between
+    // them. A failed read is transient and says nothing: the next poll retries.
+    const readConversations = useCallback((signal: AbortSignal) => polls.conversations(signal), []);
+    const conversationList = useLiveRead({
+        load: readConversations,
+        cacheKey: "inbox-conversations",
+        intervalMs: 5000,
+        initial: { value: initialConversations, at: 0 }
+    });
+    const conversations = conversationList.data ?? initialConversations;
+    const refreshConversations = conversationList.refresh;
 
     const active = useMemo(
         () => conversations.find((item) => item.id === activeId) ?? null,
@@ -271,7 +268,26 @@ function Thread({
 }) {
     const t = useTranslations("admin");
     const tc = useTranslations("common");
-    const [messages, setMessages] = useState<MessageView[]>([]);
+    // The thread goes through the shared live read, so two tabs on one
+    // conversation ask once between them. A failed read is transient and says
+    // nothing: the next poll retries.
+    const readMessages = useCallback(
+        (signal: AbortSignal) => polls.messages(conversation.id, signal),
+        [conversation.id]
+    );
+    const thread = useLiveRead({
+        load: readMessages,
+        cacheKey: `inbox-messages:${conversation.id}`,
+        intervalMs: 4000
+    });
+    const messages = useMemo(() => thread.data ?? [], [thread.data]);
+    const load = thread.refresh;
+    // What is on screen, for the optimistic edits below: they land after an
+    // await, when the render that started them is no longer the latest.
+    const shown = useRef(messages);
+    useEffect(() => {
+        shown.current = messages;
+    }, [messages]);
     const [text, setText] = useState("");
     const [optionsMode, setOptionsMode] = useState(false);
     const [optionsText, setOptionsText] = useState("");
@@ -292,21 +308,6 @@ function Thread({
     // Another conversation is another thread: it opens on its newest message,
     // whatever the reader was looking at in the one before.
     useEffect(() => follow.stick(), [conversation.id, follow]);
-
-    const signal = useUnmountSignal();
-    const load = useCallback(async () => {
-        try {
-            setMessages(await polls.messages(conversation.id, signal()));
-        } catch {
-            // Transient; the next poll retries.
-        }
-    }, [conversation.id]);
-
-    useEffect(() => {
-        void load();
-        const timer = setInterval(load, 4000);
-        return () => clearInterval(timer);
-    }, [load]);
 
     function send() {
         setError(null);
@@ -342,7 +343,7 @@ function Thread({
             senderId: null,
             createdAt: new Date().toISOString()
         };
-        setMessages((prev) => [...prev, optimistic]);
+        thread.replace([...shown.current, optimistic]);
         setText("");
         setOptionsText("");
         setOptionsMode(false);
@@ -353,8 +354,8 @@ function Thread({
                 interactive
             });
             if (result.error) {
-                setMessages((prev) =>
-                    prev.map((message) =>
+                thread.replace(
+                    shown.current.map((message) =>
                         message.id === optimisticId ? { ...message, ack: "failed" } : message
                     )
                 );
@@ -362,7 +363,7 @@ function Thread({
                 return;
             }
             // Replace the optimistic bubble with the server's persisted messages.
-            await load();
+            load();
             onSent();
         });
     }

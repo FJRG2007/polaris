@@ -70,7 +70,8 @@ import {
     Switch,
     cn,
     isDirty,
-    LanDetailsRegion
+    LanDetailsRegion,
+    pollWhileVisible
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -273,10 +274,10 @@ export function CameraDialog({
         // The worker publishes twice a minute; asking on the same cadence means
         // somebody walking in front of their own camera with this open sees it
         // register rather than having to close and reopen.
-        const timer = setInterval(() => void ask(), 15_000);
+        const stopPolling = pollWhileVisible(() => void ask(), 15_000);
         return () => {
             cancelled = true;
-            clearInterval(timer);
+            stopPolling();
         };
     }, [camera?.id]);
 

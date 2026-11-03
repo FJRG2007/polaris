@@ -90,7 +90,8 @@ import {
     DropdownMenuTrigger,
     Input,
     Textarea,
-    cn
+    cn,
+    pollWhileVisible
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -257,10 +258,10 @@ export function GameConsole({
                 if (live) setSchedules(answer.schedules);
             });
         read();
-        const timer = window.setInterval(read, SCHEDULES_EVERY_MS);
+        const stopPolling = pollWhileVisible(read, SCHEDULES_EVERY_MS);
         return () => {
             live = false;
-            window.clearInterval(timer);
+            stopPolling();
         };
     }, [installedAppId]);
 
@@ -271,13 +272,14 @@ export function GameConsole({
                 if (live) setRepeatList(answer.repeats);
             });
         read();
-        const timer = window.setInterval(
+        // Resting while hidden, like the schedules above, and reading on return.
+        const stopPolling = pollWhileVisible(
             read,
             repeatRunning ? REPEATS_RUNNING_MS : REPEATS_IDLE_MS
         );
         return () => {
             live = false;
-            window.clearInterval(timer);
+            stopPolling();
         };
     }, [installedAppId, repeatRunning]);
 

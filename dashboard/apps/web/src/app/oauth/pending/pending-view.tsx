@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldQuestion } from "lucide-react";
-import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
+import { Card, CardBody, CardHeader, CardTitle, PolarisMark, pollWhileVisible } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { signOut } from "@/lib/auth-client";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -23,8 +23,7 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const timer = window.setInterval(() => router.refresh(), POLL_MS);
-        return () => window.clearInterval(timer);
+        return pollWhileVisible(() => router.refresh(), POLL_MS);
     }, [router]);
 
     async function onCancel() {

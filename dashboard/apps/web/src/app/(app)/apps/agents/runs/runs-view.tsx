@@ -23,7 +23,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Textarea
+    Textarea,
+    pollWhileVisible
 } from "@polaris/ui";
 
 /**
@@ -51,8 +52,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
     const live = runs.some((run) => !isTerminalRunState(run.state));
     useEffect(() => {
         if (!live) return;
-        const timer = setInterval(() => router.refresh(), REFRESH_MS);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => router.refresh(), REFRESH_MS);
     }, [live, router]);
 
     const cancel = (run: AgentRunView) => {

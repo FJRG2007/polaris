@@ -28,7 +28,7 @@ import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { ItemPicker } from "./minecraft-item-picker";
 import { PlayerPicker } from "./player-picker";
 import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
-import { Badge, Button, Input, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, Input, Skeleton, cn, pollWhileVisible } from "@polaris/ui";
 import { itemLabel, maxStackFor, stacksFor } from "../../lib/minecraft/items";
 import { InventoryGrid, type PendingStack } from "./minecraft-inventory";
 import { isMovable, writableSlots } from "../../lib/minecraft/item-argument";
@@ -243,7 +243,7 @@ export function InventoryEditor({
     const slowRead = reading?.chunked === true;
     useEffect(() => {
         if (!live) return;
-        const timer = setInterval(
+        return pollWhileVisible(
             () => {
                 // Not while something is in the air: the grid moving under the cursor
                 // is how a drag ends on the slot next to the one somebody aimed at.
@@ -251,7 +251,6 @@ export function InventoryEditor({
             },
             slowRead ? SLOW_POLL_MS : POLL_MS
         );
-        return () => clearInterval(timer);
     }, [live, pending, reload, slowRead]);
 
     /*
@@ -263,10 +262,9 @@ export function InventoryEditor({
     useEffect(() => {
         if (!online || live || loading) return;
         void reload();
-        const timer = setInterval(() => {
+        return pollWhileVisible(() => {
             if (!dragging.current && !pending) void reload();
         }, SLOW_POLL_MS);
-        return () => clearInterval(timer);
     }, [online, live, loading, pending, reload]);
 
     /** The stacks waiting on a slot, which the grid draws in it, and everything

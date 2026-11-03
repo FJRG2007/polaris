@@ -32,6 +32,7 @@ import {
     type ReactNode
 } from "react";
 import { useRouter } from "next/navigation";
+import { pollWhileVisible } from "@polaris/ui";
 import * as polls from "./chat-reads";
 
 /**
@@ -394,10 +395,10 @@ export function ChatProvider({
                 stopped = true;
             };
         }
-        const timer = setInterval(ask, CALLS_RECHECK_MS);
+        const stopPolling = pollWhileVisible(ask, CALLS_RECHECK_MS);
         return () => {
             stopped = true;
-            clearInterval(timer);
+            stopPolling();
         };
     }, [may.call, callsAreOff]);
 
@@ -417,10 +418,10 @@ export function ChatProvider({
                 });
         };
         ask();
-        const timer = setInterval(ask, CALLS_OUTSIDE_RECHECK_MS);
+        const stopPolling = pollWhileVisible(ask, CALLS_OUTSIDE_RECHECK_MS);
         return () => {
             stopped = true;
-            clearInterval(timer);
+            stopPolling();
         };
     }, [may.call]);
 

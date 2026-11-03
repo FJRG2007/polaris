@@ -64,7 +64,8 @@ import {
     cn,
     MenuShortcut,
     ShortcutHint,
-    shortcutPressed
+    shortcutPressed,
+    pollWhileVisible
 } from "@polaris/ui";
 
 export interface ProjectCardData {
@@ -161,8 +162,7 @@ export function ProjectsGrid({
     const settling = projects.some((project) => project.deploying > 0);
     useEffect(() => {
         if (!settling) return;
-        const timer = setInterval(() => router.refresh(), 3000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => router.refresh(), 3000);
     }, [settling, router]);
 
     const kept = useMemo(

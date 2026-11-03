@@ -23,6 +23,7 @@
  */
 
 import { z } from "zod";
+import { pollWhileVisible } from "@polaris/ui";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { NOTIFICATION_SOUND_CHANGED } from "@/lib/notification-sound";
@@ -148,11 +149,14 @@ export function AdminWaitingProvider({
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(recount, SETTLE_MS);
         });
-        const sweep = setInterval(recount, SWEEP_MS);
+        // The sweep is the floor under the stream, for a frame that never came.
+        // A hidden tab skips it - the frames above still recount it - and sweeps
+        // once when it is looked at again.
+        const stopPolling = pollWhileVisible(recount, SWEEP_MS);
         return () => {
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;
-            clearInterval(sweep);
+            stopPolling();
             stop();
         };
     }, [enabled, scope, shelf, recount, soundChanged]);

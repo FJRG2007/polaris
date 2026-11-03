@@ -96,7 +96,8 @@ import {
     Skeleton,
     ShortcutHint,
     rowClickIntent,
-    shortcutPressed
+    shortcutPressed,
+    pollWhileVisible
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -323,8 +324,7 @@ export function GamesView({
     const copying = servers.some((server) => server.copy && server.copy.stage !== "failed");
     useEffect(() => {
         if (!copying) return;
-        const timer = setInterval(() => router.refresh(), COPY_POLL_MS);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => router.refresh(), COPY_POLL_MS);
     }, [copying, router]);
 
     function duplicateRefusal(server: list.GameServerSeed): string {

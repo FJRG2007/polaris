@@ -8,8 +8,8 @@
 
 import { Card, CardBody } from "@polaris/ui";
 import * as polls from "../inbox-polls";
-import { useUnmountSignal } from "@/lib/poll-fetch";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { ActivityView } from "@/lib/messaging-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -34,20 +34,16 @@ function stamp(iso: string): string {
 
 export function LogsView({ initialActivity }: { initialActivity: ActivityView[] }) {
     const t = useTranslations("admin");
-    const [activity, setActivity] = useState(initialActivity);
-
-    const signal = useUnmountSignal();
-    const load = useCallback(() => {
-        void polls
-            .activity(signal())
-            .then(setActivity)
-            .catch(() => undefined);
-    }, []);
-
-    useEffect(() => {
-        const timer = setInterval(load, 4000);
-        return () => clearInterval(timer);
-    }, [load]);
+    // Through the shared live read, so two tabs on the log ask once between
+    // them. A failed read says nothing: the next poll retries.
+    const load = useCallback((signal: AbortSignal) => polls.activity(signal), []);
+    const live = useLiveRead({
+        load,
+        cacheKey: "inbox-activity",
+        intervalMs: 4000,
+        initial: { value: initialActivity, at: 0 }
+    });
+    const activity = live.data ?? initialActivity;
 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">

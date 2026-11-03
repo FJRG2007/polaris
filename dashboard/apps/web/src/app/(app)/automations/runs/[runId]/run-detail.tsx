@@ -46,7 +46,8 @@ import {
     PageHeader,
     Skeleton,
     cn,
-    useToast
+    useToast,
+    pollWhileVisible
 } from "@polaris/ui";
 
 export function RunDetailView({ runId }: { runId: string }) {
@@ -60,8 +61,7 @@ export function RunDetailView({ runId }: { runId: string }) {
     const going = !!run && !core.runFinished(run.status);
     useEffect(() => {
         if (!going) return;
-        const timer = setInterval(() => void refresh(), 2000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => void refresh(), 2000);
     }, [going, refresh]);
 
     return (

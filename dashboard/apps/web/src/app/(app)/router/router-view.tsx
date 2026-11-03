@@ -221,8 +221,7 @@ function RouterEditor({
     const { poll } = read;
 
     useEffect(() => {
-        const timer = setInterval(poll, STATUS_POLL_MS);
-        return () => clearInterval(timer);
+        return ui.pollWhileVisible(poll, STATUS_POLL_MS);
     }, [poll]);
 
     const saved = read.data?.plan ?? null;

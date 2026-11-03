@@ -9,6 +9,7 @@
 
 import { Package } from "lucide-react";
 import * as actions from "../actions/security";
+import { hostUi } from "@polaris/app-host/client";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { FindingsTable, type ImageFinding } from "./findings-table";
@@ -39,30 +40,39 @@ export function ImagesPanel({
     targetId: string;
     submit: Submit;
 }) {
-    const [data, setData] = useState<Images | null>(null);
-    const [failed, setFailed] = useState(false);
+    const [busy, setBusy] = useState(false);
     const [open, setOpen] = useState<string | null>(null);
     const [findings, setFindings] = useState<ImageFinding[] | null>(null);
     const [findingsFailed, setFindingsFailed] = useState(false);
 
-    const load = useCallback(async () => {
+    // Read through the shared live read, so two tabs on this server ask once
+    // between them while a scan is running, and a revisit paints the rows it
+    // showed last straight away. Another server is another key, which starts
+    // from nothing rather than from this one's rows.
+    const read = useCallback(async (): Promise<Images> => {
         const result = await actions.serverImagesAction({ targetId });
-        if (!result.ok) return setFailed(true);
-        setFailed(false);
-        setData(result.data);
+        if (!result.ok) throw new Error("failed");
+        return result.data;
     }, [targetId]);
+    const live = hostUi.liveRead.useLiveRead<Images>({
+        load: read,
+        cacheKey: `security-server-images:${targetId}`,
+        intervalMs: 8000,
+        // Polled only while a scan is waiting or running, as before.
+        paused: !busy
+    });
+    // A kept copy whose first read failed is a failed first read: the screen
+    // renders what it rendered before there was a kept copy at all.
+    const data = live.firstFailed ? null : live.data;
+    const failed = live.error !== null || live.firstFailed;
+    const load = live.refresh;
+    const scanning =
+        data?.images.some(
+            (image) => image.scan?.state === "queued" || image.scan?.state === "running"
+        ) ?? false;
     useEffect(() => {
-        setData(null);
-        void load();
-    }, [load]);
-    const busy = data?.images.some(
-        (image) => image.scan?.state === "queued" || image.scan?.state === "running"
-    );
-    useEffect(() => {
-        if (!busy) return;
-        const timer = setInterval(() => void load(), 8000);
-        return () => clearInterval(timer);
-    }, [busy, load]);
+        setBusy(scanning);
+    }, [scanning]);
 
     const readFindings = async (scanId: string) => {
         setFindings(null);

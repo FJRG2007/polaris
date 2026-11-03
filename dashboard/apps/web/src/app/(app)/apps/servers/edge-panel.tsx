@@ -20,7 +20,7 @@
  * are told rather than surprised.
  */
 
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, pollWhileVisible } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { useCallback, useEffect, useState } from "react";
 import * as polls from "./servers-polls";
@@ -52,8 +52,7 @@ export function EdgePanel({ hostId }: { hostId: string }) {
     const elsewhere = state?.settingUp === true && !busy;
     useEffect(() => {
         if (!elsewhere) return;
-        const timer = setInterval(() => void ask(), 10_000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => void ask(), 10_000);
     }, [elsewhere, ask]);
 
     const prepare = async () => {

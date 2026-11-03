@@ -17,6 +17,7 @@ import { ProjectAccessProvider } from "./access-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
+import { pollWhileVisible } from "@polaris/ui";
 import {
     EnvironmentServices,
     NewServiceButton,
@@ -73,8 +74,7 @@ export function ProjectDetail({
     );
     useEffect(() => {
         if (!settling) return;
-        const timer = setInterval(refresh, 3000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(refresh, 3000);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settling]);
 

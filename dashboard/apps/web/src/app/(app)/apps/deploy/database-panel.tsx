@@ -54,7 +54,8 @@ import {
     Skeleton,
     Switch,
     cn,
-    DateInput
+    DateInput,
+    pollWhileVisible
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
@@ -127,8 +128,7 @@ export function DatabaseManageDialog({
         (overview?.cloud && overview.status === "provisioning");
     useEffect(() => {
         if (!open || !running) return;
-        const timer = setInterval(() => void load(), 3000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => void load(), 3000);
     }, [open, running, load]);
 
     const tabs: { value: Tab; label: string }[] = overview

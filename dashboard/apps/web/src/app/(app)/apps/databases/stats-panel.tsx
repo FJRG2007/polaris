@@ -42,7 +42,16 @@ import { grouped } from "@/app/(app)/apps/firewall/grouped";
 import type { DatabaseStats, StatValue } from "@/lib/data/stats";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardBody, Select, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Select,
+    TimeSeriesChart,
+    cn,
+    type TimePoint,
+    pollWhileVisible
+} from "@polaris/ui";
 
 /** How often a reading is taken. Fast enough to watch something happen, slow
  *  enough that the panel is not itself the load. */
@@ -129,10 +138,10 @@ export function StatsPanel() {
         // cadence. Both are cleared together, so leaving the panel mid-pair does
         // not leave a timer behind.
         const soon = setTimeout(() => void sample(), FIRST_PAIR_MS);
-        const timer = setInterval(() => void sample(), POLL_MS);
+        const stopPolling = pollWhileVisible(() => void sample(), POLL_MS);
         return () => {
             clearTimeout(soon);
-            clearInterval(timer);
+            stopPolling();
         };
     }, [sample]);
 

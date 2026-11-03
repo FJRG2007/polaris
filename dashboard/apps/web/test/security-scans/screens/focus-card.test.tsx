@@ -14,9 +14,15 @@ const focus = vi.fn();
 const findings = vi.fn();
 const rescan = vi.fn();
 
-vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
-}));
+vi.mock("@polaris/app-host/client", async () => {
+    const { useLiveRead } = await import("@/components/use-live-resource");
+    return {
+        hostUi: {
+            i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
+            liveRead: { useLiveRead }
+        }
+    };
+});
 vi.mock("@polaris-app/security-scans/src/actions/security", () => ({
     focusAction: (input: unknown) => focus(input),
     findingsAction: (input: unknown) => findings(input),
@@ -85,6 +91,7 @@ const FINDINGS = [
 
 afterEach(() => {
     cleanup();
+    sessionStorage.clear();
     focus.mockReset();
     findings.mockReset();
     rescan.mockReset();

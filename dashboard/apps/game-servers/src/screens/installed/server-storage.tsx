@@ -30,7 +30,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Skeleton
+    Skeleton,
+    pollWhileVisible
 } from "@polaris/ui";
 
 type AppStorageView = AppHostTypes["AppStorageView"];
@@ -114,8 +115,7 @@ export function ServerStorage({
 
     const working = view?.move ? WORKING.has(view.move.state) : false;
     useEffect(() => {
-        const timer = setInterval(() => void load(), working ? 3_000 : 30_000);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => void load(), working ? 3_000 : 30_000);
     }, [load, working]);
 
     if (!loaded) {

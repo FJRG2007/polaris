@@ -15,6 +15,7 @@
 import { fetchVoicePresence } from "./chat-polls";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useState } from "react";
+import { pollWhileVisible } from "@polaris/ui";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 
@@ -59,8 +60,7 @@ export function useVoiceRooms(
     useEffect(() => {
         read();
         if (!asked || !pollMs) return;
-        const timer = setInterval(read, pollMs);
-        return () => clearInterval(timer);
+        return pollWhileVisible(read, pollMs);
     }, [read, asked, pollMs]);
 
     return { inRoom, read };

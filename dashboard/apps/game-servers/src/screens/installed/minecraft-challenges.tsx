@@ -299,10 +299,10 @@ export function MinecraftChallenges({
                     // Tried again on the next beat.
                 });
         read();
-        const timer = setInterval(read, 30_000);
+        const stopPolling = ui.pollWhileVisible(read, 30_000);
         return () => {
             alive = false;
-            clearInterval(timer);
+            stopPolling();
         };
     }, [installedAppId]);
 

@@ -129,7 +129,7 @@ export function RolloutsView() {
         cacheKey: "agent-rollouts",
         intervalMs: REFRESH_MS
     });
-    const data = screen.kept && screen.stale !== null ? null : screen.data;
+    const data = screen.firstFailed ? null : screen.data;
     const failure = screen.error ?? (data === null ? screen.stale : null);
     const [notice, setNotice] = useState<string | null>(null);
     const [, startTransition] = useTransition();

@@ -30,7 +30,8 @@ import {
     CardHeader,
     CardTitle,
     SegmentedControl,
-    Textarea
+    Textarea,
+    pollWhileVisible
 } from "@polaris/ui";
 import {
     interruptSessionAction,
@@ -109,8 +110,7 @@ export function SessionDetail({
 
     useEffect(() => {
         if (over) return;
-        const timer = setInterval(() => router.refresh(), REFRESH_MS);
-        return () => clearInterval(timer);
+        return pollWhileVisible(() => router.refresh(), REFRESH_MS);
     }, [over, router]);
 
     useEffect(() => {
@@ -140,11 +140,11 @@ export function SessionDetail({
                 .catch(() => undefined);
         };
         read();
-        const timer = setInterval(read, REFRESH_MS);
+        const stopPolling = pollWhileVisible(read, REFRESH_MS);
         return () => {
             stopped = true;
             controller.abort();
-            clearInterval(timer);
+            stopPolling();
         };
     }, [session.id, session.state, shared]);
 

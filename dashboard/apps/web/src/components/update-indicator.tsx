@@ -9,7 +9,7 @@
  */
 
 import Link from "next/link";
-import { Badge } from "@polaris/ui";
+import { Badge, pollWhileVisible } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { DownloadCloud } from "lucide-react";
@@ -27,7 +27,10 @@ export function UpdateIndicator() {
             try {
                 const response = await fetch("/api/updates");
                 if (!response.ok) return;
-                const data = (await response.json()) as { phase?: string; behindBy?: number | null };
+                const data = (await response.json()) as {
+                    phase?: string;
+                    behindBy?: number | null;
+                };
                 if (!active) return;
                 setAvailable(
                     data.phase === "available"
@@ -39,10 +42,10 @@ export function UpdateIndicator() {
             }
         }
         poll();
-        const timer = setInterval(poll, POLL_INTERVAL_MS);
+        const stopPolling = pollWhileVisible(poll, POLL_INTERVAL_MS);
         return () => {
             active = false;
-            clearInterval(timer);
+            stopPolling();
         };
     }, []);
 
