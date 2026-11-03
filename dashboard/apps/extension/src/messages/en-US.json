@@ -265,7 +265,13 @@
             "available": "Version {version} is available",
             "store": "Your browser installs it",
             "auto": "Installs itself within hours",
-            "manual": "How to update"
+            "manual": "How to update",
+            "check": "Check for updates",
+            "checking": "Checking...",
+            "storeReady": "Version {version} is downloaded",
+            "restart": "Restart to update",
+            "throttled": "Checked moments ago. Try again in a few minutes.",
+            "failed": "Could not check. Try again later."
         },
         "reach": {
             "local": "Using your local network address",

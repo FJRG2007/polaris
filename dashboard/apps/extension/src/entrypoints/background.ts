@@ -3027,15 +3027,15 @@ async function currentNotice(): Promise<update.UpdateNotice | null> {
  * from an alarm, and a server that was briefly unreachable is not news that the
  * extension is suddenly current.
  */
-async function checkForUpdate(): Promise<void> {
+async function checkForUpdate(): Promise<boolean> {
     const origin = await reachOrigin();
-    if (!origin) return;
+    if (!origin) return false;
     try {
         const response = await fetch(`${origin}/api/polaris/extension`, {
             signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS),
             credentials: "omit"
         });
-        if (!response.ok) return;
+        if (!response.ok) return false;
         const answer = (await response.json()) as { version?: unknown; url?: unknown };
         await LATEST.setValue(update.publishedVersion(answer));
         await UPDATE.setValue(
@@ -3049,9 +3049,42 @@ async function checkForUpdate(): Promise<void> {
         );
         // The toolbar icon is where somebody with the popup closed finds out.
         await badge();
+        return true;
     } catch {
         // Unreachable, or an answer that was not JSON. What is stored stands.
+        return false;
     }
+}
+
+/**
+ * "Check for updates", pressed. A store install asks the store now
+ * (`runtime.requestUpdateCheck`, where the browser has it); every copy asks this
+ * Polaris for the version that is out, which is how a copy loaded from disk or
+ * kept current by the updater hears of one.
+ */
+async function checkUpdateNow(): Promise<{
+    store: "update_available" | "no_update" | "throttled" | null;
+    storeVersion: string | null;
+    polaris: boolean;
+}> {
+    const runtime = browser.runtime as unknown as {
+        requestUpdateCheck?: () => Promise<{ status?: unknown; version?: unknown } | [unknown, unknown?]>;
+    };
+    let store: "update_available" | "no_update" | "throttled" | null = null;
+    let storeVersion: string | null = null;
+    if ((await installType()) === "normal" && typeof runtime.requestUpdateCheck === "function") {
+        try {
+            const answer = await runtime.requestUpdateCheck();
+            // Chrome answers an object; Firefox has answered `[status, details]`.
+            const status = Array.isArray(answer) ? answer[0] : answer?.status;
+            const details = (Array.isArray(answer) ? answer[1] : answer) as { version?: unknown } | undefined;
+            if (status === "update_available" || status === "no_update" || status === "throttled") store = status;
+            if (typeof details?.version === "string") storeVersion = details.version;
+        } catch {
+            // Refused or not there: the Polaris answer below still stands.
+        }
+    }
+    return { store, storeVersion, polaris: await checkForUpdate() };
 }
 
 /** Polar using this browser (`lib/polar-browser.ts`): asks for each site when it first needs it. */
@@ -3695,6 +3728,15 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // started keeping this copy current since the notice was made.
                 return {
                     ok: true,
+                    update: await currentNotice(),
+                    pending: await diskVersion(),
+                    latest: await LATEST.getValue()
+                };
+
+            case "checkUpdate":
+                return {
+                    ok: true,
+                    checked: await checkUpdateNow(),
                     update: await currentNotice(),
                     pending: await diskVersion(),
                     latest: await LATEST.getValue()

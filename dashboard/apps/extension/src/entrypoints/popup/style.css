@@ -1326,6 +1326,19 @@ button.danger {
     font-size: 11px;
 }
 
+.version-check {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+    min-width: 0;
+}
+
+.version-check button {
+    padding: 0 6px;
+    font-size: inherit;
+}
+
 .version-line a {
     color: hsl(var(--foreground));
     text-decoration-color: hsl(var(--primary));
