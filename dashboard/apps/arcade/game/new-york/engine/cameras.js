@@ -344,7 +344,13 @@ class CameraSystem {
         this.followLookOffset.subVectors(this.currentLookAt, entity.position);
       }
       const k = 1 - Math.exp(-dt * 8.5);
-      this.followBaseY += (entity.position.y - this.followBaseY) * k;
+      // The helicopter's climb is eased as the continuous motion it is: the camera trails it by climb / 8.5 m at any
+      // frame time. Eased as a step per frame like a curb, the trail followed every uneven frame time, and the
+      // helicopter bobbed on screen as it climbed or levelled off
+      const climb = entity.type === 'helicopter' ? entity.verticalSpeed || 0 : 0;
+      const trail = climb / 8.5;
+      const lag = entity.position.y - this.followBaseY;
+      this.followBaseY = entity.position.y - trail - (lag - climb * dt - trail) * (1 - k);
       this.followOffset.lerp(desiredPos.sub(entity.position), k);
       this.followLookOffset.lerp(desiredLook.sub(entity.position), k);
       this.currentPos.set(entity.position.x, this.followBaseY, entity.position.z).add(this.followOffset);
