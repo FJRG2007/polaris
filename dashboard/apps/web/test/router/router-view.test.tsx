@@ -39,6 +39,15 @@ const READING = {
     rolledBack: false
 };
 
+/** Add a line from its dialog, tagged when the port's plain traffic is taken. */
+async function addLine(tagged = false): Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    const form = await screen.findByRole("dialog");
+    if (tagged) fireEvent.click(within(form).getByRole("radio", { name: "VLAN" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -59,7 +68,7 @@ describe("RouterSection", () => {
         expect(screen.getByText("Not a router yet")).toBeTruthy();
         const apply = screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement;
         expect(apply.disabled).toBe(true);
-        fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+        await addLine();
         await waitFor(() => expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy());
         expect(applyRouterAction).not.toHaveBeenCalled();
     });
@@ -124,7 +133,7 @@ describe("RouterSection", () => {
         render(<RouterSection />, { wrapper: MessagesWrapper });
         await screen.findByText("eth1");
         expect(screen.queryByText("Add a network.")).toBeNull();
-        fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+        await addLine();
         expect(await screen.findByText("Add a network.")).toBeTruthy();
     });
 
@@ -137,7 +146,7 @@ describe("RouterSection", () => {
         readRouterAction.mockResolvedValue({ plan: null, reading: { ...READING, ports } });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         await screen.findByText("eth0.20");
-        fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+        await addLine();
         expect(await screen.findByText("Add a network.")).toBeTruthy();
     });
 
@@ -152,7 +161,7 @@ describe("RouterSection", () => {
         render(<RouterSection />, { wrapper: MessagesWrapper });
         const missing = "This port is not on the machine. Check that it is plugged in.";
         expect(await screen.findAllByText(missing)).toHaveLength(1);
-        fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+        await addLine(true);
         await screen.findByRole("button", { name: "Discard" });
         expect(screen.getAllByText(missing)).toHaveLength(1);
         expect(screen.queryByText(/No internet from this port/)).toBeNull();
@@ -310,5 +319,61 @@ describe("RouterSection", () => {
         });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("The last change did not hold and was undone")).toBeTruthy();
+    });
+
+    /** The operator's machine: one port, the line and the network both untagged on it. */
+    const ONE_PORT = {
+        wans: [{ interface: "ens6", vlan: null }],
+        lans: [{ ...SAVED.lans[0], name: "Test", interface: "ens6" }],
+        forwards: []
+    };
+    const VPS = {
+        ...READING,
+        ports: [{ ...PORT, name: "ens6", addresses: ["192.0.2.10/32"], hasGateway: true }]
+    };
+
+    it("names a port clash and ends it with one button", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        readRouterAction.mockResolvedValue({ plan: null, reading: VPS });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("This machine has one port, ens6")).toBeTruthy();
+        await addLine();
+        fireEvent.click(screen.getByRole("button", { name: "Add network" }));
+        const form = await screen.findByRole("dialog");
+        const tag = within(form).getByRole("radio", { name: "VLAN" });
+        expect(tag.getAttribute("aria-checked")).toBe("true");
+        expect((within(form).getByRole("textbox", { name: "VLAN tagging" }) as HTMLInputElement).value).toBe("10");
+        fireEvent.click(within(form).getByRole("radio", { name: "Untagged" }));
+        expect(
+            within(form).getByText(
+                "ens6 untagged is already used by internet line 1. Choose VLAN, or another port."
+            )
+        ).toBeTruthy();
+        fireEvent.change(within(form).getByLabelText("Name *"), { target: { value: "Test" } });
+        fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+        expect(screen.getByRole("dialog")).toBeTruthy();
+        fireEvent.click(within(form).getByRole("radio", { name: "VLAN" }));
+        fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(screen.getAllByText("VLAN 10").length).toBeGreaterThan(0);
+    });
+
+    it("moves a clashing network onto a free VLAN and lets it apply", async () => {
+        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        readRouterAction.mockResolvedValue({ plan: ONE_PORT, reading: VPS });
+        render(<RouterSection />, { wrapper: MessagesWrapper });
+        expect(
+            await screen.findByText("ens6 untagged is used by both internet line 1 and the Test network.")
+        ).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Move Test to VLAN 10" }));
+        await screen.findByRole("button", { name: "Discard" });
+        expect(screen.queryByText(/is used by both/)).toBeNull();
+        const apply = screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement;
+        expect(apply.disabled).toBe(false);
+        fireEvent.click(apply);
+        const confirm = await screen.findByRole("dialog");
+        fireEvent.click(within(confirm).getByRole("button", { name: "Apply" }));
+        await waitFor(() => expect(applyRouterAction).toHaveBeenCalledTimes(1));
+        expect(applyRouterAction.mock.calls[0]?.[0].plan.lans[0].vlan).toBe(10);
     });
 });

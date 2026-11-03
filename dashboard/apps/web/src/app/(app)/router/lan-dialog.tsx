@@ -5,8 +5,8 @@
 
 import { useState } from "react";
 import * as ui from "@polaris/ui";
-import { Field } from "./router-field";
-import { VlanInput } from "./router-view";
+import { Field, HelpNote, VlanField } from "./router-field";
+import { hostCount, nextFreeVlan, vlanError, vlanTakenBy, type PortLink } from "@/lib/router/assist";
 import { Plus, Trash2 } from "lucide-react";
 import type { MachinesAnswer } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/router/plan";
 import {
     cidrsOverlap,
+    dhcpRange,
     firstHost,
     isHostOf,
     isUsableCidr,
@@ -33,9 +34,32 @@ function defaultCountry(): string {
     return /-([A-Z]{2})$/.exec(navigator.language)?.[1] ?? "";
 }
 
+/** Where a new network starts: a port nothing rides untagged, or else the first port
+ *  on its next free VLAN, so a one-port machine is offered a VLAN from the start. */
+function placeFor(
+    links: readonly PortLink[],
+    ports: readonly string[]
+): { interface: string; vlan: number | null } {
+    const free = ports.find(
+        (port) => !links.some((link) => link.port === port && link.vlan === null)
+    );
+    if (free) return { interface: free, vlan: null };
+    const port = ports[0] ?? "";
+    return { interface: port, vlan: port ? nextFreeVlan(links, port) : null };
+}
+
+function Heading({ children }: { children: React.ReactNode }) {
+    return (
+        <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-subtle">
+            {children}
+        </h3>
+    );
+}
+
 export function LanDialog({
     lan,
     taken,
+    links,
     ports,
     radios,
     wired,
@@ -45,6 +69,8 @@ export function LanDialog({
 }: {
     lan: RouterLan | null;
     taken: readonly RouterLan[];
+    /** Every line and network of the draft, to name a port clash and offer a free tag. */
+    links: readonly PortLink[];
     ports: readonly string[];
     /** The ports that can run an access point. */
     radios: readonly string[];
@@ -59,8 +85,10 @@ export function LanDialog({
     const others = taken.filter(({ id }) => id !== lan?.id).map(({ cidr }) => cidr);
     const suggested = lan?.cidr ?? suggestCidr(others);
     const [name, setName] = useState(lan?.name ?? "");
-    const [port, setPort] = useState(lan?.interface ?? ports[0] ?? "");
-    const [vlan, setVlan] = useState(lan?.vlan ?? null);
+    const self = { kind: "network" as const, key: id };
+    const [start] = useState(() => lan ?? placeFor(links, ports));
+    const [port, setPort] = useState(start.interface);
+    const [vlan, setVlan] = useState(start.vlan);
     const [cidr, setCidr] = useState(suggested);
     const [address, setAddress] = useState(lan?.address ?? firstHost(suggested));
     const [touched, setTouched] = useState(lan !== null);
@@ -103,10 +131,13 @@ export function LanDialog({
         ...(wifi ? { wifi } : {})
     };
     const parsed = lanSchema.safeParse(candidate);
-    const vlanBad = vlan !== null && (vlan < 2 || vlan > 4094);
+    const clash = vlanTakenBy(links, self, port, vlan) !== null;
+    const room = hostCount(clean);
+    const pool = isUsableCidr(clean) ? dhcpRange(clean) : null;
     const wifiComplete =
         !airing || (ssid.trim() !== "" && (hasPassword || wifiPassword !== "") && vlan === null);
-    const valid = parsed.success && !subnetTaken && wifiComplete;
+    const valid =
+        parsed.success && !subnetTaken && wifiComplete && !clash && vlanError(vlan) === null;
 
     function changeCidr(next: string): void {
         setCidr(next);
@@ -141,16 +172,18 @@ export function LanDialog({
                             }}
                         />
                     ) : null}
-                    <Field id="lan-name" label={`${t("name")} *`}>
+                    <Field id="lan-name" label={`${t("name")} *`} hint={t("nameHint")}>
                         <ui.Input
                             id="lan-name"
+                            placeholder={t("namePlaceholder")}
                             value={name}
                             maxLength={40}
                             onChange={(event) => setName(event.target.value)}
                         />
                     </Field>
+                    <Heading>{t("whereTitle")}</Heading>
                     <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Field id="lan-port" label={`${t("port")} *`}>
+                        <Field id="lan-port" label={`${t("port")} *`} hint={t("lanPortHint")}>
                             <ui.Select
                                 id="lan-port"
                                 aria-label={t("port")}
@@ -159,17 +192,22 @@ export function LanDialog({
                                 options={ports.map((one) => ({ value: one, label: one }))}
                             />
                         </Field>
-                        <Field
+                        <VlanField
                             id="lan-vlan"
-                            label={t("vlan")}
-                            hint={t("vlanHint")}
-                            error={vlanBad ? t("problems.badVlan") : null}
-                        >
-                            <VlanInput t={t} value={vlan} onChange={setVlan} />
-                        </Field>
+                            port={port}
+                            value={vlan}
+                            links={links}
+                            self={self}
+                            hint={t("lanVlanHint")}
+                            onChange={setVlan}
+                        />
+                    </div>
+                    <Heading>{t("addressesTitle")}</Heading>
+                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field
                             id="lan-subnet"
                             label={`${t("subnet")} *`}
+                            hint={room === null ? t("subnetHint") : t("subnetRoom", { count: room })}
                             error={
                                 subnetBad
                                     ? t("badSubnet")
@@ -181,6 +219,7 @@ export function LanDialog({
                             <ui.Input
                                 id="lan-subnet"
                                 className="font-mono"
+                                placeholder="10.77.1.0/24"
                                 value={cidr}
                                 onChange={(event) => changeCidr(event.target.value)}
                             />
@@ -188,6 +227,7 @@ export function LanDialog({
                         <Field
                             id="lan-address"
                             label={`${t("routerAddress")} *`}
+                            hint={t("routerAddressHint")}
                             error={addressBad ? t("badAddress") : null}
                         >
                             <ui.Input
@@ -201,6 +241,15 @@ export function LanDialog({
                             />
                         </Field>
                     </div>
+                    {pool ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("dhcpSummary", { first: pool.first, last: pool.last })}
+                        </p>
+                    ) : null}
+                    <HelpNote title={t("subnetHelpTitle")}>
+                        <p>{t("subnetHelp")}</p>
+                    </HelpNote>
+                    <Heading>{t("rulesTitle")}</Heading>
                     <Toggle
                         label={t("internet")}
                         hint={t("internetHint")}
@@ -283,7 +332,12 @@ export function LanDialog({
                     ) : null}
                     <div className="flex min-w-0 flex-col gap-2">
                         <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium">{t("reservations")}</span>
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">{t("reservations")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("reservationsHint")}
+                                </p>
+                            </div>
                             <ui.Button
                                 size="icon"
                                 variant="ghost"
@@ -316,7 +370,7 @@ export function LanDialog({
                                         <ui.Input
                                             className="min-w-0 flex-1 font-mono"
                                             aria-label={t("mac")}
-                                            placeholder={`${t("mac")} *`}
+                                            placeholder="aa:bb:cc:dd:ee:ff"
                                             aria-invalid={bad}
                                             value={one.mac}
                                             onChange={(event) =>
@@ -326,7 +380,7 @@ export function LanDialog({
                                         <ui.Input
                                             className="min-w-0 flex-1 font-mono"
                                             aria-label={t("reservedAddress")}
-                                            placeholder={`${t("reservedAddress")} *`}
+                                            placeholder={pool?.first ?? ""}
                                             aria-invalid={bad}
                                             value={one.address}
                                             onChange={(event) =>
