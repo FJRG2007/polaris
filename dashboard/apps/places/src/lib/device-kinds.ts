@@ -831,6 +831,8 @@ export interface DeviceView {
     readonly placeId: string | null;
     /** Which of its place's rooms it is in. Null, or absent, for none. */
     readonly roomId?: string | null;
+    /** The labels it carries. Absent, on a view from before labels, is none. */
+    readonly labelIds?: readonly string[];
     readonly model: string;
     readonly firmware: string;
     readonly state: DeviceState;

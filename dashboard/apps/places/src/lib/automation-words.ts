@@ -20,8 +20,8 @@ import { placesRefusalText } from "./refusal-text";
 /** What the sentences need to know about a device, by id. */
 export interface DeviceLookup {
     (id: string): { readonly name: string; readonly kind: string } | undefined;
-    /** A room's or a floor's name, where the screen has the place's rooms. */
-    readonly place?: (kind: "room" | "floor", id: string) => string | undefined;
+    /** A room's, a floor's or a label's name, where the screen has them. */
+    readonly place?: (kind: string, id: string) => string | undefined;
     /** A camera privacy target's name, where the screen has the targets. */
     readonly privacy?: (target: string) => string | undefined;
 }
@@ -35,7 +35,8 @@ export function lookupOf(
         readonly floor: string;
         readonly floorId?: string;
     }[] = [],
-    privacyTargets: readonly { readonly target: string; readonly label: string }[] = []
+    privacyTargets: readonly { readonly target: string; readonly label: string }[] = [],
+    labels: readonly { readonly id: string; readonly name: string }[] = []
 ): DeviceLookup {
     const targetNames = new Map(privacyTargets.map((row) => [row.target, row.label]));
     const byId = new Map(devices.map((device) => [device.id, device]));
@@ -43,9 +44,14 @@ export function lookupOf(
     const floorNames = new Map(
         rooms.flatMap((room) => (room.floorId && room.floor ? [[room.floorId, room.floor]] : []))
     );
+    const labelNames = new Map(labels.map((label) => [label.id, label.name]));
+    const names: Record<string, ReadonlyMap<string, string>> = {
+        room: roomNames,
+        floor: floorNames,
+        label: labelNames
+    };
     return Object.assign((id: string) => byId.get(id), {
-        place: (kind: "room" | "floor", id: string) =>
-            (kind === "room" ? roomNames : floorNames).get(id),
+        place: (kind: string, id: string) => names[kind]?.get(id),
         privacy: (target: string) => targetNames.get(target)
     });
 }
@@ -275,22 +281,39 @@ function deviceName(
 /** A block's devices by name: the one it has, or its first and how many more. */
 function setName(
     lookup: DeviceLookup,
-    block: { deviceId: string; targets?: readonly { kind: string; id: string }[] },
+    block: {
+        deviceId: string;
+        targets?: readonly { kind: string; id: string }[];
+        only?: readonly string[];
+        exclude?: readonly { kind: string; id: string }[];
+    },
     t: PlacesTranslator
 ): { name: string; kind: string } {
     const first = deviceName(lookup, block.deviceId, t);
     const places = auto.placeTargets(block);
     if (places.length > 0) {
-        const name = t("automations.say.inPlace", {
-            place: places
-                .map((ref) => lookup.place?.(ref.kind, ref.id) ?? t("automations.fields.placeGone"))
-                .join(", ")
-        });
+        const place = places
+            .map((ref) =>
+                ref.kind === "place"
+                    ? t("automations.say.everywhere")
+                    : (lookup.place?.(ref.kind, ref.id) ?? t("automations.fields.placeGone"))
+            )
+            .join(", ");
+        const only = (block.only ?? []).filter((kind): kind is kinds.DeviceKind =>
+            (kinds.DEVICE_KINDS as readonly string[]).includes(kind)
+        );
+        let name =
+            only.length > 0
+                ? t("automations.say.kindsInPlace", {
+                      kinds: [...new Set(only.map((kind) => t(`devices.groups.${kind}`)))].join(", "),
+                      place
+                  })
+                : t("automations.say.inPlace", { place });
         const named = (block.targets ?? []).filter((ref) => ref.kind === "device").length;
-        return {
-            name: named > 0 ? t("automations.say.deviceSet", { first: name, count: named }) : name,
-            kind: first.kind
-        };
+        if (named > 0) name = t("automations.say.deviceSet", { first: name, count: named });
+        const left = auto.excludedTargets(block).length;
+        if (left > 0) name = t("automations.say.except", { set: name, count: left });
+        return { name, kind: first.kind };
     }
     const more = auto.deviceTargets(block).length - 1;
     if (more < 1) return first;

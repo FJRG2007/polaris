@@ -47,7 +47,7 @@ import * as sun from "./sun-fields";
 import { savePlaceLocationAction } from "../actions";
 import { AutomationCanvas } from "./automation-canvas";
 import { AddBlockButton, RoomsProvider, blockIcon } from "./add-block";
-import type { RoomView } from "../../lib/room-kinds";
+import type { LabelView, RoomView } from "../../lib/room-kinds";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
@@ -192,6 +192,7 @@ function pathKey(path: readonly (string | number)[]): string {
 
 /** The rooms of a place that has none, one array for every render. */
 const NO_ROOMS: readonly RoomView[] = [];
+const NO_LABELS: readonly LabelView[] = [];
 
 /** A block with its set changed: its devices, and how they count - which goes
  *  with the set when it is down to one device again. */
@@ -355,13 +356,16 @@ export function AutomationEditor({
     }, [automationId]);
 
     const devices = loaded?.context.devices ?? [];
+    const labelList = loaded?.context.labels ?? NO_LABELS;
+    const targetPlace = useMemo(() => ({ labels: labelList, devices }), [labelList, devices]);
     const byId = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
     const lookup = useMemo<words.DeviceLookup>(
         () =>
             words.lookupOf(
                 devices,
                 loaded?.context.rooms ?? NO_ROOMS,
-                loaded?.context.privacyTargets ?? []
+                loaded?.context.privacyTargets ?? [],
+                loaded?.context.labels ?? NO_LABELS
             ),
         [devices, loaded]
     );
@@ -394,7 +398,8 @@ export function AutomationEditor({
             automationIds: loaded?.context.siblings.map((sibling) => sibling.id) ?? [],
             selfId: automationId,
             rooms: loaded?.context.rooms ?? NO_ROOMS,
-            floors: loaded?.context.floors
+            floors: loaded?.context.floors,
+            labels: loaded?.context.labels ?? NO_LABELS
         });
     }, [normalized, devices, loaded, automationId]);
 
@@ -1133,6 +1138,7 @@ export function AutomationEditor({
 
     return (
         <RoomsProvider value={loaded?.context.rooms ?? NO_ROOMS}>
+            <fields.TargetPlaceProvider value={targetPlace}>
             <sun.AutomationScopeProvider
                 value={{
                     triggers: definition.triggers,
@@ -1355,6 +1361,7 @@ export function AutomationEditor({
                     </div>
                 </flow.IssueProvider>
             </sun.AutomationScopeProvider>
+            </fields.TargetPlaceProvider>
         </RoomsProvider>
     );
 }
