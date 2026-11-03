@@ -16,6 +16,12 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { VisualChart } from "@/components/polar/visuals/visual-chart";
 import { Check, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { VisualDiagram } from "@/components/polar/visuals/visual-diagram";
+import {
+    ConversionCard,
+    TimeCard,
+    TranslationCard,
+    WeatherCard
+} from "@/components/polar/visuals/visual-cards";
 import { MessageAction, MessageResponse } from "@/components/polar/elements/message";
 import { Component, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -40,7 +46,11 @@ const KIND_KEYS = {
     steps: "visual.kinds.steps",
     comparison: "visual.kinds.comparison",
     diagram: "visual.kinds.diagram",
-    calculator: "visual.kinds.calculator"
+    calculator: "visual.kinds.calculator",
+    translation: "visual.kinds.translation",
+    weather: "visual.kinds.weather",
+    time: "visual.kinds.time",
+    conversion: "visual.kinds.conversion"
 } as const satisfies Record<Kind, string>;
 
 /** Shown while the model is still writing the view: its shape, not its half. */
@@ -258,6 +268,14 @@ function ViewBody({ view, label }: { view: PolarView; label: string }) {
             );
         case "calculator":
             return <Calculator view={view} />;
+        case "translation":
+            return <TranslationCard view={view} />;
+        case "weather":
+            return <WeatherCard view={view} />;
+        case "time":
+            return <TimeCard view={view} />;
+        case "conversion":
+            return <ConversionCard view={view} />;
     }
 }
 

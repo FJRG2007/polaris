@@ -99,6 +99,35 @@ const VIEWS: Record<string, unknown> = {
             fields: [{ id: "n", label: "Count", value: 2, min: 0, max: 10 }],
             outputs: [{ label: "Double", formula: "n * 2" }]
         }
+    },
+    translation: {
+        view: { kind: "translation", from: "en", to: "es", source: "Hello", translation: "Hola" }
+    },
+    weather: {
+        view: {
+            kind: "weather",
+            place: "Madrid",
+            units: "metric",
+            current: { temperature: 10, code: 0 },
+            days: [{ date: "2026-11-03", min: 6, max: 14, code: 3 }]
+        }
+    },
+    time: {
+        view: {
+            kind: "time",
+            places: [
+                { label: "Madrid", zone: "Europe/Madrid" },
+                { label: "Tokyo", zone: "Asia/Tokyo" }
+            ]
+        }
+    },
+    conversion: {
+        view: {
+            kind: "conversion",
+            type: "unit",
+            from: { value: 10, unit: "km" },
+            to: { value: 6.2137, unit: "mi" }
+        }
     }
 };
 

@@ -3033,7 +3033,9 @@ function MessageView({
               ? t("memory.forget")
               : name === "polar_show"
                 ? t("visual.tool")
-                : name);
+                : name === "polar_weather"
+                  ? t("visual.weather.tool")
+                  : name);
     // A web step names what it searched for or which site it read.
     const stepTitle = (name: string, input: unknown) => {
         const repo = repoStepOf(name, input);

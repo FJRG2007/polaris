@@ -1,6 +1,8 @@
 /**
  * The views Polar can draw inside an answer: a table, a chart, a row of
- * figures, steps, a side-by-side comparison, a small diagram and a calculator.
+ * figures, steps, a side-by-side comparison, a small diagram and a calculator,
+ * and the answer cards - a translation, the weather, the time in other places
+ * and a conversion - that a question of that shape is answered with.
  *
  * The model never writes markup or code. It calls one tool (`polar_show`) with
  * data shaped by one of these schemas, and the chat draws it with Polaris's own
@@ -18,6 +20,8 @@
  */
 
 import { z } from "zod";
+import { closeTo, convertUnit } from "@/lib/polar/units";
+import { instantOf, isTimeZone, isWallTime, zoneOffsetMinutes } from "@/lib/polar/zones";
 
 /** The tool's name, as its parts are typed: `tool-polar_show`. */
 export const POLAR_VISUAL_TOOL = "polar_show";
@@ -139,6 +143,90 @@ const calculatorView = z.object({
         .max(6)
 });
 
+/** A BCP 47 language tag, such as `en`, `es-MX` or `zh-Hant`; checked for real
+ *  by `Intl.getCanonicalLocales` in `viewProblem`. */
+const languageTag = z
+    .string()
+    .min(2)
+    .max(35)
+    .regex(/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/);
+const translationView = z.object({
+    kind: z.literal("translation"),
+    /** The source language, or "detected" (or left out) when it was guessed. */
+    from: languageTag.optional(),
+    to: languageTag,
+    source: z.string().min(1).max(2000),
+    translation: z.string().min(1).max(2000),
+    alternatives: z.array(z.string().min(1).max(500)).max(3).optional(),
+    /** Formality, register, a word with no exact match. */
+    notes: z.string().max(TEXT_MAX).optional()
+});
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** A local time as Open-Meteo gives it: `YYYY-MM-DDTHH:mm`, no offset. */
+const localTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+const weatherCode = z.number().int().min(0).max(99);
+const temperature = z.number().finite().min(-150).max(150);
+const percent = z.number().finite().min(0).max(100);
+const weatherView = z.object({
+    kind: z.literal("weather"),
+    place: z.string().min(1).max(120),
+    asOf: localTime.optional(),
+    units: z.enum(["metric", "imperial"]),
+    current: z
+        .object({
+            temperature,
+            apparent: temperature.optional(),
+            /** A WMO weather interpretation code (`WEATHER_CODES`). */
+            code: weatherCode,
+            wind: z.number().finite().min(0).max(1000).optional(),
+            humidity: percent.optional()
+        })
+        .optional(),
+    days: z
+        .array(
+            z.object({
+                date: isoDate,
+                min: temperature,
+                max: temperature,
+                code: weatherCode,
+                precipitation: percent.optional()
+            })
+        )
+        .max(7)
+        .optional()
+});
+
+const timeView = z.object({
+    kind: z.literal("time"),
+    /** A wall time (`YYYY-MM-DDTHH:mm`) in the first place's zone, to convert;
+     *  left out, the card shows the time now. */
+    at: localTime.optional(),
+    places: z
+        .array(z.object({ label: z.string().min(1).max(80), zone: z.string().min(1).max(64) }))
+        .min(1)
+        .max(6)
+});
+
+const amount = z.object({
+    value: z.number().finite(),
+    /** A unit symbol (km, °F, lb), or an ISO 4217 code for a currency. */
+    unit: z.string().min(1).max(24)
+});
+const conversionView = z.object({
+    kind: z.literal("conversion"),
+    type: z.enum(["unit", "currency"]),
+    from: amount,
+    to: amount,
+    /** One line of how: `°F = °C × 9/5 + 32`. */
+    formula: z.string().max(160).optional(),
+    /** For a currency: one unit of `from` in `to`. */
+    rate: z.number().finite().positive().optional(),
+    /** For a currency, required: where the rate came from and its date. */
+    source: z.string().min(1).max(120).optional(),
+    asOf: isoDate.optional()
+});
+
 const viewSchema = z.discriminatedUnion("kind", [
     tableView,
     chartView,
@@ -146,7 +234,11 @@ const viewSchema = z.discriminatedUnion("kind", [
     stepsView,
     comparisonView,
     diagramView,
-    calculatorView
+    calculatorView,
+    translationView,
+    weatherView,
+    timeView,
+    conversionView
 ]);
 
 /**
@@ -169,6 +261,84 @@ export type PolarView = PolarVisual["view"];
 export type CalculatorView = z.infer<typeof calculatorView>;
 export type ChartView = z.infer<typeof chartView>;
 export type DiagramView = z.infer<typeof diagramView>;
+export type TranslationView = z.infer<typeof translationView>;
+export type WeatherView = z.infer<typeof weatherView>;
+export type TimeView = z.infer<typeof timeView>;
+export type ConversionView = z.infer<typeof conversionView>;
+
+/** Icon groups a weather card draws a condition with. */
+export type WeatherGroup =
+    "clear" | "partly" | "cloudy" | "fog" | "drizzle" | "rain" | "snow" | "storm";
+
+/**
+ * The WMO weather interpretation codes Open-Meteo reports
+ * (https://open-meteo.com/en/docs, "WMO Weather interpretation codes"): the
+ * catalogue key of each one's label, its icon group, and its English text for
+ * the Markdown form.
+ */
+export const WEATHER_CODES = {
+    0: { key: "clear", group: "clear", text: "Clear sky" },
+    1: { key: "mainlyClear", group: "partly", text: "Mainly clear" },
+    2: { key: "partlyCloudy", group: "partly", text: "Partly cloudy" },
+    3: { key: "overcast", group: "cloudy", text: "Overcast" },
+    45: { key: "fog", group: "fog", text: "Fog" },
+    48: { key: "rimeFog", group: "fog", text: "Depositing rime fog" },
+    51: { key: "drizzleLight", group: "drizzle", text: "Light drizzle" },
+    53: { key: "drizzleModerate", group: "drizzle", text: "Moderate drizzle" },
+    55: { key: "drizzleDense", group: "drizzle", text: "Dense drizzle" },
+    56: { key: "freezingDrizzleLight", group: "drizzle", text: "Light freezing drizzle" },
+    57: { key: "freezingDrizzleDense", group: "drizzle", text: "Dense freezing drizzle" },
+    61: { key: "rainSlight", group: "rain", text: "Slight rain" },
+    63: { key: "rainModerate", group: "rain", text: "Moderate rain" },
+    65: { key: "rainHeavy", group: "rain", text: "Heavy rain" },
+    66: { key: "freezingRainLight", group: "rain", text: "Light freezing rain" },
+    67: { key: "freezingRainHeavy", group: "rain", text: "Heavy freezing rain" },
+    71: { key: "snowSlight", group: "snow", text: "Slight snowfall" },
+    73: { key: "snowModerate", group: "snow", text: "Moderate snowfall" },
+    75: { key: "snowHeavy", group: "snow", text: "Heavy snowfall" },
+    77: { key: "snowGrains", group: "snow", text: "Snow grains" },
+    80: { key: "showersSlight", group: "rain", text: "Slight rain showers" },
+    81: { key: "showersModerate", group: "rain", text: "Moderate rain showers" },
+    82: { key: "showersViolent", group: "rain", text: "Violent rain showers" },
+    85: { key: "snowShowersSlight", group: "snow", text: "Slight snow showers" },
+    86: { key: "snowShowersHeavy", group: "snow", text: "Heavy snow showers" },
+    95: { key: "thunderstorm", group: "storm", text: "Thunderstorm" },
+    96: { key: "thunderstormHailSlight", group: "storm", text: "Thunderstorm with slight hail" },
+    97: { key: "thunderstormHeavy", group: "storm", text: "Heavy thunderstorm" },
+    99: { key: "thunderstormHailHeavy", group: "storm", text: "Thunderstorm with heavy hail" }
+} as const satisfies Record<number, { key: string; group: WeatherGroup; text: string }>;
+export type WeatherCode = keyof typeof WEATHER_CODES;
+
+/** A code's entry, or null when it is not a WMO code this knows. */
+export function weatherCodeOf(code: number): (typeof WEATHER_CODES)[WeatherCode] | null {
+    return (WEATHER_CODES as Record<number, (typeof WEATHER_CODES)[WeatherCode]>)[code] ?? null;
+}
+
+/** "detected", an empty or left-out source language: it was guessed. */
+export function sourceLanguageOf(view: TranslationView): string | null {
+    return view.from && view.from.toLowerCase() !== "detected" ? view.from : null;
+}
+
+/** A language tag's name in `locale`, or the tag itself when it has none. */
+export function languageName(tag: string, locale?: string): string {
+    try {
+        return new Intl.DisplayNames(locale, { type: "language" }).of(tag) ?? tag;
+    } catch {
+        return tag;
+    }
+}
+
+function realLanguageTag(tag: string): boolean {
+    try {
+        return Intl.getCanonicalLocales(tag).length === 1;
+    } catch {
+        return false;
+    }
+}
+
+function realDate(date: string): boolean {
+    return isWallTime(`${date}T00:00`);
+}
 
 /** What no schema can say on its own: rows that match their columns, edges that
  *  name real nodes, formulas that read. Null when the view is whole. */
@@ -216,6 +386,47 @@ function viewProblem(view: PolarView): string | null {
                 if (unknown) return `${output.label}: ${unknown} is not a field.`;
             }
             return null;
+        }
+        case "translation": {
+            const from = sourceLanguageOf(view);
+            if (from && !realLanguageTag(from)) return `${from} is not a language tag.`;
+            return realLanguageTag(view.to) ? null : `${view.to} is not a language tag.`;
+        }
+        case "weather": {
+            if (!view.current && !view.days?.length) return "It needs current conditions or days.";
+            if (view.asOf && !isWallTime(view.asOf)) return "asOf is not a real time.";
+            const codes = [
+                ...(view.current ? [view.current.code] : []),
+                ...(view.days ?? []).map((day) => day.code)
+            ];
+            const unknown = codes.find((code) => !weatherCodeOf(code));
+            if (unknown !== undefined) return `${unknown} is not a WMO weather code.`;
+            for (const day of view.days ?? []) {
+                if (!realDate(day.date)) return `${day.date} is not a real date.`;
+                if (day.min > day.max) return `${day.date}: min is above max.`;
+            }
+            return null;
+        }
+        case "time": {
+            const wrong = view.places.find((place) => !isTimeZone(place.zone));
+            if (wrong) return `${wrong.zone} is not an IANA time zone.`;
+            return view.at && !isWallTime(view.at) ? "at is not a real time." : null;
+        }
+        case "conversion": {
+            if (view.type === "currency") {
+                const code = /^[A-Z]{3}$/;
+                if (!code.test(view.from.unit) || !code.test(view.to.unit))
+                    return "A currency is its ISO 4217 code, such as EUR.";
+                if (!view.source || !view.asOf) return "A currency rate needs source and asOf.";
+                if (!realDate(view.asOf)) return "asOf is not a real date.";
+                if (view.rate !== undefined && !closeTo(view.to.value, view.from.value * view.rate))
+                    return "to.value is not from.value times rate.";
+                return null;
+            }
+            const expected = convertUnit(view.from.value, view.from.unit, view.to.unit);
+            return expected !== null && !closeTo(view.to.value, expected)
+                ? `to.value is wrong: ${view.from.value} ${view.from.unit} is ${Number(expected.toPrecision(8))} ${view.to.unit}.`
+                : null;
         }
         default:
             return null;
@@ -534,9 +745,159 @@ export function visualMarkdown(visual: PolarVisual): string {
             });
             return title + [...fields, ...outputs].join("\n");
         }
+        case "translation":
+            return title + translationMarkdown(view);
+        case "weather":
+            return title + weatherMarkdown(view);
+        case "time":
+            return title + timeMarkdown(view, Date.now());
+        case "conversion":
+            return title + conversionMarkdown(view);
         default:
             return title;
     }
+}
+
+function quoted(value: string): string {
+    return value
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => `> ${line}`)
+        .join("\n");
+}
+
+function translationMarkdown(view: TranslationView): string {
+    const from = sourceLanguageOf(view);
+    const lines = [
+        `${from ? languageName(from, "en-US") : "Detected language"} -> ${languageName(view.to, "en-US")}`,
+        "",
+        quoted(view.source),
+        "",
+        view.translation.trim()
+    ];
+    if (view.alternatives?.length)
+        lines.push("", `- Alternatives: ${view.alternatives.map(inline).join("; ")}`);
+    if (view.notes?.trim()) lines.push("", `- Note: ${inline(view.notes)}`);
+    return lines.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+/** The symbols a weather view's figures carry. */
+export function weatherUnits(units: WeatherView["units"]): { temperature: string; wind: string } {
+    return units === "imperial"
+        ? { temperature: "°F", wind: "mph" }
+        : { temperature: "°C", wind: "km/h" };
+}
+
+function weatherMarkdown(view: WeatherView): string {
+    const unit = weatherUnits(view.units);
+    const degrees = (value: number) => `${Math.round(value)} ${unit.temperature}`;
+    const lines = [
+        `**${inline(view.place)}**${view.asOf ? ` (as of ${view.asOf.replace("T", " ")})` : ""}`
+    ];
+    if (view.current) {
+        const now = view.current;
+        const details = [
+            now.apparent !== undefined ? `feels like ${degrees(now.apparent)}` : null,
+            now.wind !== undefined ? `wind ${Math.round(now.wind)} ${unit.wind}` : null,
+            now.humidity !== undefined ? `humidity ${Math.round(now.humidity)}%` : null
+        ].filter(Boolean);
+        lines.push(
+            "",
+            `- Now: ${degrees(now.temperature)}, ${weatherCodeOf(now.code)?.text ?? now.code}${details.length ? ` (${details.join(", ")})` : ""}`
+        );
+    }
+    if (view.days?.length) {
+        lines.push(
+            "",
+            markdownTable(
+                ["Date", "Conditions", "Min", "Max", "Rain"],
+                view.days.map((day) => [
+                    day.date,
+                    weatherCodeOf(day.code)?.text ?? String(day.code),
+                    degrees(day.min),
+                    degrees(day.max),
+                    day.precipitation !== undefined ? `${Math.round(day.precipitation)}%` : ""
+                ])
+            )
+        );
+    }
+    return lines.join("\n");
+}
+
+/** The instant a time view shows: its `at` in the first place's zone, or now. */
+export function timeInstant(view: TimeView, now: number): number {
+    const first = view.places[0];
+    return (view.at && first ? instantOf(view.at, first.zone) : null) ?? now;
+}
+
+/** Minutes each place is ahead of the first one at `instant`. */
+export function timeOffsets(view: TimeView, instant: number): number[] {
+    const base = zoneOffsetMinutes(instant, view.places[0]?.zone ?? "UTC");
+    return view.places.map((place) => zoneOffsetMinutes(instant, place.zone) - base);
+}
+
+/** An offset in minutes as `+5 h 30 min`, `-1 h` or `0 h`. */
+export function offsetText(minutes: number): string {
+    const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
+    const hours = Math.floor(Math.abs(minutes) / 60);
+    const rest = Math.abs(minutes) % 60;
+    return `${sign}${hours} h${rest ? ` ${rest} min` : ""}`;
+}
+
+function timeMarkdown(view: TimeView, now: number): string {
+    const instant = timeInstant(view, now);
+    const offsets = timeOffsets(view, instant);
+    return view.places
+        .map((place, index) => {
+            const when = new Intl.DateTimeFormat("en-US", {
+                timeZone: place.zone,
+                dateStyle: "medium",
+                timeStyle: "short"
+            }).format(instant);
+            const offset = index === 0 ? "" : ` (${offsetText(offsets[index] ?? 0)})`;
+            return `- **${inline(place.label)}** (${place.zone}): ${when}${offset}`;
+        })
+        .join("\n");
+}
+
+/** A converted amount as text: a currency in its own format, a unit after its
+ *  figure. */
+export function amountText(
+    amount: ConversionView["from"],
+    type: ConversionView["type"],
+    locale?: string
+): string {
+    if (type === "currency") {
+        try {
+            return new Intl.NumberFormat(locale, {
+                style: "currency",
+                currency: amount.unit,
+                maximumFractionDigits: 4
+            }).format(amount.value);
+        } catch {
+            // An unknown code still reads as a figure and a code.
+        }
+    }
+    const figure = new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(amount.value);
+    return `${figure} ${amount.unit}`;
+}
+
+/** A currency view's rate as one line: `1 EUR = 1.08 USD`. */
+export function rateText(view: ConversionView, locale?: string): string | null {
+    if (view.type !== "currency" || view.rate === undefined) return null;
+    const rate = new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(view.rate);
+    return `1 ${view.from.unit} = ${rate} ${view.to.unit}`;
+}
+
+function conversionMarkdown(view: ConversionView): string {
+    const lines = [
+        `**${amountText(view.from, view.type, "en-US")} = ${amountText(view.to, view.type, "en-US")}**`
+    ];
+    const how = rateText(view, "en-US") ?? view.formula?.trim();
+    if (how) lines.push("", inline(how));
+    if (view.type === "currency" && view.source)
+        lines.push("", `Source: ${inline(view.source)}${view.asOf ? `, ${view.asOf}` : ""}`);
+    return lines.join("\n");
 }
 
 /** A tabular view as CSV, quoted the way RFC 4180 reads it. Null when the view

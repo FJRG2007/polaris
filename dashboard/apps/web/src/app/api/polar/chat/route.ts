@@ -46,6 +46,7 @@ import {
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { polarVisualTools } from "@/lib/polar/visual-tool";
+import { polarWeatherTools } from "@/lib/polar/weather";
 import { polarRepoTools } from "@/lib/polar/code-host-tools";
 import { BROWSER_TOOL, isBrowserTool } from "@/lib/polar/browser-steps";
 import { browserApprovalFor, polarBrowserTools } from "@/lib/polar/browser-tools";
@@ -230,6 +231,7 @@ export async function POST(request: Request): Promise<Response> {
         ...findToolsTool(catalog)
     };
     const visualTools = polarVisualTools();
+    const weatherTools = polarWeatherTools();
     const repoTools = polarRepoTools(user.id);
     const browserTools = polarBrowserTools(user.id);
     const checked = await safeValidateUIMessages({
@@ -239,6 +241,7 @@ export async function POST(request: Request): Promise<Response> {
             ...screenTools,
             ...memoryTools,
             ...visualTools,
+            ...weatherTools,
             ...repoTools,
             ...browserTools,
             ...NATIVE_SEARCH_STAND_INS,
@@ -328,6 +331,8 @@ export async function POST(request: Request): Promise<Response> {
         ...(remembers ? memoryTools : {}),
         ...visualTools,
         ...webTools,
+        // The forecast is fetched from outside the instance: the web switch.
+        ...(web ? weatherTools : {}),
         ...(web ? repoTools : {}),
         ...(web ? browserTools : {}),
         ...(body.data.connectors
@@ -345,6 +350,7 @@ export async function POST(request: Request): Promise<Response> {
         ...Object.keys(visualTools),
         ...Object.keys(remembers ? memoryTools : {}),
         ...Object.keys(webTools),
+        ...Object.keys(web ? weatherTools : {}),
         ...(repoOffered ? Object.keys(repoTools) : []),
         ...(browserOffered ? [BROWSER_TOOL] : []),
         // A connector is one the person added on purpose: its tools are always sent.
