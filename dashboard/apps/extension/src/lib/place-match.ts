@@ -162,6 +162,24 @@ export function countryText(stored: string, locales: readonly string[]): string 
     return name ?? stored.trim();
 }
 
+/**
+ * What to type into a country box, given what the box asks for: the alpha-2
+ * code where its token is `country` (the HTML standard's code token) or it
+ * holds three characters at most, the name in the page's language otherwise.
+ */
+export function countryInput(
+    stored: string,
+    locales: readonly string[],
+    box: { token: string; maxLength: number | null }
+): string {
+    if (stored.trim() === "") return "";
+    const wantsCode =
+        box.token === "country" ||
+        (box.maxLength !== null && box.maxLength > 0 && box.maxLength <= 3);
+    if (!wantsCode) return countryText(stored, locales);
+    return countryCode(stored, locales) ?? stored.trim();
+}
+
 /** Whether an option is the dropdown's prompt rather than a choice. */
 export function isPlaceholder(option: PlaceOption): boolean {
     if (option.disabled) return true;

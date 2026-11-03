@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
     countryCode,
+    countryInput,
     countryText,
     isPlaceholder,
     normalizePlace,
@@ -77,6 +78,20 @@ describe("a country typed into a text box", () => {
 
     it("is what was stored when it cannot be resolved", () => {
         expect(countryText(" Narnia ", LOCALES)).toBe("Narnia");
+    });
+
+    it("is the code where the box asks for one", () => {
+        const es = placeLocales("es", []);
+        expect(countryInput("España", es, { token: "country", maxLength: null })).toBe("ES");
+        expect(countryInput("ES", es, { token: "", maxLength: 2 })).toBe("ES");
+        expect(countryInput("Narnia", es, { token: "country", maxLength: null })).toBe("Narnia");
+    });
+
+    it("is the name where the box asks for the name or says nothing", () => {
+        const es = placeLocales("es", []);
+        expect(countryInput("ES", es, { token: "country-name", maxLength: null })).toBe("España");
+        expect(countryInput("ES", es, { token: "", maxLength: 40 })).toBe("España");
+        expect(countryInput("", es, { token: "country", maxLength: null })).toBe("");
     });
 });
 

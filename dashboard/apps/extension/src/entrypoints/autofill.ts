@@ -47,6 +47,7 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import {
+    autocompleteToken,
     emptyProfile,
     placePart,
     PROFILE_PARTS,
@@ -63,7 +64,7 @@ import {
     type FillSlot
 } from "@/lib/identity";
 import {
-    countryText,
+    countryInput,
     isPlaceholder,
     pickCountry,
     pickRegion,
@@ -648,9 +649,14 @@ async function start(): Promise<void> {
             if (!box) return;
             const stored = slotValue(values, slot, fields.usernameAsks);
             // A country box that takes text gets the name in the page's own
-            // language, or what was stored where that cannot be resolved.
+            // language, or the code where the box asks for one.
             const value =
-                slot === "country" && stored !== "" ? countryText(stored, locales) : stored;
+                slot === "country"
+                    ? countryInput(stored, locales, {
+                          token: autocompleteToken(box.getAttribute("autocomplete") ?? ""),
+                          maxLength: box.maxLength > 0 ? box.maxLength : null
+                      })
+                    : stored;
             if (box.value === value) return;
             const forced = box === field || replace.has(slot);
             // The rest of a replaced group is cleared where this identity has
@@ -668,17 +674,45 @@ async function start(): Promise<void> {
     };
 
     /**
+     * The closest element holding the box the menu was opened on and every other
+     * box of the identity outside a form on the same page, or null when there is
+     * no such element short of the whole document.
+     */
+    const fillScope = (field: HTMLInputElement): Element | null => {
+        const { fields } = seen;
+        const boxes = [
+            at(fields.username),
+            ...NAME_SLOTS.map((slot) => at(fields[slot])),
+            ...PROFILE_PARTS.map((part) => at(fields.profile[part]))
+        ].filter(
+            (box): box is HTMLInputElement =>
+                box !== null &&
+                box !== field &&
+                box.ownerDocument === field.ownerDocument &&
+                box.form === null &&
+                box.getRootNode() === field.getRootNode()
+        );
+        const holdsAll = (element: Element): boolean => boxes.every((box) => element.contains(box));
+        let scope = field.parentElement;
+        while (scope && !holdsAll(scope)) scope = scope.parentElement;
+        const top = field.ownerDocument;
+        return scope === top.documentElement || scope === top.body ? null : scope;
+    };
+
+    /**
      * The country and region where the page asks for them in a dropdown.
      *
      * Found here, at fill time, rather than by the scan: the scan's pipeline is
      * the boxes a mark or a menu can sit on, which a `<select>` never is, and a
      * dropdown read now has the options it holds now - which, for a region list
      * the page fills in after the country changes, is the only reading worth
-     * having. Looked for in the form of the box the menu was opened on, or the
-     * whole document of that box when it is in no form. A select inside another
-     * shadow root is not reached, and a dropdown drawn from `<div>`s by a
-     * script (one with no `<select>` behind it) cannot be filled generically
-     * and is left alone.
+     * having. Looked for in the form of the box the menu was opened on; with no
+     * form, in the closest container holding every box being filled, and only
+     * then in the rest of the document - where a select that already holds a
+     * choice (a site-wide country or language picker) is left as it is. A
+     * select inside another shadow root is not reached, and a dropdown drawn
+     * from `<div>`s by a script (one with no `<select>` behind it) cannot be
+     * filled generically and is left alone.
      */
     const fillPlaces = async (
         values: IdentityValues,
@@ -686,19 +720,32 @@ async function start(): Promise<void> {
         replace: ReadonlySet<FillSlot>,
         locales: readonly string[]
     ): Promise<void> => {
-        const find = (part: PlacePart): HTMLSelectElement | null => {
-            const pool = field.form
-                ? [...field.form.elements]
-                : [...field.ownerDocument.querySelectorAll("select")];
+        const scope = field.form ? null : fillScope(field);
+        const near = new WeakSet<HTMLSelectElement>();
+        const match = (pool: Iterable<Element>, part: PlacePart): HTMLSelectElement | null => {
             for (const element of pool) {
                 if (element.nodeName !== "SELECT") continue;
                 const select = element as HTMLSelectElement;
+                if (!field.form && select.form) continue;
                 if (placePart(describeSelect(select)) === part) return select;
             }
             return null;
         };
+        const find = (part: PlacePart): HTMLSelectElement | null => {
+            if (field.form) {
+                const select = match(field.form.elements, part);
+                if (select) near.add(select);
+                return select;
+            }
+            const close = scope ? match(scope.querySelectorAll("select"), part) : null;
+            if (close) {
+                near.add(close);
+                return close;
+            }
+            return match(field.ownerDocument.querySelectorAll("select"), part);
+        };
         const settable = (select: HTMLSelectElement, part: PlacePart): boolean => {
-            if (replace.has(part)) return true;
+            if (replace.has(part) && near.has(select)) return true;
             const chosen = select.options[select.selectedIndex];
             return !chosen || isPlaceholder(optionOf(chosen));
         };
