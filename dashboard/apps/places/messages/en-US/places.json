@@ -1775,7 +1775,32 @@
             "litterLow": "Litter low",
             "litterLevel": "Litter {percent}%"
         },
-        "colorValue": "Hue {hue} degrees, saturation {saturation}%"
+        "colorValue": "Hue {hue} degrees, saturation {saturation}%",
+        "reach": {
+            "local": "Reached on your network",
+            "cloud": "Not found on this network, using the cloud",
+            "cloud-key": "Refused a local connection, using the cloud",
+            "cloud-only": "This device only works through the cloud"
+        },
+        "switchSettings": {
+            "powerOn": {
+                "off": "Stay off",
+                "on": "Turn on",
+                "last": "As it was"
+            },
+            "indicator": {
+                "off": "None",
+                "on": "Always on",
+                "status": "Lit while on",
+                "position": "Lit while off"
+            },
+            "countdown": {
+                "off": "No timer",
+                "minutes": "{minutes} min",
+                "hours": "{hours} h",
+                "hoursMinutes": "{hours} h {minutes} min"
+            }
+        }
     },
     "devicesView": {
         "rooms": "Rooms",
@@ -1903,7 +1928,16 @@
             "dumpConfirm": "Empty litter",
             "cancel": "Cancel"
         },
-        "batteryLine": "low at {percent}%"
+        "batteryLine": "low at {percent}%",
+        "switchSettings": {
+            "title": "Settings",
+            "powerOn": "After a power cut",
+            "indicator": "Indicator light",
+            "childLock": "Child lock",
+            "countdownWhenOn": "Turns off in",
+            "countdownWhenOff": "Turns on in",
+            "left": "{time} left"
+        }
     },
     "roomsDialog": {
         "title": "Rooms and floors",

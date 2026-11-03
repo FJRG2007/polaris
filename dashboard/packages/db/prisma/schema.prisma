@@ -11772,6 +11772,14 @@ model PlaceDevice {
     /// deodorizer, today's visits and settings - as `litter-kinds` validates it.
     /// Null for every other kind.
     litter         Json?
+    /// What a wall switch or a socket reports beside on and off - its power-on
+    /// state, indicator light, child lock and timer - as `switch-kinds`
+    /// validates it. Null for every other kind, and for one that reports none.
+    switchSettings Json?
+    /// local | cloud | cloud-key | cloud-only - whether it was last read on the
+    /// local network or through its maker's cloud, and why not locally. Null for
+    /// a make that is only ever reached one way.
+    reach          String?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")
