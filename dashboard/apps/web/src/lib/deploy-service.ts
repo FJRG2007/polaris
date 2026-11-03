@@ -2814,6 +2814,15 @@ export async function deleteApplication(
     await syncAppRoutes().catch(() => undefined);
     // Its SFTP server is a container of its own, which the row delete would orphan.
     await takeDownFileAccess(applicationId, ownerId);
+    // Its ngrok and named tunnels are sidecars of their own too, and nothing else
+    // would ever take them down once the row is gone. The quick tunnel goes with
+    // the deployment below. Best-effort: the dead-container pass catches a miss.
+    const [ngrok, named] = await Promise.all([
+        import("@/lib/deploy/ngrok-tunnel-service"),
+        import("@/lib/deploy/named-tunnel-service")
+    ]);
+    await ngrok.stopNgrokTunnel(applicationId, ownerId).catch(() => undefined);
+    await named.stopNamedTunnel(applicationId, ownerId).catch(() => undefined);
     const teardown = removeApplicationDeployment(applicationId, ownerId);
     // A service that was never placed on a server has nothing running to fail on.
     if (options?.strict && app.target) {
