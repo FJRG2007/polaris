@@ -138,7 +138,9 @@ export function EnableTwoFactorDialog({
                 <DialogHeader>
                     <DialogTitle>{t("authenticator.setUpTitle")}</DialogTitle>
                     <DialogDescription>
-                        {step === "password" ? t("authenticator.confirmPassword") : t("authenticator.addSecret")}
+                        {step === "password"
+                            ? t("authenticator.confirmPassword")
+                            : t("authenticator.addSecret")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -146,11 +148,20 @@ export function EnableTwoFactorDialog({
                     <form onSubmit={onPassword} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             {t("authenticator.password")}
-                            <Input name="password" type="password" required autoComplete="current-password" />
+                            <Input
+                                name="password"
+                                type="password"
+                                required
+                                autoComplete="current-password"
+                            />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => onOpenChange(false)}
+                            >
                                 {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
@@ -163,7 +174,12 @@ export function EnableTwoFactorDialog({
                         <div className="flex flex-col items-center gap-2">
                             {/* Fixed light colors: a QR has to stay readable in dark mode. */}
                             <div className="rounded-md bg-white p-3">
-                                <QRCodeSVG value={totpUri} size={148} bgColor="#ffffff" fgColor="#000000" />
+                                <QRCodeSVG
+                                    value={totpUri}
+                                    size={148}
+                                    bgColor="#ffffff"
+                                    fgColor="#000000"
+                                />
                             </div>
                             <span className="text-xs text-muted-foreground">
                                 {t("authenticator.scan")}
@@ -171,9 +187,11 @@ export function EnableTwoFactorDialog({
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{t("authenticator.setupKey")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("authenticator.setupKey")}
+                            </span>
                             <div className="flex items-center gap-2">
-                                <code className="flex-1 break-all rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-sm">
+                                <code className="flex-1 break-all rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs">
                                     {groupSecret(secret)}
                                 </code>
                                 <Button
@@ -186,7 +204,10 @@ export function EnableTwoFactorDialog({
                                     <Copy className="size-4" />
                                 </Button>
                             </div>
-                            <a href={totpUri} className="text-xs text-primary underline-offset-2 hover:underline">
+                            <a
+                                href={totpUri}
+                                className="text-xs text-primary underline-offset-2 hover:underline"
+                            >
                                 {t("authenticator.openInApp")}
                             </a>
                         </div>
@@ -199,7 +220,11 @@ export function EnableTwoFactorDialog({
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => onOpenChange(false)}
+                            >
                                 {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy || !isWholeCode(code)}>
@@ -254,7 +279,12 @@ export function DisableTwoFactorDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("authenticator.password")}
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                        />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">

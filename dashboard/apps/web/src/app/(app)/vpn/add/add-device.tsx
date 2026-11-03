@@ -151,7 +151,7 @@ export function AddDeviceSection() {
                                     {t("overview.loginServer")}
                                 </span>
                                 <div className="flex min-w-0 items-center gap-2">
-                                    <code className="truncate font-mono text-sm" title={server}>
+                                    <code className="truncate font-mono text-xs" title={server}>
                                         {server}
                                     </code>
                                     <ui.CopyButton value={server} label={t("overview.copy")} />

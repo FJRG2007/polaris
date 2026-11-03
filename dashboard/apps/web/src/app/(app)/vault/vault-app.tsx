@@ -601,7 +601,11 @@ export function VaultApp() {
                             </Button>
                         </div>
 
-                        {loading ? (
+                        {/* Only the first opening has nothing to show while it reads. Every
+                            write reads the vault again, and swapping a list somebody is
+                            looking at for a spinner each time made a toggle feel like a
+                            page reload; the rows already there stay until the new ones land. */}
+                        {loading && items.length === 0 ? (
                             <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
                                 <Loader2 className="size-4 animate-spin" />
                                 {t("app.opening")}
