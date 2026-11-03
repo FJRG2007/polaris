@@ -14,6 +14,7 @@ import { X } from "lucide-react";
 import * as subjects from "../model/subjects";
 import * as actions from "../actions/security";
 import type { Landing } from "../model/landing";
+import { hostUi } from "@polaris/app-host/client";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { FindingsTable, type ImageFinding } from "./findings-table";
@@ -75,23 +76,33 @@ export function FocusCard({
 }) {
     const fromAlert = landing.scan !== null;
     // undefined: reading; null: nothing to show.
-    const [focus, setFocus] = useState<Focus | null | undefined>(undefined);
-    const [failed, setFailed] = useState(false);
+    const [busy, setBusy] = useState(false);
     const [open, setOpen] = useState(fromAlert);
     const [findings, setFindings] = useState<ImageFinding[] | null>(null);
     const [findingsFailed, setFindingsFailed] = useState(false);
     // The scan shown: the alert's, until "Scan again" queues a newer one.
     const [shown, setShown] = useState(landing.scan);
 
-    const load = useCallback(async () => {
+    // Through the shared live read, so two tabs opened from the same alert ask
+    // once between them while the scan runs. Wrapped, because "nothing to show"
+    // is an answer here and the read's own null means "not read yet".
+    const read = useCallback(async (): Promise<{ focus: Focus | null }> => {
         const result = await actions.focusAction({ scanId: shown });
-        if (!result.ok) return setFailed(true);
-        setFailed(false);
-        setFocus(result.data);
+        if (!result.ok) throw new Error("failed");
+        return { focus: result.data };
     }, [shown]);
-    useEffect(() => {
-        void load();
-    }, [load]);
+    const live = hostUi.liveRead.useLiveRead<{ focus: Focus | null }>({
+        load: read,
+        cacheKey: `security-focus:${shown ?? "latest"}`,
+        intervalMs: 5000,
+        paused: !busy
+    });
+    // A kept copy whose first read failed is a failed first read: the screen
+    // renders what it rendered before there was a kept copy at all.
+    const firstFailed = live.kept && live.stale !== null;
+    const focus = live.data && !firstFailed ? live.data.focus : undefined;
+    const failed = live.error !== null || firstFailed;
+    const load = live.refresh;
 
     const targetId = focus?.targetId;
     useEffect(() => {
@@ -100,12 +111,10 @@ export function FocusCard({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetId]);
 
-    const busy = focus?.state === "queued" || focus?.state === "running";
+    const scanning = focus?.state === "queued" || focus?.state === "running";
     useEffect(() => {
-        if (!busy) return;
-        const timer = setInterval(() => void load(), 5000);
-        return () => clearInterval(timer);
-    }, [busy, load]);
+        setBusy(scanning);
+    }, [scanning]);
 
     const scanId = focus?.id;
     const done = focus?.state === "done";

@@ -110,8 +110,7 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     const [serverId, setServerId] = useState<string | null>(landing.target);
     // A link names a vulnerability scan: those are on the images tab.
     const [tab, setTab] = useState<Tab>(landing.scan || landing.target ? "images" : "malware");
-    const [overview, setOverview] = useState<Overview | null>(null);
-    const [failed, setFailed] = useState(false);
+    const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const [focusOpen, setFocusOpen] = useState(true);
 
@@ -138,30 +137,36 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
         if (gone) setNotice(t("focus.serverGone"));
     }, [gone, t]);
 
-    const load = useCallback(async () => {
-        if (!current) return;
-        const result = await actions.overviewAction({ targetId: current });
-        if (!result.ok) return setFailed(true);
-        setFailed(false);
-        setOverview(result.data);
-        cacheWrite(`security:overview:${current}`, result.data);
+    // The server's overview goes through the shared live read: two tabs on one
+    // server ask once between them while a scan runs, and a revisit paints the
+    // last overview it showed (the read keeps that copy itself now). Another
+    // server is another key, so its overview never paints under this one's.
+    const readOverview = useCallback(async (): Promise<Overview> => {
+        const result = await actions.overviewAction({ targetId: current! });
+        if (!result.ok) throw new Error("failed");
+        return result.data;
     }, [current]);
+    const live = hostUi.liveRead.useLiveRead<Overview>({
+        load: readOverview,
+        cacheKey: `security-overview:${current ?? ""}`,
+        intervalMs: 5000,
+        enabled: current !== null,
+        // While something is queued or running, look again every few seconds.
+        paused: !busy
+    });
+    // A kept copy whose first read failed is a failed first read: the screen
+    // renders what it rendered before there was a kept copy at all.
+    const firstFailed = live.kept && live.stale !== null;
+    const overview = current && !firstFailed ? live.data : null;
+    const failed = live.error !== null || live.stale !== null;
+    const load = live.refresh;
 
+    const scanning =
+        overview?.scans.some((scan) => scan.state === "queued" || scan.state === "running") ??
+        false;
     useEffect(() => {
-        if (!current) return;
-        setOverview(cacheRead(`security:overview:${current}`));
-        void load();
-    }, [current, load]);
-
-    // While something is queued or running, look again every few seconds.
-    const busy = overview?.scans.some(
-        (scan) => scan.state === "queued" || scan.state === "running"
-    );
-    useEffect(() => {
-        if (!busy) return;
-        const timer = setInterval(() => void load(), 5000);
-        return () => clearInterval(timer);
-    }, [busy, load]);
+        setBusy(scanning);
+    }, [scanning]);
 
     const submit = useCallback(
         async (work: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
@@ -169,7 +174,7 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
             const result = await work();
             if (!result.ok) return error(result.error ?? "failed");
             if (done) setNotice(done);
-            await load();
+            load();
         },
         [error, load]
     );
