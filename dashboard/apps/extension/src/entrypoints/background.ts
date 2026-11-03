@@ -3068,7 +3068,9 @@ async function checkUpdateNow(): Promise<{
     polaris: boolean;
 }> {
     const runtime = browser.runtime as unknown as {
-        requestUpdateCheck?: () => Promise<{ status?: unknown; version?: unknown } | [unknown, unknown?]>;
+        requestUpdateCheck?: () => Promise<
+            { status?: unknown; version?: unknown } | [unknown, unknown?]
+        >;
     };
     let store: "update_available" | "no_update" | "throttled" | null = null;
     let storeVersion: string | null = null;
@@ -3077,8 +3079,10 @@ async function checkUpdateNow(): Promise<{
             const answer = await runtime.requestUpdateCheck();
             // Chrome answers an object; Firefox has answered `[status, details]`.
             const status = Array.isArray(answer) ? answer[0] : answer?.status;
-            const details = (Array.isArray(answer) ? answer[1] : answer) as { version?: unknown } | undefined;
-            if (status === "update_available" || status === "no_update" || status === "throttled") store = status;
+            const details = (Array.isArray(answer) ? answer[1] : answer) as
+                { version?: unknown } | undefined;
+            if (status === "update_available" || status === "no_update" || status === "throttled")
+                store = status;
             if (typeof details?.version === "string") storeVersion = details.version;
         } catch {
             // Refused or not there: the Polaris answer below still stands.

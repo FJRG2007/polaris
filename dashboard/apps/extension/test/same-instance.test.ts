@@ -15,7 +15,10 @@ const ID = "inst_0123456789abcdef";
 
 function keyPair(): { publicKey: string; privateKey: KeyObject } {
     const pair = generateKeyPairSync("ed25519");
-    return { publicKey: String(pair.publicKey.export({ format: "jwk" }).x), privateKey: pair.privateKey };
+    return {
+        publicKey: String(pair.publicKey.export({ format: "jwk" }).x),
+        privateKey: pair.privateKey
+    };
 }
 
 const real = keyPair();
@@ -24,15 +27,27 @@ const record: InstanceRecord = { id: ID, publicKey: real.publicKey, addresses: [
 
 /** `up` answers as the instance signing with `key`; anything else fails like a bad certificate. */
 function network(up: readonly string[], key: KeyObject = real.privateKey) {
-    const seen: { url: string; cookies: RequestCredentials | undefined; authorization: string | null }[] = [];
+    const seen: {
+        url: string;
+        cookies: RequestCredentials | undefined;
+        authorization: string | null;
+    }[] = [];
     const fetchImpl = async (url: string, init: RequestInit = {}): Promise<Response> => {
         const parsed = new URL(url);
-        seen.push({ url, cookies: init.credentials, authorization: new Headers(init.headers).get("authorization") });
+        seen.push({
+            url,
+            cookies: init.credentials,
+            authorization: new Headers(init.headers).get("authorization")
+        });
         if (!up.includes(parsed.origin)) throw new TypeError("Failed to fetch");
         if (parsed.pathname === "/api/instance") return Response.json(record);
         const { nonce } = JSON.parse(String(init.body)) as { nonce: string };
         const signer = parsed.origin === HOME ? real.privateKey : key;
-        const signature = sign(null, Buffer.from(challengeMessage(ID, parsed.origin, nonce)), signer).toString("base64url");
+        const signature = sign(
+            null,
+            Buffer.from(challengeMessage(ID, parsed.origin, nonce)),
+            signer
+        ).toString("base64url");
         return Response.json({ id: ID, nonce, signature });
     };
     return { fetchImpl, seen };
@@ -42,7 +57,9 @@ describe("createSameInstanceCheck", () => {
     it("names the listed server a trusted local address proves it is", async () => {
         const { fetchImpl, seen } = network([HOME, LOCAL]);
         expect(await createSameInstanceCheck(fetchImpl)(LOCAL, [HOME])).toBe(HOME);
-        expect(seen.every((one) => one.cookies === "omit" && one.authorization === null)).toBe(true);
+        expect(seen.every((one) => one.cookies === "omit" && one.authorization === null)).toBe(
+            true
+        );
     });
 
     it("asks the host without TLS when its certificate is not trusted", async () => {

@@ -132,18 +132,24 @@ type Checked =
  * installs this copy, and this Polaris for the version that is out; a newer one
  * then shows up on this line the way the hourly check would have shown it.
  */
-function CheckUpdates({ onChecked }: { onChecked: (state: UpdateState) => void }): React.JSX.Element {
+function CheckUpdates({
+    onChecked
+}: {
+    onChecked: (state: UpdateState) => void;
+}): React.JSX.Element {
     const t = useWords();
     const [checked, setChecked] = useState<Checked | null>(null);
     const downloading = checked?.kind === "storeDownloading";
     useEffect(() => {
         if (!downloading) return;
-        const updates = (browser.runtime as unknown as {
-            onUpdateAvailable?: {
-                addListener: (listener: (details: { version?: unknown }) => void) => void;
-                removeListener: (listener: (details: { version?: unknown }) => void) => void;
-            };
-        }).onUpdateAvailable;
+        const updates = (
+            browser.runtime as unknown as {
+                onUpdateAvailable?: {
+                    addListener: (listener: (details: { version?: unknown }) => void) => void;
+                    removeListener: (listener: (details: { version?: unknown }) => void) => void;
+                };
+            }
+        ).onUpdateAvailable;
         if (!updates) return;
         const ready = (details: { version?: unknown }): void =>
             setChecked((now) => ({
@@ -169,10 +175,15 @@ function CheckUpdates({ onChecked }: { onChecked: (state: UpdateState) => void }
         onChecked({ notice: reply.update, pending: reply.pending, latest: reply.latest });
         const { store, storeVersion, polaris } = reply.checked;
         const running = browser.runtime.getManifest().version;
-        if (store === "update_available") setChecked({ kind: "storeDownloading", version: storeVersion });
-        else if (reply.pending || (reply.update && reply.update.kind !== "desktop")) setChecked(null);
+        if (store === "update_available")
+            setChecked({ kind: "storeDownloading", version: storeVersion });
+        else if (reply.pending || (reply.update && reply.update.kind !== "desktop"))
+            setChecked(null);
         else if (store === "throttled") setChecked({ kind: "throttled" });
-        else if (store === "no_update" || (polaris && reply.latest && !isNewer(reply.latest, running)))
+        else if (
+            store === "no_update" ||
+            (polaris && reply.latest && !isNewer(reply.latest, running))
+        )
             setChecked({ kind: "current" });
         else setChecked({ kind: "failed" });
     };
@@ -186,16 +197,22 @@ function CheckUpdates({ onChecked }: { onChecked: (state: UpdateState) => void }
                     </button>
                 </>
             ) : checked?.kind === "storeDownloading" ? (
-                <span>{t("popup.version.storeDownloading", { version: checked.version ?? "" })}</span>
+                <span>
+                    {t("popup.version.storeDownloading", { version: checked.version ?? "" })}
+                </span>
             ) : (
                 <>
-                    {checked && checked.kind !== "checking" ? <span>{t(`popup.version.${checked.kind}`)}</span> : null}
+                    {checked && checked.kind !== "checking" ? (
+                        <span>{t(`popup.version.${checked.kind}`)}</span>
+                    ) : null}
                     <button
                         className="ghost"
                         aria-disabled={checked?.kind === "checking"}
                         onClick={() => void press()}
                     >
-                        {checked?.kind === "checking" ? t("popup.version.checking") : t("popup.version.check")}
+                        {checked?.kind === "checking"
+                            ? t("popup.version.checking")
+                            : t("popup.version.check")}
                     </button>
                 </>
             )}
@@ -282,7 +299,10 @@ function VersionLine({
     latest,
     server,
     apply
-}: UpdateState & { server: string | null; apply: (state: UpdateState) => void }): React.JSX.Element {
+}: UpdateState & {
+    server: string | null;
+    apply: (state: UpdateState) => void;
+}): React.JSX.Element {
     const t = useWords();
     const running = browser.runtime.getManifest().version;
     const newer = pending ?? (notice && notice.kind !== "desktop" ? notice.version : null);

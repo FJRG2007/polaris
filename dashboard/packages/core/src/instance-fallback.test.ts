@@ -238,8 +238,12 @@ describe("findSameInstance", () => {
 
     it("finds nothing for another instance or one that does not describe itself", async () => {
         const other = { ...record, id: "inst_another_instance" };
-        expect(await findSameInstance([LOCAL], listed, answering(other, real.privateKey).fetchImpl)).toBeNull();
-        expect(await findSameInstance([LOCAL], listed, answering(null, real.privateKey).fetchImpl)).toBeNull();
+        expect(
+            await findSameInstance([LOCAL], listed, answering(other, real.privateKey).fetchImpl)
+        ).toBeNull();
+        expect(
+            await findSameInstance([LOCAL], listed, answering(null, real.privateKey).fetchImpl)
+        ).toBeNull();
     });
 
     it("tries the next way of asking when the first does not answer", async () => {

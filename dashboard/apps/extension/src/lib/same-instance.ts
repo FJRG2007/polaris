@@ -31,7 +31,10 @@ export function createSameInstanceCheck(
     fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
     now: () => number = Date.now
 ) {
-    const records = new Map<string, { readonly record: InstanceRecord | null; readonly until: number }>();
+    const records = new Map<
+        string,
+        { readonly record: InstanceRecord | null; readonly until: number }
+    >();
     const answers = new Map<string, { readonly same: string | null; readonly until: number }>();
 
     const remember = <T>(map: Map<string, T>, key: string, value: T): void => {

@@ -76,7 +76,10 @@ const sameInstance = createSameInstanceCheck();
  * usual reason - so that is what the line says instead.
  */
 export function useSameInstance(check: AddressCheck, listed: readonly string[]): string | null {
-    const [same, setSame] = useState<{ readonly origin: string; readonly as: string | null } | null>(null);
+    const [same, setSame] = useState<{
+        readonly origin: string;
+        readonly as: string | null;
+    } | null>(null);
     const asks =
         check.kind === "polaris" || check.kind === "unreachable" || check.kind === "unconfirmed";
     const origin = asks ? check.origin : null;
