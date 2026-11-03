@@ -164,9 +164,10 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "steam") return SteamDialog;
     // Both GIF services are a key and a switch, so they share the dialog and
     // the action; which one the picker asks is decided where the search is made.
-    // Last.fm and Tailscale are the same shape: a key, and a switch for what it
-    // turns on.
-    if (["tenor", "giphy", "lastfm", "tailscale"].includes(card.slug)) return TenorDialog;
+    // Last.fm, Tailscale and the translation services are the same shape: a key,
+    // and a switch for what it turns on.
+    if (["tenor", "giphy", "lastfm", "tailscale", "deepl", "google-translate"].includes(card.slug))
+        return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     return null;
@@ -1302,7 +1303,12 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
     const [loaded] = useState(() => values);
     const unchanged = !isDirty(loaded, values);
     const [saving, startSave] = useTransition();
-    const words = card.slug === "lastfm" || card.slug === "tailscale" ? card.slug : null;
+    const words =
+        card.slug === "lastfm" || card.slug === "tailscale"
+            ? card.slug
+            : card.slug === "deepl" || card.slug === "google-translate"
+              ? "translation"
+              : null;
     const switchLabel = words ? t(`integrations.${words}.switch`) : t("integrations.tenor.search");
 
     function onSave() {

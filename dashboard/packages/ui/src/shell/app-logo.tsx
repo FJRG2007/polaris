@@ -270,7 +270,7 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
     },
     // Translate: two speech bubbles, one answering the other.
     translate: {
-        palette: ["#C4B5FD", "#8B5CF6", "#5B21B6"],
+        palette: ["#93C5FD", "#2563EB", "#1E40AF"],
         draw: ({ base, face }) => (
             <>
                 <path

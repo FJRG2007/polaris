@@ -2002,6 +2002,10 @@
             "switch": "Mostrar lo que registra la gente",
             "hint": "Permite que cada persona escriba su usuario de Last.fm en Cuentas conectadas y muestra su canción junto a su nombre."
         },
+        "translation": {
+            "switch": "Usarla en Traductor",
+            "hint": "Si está apagado, Traductor deja de ofrecer este servicio y guarda la clave."
+        },
         "tailscale": {
             "switch": "Entrar con esta clave",
             "hint": "Si está apagado, el acceso remoto entra con un enlace que abres tú."

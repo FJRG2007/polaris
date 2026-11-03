@@ -2002,6 +2002,10 @@
             "switch": "Show what people scrobble",
             "hint": "Lets everybody type their Last.fm username under Connected accounts and shows their song beside their name."
         },
+        "translation": {
+            "switch": "Use it in Translate",
+            "hint": "Off, Translate stops offering this service and keeps the key."
+        },
         "tailscale": {
             "switch": "Sign in with this key",
             "hint": "Off, remote access signs in with a link you open instead."
