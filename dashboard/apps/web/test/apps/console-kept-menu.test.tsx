@@ -17,7 +17,7 @@ import type { SavedCommand } from "@polaris-app/game-servers/src/lib/console-com
 Element.prototype.scrollIntoView ??= () => undefined;
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 
 const { KeptCommandsMenu, duplicateDraft, filterKeptCommands } = await import(

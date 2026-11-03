@@ -13,7 +13,7 @@ import type { GameDefinition } from "../../../arcade/src/games/types";
 import { isDrivingKey, mayTakeFocus } from "../../../arcade/src/screens/frame-focus";
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 vi.mock("../../../arcade/src/screens/i18n", () => ({ useArcadeT: () => (key: string) => key }));
 

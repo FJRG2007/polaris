@@ -142,7 +142,10 @@ vi.mock("@polaris/db", () => {
 
 const requireGameServer = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/apps/install-access", () => ({ requireGameServer }));
-vi.mock("@/lib/i18n/request", () => ({ getLocale: async () => "en-US" }));
+vi.mock("@/lib/i18n/request", () => ({
+    getClient: async () => "browser",
+    getLocale: async () => "en-US"
+}));
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => owner.locale }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/apps/install-secret", () => ({

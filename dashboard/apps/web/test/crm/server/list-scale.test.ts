@@ -131,7 +131,10 @@ const crmHost = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({ prisma: db, Prisma: { Decimal: class {} } }));
 vi.mock("@polaris/app-host", () => ({
-    host: { crmHost, i18nRequest: { getLocale: async () => "en-US" } }
+    host: {
+        crmHost,
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" }
+    }
 }));
 
 import * as access from "@polaris-app/crm/src/lib/access";

@@ -24,7 +24,7 @@ vi.mock("@polaris/app-host/client", async () => {
             },
             structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
             confirmDialog: { useConfirm: () => [async () => true, null] },
-            i18nProvider: { useLocale: () => "en-US" }
+            i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" }
         }
     };
 });

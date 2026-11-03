@@ -15,7 +15,7 @@ let locale = "en-US";
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
-        i18nProvider: { useLocale: () => locale },
+        i18nProvider: { useClient: () => "browser", useLocale: () => locale },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         copyButton: {
             CopyButton: ({ label }: { label?: string }) => <button aria-label={label} />

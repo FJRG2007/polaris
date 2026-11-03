@@ -182,7 +182,7 @@ export const host = {
         apiUser: async (): Promise<FakeUser | Response> =>
             fake.current ?? new Response(null, { status: 401 })
     },
-    i18nRequest: { getLocale: async () => fake.requestLocale },
+    i18nRequest: { getClient: async () => "browser", getLocale: async () => fake.requestLocale },
     i18nLocaleService: {
         getUserLocale: async (userId: string) => fake.locales.get(userId) ?? "en-US"
     },

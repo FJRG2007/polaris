@@ -10,7 +10,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { CardBoundary } from "@polaris-app/game-servers/src/components/card-boundary";
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 
 afterEach(() => cleanup());

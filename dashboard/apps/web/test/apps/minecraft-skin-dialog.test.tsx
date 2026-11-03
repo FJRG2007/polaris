@@ -17,7 +17,7 @@ const picker = vi.fn((props: { accept?: string }) => (
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
-        i18nProvider: { useLocale: () => "en-US" },
+        i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
         confirmDialog: { useConfirm: () => [confirm, null] },
         filePicker: { ChooseFilesDialog: (props: { accept?: string }) => picker(props) }
     }

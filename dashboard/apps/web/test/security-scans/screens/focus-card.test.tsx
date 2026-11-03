@@ -15,7 +15,7 @@ const findings = vi.fn();
 const rescan = vi.fn();
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 vi.mock("@polaris-app/security-scans/src/actions/security", () => ({
     focusAction: (input: unknown) => focus(input),

@@ -16,7 +16,7 @@ let locale = "en-US";
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         confirmDialog: { useConfirm: () => [async () => true, null] },
-        i18nProvider: { useLocale: () => locale },
+        i18nProvider: { useClient: () => "browser", useLocale: () => locale },
         displayFormat: {
             useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
         },

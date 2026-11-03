@@ -17,7 +17,7 @@ import {
 } from "@polaris-app/game-servers/src/lib/minecraft/completion";
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 
 afterEach(cleanup);

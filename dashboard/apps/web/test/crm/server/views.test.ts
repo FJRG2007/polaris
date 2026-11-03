@@ -125,7 +125,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@polaris/app-host", () => ({
-    host: { i18nRequest: { getLocale: async () => "en-US" } }
+    host: { i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" } }
 }));
 
 import * as views from "@polaris-app/crm/src/lib/views";

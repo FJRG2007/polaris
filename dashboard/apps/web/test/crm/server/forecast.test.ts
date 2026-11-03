@@ -20,7 +20,7 @@ const db = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
 vi.mock("@polaris/app-host", () => ({
-    host: { i18nRequest: { getLocale: async () => "en-US" } }
+    host: { i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" } }
 }));
 
 import { CrmRefusal } from "@polaris-app/crm/src/lib/errors";

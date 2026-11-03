@@ -10,9 +10,11 @@ const mocks = vi.hoisted(() => ({
     companies: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
     people: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
     opportunities: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
-    crmRunner: vi.fn(
-        async (): Promise<unknown> => ({ id: "u1", name: "Test User", isAdmin: false })
-    ),
+    crmRunner: vi.fn(async (): Promise<unknown> => ({
+        id: "u1",
+        name: "Test User",
+        isAdmin: false
+    })),
     crmShelf: vi.fn(async () => ({ orgId: null as string | null, orgName: null as string | null })),
     crmOrgAccess: vi.fn(async (): Promise<unknown> => ({ role: null, permissions: [] }))
 }));
@@ -32,7 +34,7 @@ vi.mock("@polaris/app-host", () => ({
             crmShelf: mocks.crmShelf,
             crmOrgAccess: mocks.crmOrgAccess
         },
-        i18nRequest: { getLocale: async () => "en-US" }
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" }
     }
 }));
 

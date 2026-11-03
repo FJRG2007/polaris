@@ -54,7 +54,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/live-display-actions", 
 }));
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
-        i18nProvider: { useLocale: () => "en-US" },
+        i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
         liveRead: { useKeptSnapshot: () => undefined },
         snapshotCache: {
             readSnapshot: () => null,
