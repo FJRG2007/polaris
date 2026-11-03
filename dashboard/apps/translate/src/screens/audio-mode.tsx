@@ -84,7 +84,8 @@ export function AudioMode({
     reads,
     manager,
     from,
-    to
+    to,
+    file
 }: {
     translate: Translate;
     reads: Reads;
@@ -92,6 +93,8 @@ export function AudioMode({
     /** The language bar's source, or null for "detect". */
     from: string | null;
     to: string;
+    /** A file handed over by the box (dropped, pasted or chosen), opened on arrival. */
+    file?: File | null;
 }) {
     const t = useTranslateT();
     const locale = useTranslateLocale();
@@ -171,6 +174,11 @@ export function AudioMode({
             setBusy(false);
         }
     };
+
+    useEffect(() => {
+        if (file) void openFile(file);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per file handed over
+    }, [file]);
 
     const listenNatively = (side: "a" | "b") => {
         const Api = recognitionClass()!;

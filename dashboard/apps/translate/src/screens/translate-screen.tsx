@@ -6,10 +6,13 @@
  * newer keystroke cancels the one still on its way, so an older answer never
  * lands over a newer one. The line under the panes says which engine answered.
  *
- * Besides typed text, the reader can translate a picture, the camera, a
- * document or speech; every mode goes through the same engines and language
- * bar (`run.ts`), and none of them meets a length unless the administrator
- * set one.
+ * One box takes everything, the way Google Translate and DeepL do: typed
+ * text, a picture pasted even while typing, a file dropped on it or chosen from
+ * Polaris, a web address, the camera or a conversation. What it was handed
+ * decides the path (`model/input.ts`), and the panel for that path appears
+ * only while it is the input. Every path goes through the same engines and
+ * language bar (`run.ts`), and none of them meets a length unless the
+ * administrator set one.
  *
  * The frame draws at once. The engines are read in the browser (the last
  * answer from this tab's cache first), and only the history waits behind a
@@ -18,7 +21,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Languages, Settings2, Square, Trash2, Volume2, X } from "lucide-react";
+import {
+    ArrowLeftRight,
+    Camera,
+    Globe,
+    Languages,
+    MessagesSquare,
+    Paperclip,
+    Settings2,
+    Square,
+    Trash2,
+    Upload,
+    Volume2,
+    X
+} from "lucide-react";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -26,7 +42,6 @@ import {
     EmptyState,
     PageHeader,
     SearchableSelect,
-    SegmentedControl,
     Select,
     Skeleton,
     Textarea,
@@ -38,6 +53,9 @@ import { AudioMode } from "./audio-mode";
 import { ImageMode } from "./image-mode";
 import { CameraMode } from "./camera-mode";
 import { DocumentMode } from "./document-mode";
+import { WebsiteMode } from "./website-mode";
+import { hostUi } from "@polaris/app-host/client";
+import { INPUT_ACCEPT, pastedFile, routeFile, websiteOf, type InputKind } from "../model/input";
 import type { Reads } from "./reads";
 import { PIECE_MAX } from "../model/chunk";
 import { runTranslation, translateReusing, type PieceCache, type Translate } from "./run";
@@ -63,15 +81,24 @@ const DEBOUNCE_MS = 450;
 /** How long a translation has to stay before it is kept in the history. */
 const REMEMBER_MS = 2500;
 
-export type Mode = "text" | "image" | "document" | "audio" | "camera";
-const MODES: readonly Mode[] = ["text", "image", "document", "audio", "camera"];
+const { useChooseFiles } = hostUi.filePicker;
 
-const MODE_KEY = {
-    text: "modes.text",
+/** What the box is translating now. Typed text is kept while another input shows. */
+export type Input =
+    | { kind: "text" }
+    | { kind: InputKind; file: File }
+    | { kind: "camera" }
+    | { kind: "conversation" }
+    | { kind: "website"; url: string };
+
+const INPUT_KEY = {
     image: "modes.image",
     document: "modes.document",
     audio: "modes.audio",
-    camera: "modes.camera"
+    video: "modes.video",
+    camera: "modes.camera",
+    conversation: "modes.conversation",
+    website: "modes.website"
 } as const;
 
 const NO_SERVER: Record<ServerEngineId, boolean> = { deepl: false, google: false, polar: false };
@@ -117,7 +144,9 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [from, setFrom] = useState<SourceLanguage>(AUTO);
     const [to, setTo] = useState<string | null>(null);
     const [chosen, setChosen] = useState<EngineId | null>(null);
-    const [mode, setMode] = useState<Mode>("text");
+    const [input, setInput] = useState<Input>({ kind: "text" });
+    const [dragging, setDragging] = useState(false);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [source, setSource] = useState("");
     const [target, setTarget] = useState("");
     const [answeredBy, setAnsweredBy] = useState<EngineId | null>(null);
@@ -395,6 +424,43 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         }
     };
 
+    /** A file from anywhere - pasted, dropped, chosen - sent down its path. */
+    const take = useCallback(
+        (file: File) => {
+            const kind = routeFile(file);
+            if (!kind) {
+                toast.show({ title: t("input.unsupported"), body: file.name });
+                return;
+            }
+            setInput({ kind, file });
+        },
+        [toast, t]
+    );
+
+    // A picture or a file pasted anywhere on the screen, the text box included,
+    // is translated as what it is; pasted text stays text.
+    useEffect(() => {
+        const paste = (event: ClipboardEvent) => {
+            const file = pastedFile(event.clipboardData?.items);
+            if (!file) return;
+            event.preventDefault();
+            take(file);
+        };
+        window.addEventListener("paste", paste);
+        return () => window.removeEventListener("paste", paste);
+    }, [take]);
+
+    const attach = () =>
+        void chooseFiles({
+            accept: INPUT_ACCEPT,
+            title: t("input.attachTitle"),
+            onFailed: (message) => toast.show({ title: message })
+        }).then(([file]) => {
+            if (file) take(file);
+        });
+
+    const typedSite = input.kind === "text" ? websiteOf(source) : null;
+
     const sourceOptions: SearchableSelectOption[] = [
         {
             value: AUTO,
@@ -461,14 +527,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 />
             ) : null}
 
-            <div className="mb-3 min-w-0 overflow-x-auto">
-                <SegmentedControl
-                    aria-label={t("modes.label")}
-                    value={mode}
-                    onValueChange={setMode}
-                    options={MODES.map((id) => ({ value: id, label: t(MODE_KEY[id]) }))}
-                />
-            </div>
+            {chooser}
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <SearchableSelect
                     className="w-full min-w-0 sm:w-56"
@@ -514,22 +573,92 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 ) : null}
             </div>
 
-            {mode === "image" ? (
-                <ImageMode translate={translate} reads={reads} manager={manager} />
-            ) : mode === "camera" ? (
-                <CameraMode translate={translate} reads={reads} manager={manager} />
-            ) : mode === "document" ? (
-                <DocumentMode translate={translate} charLimit={charLimit} to={targetLanguage} />
-            ) : mode === "audio" ? (
+            {input.kind !== "text" && input.kind !== "website" ? (
+                <div className="mb-2 flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {t(INPUT_KEY[input.kind])}
+                        {"file" in input ? (
+                            <span
+                                className="ml-2 font-normal text-muted-foreground"
+                                title={input.file.name}
+                            >
+                                {input.file.name}
+                            </span>
+                        ) : null}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => setInput({ kind: "text" })}>
+                        <X className="size-4 shrink-0" aria-hidden />
+                        {t("input.backToText")}
+                    </Button>
+                </div>
+            ) : null}
+            {input.kind === "image" ? (
+                <ImageMode
+                    translate={translate}
+                    reads={reads}
+                    manager={manager}
+                    file={input.file}
+                />
+            ) : input.kind === "camera" || input.kind === "video" ? (
+                <CameraMode
+                    translate={translate}
+                    reads={reads}
+                    manager={manager}
+                    file={input.kind === "video" ? input.file : null}
+                />
+            ) : input.kind === "document" ? (
+                <DocumentMode
+                    translate={translate}
+                    charLimit={charLimit}
+                    to={targetLanguage}
+                    file={input.file}
+                />
+            ) : input.kind === "audio" || input.kind === "conversation" ? (
                 <AudioMode
                     translate={translate}
                     reads={reads}
                     manager={manager}
                     from={from === AUTO ? null : from}
                     to={targetLanguage}
+                    file={input.kind === "audio" ? input.file : null}
+                />
+            ) : input.kind === "website" ? (
+                <WebsiteMode
+                    translate={translate}
+                    charLimit={charLimit}
+                    url={input.url}
+                    onClose={() => setInput({ kind: "text" })}
                 />
             ) : null}
-            <div className={cn("grid gap-3 lg:grid-cols-2", mode !== "text" && "hidden")}>
+            <div
+                className={cn(
+                    "relative grid gap-3 lg:grid-cols-2",
+                    input.kind !== "text" && "hidden"
+                )}
+                onDragOver={(event) => {
+                    if (![...event.dataTransfer.types].includes("Files")) return;
+                    event.preventDefault();
+                    setDragging(true);
+                }}
+                onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                        setDragging(false);
+                    }
+                }}
+                onDrop={(event) => {
+                    const file = event.dataTransfer.files[0];
+                    if (!file) return;
+                    event.preventDefault();
+                    setDragging(false);
+                    take(file);
+                }}
+            >
+                {dragging ? (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary bg-card/90 text-center">
+                        <Upload className="size-6 shrink-0 text-primary" aria-hidden />
+                        <span className="px-4 text-sm font-medium">{t("input.drop")}</span>
+                    </div>
+                ) : null}
                 <section className="flex min-w-0 flex-col rounded-lg border border-border bg-card">
                     <Textarea
                         aria-label={t("pane.source")}
@@ -538,7 +667,56 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         onChange={(event) => setSource(event.target.value)}
                         className="min-h-48 flex-1 resize-none border-0 bg-transparent text-base [overflow-wrap:anywhere] focus:border-0"
                     />
+                    {typedSite ? (
+                        <div className="flex min-w-0 items-center gap-2 px-2 pb-1.5">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-w-0"
+                                onClick={() => setInput({ kind: "website", url: typedSite })}
+                            >
+                                <Globe className="size-4 shrink-0" aria-hidden />
+                                <span className="truncate">{t("input.translateSite")}</span>
+                            </Button>
+                        </div>
+                    ) : null}
                     <div className="flex flex-wrap items-center gap-1 border-t border-border px-2 py-1.5">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={attach}
+                            aria-label={t("input.attach")}
+                            title={t("input.attach")}
+                        >
+                            <Paperclip className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setInput({ kind: "camera" })}
+                            aria-label={t("input.camera")}
+                            title={t("input.camera")}
+                        >
+                            <Camera className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setInput({ kind: "conversation" })}
+                            aria-label={t("input.conversation")}
+                            title={t("input.conversation")}
+                        >
+                            <MessagesSquare className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setInput({ kind: "website", url: "" })}
+                            aria-label={t("input.website")}
+                            title={t("input.website")}
+                        >
+                            <Globe className="size-4 shrink-0" aria-hidden />
+                        </Button>
                         <Button
                             variant="ghost"
                             size="sm"
