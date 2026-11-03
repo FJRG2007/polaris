@@ -112,7 +112,7 @@ export function CardUpdateButton({ state }: { state: CardUpdateState }) {
             onClick={state.onUpdate}
         >
             <ArrowUpCircle className={state.busy ? "size-4 animate-pulse" : "size-4"} />
-            {state.busy ? t("appUpdates.updating") : t("appUpdates.updateShort")}
+            {state.busy ? t("appUpdates.updating") : t("appUpdates.update")}
         </Button>
     );
 }

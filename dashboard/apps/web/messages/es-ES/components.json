@@ -1721,7 +1721,6 @@
             "failed": "La nueva versión no ha arrancado, así que {name} sigue con la que tenía.",
             "noPrevious": "No hay una versión anterior de {name} a la que volver."
         },
-        "updateShort": "Actualizar",
         "updatesAvailable": "{count, plural, one {# actualización disponible} other {# actualizaciones disponibles}}",
         "updateAll": "Actualizar todo",
         "checking": "Buscando novedades"

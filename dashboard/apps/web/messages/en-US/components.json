@@ -1721,9 +1721,8 @@
             "failed": "The new version did not start, so {name} stays on the one it had.",
             "noPrevious": "There is no earlier version of {name} to go back to."
         },
-        "updateShort": "Update",
         "updatesAvailable": "{count, plural, one {# update available} other {# updates available}}",
-        "updateAll": "Update all",
+        "updateAll": "Update all apps",
         "checking": "Checking for updates"
     },
     "gameInvite": {
