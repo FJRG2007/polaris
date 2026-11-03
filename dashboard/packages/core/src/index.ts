@@ -18,6 +18,7 @@ export * from "./camera-live.js";
 export * from "./camera-motion.js";
 export * from "./camera-tracking.js";
 export * from "./camera-zones.js";
+export * from "./client-surface.js";
 export * from "./cidr.js";
 export * from "./geo.js";
 export * from "./games-catalog.js";

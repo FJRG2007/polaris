@@ -108,6 +108,15 @@ env:
   NPM_CONFIG_FETCH_RETRIES: "5"
   NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
   NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
+  # A registry socket that goes quiet instead of closing (`EIDLETIMEOUT`, "Idle
+  # timeout reached for host registry.npmjs.org") sat for npm's default five
+  # minutes and then took `npm ci` down, on a commit that touched no dependency.
+  # A minute of silence is already a dead socket; failing it then leaves the
+  # retries above, and the step's own second and third attempt below, time to
+  # finish inside the job's limit. A stall in the middle of a tarball is past
+  # npm's own retries, which is why the step repeats the whole install - with
+  # --prefer-offline every tarball the first attempt finished comes from cache.
+  NPM_CONFIG_FETCH_TIMEOUT: "60000"
 
 jobs:
   checks:
@@ -123,7 +132,7 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      - run: npm ci --prefer-offline
+      - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
 
       # A high or critical advisory in a production dependency fails the pull
       # request that changes the dependencies, unless scripts/audit-allowlist.json
@@ -212,7 +221,7 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      - run: npm ci --prefer-offline
+      - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
       - run: npm run db:generate
       # The same cache as the checks job above, and the same key, written out
       # again because a key cannot be shared between jobs. dashboard-cache.yml
@@ -261,7 +270,7 @@ jobs:
             next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-
             next-${{ runner.os }}-
 
-      - run: npm ci --prefer-offline
+      - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
       - run: npm run db:generate
       # The same cache as the checks job above, and the same key, written out
       # again because a key cannot be shared between jobs. dashboard-cache.yml

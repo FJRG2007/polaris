@@ -29,7 +29,7 @@ import {
     MessageSquareText,
     UserCog,
     Users,
-    Server
+    AppWindow
 } from "lucide-react";
 import {
     MAX_STATUS,
@@ -649,7 +649,7 @@ export function AccountMenu({
                     </DropdownMenuItem>
                     {desktop?.openServers ? (
                         <DropdownMenuItem onSelect={() => void desktop.openServers?.()}>
-                            <Server className="size-4" />
+                            <AppWindow className="size-4" />
                             {t("account.servers")}
                         </DropdownMenuItem>
                     ) : null}

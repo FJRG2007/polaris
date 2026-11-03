@@ -150,7 +150,7 @@
         "notOrganizer": "No eres quien organiza: los cambios quedan en tu copia y no llegan a los demás.",
         "openAttachment": "Abrir {name}",
         "openLink": "Abrir",
-        "openLinkBody": "Se abre {host} en otra pestaña.",
+        "openLinkBody": "{surface, select, app {Se abre {host} en tu navegador.} other {Se abre {host} en otra pestaña.}}",
         "openLinkTitle": "¿Abrir este enlace?",
         "pending": "Sin sincronizar",
         "pendingHint": "Pendiente de escribirse en la cuenta vinculada. Se reintenta solo.",

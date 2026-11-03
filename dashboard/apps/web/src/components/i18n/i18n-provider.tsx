@@ -20,29 +20,37 @@ import type { Namespace, NamespaceTranslator } from "@/lib/i18n/types";
 import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
 import { UiStringsProvider, type UiStrings } from "@polaris/ui";
 import { I18nContext } from "@polaris/ui/i18n";
-import { Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { setActionFailureText } from "@/lib/run-action";
 import { useRouterSettled } from "@/components/use-router-settled";
 import {
+    clientFacts,
     createTranslator,
     DEFAULT_LOCALE,
     negotiateLocale,
+    type Client,
+    type ClientFacts,
     type Locale,
     type Namespaces
 } from "@polaris/core";
+import { desktopBridge } from "@/lib/desktop-bridge";
 
 /** The locale and the first namespaces, for everything below. Pure, so a test
  *  can render a translated component inside one without a router. */
 export function I18nProvider({
     locale,
     messages,
+    client: served = "browser",
     children
 }: {
     locale: Locale;
     messages: Namespaces;
+    /** Which Polaris the request came from, as the server read it. */
+    client?: Client;
     children: ReactNode;
 }) {
-    const value = useMemo(() => ({ locale, messages }), [locale, messages]);
+    const client = useSettledClient(served);
+    const value = useMemo(() => ({ locale, messages, client }), [locale, messages, client]);
     return (
         <I18nContext.Provider value={value}>
             <UiWords>{children}</UiWords>
@@ -155,7 +163,8 @@ export function MessagesProvider({
     const value = useMemo(
         () => ({
             locale: parent?.locale ?? DEFAULT_LOCALE,
-            messages: { ...parent?.messages, ...messages }
+            messages: { ...parent?.messages, ...messages },
+            client: parent?.client
         }),
         [parent, messages]
     );
@@ -183,8 +192,44 @@ export function useTranslations<N extends Namespace>(namespace: N): NamespaceTra
     return useMemo(
         () =>
             createTranslator(state?.locale ?? DEFAULT_LOCALE, state?.messages[namespace], {
-                namespace
+                namespace,
+                client: state?.client
             }) as unknown as NamespaceTranslator<N>,
         [state, namespace]
     );
+}
+
+/**
+ * The Polaris this page is drawn in - a browser, the desktop app, or the
+ * dashboard installed as an app - and what that means for it (see
+ * client-surface.ts). The one question every screen asks instead of looking for
+ * the desktop bridge or the display mode itself.
+ */
+export function useClient(): Client {
+    return useContext(I18nContext)?.client ?? "browser";
+}
+
+export function useClientFacts(): ClientFacts {
+    return clientFacts(useClient());
+}
+
+/**
+ * The server's reading, corrected once the page can see for itself. The server
+ * knows the desktop app by its user-agent, so that case paints right the first
+ * time; an app installed from the browser sends the browser's user-agent, and
+ * only the display mode tells it apart, so it is worded as a browser for the
+ * first paint and as the app straight after.
+ */
+function useSettledClient(served: Client): Client {
+    const [client, setClient] = useState<Client>(served);
+    useEffect(() => {
+        if (desktopBridge()) setClient("desktop");
+        else if (
+            served === "browser" &&
+            window.matchMedia?.("(display-mode: standalone)").matches
+        ) {
+            setClient("installed");
+        } else setClient(served);
+    }, [served]);
+    return client;
 }

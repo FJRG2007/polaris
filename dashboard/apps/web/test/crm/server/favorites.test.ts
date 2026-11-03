@@ -43,7 +43,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/app-host", () => ({
     host: {
         crmHost: { crmRunner: db.crmRunner, crmShelf: db.crmShelf },
-        i18nRequest: { getLocale: async () => "en-US" }
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" }
     }
 }));
 

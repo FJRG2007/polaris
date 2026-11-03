@@ -398,7 +398,7 @@
         "hideTrimmed": "Hide trimmed content"
     },
     "address": {
-        "copyRefused": "This browser would not let Polaris copy that.",
+        "copyRefused": "{surface, select, app {This app would not let Polaris copy that.} other {This browser would not let Polaris copy that.}}",
         "copyNamed": "Copy {address}",
         "copy": "Copy address",
         "newMessage": "New message",
@@ -493,7 +493,7 @@
             "addressCopied": "Address copied.",
             "linkCopied": "Link copied."
         },
-        "copyRefused": "This browser would not let Polaris copy that.",
+        "copyRefused": "{surface, select, app {This app would not let Polaris copy that.} other {This browser would not let Polaris copy that.}}",
         "reply": "Reply",
         "replyAll": "Reply to everybody",
         "forward": "Forward",

@@ -18,7 +18,7 @@ Object.assign(Element.prototype, {
 });
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 
 const { EnchantStackDialog } = await import(

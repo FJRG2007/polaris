@@ -398,7 +398,7 @@
         "hideTrimmed": "Ocultar lo recortado"
     },
     "address": {
-        "copyRefused": "Este navegador no dejó que Polaris lo copiara.",
+        "copyRefused": "{surface, select, app {Esta app no dejó que Polaris lo copiara.} other {Este navegador no dejó que Polaris lo copiara.}}",
         "copyNamed": "Copiar {address}",
         "copy": "Copiar correo",
         "newMessage": "Nuevo mensaje",
@@ -493,7 +493,7 @@
             "addressCopied": "Dirección copiada.",
             "linkCopied": "Enlace copiado."
         },
-        "copyRefused": "Este navegador no dejó que Polaris lo copiara.",
+        "copyRefused": "{surface, select, app {Esta app no dejó que Polaris lo copiara.} other {Este navegador no dejó que Polaris lo copiara.}}",
         "reply": "Responder",
         "replyAll": "Responder a todos",
         "forward": "Reenviar",

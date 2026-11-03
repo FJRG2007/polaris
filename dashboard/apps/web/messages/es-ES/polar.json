@@ -340,8 +340,8 @@
         "transcribing": "Transcribiendo",
         "call": "Modo de voz",
         "unavailable": "Hablar con Polar requiere una clave de voz, como Groq u OpenAI.",
-        "micDenied": "Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.",
-        "cannotRecord": "Este navegador no puede grabar audio.",
+        "micDenied": "{clientKind, select, desktop {Polar no puede usar tu micrófono. Permítelo para Polaris en los ajustes del sistema y vuelve a probar.} other {Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.}}",
+        "cannotRecord": "{surface, select, app {Esta app no puede grabar audio.} other {Este navegador no puede grabar audio.}}",
         "modelNotSaved": "No se ha guardado el modelo. Vuelve a probar.",
         "errors": {
             "no_voice_provider": "Polar no puede oírte sin una clave de voz, como Groq u OpenAI.",
@@ -349,12 +349,12 @@
             "rate_limited": "Demasiados intentos. Espera un minuto.",
             "too_large": "La grabación es demasiado larga.",
             "speak_failed": "Polar no ha podido leer esta respuesta. Está en pantalla.",
-            "no_speech_provider": "Este navegador no tiene voz y ninguna clave puede hablar. Las respuestas siguen en pantalla.",
+            "no_speech_provider": "{surface, select, app {Esta app no tiene voz y ninguna clave puede hablar. Las respuestas siguen en pantalla.} other {Este navegador no tiene voz y ninguna clave puede hablar. Las respuestas siguen en pantalla.}}",
             "usage_limit": "Has llegado al límite de la clave compartida. Usa una tuya."
         },
         "callTitle": "Modo de voz",
         "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",
-        "browserVoice": "Hablando con la voz del navegador",
+        "browserVoice": "{clientKind, select, desktop {Hablando con la voz del sistema} other {Hablando con la voz del navegador}}",
         "phase": {
             "listening": "Escuchando",
             "hearing": "Te escucho",
@@ -374,7 +374,7 @@
             "microphone": "Micrófono",
             "systemDefault": "Del sistema",
             "allow": "Permite el micro para ver nombres",
-            "denied": "Bloqueado. Permítelo en el navegador.",
+            "denied": "{clientKind, select, desktop {Bloqueado. Permítelo en los ajustes del sistema.} other {Bloqueado. Permítelo en el navegador.}}",
             "model": "Modelo"
         }
     },

@@ -42,7 +42,10 @@ vi.mock("@polaris/db", () => {
     return { prisma: client, Prisma: { Decimal: class {} } };
 });
 vi.mock("@polaris/app-host", () => ({
-    host: { crmHost: {}, i18nRequest: { getLocale: async () => "en-US" } }
+    host: {
+        crmHost: {},
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" }
+    }
 }));
 vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }));
 

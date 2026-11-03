@@ -51,7 +51,7 @@ provideAppHostUi({
             null
         ]
     },
-    i18nProvider: { useLocale: () => "en-US" },
+    i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
     liveRead: { useKeptSnapshot: () => undefined },
     snapshotCache: { writeSnapshot: () => undefined }
 } as never);

@@ -18,7 +18,11 @@ export type GameText<N extends GameNamespace> = Translator<GameKey<N>>;
 
 /** One namespace's translator, in the page's language. */
 export function useGameText<N extends GameNamespace>(namespace: N): GameText<N> {
-    return gameCatalogs.translator(hostUi.i18nProvider.useLocale(), namespace);
+    return gameCatalogs.translator(
+        hostUi.i18nProvider.useLocale(),
+        namespace,
+        hostUi.i18nProvider.useClient()
+    );
 }
 
 /** The catalog key for each screen, by the name the dashboard's tab list gives it. */

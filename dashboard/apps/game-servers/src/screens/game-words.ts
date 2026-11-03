@@ -10,7 +10,11 @@ import type { GameText } from "./game-text";
 
 /** One namespace's translator, in the requester's language. */
 export async function gameWords<N extends GameNamespace>(namespace: N): Promise<GameText<N>> {
-    return gameCatalogs.translator(await host.i18nRequest.getLocale(), namespace);
+    return gameCatalogs.translator(
+        await host.i18nRequest.getLocale(),
+        namespace,
+        await host.i18nRequest.getClient()
+    );
 }
 
 /**

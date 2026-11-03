@@ -2863,7 +2863,7 @@
             "deleteTitle": "Delete {name}?",
             "deleteBody": "Event moments and arrivals that use it go back to the game's own sound.",
             "deleted": "Deleted {name}.",
-            "cannotPlay": "This browser cannot play Ogg files. The players' game can.",
+            "cannotPlay": "{surface, select, app {This app cannot play Ogg files. The players' game can.} other {This browser cannot play Ogg files. The players' game can.}}",
             "addedMany": "Added {count} sounds.",
             "copied": "Copied {id}.",
             "copyFailed": "Could not copy. Select the id and copy it by hand.",
@@ -2955,7 +2955,7 @@
         },
         "encode": {
             "tooLarge": "That file is too big to read.",
-            "unreadable": "This browser could not read it as audio. Try MP3, WAV or OGG.",
+            "unreadable": "{surface, select, app {This app could not read it as audio. Try MP3, WAV or OGG.} other {This browser could not read it as audio. Try MP3, WAV or OGG.}}",
             "tooLong": "Too long for one sound, even at the lowest quality. Cut it shorter.",
             "encoder": "The converter did not load. Reload the page and try again."
         },

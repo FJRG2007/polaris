@@ -12,7 +12,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 
 let locale = "en-US";
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => locale } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => locale } }
 }));
 
 const slots = await import("@polaris-app/game-servers/src/screens/installed/item-slots");

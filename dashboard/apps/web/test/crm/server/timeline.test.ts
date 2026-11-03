@@ -31,7 +31,10 @@ vi.mock("@polaris/db", () => ({
     Prisma: { Decimal: class {} }
 }));
 vi.mock("@polaris/app-host", () => ({
-    host: { crmHost: {}, i18nRequest: { getLocale: async () => "en-US" } }
+    host: {
+        crmHost: {},
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" }
+    }
 }));
 
 import { listTimeline } from "@polaris-app/crm/src/lib/timeline";

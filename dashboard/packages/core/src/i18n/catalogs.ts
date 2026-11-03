@@ -9,6 +9,7 @@
  */
 
 import { LOCALES, type Locale } from "./locales.js";
+import type { Client } from "../client-surface.js";
 import {
     createTranslator,
     formatMessage,
@@ -33,7 +34,9 @@ export type QualifiedKey<T extends Namespaces> = {
 
 /** The source locale's namespaces as they are, and every other locale's in the
  *  same shape - a missing key in a translation is a type error. */
-export type LocaleCatalogs<T extends Namespaces> = { readonly [SOURCE in typeof SOURCE_LOCALE]: T } & {
+export type LocaleCatalogs<T extends Namespaces> = {
+    readonly [SOURCE in typeof SOURCE_LOCALE]: T;
+} & {
     readonly [L in Exclude<Locale, typeof SOURCE_LOCALE>]: CatalogShape<T>;
 };
 
@@ -41,8 +44,14 @@ export interface CatalogSet<T extends Namespaces> {
     readonly catalogs: LocaleCatalogs<T>;
     /** Every namespace name the set has. */
     readonly namespaces: readonly (keyof T & string)[];
-    /** A translator over one namespace in one locale, kept once built. */
-    translator<N extends keyof T & string>(locale: Locale, namespace: N): Translator<MessageKey<T[N]>>;
+    /** A translator over one namespace in one locale, kept once built. `client`
+     *  is the Polaris it is read in (see client-surface.ts); a browser when not
+     *  given. */
+    translator<N extends keyof T & string>(
+        locale: Locale,
+        namespace: N,
+        client?: Client
+    ): Translator<MessageKey<T[N]>>;
     /** One message by its qualified key, with no translator in hand - for a
      *  notification, an email, a line sent into a game. */
     translate(locale: Locale, key: QualifiedKey<T>, params?: MessageParams): string;
@@ -61,11 +70,15 @@ export function defineCatalogs<T extends Namespaces>(catalogs: LocaleCatalogs<T>
         return (catalogs[locale] as Namespaces | undefined)?.[namespace];
     }
 
-    function translator<N extends keyof T & string>(locale: Locale, namespace: N): Translator<MessageKey<T[N]>> {
-        const id = `${locale}:${namespace}`;
+    function translator<N extends keyof T & string>(
+        locale: Locale,
+        namespace: N,
+        client?: Client
+    ): Translator<MessageKey<T[N]>> {
+        const id = `${locale}:${namespace}:${client ?? ""}`;
         let found = translators.get(id);
         if (!found) {
-            found = createTranslator(locale, namespaceOf(locale, namespace), { namespace });
+            found = createTranslator(locale, namespaceOf(locale, namespace), { namespace, client });
             translators.set(id, found);
         }
         return found as Translator<MessageKey<T[N]>>;
@@ -75,7 +88,8 @@ export function defineCatalogs<T extends Namespaces>(catalogs: LocaleCatalogs<T>
         const cut = key.indexOf(".");
         const namespace = key.slice(0, cut);
         const message = lookupMessage(namespaceOf(locale, namespace), key.slice(cut + 1));
-        if (message === undefined) return translator(locale, namespace)(key.slice(cut + 1) as never, params);
+        if (message === undefined)
+            return translator(locale, namespace)(key.slice(cut + 1) as never, params);
         return formatMessage(locale, message, params, undefined, key);
     }
 

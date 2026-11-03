@@ -150,7 +150,7 @@
         "notOrganizer": "You are not the organizer: changes stay in your copy and are not sent to the others.",
         "openAttachment": "Open {name}",
         "openLink": "Open",
-        "openLinkBody": "This opens {host} in a new tab.",
+        "openLinkBody": "{surface, select, app {This opens {host} in your browser.} other {This opens {host} in a new tab.}}",
         "openLinkTitle": "Open this link?",
         "pending": "Not synced yet",
         "pendingHint": "Waiting to be written to the linked account. It is retried on its own.",

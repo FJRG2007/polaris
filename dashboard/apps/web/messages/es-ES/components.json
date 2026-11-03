@@ -474,8 +474,8 @@
         "answerHere": "Responde en Polaris",
         "missedGroup": "Llamada de grupo perdida {where}",
         "missed": "Llamada perdida",
-        "onlyThisTab": "Polaris solo puede sonar en esta pestaña. Deja que te avise en cualquier parte.",
-        "blocked": "Este navegador bloquea los avisos de Polaris, así que una llamada solo puede sonar en esta pestaña.",
+        "onlyThisTab": "{clientKind, select, desktop {Polaris solo puede sonar en esta ventana. Deja que te avise en cualquier parte.} other {Polaris solo puede sonar en esta pestaña. Deja que te avise en cualquier parte.}}",
+        "blocked": "{clientKind, select, desktop {El sistema bloquea los avisos de Polaris, así que una llamada solo puede sonar en esta ventana.} other {Este navegador bloquea los avisos de Polaris, así que una llamada solo puede sonar en esta pestaña.}}",
         "whatToDo": "Qué hacer",
         "callBack": "Devolver",
         "dismiss": "Descartar",
@@ -510,7 +510,7 @@
     },
     "images": {
         "copied": "Copiada",
-        "copyRefused": "Este navegador no acepta la imagen: copia el enlace",
+        "copyRefused": "{surface, select, app {Esta app no acepta la imagen: copia el enlace} other {Este navegador no acepta la imagen: copia el enlace}}",
         "copy": "Copiar imagen",
         "linkCopied": "Enlace copiado",
         "copyLink": "Copiar enlace",
@@ -521,7 +521,7 @@
     },
     "cropper": {
         "intro": "Lo que queda dentro del marco es lo que ven los demás. Arrástrala para moverla y usa el control para acercar.",
-        "saveFailed": "Este navegador no pudo guardar esa imagen",
+        "saveFailed": "{surface, select, app {Esta app no pudo guardar esa imagen} other {Este navegador no pudo guardar esa imagen}}",
         "unreadable": "Ese archivo no se pudo leer como imagen",
         "title": "Encuadra la imagen",
         "move": "Mueve la imagen dentro del marco con las flechas",
@@ -556,7 +556,7 @@
     },
     "build": {
         "title": "Polaris se ha actualizado",
-        "body": "Esta pestaña sigue con la versión anterior. Se recarga sola en cuanto no haya nada a medias, o recarga ahora{call, select, yes {: volverás directamente a tu llamada} other {: se pierde lo que tengas a medio escribir en esta página}}.",
+        "body": "{surface, select, app {Esta ventana sigue con la versión anterior. Se recarga sola en cuanto no haya nada a medias, o recarga ahora{call, select, yes {: volverás directamente a tu llamada} other {: se pierde lo que tengas a medio escribir en esta página}}.} other {Esta pestaña sigue con la versión anterior. Se recarga sola en cuanto no haya nada a medias, o recarga ahora{call, select, yes {: volverás directamente a tu llamada} other {: se pierde lo que tengas a medio escribir en esta página}}.}}",
         "reload": "Recargar",
         "hide": "Ocultar hasta que haga falta",
         "later": "Luego"
@@ -1170,8 +1170,8 @@
         "onlyHint": "Se busca en cualquier parte del user-agent del cliente, sin distinguir mayúsculas. Usa * para cualquier secuencia de caracteres. Déjalo vacío para permitir cualquier cliente.",
         "never": "Nunca estos clientes",
         "neverHint": "Se rechazan aunque coincidan con la lista de arriba.",
-        "refused": "El navegador que usas ahora sería rechazado. Está bien para una clave pensada para un script.",
-        "accepted": "El navegador que usas ahora sería aceptado."
+        "refused": "{surface, select, app {La app que usas ahora sería rechazada. Está bien para una clave pensada para un script.} other {El navegador que usas ahora sería rechazado. Está bien para una clave pensada para un script.}}",
+        "accepted": "{surface, select, app {La app que usas ahora sería aceptada.} other {El navegador que usas ahora sería aceptado.}}"
     },
     "accessRules": {
         "groups": "Grupos de acceso",

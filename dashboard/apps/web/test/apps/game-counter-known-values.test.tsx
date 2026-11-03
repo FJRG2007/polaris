@@ -16,7 +16,7 @@ import { english } from "../setup/game-english";
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
-        i18nProvider: { useLocale: () => "en-US" },
+        i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         liveRead: { useKeptSnapshot: () => undefined },
         snapshotCache: {

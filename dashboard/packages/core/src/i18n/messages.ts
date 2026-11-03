@@ -15,6 +15,11 @@
 
 import type { Locale } from "./locales.js";
 import { IntlMessageFormat, type PrimitiveType } from "intl-messageformat";
+import { clientMessageValues, type Client } from "../client-surface.js";
+
+/** What a message reads `{clientKind}` and `{surface}` as when nobody said: a browser,
+ *  which is what every translator outside a page (a job, a test) is closest to. */
+const CLIENT_FALLBACK = clientMessageValues("browser");
 
 /** A catalog: nested groups of messages, keyed by name. */
 export interface Catalog {
@@ -100,7 +105,8 @@ function reportOnce(problem: MessageProblem): void {
 export function lookupMessage(catalog: Catalog | undefined, key: string): string | undefined {
     let node: string | Catalog | undefined = catalog;
     for (const part of key.split(".")) {
-        if (node === undefined || typeof node === "string" || !Object.hasOwn(node, part)) return undefined;
+        if (node === undefined || typeof node === "string" || !Object.hasOwn(node, part))
+            return undefined;
         node = node[part];
     }
     return typeof node === "string" ? node : undefined;
@@ -119,10 +125,18 @@ export function formatMessage(
     key = message
 ): string {
     try {
-        const result = formatterFor(locale, message).format(params as Record<string, PrimitiveType>);
+        const result = formatterFor(locale, message).format({
+            ...CLIENT_FALLBACK,
+            ...params
+        } as Record<string, PrimitiveType>);
         return Array.isArray(result) ? result.join("") : String(result);
     } catch (caught) {
-        onProblem({ kind: "format", locale, key, detail: caught instanceof Error ? caught.message : undefined });
+        onProblem({
+            kind: "format",
+            locale,
+            key,
+            detail: caught instanceof Error ? caught.message : undefined
+        });
         return message;
     }
 }
@@ -135,12 +149,18 @@ function formatRich<R>(
     key: string
 ): (string | R)[] {
     try {
-        const result = formatterFor(locale, message).format<R>(
-            params as Record<string, PrimitiveType | R | RichTag<R>>
-        );
+        const result = formatterFor(locale, message).format<R>({
+            ...CLIENT_FALLBACK,
+            ...params
+        } as Record<string, PrimitiveType | R | RichTag<R>>);
         return Array.isArray(result) ? result : [result];
     } catch (caught) {
-        onProblem({ kind: "format", locale, key, detail: caught instanceof Error ? caught.message : undefined });
+        onProblem({
+            kind: "format",
+            locale,
+            key,
+            detail: caught instanceof Error ? caught.message : undefined
+        });
         return [message];
     }
 }
@@ -151,6 +171,10 @@ export interface TranslatorOptions {
     readonly namespace?: string;
     /** Where problems go. Logged once per key by default. */
     readonly onProblem?: (problem: MessageProblem) => void;
+    /** The Polaris this text is read in, offered to every message as `{clientKind}`
+     *  and `{surface}` so a catalog entry can word itself for a browser or for the
+     *  app (see client-surface.ts). A browser when not given. */
+    readonly client?: Client;
 }
 
 /**
@@ -173,18 +197,35 @@ export function createTranslator<T extends Catalog>(
         return message;
     }
 
+    // The caller's own values win: a screen that passes `surface` for a reason
+    // of its own is not overridden by where it happens to be drawn.
+    const surface = options.client ? clientMessageValues(options.client) : undefined;
+
     const translate = ((key: string, params?: MessageParams) => {
         const message = resolve(key);
         if (message === undefined) return qualified(key);
-        return formatMessage(locale, message, params, onProblem, qualified(key));
+        return formatMessage(
+            locale,
+            message,
+            surface ? { ...surface, ...params } : params,
+            onProblem,
+            qualified(key)
+        );
     }) as unknown as Translator<MessageKey<T>>;
 
     translate.rich = <R>(key: string, params: RichParams<R>) => {
         const message = resolve(key);
         if (message === undefined) return [qualified(key)];
-        return formatRich(locale, message, params, onProblem, qualified(key));
+        return formatRich(
+            locale,
+            message,
+            surface ? { ...surface, ...params } : params,
+            onProblem,
+            qualified(key)
+        );
     };
-    translate.has = (key: string): key is MessageKey<T> => lookupMessage(catalog, key) !== undefined;
+    translate.has = (key: string): key is MessageKey<T> =>
+        lookupMessage(catalog, key) !== undefined;
     Object.defineProperty(translate, "locale", { value: locale, enumerable: true });
     return translate;
 }

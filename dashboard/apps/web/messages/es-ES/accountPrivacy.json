@@ -12,7 +12,7 @@
         "zone": {
             "assumed": "Funcionan con el reloj de la máquina en la que esté Polaris. Elige una zona horaria en Preferencias para asegurarte de que usan el tuyo.",
             "pinned": "Las horas se leen en tu propio reloj ({zone}).",
-            "browser": "Las horas se leen en el reloj de este navegador ({zone}). Elige una zona horaria en Preferencias para fijarlas a una."
+            "browser": "{surface, select, app {Las horas se leen en el reloj de este equipo ({zone}). Elige una zona horaria en Preferencias para fijarlas a una.} other {Las horas se leen en el reloj de este navegador ({zone}). Elige una zona horaria en Preferencias para fijarlas a una.}}"
         },
         "new": "Nuevo horario",
         "emptyTitle": "Sin horarios aún",

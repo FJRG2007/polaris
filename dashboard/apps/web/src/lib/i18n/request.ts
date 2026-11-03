@@ -20,7 +20,13 @@ import { clientIp } from "@/lib/request-context";
 import { LOCALE_COOKIE, localeFromCookie } from "./cookie";
 import type { Namespace, NamespaceTranslator } from "./types";
 import { recordDetectedLocale, storedLocale } from "./locale-service";
-import { DEFAULT_LOCALE, detectLocale, type Locale } from "@polaris/core";
+import {
+    clientFromUserAgent,
+    DEFAULT_LOCALE,
+    detectLocale,
+    type Client,
+    type Locale
+} from "@polaris/core";
 
 /** How long a first request waits for the address's country before giving up on
  *  it. Only reached when the browser names no language Polaris has, and only
@@ -37,7 +43,9 @@ export interface DetectedLocale {
 
 /** The country an address is in, or null - within a bounded wait. Null
  *  `country` with `answered: false` means the lookup ran out of time. */
-async function countryOf(ip: string | undefined): Promise<{ country: string | null; answered: boolean }> {
+async function countryOf(
+    ip: string | undefined
+): Promise<{ country: string | null; answered: boolean }> {
     if (!ip) return { country: null, answered: true };
     // Imported when needed: it reaches the database and the network, and the
     // common case - a browser that names a language - never gets this far.
@@ -48,7 +56,9 @@ async function countryOf(ip: string | undefined): Promise<{ country: string | nu
     });
     try {
         const found = await Promise.race([resolveGeo(ip).then((geo) => geo.countryCode), late]);
-        return found === null ? { country: null, answered: false } : { country: found, answered: true };
+        return found === null
+            ? { country: null, answered: false }
+            : { country: found, answered: true };
     } catch {
         return { country: null, answered: true };
     } finally {
@@ -65,7 +75,9 @@ async function countryOf(ip: string | undefined): Promise<{ country: string | nu
  * then `Accept-Language`, then, when `withCountry` is set and neither names a
  * language Polaris has, the country the address is in.
  */
-export async function detectRequestLocale(options: { withCountry: boolean }): Promise<DetectedLocale> {
+export async function detectRequestLocale(options: {
+    withCountry: boolean;
+}): Promise<DetectedLocale> {
     const [store, incoming] = await Promise.all([cookies(), headers()]);
     const remembered = localeFromCookie(store.get(LOCALE_COOKIE)?.value);
     if (remembered) return { locale: remembered, decided: true };
@@ -100,7 +112,8 @@ export async function adoptRequestLocale(userId: string): Promise<Locale> {
 const requestLocale = cache(async (): Promise<Locale> => {
     try {
         const session = await resolveSession().catch(() => null);
-        if (session) return (await storedLocale(session.id)) ?? (await adoptRequestLocale(session.id));
+        if (session)
+            return (await storedLocale(session.id)) ?? (await adoptRequestLocale(session.id));
         return (await detectRequestLocale({ withCountry: false })).locale;
     } catch {
         return DEFAULT_LOCALE;
@@ -122,6 +135,22 @@ export async function getLocale(): Promise<Locale> {
  *     const t = await getTranslations("account");
  *     return { error: t("language.unsupported") };
  */
-export async function getTranslations<N extends Namespace>(namespace: N): Promise<NamespaceTranslator<N>> {
-    return translatorFor(await getLocale(), namespace);
+export async function getTranslations<N extends Namespace>(
+    namespace: N
+): Promise<NamespaceTranslator<N>> {
+    const [locale, client] = await Promise.all([getLocale(), getClient()]);
+    return translatorFor(locale, namespace, client);
 }
+
+/**
+ * Which Polaris this request comes from - the desktop app or a browser - read
+ * from its user-agent, so the page is worded for it from the first paint (see
+ * client-surface.ts). Outside a request, a browser.
+ */
+export const getClient = cache(async (): Promise<Client> => {
+    try {
+        return clientFromUserAgent((await headers()).get("user-agent"));
+    } catch {
+        return "browser";
+    }
+});

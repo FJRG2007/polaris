@@ -10,7 +10,11 @@ import { securityCatalogs, type SecurityKey } from "../../messages";
 export type SecurityTranslator = Translator<SecurityKey>;
 
 export async function securityT(): Promise<SecurityTranslator> {
-    return securityCatalogs.translator(await host.i18nRequest.getLocale(), "security");
+    return securityCatalogs.translator(
+        await host.i18nRequest.getLocale(),
+        "security",
+        await host.i18nRequest.getClient()
+    );
 }
 
 /** One person's words, for what reaches them outside a request (the bell). */

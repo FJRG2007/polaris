@@ -41,7 +41,7 @@
         "creating": "Creando",
         "submit": "Crear tarea",
         "keepTitle": "¿Guardar este borrador?",
-        "keepDescription": "Se queda en este navegador y se te ofrecerá la próxima vez que escribas una tarea en esta lista.",
+        "keepDescription": "{surface, select, app {Se queda en esta app y se te ofrecerá la próxima vez que escribas una tarea en esta lista.} other {Se queda en este navegador y se te ofrecerá la próxima vez que escribas una tarea en esta lista.}}",
         "discard": "Descartarlo",
         "keepWriting": "Continuar",
         "saveDraft": "Guardar borrador"

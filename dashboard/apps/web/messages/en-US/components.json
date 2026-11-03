@@ -474,8 +474,8 @@
         "answerHere": "Answer in Polaris",
         "missedGroup": "Missed group call {where}",
         "missed": "Missed call",
-        "onlyThisTab": "Polaris can only ring this tab. Let it reach you anywhere.",
-        "blocked": "This browser is blocking Polaris' notices, so a call can only ring in this tab.",
+        "onlyThisTab": "{clientKind, select, desktop {Polaris can only ring this window. Let it reach you anywhere.} other {Polaris can only ring this tab. Let it reach you anywhere.}}",
+        "blocked": "{clientKind, select, desktop {The system is blocking Polaris' notices, so a call can only ring in this window.} other {This browser is blocking Polaris' notices, so a call can only ring in this tab.}}",
         "whatToDo": "What to do about it",
         "callBack": "Call back",
         "dismiss": "Dismiss",
@@ -510,7 +510,7 @@
     },
     "images": {
         "copied": "Copied",
-        "copyRefused": "This browser would not take the image - copy the link instead",
+        "copyRefused": "{surface, select, app {This app would not take the image - copy the link instead} other {This browser would not take the image - copy the link instead}}",
         "copy": "Copy image",
         "linkCopied": "Link copied",
         "copyLink": "Copy media link",
@@ -521,7 +521,7 @@
     },
     "cropper": {
         "intro": "What is inside the frame is what everybody else sees. Drag it to move, and use the slider to zoom.",
-        "saveFailed": "This browser could not save that picture",
+        "saveFailed": "{surface, select, app {This app could not save that picture} other {This browser could not save that picture}}",
         "unreadable": "That file could not be read as an image",
         "title": "Frame the picture",
         "move": "Move the picture inside the frame with the arrow keys",
@@ -556,7 +556,7 @@
     },
     "build": {
         "title": "Polaris has been updated",
-        "body": "This tab is still on the previous version. It reloads by itself as soon as nothing is in progress, or reload now{call, select, yes { - you will come straight back into your call} other { - anything half-written on this page is lost}}.",
+        "body": "{surface, select, app {This window is still on the previous version. It reloads by itself as soon as nothing is in progress, or reload now{call, select, yes { - you will come straight back into your call} other { - anything half-written on this page is lost}}.} other {This tab is still on the previous version. It reloads by itself as soon as nothing is in progress, or reload now{call, select, yes { - you will come straight back into your call} other { - anything half-written on this page is lost}}.}}",
         "reload": "Reload",
         "hide": "Hide until something needs it",
         "later": "Later"
@@ -1170,8 +1170,8 @@
         "onlyHint": "Matched anywhere in the client's user-agent, ignoring case. Use * for any run of characters. Leave empty to allow any client.",
         "never": "Never these clients",
         "neverHint": "Refused even when they match the list above.",
-        "refused": "The browser you are using now would be refused. That is fine for a key meant for a script.",
-        "accepted": "The browser you are using now would be accepted."
+        "refused": "{surface, select, app {The app you are using now would be refused. That is fine for a key meant for a script.} other {The browser you are using now would be refused. That is fine for a key meant for a script.}}",
+        "accepted": "{surface, select, app {The app you are using now would be accepted.} other {The browser you are using now would be accepted.}}"
     },
     "accessRules": {
         "groups": "Access groups",

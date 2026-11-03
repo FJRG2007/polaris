@@ -289,7 +289,7 @@
         "connectTo": "Conectar a {name}",
         "switchTo": "Cambiar a {name}",
         "disconnect": "Desconectar",
-        "useApps": "Conecta desde la app de Polaris en tu ordenador, o desde la extensión de Polaris solo para este navegador.",
+        "useApps": "{clientKind, select, desktop {Conecta desde esta app, o desde la extensión de Polaris solo para un navegador.} other {Conecta desde la app de Polaris en tu ordenador, o desde la extensión de Polaris solo para este navegador.}}",
         "getApps": "Ver las apps",
         "noPhoneApp": "Todavía no hay app de Polaris para móviles.",
         "cancel": "Cancelar",

@@ -15,6 +15,7 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { closeNotice, showNotice } from "./notices";
+import { appBadgeSchema, applyAppBadge } from "./app-badge";
 import { isServerUrl, serverPath } from "./navigation";
 import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
@@ -248,6 +249,15 @@ export function registerIpc(host: IpcHost): void {
         opened.set(url, window);
         window.on("closed", () => opened.delete(url));
         return { ok: true };
+    });
+
+    // The window that asked is the one whose taskbar button carries it.
+    ipcMain.handle(CHANNELS.appBadge, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const badge = appBadgeSchema.safeParse(raw);
+        if (!badge.success) return false;
+        applyAppBadge(BrowserWindow.fromWebContents(event.sender), badge.data);
+        return true;
     });
 
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {

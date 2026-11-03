@@ -12,7 +12,7 @@
         "zone": {
             "assumed": "These run on the clock of whichever machine Polaris is on. Pick a timezone in Preferences to be sure they run on yours.",
             "pinned": "Times are read on your own clock ({zone}).",
-            "browser": "Times are read on this browser's clock ({zone}). Pick a timezone in Preferences to keep them on one."
+            "browser": "{surface, select, app {Times are read on this computer's clock ({zone}). Pick a timezone in Preferences to keep them on one.} other {Times are read on this browser's clock ({zone}). Pick a timezone in Preferences to keep them on one.}}"
         },
         "new": "New schedule",
         "emptyTitle": "No schedules yet",

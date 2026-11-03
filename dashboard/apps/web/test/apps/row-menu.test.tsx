@@ -18,7 +18,7 @@ import {
 } from "@polaris-app/game-servers/src/components/row-menu";
 
 vi.mock("@polaris/app-host/client", () => ({
-    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+    hostUi: { i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" } }
 }));
 
 const kicked = vi.fn();

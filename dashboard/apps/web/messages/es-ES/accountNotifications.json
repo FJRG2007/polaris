@@ -68,17 +68,17 @@
         "connectedAccounts": "Cuentas conectadas"
     },
     "browser": {
-        "title": "Avisos del navegador",
+        "title": "{clientKind, select, desktop {Avisos del sistema} other {Avisos del navegador}}",
         "standing": {
             "app": "La app de Polaris las muestra por sí misma. No hay nada que permitir.",
-            "granted": "Polaris puede avisarte de esto mientras estás en otra pestaña.",
-            "denied": "Este navegador las está bloqueando. Permite las notificaciones de este sitio en sus ajustes para volver a activarlas.",
-            "askable": "Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra pestaña.",
-            "unsupported": "Este navegador no puede mostrarlas."
+            "granted": "{clientKind, select, desktop {Polaris puede avisarte de esto mientras estás en otra ventana.} other {Polaris puede avisarte de esto mientras estás en otra pestaña.}}",
+            "denied": "{clientKind, select, desktop {El sistema las está bloqueando. Permite las notificaciones de Polaris en los ajustes del sistema para volver a activarlas.} other {Este navegador las está bloqueando. Permite las notificaciones de este sitio en sus ajustes para volver a activarlas.}}",
+            "askable": "{clientKind, select, desktop {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra ventana.} other {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra pestaña.}}",
+            "unsupported": "{clientKind, select, desktop {Esta app no puede mostrarlas.} other {Este navegador no puede mostrarlas.}}"
         },
         "testBody": "Así es un aviso de Polaris.",
         "testSent": "Enviado. Si no ha aparecido nada, el sistema lo está reteniendo: revisa sus propios ajustes de notificaciones.",
-        "testRefused": "Este navegador no ha querido mostrarlo.",
+        "testRefused": "{clientKind, select, desktop {El sistema no ha querido mostrarlo.} other {Este navegador no ha querido mostrarlo.}}",
         "allowed": "Permitidas",
         "on": "Sí",
         "blocked": "Bloqueadas",
@@ -91,7 +91,7 @@
             },
             "messages": {
                 "title": "Mensajes de Chat",
-                "hint": "Un mensaje en una conversación que sigues, mientras estás en otra pestaña."
+                "hint": "{surface, select, app {Un mensaje en una conversación que sigues, mientras estás en otra ventana.} other {Un mensaje en una conversación que sigues, mientras estás en otra pestaña.}}"
             },
             "mail": {
                 "title": "Correo",
@@ -102,8 +102,8 @@
                 "hint": "Una compilación terminada, un servidor que se ha parado, cualquier cosa que llevaría la campana."
             }
         },
-        "outsideTab": "{kind} fuera de la pestaña",
-        "keptHere": "Esto se guarda para este navegador, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo."
+        "outsideTab": "{surface, select, app {{kind} fuera de la ventana} other {{kind} fuera de la pestaña}}",
+        "keptHere": "{clientKind, select, desktop {Esto se guarda para esta app, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.} other {Esto se guarda para este navegador, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.}}"
     },
     "sound": {
         "title": "Sonido",
@@ -116,16 +116,16 @@
         "volumeHint": "Para todos los sonidos de Polaris: avisos, mensajes y llamadas. Se guarda en tu cuenta."
     },
     "tabIcon": {
-        "title": "Icono",
-        "label": "Qué muestra el icono de la pestaña cuando hay algo pendiente",
+        "title": "{surface, select, app {Icono} other {Icono}}",
+        "label": "{surface, select, app {Qué muestra el icono de la app cuando hay algo pendiente} other {Qué muestra el icono de la pestaña cuando hay algo pendiente}}",
         "styles": {
             "count": {
                 "label": "Número",
-                "hint": "Cuántos hay pendientes, en el icono de la pestaña."
+                "hint": "{surface, select, app {Cuántos hay pendientes, en el icono de la app.} other {Cuántos hay pendientes, en el icono de la pestaña.}}"
             },
             "dot": {
                 "label": "Punto",
-                "hint": "Un punto en el icono de la pestaña, sin el número."
+                "hint": "{surface, select, app {Un punto en el icono de la app, sin el número.} other {Un punto en el icono de la pestaña, sin el número.}}"
             },
             "none": {
                 "label": "Nada",

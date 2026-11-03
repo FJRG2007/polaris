@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
-        i18nProvider: { useLocale: () => "en-US" },
+        i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         copyButton: {
             CopyButton: ({ label }: { label?: string }) => <button aria-label={label} />

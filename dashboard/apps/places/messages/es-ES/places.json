@@ -2747,7 +2747,7 @@
         "locating": "Buscando...",
         "denied": "Se denegó la ubicación. Permítela o escríbela.",
         "failed": "No se pudo obtener la ubicación. Reinténtalo.",
-        "unsupported": "Este navegador no puede dar su ubicación."
+        "unsupported": "{surface, select, app {Esta app no puede dar su ubicación.} other {Este navegador no puede dar su ubicación.}}"
     },
     "guest": {
         "until": "Funciona hasta el {when}.",

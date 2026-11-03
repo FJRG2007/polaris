@@ -39,7 +39,7 @@ vi.mock("@polaris/app-host/client", () => ({
                 null
             ]
         },
-        i18nProvider: { useLocale: () => "en-US" }
+        i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" }
     }
 }));
 vi.mock("@polaris-app/game-servers/src/screens/installed/ranks-actions", () => ({

@@ -28,7 +28,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/ark-actions", () => ({}
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         confirmDialog: { useConfirm: () => [async () => true, null] },
-        i18nProvider: { useLocale: () => "en-US" },
+        i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
         liveRead: { useKeptSnapshot: () => undefined },
         relativeTime: { RelativeTime: () => null },
         snapshotCache: {

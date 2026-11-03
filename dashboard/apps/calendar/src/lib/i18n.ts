@@ -12,7 +12,11 @@ export type CalendarRuleTranslator = Translator<CalendarRuleKey>;
 
 /** The translator for whoever is reading this request. */
 export async function calendarT(): Promise<CalendarTranslator> {
-    return calendarCatalogs.translator(await host.i18nRequest.getLocale(), "calendar");
+    return calendarCatalogs.translator(
+        await host.i18nRequest.getLocale(),
+        "calendar",
+        await host.i18nRequest.getClient()
+    );
 }
 
 /** The language of one account, with no request around it - a reminder, an

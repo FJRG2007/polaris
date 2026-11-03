@@ -50,27 +50,23 @@ const db = vi.hoisted(() => ({
             deletedAt: null,
             ...data
         })),
-        findFirst: vi.fn(
-            async (): Promise<Record<string, unknown> | null> => ({
-                id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-                name: "Acme",
-                position: 0,
-                deletedAt: null
-            })
-        )
+        findFirst: vi.fn(async (): Promise<Record<string, unknown> | null> => ({
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            name: "Acme",
+            position: 0,
+            deletedAt: null
+        }))
     }
 }));
 
 const crmHost = vi.hoisted(() => ({
-    crmRunner: vi.fn(
-        async (id: string): Promise<unknown> => ({
-            id,
-            name: "Test User",
-            email: "test@example.invalid",
-            isAdmin: false,
-            sessionId: ""
-        })
-    ),
+    crmRunner: vi.fn(async (id: string): Promise<unknown> => ({
+        id,
+        name: "Test User",
+        email: "test@example.invalid",
+        isAdmin: false,
+        sessionId: ""
+    })),
     crmOrgAccess: vi.fn(async (): Promise<unknown> => ({ role: null, permissions: ["*"] })),
     crmOrgPeople: vi.fn(async () => [
         { id: "u1", name: "Test User", contact: "" },
@@ -86,12 +82,10 @@ const crmHost = vi.hoisted(() => ({
         { id: "33333333-3333-4333-8333-333333333333", name: "sales" }
     ]),
     crmSendChat: vi.fn(async (): Promise<unknown> => ({ sent: true })),
-    createTask: vi.fn(
-        async (): Promise<unknown> => ({
-            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-            reference: "T-1"
-        })
-    )
+    createTask: vi.fn(async (): Promise<unknown> => ({
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        reference: "T-1"
+    }))
 }));
 
 const notifications = vi.hoisted(() => ({ createNotification: vi.fn(async () => undefined) }));
@@ -115,7 +109,7 @@ vi.mock("@polaris/db", () => {
 vi.mock("@polaris/app-host", () => ({
     host: {
         crmHost,
-        i18nRequest: { getLocale: async () => "en-US" },
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" },
         rateLimitService: { rateLimit: async () => ({ ok: limits.ok }) },
         requestContext: { clientIp: async () => "203.0.113.9" },
         notificationService: notifications

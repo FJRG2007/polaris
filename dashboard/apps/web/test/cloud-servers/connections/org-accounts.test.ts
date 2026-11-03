@@ -54,7 +54,7 @@ vi.mock("@polaris-app/cloud-servers/src/lib/providers", () => ({
 
 vi.mock("@polaris/app-host", () => ({
     host: {
-        i18nRequest: { getLocale: async () => "en-US" },
+        i18nRequest: { getClient: async () => "browser", getLocale: async () => "en-US" },
         session: {
             requireUser: async () => ({ id: "user-1", isAdmin: false }),
             sessionCan: async () => state.usesCloud

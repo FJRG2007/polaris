@@ -10,5 +10,9 @@ import type { PlacesTranslator } from "../lib/i18n";
 import { placesCatalogs } from "../../messages";
 
 export function usePlacesT(): PlacesTranslator {
-    return placesCatalogs.translator(hostUi.i18nProvider.useLocale(), "places");
+    return placesCatalogs.translator(
+        hostUi.i18nProvider.useLocale(),
+        "places",
+        hostUi.i18nProvider.useClient()
+    );
 }
