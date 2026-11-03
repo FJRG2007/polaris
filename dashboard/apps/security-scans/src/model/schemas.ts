@@ -50,7 +50,6 @@ export const filesInput = z.object({
 
 export const imageInput = z.object({ targetId: id, applicationId: id });
 
-/** One image a server runs, by its id. */
 /** A sidecar on the image list, and the feature the screen says started it. */
 export const sidecarInput = z.object({
     feature: z.enum([
@@ -69,6 +68,7 @@ export const sidecarInput = z.object({
         .regex(/^polaris-[a-z0-9-]{1,48}$/)
 });
 
+/** One image a server runs, by its id. */
 export const serverImageInput = z.object({
     targetId: id,
     imageId: z

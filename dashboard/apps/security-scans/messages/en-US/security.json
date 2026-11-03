@@ -106,7 +106,10 @@
         "startedBy": "Started by {feature}",
         "turnOff": "Turn off",
         "turnOffTitle": "Turn off {feature}?",
-        "turnOffBody": "Its container is removed. Turn it on again from its own page.",
+        "turnOffQuestion": "The {feature} stops and its container is removed.",
+        "turnOffDenied": "Only someone who manages this feature can turn it off.",
+        "tunnelKind": "tunnel",
+        "turnOffBody": "Turn it on again from its own page.",
         "feature": {
             "tunnel-ngrok": "ngrok tunnel",
             "tunnel-cloudflare": "Cloudflare tunnel",

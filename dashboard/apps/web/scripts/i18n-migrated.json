@@ -1979,6 +1979,8 @@
         "web/src/components/github-app-gap.tsx",
         "extension/src/entrypoints/sidepanel/panel.tsx",
         "security-scans/src/screens/security-view.tsx",
+        "security-scans/src/screens/images-panel.tsx",
+        "web/src/lib/deploy/dead-containers.ts",
         "extension/src/lib/context-menu.ts",
         "extension/src/lib/polar-panel.ts",
         "extension/src/lib/lock.ts",

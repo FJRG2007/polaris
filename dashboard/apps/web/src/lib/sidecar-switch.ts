@@ -10,8 +10,48 @@
  * Server-only.
  */
 
-import { prisma } from "@polaris/db";
-import { shortHash, sidecarOf, type SidecarFeature } from "@polaris/deploy";
+import { sidecarOf, type SidecarFeature } from "@polaris/deploy";
+import { appProjectIds } from "@/lib/deploy/uninstall-leftovers";
+
+const APP_TUNNELS: ReadonlySet<SidecarFeature> = new Set([
+    "app-tunnel-named",
+    "app-tunnel-quick",
+    "app-tunnel-ngrok"
+]);
+
+/** The projects, of those given, whose feature the person asking may turn off -
+ *  the same checks each feature's own switch makes: an administrator for the
+ *  account, share and backup tunnels, `deploy.manage` and the service's domains
+ *  for a service's tunnel. */
+export async function turnOffAllowed(
+    sidecars: readonly { feature: SidecarFeature; project: string }[]
+): Promise<string[]> {
+    if (sidecars.length === 0) return [];
+    const { requireUser, sessionCan } = await import("@/lib/session");
+    const user = await requireUser();
+    const services = sidecars.some((one) => APP_TUNNELS.has(one.feature))
+        ? await appProjectIds()
+        : null;
+    const deploys = services ? await sessionCan(user, "deploy.manage") : false;
+    const { requireApplicationAccess } = await import("@/lib/deploy-project-access");
+    const allowed: string[] = [];
+    for (const one of sidecars) {
+        const sidecar = sidecarOf(one.project, one.feature === "tunnel-ngrok" ? "ngrok/ngrok" : "");
+        if (!sidecar || sidecar.feature !== one.feature) continue;
+        if (!APP_TUNNELS.has(sidecar.feature)) {
+            if (user.isAdmin) allowed.push(one.project);
+            continue;
+        }
+        const appId = sidecar.appProject ? services?.get(sidecar.appProject) : undefined;
+        if (!deploys || !appId) continue;
+        const reaches = await requireApplicationAccess(appId, user.id, "domains.manage").then(
+            () => true,
+            () => false
+        );
+        if (reaches) allowed.push(one.project);
+    }
+    return allowed;
+}
 
 /** The features this can turn off, and the project each one has to match. */
 export async function turnOffSidecar(
@@ -62,6 +102,5 @@ export async function turnOffSidecar(
 /** The service a tunnel's project names, by its hashed id. */
 async function serviceOf(appProject: string | undefined): Promise<string | null> {
     if (!appProject) return null;
-    const apps = await prisma.application.findMany({ select: { id: true } });
-    return apps.find((app) => `polaris-${shortHash(app.id, 8)}` === appProject)?.id ?? null;
+    return (await appProjectIds())?.get(appProject) ?? null;
 }

@@ -402,7 +402,8 @@ export const serverHost = {
         getPorts: later(load.deployRuntime, "getPorts")
     },
     sidecarSwitch: {
-        turnOffSidecar: later(load.sidecarSwitch, "turnOffSidecar")
+        turnOffSidecar: later(load.sidecarSwitch, "turnOffSidecar"),
+        turnOffAllowed: later(load.sidecarSwitch, "turnOffAllowed")
     },
     deployService: {
         deployApplication: later(load.deployService, "deployApplication"),

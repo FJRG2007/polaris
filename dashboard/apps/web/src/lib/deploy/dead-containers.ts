@@ -14,9 +14,10 @@
  *     `polaris-qtunnel-<hash>`, `polaris-ngrok-<hash>`) whose service is gone;
  *   - the account tunnel (`polaris-tunnel`) while no provider is switched on in
  *     Integrations;
- *   - a deployed service's own containers, networks, folders and routes when the
- *     service is gone - `cleanLeftovers`, the same clean-up the storage screen's
- *     button runs.
+ *   - a deployed service's own containers, networks and routes when the service
+ *     is gone - `cleanLeftovers`, the same clean-up the storage screen's button
+ *     runs, held to the same grace and leaving the service's folders, which may
+ *     hold its bind-mounted data, to that button.
  *
  * Never a container without one of those exact projects, never one whose owner
  * is present and switched on (an idle tunnel is not a dead one), never one made
@@ -177,15 +178,20 @@ async function pass(now: Date): Promise<ReaperPass> {
         });
     }
 
-    const cleaned = await cleanLeftovers().catch(() => null);
+    const cleaned = await cleanLeftovers({
+        createdBefore: now.getTime() - DEAD_GRACE_MS,
+        dirs: false
+    }).catch(() => null);
     const leftovers = cleaned?.removed.containers ?? 0;
-    if (leftovers > 0) {
-        console.log(`polaris: removed ${leftovers} container(s) of deleted services`);
+    if (cleaned && Object.values(cleaned.removed).some((count) => count > 0)) {
+        console.log(
+            `polaris: removed what deleted services left: ${JSON.stringify(cleaned.removed)}`
+        );
         await recordAudit({
             actorId: null,
             action: "server.leftovers.removed",
             targetType: "server",
-            metadata: { ...cleaned?.removed, automatic: true }
+            metadata: { ...cleaned.removed, failed: cleaned.failed, automatic: true }
         });
     }
     return { sidecars: removed, leftovers };

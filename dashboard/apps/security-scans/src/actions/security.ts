@@ -86,7 +86,24 @@ export async function serverImagesAction(input: unknown) {
     await requireSecurityUser();
     const parsed = schemas.targetInput.safeParse(input);
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
-    return run(async () => (await service()).serverImages(parsed.data.targetId));
+    return run(async () => {
+        const found = await (await service()).serverImages(parsed.data.targetId);
+        const allowed = new Set(
+            await host.sidecarSwitch
+                .turnOffAllowed(found.images.flatMap((image) => image.sidecars))
+                .catch(() => [])
+        );
+        return {
+            ...found,
+            images: found.images.map((image) => ({
+                ...image,
+                sidecars: image.sidecars.map((sidecar) => ({
+                    ...sidecar,
+                    canTurnOff: allowed.has(sidecar.project)
+                }))
+            }))
+        };
+    });
 }
 
 /** Turn off the Polaris feature that started a sidecar, through that feature's

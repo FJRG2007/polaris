@@ -197,14 +197,25 @@ export function ImagesPanel({
                                                                   )
                                                               })}
                                                           </span>
-                                                          <Button
-                                                              size="xs"
-                                                              variant="ghost"
+                                                          <span
                                                               className="shrink-0"
-                                                              onClick={() => setTurningOff(sidecar)}
+                                                              title={
+                                                                  sidecar.canTurnOff
+                                                                      ? undefined
+                                                                      : t("images.turnOffDenied")
+                                                              }
                                                           >
-                                                              {t("images.turnOff")}
-                                                          </Button>
+                                                              <Button
+                                                                  size="xs"
+                                                                  variant="ghost"
+                                                                  disabled={!sidecar.canTurnOff}
+                                                                  onClick={() =>
+                                                                      setTurningOff(sidecar)
+                                                                  }
+                                                              >
+                                                                  {t("images.turnOff")}
+                                                              </Button>
+                                                          </span>
                                                       </span>
                                                   ))}
                                               </td>
@@ -332,8 +343,16 @@ export function ImagesPanel({
                     onOpenChange={(next) => {
                         if (!next && !turnOffPending) setTurningOff(null);
                     }}
-                    kind={t("images.turnOff")}
+                    kind={t("images.tunnelKind")}
                     name={turningOff?.project ?? ""}
+                    requireTyping={false}
+                    question={
+                        turningOff
+                            ? t("images.turnOffQuestion", {
+                                  feature: t(`images.feature.${turningOff.feature}`)
+                              })
+                            : null
+                    }
                     title={
                         turningOff
                             ? t("images.turnOffTitle", {

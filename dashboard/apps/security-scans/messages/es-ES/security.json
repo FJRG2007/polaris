@@ -106,7 +106,10 @@
         "startedBy": "Lo inició {feature}",
         "turnOff": "Apagar",
         "turnOffTitle": "¿Apagar {feature}?",
-        "turnOffBody": "Se quita su contenedor. Vuelve a activarlo en su página.",
+        "turnOffQuestion": "{feature} se detiene y se quita su contenedor.",
+        "turnOffDenied": "Solo quien gestiona esta función puede apagarla.",
+        "tunnelKind": "túnel",
+        "turnOffBody": "Vuelve a activarlo desde su propia página.",
         "feature": {
             "tunnel-ngrok": "Túnel de ngrok",
             "tunnel-cloudflare": "Túnel de Cloudflare",

@@ -10,9 +10,8 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@polaris/hostd-client", () => ({ HostdClient: class {} }));
 vi.mock("@/lib/deploy/service-networks", () => ({ wantedPrivateNetworks: async () => [] }));
 
-const { findLeftovers, liveContainers, routeIdsIn } = await import(
-    "@/lib/deploy/uninstall-leftovers"
-);
+const { findLeftovers, liveContainers, routeIdsIn } =
+    await import("@/lib/deploy/uninstall-leftovers");
 const { leftByRemovedApp } = await import("@/lib/deploy/host-volumes");
 
 const LIVE_APP = "polaris-0a1b2c3d";
@@ -95,6 +94,28 @@ describe("findLeftovers", () => {
         expect(found.routes).toEqual([]);
         expect(found.dirs).toEqual([]);
         expect(found.containers).toHaveLength(1);
+    });
+
+    it("leaves a new container, its network and every folder to an unattended pass", () => {
+        const now = Date.parse("2026-11-03T12:00:00Z");
+        const made = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+        const found = findLeftovers(
+            {
+                containers: [
+                    { ...container("old", GONE_APP, [NET_GONE]), createdAt: made(30) },
+                    { ...container("new", `${GONE_APP}-r2`, [NET_SHARED]), createdAt: made(1) },
+                    container("unknown", `${GONE_APP}-r3`)
+                ],
+                networks: [NET_GONE, NET_SHARED],
+                dirs: [GONE_APP],
+                routes: []
+            },
+            known,
+            { createdBefore: now - 10 * 60_000, dirs: false }
+        );
+        expect(found.containers.map((entry) => entry.id)).toEqual(["old"]);
+        expect(found.networks).toEqual([NET_GONE]);
+        expect(found.dirs).toEqual([]);
     });
 
     it("finds nothing on a clean machine", () => {
