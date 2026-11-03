@@ -281,9 +281,14 @@ export function PoolDialog({ local }: { local: LocalServer }) {
                             onValueChange={(id) => setServerId(id)}
                             placeholder={t("dialog.pickServer")}
                             fixed={[
-                                { value: local.id, label: t("dialog.thisMachine", { name: local.name }) }
+                                {
+                                    value: local.id,
+                                    label: t("dialog.thisMachine", { name: local.name })
+                                }
                             ]}
-                            filter={local.id === LOCAL_SERVER_ID ? undefined : { exclude: [local.id] }}
+                            filter={
+                                local.id === LOCAL_SERVER_ID ? undefined : { exclude: [local.id] }
+                            }
                         />
                         <MachineNote
                             probing={probing}

@@ -21,9 +21,8 @@ vi.mock("../../../src/app/(app)/apps/tunnels/actions", () => ({
     tunnelStatusesAction: vi.fn()
 }));
 
-const { FirewallStep, TunnelsView } = await import(
-    "../../../src/app/(app)/apps/tunnels/tunnels-view"
-);
+const { FirewallStep, TunnelsView } =
+    await import("../../../src/app/(app)/apps/tunnels/tunnels-view");
 
 const TUNNEL: TunnelView = {
     id: "0190a8c4-0000-7000-8000-000000000001",
@@ -41,12 +40,9 @@ const TUNNEL: TunnelView = {
     createdAt: "2026-10-01T00:00:00.000Z"
 };
 
-
 describe("the tunnels list", () => {
     it("names the hostname, the public server and port, and the service it reaches", () => {
-        const markup = renderToStaticMarkup(
-            withMessages(<TunnelsView tunnels={[TUNNEL]} />)
-        );
+        const markup = renderToStaticMarkup(withMessages(<TunnelsView tunnels={[TUNNEL]} />));
         expect(markup).toContain("app.example.com");
         expect(markup).toContain('href="https://app.example.com"');
         expect(markup).toContain("Through edge-1, UDP port 51821");
@@ -66,9 +62,7 @@ describe("the tunnels list", () => {
     });
 
     it("says there are none, and still offers to make one", () => {
-        const markup = renderToStaticMarkup(
-            withMessages(<TunnelsView tunnels={[]} />)
-        );
+        const markup = renderToStaticMarkup(withMessages(<TunnelsView tunnels={[]} />));
         expect(markup).toContain("No tunnels yet");
         expect(markup).toContain("New tunnel");
     });

@@ -16,9 +16,8 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 
-const { listDeployTargetOptionsAction, listServiceOptionsAction } = await import(
-    "@/app/(app)/deploy-target-options-actions"
-);
+const { listDeployTargetOptionsAction, listServiceOptionsAction } =
+    await import("@/app/(app)/deploy-target-options-actions");
 const { encodeServerCursor } = await import("@/lib/server-options");
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -26,7 +25,11 @@ const ADMIN = "44444444-4444-4444-8444-444444444444";
 const TARGET = "33333333-3333-4333-8333-333333333333";
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const target = (n: number) => ({ id: id(n), name: `t-${String(n).padStart(4, "0")}`, kind: n === 1 ? "local" : "ssh" });
+const target = (n: number) => ({
+    id: id(n),
+    name: `t-${String(n).padStart(4, "0")}`,
+    kind: n === 1 ? "local" : "ssh"
+});
 const app = (n: number) => ({
     id: id(n),
     name: `svc-${n}`,

@@ -50,7 +50,6 @@ const TUNNEL: TunnelView = {
     createdAt: "2026-10-01T00:00:00.000Z"
 };
 
-
 beforeEach(() => {
     status.calls = 0;
     status.ids = [];

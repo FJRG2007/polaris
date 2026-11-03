@@ -63,7 +63,10 @@ export function DeployTargetPicker({
     localLabel,
     placeholder,
     ...rest
-}: PickerProps<DeployTargetOption> & { scope: DeployTargetScope; localLabel?: (name: string) => string }) {
+}: PickerProps<DeployTargetOption> & {
+    scope: DeployTargetScope;
+    localLabel?: (name: string) => string;
+}) {
     const t = useTranslations("components");
     const { load, resolve, key } = usePaged<DeployTargetOption>(listDeployTargetOptionsAction, {
         scope

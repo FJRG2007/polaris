@@ -208,7 +208,10 @@ function AsyncPicker<T>({
             {item !== null && itemIcon ? (
                 <span className="flex shrink-0 items-center">{itemIcon(item)}</span>
             ) : null}
-            <span className="min-w-0 flex-1 truncate" title={detail ? `${label} - ${detail}` : label}>
+            <span
+                className="min-w-0 flex-1 truncate"
+                title={detail ? `${label} - ${detail}` : label}
+            >
                 {label}
             </span>
             {detail ? (
@@ -298,7 +301,12 @@ function AsyncPicker<T>({
                                                 <div className="h-6 animate-pulse rounded bg-muted" />
                                             </div>
                                         ) : (
-                                            row(itemValue(item), itemLabel(item), item, itemDetail?.(item))
+                                            row(
+                                                itemValue(item),
+                                                itemLabel(item),
+                                                item,
+                                                itemDetail?.(item)
+                                            )
                                         )}
                                     </div>
                                 );

@@ -45,10 +45,7 @@ export default async function RunnersPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("page.title")}
-                description={t("page.description")}
-            />
+            <PageHeader title={t("page.title")} description={t("page.description")} />
             <RunnersView
                 pools={pools}
                 local={local}

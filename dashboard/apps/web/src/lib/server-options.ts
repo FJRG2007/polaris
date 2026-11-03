@@ -61,7 +61,9 @@ export function serverOptionsWhere(
     if (filter.withoutVpnNode) and.push({ vpnNode: { is: null } });
     if (filter.exclude?.length) and.push({ id: { notIn: [...filter.exclude] } });
     if (after) {
-        and.push({ OR: [{ name: { gt: after.name } }, { name: after.name, id: { gt: after.id } }] });
+        and.push({
+            OR: [{ name: { gt: after.name } }, { name: after.name, id: { gt: after.id } }]
+        });
     }
     return { AND: and };
 }

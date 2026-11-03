@@ -42,11 +42,7 @@ export function TunnelDialog() {
     // something in it to complain about.
     const hostnameError =
         normalized && !isRouteHostname(normalized) ? t("dialog.hostnameInvalid") : null;
-    const ready =
-        Boolean(serverId) &&
-        Boolean(serviceId) &&
-        Boolean(normalized) &&
-        !hostnameError;
+    const ready = Boolean(serverId) && Boolean(serviceId) && Boolean(normalized) && !hostnameError;
 
     function reset(): void {
         setServerId("");

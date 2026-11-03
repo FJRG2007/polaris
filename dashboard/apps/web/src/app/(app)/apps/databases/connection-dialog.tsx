@@ -473,7 +473,6 @@ export function ConnectionDialog({
         );
     };
 
-
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-w-lg">
@@ -885,7 +884,9 @@ export function ConnectionDialog({
                                                     hint={t("dialog.jumpHint")}
                                                 >
                                                     <ServerPicker
-                                                        value={jumpId === JUMP_UNPICKED ? null : jumpId}
+                                                        value={
+                                                            jumpId === JUMP_UNPICKED ? null : jumpId
+                                                        }
                                                         onValueChange={(id) => setJumpId(id)}
                                                         aria-label={t("dialog.jumpServer")}
                                                         placeholder={t("dialog.pickOne")}

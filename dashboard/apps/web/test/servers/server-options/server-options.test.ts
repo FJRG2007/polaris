@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findMany = vi.fn();
 const sessionCan = vi.fn(async (..._args: unknown[]) => true);
-vi.mock("@polaris/db", () => ({ prisma: { host: { findMany: (...args: unknown[]) => findMany(...args) } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: { host: { findMany: (...args: unknown[]) => findMany(...args) } }
+}));
 vi.mock("@/lib/session", () => ({
     requireUser: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111" })),
     requirePermission: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111" })),
@@ -17,7 +19,8 @@ vi.mock("@/lib/deploy-project-access", () => ({
 
 const { listServerOptionsAction } = await import("@/app/(app)/server-options-actions");
 const { encodeServerCursor, findLocalHost } = await import("@/lib/server-options");
-const { SERVER_OPTIONS_MAX_PAGE, SERVER_OPTIONS_PAGE } = await import("@/lib/server-options-schema");
+const { SERVER_OPTIONS_MAX_PAGE, SERVER_OPTIONS_PAGE } =
+    await import("@/lib/server-options-schema");
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const OWNER = "22222222-2222-4222-8222-222222222222";
@@ -38,7 +41,8 @@ function host(n: number) {
 }
 
 type Where = { AND: Record<string, unknown>[] };
-const lastQuery = () => findMany.mock.calls.at(-1)![0] as { where: Where; take: number; orderBy: unknown };
+const lastQuery = () =>
+    findMany.mock.calls.at(-1)![0] as { where: Where; take: number; orderBy: unknown };
 
 beforeEach(() => {
     findMany.mockReset();
@@ -83,7 +87,9 @@ describe("listServerOptionsAction", () => {
     it("applies a screen's filters in the query", async () => {
         findMany.mockResolvedValue([]);
         const other = host(9).id;
-        await listServerOptionsAction({ filter: { root: true, withoutVpnNode: true, exclude: [other] } });
+        await listServerOptionsAction({
+            filter: { root: true, withoutVpnNode: true, exclude: [other] }
+        });
         const and = lastQuery().where.AND;
         expect(and).toContainEqual({ OR: [{ sudo: true }, { username: "root" }] });
         expect(and).toContainEqual({ vpnNode: { is: null } });
@@ -91,7 +97,9 @@ describe("listServerOptionsAction", () => {
     });
 
     it("pages by name and id, reading one past the page to know there is more", async () => {
-        findMany.mockResolvedValue(Array.from({ length: SERVER_OPTIONS_PAGE + 1 }, (_, n) => host(n + 1)));
+        findMany.mockResolvedValue(
+            Array.from({ length: SERVER_OPTIONS_PAGE + 1 }, (_, n) => host(n + 1))
+        );
         const page = await listServerOptionsAction({});
         if ("error" in page) throw new Error(page.error);
         expect(lastQuery().take).toBe(SERVER_OPTIONS_PAGE + 1);
@@ -119,7 +127,9 @@ describe("listServerOptionsAction", () => {
         for (const name of longest) {
             const last = { ...host(1), name };
             findMany.mockResolvedValue([last]);
-            const result = await listServerOptionsAction({ cursor: encodeServerCursor(name, last.id) });
+            const result = await listServerOptionsAction({
+                cursor: encodeServerCursor(name, last.id)
+            });
             expect(result).not.toHaveProperty("error");
             expect(lastQuery().where.AND).toContainEqual({
                 OR: [{ name: { gt: name } }, { name, id: { gt: last.id } }]
