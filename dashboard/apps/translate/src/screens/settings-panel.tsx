@@ -220,7 +220,10 @@ function EngineRow({
             className={`flex min-w-0 items-start gap-2 rounded-md px-1 py-1.5 ${over ? "bg-muted/40" : ""}`}
         >
             <span className="flex shrink-0 items-center gap-1 pt-0.5">
-                <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />
+                <GripVertical
+                    className="size-4 shrink-0 cursor-grab text-muted-foreground"
+                    aria-hidden
+                />
                 <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">
                     {index + 1}
                 </span>

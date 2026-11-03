@@ -77,9 +77,17 @@ describe("readSettings", () => {
 
     it("refuses an order that repeats or leaves out an engine", () => {
         const base = { engines: DEFAULT_SETTINGS.engines, defaultTarget: "en" };
-        expect(settingsInput.safeParse({ ...base, order: ["polar", "google", "deepl", "browser"] }).success).toBe(true);
-        expect(settingsInput.safeParse({ ...base, order: ["polar", "polar", "deepl", "browser"] }).success).toBe(false);
-        expect(settingsInput.safeParse({ ...base, order: ["polar", "deepl", "browser"] }).success).toBe(false);
+        expect(
+            settingsInput.safeParse({ ...base, order: ["polar", "google", "deepl", "browser"] })
+                .success
+        ).toBe(true);
+        expect(
+            settingsInput.safeParse({ ...base, order: ["polar", "polar", "deepl", "browser"] })
+                .success
+        ).toBe(false);
+        expect(
+            settingsInput.safeParse({ ...base, order: ["polar", "deepl", "browser"] }).success
+        ).toBe(false);
     });
 });
 

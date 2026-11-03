@@ -44,10 +44,7 @@ async function open(): Promise<void> {
     await act(async () => {});
 }
 
-const names = () =>
-    screen
-        .getAllByRole("switch")
-        .map((one) => one.getAttribute("aria-label"));
+const names = () => screen.getAllByRole("switch").map((one) => one.getAttribute("aria-label"));
 
 describe("the engines' order", () => {
     it("lists them in the order they are tried", async () => {
@@ -67,7 +64,12 @@ describe("the engines' order", () => {
             fireEvent.click(screen.getByRole("button", { name: "Save" }));
         });
         expect(saved).toHaveLength(1);
-        expect((saved[0] as TranslateSettings).order).toEqual(["browser", "deepl", "polar", "google"]);
+        expect((saved[0] as TranslateSettings).order).toEqual([
+            "browser",
+            "deepl",
+            "polar",
+            "google"
+        ]);
     });
 
     it("moves one by dragging it onto another row", async () => {

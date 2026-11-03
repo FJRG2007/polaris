@@ -59,7 +59,10 @@ describe("the screen's engines", () => {
     });
 
     it("follow the administrator's order, the browser included", () => {
-        const order = { ...DEFAULT_SETTINGS, order: ["polar", "google", "browser", "deepl"] as TranslateSettings["order"] };
+        const order = {
+            ...DEFAULT_SETTINGS,
+            order: ["polar", "google", "browser", "deepl"] as TranslateSettings["order"]
+        };
         expect(usableEngines({ browser: true, available: ALL, settings: order })).toEqual([
             "polar",
             "google",

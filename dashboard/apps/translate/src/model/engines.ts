@@ -7,7 +7,12 @@
  * is missing from the reader's browser.
  */
 
-import { SERVER_ENGINE_IDS, type EngineId, type ServerEngineId, type TranslateSettings } from "./schemas";
+import {
+    SERVER_ENGINE_IDS,
+    type EngineId,
+    type ServerEngineId,
+    type TranslateSettings
+} from "./schemas";
 
 export interface EngineResult {
     texts: string[];
@@ -38,7 +43,9 @@ export function usableServerEngines(
     available: ServerAvailability,
     settings: TranslateSettings
 ): ServerEngineId[] {
-    return settings.order.filter(isServerEngine).filter((id) => available[id] && settings.engines[id]);
+    return settings.order
+        .filter(isServerEngine)
+        .filter((id) => available[id] && settings.engines[id]);
 }
 
 /**
