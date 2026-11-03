@@ -1,6 +1,6 @@
 {
     "title": "Traductor",
-    "description": "Escribe o pega texto y léelo en otro idioma.",
+    "description": "Traduce texto, imágenes, documentos y voz a otro idioma.",
     "pane": {
         "source": "Texto que traducir",
         "target": "Traducción",
@@ -56,7 +56,7 @@
     },
     "settings": {
         "title": "Ajustes del Traductor",
-        "description": "Qué motores responden aquí y a qué idioma se traduce por defecto.",
+        "description": "Qué motores responden aquí, el idioma al que se traduce por defecto y un límite de longitud opcional.",
         "engines": "Motores",
         "orderHint": "Se prueban de arriba abajo. Arrastra uno para cambiar cuál va primero.",
         "moveUp": "Subir {engine}",
@@ -70,7 +70,12 @@
         "cancel": "Cancelar",
         "saved": "Ajustes guardados",
         "keys": "Ver claves",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "limit": "Límite de longitud",
+        "limitOn": "Limitar la longitud de una traducción",
+        "limitHint": "Desactivado por defecto: se traduce cualquier longitud. Actívalo para limitar una traducción.",
+        "limitChars": "Máximo de caracteres",
+        "limitInvalid": "Escribe un número entero de {min} a {max}."
     },
     "errors": {
         "generic": "Algo ha fallado. Inténtalo de nuevo.",
@@ -90,6 +95,82 @@
         "deleteFailed": "No se ha podido quitar.",
         "saveFailed": "No se han podido guardar los ajustes.",
         "statusFailed": "No se han podido comprobar los motores. Traducir en el navegador sigue funcionando.",
-        "forbidden": "Tu rol no incluye el Traductor."
+        "forbidden": "Tu rol no incluye el Traductor.",
+        "overLimit": "Supera los {limit} caracteres permitidos aquí.",
+        "fileTooLarge": "Ese archivo es demasiado grande para leerlo aquí.",
+        "imageType": "Ese archivo no es una imagen PNG, JPEG, WebP o GIF.",
+        "audioType": "Ese archivo no es una grabación que se pueda leer (WebM, Ogg, WAV, MP3 o M4A).",
+        "audioTooLong": "Esa grabación dura más de 5 minutos. Recórtala y vuelve a intentarlo.",
+        "documentType": "Ese archivo no es un documento que se pueda traducir.",
+        "documentFailed": "No se pudo leer el documento. Puede estar dañado o protegido.",
+        "readFailed": "No se pudo leer el texto. Vuelve a intentarlo.",
+        "transcribeFailed": "No se pudo transcribir la grabación. Vuelve a intentarlo."
+    },
+    "modes": {
+        "label": "Qué traducir",
+        "text": "Texto",
+        "image": "Imágenes",
+        "document": "Documentos",
+        "audio": "Audio",
+        "camera": "Cámara"
+    },
+    "reads": {
+        "imagesManager": "Leer imágenes necesita un modelo de Polar que lea imágenes.",
+        "imagesReader": "Leer imágenes aún no está configurado. Se encargan los administradores.",
+        "audioManager": "Transcribir necesita un modelo de Polar que transcriba voz.",
+        "audioReader": "Transcribir aún no está configurado. Se encargan los administradores.",
+        "setUp": "Configurar los modelos de Polar"
+    },
+    "image": {
+        "drop": "Suelta, pega o elige una imagen",
+        "choose": "Elegir una imagen",
+        "hint": "Capturas y fotos, hasta 8 MB.",
+        "reading": "Leyendo el texto...",
+        "overlay": "Sobre la imagen",
+        "side": "Al lado",
+        "view": "Cómo mostrarla",
+        "original": "Texto original",
+        "copyOriginal": "Copiar el texto original",
+        "clear": "Quitar la imagen",
+        "alt": "La imagen que se traduce",
+        "none": "No se encontró texto en esta imagen."
+    },
+    "camera": {
+        "start": "Abrir la cámara",
+        "stop": "Cerrar la cámara",
+        "video": "Traducir un vídeo",
+        "hint": "Apunta la cámara a un texto. La traducción se actualiza cada pocos segundos.",
+        "denied": "No se pudo abrir la cámara. Permítela en el navegador y vuelve a intentarlo.",
+        "unsupported": "Este navegador no puede abrir una cámara.",
+        "pause": "Pausar",
+        "resume": "Seguir",
+        "waiting": "Buscando texto...",
+        "videoFailed": "No se pudo reproducir ese vídeo."
+    },
+    "audio": {
+        "choose": "Elegir una grabación",
+        "hint": "Hasta 5 minutos y 8 MB.",
+        "transcribing": "Transcribiendo...",
+        "talk": "Hablar en {language}",
+        "stop": "Parar",
+        "listening": "Escuchando...",
+        "micDenied": "No se pudo abrir el micrófono. Permítelo en el navegador y vuelve a intentarlo.",
+        "micUnsupported": "Este navegador no puede usar un micrófono.",
+        "empty": "Elige una grabación o habla, y la traducción aparece aquí.",
+        "clear": "Borrar la conversación",
+        "listen": "Escuchar",
+        "pickSource": "Elige arriba el idioma en que hablas para conversar."
+    },
+    "document": {
+        "choose": "Elegir un documento",
+        "hint": "Word, PowerPoint, Excel, PDF o texto, hasta 25 MB.",
+        "reading": "Leyendo el documento...",
+        "progress": "Traduciendo, {done} de {total}",
+        "ready": "{name} está traducido",
+        "download": "Descargar la traducción",
+        "pdfNote": "Un PDF vuelve como texto, página a página. No conserva su diseño.",
+        "another": "Traducir otro",
+        "preview": "Vista previa",
+        "cancel": "Cancelar"
     }
 }

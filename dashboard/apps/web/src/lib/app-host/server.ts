@@ -171,6 +171,7 @@ const load = {
     storageHold: once(() => import("@/lib/storage-moves/hold")),
     storageTarget: once(() => import("@/lib/storage-target")),
     translateEngines: once(() => import("@/lib/translate/server-engines")),
+    translateMedia: once(() => import("@/lib/translate/server-media")),
     wafService: once(() => import("@/lib/waf-service"))
 };
 
@@ -582,11 +583,15 @@ export const serverHost = {
         storageTargetOptions: later(load.storageTarget, "storageTargetOptions")
     },
     // The Translate app's server engines: Polar's model and the paid
-    // providers, whose keys never reach the app.
+    // providers, whose keys never reach the app; and what reads a picture or a
+    // recording for it, on the models Polar already has.
     translateEngines: {
         serverDetect: later(load.translateEngines, "serverDetect"),
         serverEngineStatus: later(load.translateEngines, "serverEngineStatus"),
-        serverTranslate: later(load.translateEngines, "serverTranslate")
+        serverTranslate: later(load.translateEngines, "serverTranslate"),
+        serverMediaStatus: later(load.translateMedia, "serverMediaStatus"),
+        serverReadImage: later(load.translateMedia, "serverReadImage"),
+        serverTranscribe: later(load.translateMedia, "serverTranscribe")
     },
     wafService: {
         resolveWaf: later(load.wafService, "resolveWaf")

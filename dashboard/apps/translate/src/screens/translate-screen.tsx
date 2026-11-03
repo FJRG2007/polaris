@@ -6,6 +6,11 @@
  * newer keystroke cancels the one still on its way, so an older answer never
  * lands over a newer one. The line under the panes says which engine answered.
  *
+ * Besides typed text, the reader can translate a picture, the camera, a
+ * document or speech; every mode goes through the same engines and language
+ * bar (`run.ts`), and none of them meets a length unless the administrator
+ * set one.
+ *
  * The frame draws at once. The engines are read in the browser (the last
  * answer from this tab's cache first), and only the history waits behind a
  * skeleton.
@@ -21,6 +26,7 @@ import {
     EmptyState,
     PageHeader,
     SearchableSelect,
+    SegmentedControl,
     Select,
     Skeleton,
     Textarea,
@@ -28,12 +34,17 @@ import {
     useToast,
     type SearchableSelectOption
 } from "@polaris/ui";
+import { AudioMode } from "./audio-mode";
+import { ImageMode } from "./image-mode";
+import { CameraMode } from "./camera-mode";
+import { DocumentMode } from "./document-mode";
+import type { Reads } from "./reads";
+import { runTranslation, type Translate } from "./run";
 import { useLanguageOptions } from "./language-options";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
 import { readCache, unwrap, useTranslateLocale, useTranslateT, writeCache } from "./i18n";
 import {
-    ServerEngineError,
     createServerEngine,
     fetchServerStatus,
     type ServerStatusView
@@ -43,7 +54,7 @@ import {
     DEFAULT_SETTINGS,
     readOrder,
     HISTORY_MAX,
-    TEXT_MAX,
+    HISTORY_TEXT_MAX,
     type EngineId,
     type ServerEngineId
 } from "../model/schemas";
@@ -54,6 +65,17 @@ import { AUTO, languageName, normalizeDetected, type SourceLanguage } from "../m
 const DEBOUNCE_MS = 450;
 /** How long a translation has to stay before it is kept in the history. */
 const REMEMBER_MS = 2500;
+
+export type Mode = "text" | "image" | "document" | "audio" | "camera";
+const MODES: readonly Mode[] = ["text", "image", "document", "audio", "camera"];
+
+const MODE_KEY = {
+    text: "modes.text",
+    image: "modes.image",
+    document: "modes.document",
+    audio: "modes.audio",
+    camera: "modes.camera"
+} as const;
 
 const NO_SERVER: Record<ServerEngineId, boolean> = { deepl: false, google: false, polar: false };
 
@@ -98,6 +120,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [from, setFrom] = useState<SourceLanguage>(AUTO);
     const [to, setTo] = useState<string | null>(null);
     const [chosen, setChosen] = useState<EngineId | null>(null);
+    const [mode, setMode] = useState<Mode>("text");
     const [source, setSource] = useState("");
     const [target, setTarget] = useState("");
     const [answeredBy, setAnsweredBy] = useState<EngineId | null>(null);
@@ -159,6 +182,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     );
     const engineId = pickEngine(usable, chosen);
     const targetLanguage = to ?? status?.defaultTarget ?? DEFAULT_SETTINGS.defaultTarget;
+    const charLimit = status?.charLimit ?? null;
+    const overLimit = charLimit !== null && source.length > charLimit;
 
     const engines = useMemo(() => {
         const made = new Map<EngineId, TranslateEngine>();
@@ -169,6 +194,29 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         }
         return made;
     }, [browser, t]);
+
+    // Every mode translates through this: the chosen engine, or each usable
+    // one in the administrator's order until one answers.
+    const translate = useCallback<Translate>(
+        (texts, signal, pair) => {
+            if (!engineId) return Promise.reject(new Error(t("errors.noEngineReader")));
+            const order = [engineId, ...usable.filter((id) => id !== engineId && chosen === null)];
+            return runTranslation(
+                texts,
+                {
+                    engines,
+                    order,
+                    from: pair ? pair.from : from === AUTO ? null : from,
+                    to: pair ? pair.to : targetLanguage,
+                    charLimit,
+                    fallback: t("errors.failed"),
+                    overLimit: (limit) => t("errors.overLimit", { limit })
+                },
+                signal
+            );
+        },
+        [engineId, usable, chosen, engines, from, targetLanguage, charLimit, t]
+    );
 
     // Translate on a pause in typing; a newer request cancels the older one.
     const latest = useRef(0);
@@ -189,48 +237,35 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             setAnsweredBy(null);
             return;
         }
+        if (overLimit) {
+            ++latest.current;
+            setPending(false);
+            setError(t("errors.overLimit", { limit: charLimit }));
+            return;
+        }
         const ticket = ++latest.current;
         const controller = new AbortController();
         const timer = window.setTimeout(async () => {
             setPending(true);
-            const order = [engineId, ...usable.filter((id) => id !== engineId && chosen === null)];
-            let lastError: string | null = null;
-            for (const id of order) {
-                const engine = engines.get(id);
-                if (!engine) continue;
-                try {
-                    const answer = await engine.translate(
-                        [text],
-                        from === AUTO ? null : from,
-                        targetLanguage,
-                        controller.signal
-                    );
-                    if (ticket !== latest.current) return;
-                    setTarget(answer.texts[0] ?? "");
-                    setAnsweredBy(id);
-                    setDetected(from === AUTO ? normalizeDetected(answer.detected) : null);
-                    setError(null);
-                    setPending(false);
-                    setDownload(null);
-                    return;
-                } catch (caught) {
-                    if (controller.signal.aborted || ticket !== latest.current) return;
-                    // Only the server words its refusals for the reader.
-                    lastError = caught instanceof ServerEngineError ? caught.message : null;
-                    // The browser could not do it: the next engine tries,
-                    // unless the reader chose this one.
-                }
+            try {
+                const answer = await translate([text], controller.signal);
+                if (ticket !== latest.current) return;
+                setTarget(answer.texts[0] ?? "");
+                setAnsweredBy(answer.engine);
+                setDetected(from === AUTO ? normalizeDetected(answer.detected) : null);
+                setError(null);
+            } catch (caught) {
+                if (controller.signal.aborted || ticket !== latest.current) return;
+                setError((caught as Error).message);
             }
-            if (ticket !== latest.current) return;
             setPending(false);
             setDownload(null);
-            setError(lastError ?? t("errors.failed"));
         }, DEBOUNCE_MS);
         return () => {
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [source, from, targetLanguage, engineId, engines, usable, chosen, t]);
+    }, [source, from, targetLanguage, engineId, translate, overLimit, charLimit, chosen, t]);
 
     // Keep a translation once it has stayed on screen for a moment.
     useEffect(() => {
@@ -239,8 +274,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         if (isLoaded(loaded.current, { source, from, to: targetLanguage, chosen })) return;
         const timer = window.setTimeout(() => {
             void rememberAction({
-                sourceText: source.trim().slice(0, TEXT_MAX),
-                targetText: target.trim(),
+                sourceText: source.trim().slice(0, HISTORY_TEXT_MAX),
+                targetText: target.trim().slice(0, HISTORY_TEXT_MAX * 2),
                 from: sourceLanguage,
                 to: targetLanguage,
                 engine: answeredBy
@@ -280,7 +315,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const swap = () => {
         if (!swapFrom) return;
         const nextFrom = targetLanguage as SourceLanguage;
-        const nextSource = target.slice(0, TEXT_MAX);
+        const nextSource = target;
         loaded.current =
             nextSource === target && source
                 ? { source: nextSource, from: nextFrom, to: swapFrom, chosen }
@@ -368,6 +403,11 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         { value: "auto", label: t("engine.automatic") },
         ...usable.map((id) => ({ value: id, label: t(ENGINE_KEY[id]) }))
     ];
+    // Until the server has said, a mode is offered: the notice would only flash.
+    const reads: Reads = {
+        images: status?.reads?.images ?? status === null,
+        audio: status?.reads?.audio ?? status === null
+    };
     const nothing = status !== null && usable.length === 0 && !statusFailed;
 
     return (
@@ -414,6 +454,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 />
             ) : null}
 
+            <div className="mb-3 min-w-0 overflow-x-auto">
+                <SegmentedControl
+                    aria-label={t("modes.label")}
+                    value={mode}
+                    onValueChange={setMode}
+                    options={MODES.map((id) => ({ value: id, label: t(MODE_KEY[id]) }))}
+                />
+            </div>
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <SearchableSelect
                     className="w-full min-w-0 sm:w-56"
@@ -459,13 +507,27 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 ) : null}
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-2">
+            {mode === "image" ? (
+                <ImageMode translate={translate} reads={reads} manager={manager} />
+            ) : mode === "camera" ? (
+                <CameraMode translate={translate} reads={reads} manager={manager} />
+            ) : mode === "document" ? (
+                <DocumentMode translate={translate} charLimit={charLimit} to={targetLanguage} />
+            ) : mode === "audio" ? (
+                <AudioMode
+                    translate={translate}
+                    reads={reads}
+                    manager={manager}
+                    from={from === AUTO ? null : from}
+                    to={targetLanguage}
+                />
+            ) : null}
+            <div className={cn("grid gap-3 lg:grid-cols-2", mode !== "text" && "hidden")}>
                 <section className="flex min-w-0 flex-col rounded-lg border border-border bg-card">
                     <Textarea
                         aria-label={t("pane.source")}
                         placeholder={t("pane.placeholder")}
                         value={source}
-                        maxLength={TEXT_MAX}
                         onChange={(event) => setSource(event.target.value)}
                         className="min-h-48 flex-1 resize-none border-0 bg-transparent text-base [overflow-wrap:anywhere] focus:border-0"
                     />
@@ -478,9 +540,18 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         >
                             {t("actions.detect")}
                         </Button>
-                        <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                            {t("pane.count", { count: source.length, max: TEXT_MAX })}
-                        </span>
+                        {charLimit !== null ? (
+                            <span
+                                className={cn(
+                                    "ml-auto text-xs tabular-nums text-muted-foreground",
+                                    overLimit && "text-destructive"
+                                )}
+                            >
+                                {t("pane.count", { count: source.length, max: charLimit })}
+                            </span>
+                        ) : (
+                            <span className="ml-auto" />
+                        )}
                         <Button
                             variant="ghost"
                             size="icon"

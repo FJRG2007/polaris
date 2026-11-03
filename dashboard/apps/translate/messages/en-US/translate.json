@@ -1,6 +1,6 @@
 {
     "title": "Translate",
-    "description": "Type or paste text and read it in another language.",
+    "description": "Translate text, pictures, documents and speech into another language.",
     "pane": {
         "source": "Text to translate",
         "target": "Translation",
@@ -56,7 +56,7 @@
     },
     "settings": {
         "title": "Translate settings",
-        "description": "Which engines answer here, and the language a translation goes into by default.",
+        "description": "Which engines answer here, the language a translation goes into by default, and an optional length limit.",
         "engines": "Engines",
         "orderHint": "Tried from the top. Drag one to change which answers first.",
         "moveUp": "Move {engine} up",
@@ -70,7 +70,12 @@
         "cancel": "Cancel",
         "saved": "Settings saved",
         "keys": "Manage keys",
-        "retry": "Try again"
+        "retry": "Try again",
+        "limit": "Length limit",
+        "limitOn": "Limit the length of one translation",
+        "limitHint": "Off by default, so any length is translated. Turn it on to cap one translation.",
+        "limitChars": "Most characters",
+        "limitInvalid": "Enter a whole number from {min} to {max}."
     },
     "errors": {
         "generic": "Something went wrong. Try again.",
@@ -90,6 +95,82 @@
         "deleteFailed": "That could not be removed.",
         "saveFailed": "The settings could not be saved.",
         "statusFailed": "The engines could not be checked. Translation in the browser still works.",
-        "forbidden": "Your role does not include Translate."
+        "forbidden": "Your role does not include Translate.",
+        "overLimit": "That is longer than the {limit} characters allowed here.",
+        "fileTooLarge": "That file is too large to read here.",
+        "imageType": "That file is not a PNG, JPEG, WebP or GIF picture.",
+        "audioType": "That file is not a recording this can read (WebM, Ogg, WAV, MP3 or M4A).",
+        "audioTooLong": "That recording is longer than 5 minutes. Trim it and try again.",
+        "documentType": "That file is not a document this can translate.",
+        "documentFailed": "The document could not be read. It may be damaged or protected.",
+        "readFailed": "The text could not be read. Try again.",
+        "transcribeFailed": "The recording could not be transcribed. Try again."
+    },
+    "modes": {
+        "label": "What to translate",
+        "text": "Text",
+        "image": "Images",
+        "document": "Documents",
+        "audio": "Audio",
+        "camera": "Camera"
+    },
+    "reads": {
+        "imagesManager": "Reading pictures needs a Polar model that can read images.",
+        "imagesReader": "Reading pictures is not set up here yet. The administrators look after that.",
+        "audioManager": "Transcribing needs a Polar model that can transcribe speech.",
+        "audioReader": "Transcribing is not set up here yet. The administrators look after that.",
+        "setUp": "Set up Polar's models"
+    },
+    "image": {
+        "drop": "Drop, paste or choose a picture",
+        "choose": "Choose a picture",
+        "hint": "Screenshots and photos, up to 8 MB.",
+        "reading": "Reading the text...",
+        "overlay": "On the picture",
+        "side": "Side by side",
+        "view": "How to show it",
+        "original": "Original text",
+        "copyOriginal": "Copy original text",
+        "clear": "Remove picture",
+        "alt": "The picture being translated",
+        "none": "No text was found in this picture."
+    },
+    "camera": {
+        "start": "Start camera",
+        "stop": "Stop camera",
+        "video": "Translate a video file",
+        "hint": "Point the camera at text. The translation follows every few seconds.",
+        "denied": "The camera could not be opened. Allow it in the browser and try again.",
+        "unsupported": "This browser cannot open a camera.",
+        "pause": "Pause",
+        "resume": "Resume",
+        "waiting": "Looking for text...",
+        "videoFailed": "That video could not be played."
+    },
+    "audio": {
+        "choose": "Choose a recording",
+        "hint": "Up to 5 minutes and 8 MB.",
+        "transcribing": "Transcribing...",
+        "talk": "Speak {language}",
+        "stop": "Stop",
+        "listening": "Listening...",
+        "micDenied": "The microphone could not be opened. Allow it in the browser and try again.",
+        "micUnsupported": "This browser cannot use a microphone.",
+        "empty": "Choose a recording or speak, and the translation shows up here.",
+        "clear": "Clear conversation",
+        "listen": "Listen",
+        "pickSource": "Choose the language you speak above to talk."
+    },
+    "document": {
+        "choose": "Choose a document",
+        "hint": "Word, PowerPoint, Excel, PDF or text files, up to 25 MB.",
+        "reading": "Reading the document...",
+        "progress": "Translating, {done} of {total}",
+        "ready": "{name} is translated",
+        "download": "Download translation",
+        "pdfNote": "A PDF comes back as text, page by page. Its layout is not kept.",
+        "another": "Translate another",
+        "preview": "Preview",
+        "cancel": "Cancel"
     }
 }

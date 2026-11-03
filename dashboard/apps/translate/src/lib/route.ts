@@ -78,3 +78,42 @@ export async function body<T extends z.ZodTypeAny>(
     }
     return parsed.data as z.infer<T>;
 }
+
+/**
+ * A binary body no larger than `max` bytes, or the 413 that refuses it. The
+ * stream is read only up to the cap, so a body that lies about its length
+ * costs no more than `max`.
+ */
+export async function bytes(request: Request, max: number): Promise<Uint8Array | Response> {
+    const t = await translateT();
+    const tooLarge = () =>
+        // i18n-ignore a code for the caller; `message` carries the words
+        Response.json({ error: "tooLarge", message: t("errors.fileTooLarge") }, { status: 413 });
+    if (Number(request.headers.get("content-length") ?? 0) > max) return tooLarge();
+    if (!request.body) {
+        return Response.json({ error: "invalid", message: t("errors.invalid") }, { status: 400 });
+    }
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > max) {
+            await reader.cancel().catch(() => undefined);
+            return tooLarge();
+        }
+        chunks.push(value);
+    }
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) {
+        out.set(chunk, at);
+        at += chunk.byteLength;
+    }
+    if (size === 0) {
+        return Response.json({ error: "invalid", message: t("errors.invalid") }, { status: 400 });
+    }
+    return out;
+}

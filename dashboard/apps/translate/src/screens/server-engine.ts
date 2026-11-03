@@ -15,6 +15,10 @@ export interface ServerStatusView {
     defaultTarget: string;
     /** The administrator's order; missing from a status cached before it existed. */
     order?: EngineId[];
+    /** The most characters one translation may have; null or missing is no limit. */
+    charLimit?: number | null;
+    /** Whether pictures and recordings can be read here; missing from an older cache. */
+    reads?: { images: boolean; audio: boolean };
 }
 
 /** An answer the server refused, carrying the sentence it gave. */
@@ -78,4 +82,26 @@ export function createServerEngine(id: ServerEngineId, fallback: string): Transl
             return answer.language;
         }
     };
+}
+
+/** A file posted as it is to one of the reading routes; the answer, or the sentence refusing it. */
+export async function postFile<T>(
+    path: string,
+    file: Blob,
+    fallback: string,
+    signal?: AbortSignal
+): Promise<T> {
+    const response = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": file.type || "application/octet-stream" },
+        body: file,
+        signal
+    });
+    const answer = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+    } & T;
+    if (!response.ok)
+        throw new ServerEngineError(answer.error ?? "failed", answer.message ?? fallback);
+    return answer;
 }

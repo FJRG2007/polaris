@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
         texts: texts.map((text) => `<${text}>`),
         detected: "ES"
     })),
-    serverDetect: vi.fn(async () => "pt-br")
+    serverDetect: vi.fn(async () => "pt-br"),
+    serverMediaStatus: vi.fn(async () => ({ images: true, audio: false })),
+    serverReadImage: vi.fn(async () => ({ lines: [{ text: "SALIDA", box: [0.1, 0.2, 0.3, 0.05] }] })),
+    serverTranscribe: vi.fn(async () => ({ text: "hola" }))
 }));
 
 vi.mock("@polaris/app-host", () => ({
@@ -28,13 +31,18 @@ vi.mock("@polaris/app-host", () => ({
         translateEngines: {
             serverEngineStatus: async () => mocks.status,
             serverTranslate: mocks.serverTranslate,
-            serverDetect: mocks.serverDetect
+            serverDetect: mocks.serverDetect,
+            serverMediaStatus: mocks.serverMediaStatus,
+            serverReadImage: mocks.serverReadImage,
+            serverTranscribe: mocks.serverTranscribe
         }
     }
 }));
 
 import { GET, POST } from "@polaris-app/translate/src/routes/api/translate/route";
 import { POST as DETECT } from "@polaris-app/translate/src/routes/api/translate/detect/route";
+import { POST as IMAGE } from "@polaris-app/translate/src/routes/api/translate/image/route";
+import { POST as TRANSCRIBE } from "@polaris-app/translate/src/routes/api/translate/transcribe/route";
 
 function post(body: unknown): Request {
     return new Request("http://localhost/api/translate", {
@@ -162,5 +170,93 @@ describe("POST /api/translate/detect", () => {
         mocks.status = { deepl: true, google: true, polar: true };
         await DETECT(post({ text: "olá" }));
         expect(mocks.serverDetect).toHaveBeenCalledWith("google", "user-1", "olá");
+    });
+});
+
+describe("no length limit unless one is set", () => {
+    it("translates a long text in pieces the engine takes, and answers it whole", async () => {
+        mocks.status = { deepl: false, google: false, polar: true };
+        const text = Array.from({ length: 6 }, () => "Una frase. ".repeat(500).trim()).join("\n\n");
+        const response = await POST(post({ texts: [text], from: "es", to: "en" }));
+        expect(response.status).toBe(200);
+        const answer = (await response.json()) as { texts: string[] };
+        expect(mocks.serverTranslate.mock.calls.length).toBeGreaterThan(1);
+        for (const call of mocks.serverTranslate.mock.calls) {
+            expect((call[2] as string[]).join("").length).toBeLessThanOrEqual(6000);
+        }
+        expect(answer.texts[0]!.split("\n\n")).toHaveLength(6);
+    });
+
+    it("refuses a text past the administrator's limit, naming it", async () => {
+        mocks.settings = JSON.stringify({ charLimit: 100 });
+        const response = await POST(post({ texts: ["a".repeat(101)], to: "en" }));
+        expect(response.status).toBe(413);
+        expect(await response.json()).toMatchObject({ error: "overLimit" });
+        expect(mocks.serverTranslate).not.toHaveBeenCalled();
+    });
+
+    it("reads a stored limit leniently and says it, with what can be read", async () => {
+        mocks.settings = JSON.stringify({ charLimit: "lots" });
+        const answer = (await (await GET()).json()) as Record<string, unknown>;
+        expect(answer.charLimit).toBeNull();
+        expect(answer.reads).toEqual({ images: true, audio: false });
+    });
+});
+
+function file(path: string, body: Uint8Array, type = "application/octet-stream"): Request {
+    return new Request(`http://localhost${path}`, {
+        method: "POST",
+        headers: { "content-type": type },
+        body
+    });
+}
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+
+describe("POST /api/translate/image", () => {
+    it("answers the lines in a picture, whatever type it was sent as", async () => {
+        const response = await IMAGE(file("/api/translate/image", PNG, "text/plain"));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            lines: [{ text: "SALIDA", box: [0.1, 0.2, 0.3, 0.05] }]
+        });
+        expect(mocks.serverReadImage).toHaveBeenCalledWith("user-1", expect.any(Uint8Array), "image/png");
+    });
+
+    it("refuses what is not a picture, and a body past the cap", async () => {
+        expect((await IMAGE(file("/api/translate/image", new Uint8Array([1, 2, 3])))).status).toBe(415);
+        const big = new Uint8Array(8 * 1024 * 1024 + 1);
+        big.set(PNG);
+        expect((await IMAGE(file("/api/translate/image", big))).status).toBe(413);
+        expect(mocks.serverReadImage).not.toHaveBeenCalled();
+    });
+
+    it("refuses a caller without the permission before reading anything", async () => {
+        mocks.allowed = false;
+        expect((await IMAGE(file("/api/translate/image", PNG))).status).toBe(403);
+    });
+});
+
+describe("POST /api/translate/transcribe", () => {
+    const OGG = new Uint8Array([0x4f, 0x67, 0x67, 0x53, 0, 0]);
+
+    it("answers what was said", async () => {
+        const response = await TRANSCRIBE(file("/api/translate/transcribe?durationMs=2000", OGG));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ text: "hola" });
+    });
+
+    it("refuses a recording too long, or one that is not audio", async () => {
+        expect((await TRANSCRIBE(file("/api/translate/transcribe?durationMs=999999999", OGG))).status).toBe(400);
+        expect((await TRANSCRIBE(file("/api/translate/transcribe?durationMs=10", PNG))).status).toBe(415);
+        expect(mocks.serverTranscribe).not.toHaveBeenCalled();
+    });
+
+    it("says the engine cannot answer when no model transcribes here", async () => {
+        mocks.serverTranscribe.mockRejectedValueOnce(
+            Object.assign(new Error("x"), { name: "EngineRefusal", code: "unavailable" })
+        );
+        const response = await TRANSCRIBE(file("/api/translate/transcribe?durationMs=10", OGG));
+        expect(response.status).toBe(409);
     });
 });
