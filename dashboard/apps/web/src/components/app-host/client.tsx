@@ -95,6 +95,21 @@ const GameInviteDialog = dynamic(
 const gameInviteAccess = () =>
     import("@/app/(app)/chat/activity-card-actions").then((module) => module.gameInviteAccess());
 
+/** The server pickers read their pages through a server action, which nothing
+ *  that merely renders a screen should pay for. */
+const ServerPicker = dynamic(
+    () => import("@/components/server-picker").then((module) => module.ServerPicker),
+    { ssr: false }
+);
+
+const ServerMultiPicker = dynamic(
+    () => import("@/components/server-picker").then((module) => module.ServerMultiPicker),
+    { ssr: false }
+);
+
+const dropServerOptions = () =>
+    import("@/components/server-picker").then((module) => module.dropServerOptions());
+
 const Avatar = dynamic(() => import("@/components/avatar").then((module) => module.Avatar), {
     ssr: false
 });
@@ -204,6 +219,7 @@ export const clientHost = {
     metricsHistory: { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS },
     relativeTime: { RelativeTime, relativeTime },
     runAction: { runAction },
+    serverPicker: { dropServerOptions, ServerMultiPicker, ServerPicker },
     sessionScope: { useSessionScope },
     sharedStream: { subscribeSharedStream },
     shortcuts: { ShortcutSettings, ShortcutsDialog },

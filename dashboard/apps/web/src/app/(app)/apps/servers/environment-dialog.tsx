@@ -21,6 +21,7 @@ import {
     isDirty
 } from "@polaris/ui";
 import { setServerEnvironmentAction, setServerWildcardAction } from "./actions";
+import { dropServerOptions } from "@/components/server-picker";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -63,6 +64,7 @@ export function EnvironmentDialog({
         // A registered server also has its domain here, so the dialog stays open to
         // finish that; the local box has nothing left to answer.
         if (!target.hostId) onClose();
+        dropServerOptions();
         router.refresh();
     }
 

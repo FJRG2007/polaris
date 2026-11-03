@@ -18,6 +18,7 @@ import { runAction } from "@/lib/run-action";
 import type { LocalPath } from "@/lib/server-local-path";
 import { findLocalPathAction, renameServerAction, adoptLocalPathAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
+import { dropServerOptions } from "@/components/server-picker";
 import type { ServerRow, ServerStatus } from "./types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
@@ -44,6 +45,7 @@ export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed
             setError(result.error);
             return;
         }
+        dropServerOptions();
         onRenamed();
     }
 

@@ -148,11 +148,6 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
             "serviceHistoryAction",
             1
         ),
-        deployServers: forward(
-            () => import("@/app/(app)/apps/deploy/actions"),
-            "listDeployServersAction",
-            1
-        ),
         quickTunnelStatus: forward(
             () => import("@/app/(app)/apps/deploy/actions"),
             "quickTunnelStatusAction",

@@ -3,7 +3,7 @@ import { TunnelsView } from "./tunnels-view";
 import { requirePermission } from "@/lib/session";
 import { PageHeader, Skeleton } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
-import { listTunnels, tunnelOptions } from "@/lib/deploy/wireguard/tunnel-service";
+import { listTunnels } from "@/lib/deploy/wireguard/tunnel-service";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +27,8 @@ export default async function TunnelsPage() {
 
 async function TunnelList() {
     const user = await requirePermission("deploy.manage");
-    const [tunnels, options] = await Promise.all([listTunnels(user.id), tunnelOptions(user.id)]);
-    return <TunnelsView tunnels={tunnels} options={options} />;
+    const tunnels = await listTunnels(user.id);
+    return <TunnelsView tunnels={tunnels} />;
 }
 
 function ListSkeleton() {

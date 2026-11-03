@@ -1746,5 +1746,28 @@
         "sent": "{count, plural, one {# invitado.} other {# invitados.}}",
         "skipped": "{count, plural, one {# no está en la conversación de esta llamada.} other {# no están en la conversación de esta llamada.}}",
         "done": "Hecho"
+    },
+    "asyncSelect": {
+        "search": "Buscar",
+        "loading": "Cargando",
+        "empty": "Nada coincide",
+        "failed": "La lista no cargó.",
+        "failedMore": "El resto no cargó.",
+        "retry": "Reintentar",
+        "selected": "{count} elegidos"
+    },
+    "serverPicker": {
+        "placeholder": "Elige un servidor",
+        "placeholderMany": "Elige servidores",
+        "search": "Busca por nombre o dirección",
+        "empty": "Sin servidores así"
+    },
+    "servicePicker": {
+        "placeholder": "Elige un servicio",
+        "search": "Busca por servicio o proyecto",
+        "empty": "Sin servicios así"
+    },
+    "deployTargetPicker": {
+        "search": "Busca por nombre"
     }
 }

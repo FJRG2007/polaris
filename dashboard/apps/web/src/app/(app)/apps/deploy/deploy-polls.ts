@@ -207,13 +207,6 @@ export const serviceHistory = (applicationId: string, signal?: AbortSignal) =>
         signal
     );
 
-export const deployServers = (environmentId?: string, signal?: AbortSignal) =>
-    readPoll<Answer<typeof actions.listDeployServersAction>>(
-        "/api/deploy/servers",
-        { ...(environmentId ? { environmentId } : {}) },
-        signal
-    );
-
 export const quickTunnelStatus = (applicationId: string, signal?: AbortSignal) =>
     readPoll<Answer<typeof actions.quickTunnelStatusAction>>(
         "/api/deploy/services/quick-tunnel",

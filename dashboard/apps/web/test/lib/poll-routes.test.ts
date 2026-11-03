@@ -53,7 +53,6 @@ const actions = vi.hoisted(() => {
         "serviceScalingAction",
         "serviceFollowStateAction",
         "serviceHistoryAction",
-        "listDeployServersAction",
         "quickTunnelStatusAction",
         "ngrokTunnelStatusAction",
         "namedTunnelStatusAction",
@@ -207,7 +206,6 @@ vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     listDatabaseInstancesAction: actions.listDatabaseInstancesAction,
     serviceFollowStateAction: actions.serviceFollowStateAction,
     serviceHistoryAction: actions.serviceHistoryAction,
-    listDeployServersAction: actions.listDeployServersAction,
     quickTunnelStatusAction: actions.quickTunnelStatusAction,
     ngrokTunnelStatusAction: actions.ngrokTunnelStatusAction,
     namedTunnelStatusAction: actions.namedTunnelStatusAction,
@@ -542,7 +540,6 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/deploy/services/follow-state": () =>
         import("@/app/api/deploy/services/follow-state/route"),
     "/api/deploy/services/history": () => import("@/app/api/deploy/services/history/route"),
-    "/api/deploy/servers": () => import("@/app/api/deploy/servers/route"),
     "/api/deploy/services/quick-tunnel": () =>
         import("@/app/api/deploy/services/quick-tunnel/route"),
     "/api/deploy/services/ngrok-tunnel": () =>
@@ -1187,18 +1184,6 @@ const CASES: Case[] = [
             ).serviceHistory("applicationId-1"),
         action: "serviceHistoryAction",
         args: ["applicationId-1"]
-    },
-    {
-        name: "the machines a service can deploy to",
-        path: "/api/deploy/servers",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/apps/deploy/deploy-polls")>(
-                    "@/app/(app)/apps/deploy/deploy-polls"
-                )
-            ).deployServers("environmentId-1"),
-        action: "listDeployServersAction",
-        args: ["environmentId-1"]
     },
     {
         name: "a service's quick tunnel",

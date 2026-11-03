@@ -75,11 +75,6 @@ export interface TunnelStatus {
     readonly txBytes: number;
 }
 
-export interface TunnelOptions {
-    readonly servers: { id: string; name: string; local: boolean }[];
-    readonly services: { id: string; name: string; project: string; serverId: string }[];
-}
-
 const TARGET_SELECT = {
     id: true,
     name: true,
@@ -106,42 +101,6 @@ export function openKey(sealed: string, masterKey = loadEnv().POLARIS_MASTER_KEY
         { ciphertext: Buffer.from(c, "base64"), nonce: Buffer.from(n, "base64"), keyId: k },
         masterKey
     );
-}
-
-/** What the create form can offer: the owner's servers and services. */
-export async function tunnelOptions(ownerId: string): Promise<TunnelOptions> {
-    const [targets, apps] = await Promise.all([
-        prisma.deployTarget.findMany({
-            where: { ownerId, status: "active" },
-            select: { id: true, name: true, kind: true },
-            orderBy: { name: "asc" },
-            take: 200
-        }),
-        prisma.application.findMany({
-            where: { environment: { project: { ownerId } } },
-            select: {
-                id: true,
-                name: true,
-                targetId: true,
-                environment: { select: { project: { select: { name: true } } } }
-            },
-            orderBy: { name: "asc" },
-            take: 500
-        })
-    ]);
-    return {
-        servers: targets.map((target) => ({
-            id: target.id,
-            name: target.name,
-            local: target.kind === "local"
-        })),
-        services: apps.map((app) => ({
-            id: app.id,
-            name: app.name,
-            project: app.environment.project.name,
-            serverId: app.targetId
-        }))
-    };
 }
 
 /** The owner's tunnels, newest first. */

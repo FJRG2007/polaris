@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
 import { EnrollmentProgress } from "./enrollment-progress";
+import { dropServerOptions } from "@/components/server-picker";
 import {
     enrollmentStillRunning,
     enrollmentTimeline,
@@ -105,6 +106,7 @@ export function QuickEnroll({
             if (!live || !status) return;
             setProgress(status.progress);
             if (status.state === "claimed") {
+                dropServerOptions();
                 router.refresh();
                 // A server Polaris prepares for deployments right after it joins
                 // has one more step to watch; the dialog stays on it until that

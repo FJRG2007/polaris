@@ -3,12 +3,12 @@ import { Suspense } from "react";
 import { Notice } from "./notice";
 import { PageHeader } from "@polaris/ui";
 import { RunnersView } from "./runners-view";
-import { listHosts } from "@/lib/host-service";
 import { LOCAL_SERVER_ID } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { listRunnerPools } from "@/lib/runners/runner-service";
-import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
+import { localMachineIdentity } from "@/lib/local-machine";
+import { findLocalHost, hasOtherServer } from "@/lib/server-options";
 import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 import { getTranslations } from "@/lib/i18n/request";
 import { runnerText } from "@/lib/runners/words";
@@ -24,9 +24,8 @@ export const dynamic = "force-dynamic";
 export default async function RunnersPage() {
     const user = await requirePermission("system.manage");
     const t = await getTranslations("runners");
-    const [pools, hosts, localName, identity] = await Promise.all([
+    const [pools, localName, identity] = await Promise.all([
         listRunnerPools(user.id),
-        listHosts(user.id),
         getLocalServerName(),
         localMachineIdentity()
     ]);
@@ -36,27 +35,20 @@ export default async function RunnersPage() {
     // can be asked to do: enrolled, it is a Host with a login, so a job can be
     // given a directory on it; unenrolled, Polaris reaches it only through the
     // container engine and it runs contained jobs or none.
-    const localHost = hosts.find((host) => isLocalMachine(host, identity)) ?? null;
-    const servers = [
-        {
-            id: localHost?.id ?? LOCAL_SERVER_ID,
-            name: localName || localHost?.name || LOCAL_SERVER_FALLBACK_NAME,
-            local: true
-        },
-        ...hosts
-            .filter((host) => host.id !== localHost?.id)
-            .map((host) => ({ id: host.id, name: host.name, local: false }))
-    ];
+    const localHost = await findLocalHost(user.id, identity);
+    const local = {
+        id: localHost?.id ?? LOCAL_SERVER_ID,
+        name: localName || localHost?.name || LOCAL_SERVER_FALLBACK_NAME,
+        // Nothing to pick besides it: the form picks this machine for the operator.
+        alone: !(await hasOtherServer(user.id, localHost?.id ?? null))
+    };
 
     return (
         <>
-            <PageHeader
-                title={t("page.title")}
-                description={t("page.description")}
-            />
+            <PageHeader title={t("page.title")} description={t("page.description")} />
             <RunnersView
                 pools={pools}
-                servers={servers}
+                local={local}
                 accessNotice={
                     <Suspense fallback={null}>
                         <GithubAccess />

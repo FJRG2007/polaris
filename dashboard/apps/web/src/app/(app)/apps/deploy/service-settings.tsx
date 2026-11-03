@@ -7,6 +7,7 @@
  * filter that finds a setting by name (see settings-kit.tsx for the pieces).
  */
 
+import { ServerPicker } from "@/components/server-picker";
 import { DeployHooksCard } from "./deploy-hooks-card";
 import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
@@ -2513,24 +2514,13 @@ function DangerSection({
  *  current deployment down on the old server; the service redeploys on the new. */
 function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
     const t = useTranslations("deployService");
-    const [servers, setServers] = useState<{ id: string; name: string }[]>([]);
     const [serverId, setServerId] = useState(app.serverId);
+    const [serverName, setServerName] = useState(app.serverName);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    useEffect(() => {
-        void polls
-            .deployServers(app.environmentId)
-            .then((list) => setServers(list))
-            .catch(() => undefined);
-    }, [app.environmentId]);
-
     const changed = serverId !== app.serverId;
-    const target = options().find((server) => server.id === serverId)?.name ?? t("server.fallback");
-
-    function options() {
-        return servers.length > 0 ? servers : [{ id: app.serverId, name: app.serverName }];
-    }
+    const target = serverName || t("server.fallback");
 
     function move() {
         if (!changed) return;
@@ -2560,10 +2550,15 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
                 />
             }
         >
-            <Select
+            <ServerPicker
                 value={serverId}
-                onValueChange={setServerId}
-                options={options().map((server) => ({ value: server.id, label: server.name }))}
+                selectedLabel={serverName}
+                onValueChange={(id, server) => {
+                    setServerId(id);
+                    setServerName(server?.name ?? "");
+                }}
+                environmentId={app.environmentId}
+                includeLocal
                 aria-label={t("server.label")}
             />
         </SettingsCard>

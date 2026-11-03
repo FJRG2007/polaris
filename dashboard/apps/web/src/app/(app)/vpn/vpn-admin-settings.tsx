@@ -3,6 +3,7 @@
 /** The VPN's settings: the machines people connect through, and who may use them. */
 
 import * as ui from "@polaris/ui";
+import { dropServerOptions, ServerPicker } from "@/components/server-picker";
 import { useVpnRead } from "./use-vpn-read";
 import * as actions from "./connect-actions";
 import { VpnOverviewSection } from "./overview";
@@ -11,7 +12,6 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DEFAULT_DEVICE_LIMIT, DEFAULT_PORT, isPublicEndpoint } from "@/lib/vpn/wireguard";
 
-type Machine = actions.NodesAnswer["machines"][number];
 type NodeRow = actions.NodesAnswer["nodes"][number];
 type AccessRow = actions.NodesAnswer["access"][number];
 
@@ -57,6 +57,7 @@ export function VpnAdminSettings() {
         startTransition(async () => {
             const result = await actions.removeVpnNodeAction({ id: node.id, anyway: unreachable });
             if (result.error === undefined) {
+                dropServerOptions();
                 closeRemoval();
                 read.reload();
                 return;
@@ -73,9 +74,8 @@ export function VpnAdminSettings() {
         };
     }
 
-    const used = new Set(data?.nodes.map(({ hostId }) => hostId));
-    const mine = new Set(data?.machines.map(({ id }) => id));
-    const free = data?.machines.filter(({ id, root }) => root && !used.has(id)) ?? [];
+    const mine = new Set(data?.mine);
+    const canAdd = data?.canAdd ?? false;
 
     return (
         <div className="flex min-w-0 flex-col gap-6">
@@ -94,8 +94,8 @@ export function VpnAdminSettings() {
                     <ui.Button
                         size="sm"
                         variant="secondary"
-                        disabled={free.length === 0}
-                        title={free.length === 0 ? t("nodes.noMachines") : undefined}
+                        disabled={!canAdd}
+                        title={!canAdd ? t("nodes.noMachines") : undefined}
                         onClick={() => setNodeDialog("new")}
                     >
                         <Plus />
@@ -246,7 +246,6 @@ export function VpnAdminSettings() {
             </section>
             {nodeDialog ? (
                 <NodeDialog
-                    machines={free}
                     node={nodeDialog === "new" ? null : nodeDialog}
                     onClose={() => setNodeDialog(null)}
                     onDone={done(() => setNodeDialog(null))}
@@ -278,27 +277,31 @@ export function VpnAdminSettings() {
     );
 }
 
+/** A node runs on a server Polaris is root on, and only one node per server. */
+const NODE_SERVERS = { root: true, withoutVpnNode: true } as const;
+
 function NodeDialog({
-    machines,
     node,
     onClose,
     onDone
 }: {
-    machines: readonly Machine[];
     node: NodeRow | null;
     onClose: () => void;
     onDone: () => void;
 }) {
     const t = useTranslations("vpn");
-    const first = machines[0];
-    const [hostId, setHostId] = useState(first?.id ?? "");
-    const [name, setName] = useState(node?.name ?? first?.name ?? "");
-    const [endpoint, setEndpoint] = useState(node?.endpoint ?? first?.address ?? "");
+    const [hostId, setHostId] = useState<string | null>(null);
+    const [name, setName] = useState(node?.name ?? "");
+    const [endpoint, setEndpoint] = useState(node?.endpoint ?? "");
     const [port, setPort] = useState(String(node?.port ?? DEFAULT_PORT));
     const [exit, setExit] = useState(node?.exit === "tor" ? "tor" : "direct");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-    const ready = name.trim() !== "" && endpoint.trim() !== "" && port !== "";
+    const ready =
+        (node !== null || hostId !== null) &&
+        name.trim() !== "" &&
+        endpoint.trim() !== "" &&
+        port !== "";
 
     function save(): void {
         if (!ready || pending) return;
@@ -307,9 +310,12 @@ function NodeDialog({
         startTransition(async () => {
             const result = node
                 ? await actions.updateVpnNodeAction({ ...fields, id: node.id })
-                : await actions.addVpnNodeAction({ ...fields, hostId });
+                : await actions.addVpnNodeAction({ ...fields, hostId: hostId ?? "" });
             if (result.error !== undefined) setError(result.error);
-            else onDone();
+            else {
+                dropServerOptions();
+                onDone();
+            }
         });
     }
 
@@ -327,18 +333,17 @@ function NodeDialog({
                 </ui.DialogHeader>
                 <div className="flex min-w-0 flex-col gap-3">
                     {node ? null : (
-                        <ui.Select
+                        <ServerPicker
                             aria-label={t("nodes.machine")}
                             value={hostId}
-                            onValueChange={(id) => {
-                                const machine = machines.find((one) => one.id === id);
+                            filter={NODE_SERVERS}
+                            onValueChange={(id, machine) => {
                                 setHostId(id);
                                 if (machine) {
-                                    setName(machine.name);
+                                    setName(machine.name.slice(0, 40));
                                     setEndpoint(machine.address);
                                 }
                             }}
-                            options={machines.map(({ id, name: label }) => ({ value: id, label }))}
                         />
                     )}
                     <label className="flex min-w-0 flex-col gap-1 text-sm font-medium">

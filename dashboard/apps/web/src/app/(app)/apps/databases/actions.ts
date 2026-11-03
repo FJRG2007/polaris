@@ -21,7 +21,7 @@ import { revalidatePath } from "next/cache";
 import { dataText } from "@/lib/data/words";
 import { closeSessions, withDriver } from "@/lib/data/open";
 import * as browser from "@/lib/data/browser";
-import { listHosts } from "@/lib/host-service";
+import { readServerOptions } from "@/lib/server-options";
 import { requirePermission } from "@/lib/session";
 import { guardData } from "@/lib/data/action-guard";
 import { DataRequestError } from "@/lib/data/driver";
@@ -512,9 +512,11 @@ export async function listTunnelServersAction(): Promise<{
     servers: { id: string; name: string; address: string }[];
 }> {
     const me = await actor();
-    const hosts = await listHosts(me.id);
+    // A first page only: the form asks whether there is any server to tunnel
+    // through, and its picker reads the rest a page at a time.
+    const page = await readServerOptions(me.id, { query: "", cursor: null, limit: 20, filter: {} });
     return {
-        servers: hosts.map((host) => ({ id: host.id, name: host.name, address: host.address }))
+        servers: page.items.map((host) => ({ id: host.id, name: host.name, address: host.address }))
     };
 }
 

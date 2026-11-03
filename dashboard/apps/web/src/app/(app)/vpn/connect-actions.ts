@@ -4,6 +4,7 @@
  *  and who may use them. Every limit is decided in the service, never on the screen. */
 
 import { z } from "zod";
+import { serverOptionsWhere } from "@/lib/server-options";
 import { prisma } from "@polaris/db";
 import * as wg from "@/lib/vpn/wireguard";
 import { recordAudit } from "@/lib/audit-service";
@@ -87,7 +88,10 @@ export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
 
 export interface NodesAnswer {
     readonly nodes: Awaited<ReturnType<typeof service.listNodes>>;
-    readonly machines: { id: string; name: string; address: string; root: boolean }[];
+    /** The nodes on this admin's own servers - the ones they may edit or remove. */
+    readonly mine: string[];
+    /** Whether one of their servers could still become a node. */
+    readonly canAdd: boolean;
     readonly access: Awaited<ReturnType<typeof service.listAccess>>;
     readonly open: boolean;
 }
@@ -95,28 +99,22 @@ export interface NodesAnswer {
 export async function vpnAdminAction(): Promise<Result<NodesAnswer>> {
     const user = await requireAdmin();
     try {
-        const [nodes, hosts, access, open] = await Promise.all([
+        const [nodes, free, access, open] = await Promise.all([
             service.listNodes(),
-            prisma.host.findMany({
-                where: { ownerId: user.id },
-                select: { id: true, name: true, address: true, username: true, sudo: true },
-                orderBy: { name: "asc" },
-                take: 1000
+            // Only whether one exists: the dialog reads the servers themselves a
+            // page at a time, under the same filters.
+            prisma.host.findFirst({
+                where: serverOptionsWhere(user.id, "", { root: true, withoutVpnNode: true }),
+                select: { id: true }
             }),
             service.listAccess(),
             service.openAccess()
         ]);
-        return {
-            nodes,
-            access,
-            open,
-            machines: hosts.map(({ id, name, address, username, sudo }) => ({
-                id,
-                name,
-                address,
-                root: sudo || username === "root"
-            }))
-        };
+        const owned = await prisma.host.findMany({
+            where: { ownerId: user.id, id: { in: nodes.map(({ hostId }) => hostId) } },
+            select: { id: true }
+        });
+        return { nodes, access, open, mine: owned.map(({ id }) => id), canAdd: free !== null };
     } catch (error) {
         return failed(error);
     }

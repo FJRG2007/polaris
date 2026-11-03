@@ -35,7 +35,8 @@ export default defineConfig({
             "./test/setup/app-polls.ts",
             "./test/setup/layout-box.ts",
             "./test/setup/mention-actions.ts",
-            "./test/setup/activity-card-actions.ts"
+            "./test/setup/activity-card-actions.ts",
+            "./test/setup/server-options-actions.ts"
         ],
         testTimeout: 30_000,
         hookTimeout: 30_000

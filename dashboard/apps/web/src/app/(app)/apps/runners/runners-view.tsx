@@ -24,11 +24,16 @@ import { PoolDialog } from "./pool-dialog";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RunsOnSnippet } from "./runs-on-snippet";
-import type { ServerOption } from "./pool-dialog";
+import type { LocalServer } from "./pool-dialog";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { Box, FolderOpen, Github, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import type { RunnerJobView, RunnerPoolView, RunnerTargetView } from "@/lib/runners/runner-service";
-import { deleteRunnerPoolAction, reconcileRunnersAction, refreshPoolTargetsAction, updateRunnerPoolAction } from "./actions";
+import {
+    deleteRunnerPoolAction,
+    reconcileRunnersAction,
+    refreshPoolTargetsAction,
+    updateRunnerPoolAction
+} from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runnerText, scopeSummaryText } from "@/lib/runners/words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -37,11 +42,11 @@ type Words = NamespaceTranslator<"runners">;
 
 export function RunnersView({
     pools,
-    servers,
+    local,
     accessNotice
 }: {
     pools: RunnerPoolView[];
-    servers: ServerOption[];
+    local: LocalServer;
     /** What the GitHub connection is missing, streamed in after the page paints. */
     accessNotice: React.ReactNode;
 }) {
@@ -129,7 +134,7 @@ export function RunnersView({
                             <RefreshCw className="size-4" />
                         </Button>
                     ) : null}
-                    <PoolDialog servers={servers} />
+                    <PoolDialog local={local} />
                 </div>
             </div>
 
@@ -139,14 +144,12 @@ export function RunnersView({
 
             {visible.length === 0 ? (
                 <div className="flex max-w-lg flex-col gap-2">
-                    <p className="text-xs text-muted-foreground">
-                        {t("pools.intro")}
-                    </p>
-                    <RunsOnSnippet
-                        labels={["self-hosted"]}
-                        label={t("pools.snippet")}
-                    />
-                    <Link href="/apps/runners/guide" className="text-xs text-muted-foreground underline">
+                    <p className="text-xs text-muted-foreground">{t("pools.intro")}</p>
+                    <RunsOnSnippet labels={["self-hosted"]} label={t("pools.snippet")} />
+                    <Link
+                        href="/apps/runners/guide"
+                        className="text-xs text-muted-foreground underline"
+                    >
                         {t("pools.guideLink")}
                     </Link>
                 </div>
@@ -219,12 +222,17 @@ function PoolCard({
                                 </>
                             ) : (
                                 <>
-                                    <FolderOpen className="size-3.5" /> {t("pools.shares", { host: pool.hostName })}
+                                    <FolderOpen className="size-3.5" />{" "}
+                                    {t("pools.shares", { host: pool.hostName })}
                                 </>
                             )}
                         </span>
                         <span>
-                            {t("pools.waiting", { live: pool.live, max: pool.maxConcurrent, host: pool.hostName })}
+                            {t("pools.waiting", {
+                                live: pool.live,
+                                max: pool.maxConcurrent,
+                                host: pool.hostName
+                            })}
                         </span>
                         <LimitsNote pool={pool} />
                     </span>
@@ -257,11 +265,19 @@ function PoolCard({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={enabled ? t("pools.pauseNamed", { name: pool.name }) : t("pools.resumeNamed", { name: pool.name })}
+                                aria-label={
+                                    enabled
+                                        ? t("pools.pauseNamed", { name: pool.name })
+                                        : t("pools.resumeNamed", { name: pool.name })
+                                }
                                 title={enabled ? t("pools.pause") : t("pools.resume")}
                                 onClick={onToggle}
                             >
-                                {enabled ? <Pause className="size-4" /> : <Play className="size-4" />}
+                                {enabled ? (
+                                    <Pause className="size-4" />
+                                ) : (
+                                    <Play className="size-4" />
+                                )}
                             </Button>
                             <Button
                                 size="icon"
@@ -294,7 +310,9 @@ function PoolCard({
                                     onClick={() => setExpanded(true)}
                                     className="text-muted-foreground hover:underline"
                                 >
-                                    {t("pools.showMore", { count: pool.targets.length - shown.length })}
+                                    {t("pools.showMore", {
+                                        count: pool.targets.length - shown.length
+                                    })}
                                 </button>
                             </li>
                         ) : null}
@@ -323,7 +341,9 @@ function TargetRow({ target, pool }: { target: RunnerTargetView; pool: RunnerPoo
     const t = useTranslations("runners");
     const spent: string[] = [];
     if (pool.limits.minutesBudget !== null) {
-        spent.push(t("pools.spentOf", { spent: target.minutes, budget: pool.limits.minutesBudget }));
+        spent.push(
+            t("pools.spentOf", { spent: target.minutes, budget: pool.limits.minutesBudget })
+        );
     } else if (target.minutes > 0) {
         spent.push(t("pools.spent", { spent: target.minutes }));
     }
@@ -342,12 +362,18 @@ function TargetRow({ target, pool }: { target: RunnerTargetView; pool: RunnerPoo
                 >
                     {target.key}
                 </Link>
-                {target.blocked ? <span className="text-danger">{runnerText(t, target.blocked)}</span> : null}
+                {target.blocked ? (
+                    <span className="text-danger">{runnerText(t, target.blocked)}</span>
+                ) : null}
             </span>
             <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
                 {spent.length > 0 ? <span>{spent.join(" - ")}</span> : null}
-                {target.queued > 0 ? <Badge variant="warning">{t("pools.queued", { count: target.queued })}</Badge> : null}
-                {target.live > 0 ? <Badge variant="primary">{t("pools.up", { count: target.live })}</Badge> : null}
+                {target.queued > 0 ? (
+                    <Badge variant="warning">{t("pools.queued", { count: target.queued })}</Badge>
+                ) : null}
+                {target.live > 0 ? (
+                    <Badge variant="primary">{t("pools.up", { count: target.live })}</Badge>
+                ) : null}
             </span>
         </li>
     );
@@ -367,7 +393,8 @@ function LimitsNote({ pool }: { pool: RunnerPoolView }) {
                 : t("pools.minutesMonth", { count: pool.limits.minutesBudget })
         );
     }
-    if (pool.limits.jobsPerDay !== null) parts.push(t("pools.jobsDay", { count: pool.limits.jobsPerDay }));
+    if (pool.limits.jobsPerDay !== null)
+        parts.push(t("pools.jobsDay", { count: pool.limits.jobsPerDay }));
     if (parts.length === 0) return null;
     return <span>{parts.join(", ")}</span>;
 }
@@ -395,10 +422,16 @@ function JobRow({ job, showTarget }: { job: RunnerJobView; showTarget: boolean }
         <li className="flex items-start justify-between gap-3 border-t border-border pt-1 first:border-0 first:pt-0">
             <span className="flex min-w-0 flex-col">
                 <span className="truncate font-mono text-muted-foreground">{job.name}</span>
-                {showTarget ? <span className="truncate text-muted-foreground">{job.target}</span> : null}
+                {showTarget ? (
+                    <span className="truncate text-muted-foreground">{job.target}</span>
+                ) : null}
                 {job.error ? <span className="text-danger">{runnerText(t, job.error)}</span> : null}
             </span>
-            <Badge variant={job.state === "failed" ? "danger" : job.state === "busy" ? "primary" : "neutral"}>
+            <Badge
+                variant={
+                    job.state === "failed" ? "danger" : job.state === "busy" ? "primary" : "neutral"
+                }
+            >
                 {jobStateLabel(t, job.state)}
             </Badge>
         </li>

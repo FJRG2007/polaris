@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { machineHref } from "@/lib/machines/machine-links";
 import { renameServerAction } from "./actions";
+import { dropServerOptions } from "@/components/server-picker";
 import { useEffect, useRef, useState } from "react";
 import { QuickEnroll } from "./quick-enroll";
 import { ServerGroups } from "./server-groups";
@@ -191,6 +192,7 @@ export function ServersView({
             if (result?.error) setRenameError(result.error);
             return;
         }
+        dropServerOptions();
         router.refresh();
     }
 
@@ -638,6 +640,7 @@ export function ServersView({
                 onClose={() => setRemoving(null)}
                 onRemoved={(result) => {
                     setOutcome(result);
+                    dropServerOptions();
                     router.refresh();
                 }}
             />

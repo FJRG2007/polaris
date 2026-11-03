@@ -18,11 +18,7 @@ import { Network, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import { removeTunnelAction, setTunnelPausedAction } from "./actions";
 import * as polls from "./tunnels-polls";
 import { useUnmountSignal } from "@/lib/poll-fetch";
-import type {
-    TunnelOptions,
-    TunnelStatus,
-    TunnelView
-} from "@/lib/deploy/wireguard/tunnel-service";
+import type { TunnelStatus, TunnelView } from "@/lib/deploy/wireguard/tunnel-service";
 import {
     Badge,
     Button,
@@ -107,13 +103,7 @@ function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
     return { watch, refresh };
 }
 
-export function TunnelsView({
-    tunnels,
-    options
-}: {
-    tunnels: TunnelView[];
-    options: TunnelOptions;
-}) {
+export function TunnelsView({ tunnels }: { tunnels: TunnelView[] }) {
     const t = useTranslations("tunnels");
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
     const shown = tunnels.filter((tunnel) => !hidden.has(tunnel.id));
@@ -122,7 +112,7 @@ export function TunnelsView({
     return (
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex justify-end">
-                <TunnelDialog options={options} />
+                <TunnelDialog />
             </div>
             {shown.length === 0 ? (
                 <EmptyState

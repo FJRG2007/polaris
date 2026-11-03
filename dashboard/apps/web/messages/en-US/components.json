@@ -1746,5 +1746,28 @@
         "sent": "{count, plural, one {# invited.} other {# invited.}}",
         "skipped": "{count, plural, one {# is not in this call's conversation.} other {# are not in this call's conversation.}}",
         "done": "Done"
+    },
+    "asyncSelect": {
+        "search": "Search",
+        "loading": "Loading",
+        "empty": "Nothing matches",
+        "failed": "The list did not load.",
+        "failedMore": "The rest did not load.",
+        "retry": "Try again",
+        "selected": "{count} selected"
+    },
+    "serverPicker": {
+        "placeholder": "Choose a server",
+        "placeholderMany": "Choose servers",
+        "search": "Search by name or address",
+        "empty": "No server matches"
+    },
+    "servicePicker": {
+        "placeholder": "Choose a service",
+        "search": "Search by service or project",
+        "empty": "No service matches"
+    },
+    "deployTargetPicker": {
+        "search": "Search by name"
     }
 }

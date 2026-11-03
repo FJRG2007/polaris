@@ -7,11 +7,11 @@
  */
 
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTunnelAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { TunnelOptions } from "@/lib/deploy/wireguard/tunnel-service";
+import { DeployTargetPicker, ServicePicker } from "@/components/deploy-target-picker";
 import { isRouteHostname, normalizeHostname } from "@/lib/deploy/wireguard/tunnel-hostname";
 import {
     Button,
@@ -21,39 +21,33 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    Input,
-    SearchableSelect,
-    Select
+    Input
 } from "@polaris/ui";
 
-export function TunnelDialog({ options }: { options: TunnelOptions }) {
+export function TunnelDialog() {
     const t = useTranslations("tunnels");
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [serverId, setServerId] = useState("");
     const [serviceId, setServiceId] = useState("");
+    // The server the chosen service runs on, so picking that same server as the
+    // public end lets go of it.
+    const [serviceTarget, setServiceTarget] = useState<string | null>(null);
     const [hostname, setHostname] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const services = useMemo(
-        () => options.services.filter((service) => service.serverId !== serverId),
-        [options.services, serverId]
-    );
     const normalized = normalizeHostname(hostname);
     // Empty is unfinished, not wrong: the field only complains once there is
     // something in it to complain about.
     const hostnameError =
         normalized && !isRouteHostname(normalized) ? t("dialog.hostnameInvalid") : null;
-    const ready =
-        Boolean(serverId) &&
-        services.some((service) => service.id === serviceId) &&
-        Boolean(normalized) &&
-        !hostnameError;
+    const ready = Boolean(serverId) && Boolean(serviceId) && Boolean(normalized) && !hostnameError;
 
     function reset(): void {
         setServerId("");
         setServiceId("");
+        setServiceTarget(null);
         setHostname("");
         setError(null);
     }
@@ -100,49 +94,41 @@ export function TunnelDialog({ options }: { options: TunnelOptions }) {
                 </DialogHeader>
                 <form onSubmit={submit} className="flex flex-col gap-3">
                     <Field label={t("dialog.publicServer")} hint={t("dialog.publicHint")}>
-                        <Select
-                            value={serverId}
+                        <DeployTargetPicker
+                            scope="mine"
+                            value={serverId || null}
                             onValueChange={(value) => {
                                 setServerId(value);
-                                if (
-                                    options.services.find((service) => service.id === serviceId)
-                                        ?.serverId === value
-                                )
+                                if (serviceTarget === value) {
                                     setServiceId("");
+                                    setServiceTarget(null);
+                                }
                             }}
                             placeholder={t("dialog.pickServer")}
                             aria-label={t("dialog.publicServer")}
-                            options={options.servers.map((server) => ({
-                                value: server.id,
-                                label: server.local
-                                    ? t("dialog.thisMachine", { name: server.name })
-                                    : server.name
-                            }))}
+                            localLabel={(name) => t("dialog.thisMachine", { name })}
                         />
                     </Field>
                     <Field label={t("dialog.service")} hint={t("dialog.serviceHint")}>
-                        <SearchableSelect
-                            value={serviceId}
-                            onValueChange={setServiceId}
-                            disabled={!serverId || services.length === 0}
+                        <ServicePicker
+                            value={serviceId || null}
+                            onValueChange={(value, service) => {
+                                setServiceId(value);
+                                setServiceTarget(service?.targetId ?? null);
+                            }}
+                            excludeTargetId={serverId || undefined}
+                            disabled={!serverId}
                             placeholder={t("dialog.pickService")}
                             searchPlaceholder={t("dialog.searchServices")}
                             emptyText={t("dialog.noServices")}
                             aria-label={t("dialog.service")}
-                            options={services.map((service) => ({
-                                value: service.id,
-                                label: t("dialog.serviceOption", {
+                            optionLabel={(service) =>
+                                t("dialog.serviceOption", {
                                     service: service.name,
                                     project: service.project
-                                }),
-                                keywords: `${service.name} ${service.project}`
-                            }))}
+                                })
+                            }
                         />
-                        {serverId && services.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">
-                                {t("dialog.noOtherServer")}
-                            </span>
-                        ) : null}
                     </Field>
                     <Field label={t("dialog.hostname")} error={hostnameError}>
                         <Input
