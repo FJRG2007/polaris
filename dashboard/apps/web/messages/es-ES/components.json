@@ -1760,6 +1760,6 @@
         "placeholder": "Elige un servidor",
         "placeholderMany": "Elige servidores",
         "search": "Busca por nombre o dirección",
-        "empty": "Ningún servidor coincide"
+        "empty": "Sin servidores así"
     }
 }
