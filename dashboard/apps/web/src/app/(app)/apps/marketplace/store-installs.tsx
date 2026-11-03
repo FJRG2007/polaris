@@ -5,7 +5,12 @@
  * grid and an app's own page alike.
  */
 
+import Link from "next/link";
+import { Settings } from "lucide-react";
 import { findApp } from "@/lib/apps/catalog";
+import { isNativeApp } from "@/lib/apps/native-apps";
+import { getTranslations } from "@/lib/i18n/request";
+import { appSettingsHref } from "@/lib/apps/app-settings";
 import type { StoreInstallRow } from "./marketplace-view";
 import { AppInstallPanel } from "./[appId]/app-detail";
 import { uninstallAccess } from "@/lib/apps/install-access";
@@ -52,16 +57,47 @@ export async function storeInstalls(
     return { installed: shown, canInstall };
 }
 
+/** The installs of one app this reader's marketplace lists, as its cards count them. */
+async function appInstalls(user: SessionUser, appId: string) {
+    const installed = await instanceWideInstallIds().then((ids) => listInstalledApps(user.id, ids));
+    return installed.filter((item) => item.catalogId === appId);
+}
+
+/** Whether this reader's marketplace lists the app as installed. */
+export async function hasAppInstall(user: SessionUser, appId: string): Promise<boolean> {
+    return isNativeApp(appId) || (await appInstalls(user, appId)).length > 0;
+}
+
+/** The app's Settings link, offered once it is installed, as its card offers it. */
+export async function AppSettingsLink({
+    app,
+    user
+}: {
+    app: Parameters<typeof appSettingsHref>[0];
+    user: SessionUser;
+}) {
+    const href = appSettingsHref(app);
+    if (!href || !(await hasAppInstall(user, app.id))) return null;
+    const t = await getTranslations("marketplace");
+    return (
+        <Link
+            href={href}
+            className="text-primary inline-flex w-fit items-center gap-1 text-sm hover:underline"
+        >
+            <Settings className="size-4" />
+            {t("detail.settings")}
+        </Link>
+    );
+}
+
 /** Whether this Polaris has the app, and what this reader may do about it. */
 export async function AppInstallState({ appId, user }: { appId: string; user: SessionUser }) {
     const [installed, canInstall, openable] = await Promise.all([
-        instanceWideInstallIds().then((ids) => listInstalledApps(user.id, ids)),
+        appInstalls(user, appId),
         sessionCan(user, "deploy.manage"),
         openableBuiltIns(user)
     ]);
-    const installs = await Promise.all(
-        installed.filter((item) => item.catalogId === appId).map((item) => readerRow(user, item))
-    );
+    const installs = await Promise.all(installed.map((item) => readerRow(user, item)));
     return (
         <AppInstallPanel
             appId={appId}

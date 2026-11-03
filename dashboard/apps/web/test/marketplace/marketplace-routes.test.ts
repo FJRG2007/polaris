@@ -28,11 +28,15 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/app-extensions/registry", () => ({ adoptAppInstalls: vi.fn(async () => {}) }));
 vi.mock("@/lib/mail-server/app-install", () => ({ adoptMailServerApp: vi.fn(async () => {}) }));
 vi.mock("@/lib/apps/install-access", () => ({ uninstallAccess: vi.fn(async () => null) }));
+const installs = vi.hoisted(() => ({ catalogIds: [] as string[] }));
 vi.mock("@/lib/apps/install-service", () => ({
     installForReader: vi.fn(),
     instanceWideInstallIds: vi.fn(async () => []),
-    listInstalledApps: vi.fn(async () => [])
+    listInstalledApps: vi.fn(async () =>
+        installs.catalogIds.map((catalogId) => ({ id: `install-${catalogId}`, catalogId }))
+    )
 }));
+vi.mock("@/app/(app)/vpn/vpn-admin-settings", () => ({ VpnAdminSettings: () => null }));
 vi.mock("@/app/(app)/apps/marketplace/marketplace-view", () => ({ MarketplaceView: () => null }));
 vi.mock("@/app/(app)/apps/marketplace/[appId]/app-detail", () => ({
     AppDetail: () => null,
@@ -44,12 +48,15 @@ const { default: MarketplacePage } = await import("@/app/(app)/apps/marketplace/
 const { default: MarketplaceAppPage } = await import("@/app/(app)/apps/marketplace/[appId]/page");
 const { default: PolarisAppsPage } = await import("@/app/(app)/admin/apps/page");
 const { default: PolarisAppPage } = await import("@/app/(app)/admin/apps/[appId]/page");
+const { default: PolarisAppSettingsPage } =
+    await import("@/app/(app)/admin/apps/[appId]/settings/page");
 
 const query = (app?: string) => ({ searchParams: Promise.resolve(app ? { app } : {}) });
 const page = (appId: string) => ({ params: Promise.resolve({ appId }) });
 
 beforeEach(() => {
     session.admin = true;
+    installs.catalogIds = [];
 });
 
 describe("a link to a Polaris app in the user marketplace", () => {
@@ -86,5 +93,27 @@ describe("the admin screen", () => {
         await expect(PolarisAppPage(page("no-such-app"))).rejects.toThrow("not found");
         // A helper another app runs is not listed on its own.
         await expect(PolarisAppPage(page("dns-blocker-engine"))).rejects.toThrow("not found");
+    });
+});
+
+describe("an app's settings address", () => {
+    it("opens the app's own settings screen once it is installed", async () => {
+        installs.catalogIds = ["translate"];
+        await expect(PolarisAppSettingsPage(page("translate"))).rejects.toThrow(
+            "redirect /translate/settings"
+        );
+    });
+
+    it("sends back to the app's page while it is not installed", async () => {
+        await expect(PolarisAppSettingsPage(page("translate"))).rejects.toThrow(
+            "redirect /admin/apps/translate"
+        );
+        await expect(PolarisAppSettingsPage(page("vpn"))).rejects.toThrow(
+            "redirect /admin/apps/vpn"
+        );
+    });
+
+    it("answers an app with no settings with not found", async () => {
+        await expect(PolarisAppSettingsPage(page("dns-blocker"))).rejects.toThrow("not found");
     });
 });

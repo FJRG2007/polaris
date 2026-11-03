@@ -13,6 +13,7 @@ import { appSettingsPath } from "@/lib/apps/app-settings";
 import { PageHeader } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
+import { hasAppInstall } from "@/app/(app)/apps/marketplace/store-installs";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -24,10 +25,11 @@ export default async function PolarisAppSettingsPage({
 }: {
     params: Promise<{ appId: string }>;
 }) {
-    await requireAdmin();
+    const user = await requireAdmin();
     const { appId } = await params;
     const app = findStoreApp(appId);
     if (!app?.settingsAt) notFound();
+    if (!(await hasAppInstall(user, app.id))) redirect(`/admin/apps/${encodeURIComponent(app.id)}`);
     if (app.settingsAt !== appSettingsPath(app.id)) redirect(app.settingsAt);
     if (app.id !== "vpn") notFound();
     const t = await getTranslations("marketplace");

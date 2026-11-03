@@ -37,7 +37,7 @@ export default async function TranslatePage({
     return (
         <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-4">
             <Link
-                href="/admin/apps/translate"
+                href="/translate"
                 className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden />
