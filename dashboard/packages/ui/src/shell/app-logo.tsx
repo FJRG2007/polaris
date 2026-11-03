@@ -273,10 +273,29 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
         palette: ["#C4B5FD", "#8B5CF6", "#5B21B6"],
         draw: ({ base, face }) => (
             <>
-                <path d="M4 8a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H10l-4 3.5V17.6A4 4 0 0 1 4 14z" fill={base} />
-                <path d="M28 17a4 4 0 0 0-4-4h-7a4 4 0 0 0-4 4v5a4 4 0 0 0 4 4h5l4 3v-3.4a4 4 0 0 0 2-3.6z" fill={face} />
-                <path d="M9 8.5h7M12.5 8.5v5" stroke={WHITE} strokeWidth={1.8} strokeLinecap="round" fill="none" />
-                <path d="M17.5 22.5l2.5-6 2.5 6M18.4 20.5h3.2" stroke={WHITE} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path
+                    d="M4 8a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H10l-4 3.5V17.6A4 4 0 0 1 4 14z"
+                    fill={base}
+                />
+                <path
+                    d="M28 17a4 4 0 0 0-4-4h-7a4 4 0 0 0-4 4v5a4 4 0 0 0 4 4h5l4 3v-3.4a4 4 0 0 0 2-3.6z"
+                    fill={face}
+                />
+                <path
+                    d="M9 8.5h7M12.5 8.5v5"
+                    stroke={WHITE}
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    fill="none"
+                />
+                <path
+                    d="M17.5 22.5l2.5-6 2.5 6M18.4 20.5h3.2"
+                    stroke={WHITE}
+                    strokeWidth={1.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                />
             </>
         )
     },

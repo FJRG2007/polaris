@@ -24,7 +24,10 @@ export async function caller(): Promise<Caller | Response> {
     if (user instanceof Response) return user;
     if (!(await host.session.sessionCan(user, "translate.use"))) {
         const t = await translateT();
-        return Response.json({ error: "forbidden", message: t("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: "forbidden", message: t("errors.forbidden") },
+            { status: 403 }
+        );
     }
     const rate = await host.rateLimitService.rateLimit(`translate:${user.id}`, PER_MINUTE, 60_000);
     if (!rate.ok) {

@@ -69,7 +69,10 @@ describe("the day's characters", () => {
             count: 1,
             chars: 6
         });
-        settings.set("integration.spent.deepl", JSON.stringify({ day, count: 1, chars: 1_000_000 }));
+        settings.set(
+            "integration.spent.deepl",
+            JSON.stringify({ day, count: 1, chars: 1_000_000 })
+        );
         await expect(deeplTranslate("key", ["a"], "EN-US")).rejects.toThrow();
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(settings.get("integration.pause.deepl")).toContain("budget");
@@ -102,17 +105,25 @@ describe("DeepL", () => {
 
 describe("Google Cloud Translation", () => {
     it("keeps the key out of the address and asks for plain text", async () => {
-        answer(200, { data: { translations: [{ translatedText: "Hello", detectedSourceLanguage: "es" }] } });
+        answer(200, {
+            data: { translations: [{ translatedText: "Hello", detectedSourceLanguage: "es" }] }
+        });
         const result = await googleTranslate("secret", ["Hola"], "en");
         expect(result).toEqual({ texts: ["Hello"], detected: "es" });
         const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
         expect(url).not.toContain("secret");
         expect(new Headers(init.headers).get("x-goog-api-key")).toBe("secret");
-        expect(JSON.parse(String(init.body))).toEqual({ q: ["Hola"], target: "en", format: "text" });
+        expect(JSON.parse(String(init.body))).toEqual({
+            q: ["Hola"],
+            target: "en",
+            format: "text"
+        });
     });
 
     it("reads a detection", async () => {
-        answer(200, { data: { detections: [[{ language: "es", confidence: 1, isReliable: false }]] } });
+        answer(200, {
+            data: { detections: [[{ language: "es", confidence: 1, isReliable: false }]] }
+        });
         expect(await googleDetect("k", "hola")).toBe("es");
     });
 });

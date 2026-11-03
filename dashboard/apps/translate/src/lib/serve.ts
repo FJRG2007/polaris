@@ -14,7 +14,12 @@ import { loadSettings } from "./settings";
 import type { TranslateKey } from "../../messages";
 import { AUTO, normalizeDetected } from "../model/languages";
 import { pickServerEngine, usableServerEngines } from "../model/engines";
-import type { DetectInput, ServerEngineId, TranslateInput, TranslateSettings } from "../model/schemas";
+import type {
+    DetectInput,
+    ServerEngineId,
+    TranslateInput,
+    TranslateSettings
+} from "../model/schemas";
 
 /** Why a request got no translation, as the route answers it. */
 export type ServeFailure = "noEngine" | "unavailable" | "limit" | "paused" | "failed";
@@ -85,7 +90,8 @@ async function engineFor(userId: string, asked?: ServerEngineId): Promise<Server
     return pickServerEngine(available, settings, asked);
 }
 
-export type Served<T> = ({ ok: true; engine: ServerEngineId } & T) | { ok: false; failure: ServeFailure };
+export type Served<T> =
+    ({ ok: true; engine: ServerEngineId } & T) | { ok: false; failure: ServeFailure };
 
 export async function translateOnServer(
     userId: string,

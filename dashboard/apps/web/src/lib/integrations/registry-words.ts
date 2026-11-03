@@ -70,7 +70,10 @@ export function categoryWords(
     category: { name: IntegrationCategory; hint: string }
 ): { name: string; hint: string } {
     const base = `integrations.categories.${CATEGORY_KEY[category.name]}`;
-    return { name: said(t, `${base}.name`, category.name), hint: said(t, `${base}.hint`, category.hint) };
+    return {
+        name: said(t, `${base}.name`, category.name),
+        hint: said(t, `${base}.hint`, category.hint)
+    };
 }
 
 /** One of Dymo's IP rules, as the screen names it; a rule the catalog does not

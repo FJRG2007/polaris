@@ -11,12 +11,10 @@ const mocks = vi.hoisted(() => ({
     allowed: true,
     settings: null as string | null,
     status: { deepl: true, google: false, polar: true },
-    serverTranslate: vi.fn(
-        async (_engine: string, _user: string, texts: readonly string[]) => ({
-            texts: texts.map((text) => `<${text}>`),
-            detected: "ES"
-        })
-    ),
+    serverTranslate: vi.fn(async (_engine: string, _user: string, texts: readonly string[]) => ({
+        texts: texts.map((text) => `<${text}>`),
+        detected: "ES"
+    })),
     serverDetect: vi.fn(async () => "pt-br")
 }));
 
@@ -59,7 +57,11 @@ describe("POST /api/translate", () => {
     it("translates with the first usable engine and names it", async () => {
         const response = await POST(post({ texts: ["hola"], to: "en" }));
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({ texts: ["<hola>"], engine: "deepl", detected: "es" });
+        expect(await response.json()).toEqual({
+            texts: ["<hola>"],
+            engine: "deepl",
+            detected: "es"
+        });
         expect(mocks.serverTranslate).toHaveBeenCalledWith("deepl", "user-1", ["hola"], null, "en");
     });
 

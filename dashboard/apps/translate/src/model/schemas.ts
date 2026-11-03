@@ -63,7 +63,11 @@ export type DetectInput = z.infer<typeof detectInput>;
 export const rememberInput = z
     .object({
         sourceText: z.string().trim().min(1).max(TEXT_MAX),
-        targetText: z.string().trim().min(1).max(TEXT_MAX * 2),
+        targetText: z
+            .string()
+            .trim()
+            .min(1)
+            .max(TEXT_MAX * 2),
         from: languageCode,
         to: languageCode,
         engine: engineId

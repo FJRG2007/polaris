@@ -33,7 +33,9 @@ describe("server engines", () => {
 
     it("answer nothing when nothing is usable", () => {
         expect(pickServerEngine(NONE, DEFAULT_SETTINGS)).toBeNull();
-        expect(pickServerEngine(ALL, only({ deepl: false, google: false, polar: false }))).toBeNull();
+        expect(
+            pickServerEngine(ALL, only({ deepl: false, google: false, polar: false }))
+        ).toBeNull();
     });
 
     it("use the engine asked for, or none - never another", () => {
@@ -45,18 +47,15 @@ describe("server engines", () => {
 
 describe("the screen's engines", () => {
     it("put the browser first when it has a translator and the owner allows it", () => {
-        expect(usableEngines({ browser: true, available: ALL, settings: DEFAULT_SETTINGS })).toEqual([
-            "browser",
-            "deepl",
-            "google",
-            "polar"
-        ]);
+        expect(
+            usableEngines({ browser: true, available: ALL, settings: DEFAULT_SETTINGS })
+        ).toEqual(["browser", "deepl", "google", "polar"]);
         expect(
             usableEngines({ browser: true, available: NONE, settings: only({ browser: false }) })
         ).toEqual([]);
-        expect(usableEngines({ browser: false, available: NONE, settings: DEFAULT_SETTINGS })).toEqual(
-            []
-        );
+        expect(
+            usableEngines({ browser: false, available: NONE, settings: DEFAULT_SETTINGS })
+        ).toEqual([]);
     });
 
     it("keep the reader's pick while it is usable, else the first", () => {

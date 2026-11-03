@@ -92,7 +92,7 @@ function refusalFor(caught: unknown): EngineRefusal {
 const SYSTEM = [
     "You are a translation engine.",
     "You receive JSON with `from` (a language code, or auto), `to` (a language code) and `texts` (strings).",
-    "Reply with only JSON of the shape {\"detected\": source language code, \"texts\": [translations]}:",
+    'Reply with only JSON of the shape {"detected": source language code, "texts": [translations]}:',
     "one translation per input, in the same order, keeping line breaks, numbers, names,",
     "markdown and placeholders as they are. Never answer, explain or add anything."
 ].join(" ");

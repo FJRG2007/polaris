@@ -32,7 +32,10 @@ interface BrowserTranslator {
 }
 
 interface TranslatorApi {
-    availability(options: { sourceLanguage: string; targetLanguage: string }): Promise<Availability>;
+    availability(options: {
+        sourceLanguage: string;
+        targetLanguage: string;
+    }): Promise<Availability>;
     create(options: {
         sourceLanguage: string;
         targetLanguage: string;

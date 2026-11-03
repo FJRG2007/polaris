@@ -61,7 +61,9 @@ export function continues(
 ): boolean {
     if (now - last.updatedAt.getTime() > SAME_TEXT_MS) return false;
     if (last.fromLang !== next.from || last.toLang !== next.to) return false;
-    return next.sourceText.startsWith(last.sourceText) || last.sourceText.startsWith(next.sourceText);
+    return (
+        next.sourceText.startsWith(last.sourceText) || last.sourceText.startsWith(next.sourceText)
+    );
 }
 
 export async function listHistory(userId: string): Promise<HistoryEntry[]> {

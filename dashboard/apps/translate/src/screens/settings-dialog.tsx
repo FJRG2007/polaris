@@ -92,7 +92,9 @@ export function SettingsDialog({
     };
 
     const toggle = (id: EngineId, on: boolean) =>
-        setDraft((current) => (current ? { ...current, engines: { ...current.engines, [id]: on } } : current));
+        setDraft((current) =>
+            current ? { ...current, engines: { ...current.engines, [id]: on } } : current
+        );
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,12 +112,20 @@ export function SettingsDialog({
                 ) : (
                     <div className="space-y-4">
                         <fieldset className="space-y-3">
-                            <legend className="mb-2 text-sm font-medium">{t("settings.engines")}</legend>
+                            <legend className="mb-2 text-sm font-medium">
+                                {t("settings.engines")}
+                            </legend>
                             {ENGINE_IDS.map((id) => (
-                                <div key={id} className="flex min-w-0 items-start justify-between gap-3">
+                                <div
+                                    key={id}
+                                    className="flex min-w-0 items-start justify-between gap-3"
+                                >
                                     <div className="min-w-0">
                                         <p className="text-sm">{t(NAME[id])}</p>
-                                        <p id={`${ids}-${id}`} className="text-xs text-muted-foreground">
+                                        <p
+                                            id={`${ids}-${id}`}
+                                            className="text-xs text-muted-foreground"
+                                        >
                                             {t(HINT[id])}
                                         </p>
                                     </div>
@@ -143,7 +153,11 @@ export function SettingsDialog({
                                 onValueChange={(value) =>
                                     setDraft((current) =>
                                         current
-                                            ? { ...current, defaultTarget: value as TranslateSettings["defaultTarget"] }
+                                            ? {
+                                                  ...current,
+                                                  defaultTarget:
+                                                      value as TranslateSettings["defaultTarget"]
+                                              }
                                             : current
                                     )
                                 }

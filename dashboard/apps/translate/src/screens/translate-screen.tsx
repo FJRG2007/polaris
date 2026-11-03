@@ -39,9 +39,21 @@ import {
     type ServerStatusView
 } from "./server-engine";
 import { createBrowserEngine, hasBrowserTranslator, type BrowserScope } from "./browser-engine";
-import { DEFAULT_SETTINGS, HISTORY_MAX, TEXT_MAX, type EngineId, type ServerEngineId } from "../model/schemas";
+import {
+    DEFAULT_SETTINGS,
+    HISTORY_MAX,
+    TEXT_MAX,
+    type EngineId,
+    type ServerEngineId
+} from "../model/schemas";
 import { forgetAction, forgetAllAction, historyAction, rememberAction } from "../actions/translate";
-import { AUTO, LANGUAGE_CODES, languageName, normalizeDetected, type SourceLanguage } from "../model/languages";
+import {
+    AUTO,
+    LANGUAGE_CODES,
+    languageName,
+    normalizeDetected,
+    type SourceLanguage
+} from "../model/languages";
 
 /** How long typing has to pause before a request leaves. */
 const DEBOUNCE_MS = 450;
@@ -168,7 +180,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 
     const engines = useMemo(() => {
         const made = new Map<EngineId, TranslateEngine>();
-        if (browser) made.set("browser", createBrowserEngine(self as unknown as BrowserScope, setDownload));
+        if (browser)
+            made.set("browser", createBrowserEngine(self as unknown as BrowserScope, setDownload));
         for (const id of ["deepl", "google", "polar"] as const) {
             made.set(id, createServerEngine(id, t("errors.failed")));
         }
@@ -273,7 +286,10 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         } catch (caught) {
             toast.show({
                 title: t("errors.detectFailed"),
-                body: caught instanceof Error && caught.message !== t("errors.detectFailed") ? caught.message : undefined
+                body:
+                    caught instanceof Error && caught.message !== t("errors.detectFailed")
+                        ? caught.message
+                        : undefined
             });
         }
     };
@@ -302,7 +318,12 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             return;
         }
         const utterance = new SpeechSynthesisUtterance(target);
-        utterance.lang = targetLanguage === "zh-Hans" ? "zh-CN" : targetLanguage === "zh-Hant" ? "zh-TW" : targetLanguage;
+        utterance.lang =
+            targetLanguage === "zh-Hans"
+                ? "zh-CN"
+                : targetLanguage === "zh-Hant"
+                  ? "zh-TW"
+                  : targetLanguage;
         utterance.onend = () => setSpeaking(false);
         utterance.onerror = () => setSpeaking(false);
         synth.cancel();
@@ -391,7 +412,9 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         manager ? (
                             <div className="flex flex-wrap justify-center gap-2">
                                 <Button asChild size="sm">
-                                    <Link href="/admin/integrations?configure=deepl">{t("none.addDeepl")}</Link>
+                                    <Link href="/admin/integrations?configure=deepl">
+                                        {t("none.addDeepl")}
+                                    </Link>
                                 </Button>
                                 <Button asChild size="sm" variant="outline">
                                     <Link href="/admin/integrations?configure=google-translate">
@@ -444,7 +467,9 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         className="w-full min-w-0 sm:ml-auto sm:w-48"
                         aria-label={t("engine.label")}
                         value={chosen ?? "auto"}
-                        onValueChange={(value) => setChosen(value === "auto" ? null : (value as EngineId))}
+                        onValueChange={(value) =>
+                            setChosen(value === "auto" ? null : (value as EngineId))
+                        }
                         options={engineOptions}
                     />
                 ) : null}
@@ -461,7 +486,12 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         className="min-h-48 flex-1 resize-none border-0 bg-transparent text-base [overflow-wrap:anywhere] focus:border-0"
                     />
                     <div className="flex flex-wrap items-center gap-1 border-t border-border px-2 py-1.5">
-                        <Button variant="ghost" size="sm" onClick={() => void detect()} disabled={!source.trim() || !engineId}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void detect()}
+                            disabled={!source.trim() || !engineId}
+                        >
                             {t("actions.detect")}
                         </Button>
                         <span className="ml-auto text-xs tabular-nums text-muted-foreground">
@@ -492,7 +522,10 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         {target || (pending ? t("engine.translating") : t("pane.empty"))}
                     </div>
                     <div className="flex flex-wrap items-center gap-1 border-t border-border px-2 py-1.5">
-                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" role="status">
+                        <span
+                            className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                            role="status"
+                        >
                             {error ? (
                                 <span className="text-destructive">{error}</span>
                             ) : download !== null && download < 1 ? (
@@ -521,7 +554,9 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     </div>
                 </section>
             </div>
-            {statusFailed ? <p className="mt-2 text-xs text-muted-foreground">{t("errors.statusFailed")}</p> : null}
+            {statusFailed ? (
+                <p className="mt-2 text-xs text-muted-foreground">{t("errors.statusFailed")}</p>
+            ) : null}
 
             <section className="mt-8 min-w-0" aria-labelledby="translate-history">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -553,10 +588,21 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                                     className="min-w-0 flex-1 text-left"
                                 >
                                     <span className="block text-xs text-muted-foreground">
-                                        {languageName(entry.fromLang, locale)} {"->"} {languageName(entry.toLang, locale)}
+                                        {languageName(entry.fromLang, locale)} {"->"}{" "}
+                                        {languageName(entry.toLang, locale)}
                                     </span>
-                                    <span className="block truncate text-sm" title={entry.sourceText}>{entry.sourceText}</span>
-                                    <span className="block truncate text-sm text-muted-foreground" title={entry.targetText}>{entry.targetText}</span>
+                                    <span
+                                        className="block truncate text-sm"
+                                        title={entry.sourceText}
+                                    >
+                                        {entry.sourceText}
+                                    </span>
+                                    <span
+                                        className="block truncate text-sm text-muted-foreground"
+                                        title={entry.targetText}
+                                    >
+                                        {entry.targetText}
+                                    </span>
                                 </button>
                                 <Button
                                     variant="ghost"

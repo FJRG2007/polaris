@@ -26,7 +26,10 @@ describe("translateInput", () => {
         ["only whitespace", { texts: ["  ", "\n"], to: "en" }],
         ["a text past the limit", { texts: ["a".repeat(TEXT_MAX + 1)], to: "en" }],
         ["too many texts", { texts: Array.from({ length: TEXTS_MAX + 1 }, () => "a"), to: "en" }],
-        ["too much text in all", { texts: Array.from({ length: 5 }, () => "a".repeat(TOTAL_MAX / 4)), to: "en" }],
+        [
+            "too much text in all",
+            { texts: Array.from({ length: 5 }, () => "a".repeat(TOTAL_MAX / 4)), to: "en" }
+        ],
         ["an unknown target", { texts: ["Hola"], to: "xx" }],
         ["an unknown engine", { texts: ["Hola"], to: "en", engine: "bing" }],
         ["the same language both sides", { texts: ["Hola"], from: "es", to: "es" }],
@@ -47,7 +50,9 @@ describe("readSettings", () => {
     });
 
     it("keeps what parses and defaults the rest", () => {
-        expect(readSettings({ engines: { deepl: false, polar: "no" }, defaultTarget: "xx" })).toEqual({
+        expect(
+            readSettings({ engines: { deepl: false, polar: "no" }, defaultTarget: "xx" })
+        ).toEqual({
             engines: { browser: true, polar: true, deepl: false, google: true },
             defaultTarget: "en"
         });

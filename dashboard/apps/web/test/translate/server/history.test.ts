@@ -28,7 +28,8 @@ function newest(userId: string): Row[] {
 vi.mock("@polaris/db", () => ({
     prisma: {
         translateHistory: {
-            findFirst: async ({ where }: { where: { userId: string } }) => newest(where.userId)[0] ?? null,
+            findFirst: async ({ where }: { where: { userId: string } }) =>
+                newest(where.userId)[0] ?? null,
             findMany: async ({
                 where,
                 skip = 0,

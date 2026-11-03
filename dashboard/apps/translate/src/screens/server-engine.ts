@@ -26,7 +26,12 @@ export class ServerEngineError extends Error {
     }
 }
 
-async function post<T>(path: string, body: unknown, fallback: string, signal?: AbortSignal): Promise<T> {
+async function post<T>(
+    path: string,
+    body: unknown,
+    fallback: string,
+    signal?: AbortSignal
+): Promise<T> {
     const response = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -37,7 +42,8 @@ async function post<T>(path: string, body: unknown, fallback: string, signal?: A
         error?: string;
         message?: string;
     } & T;
-    if (!response.ok) throw new ServerEngineError(answer.error ?? "failed", answer.message ?? fallback);
+    if (!response.ok)
+        throw new ServerEngineError(answer.error ?? "failed", answer.message ?? fallback);
     return answer;
 }
 

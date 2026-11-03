@@ -13,7 +13,8 @@ import type { TranslateKey } from "../../messages";
 import { loadSettings, saveSettings } from "../lib/settings";
 import { idInput, rememberInput, settingsInput, type TranslateSettings } from "../model/schemas";
 
-export type Outcome<T> = ({ readonly ok: true } & T) | { readonly ok: false; readonly error: string };
+export type Outcome<T> =
+    ({ readonly ok: true } & T) | { readonly ok: false; readonly error: string };
 
 async function refuse(key: TranslateKey): Promise<{ readonly ok: false; readonly error: string }> {
     return { ok: false, error: (await translateT())(key) };
