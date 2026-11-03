@@ -1720,7 +1720,10 @@
             "needsPolaris": "This version of {name} needs a newer Polaris. Update Polaris first.",
             "failed": "The new version did not start, so {name} stays on the one it had.",
             "noPrevious": "There is no earlier version of {name} to go back to."
-        }
+        },
+        "updatesAvailable": "{count, plural, one {# update available} other {# updates available}}",
+        "updateAll": "Update all apps",
+        "checking": "Checking for updates"
     },
     "gameInvite": {
         "title": "Invite to {game}",

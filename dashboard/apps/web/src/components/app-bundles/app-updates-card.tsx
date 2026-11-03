@@ -8,92 +8,17 @@
  * for how far it got, so the bar moves while the download runs.
  */
 
-import { z } from "zod";
 import { isNativeApp } from "@/lib/apps/native-apps";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpCircle, RotateCcw, RotateCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
-import {
-    appUpdatesAction,
-    changeAppBuildAction,
-    type AppUpdateRow
-} from "@/lib/app-bundles/actions";
+import type { AppUpdateRow } from "@/lib/app-bundles/actions";
 import type { UpdateRefusal } from "@/lib/app-bundles/releases";
-
-const POLL_MS = 1_000;
-
-const Progress = z.record(
-    z.string(),
-    z.object({
-        phase: z.enum(["checking", "downloading", "starting"]),
-        received: z.number().nonnegative(),
-        total: z.number().nonnegative()
-    })
-);
-
-/** A build as a reader tells two apart: its version and the start of its digest. */
-function buildLabel(build: { version?: string; digest: string }): string {
-    const short = build.digest.replace(/^sha256:/, "").slice(0, 7);
-    return build.version ? `${build.version} (${short})` : short;
-}
+import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
+import { buildLabel, newerBuild, progressPercent, useAppUpdates } from "./use-app-updates";
 
 export function AppUpdatesCard() {
     const t = useTranslations("components");
-    const [rows, setRows] = useState<AppUpdateRow[] | null>(null);
-    const [failed, setFailed] = useState(false);
-    const [busy, setBusy] = useState<string | null>(null);
-    const [refusals, setRefusals] = useState<Record<string, UpdateRefusal>>({});
-    const poll = useRef<ReturnType<typeof setInterval> | null>(null);
-
-    const load = useCallback(async (check: boolean) => {
-        try {
-            setRows(await appUpdatesAction(check));
-            setFailed(false);
-        } catch {
-            setFailed(true);
-        }
-    }, []);
-
-    const track = useCallback(async (id: string) => {
-        try {
-            const response = await fetch("/api/app-bundles/progress", { cache: "no-store" });
-            if (!response.ok) return;
-            const parsed = Progress.safeParse(await response.json());
-            if (!parsed.success) return;
-            const progress = parsed.data[id];
-            if (!progress || !poll.current) return;
-            setRows(
-                (all) => all?.map((row) => (row.id === id ? { ...row, progress } : row)) ?? all
-            );
-        } catch {
-            return;
-        }
-    }, []);
-
-    useEffect(() => {
-        void load(true);
-        return () => {
-            if (poll.current) clearInterval(poll.current);
-        };
-    }, [load]);
-
-    async function change(id: string, kind: "update" | "rollback") {
-        setBusy(id);
-        setRefusals(({ [id]: _dropped, ...rest }) => rest);
-        poll.current = setInterval(() => void track(id), POLL_MS);
-        try {
-            const result = await changeAppBuildAction(id, kind);
-            setRows(result.rows);
-            if (result.refused) setRefusals((all) => ({ ...all, [id]: result.refused! }));
-        } catch {
-            setRefusals((all) => ({ ...all, [id]: "failed" }));
-        } finally {
-            if (poll.current) clearInterval(poll.current);
-            poll.current = null;
-            setBusy(null);
-        }
-    }
+    const { rows, failed, busy, refusals, load, change } = useAppUpdates();
 
     return (
         <Card className="mt-4" id="app-updates">
@@ -155,13 +80,9 @@ function AppRow({
     onChange: (kind: "update" | "rollback") => void;
 }) {
     const t = useTranslations("components");
-    const newer =
-        row.available && row.available.digest !== row.installed?.digest ? row.available : null;
+    const newer = newerBuild(row);
     const progress = row.progress;
-    const percent =
-        progress && progress.total > 0
-            ? Math.min(100, Math.round((progress.received / progress.total) * 100))
-            : null;
+    const percent = progressPercent(row);
 
     // A native app is part of every Polaris: it runs a build, nobody installed it.
     const running = isNativeApp(row.id) ? "appUpdates.builtIn" : "appUpdates.installed";

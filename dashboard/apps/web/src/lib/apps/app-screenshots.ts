@@ -33,14 +33,19 @@ export function screenshotLanguage(locale: string): "en" | "es" {
     return locale.toLowerCase().startsWith("es") ? "es" : "en";
 }
 
-export function appScreenshots(catalogId: string, locale: string): AppScreenshot[] {
+/** One capture slug as the files `public/marketplace` ships for it, in the reader's language. */
+function shotFiles(slug: string, locale: string): AppScreenshot {
     const language = screenshotLanguage(locale);
-    const file = (slug: string, theme: string, form: string) =>
+    const file = (theme: string, form: string) =>
         `/marketplace/${slug}-${theme}-${language}-${form}.webp`;
-    return (SHOTS[catalogId] ?? []).map((slug) => ({
-        dark: { desktop: file(slug, "dark", "desktop"), mobile: file(slug, "dark", "mobile") },
-        light: { desktop: file(slug, "light", "desktop"), mobile: file(slug, "light", "mobile") }
-    }));
+    return {
+        dark: { desktop: file("dark", "desktop"), mobile: file("dark", "mobile") },
+        light: { desktop: file("light", "desktop"), mobile: file("light", "mobile") }
+    };
+}
+
+export function appScreenshots(catalogId: string, locale: string): AppScreenshot[] {
+    return (SHOTS[catalogId] ?? []).map((slug) => shotFiles(slug, locale));
 }
 
 /**
@@ -96,4 +101,14 @@ const BUILT_IN_SCENES: Readonly<Record<string, readonly string[]>> = {
 /** The capture scenes of built-in app `appId`; empty for one nobody has captured. */
 export function builtInScenes(appId: string): readonly string[] {
     return BUILT_IN_SCENES[appId] ?? [];
+}
+
+/**
+ * The card preview of built-in app `appId`: its first scene, copied to
+ * `public/marketplace` like a catalog app's captures. The rest of its scenes
+ * stay in `docs/`, read only by the public site.
+ */
+export function builtInPreview(appId: string, locale: string): AppScreenshot | null {
+    const first = builtInScenes(appId)[0];
+    return first ? shotFiles(first, locale) : null;
 }

@@ -12,6 +12,11 @@ import { AppDetail } from "@/app/(app)/apps/marketplace/[appId]/app-detail";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({

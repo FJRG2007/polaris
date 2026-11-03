@@ -25,6 +25,11 @@ import {
     storeScope
 } from "@/lib/apps/marketplace-store";
 
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
@@ -179,21 +184,26 @@ describe("the admin marketplace", () => {
         render(<MarketplaceView scope="polaris" installed={[]} canInstall />, {
             wrapper: MessagesWrapper
         });
-        const section = screen.getByRole("region", { name: "Built in" });
-        const rows = section.querySelectorAll("[data-built-in]");
-        expect(rows.length).toBe(builtInApps().length);
-        for (const row of rows) {
-            expect(within(row as HTMLElement).queryAllByRole("button")).toEqual([]);
-            expect(within(row as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
+        // Cards in the same grid as the apps an administrator switches on.
+        const shelf = screen.getByRole("region", { name: "Polaris apps" });
+        const cards = shelf.querySelectorAll("[data-built-in]");
+        expect(cards.length).toBe(builtInApps().length);
+        for (const card of cards) {
+            expect(within(card as HTMLElement).queryAllByRole("button")).toEqual([]);
+            expect(within(card as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
+            expect(within(card as HTMLElement).getByText("Built in")).toBeTruthy();
         }
-        expect(within(section).queryByText(/uninstall/i)).toBeNull();
+        expect(within(shelf).queryByText(/uninstall/i)).toBeNull();
+        // No separate built-in list and no Installed rows beside the cards.
+        expect(screen.queryByRole("region", { name: "Built in" })).toBeNull();
+        expect(screen.queryByRole("region", { name: "Installed" })).toBeNull();
     });
 
     it("draws each built-in app with its own logo, not the plain icon", () => {
         render(<MarketplaceView scope="polaris" installed={[]} />, {
             wrapper: MessagesWrapper
         });
-        const section = screen.getByRole("region", { name: "Built in" });
+        const section = document.body;
         const withLogo = builtInApps().filter((app) => hasAppLogo(app.id));
         expect(withLogo.length).toBeGreaterThan(0);
         for (const app of withLogo) {
@@ -213,6 +223,6 @@ describe("the admin marketplace", () => {
 
     it("keeps the user marketplace's apps off the built-in list", () => {
         render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
-        expect(screen.queryByRole("region", { name: "Built in" })).toBeNull();
+        expect(document.querySelector("[data-built-in]")).toBeNull();
     });
 });

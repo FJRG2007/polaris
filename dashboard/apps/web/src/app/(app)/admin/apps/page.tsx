@@ -36,6 +36,7 @@ export default async function PolarisAppsPage({
             installed={installed}
             initialQuery={focus?.name ?? ""}
             canInstall={canInstall}
+            canUpdateApps={user.isAdmin}
         />
     );
 }

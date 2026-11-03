@@ -16,6 +16,11 @@ import { AppDetail } from "@/app/(app)/apps/marketplace/[appId]/app-detail";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { APP_REPLACES, appReplaces, replacedLogoSrc } from "@/lib/apps/replaces";
 
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
@@ -102,12 +107,11 @@ describe("an app's store page", () => {
     });
 });
 
-describe("a built-in app's row", () => {
-    it("draws its logos, named in their tooltips", () => {
+describe("a built-in app's card", () => {
+    it("leaves what it replaces to the app's own page", () => {
         render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
         const chat = document.querySelector('[data-built-in="chat"]') as HTMLElement;
-        const list = within(chat).getByRole("list", { name: "Replaces" });
-        expect(within(list).getByRole("img", { name: "Discord" })).toBeTruthy();
-        expect(within(list).getByTitle("Microsoft Teams")).toBeTruthy();
+        expect(chat).not.toBeNull();
+        expect(within(chat).queryByRole("list", { name: "Replaces" })).toBeNull();
     });
 });

@@ -17,6 +17,11 @@ import {
 import { MessagesWrapper } from "../setup/i18n";
 
 const refresh = vi.fn();
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({

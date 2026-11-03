@@ -157,6 +157,7 @@
     "polaris": {
         "title": "Polaris apps",
         "description": "Switch on Polaris's own apps for everybody here.",
-        "builtIn": "Built in"
+        "builtIn": "Built in",
+        "builtInBy": "Part of every Polaris"
     }
 }

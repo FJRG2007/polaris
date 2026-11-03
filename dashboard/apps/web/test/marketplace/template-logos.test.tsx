@@ -16,6 +16,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { builtInAlternative, findStoreApp } from "@/lib/apps/marketplace-store";
 
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     listTemplateTargetsAction: vi.fn(async () => []),
