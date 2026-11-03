@@ -1,6 +1,6 @@
 """The Haier H50H5F restart-loop bullet (#1578) must not present the attached list as the agent's work.
 
-The report attached the six files PROMPT.md has the agent save before changing anything, and the reply
+The report attached the six files the tools save before changing anything, and the reply
 on the issue named eight packages from its disabled list. On the Haier-built AQUA MatrixTV EE 50, five of
 those eight are disabled from the factory, so the list may be the TV's state before the debloat. The
 bullet says so, keeps the way back that holds either way (the factory reset in the recovery menu), and

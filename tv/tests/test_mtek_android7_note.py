@@ -16,8 +16,8 @@ So the claims are read out of their sources rather than copied in here:
     the note's point is that CVTE's app answers a different one;
   * the CVTE factory-menu route out of examples/super-general-cvte-t972/README.md, the board page that
     already documents it, so the two cannot drift apart;
-  * AGENTS.md's CVTE rule that the stock launcher stays enabled, and PROMPT.md's `INSTALL_FAILED_OLDER_SDK`
-    sentence the note defers to.
+  * the CVTE rule that the stock launcher stays enabled, and the `INSTALL_FAILED_OLDER_SDK` answer the
+    note gives.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
@@ -94,7 +94,7 @@ class TheNoteItself(unittest.TestCase):
                       "the note should name what an Android 7 set answers")
 
     def test_the_note_hands_out_no_build_artifact_and_no_uninstall(self):
-        # A fork is source that others build; an APK in the tree is what AGENTS.md forbids.
+        # A fork is source that others build; an APK in the tree is what docs/DOS-AND-DONTS.md forbids.
         for banned in ("pm uninstall", ".apk", "adb install"):
             self.assertNotIn(banned, self.page, f"the note should not hand out {banned!r}")
 

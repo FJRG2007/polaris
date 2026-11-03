@@ -3,7 +3,7 @@
 `tools/disable.sh` and `disable.ps1` skip setupwraith while it owns a saved Wi-Fi network, because Android
 deletes an app's saved networks when the app is disabled: the TV drops off Wi-Fi, and ADB and the phone remote
 go with it. Their own messages offer the override only "on Ethernet" (on Wi-Fi they say to forget the network
-and join it again), and AGENTS.md allows `FORCE_SETUPWRAITH=1` only in the situation those messages describe.
+and join it again), and `FORCE_SETUPWRAITH=1` belongs only in the situation those messages describe.
 
 The Apply line is the command an owner of that model copies. One that carries the override with no condition
 switches the guard off for every other unit, including the ones whose network in use belongs to setupwraith.

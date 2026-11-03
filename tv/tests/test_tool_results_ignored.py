@@ -4,7 +4,7 @@
 first usage line is `python tools/bench.py --keys 36 --series 3`, with no `--out-dir`, so the default is
 what a reader copies - and that file carries `"host": args.host`, the address the run was given, next to
 the TV's fingerprint, which the script reads with `getprop ro.build.fingerprint` into `environment`.
-CONTRIBUTING.md and AGENTS.md both forbid an IP address in the tree, and .gitignore already keeps every
+docs/DOS-AND-DONTS.md forbids an IP address in the tree, and .gitignore already keeps every
 other place a run leaves the set: `backup/` (package dumps), `shots/` (session screenshots), `work/`
 (notes) and `traces/` (Perfetto traces, "they hold the TV's process list"), each with the reason in its
 own comment. `bench-results/` was the one folder the tools write into by default that it did not, so a

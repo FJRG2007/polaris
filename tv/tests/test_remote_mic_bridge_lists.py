@@ -15,7 +15,7 @@ Two places still pointed the other way:
   line stays active so the owner's choice stands; only its note changes.
 - The troubleshooting bullet named the folders that still disable the package as if the set were
   complete, and five lists added after it disable it too. Making every new list edit the bullet would break
-  CONTRIBUTING.md's "Change nothing outside your folder", so the bullet also gives the grep that always
+  docs/workflows/tv-list.md's "Change nothing outside the folder", so the bullet also gives the grep that always
   finds the current set. These tests run that grep's pattern over the lists instead of trusting it.
 
 The list and the bullet are read with the helpers in tests/test_g10_mic_bridge.py, by identifier: the

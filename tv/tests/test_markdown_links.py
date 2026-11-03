@@ -7,8 +7,8 @@ never existed. CI runs the unit tests and the shell helpers, so a link like that
 the reader who clicks it, and only when they are on the page that has it. This walks every `.md`
 file once and fails on the ones that lead nowhere.
 
-The same goes for the `#section` a link carries. `README.nl.md` keeps its sections in Dutch (`## Snel
-aan de slag`) and its links in the English page's words (`#quick-start`), which only works because
+The same goes for the `#section` a link carries. A translated page can keep its sections in its own language
+(`## Snel aan de slag`) and its links in the English page's words (`#quick-start`), which only works because
 each Dutch heading has an `<a id="quick-start"></a>` above it: a link whose anchor nothing on the
 page gives does nothing at all when it is clicked - the browser stays exactly where it is, with
 nothing to see. So the anchors every page gives are worked out here from its headings in GitHub's
@@ -43,7 +43,7 @@ HTML_ATTR = re.compile(r"(?:href|src)=\"([^\"]+)\"")
 FENCE = re.compile(r"```.*?```", re.S)
 HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.M)
 HEADING_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
-# The anchor a page states by hand: README.nl.md puts one above each Dutch heading, in the English
+# The anchor a page states by hand: a translated page puts one above each heading, in the English
 # page's words, so the links that came across with the text still land on their section.
 EXPLICIT_ANCHOR = re.compile(r"<a\s+(?:id|name)=\"([^\"]+)\"", re.I)
 EXTERNAL = ("http://", "https://", "mailto:", "data:", "#", "<")
@@ -209,7 +209,7 @@ class AnchorTest(unittest.TestCase):
             )
 
     def test_an_anchor_stated_by_hand_counts_as_a_section(self):
-        # The shape README.nl.md is built on: a Dutch heading, an English id above it, English links.
+        # The shape a translated page is built on: a Dutch heading, an English id above it, English links.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "nl.md").write_text(

@@ -6,13 +6,13 @@ it: it was written when themes/ held five folders (aurora, default, dussehra, sc
 and stayed at five while glass and ruska were added, so the page offered a reader two fewer looks
 than the repo ships.
 
-The count is on more than one front page. README.de.md and README.nl.md carry the same feature row
+The count was on more than one front page. The German and Dutch pages carried the same feature row
 in their own words ("Zehn liegen in themes/", "staan tien thema's"), and nothing read those: on
 main both still say ten while themes/ holds eleven, so the German and Dutch pages offer a reader one
 fewer look than the English one does - the gap #2132 and #2461 closed for the press counts, on the
 number a theme PR moves.
 
-README.uk.md is the fourth such page, and it is the case the table below missed: the Ukrainian page
+The Ukrainian page was the fourth such page, and it was the case the table below missed: the Ukrainian page
 landed with the row in its own words ("У themes/ постачається чотирнадцять"), while the table carried
 English, German and Dutch only, so claims() read nothing on it and the pinned set of pages that state
 a count stayed the three it named. A page left at the previous count - the failure the German and
@@ -25,7 +25,7 @@ table does not carry names the page that wrote it rather than reading as no clai
 out of the table on purpose, since "een" and "ein" are also the articles these languages put before a
 noun, and a single-theme repo is not a thing. Another language that writes the count as a word means
 another line in that table: the last page added did not fail here, it simply became a page this file
-could not see. README.tr.md, the fifth page, writes it in digits ("15 tema"), which NUMBER reads
+could not see. The Turkish page, the fifth, wrote it in digits ("15 tema"), which NUMBER reads
 without a table line.
 
 That one table is what README.md's row is read through too. The row had a twelve-word table of its own
@@ -57,7 +57,7 @@ ROW_START = "| **Themes** |"
 # Every feature row that names themes/ and states how many ship there, whatever language it is in:
 # English "eleven ship in", German "Zehn liegen in", Dutch "staan tien thema's", Ukrainian
 # "постачається чотирнадцять". The words come from the four languages whose front pages write the
-# count as a word today (README.tr.md writes digits), two to twenty each; one is left out because
+# count as a word (the Turkish page wrote digits), two to twenty each; one is left out because
 # "een" and "ein" are also the articles those languages put before a noun, so an English "one" would
 # read a Dutch sentence as a claim of one theme.
 NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
@@ -71,7 +71,7 @@ NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7
                 "twee": 2, "drie": 3, "vijf": 5, "zes": 6, "zeven": 7, "negen": 9, "tien": 10,
                 "twaalf": 12, "dertien": 13, "veertien": 14, "vijftien": 15, "zestien": 16,
                 "zeventien": 17, "achttien": 18, "negentien": 19, "twintig": 20,
-                # Ukrainian, README.uk.md's row as it is written today. The apostrophe is the page's
+                # Ukrainian, the Ukrainian page's row as it was written. The apostrophe is the page's
                 # own: п'ять, дев'ять and п'ятнадцять carry a straight one there.
                 "два": 2, "три": 3, "чотири": 4, "п'ять": 5, "шість": 6, "сім": 7, "вісім": 8,
                 "дев'ять": 9, "десять": 10, "одинадцять": 11, "дванадцять": 12, "тринадцять": 13,
@@ -216,7 +216,7 @@ class CountTest(unittest.TestCase):
         self.assertEqual([({11}, dutch)], claims(dutch))
 
     def test_a_ukrainian_sentence_is_read(self):
-        """README.uk.md's row as the page writes it: the count follows the link, then the gloss."""
+        """The Ukrainian page's row as it was written: the count follows the link, then the gloss."""
         ukrainian = ("| **Теми** | Тло, шпалери й розкладка з `config.json`, надісланого через Wi-Fi, "
                      "без перезбирання. У [`themes/`](themes/) постачається чотирнадцять, включно з "
                      "вбудованою `default/` |")
@@ -302,10 +302,10 @@ class CountTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "README.md").write_text("eleven ship in [`themes/`](themes/)", encoding="utf-8")
-            (root / "README.de.md").write_text("Zehn liegen in [`themes/`](themes/)", encoding="utf-8")
+            (root / "README-second.md").write_text("Zehn liegen in [`themes/`](themes/)", encoding="utf-8")
             (root / "docs").mkdir()
             (root / "docs" / "README.other.md").write_text("nothing", encoding="utf-8")
-            self.assertEqual(["README.de.md", "README.md"],
+            self.assertEqual(["README-second.md", "README.md"],
                              [p.name for p in front_pages(root)])
 
     def test_a_page_that_names_one_too_few_is_refused(self):
@@ -319,7 +319,7 @@ class CountTest(unittest.TestCase):
             shipped = theme_folders(root / "themes")
             self.assertEqual(4, len(shipped))
             page = "| **Themes** | Drei liegen in [`themes/`](themes/) |"
-            (root / "README.de.md").write_text(page, encoding="utf-8")
+            (root / "README-second.md").write_text(page, encoding="utf-8")
             claimed = next(iter(claims(page)))[0]
             self.assertNotEqual(claimed, {len(shipped)},
                                 "a page saying three themes must not read as the four that ship")

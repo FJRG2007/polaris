@@ -1,8 +1,8 @@
 """The README's Tools table lists every tool that ships in tools/.
 
-AGENTS.md asks a new tool to get its row "where the others are", and that table is where a reader of
+docs/workflows/docs-notes.md asks a new tool to get its row "where the others are", and that table is where a reader of
 the front page finds a tool at all. Two tools were missing from it: tools/bench.py, the benchmark
-that AGENTS.md and tools/trace.md already send contributors to for key latency, jank and cold start
+that tools/trace.md already sends contributors to for key latency, jank and cold start
 numbers, and tools/adb-closed.py, which the closing step in the README quoted inline and nowhere
 else. Nobody notices a missing row, so this test reads the table the way a reader does.
 

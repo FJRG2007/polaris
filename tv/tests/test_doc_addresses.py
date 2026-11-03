@@ -1,7 +1,7 @@
 """Pages and lists give `<tv ip>` or `192.168.1.50`, never the LAN address of the set they were written on.
 
-AGENTS.md ("Hard rules") keeps IP addresses out of lists and docs, and CODE_OF_CONDUCT.md counts them as
-private information. Five TV pages and lists, and the two scripts in one of those folders, still gave
+docs/DOS-AND-DONTS.md ("No personal details") keeps IP addresses out of lists and docs, as private
+information. Five TV pages and lists, and the two scripts in one of those folders, still gave
 the address of the contributor's own set, mostly in commands a reader pastes: the Philips TA7 Undo
 among them, which a reader who pastes it unchanged points at another host. One page also gave a
 Windows user name in a `JAVA_HOME` path, and docs/REMOTE.md an example address other than the one the

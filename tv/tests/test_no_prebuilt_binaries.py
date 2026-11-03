@@ -1,7 +1,7 @@
 """A prebuilt binary is refused anywhere in the tree, not only an APK in an add-on folder.
 
-AGENTS.md's hard rules: "**No prebuilt APKs or binaries** in the repo, not even as CI artifacts. People
-build from source", and it is the reason the maintainer closed #761, #398 and #1298.
+docs/DOS-AND-DONTS.md: "**No prebuilt binaries.** No APKs (not even as workflow artifacts) ... everyone builds
+from source", and it is the reason the maintainer closed #761, #398 and #1298.
 docs/DOS-AND-DONTS.md puts the same rule to a contributor and names the shapes: "No APKs (not even as
 workflow artifacts), `.so` files or zip uploads: everyone builds from source".
 
@@ -54,7 +54,7 @@ def problems(paths):
         for suffix in BINARIES:
             if path.lower().endswith(suffix):
                 out.append(f"{path}: a prebuilt {suffix} is committed; this repo builds from source "
-                           f"(AGENTS.md, \"No prebuilt APKs or binaries\"; docs/DOS-AND-DONTS.md)")
+                           f"(docs/DOS-AND-DONTS.md, \"No prebuilt binaries\")")
                 break
     return out
 

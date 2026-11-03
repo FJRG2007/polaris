@@ -3,7 +3,7 @@
 examples/ffalcon-r34a0-cn: the header says this firmware denies `pm disable-user` to the shell, yet its
 Apply line ran tools/disable.sh, which sends nothing else. It now hides with the `pm hide` batch that
 examples/redmi-mitv-antl0 uses for the same Android 5.1 refusal, and gives `pm unhide` as the undo
-AGENTS.md asks for next to any `pm hide`. The test runs each header's command with tools/venv/bin/python
+docs/DOS-AND-DONTS.md asks for next to any `pm hide`. The test runs each header's command with tools/venv/bin/python
 replaced by a stand-in that keeps what `tools/tv.py --batch` was given.
 
 Which lists that rule is read for was a pair of folder names in this file, so the third list built the
@@ -100,7 +100,7 @@ def hiding(root=None):
 def undo_problem(path):
     """Why a list that hides gives no way back, or None.
 
-    AGENTS.md's hard rule: `pm hide` only with the matching undo written in the list header. `pm enable`
+    docs/DOS-AND-DONTS.md: `pm hide` only with the matching undo written in the list header. `pm enable`
     (tools/restore.sh) does not bring a hidden package back, so the undo has to be `pm unhide`, and the
     header may not hand the reader the disable or restore scripts for this list either.
     """

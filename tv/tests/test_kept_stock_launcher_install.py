@@ -3,7 +3,7 @@
 `launcher/build-and-install.sh` disables the package STOCK_LAUNCHER names (`pm disable-user --user 0
 $STOCK_LAUNCHER`, once the new launcher has started), and with no STOCK_LAUNCHER it disables the app
 that owns Home when that is one of its `KNOWN_STOCK_LAUNCHERS`. Only `STOCK_LAUNCHER=none` leaves the
-stock launcher enabled (CONTRIBUTING.md, "Add your TV model").
+stock launcher enabled (docs/workflows/tv-list.md).
 
 Two Xiaomi CN lists said the opposite of their own notes. The MiTV-ANSP0 header read "KEEP IT
 ENABLED" and then gave `STOCK_LAUNCHER=com.mitv.tvhome` as the install command, and the MiTV-ASTP0

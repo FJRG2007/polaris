@@ -2,7 +2,7 @@
 
 `tools/tv.py` talks to network ADB on port 5555, and on the Chromecast with Google TV and the Google TV
 Streamer that port refuses until the TV has been paired once through Wireless debugging and opened with
-`adb tcpip 5555` (all three Google lists say so). README.zh-CN.md, README.vi.md and README.ja.md open
+`adb tcpip 5555` (all three Google lists say so). The Chinese, Vietnamese and Japanese pages opened
 "Doing it by hand" with that note; the English page went straight to `tools/tv.py --probe`, so an owner
 following it by hand got "connection refused" and nothing to go on.
 

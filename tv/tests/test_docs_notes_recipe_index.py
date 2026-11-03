@@ -1,7 +1,7 @@
 """The docs recipe asks for the links that keep a new docs page findable.
 
-`docs/workflows/docs-notes.md` is the page AGENTS.md's workflow list and CONTRIBUTING's routing table
-send a contributor to for "a troubleshooting entry, a fix to PROMPT.md, or any other docs change", and
+`docs/workflows/docs-notes.md` is the page the README's Contributing section
+sends a contributor to for "a troubleshooting entry, a device note, or any other docs change", and
 its own second bullet is what sends brand-specific knowledge into `docs/devices/`. The page said what
 a note holds and that several tests pin facts inside one, but not the one thing
 `tests/test_device_notes_index.py` refuses a note without: a link from a page a reader comes through -
@@ -187,7 +187,7 @@ class ThePageCheckerStillBitesTest(unittest.TestCase):
         self.assertEqual(["docs/hdmi-cec.md"], unlinked_docs(root))
 
     def test_the_same_page_linked_from_a_page_is_quiet(self):
-        root = self.tree({"CONTRIBUTING.md": "Read [the HDMI notes](docs/hdmi-cec.md).\n",
+        root = self.tree({"GUIDE.md": "Read [the HDMI notes](docs/hdmi-cec.md).\n",
                           "docs/hdmi-cec.md": "# notes\n"})
         self.assertEqual([], unlinked_docs(root))
 

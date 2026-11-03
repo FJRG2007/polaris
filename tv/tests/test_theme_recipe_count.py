@@ -1,4 +1,4 @@
-"""docs/workflows/theme.md is the recipe a theme author is sent to (AGENTS.md's workflow list), and its
+"""docs/workflows/theme.md is the recipe a theme author is sent to (the README's Contributing section), and its
 steps stopped at "add a row to themes/README.md" - while the suite also holds the front page's Themes
 row to the number of theme folders.
 

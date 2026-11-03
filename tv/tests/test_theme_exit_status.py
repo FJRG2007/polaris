@@ -3,7 +3,7 @@
 The header says: "0 the theme is on the TV, or the reset ran; 1 the theme could not be pushed, or Home did not
 restart after it; 2 the run stopped before the theme was up - the command line is not one theme folder or
 --reset, ... the TV was not reached". Two shapes that never reached the TV answered 1 instead, the status a
-reader (and an assistant following PROMPT.md) reads as "the theme was tried and the TV refused it":
+reader (and an assistant) reads as "the theme was tried and the TV refused it":
 
   * TV_HOST unset or empty: bash's own `${TV_HOST:?}` expansion wrote "tools/theme.sh: line 44: TV_HOST: set
     TV_HOST ..." and exited 1 - bash answers a failed `:?` with 1 - so a run that sent nothing looked like a
