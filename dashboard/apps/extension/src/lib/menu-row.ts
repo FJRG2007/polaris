@@ -83,7 +83,12 @@ export function drawFace(doc: Document, face: Face): HTMLElement {
  * ellipsis and kept whole in the row's title, so an email or a street that does
  * not fit is still readable.
  */
-export function drawRow(doc: Document, label: string, detail: string, face: Face): HTMLButtonElement {
+export function drawRow(
+    doc: Document,
+    label: string,
+    detail: string,
+    face: Face
+): HTMLButtonElement {
     const row = doc.createElement("button");
     row.type = "button";
     row.title = [label, detail].filter(Boolean).join("\n");

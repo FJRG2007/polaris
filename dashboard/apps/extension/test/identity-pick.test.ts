@@ -39,7 +39,10 @@ describe("splitting a family name into two surnames", () => {
     });
 
     it("puts everything after the first surname into the second", () => {
-        expect(identity.splitSurnames("Romero González López")).toEqual(["Romero", "González López"]);
+        expect(identity.splitSurnames("Romero González López")).toEqual([
+            "Romero",
+            "González López"
+        ]);
     });
 });
 
@@ -115,7 +118,9 @@ describe("the preview a card carries", () => {
 
     it("is on every card, the account's too", () => {
         expect(card("h", "Home", { email: "h@x.test" }).preview.email).toBe("h@x.test");
-        expect(identity.accountCard(values({ email: "me@x.test" }), "Me").preview.email).toBe("me@x.test");
+        expect(identity.accountCard(values({ email: "me@x.test" }), "Me").preview.email).toBe(
+            "me@x.test"
+        );
     });
 });
 
@@ -133,7 +138,11 @@ describe("the value a menu leads with", () => {
 });
 
 describe("the identity rows of a menu", () => {
-    const home = card("home", "Home", { email: "me@x.test", address1: "Calle A 1", city: "Madrid" });
+    const home = card("home", "Home", {
+        email: "me@x.test",
+        address1: "Calle A 1",
+        city: "Madrid"
+    });
     const work = card("work", "Work", { email: "me@x.test", address1: "Av. B 2", city: "Bilbao" });
     const bare = card("bare", "Bare");
 
