@@ -148,7 +148,7 @@ export function VlanField({
                         onChange={(event) => {
                             const digits = event.target.value.replace(/\D/g, "").slice(0, 4);
                             setText(digits);
-                            onChange(digits === "" ? null : Number(digits));
+                            onChange(digits === "" ? Number.NaN : Number(digits));
                         }}
                     />
                 ) : null}

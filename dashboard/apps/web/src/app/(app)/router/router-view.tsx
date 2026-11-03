@@ -562,7 +562,10 @@ function RouterEditor({
                                 <td className="py-2 pr-3 font-mono">{forward.port}</td>
                                 <td className="py-2 pr-3 font-mono">{forward.address}</td>
                                 <td className="py-2 pr-3 font-mono">{forward.toPort}</td>
-                                <td className="max-w-0 truncate py-2 pr-3">
+                                <td
+                                    className="max-w-0 truncate py-2 pr-3"
+                                    title={networkOf(plan.lans, forward.address)?.name}
+                                >
                                     {networkOf(plan.lans, forward.address)?.name ?? "-"}
                                 </td>
                                 <td className="py-2 text-right">
@@ -953,7 +956,10 @@ function ClientList({
                             </span>
                         </td>
                         <td className="py-1.5 pr-3 font-mono text-xs">{client.mac}</td>
-                        <td className="max-w-0 truncate py-1.5 pr-3">
+                        <td
+                            className="max-w-0 truncate py-1.5 pr-3"
+                            title={networkOf(lans, client.address)?.name}
+                        >
                             {networkOf(lans, client.address)?.name ?? "-"}
                         </td>
                         <td className="py-1.5 pr-3 text-xs whitespace-nowrap text-muted-foreground">
