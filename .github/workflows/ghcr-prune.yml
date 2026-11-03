@@ -79,6 +79,7 @@ jobs:
             polaris-messaging-bridge
             polaris-edge-guard
             polaris-camera-relay
+            polaris-matter-bridge
             polaris-vision
             polaris-face
           # The buildkit cache, pruned by the other rule below. Its tags (web,
