@@ -156,8 +156,7 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     });
     // A kept copy whose first read failed is a failed first read: the screen
     // renders what it rendered before there was a kept copy at all.
-    const firstFailed = live.kept && live.stale !== null;
-    const overview = current && !firstFailed ? live.data : null;
+    const overview = current && !live.firstFailed ? live.data : null;
     const failed = live.error !== null || live.stale !== null;
     const load = live.refresh;
 

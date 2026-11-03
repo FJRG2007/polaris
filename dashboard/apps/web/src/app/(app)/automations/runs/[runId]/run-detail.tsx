@@ -46,7 +46,8 @@ import {
     PageHeader,
     Skeleton,
     cn,
-    useToast
+    useToast,
+    pollWhileVisible
 } from "@polaris/ui";
 
 export function RunDetailView({ runId }: { runId: string }) {
@@ -60,19 +61,7 @@ export function RunDetailView({ runId }: { runId: string }) {
     const going = !!run && !core.runFinished(run.status);
     useEffect(() => {
         if (!going) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void refresh();
-        }, 2000);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") void refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => void refresh(), 2000);
     }, [going, refresh]);
 
     return (

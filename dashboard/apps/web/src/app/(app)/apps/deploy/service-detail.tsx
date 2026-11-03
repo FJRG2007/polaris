@@ -74,7 +74,8 @@ import {
     ScrollRow,
     SegmentedControl,
     Select,
-    DateInput
+    DateInput,
+    pollWhileVisible
 } from "@polaris/ui";
 import {
     Activity,
@@ -817,19 +818,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     // three seconds with nothing left to learn.
     useEffect(() => {
         if (!items?.some((item) => !isSettled(item))) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") reload();
-        }, 3000);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") reload();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(reload, 3000);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items]);
 

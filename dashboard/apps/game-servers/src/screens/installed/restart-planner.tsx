@@ -25,7 +25,7 @@
 import * as actions from "./restart-actions";
 import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
-import { Button, Card, CardBody, DateInput } from "@polaris/ui";
+import { Button, Card, CardBody, DateInput, pollWhileVisible } from "@polaris/ui";
 import type { PendingRestart } from "../../lib/games-restart";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CalendarClock, Loader2, RotateCcw, Users, X } from "lucide-react";
@@ -104,19 +104,7 @@ export function RestartPlanner({
     // own, when the server empties or the time comes.
     useEffect(() => {
         if (!pending) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void load();
-        }, WATCH_BOOKED_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") void load();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => void load(), WATCH_BOOKED_MS);
     }, [pending, load]);
 
     useEffect(() => {

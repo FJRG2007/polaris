@@ -10,7 +10,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Joystick } from "lucide-react";
-import { Button } from "@polaris/ui";
+import { Button, pollWhileVisible } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -37,29 +37,22 @@ export function ActivityCard({
 
     useEffect(() => {
         let live = true;
-        let timer: number | undefined;
+        let stopPolling: (() => void) | undefined;
         const read = () =>
             void readActivityCard(sessionId)
                 .then((found) => {
                     if (!live) return;
                     setView(found);
-                    if (!found || found.ended) window.clearInterval(timer);
-                    else if (timer === undefined) timer = window.setInterval(tick, REFRESH_MS);
+                    if (!found || found.ended) {
+                        stopPolling?.();
+                        stopPolling = undefined;
+                    } else stopPolling ??= pollWhileVisible(read, REFRESH_MS);
                 })
                 .catch(() => undefined);
-        // Nobody is looking at a card in a hidden tab; it is read on return.
-        const tick = (): void => {
-            if (document.visibilityState === "visible") read();
-        };
-        const onReturn = (): void => {
-            if (timer !== undefined && document.visibilityState === "visible") read();
-        };
         read();
-        document.addEventListener("visibilitychange", onReturn);
         return () => {
             live = false;
-            window.clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
+            stopPolling?.();
         };
         // The message object is replaced whenever it is woken, which is the
         // signal to read the card again.

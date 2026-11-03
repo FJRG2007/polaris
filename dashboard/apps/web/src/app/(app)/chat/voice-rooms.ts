@@ -15,6 +15,7 @@
 import { fetchVoicePresence } from "./chat-polls";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useState } from "react";
+import { pollWhileVisible } from "@polaris/ui";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 
@@ -59,19 +60,7 @@ export function useVoiceRooms(
     useEffect(() => {
         read();
         if (!asked || !pollMs) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") read();
-        }, pollMs);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") read();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(read, pollMs);
     }, [read, asked, pollMs]);
 
     return { inRoom, read };

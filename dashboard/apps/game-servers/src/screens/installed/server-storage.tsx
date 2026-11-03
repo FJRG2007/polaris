@@ -30,7 +30,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Skeleton
+    Skeleton,
+    pollWhileVisible
 } from "@polaris/ui";
 
 type AppStorageView = AppHostTypes["AppStorageView"];
@@ -114,22 +115,7 @@ export function ServerStorage({
 
     const working = view?.move ? WORKING.has(view.move.state) : false;
     useEffect(() => {
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(
-            () => {
-                if (document.visibilityState === "visible") void load();
-            },
-            working ? 3_000 : 30_000
-        );
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") void load();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => void load(), working ? 3_000 : 30_000);
     }, [load, working]);
 
     if (!loaded) {

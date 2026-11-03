@@ -76,6 +76,9 @@ export interface LiveResource<T> {
      * error, and renders what it rendered then.
      */
     kept: boolean;
+    /** `kept && stale !== null`: this visit's first read failed, and `data` is
+     *  only the kept snapshot. See `kept`. */
+    firstFailed: boolean;
     refresh: () => void;
     /**
      * Put a value on screen and in the kept copy without asking anything - an
@@ -344,6 +347,7 @@ export function useLiveRead<T>({
         refreshing,
         updatedAt,
         kept,
+        firstFailed: kept && data !== null && error !== null,
         refresh,
         replace
     };

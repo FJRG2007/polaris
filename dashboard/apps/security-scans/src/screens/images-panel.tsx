@@ -63,9 +63,8 @@ export function ImagesPanel({
     });
     // A kept copy whose first read failed is a failed first read: the screen
     // renders what it rendered before there was a kept copy at all.
-    const firstFailed = live.kept && live.stale !== null;
-    const data = firstFailed ? null : live.data;
-    const failed = live.error !== null || firstFailed;
+    const data = live.firstFailed ? null : live.data;
+    const failed = live.error !== null || live.firstFailed;
     const load = live.refresh;
     const scanning =
         data?.images.some(

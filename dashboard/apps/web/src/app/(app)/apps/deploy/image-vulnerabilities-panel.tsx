@@ -61,11 +61,10 @@ export function ImageVulnerabilitiesPanel({ applicationId }: { applicationId: st
     // nothing shows the skeleton again until it answers.
     // A kept copy whose first read failed is a failed first read: the panel
     // renders what it rendered before there was a kept copy at all.
-    const firstFailed = live.kept && live.stale !== null;
     const loaded: Loaded =
-        live.data && !firstFailed
+        live.data && !live.firstFailed
             ? { status: "ready", ...live.data }
-            : (live.error !== null || firstFailed) && !live.refreshing
+            : (live.error !== null || live.firstFailed) && !live.refreshing
               ? { status: "failed" }
               : { status: "loading" };
     const read = live.refresh;

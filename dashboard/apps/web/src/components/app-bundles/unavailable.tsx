@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpCircle, PackageX, RotateCw } from "lucide-react";
-import { Button, EmptyState, buttonVariants } from "@polaris/ui";
+import { Button, EmptyState, buttonVariants, pollWhileVisible } from "@polaris/ui";
 import { changeAppBuildAction, retryAppAction } from "@/lib/app-bundles/actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -52,19 +52,7 @@ export function AppUnavailable({
     // becomes the app the moment it is running.
     useEffect(() => {
         if (!updating) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") router.refresh();
-        }, 3_000);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") router.refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => router.refresh(), 3_000);
     }, [updating, router]);
 
     const updateHere = () =>

@@ -11,6 +11,7 @@ export { KeyNamesProvider, useKeyNames } from "./lib/key-names";
 export { keepFocusOnClose } from "./lib/menu-focus";
 export { rowClickIntent } from "./lib/row-open";
 export { useDeferredFocus } from "./lib/use-deferred-focus";
+export { pollWhileVisible } from "./lib/poll-while-visible";
 export {
     allChosen,
     pressedSelection,

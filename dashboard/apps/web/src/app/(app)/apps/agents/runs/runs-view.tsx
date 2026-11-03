@@ -23,7 +23,8 @@ import {
     DialogHeader,
     DialogTitle,
     Select,
-    Textarea
+    Textarea,
+    pollWhileVisible
 } from "@polaris/ui";
 
 /**
@@ -51,19 +52,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
     const live = runs.some((run) => !isTerminalRunState(run.state));
     useEffect(() => {
         if (!live) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") router.refresh();
-        }, REFRESH_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") router.refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => router.refresh(), REFRESH_MS);
     }, [live, router]);
 
     const cancel = (run: AgentRunView) => {

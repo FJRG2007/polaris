@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldQuestion } from "lucide-react";
-import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
+import { Card, CardBody, CardHeader, CardTitle, PolarisMark, pollWhileVisible } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { signOut } from "@/lib/auth-client";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -23,19 +23,7 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = window.setInterval(() => {
-            if (document.visibilityState === "visible") router.refresh();
-        }, POLL_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") router.refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            window.clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => router.refresh(), POLL_MS);
     }, [router]);
 
     async function onCancel() {

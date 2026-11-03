@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { pollWhileVisible } from "@polaris/ui";
 
 const POLL_MS = 4000;
 
@@ -21,7 +22,9 @@ export function useRuntimeLog(
     const refresh = useCallback(async () => {
         if (!applicationId) return;
         try {
-            const response = await fetch(`/api/deploy/apps/${applicationId}/logs?tail=${tail}`, { cache: "no-store" });
+            const response = await fetch(`/api/deploy/apps/${applicationId}/logs?tail=${tail}`, {
+                cache: "no-store"
+            });
             if (!response.ok) return;
             const data = (await response.json()) as { log?: string };
             setLog(data.log ?? "");
@@ -33,19 +36,7 @@ export function useRuntimeLog(
     useEffect(() => {
         if (!applicationId || !active) return;
         void refresh();
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void refresh();
-        }, POLL_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") void refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => void refresh(), POLL_MS);
     }, [applicationId, active, refresh]);
 
     return { log, refresh };

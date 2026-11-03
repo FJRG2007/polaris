@@ -90,7 +90,8 @@ import {
     DropdownMenuTrigger,
     Input,
     Textarea,
-    cn
+    cn,
+    pollWhileVisible
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -257,19 +258,10 @@ export function GameConsole({
                 if (live) setSchedules(answer.schedules);
             });
         read();
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = window.setInterval(() => {
-            if (document.visibilityState === "visible") read();
-        }, SCHEDULES_EVERY_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") read();
-        };
-        document.addEventListener("visibilitychange", onReturn);
+        const stopPolling = pollWhileVisible(read, SCHEDULES_EVERY_MS);
         return () => {
             live = false;
-            window.clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
+            stopPolling();
         };
     }, [installedAppId]);
 
@@ -281,20 +273,13 @@ export function GameConsole({
             });
         read();
         // Resting while hidden, like the schedules above, and reading on return.
-        const timer = window.setInterval(
-            () => {
-                if (document.visibilityState === "visible") read();
-            },
+        const stopPolling = pollWhileVisible(
+            read,
             repeatRunning ? REPEATS_RUNNING_MS : REPEATS_IDLE_MS
         );
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") read();
-        };
-        document.addEventListener("visibilitychange", onReturn);
         return () => {
             live = false;
-            window.clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
+            stopPolling();
         };
     }, [installedAppId, repeatRunning]);
 

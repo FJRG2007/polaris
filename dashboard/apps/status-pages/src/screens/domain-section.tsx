@@ -11,7 +11,7 @@ import { unwrap, useStatusT } from "./i18n";
 import type { DomainStatus } from "../lib/manage";
 import { useEffect, useId, useState } from "react";
 import { CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
-import { Button, CopyButton, Input, useToast } from "@polaris/ui";
+import { Button, CopyButton, Input, useToast, pollWhileVisible } from "@polaris/ui";
 import { isCustomHostname, normalizeHostname } from "../model/schemas";
 import { checkCustomDomainAction, setCustomDomainAction } from "../actions/manage";
 
@@ -54,19 +54,7 @@ export function DomainSection({
     // says when it starts working without being refreshed.
     useEffect(() => {
         if (!domain || !status || status.state === "ready") return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") check();
-        }, RECHECK_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") check();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(check, RECHECK_MS);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [domain, status?.state]);
 

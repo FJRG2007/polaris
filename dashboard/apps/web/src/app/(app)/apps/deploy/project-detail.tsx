@@ -17,6 +17,7 @@ import { ProjectAccessProvider } from "./access-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
+import { pollWhileVisible } from "@polaris/ui";
 import {
     EnvironmentServices,
     NewServiceButton,
@@ -73,19 +74,7 @@ export function ProjectDetail({
     );
     useEffect(() => {
         if (!settling) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") refresh();
-        }, 3000);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(refresh, 3000);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settling]);
 

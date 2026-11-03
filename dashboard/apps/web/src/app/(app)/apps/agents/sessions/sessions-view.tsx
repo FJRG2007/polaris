@@ -43,7 +43,8 @@ import {
     Input,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    pollWhileVisible
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentText, agentWord, sessionStateWord } from "@/lib/agents/words";
@@ -93,19 +94,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
     const live = sessions.some((session) => !core.isSessionOver(session.state));
     useEffect(() => {
         if (!live) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") router.refresh();
-        }, REFRESH_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") router.refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => router.refresh(), REFRESH_MS);
     }, [live, router]);
 
     const ordered = [...sessions].sort((a, b) => ORDER[a.state] - ORDER[b.state]);

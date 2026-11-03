@@ -51,9 +51,8 @@ export function OwnImagesView() {
     });
     // A kept copy whose first read failed is a failed first read: the screen
     // renders what it rendered before there was a kept copy at all.
-    const firstFailed = live.kept && live.stale !== null;
-    const images = firstFailed ? null : live.data;
-    const failed = live.error !== null || firstFailed;
+    const images = live.firstFailed ? null : live.data;
+    const failed = live.error !== null || live.firstFailed;
     const load = live.refresh;
 
     const readFindings = useCallback(async (scanId: string) => {

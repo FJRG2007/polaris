@@ -30,7 +30,8 @@ import {
     CardHeader,
     CardTitle,
     SegmentedControl,
-    Textarea
+    Textarea,
+    pollWhileVisible
 } from "@polaris/ui";
 import {
     interruptSessionAction,
@@ -109,19 +110,7 @@ export function SessionDetail({
 
     useEffect(() => {
         if (over) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") router.refresh();
-        }, REFRESH_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") router.refresh();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => router.refresh(), REFRESH_MS);
     }, [over, router]);
 
     useEffect(() => {
@@ -151,20 +140,11 @@ export function SessionDetail({
                 .catch(() => undefined);
         };
         read();
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") read();
-        }, REFRESH_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") read();
-        };
-        document.addEventListener("visibilitychange", onReturn);
+        const stopPolling = pollWhileVisible(read, REFRESH_MS);
         return () => {
             stopped = true;
             controller.abort();
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
+            stopPolling();
         };
     }, [session.id, session.state, shared]);
 

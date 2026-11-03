@@ -32,6 +32,7 @@ import {
     type ReactNode
 } from "react";
 import { useRouter } from "next/navigation";
+import { pollWhileVisible } from "@polaris/ui";
 import * as polls from "./chat-reads";
 
 /**
@@ -394,19 +395,10 @@ export function ChatProvider({
                 stopped = true;
             };
         }
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") ask();
-        }, CALLS_RECHECK_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") ask();
-        };
-        document.addEventListener("visibilitychange", onReturn);
+        const stopPolling = pollWhileVisible(ask, CALLS_RECHECK_MS);
         return () => {
             stopped = true;
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
+            stopPolling();
         };
     }, [may.call, callsAreOff]);
 
@@ -426,19 +418,10 @@ export function ChatProvider({
                 });
         };
         ask();
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") ask();
-        }, CALLS_OUTSIDE_RECHECK_MS);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") ask();
-        };
-        document.addEventListener("visibilitychange", onReturn);
+        const stopPolling = pollWhileVisible(ask, CALLS_OUTSIDE_RECHECK_MS);
         return () => {
             stopped = true;
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
+            stopPolling();
         };
     }, [may.call]);
 

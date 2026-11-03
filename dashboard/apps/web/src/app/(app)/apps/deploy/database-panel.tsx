@@ -54,7 +54,8 @@ import {
     Skeleton,
     Switch,
     cn,
-    DateInput
+    DateInput,
+    pollWhileVisible
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
@@ -127,19 +128,7 @@ export function DatabaseManageDialog({
         (overview?.cloud && overview.status === "provisioning");
     useEffect(() => {
         if (!open || !running) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void load();
-        }, 3000);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") void load();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => void load(), 3000);
     }, [open, running, load]);
 
     const tabs: { value: Tab; label: string }[] = overview

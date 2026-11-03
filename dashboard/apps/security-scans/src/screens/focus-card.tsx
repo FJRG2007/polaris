@@ -99,9 +99,8 @@ export function FocusCard({
     });
     // A kept copy whose first read failed is a failed first read: the screen
     // renders what it rendered before there was a kept copy at all.
-    const firstFailed = live.kept && live.stale !== null;
-    const focus = live.data && !firstFailed ? live.data.focus : undefined;
-    const failed = live.error !== null || firstFailed;
+    const focus = live.data && !live.firstFailed ? live.data.focus : undefined;
+    const failed = live.error !== null || live.firstFailed;
     const load = live.refresh;
 
     const targetId = focus?.targetId;

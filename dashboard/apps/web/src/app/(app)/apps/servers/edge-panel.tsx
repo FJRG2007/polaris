@@ -20,7 +20,7 @@
  * are told rather than surprised.
  */
 
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, pollWhileVisible } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { useCallback, useEffect, useState } from "react";
 import * as polls from "./servers-polls";
@@ -52,19 +52,7 @@ export function EdgePanel({ hostId }: { hostId: string }) {
     const elsewhere = state?.settingUp === true && !busy;
     useEffect(() => {
         if (!elsewhere) return;
-        // Not while the tab is hidden: nobody is looking, and it reads once on
-        // the way back instead.
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void ask();
-        }, 10_000);
-        const onReturn = (): void => {
-            if (document.visibilityState === "visible") void ask();
-        };
-        document.addEventListener("visibilitychange", onReturn);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onReturn);
-        };
+        return pollWhileVisible(() => void ask(), 10_000);
     }, [elsewhere, ask]);
 
     const prepare = async () => {
