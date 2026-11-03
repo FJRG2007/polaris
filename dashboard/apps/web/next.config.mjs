@@ -5,6 +5,7 @@
  * source. Prisma is kept external so its engine binaries are not bundled.
  */
 
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { PortableImportMetaUrl } from "./scripts/portable-import-meta.mjs";
@@ -83,7 +84,10 @@ export const CLI_PROTOCOL_RANGE = "1-1";
  * way that bundle expected; keying the channel on the build keeps it from
  * feeding a tab that expects the new shape.
  */
-const BUILD_STAMP = (process.env.POLARIS_BUILD_SHA ?? "").trim() || Date.now().toString(36);
+const BUILD_SHA = (process.env.POLARIS_BUILD_SHA ?? "").trim();
+const BUILD_STAMP = BUILD_SHA
+    ? createHash("sha256").update(BUILD_SHA).digest("hex").slice(0, 16)
+    : Date.now().toString(36);
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {

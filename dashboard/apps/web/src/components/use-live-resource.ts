@@ -201,6 +201,7 @@ export function useLiveRead<T>({
         const controller = new AbortController();
         inFlight.current.add(controller);
         const turn = (started.current += 1);
+        const askedAt = Date.now();
         const current = (): boolean => {
             if (controller.signal.aborted || turn < shown.current) return false;
             shown.current = turn;
@@ -214,15 +215,14 @@ export function useLiveRead<T>({
                 // panel does not re-render and nothing flickers.
                 const merged =
                     latest.current === null ? value : mergeUnchanged(latest.current, value);
-                const at = Date.now();
                 latest.current = merged;
-                shownAt.current = at;
+                shownAt.current = askedAt;
                 setData(merged);
-                setUpdatedAt(at);
+                setUpdatedAt(Date.now());
                 setKept(false);
                 setError(null);
                 writeSnapshot(cacheKey, merged);
-                answers.current?.post(value, at);
+                answers.current?.post(value, askedAt);
             })
             .catch((caught: unknown) => {
                 noteRequestFailure(caught);

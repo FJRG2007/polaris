@@ -148,6 +148,22 @@ describe("useLiveRead across tabs", () => {
         expect(a.result.current.data).toEqual({ cpu: 9 });
     });
 
+    it("does not undo a change with an answer another tab asked for before it", async () => {
+        vi.useFakeTimers();
+        const first = controlledLoad();
+        const second = controlledLoad();
+        tab(first.load, { paused: true });
+        const b = tab(second.load);
+        await act(async () => second.answer({ cpu: 1 }));
+
+        await act(async () => vi.advanceTimersByTime(1000));
+        act(() => b.result.current.replace({ cpu: 9 }));
+        await act(async () => vi.advanceTimersByTime(1000));
+        await act(async () => first.answer({ cpu: 1 }));
+
+        expect(b.result.current.data).toEqual({ cpu: 9 });
+    });
+
     it("leaves a screen that was told to hold still as it is", async () => {
         const first = controlledLoad();
         tab(first.load);
