@@ -101,7 +101,8 @@
         "inbox_manage": "Reply and manage the inbox",
         "users_manage": "Manage users",
         "settings_manage": "Change instance settings",
-        "system_manage": "Run updates and system operations"
+        "system_manage": "Run updates and system operations",
+        "translate_use": "Translate text"
     },
     "page": {
         "title": "AI assistants",

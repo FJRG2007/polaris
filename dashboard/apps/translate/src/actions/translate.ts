@@ -21,9 +21,9 @@ async function refuse(key: TranslateKey): Promise<{ readonly ok: false; readonly
 
 /** Runs the work as the signed-in person; anything unexpected is logged, not shown. */
 async function settle<T extends object>(
-    work: (user: Awaited<ReturnType<typeof host.session.requireUser>>) => Promise<T>
+    work: (user: Awaited<ReturnType<typeof host.session.requirePermission>>) => Promise<T>
 ): Promise<Outcome<T>> {
-    const user = await host.session.requireUser();
+    const user = await host.session.requirePermission("translate.use");
     try {
         return { ok: true, ...(await work(user)) };
     } catch (caught) {
@@ -69,7 +69,7 @@ export async function saveSettingsAction(
 ): Promise<Outcome<{ settings: TranslateSettings }>> {
     const parsed = settingsInput.safeParse(input);
     if (!parsed.success) return refuse("errors.invalid");
-    const user = await host.session.requireUser();
+    const user = await host.session.requirePermission("translate.use");
     if (!user.isAdmin) return refuse("errors.adminOnly");
     return settle(async () => {
         await saveSettings(parsed.data);

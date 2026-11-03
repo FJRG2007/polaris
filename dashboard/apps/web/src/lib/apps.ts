@@ -474,6 +474,7 @@ export const POLARIS_APPS: AppEntry[] = [
         description: "Translate text between languages", // i18n-ignore
         icon: Languages,
         href: "/translate",
+        permission: "translate.use",
         requiresApp: "translate"
     },
     {

@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
     user: { id: "user-1", isAdmin: false } as { id: string; isAdmin: boolean } | Response,
     rate: { ok: true },
+    allowed: true,
     settings: null as string | null,
     status: { deepl: true, google: false, polar: true },
     serverTranslate: vi.fn(
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@polaris/app-host", () => ({
     host: {
         apiSession: { apiUser: async () => mocks.user },
+        session: { sessionCan: async () => mocks.allowed },
         rateLimitService: { rateLimit: async () => mocks.rate },
         settingStore: { getSetting: async () => mocks.settings },
         i18nRequest: { getLocale: async () => "en-US" },
@@ -48,6 +50,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     mocks.user = { id: "user-1", isAdmin: false };
     mocks.rate = { ok: true };
+    mocks.allowed = true;
     mocks.settings = null;
     mocks.status = { deepl: true, google: false, polar: true };
 });
@@ -63,6 +66,12 @@ describe("POST /api/translate", () => {
     it("refuses anybody not signed in", async () => {
         mocks.user = new Response(null, { status: 401 });
         expect((await POST(post({ texts: ["hola"], to: "en" }))).status).toBe(401);
+        expect(mocks.serverTranslate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a role without Translate", async () => {
+        mocks.allowed = false;
+        expect((await POST(post({ texts: ["hola"], to: "en" }))).status).toBe(403);
         expect(mocks.serverTranslate).not.toHaveBeenCalled();
     });
 

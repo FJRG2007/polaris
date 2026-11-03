@@ -2896,7 +2896,8 @@
             "crm": "CRM",
             "automations": "Automations",
             "statusPages": "Status pages",
-            "games": "Games"
+            "games": "Games",
+            "translate": "Translate"
         },
         "permissions": {
             "drive": {
@@ -2998,6 +2999,9 @@
             "arcade": {
                 "open": "Open Games",
                 "calls": "Play games in calls"
+            },
+            "translate": {
+                "use": "Translate text"
             }
         }
     },

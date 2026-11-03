@@ -2476,14 +2476,14 @@
                 "apiKeyHelp": "En tu cuenta de DeepL -> Claves de API. Una clave que acaba en :fx es Free.",
                 "links": {
                     "0": {
-                        "label": "Consigue tu clave de API"
+                        "label": "Tu clave de API"
                     }
                 }
             },
             "googleTranslate": {
                 "summary": "Traduce texto con Google Cloud Translation.",
                 "description": "Permite que la app Traductor envíe texto a Google Cloud Translation con tu clave de API. La clave se queda en este servidor; Google Cloud factura el uso.",
-                "apiKeyLabel": "Clave de API",
+                "apiKeyLabel": "Clave API",
                 "apiKeyHelp": "Activa la API Cloud Translation en el proyecto y limita la clave a ella.",
                 "links": {
                     "0": {
@@ -2896,7 +2896,8 @@
             "crm": "CRM",
             "automations": "Automatizaciones",
             "statusPages": "Estado público",
-            "games": "Juegos"
+            "games": "Juegos",
+            "translate": "Traductor"
         },
         "permissions": {
             "drive": {
@@ -2998,6 +2999,9 @@
             "arcade": {
                 "open": "Abrir Juegos",
                 "calls": "Jugar en llamadas"
+            },
+            "translate": {
+                "use": "Traducir texto"
             }
         }
     },

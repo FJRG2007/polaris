@@ -83,6 +83,7 @@
         "historyFailed": "No se ha podido cargar tu historial.",
         "deleteFailed": "No se ha podido quitar.",
         "saveFailed": "No se han podido guardar los ajustes.",
-        "statusFailed": "No se han podido comprobar los motores. Traducir en el navegador sigue funcionando."
+        "statusFailed": "No se han podido comprobar los motores. Traducir en el navegador sigue funcionando.",
+        "forbidden": "Tu rol no incluye el Traductor."
     }
 }

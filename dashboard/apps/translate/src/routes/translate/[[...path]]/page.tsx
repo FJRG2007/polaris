@@ -17,7 +17,7 @@ export default async function TranslatePage({
     params: Promise<Record<string, string | string[]>>;
 }) {
     const [user, raw] = await Promise.all([
-        host.session.requireUser(),
+        host.session.requirePermission("translate.use"),
         params.then((all) => all.path)
     ]);
     if (raw !== undefined && (!Array.isArray(raw) || raw.length > 0)) notFound();

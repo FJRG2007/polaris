@@ -83,6 +83,7 @@
         "historyFailed": "Your history could not be loaded.",
         "deleteFailed": "That could not be removed.",
         "saveFailed": "The settings could not be saved.",
-        "statusFailed": "The engines could not be checked. Translation in the browser still works."
+        "statusFailed": "The engines could not be checked. Translation in the browser still works.",
+        "forbidden": "Your role does not include Translate."
     }
 }
