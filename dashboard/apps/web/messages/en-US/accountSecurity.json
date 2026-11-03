@@ -31,7 +31,7 @@
         "turnOff": "Turn off",
         "newDevice": {
             "title": "This device is still new here",
-            "hint": "Use a device you have signed in from before, or wait it out. Signing out from here still works."
+            "hint": "Sign in here with a passkey, use a device you have signed in from before, or wait it out. Signing out from here still works."
         },
         "password": {
             "title": "Password",
@@ -57,7 +57,7 @@
             "title": "New devices",
             "description": "Make a browser you have not signed in from before wait before it can change anything on this page. It buys you time to notice if someone else signs in with your password.",
             "label": "Wait before a new device can change security",
-            "hint": "A waiting device can still read this page and sign itself out. Devices you already use are not affected, and neither is the one you opened this account from."
+            "hint": "A waiting device can still read this page and sign itself out. Devices you already use are not affected, nor is the one you opened this account from, nor a sign-in with a passkey."
         },
         "limits": {
             "title": "Session limits",

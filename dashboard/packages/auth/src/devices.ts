@@ -202,16 +202,62 @@ export async function accountDeviceStanding(
  * that has already served the wait. Polaris's own copy is preferred over
  * better-auth's for the same reason it is everywhere else: better-auth writes its
  * column once and never follows it.
+ *
+ * Two sign-ins are settled however new their browser reads, because neither is
+ * the stolen password the wait exists for:
+ *
+ * - **A passkey.** It is something the owner's machine holds, not something that
+ *   can be read off a phishing page, and adding one is itself a Security change a
+ *   waiting device is refused - so every passkey on the account was put there by
+ *   a device that was allowed to. This is the owner opening the desktop app, or a
+ *   second browser, on the computer they have always used: a user-agent cannot
+ *   tell those apart from a stranger's, and the passkey on the machine can.
+ * - **A sign-in another session let in** (approved from Account > Sessions, or a
+ *   code it scanned), when that session is still there and is itself settled. One
+ *   level only: a device let in by a device that was itself let in is judged on
+ *   its own, so an approval cannot launder a wait down a chain.
  */
-export async function sessionDeviceStanding(userId: string, sessionId: string): Promise<DeviceStanding> {
+export async function sessionDeviceStanding(
+    userId: string,
+    sessionId: string
+): Promise<DeviceStanding> {
+    return sessionStanding(userId, sessionId, true);
+}
+
+async function sessionStanding(
+    userId: string,
+    sessionId: string,
+    followApproval: boolean
+): Promise<DeviceStanding> {
     const session = await prisma.session.findFirst({
         where: { id: sessionId, userId },
-        select: { userAgent: true, state: { select: { userAgent: true } } }
+        select: {
+            userAgent: true,
+            state: { select: { userAgent: true, signInMethod: true, authorizedBySessionId: true } }
+        }
     });
     // A session that is not there describes nothing, which an account asking for
     // a wait treats as a device it cannot place - and an account asking for none
     // treats as the nothing it is.
-    return accountDeviceStanding(userId, session?.state?.userAgent ?? session?.userAgent);
+    const standing = await accountDeviceStanding(
+        userId,
+        session?.state?.userAgent ?? session?.userAgent
+    );
+    if (standing.settled || !session) return standing;
+
+    const vouched = {
+        settled: true,
+        graceDays: standing.graceDays,
+        settlesAt: null,
+        firstSeenAt: standing.firstSeenAt
+    };
+    if (session.state?.signInMethod === "passkey") return vouched;
+
+    const approver = session.state?.authorizedBySessionId;
+    if (followApproval && approver && approver !== sessionId) {
+        if ((await sessionStanding(userId, approver, false)).settled) return vouched;
+    }
+    return standing;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
