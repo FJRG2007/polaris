@@ -177,3 +177,20 @@ export function linkedRequest(search: string): { text?: string; to?: LanguageCod
         ...(answer.to ? { to: answer.to } : {})
     };
 }
+
+/** How the text box is dictated into, or null when it cannot be here. */
+export type DictationWay = "server" | "browser" | null;
+
+/**
+ * The server transcribes when it can and the browser can record; otherwise
+ * the browser's own speech recognition; otherwise there is no dictation and
+ * the button says so.
+ */
+export function dictationWay(can: {
+    record: boolean;
+    serverTranscribes: boolean;
+    browserRecognizes: boolean;
+}): DictationWay {
+    if (can.record && can.serverTranscribes) return "server";
+    return can.browserRecognizes ? "browser" : null;
+}

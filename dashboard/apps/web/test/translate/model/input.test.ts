@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
     INPUT_ACCEPT,
     LINKED_TEXT_MAX,
+    dictationWay,
     linkedRequest,
     normalizeWebsite,
     pastedFile,
@@ -160,5 +161,22 @@ describe("linkedRequest", () => {
     it("caps a long text", () => {
         const answer = linkedRequest(`?text=${"a".repeat(LINKED_TEXT_MAX + 50)}`);
         expect(answer.text).toHaveLength(LINKED_TEXT_MAX);
+    });
+});
+
+describe("dictationWay", () => {
+    it("lets the server transcribe when it can and the browser records", () => {
+        expect(dictationWay({ record: true, serverTranscribes: true, browserRecognizes: true })).toBe("server");
+        expect(dictationWay({ record: true, serverTranscribes: true, browserRecognizes: false })).toBe("server");
+    });
+
+    it("falls back to the browser's recognition", () => {
+        expect(dictationWay({ record: false, serverTranscribes: true, browserRecognizes: true })).toBe("browser");
+        expect(dictationWay({ record: true, serverTranscribes: false, browserRecognizes: true })).toBe("browser");
+    });
+
+    it("has none when neither can", () => {
+        expect(dictationWay({ record: true, serverTranscribes: false, browserRecognizes: false })).toBeNull();
+        expect(dictationWay({ record: false, serverTranscribes: true, browserRecognizes: false })).toBeNull();
     });
 });

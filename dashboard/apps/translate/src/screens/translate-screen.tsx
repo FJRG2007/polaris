@@ -61,6 +61,7 @@ import { WebsiteMode } from "./website-mode";
 import { hostUi } from "@polaris/app-host/client";
 import {
     INPUT_ACCEPT,
+    dictationWay,
     linkedRequest,
     pastedFile,
     routeFile,
@@ -504,8 +505,13 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         if (!text) return;
         setSource((now) => (now && !/\s$/.test(now) ? `${now} ${text}` : now + text));
     };
-    const serverDictation = canRecord && (status?.reads?.audio ?? false);
-    const canDictate = serverDictation || nativeDictation;
+    const dictation = dictationWay({
+        record: canRecord,
+        serverTranscribes: status?.reads?.audio ?? false,
+        browserRecognizes: nativeDictation
+    });
+    const serverDictation = dictation === "server";
+    const canDictate = dictation !== null;
     const dictate = async () => {
         if (dictating) return stopDictation.current?.();
         if (dictationStarting.current) return;
