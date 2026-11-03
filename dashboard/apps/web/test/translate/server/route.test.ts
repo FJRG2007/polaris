@@ -16,7 +16,8 @@ const mocks = vi.hoisted(() => ({
         detected: "ES"
     })),
     serverDetect: vi.fn(async () => "pt-br"),
-    serverMediaStatus: vi.fn(async () => ({ images: true, audio: false })),
+    // Nothing set up to read pictures or recordings unless a test says so.
+    serverMediaStatus: vi.fn(async () => ({ images: false, audio: false })),
     serverReadImage: vi.fn(async () => ({ lines: [{ text: "SALIDA", box: [0.1, 0.2, 0.3, 0.05] }] })),
     serverTranscribe: vi.fn(async () => ({ text: "hola" }))
 }));
@@ -95,7 +96,8 @@ describe("POST /api/translate", () => {
         ["not JSON", "{"],
         ["an unknown language", { texts: ["hola"], to: "klingon" }],
         ["no text", { texts: [""], to: "en" }],
-        ["a text past the limit", { texts: ["a".repeat(5001)], to: "en" }]
+        // One request's technical cap; the screen cuts longer texts before sending.
+        ["a text past one request's cap", { texts: ["a".repeat(50_001)], to: "en" }]
     ])("refuses %s before sending anything", async (_name, body) => {
         const response = await POST(post(body));
         expect(response.status).toBe(400);
@@ -155,7 +157,9 @@ describe("GET /api/translate", () => {
             engines: ["deepl", "polar"],
             browser: true,
             defaultTarget: "en",
-            order: ["browser", "deepl", "google", "polar"]
+            order: ["browser", "deepl", "google", "polar"],
+            charLimit: null,
+            reads: { images: false, audio: false }
         });
     });
 });
@@ -197,6 +201,7 @@ describe("no length limit unless one is set", () => {
 
     it("reads a stored limit leniently and says it, with what can be read", async () => {
         mocks.settings = JSON.stringify({ charLimit: "lots" });
+        mocks.serverMediaStatus.mockResolvedValueOnce({ images: true, audio: false });
         const answer = (await (await GET()).json()) as Record<string, unknown>;
         expect(answer.charLimit).toBeNull();
         expect(answer.reads).toEqual({ images: true, audio: false });
