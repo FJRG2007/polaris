@@ -275,6 +275,53 @@ export async function verifyAlternate(
     return signed ? { kind: "same" } : { kind: "different" };
 }
 
+/** An instance a client already has on its list, as learned over that address. */
+export interface KnownInstance {
+    /** The address it is listed under. */
+    readonly origin: string;
+    readonly record: InstanceRecord;
+}
+
+/**
+ * Which listed instance an address being added already is, or null.
+ *
+ * Asked so that the same Polaris typed under a second name (`polaris.local` next
+ * to `polaris.example.com`) is named as the one already there, rather than added
+ * twice or turned away for some unrelated reason such as its certificate. A
+ * hostname proves nothing, and neither does a matching id or key - both are
+ * public. So the address is asked who it claims to be, and an address that claims
+ * a listed instance must then sign a fresh nonce with that instance's key, over
+ * its own origin (`verifyAlternate`).
+ *
+ * `candidates` are the ways to ask the one address, in order: the address itself,
+ * and for a client that cannot open it, the same host without TLS. Only the
+ * public describe and challenge routes are called, with no credential and no
+ * cookie, so the answer is used for the comparison and for nothing else.
+ */
+export async function findSameInstance(
+    candidates: readonly string[],
+    known: readonly KnownInstance[],
+    fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+    timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<KnownInstance | null> {
+    if (known.length === 0) return null;
+    for (const candidate of candidates) {
+        const claimed = await learnInstance(candidate, fetchImpl, timeoutMs);
+        if (!claimed) continue;
+        const matching = known.filter(
+            (one) =>
+                one.origin !== candidate &&
+                one.record.id === claimed.id &&
+                one.record.publicKey === claimed.publicKey
+        );
+        for (const one of matching) {
+            const verdict = await verifyAlternate(candidate, one.record, fetchImpl, timeoutMs);
+            if (verdict.kind === "same") return one;
+        }
+    }
+    return null;
+}
+
 /** Which address a client is on, for the screen that shows it. */
 export interface FailoverStatus {
     /** The origin the last request went to. */
