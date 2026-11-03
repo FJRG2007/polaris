@@ -32,7 +32,7 @@
 # RemoteKeyEventActionImpl, LogcatEventProducer and an AccessibilityController. AdGuard DNS does not
 # block it (hopprtv.com, hoppr.com.au resolve), so disabling it is the only way to stop it.
 #
-# Private DNS with dns.adguard-dns.com works (Android 14), see PROMPT.md.
+# Private DNS with dns.adguard-dns.com works (Android 14).
 #
 # Kept on purpose (load-bearing or wanted, checked with dumpsys package):
 #   com.nes.blerc                  Bluetooth remote service

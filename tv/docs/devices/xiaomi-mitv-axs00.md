@@ -64,7 +64,7 @@ getevent -pl                                     # which input device is sending
 with `tools/tv.py --screenshot shots/home.png` so the launcher and any ad rows are on record. Keep
 the TV app, the input/source menu, remote and Bluetooth pairing, the on-screen keyboard, Play Store
 and Play Services enabled; disable with `pm disable-user --user 0`, never uninstall. The full
-procedure and its safety rules are in `PROMPT.md` and
+procedure and its safety rules are in the [README](../../README.md) and
 [`docs/TROUBLESHOOTING.md`](../TROUBLESHOOTING.md).
 
 This note omits the unit's serial number, network addresses and any account details; only the model,

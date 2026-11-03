@@ -56,7 +56,7 @@ key sequence with a person watching the screen, not a package list. Combined wit
 the router, it is the realistic shape of a Tizen version of this repo: settings by remote keys plus
 DNS, rather than debloat plus a launcher.
 
-A port like that belongs in its own repository, with a row in SHOWCASE.md, the
+A port like that belongs in its own repository, the
 same as the [webOS launcher](https://github.com/OmkarK97/webos-vibehack).
 
 ## What the AU8000 report does not establish

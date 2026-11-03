@@ -5,8 +5,8 @@ Android 7.0 (SDK 24), firmware `20171230_042214`, 1 GB of RAM and 8 GB of flash,
 
 This is one session on one set: the launcher ran there from a local build, and no debloat list was
 kept. The repo's launcher stays at Android 8.0 - `minSdk 26` in `launcher/app/build.gradle` - so an
-Android 7 set answers `INSTALL_FAILED_OLDER_SDK`, and `PROMPT.md` says to offer the debloat half and
-say the launcher cannot be installed. What follows is the fork the owner built instead, kept here
+Android 7 set answers `INSTALL_FAILED_OLDER_SDK`, so only the debloat half is offered and
+the launcher cannot be installed. What follows is the fork the owner built instead, kept here
 because it is the part another owner of this board would have to redo.
 
 ## ADB, with no Developer options
@@ -19,7 +19,7 @@ on the remote, and set DEBUG > ADB ENABLE.
 The "Allow USB debugging?" prompt only appeared after unplugging the set from the wall and powering it
 on again; standby was not enough.
 
-AGENTS.md's rule applies as it does everywhere else: the factory menu is opened with the remote to get
+The factory-menu rule applies as it does everywhere else: the factory menu is opened with the remote to get
 ADB and turned off the same way when the session ends, and no test package in it is started, from the
 shell or by hand. Close the session as usual, then `tools/adb-closed.py <tv ip>` must report the port
 closed.
@@ -56,7 +56,7 @@ about 28 MB of heap.
 
 ## Home, and the CVTE rule
 
-The stock launcher is `com.cvte.tv.launcher`. On a `com.cvte.*` board AGENTS.md keeps that launcher
+The stock launcher is `com.cvte.tv.launcher`. On a `com.cvte.*` board that launcher stays
 enabled: the new one is made Home, the set is rebooted once, and Home and ADB are confirmed before
 anything else. The session ended with Home on the new launcher and the stock one still installed, and
 the report does not record which command moved it, so treat that step as unverified here and check it

@@ -168,8 +168,8 @@ def main():
         # macOS Local Network privacy denies a process the local subnet and the kernel reports that as
         # EHOSTUNREACH, the same errno as a TV that is switched off, so "is the TV on?" sends people
         # rebuilding a network that was never broken. tools/tv.py says so at connect time since #1982; this
-        # is the other client, and the one the closing step depends on (PROMPT.md, AGENTS.md and the README
-        # accept only its "closed"), so an assistant on a Mac whose terminal was never granted the
+        # is the other client, and the one the closing step depends on (the README accepts only
+        # its "closed"), so an assistant on a Mac whose terminal was never granted the
         # permission was told the TV was off or on another network while the port it was asked about may
         # be open or closed: nothing was learned about it either way. Exit 2 already means that.
         note = ""

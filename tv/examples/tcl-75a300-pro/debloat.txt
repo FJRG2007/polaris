@@ -14,7 +14,7 @@
 # TCL Live (com.tcl.channelplus), com.tcl.UpdatePeripheral (TCL soundbar), com.tcl.autopair, com.tcl.suspension,
 # com.tcl.ttvs, com.tcl.tv, com.tcl.tvinput. See tcl-g08-eu-android12 for why autopair, suspension and ttvs stay.
 #
-# First set up with Claude Code and PROMPT.md, launcher installed 18 October 2026. On 31 October the launcher
+# First set up with Claude Code, launcher installed 18 October 2026. On 31 October the launcher
 # went from 2.0 to 3.2 (build-and-install.sh, SKIP_BUILD=1, over the old build) and the last five packages
 # below were disabled with tools/disable.sh. After each of two reboots Home came back on the launcher (about
 # 3 s of FallbackHome first) and all 40 stayed disabled; no launcher crashes in the crash log.

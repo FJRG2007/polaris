@@ -24,8 +24,8 @@ debugging** on. Port 5555 opened and "Allow USB debugging?" appeared on the scre
 entries in that menu alone. The TV has no USB device mode, so ADB over USB is not an option. After a power cycle the
 port came back by itself on the occasions checked; if it does not, repeat the menu steps.
 
-Do not launch `mediatek.factorymenu.ui` or `com.ctv.autotest.helper` from the shell, not even to look
-(see the factory-package rule in `PROMPT.md`).
+Do not launch `mediatek.factorymenu.ui` or `com.ctv.autotest.helper` from the shell, not even to look:
+factory packages are never started.
 
 ## What was changed, and how far to trust it
 

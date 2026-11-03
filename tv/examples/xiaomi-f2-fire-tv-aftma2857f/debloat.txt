@@ -4,8 +4,8 @@
 # ships, plus Xiaomi's own analytics.
 #
 # FIRE OS: DEBLOAT ONLY. com.amazon.tv.launcher keeps HOME (protected; set-home-activity changes nothing).
-# A separate home screen can be brought up over it with an accessibility watcher - see SHOWCASE.md, Amazon
-# Fire TV ("Fire TV → Apple TV front end"). Live TV app: com.amazon.tv.livetv.
+# A separate home screen can be brought up over it with an accessibility watcher. Live TV app:
+# com.amazon.tv.livetv.
 #
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/xiaomi-f2-fire-tv-aftma2857f/debloat.txt
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/xiaomi-f2-fire-tv-aftma2857f/debloat.txt com.amazon.tv.launcher

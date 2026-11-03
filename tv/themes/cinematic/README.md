@@ -9,7 +9,6 @@ A dark, high-contrast theme optimized for OLED televisions and cinema setups.
 - **Ambient Glow Off**: Disables icon-tinted ambient halo wash (`ambient_glow: false`) to preserve true OLED pitch black and pure backdrop colors.
 - **Idle Clock**: Transitions to a calm drifting clock after 2 minutes of inactivity (`home_idle_clock_minutes: 2`).
 
-For the dynamic launcher with live TMDb backdrops and ratings, see the Polaris TV Cinema & OLED Edition fork in SHOWCASE.md.
 
 ## Credits
 

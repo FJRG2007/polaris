@@ -65,7 +65,7 @@ com.hisense.tv.weather                          # weather card, another content 
 com.hisense.demonstrate                         # DbxDemo / multi-channel sound demo reels
 com.hisense.hotelmenu                           # hotel mode menu
 com.meetingroom                                 # meeting-room mode
-com.hisense.autotest                            # factory autotest app (never launch it, see PROMPT.md)
+com.hisense.autotest                            # factory autotest app (never launch it)
 com.hisense.electronictutorial                  # e-manual
 com.hisense.ar.baike                            # AR encyclopedia
 com.jamdeo.tv.fte                               # first-run wizard, already done; Wi-Fi belongs to android.uid.system

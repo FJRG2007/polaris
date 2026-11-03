@@ -9,7 +9,7 @@
 #
 # Tested: disabled in batches of 1-7 with a screenshot after each, launcher from launcher/ installed
 # and owning Home, Inputs switches to HDMI (com.mitv.livetv comes up), Prime Video plays. A first-day
-# report, not the few days of living with it that CONTRIBUTING.md asks for.
+# report, not the few days of living with it that docs/workflows/tv-list.md asks for.
 #
 # Second unit: sold as Xiaomi TV S Pro Mini LED 75 2026 (Thailand), same MiTV-MOEU0 / ladybird,
 # firmware UKN1.240806.017.V816.0.26.3.19.002.ULBMIXM. The list applied as is: 16 disabled on the first

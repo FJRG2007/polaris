@@ -16,7 +16,7 @@ profile either.
 | System | Android TV 14 (SDK 34) |
 | Firmware | build `UKNV.260317.001` |
 | Stock Home | `com.google.android.apps.tv.launcherx` |
-| CVTE components | `com.cvte.tv.at` present, so the board counts as CVTE for the rule in PROMPT.md even though its stock launcher is Google's |
+| CVTE components | `com.cvte.tv.at` present, so the board counts as CVTE (stock launcher stays enabled) even though its stock launcher is Google's |
 
 ## Home
 

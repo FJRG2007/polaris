@@ -1,6 +1,6 @@
 # Xiaomi TV Box S 3rd gen (MiTV-AFMU0, twilight), second unit
 
-Tested with `PROMPT.md` and `examples/xiaomi-mitv-afmu0/debloat.txt` on 2026-10-27.
+Tested with `examples/xiaomi-mitv-afmu0/debloat.txt` on 2026-10-27.
 Model: `MiTV-AFMU0`, codename `twilight`, Amlogic, Google TV on Android 14 (SDK 34).
 Firmware: `UKG3.250826.001 / V816.0.11.0.UZFAABX` (HyperOS), 2 GB RAM, `ro.adb.secure=1`.
 

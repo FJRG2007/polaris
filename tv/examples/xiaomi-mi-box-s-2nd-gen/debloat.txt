@@ -17,7 +17,7 @@
 # launcher/ was installed and owns Home, and Home and Wi-Fi both came back by themselves after a reboot.
 # Validated again 2026-10-19 on 737: launcher app.polaris.tv owns Home,
 # cname switched from setupwraith to com.android.tv.settings and survives reboot. Still provisional
-# until few-days soak per CONTRIBUTING.md, but second confirmation.
+# until few-days soak per docs/workflows/tv-list.md, but second confirmation.
 #
 # Notes from this box:
 # - The stock adb on macOS connected fine on port 5555 once USB debugging was on; no wireless-debugging

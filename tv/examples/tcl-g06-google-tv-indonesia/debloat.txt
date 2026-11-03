@@ -15,7 +15,7 @@
 # disabled; com.tcl.usercenter is switched back on at every boot (as on the other TCL AR2101 lists). It
 # stays idle, so it is left in the list. Checked after the reboot: Home, the Input key and HDMI, Wi-Fi,
 # the remote, Settings, YouTube, Netflix and Vidio all work. Tested on one day only (shorter than
-# CONTRIBUTING.md asks).
+# docs/workflows/tv-list.md asks).
 #
 # Live TV / HDMI: com.tcl.tv + com.tcl.tvinput.
 # DO NOT DISABLE on this TV (kept and working):

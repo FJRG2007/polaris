@@ -19,7 +19,7 @@
 #
 # Applied in four batches on one real unit on 2026-10-20, each batch checked with screenshots and key
 # injection (Home, Input key source picker, Settings, Wi-Fi, Netflix). Tested on one day only (shorter
-# than CONTRIBUTING.md asks); I will report back if anything breaks.
+# than docs/workflows/tv-list.md asks); I will report back if anything breaks.
 # Checked after the full list: launcher/ installed with pm install and is Home after a reboot; the
 # Inputs menu lists HDMI 1/2, AV and Live TV; the Input key still opens com.tcl.tv's source picker;
 # Wi-Fi stays connected across reboots.

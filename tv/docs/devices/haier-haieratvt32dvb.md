@@ -9,8 +9,8 @@ it for a few days" bar is not met. The purpose of the note is narrower:
 - Record what the `dupont` platform's factory stack looks like on Google TV 14 build
   `UKNV.260408.001`, so the Durabrand trap and the Haier `examples/` entries can be read in
   context.
-- Name `com.cvte.tv.fac.menu` as a factory-stack package observed on this unit that the current
-  `PROMPT.md` list does not spell out literally.
+- Name `com.cvte.tv.fac.menu` as a factory-stack package observed on this unit that no other page
+  spells out literally.
 
 ## Identify the firmware
 
@@ -56,11 +56,11 @@ these packages was launched: opening one is the trap documented in the Durabrand
 | `mediatek.factorymenu.ui` | `/system_ext/app/HFactory` | `installed=false, enabled=3` |
 | `com.haier.tv.hmagicboard` | `/product/app/HMagicBoard` | `installed=true, enabled=1` |
 
-- `com.cvte.tv.hkcfac` is already named by `PROMPT.md` and by the Durabrand
+- `com.cvte.tv.hkcfac` is already named by the Durabrand
   note; on this unit it is not installed for user 0.
-- `mediatek.factorymenu.ui` is already named by `PROMPT.md`; on this unit it is not installed for
+- `mediatek.factorymenu.ui` is a known factory menu; on this unit it is not installed for
   user 0 either.
-- `com.at.factory.androidtvaidlservice` is covered by the `com.at.factory.*` glob in `PROMPT.md`.
+- `com.at.factory.androidtvaidlservice` belongs to the `com.at.factory.*` factory stack.
 - `com.mediatek.wwtv.tvcenter` matches the Live TV entry in both existing Haier `examples/`.
 
 ## `com.cvte.tv.fac.menu` is a different package from `com.cvte.fac.menu`
@@ -73,8 +73,8 @@ The repo already names `com.cvte.fac.menu` (no `.tv.`) in
 The package observed on this unit is `com.cvte.tv.fac.menu` (with `.tv.` in the middle), at
 `/product/app/CVTE_fac_settings`. It is enabled by default and declares a `MAIN` + `DEFAULT`
 activity. On the name alone it reads as a factory-settings surface in the same family as
-`com.cvte.tv.hkcfac`, and the "fac menu" wording of the `PROMPT.md` warning already covers it in
-spirit, but no literal entry in that list is spelled with `.tv.` between `cvte` and `fac.menu`.
+`com.cvte.tv.hkcfac`, and the "fac menu" in its name puts it with the factory menus that are never opened,
+but no package named so far is spelled with `.tv.` between `cvte` and `fac.menu`.
 
 What this note does **not** claim:
 

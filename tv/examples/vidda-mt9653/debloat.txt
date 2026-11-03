@@ -20,8 +20,8 @@
 #       act=com.hisense.tv.tiletransition.TileAnimationService
 #       pkg=com.hisense.tv.tiletransition } not found
 #   W/a: switchToAppViaRemote, no service found
-# Re-enabling it fixes input switching immediately. This is the "package names often don't say what a
-# package does" warning in PROMPT.md, made concrete.
+# Re-enabling it fixes input switching immediately: a package name often does not say what the
+# package does.
 #
 # Stock launcher: com.jamdeo.tv.vod (JuUI). launcher/build-and-install.sh does not know that name:
 #   TV_HOST=<tv ip> HOME_KEY_SERVICE=1 STOCK_LAUNCHER=com.jamdeo.tv.vod launcher/build-and-install.sh

@@ -32,7 +32,7 @@ The replacement was opened explicitly and checked before disabling stock Home. A
 with stock Home still enabled completed and ADB returned. After the guarded `tools/disable.sh`
 handover, both the HOME resolver and foreground window identified `app.polaris.tv/.MainActivity`;
 this held across subsequent software reboots. This is the observed result on this firmware, not a
-reason to skip the CVTE/Home checks in PROMPT.md on another unit.
+reason to skip the CVTE/Home checks on another unit.
 
 The owner confirmed physical Home, YouTube, Input/source, Settings, voice search and held Volume Up
 worked. Neither `InputKeyService` nor `HomeKeyService` was enabled. The Inputs menu showed HDMI 1,

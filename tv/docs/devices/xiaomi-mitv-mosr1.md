@@ -92,4 +92,4 @@ and used Home, then Down from the dock, to reach the app grid.
 This is one short setup session and a next-day owner report, with one package-persistence reboot
 check. It does not establish long-term stability, every HDMI/tuner path, a successful auto-Home
 boot, or behavior on another firmware or remote. A tested list under `examples/` should wait for
-several days of ordinary use, as required by CONTRIBUTING.md.
+several days of ordinary use, as [`docs/workflows/tv-list.md`](../workflows/tv-list.md) asks.

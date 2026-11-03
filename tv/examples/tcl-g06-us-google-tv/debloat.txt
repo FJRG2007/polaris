@@ -25,7 +25,7 @@
 #   does not apply here; it is disabled below, as on the Indonesia unit.
 #
 # Notes from this unit (one session on 2026-10-31, verified with screenshots; one day, shorter than
-# CONTRIBUTING.md asks):
+# docs/workflows/tv-list.md asks):
 # - No Wireless debugging on this firmware: USB debugging alone opens port 5555 over Wi-Fi. The TV asks to
 #   allow the computer's key once.
 # - The saved Wi-Fi belonged to setupwraith (dumpsys wifi showed four entries with

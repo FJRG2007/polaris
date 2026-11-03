@@ -102,7 +102,7 @@ The YouTube button sends 190 here. The G09 list maps 4065 for its YouTube button
 
 ## Second unit: 65Q7D Pro (Greece, Wi-Fi)
 
-One owner's session on 2026-10-22, following `PROMPT.md` on Windows 11 with the repo's
+One owner's session on 2026-10-22, on Windows 11 with the repo's
 tools (upstream `4c55533`, launcher 2.6). The firmware is the same build as the Q7C above (`G08_4K_GB`, `AU02`),
 so `debloat.txt` here is the list to run; this section records the deltas and what differed on this unit. The
 packages were applied in five batches with `tools/disable.sh` and checked after one reboot, but they have **not**
@@ -300,7 +300,7 @@ removed the paired computer, switched Wireless debugging and USB debugging off, 
 
 ## Third unit: 55Q6C (Vietnam, Wi-Fi)
 
-One owner's session on 2026-10-23, following `PROMPT.md` on macOS with Claude Code. `tools/tv.py
+One owner's session on 2026-10-23, on macOS with Claude Code. `tools/tv.py
 --probe` reported `Smart TV Pro`, device `G08`, Android 14 (SDK 34), `tcl9618-user 14 UTT2.250416.001 AU02
 release-keys` and `ro.adb.secure = 1`: the same pair as this folder.
 
@@ -363,7 +363,7 @@ Mirroring. That is the router, not the debloat: nothing AirPlay-related was disa
 
 ## Fourth unit: 65T8C (Wi-Fi)
 
-One owner's session on 2026-10-23, following `PROMPT.md` on Linux with Google's platform-tools
+One owner's session on 2026-10-23, on Linux with Google's platform-tools
 `adb` and launcher 2.6. Same build as the Q7C (`G08_4K_GB`, `UTT2.250416.001 AU02`, `ro.software.version_id`
 `V8-T653T01-LF1V643`, security patch `2025-12-05`), so `debloat.txt` here is the list to run. Packages were
 disabled by hand, one `pm disable-user` call each, in seven batches with a screenshot after each; the first 34
@@ -474,7 +474,7 @@ launcher (launcherx and setupwraith off). This set is the source of the groups m
 
 ## Sixth unit: 55C69K (Europe, Wi-Fi)
 
-One owner's session on 2026-10-26, following `PROMPT.md` on Windows 11 with Claude Code and the
+One owner's session on 2026-10-26, on Windows 11 with Claude Code and the
 repo's PowerShell tools (`tools/disable.ps1`, `launcher/build-and-install.ps1`; no platform-tools `adb`). Same pair as
 this folder, so `debloat.txt` here is the list to run; this section records the deltas.
 
@@ -617,7 +617,7 @@ with `stock_home_redirect`, then launcherx and setupwraith were disabled so Goog
 
 ## Ninth unit: 98Q6C (Poland, Ethernet, AU04)
 
-One owner's session on 2026-10-24, following `PROMPT.md` on Linux with the repo's tools and
+One owner's session on 2026-10-24, on Linux with the repo's tools and
 launcher. The first unit in this folder set up on build **AU04**, one step newer than the AU02 above. Nothing was
 added to `debloat.txt` beyond header lines naming this unit; the deltas are below.
 
@@ -714,7 +714,7 @@ SmartTube (`org.smarttube.stable`, the `armeabi-v7a` build: this userland is 32-
 - Checked by the owner: Chromecast from a phone, a PS5 on HDMI through the Inputs menu, standby and wake, and
   every remote button above. Live TV opened; no long playback.
 ## Tenth unit: 55T8C (Wi-Fi)
-One owner's session on 2026-10-26 on Windows, following `PROMPT.md` with `tools/tv.py` and the
+One owner's session on 2026-10-26 on Windows, with `tools/tv.py` and the
 PowerShell twins, then a week of use to 2026-11-01. Same build as the Q7C, so the list here is the one to run with
 the deltas below. Packages were disabled by hand, one `pm disable-user --user 0` call each, in six batches with a
 screenshot after each. Nothing was added to the list beyond a header line naming this unit.

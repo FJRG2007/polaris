@@ -122,7 +122,7 @@ THEME="${THEME_ARG:?usage: theme.sh <theme folder> | --reset}"
 # A folder that is not a theme, a file the launcher would drop, a wallpaper name the push refuses: each is a
 # run that stops before anything is sent, which the header gives 2, not 1 - the status of a push that ran and
 # failed. The three answered 1 while their own last sentence said "Nothing was sent to the TV.", so an owner
-# (or an assistant following PROMPT.md) read a command line it could fix as the TV refusing the theme.
+# (or an assistant) read a command line it could fix as the TV refusing the theme.
 [ -f "$THEME/config.json" ] || { echo "no config.json in $THEME. Nothing was sent to the TV." >&2; exit 2; }
 # What the launcher makes of the file: Config.read() answers "no overlay" for anything that is not a JSON
 # object, so an array, a number or a string is a theme the TV drops - and it replaces the theme the set had,

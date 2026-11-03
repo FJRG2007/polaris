@@ -12,7 +12,7 @@ disabled. The reference launcher was not tested: the owner chose Projectivy inst
 - Connected over Wi-Fi, with no USB peripherals or USB Ethernet adapter during the session.
 
 These observations apply to this unit and firmware; they do not establish that other
-Pixpaq models behave the same way. Follow PROMPT.md for backups,
+Pixpaq models behave the same way. Follow the [README](../../README.md) for backups,
 protected packages, Home checks and closing debugging.
 
 ## Reach Android Settings and Developer options before ADB is available
@@ -38,7 +38,7 @@ also installed, but its main screen needs an explicit activity launch.
    Wireless debugging here for the initial setup. If Developer options itself is
    off, enable its master switch first; first-time unlocking was not independently
    repeated on this already-configured unit.
-5. Follow the connection procedure in PROMPT.md, accepting the
+5. Follow the connection procedure in the [README](../../README.md), accepting the
    on-screen debugging authorization when requested. If Wireless debugging shows
    pairing details, use those ports and code rather than assuming port 5555.
 

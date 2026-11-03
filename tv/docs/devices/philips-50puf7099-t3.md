@@ -115,7 +115,7 @@ Applied with `tools/disable.sh`, then the launcher handover, then a reboot:
 ## Limits
 
 - **One session, one reboot.** The list has not been lived with for days, so this note is the
-  record of what was checked, not of what held up over time. `CONTRIBUTING.md` asks for several days
+  record of what was checked, not of what held up over time. [`docs/workflows/tv-list.md`](../workflows/tv-list.md) asks for several days
   before a list moves into `examples/`; the list is here so it can be reviewed and corrected.
 - **Only injected keys were used** (`deviceId=-1`), never the physical remote. The Home key, the
   app list scrolling, the app library and the theme switch have not been tried with the real remote

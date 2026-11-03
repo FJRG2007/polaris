@@ -30,7 +30,7 @@
 # re-enables it at every boot (all other disabled packages stay off), so dropping voice search means re-running
 # disable.sh after each reboot. Disabling the casting group at the end closed ports 8009, 55442 and 60000 on the LAN.
 # With Fire OS parental controls on ("PIN protect app launches"), any start of another app over Amazon's home,
-# including a Home-watcher launcher from SHOWCASE.md, opens the Prime Video PIN prompt every time.
+# including a Home-watcher launcher, opens the Prime Video PIN prompt every time.
 # After 10 days two disabled third-party apps (Disney+, RaiPlay) were enabled again, both updated meanwhile, most likely
 # by Appstore auto-update; the Amazon packages all stayed off. Check `pm list packages -d` now and then.
 #

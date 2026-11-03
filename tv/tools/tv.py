@@ -493,7 +493,7 @@ def transfer_args(args):
 def screenshot_target(local):
     """Judge the file --screenshot saves to, and make the folder it needs, before the TV is opened.
 
-    Every page here hands out `--screenshot shots/01.png` - PROMPT.md, AGENTS.md, CONTRIBUTING.md - and
+    Pages here hand out `--screenshot shots/01.png`, and
     the folder that does not exist yet was fixed for them in #364. Two other shapes a destination takes
     were judged nowhere: a folder of that name (`mkdir shots` and then `--screenshot shots`, or a name
     typed with its trailing separator) reached adb_shell's pull, which writes to the name it is given,
@@ -613,7 +613,7 @@ def screenshot(dev, local, keys=(), wait=0.0):
     size = os.path.getsize(local) if os.path.exists(local) else 0
     if size == 0:
         # 0 bytes means the input, not the connection: Live TV and HDMI captures come back empty on
-        # most sets, and PROMPT.md tells the agent to look at the screen rather than the ADB link.
+        # most sets, so the screen is what to check, not the ADB link.
         print(f"captured 0 bytes into {local}: Live TV and HDMI inputs come back empty on most TVs, as do "
               "some streaming apps (Netflix), so check what is on screen before the ADB connection "
               "(see docs/TROUBLESHOOTING.md)", file=sys.stderr)

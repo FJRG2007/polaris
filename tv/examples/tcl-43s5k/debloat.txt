@@ -53,7 +53,7 @@
 # the network owner on another unit before copying that step.
 #
 # Applied in four batches on 2026-10-20 with a screenshot after each and lived with for an afternoon so far
-# (shorter than CONTRIBUTING.md asks; I'll report back if anything breaks). Since then: two power cuts and a
+# (shorter than docs/workflows/tv-list.md asks; I'll report back if anything breaks). Since then: two power cuts and a
 # reboot, Home came back on launcher/ each time; Wi-Fi, the remote's Input key (TCL's source panel), the
 # launcher's Inputs menu (HDMI 1, HDMI 2, Composite, Live TV), YouTube, Netflix and JioHotstar (with AdGuard
 # Private DNS) all fine. launcherx was disabled by launcher/build-and-install.sh after the new Home ran.
@@ -101,7 +101,7 @@
 # TV and HDMI are com.mediatek.wwtv.tvcenter here as well; no Ginga package is installed. The network in use belonged to android.uid.system, but an unused
 # network saved during setup belonged to setupwraith, so tools/disable.sh skipped setupwraith; it was
 # disabled with FORCE_SETUPWRAITH=1 after checking the owners, which deleted only the unused network. Home
-# on this unit is the Polaris TV UI fork from SHOWCASE.md, not launcher/, and its install script disabled
+# on this unit is a community fork of the launcher, not launcher/, and its install script disabled
 # launcherx. After the reboot: Home came back on it, Wi-Fi reconnected, and MemAvailable was 385 MB
 # (295 MB before the list). `input keyevent 83` did nothing once launcherx was off (simulated, not a press
 # on the remote).

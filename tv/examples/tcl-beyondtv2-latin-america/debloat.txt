@@ -46,14 +46,14 @@
 # watching and restoring them, the same way com.tcl.overseasappshow is documented to do for
 # notereminder and tclhome_master on the Android 11 BeyondTV2 (examples/tcl-beyondtv2-android-11).
 # They are listed below for completeness and because they do disable (just not stay disabled);
-# do not keep re-running disable.sh on them, per PROMPT.md.
+# do not keep re-running disable.sh on them.
 #
 # DO NOT DISABLE (load-bearing): com.tcl.tv com.tcl.tvinput com.tcl.sourcemananger (Live TV,
 # HDMI, tuner, Source menu), com.tcl.autopair com.tcl.tcl_bt_rcu_service
 # com.tcl.keycustomfunctionservice (remote, BT pairing, FallbackHome), com.tcl.framework.custom
 # com.tcl.keyhelp com.tcl.partnercustomizer (key handling, TKey activity),
 # com.tcl.inputmethod.international com.tcl.settings com.tcl.initsetup com.tcl.factory.view
-# (never even opened - the name alone puts it in PROMPT.md's "never start a factory package"
+# (never even opened - the name alone puts it in the "never start a factory package"
 # category) com.tcl.common.terminalmanagerplus com.tcl.xian.StartandroidService
 # com.tcl.appstatecontroller com.android.ListenNetStateService (unclear roles, boot/package/network
 # hooks; appstatecontroller is also the suspected watchdog above), com.realtek.netflix.setting

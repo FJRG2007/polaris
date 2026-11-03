@@ -174,8 +174,8 @@ An earlier draft of this list offered `com.arris.gtvs`, `com.arris.chmframework`
 or (for `oemdata`) disabled by default. That was wrong on both counts: `debloat.txt` is a bloat
 list, and none of these seven is bloat by any definition - six back a normal device function, and
 the seventh (`oemdata`) looked like telemetry but turned out to be a real dependency another kept
-package needs (see above). The same category CONTRIBUTING.md tells contributors to leave out
-entirely for AOSP's own core packages:
+package needs (see above). They are the same category as AOSP's own core packages, which a list leaves
+out entirely:
 
 | Package | What it does |
 |---|---|

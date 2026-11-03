@@ -549,8 +549,8 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   MediaTek, #1578). What the agent disabled
   is not known. The reply on the issue names eight packages from the disabled-package list attached
   to the report: `com.cltv.mal` (TV middleware), `com.cltv.hybrid` (Live TV), the ISDB and ATSC
-  tuner inputs and four Haier apps. But the six files attached match the backup PROMPT.md has the
-  agent save before changing anything, and on the Haier-built [AQUA MatrixTV EE
+  tuner inputs and four Haier apps. But the six files attached match the backup the tools
+  save before changing anything, and on the Haier-built [AQUA MatrixTV EE
   50](../examples/aqua-matrixtv-ee-50/debloat.txt) five of those eight are disabled from the
   factory. So the list may be the TV's state before the debloat: then it says nothing about the
   cause, and turning those eight back on would switch on what the factory left off instead of
@@ -1588,9 +1588,9 @@ VH2 and do nothing from an app: Android's system-audio setting, volume nudges, a
 service. What does work is an app that keeps Network debugging on and connects to the TV's own ADB on
 `127.0.0.1:5555` with its own key, which the TV asks to allow once, and runs only that one command when
 an app opens or media starts while no `TYPE_HDMI_ARC`/`TYPE_HDMI_EARC` output is listed. The
-[Sony BRAVIA Launcher](https://github.com/udeshvirk/sony-bravia-launcher) in `SHOWCASE.md`
+[Sony BRAVIA Launcher](https://github.com/udeshvirk/sony-bravia-launcher)
 does this (`SoundbarWaker.java`). It is a trade-off: Network debugging stays on and the port is open on
-the home network, which the PROMPT's last step closes on purpose; on a set with `ro.adb.secure=0` an open port is a shell for anyone on the network, so only consider it where the TV asks to allow each new key. On Sony, an app can instead open the
+the home network, which the README's closing step closes on purpose; on a set with `ro.adb.secure=0` an open port is a shell for anyone on the network, so only consider it where the TV asks to allow each new key. On Sony, an app can instead open the
 Home Theatre Control panel (`com.sony.dtv.HomeTheatreControl`) for about half a second, which also
 wakes the soundbar and needs no ADB, at the cost of the panel flashing on screen.
 

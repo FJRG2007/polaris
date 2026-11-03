@@ -27,7 +27,7 @@
 # com.tcl.messagebox (carries the ttvs receiver), com.tcl.suspension (Quick Panel),
 # com.android.location.fused (boot-looped a 43S5400A into recovery on V325, #2803).
 #
-# Applied on 2026-10-20 and checked the same day (shorter than CONTRIBUTING.md asks; I will report
+# Applied on 2026-10-20 and checked the same day (shorter than docs/workflows/tv-list.md asks; I will report
 # back if anything breaks). The first pass also disabled com.tcl.system.server, com.tcl.autopair,
 # com.tcl.settings, com.tcl.messagebox and com.tcl.dashboard; after comparing with tcl-40s5400a they
 # are not in this list, because the first three are remote/pairing/picture-sound plumbing. If an

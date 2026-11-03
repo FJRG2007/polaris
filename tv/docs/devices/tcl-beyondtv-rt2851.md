@@ -36,8 +36,8 @@ from an HDMI input, however the helper is set up.
 - **T (4020).** On every real press it sends the non-protected broadcast `tcl.sys.intent.action.TKey` and,
   from uid 1000, starts the action `com.tcl.partnercustomizer.tkey`, which `TKeyActivity` and
   `TKeyGalaActivity` in `com.tcl.partnercustomizer` answer. An `input keyevent 4020` injection does **not**
-  trigger it: only a press on the real remote does, so a test with `tools/tv.py` proves nothing here (the
-  same caution as the "An injected key is not proof" rule in AGENTS.md).
+  trigger it: only a press on the real remote does, so a test with `tools/tv.py` proves nothing here (an
+  injected key is not proof).
 - **Netflix (4062).** It sends the broadcast `com.netflix.ninja.intent.action.NETFLIX_KEY`, guarded by the
   permission `com.netflix.ninja.permission.NETFLIX_KEY`, so no third-party app can receive it. With
   Netflix disabled the button does nothing inside apps.

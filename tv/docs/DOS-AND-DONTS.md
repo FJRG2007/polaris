@@ -1,7 +1,7 @@
 # Do's and don'ts
 
 These are the reasons pull requests most often came back for changes or were closed. They come from the
-maintainer's reviews, and each line links an example. None of this replaces CONTRIBUTING.md:
+maintainer's reviews, and each line links an example. None of this replaces the steps in [`docs/workflows/`](workflows/):
 it is the short list of mistakes to skip. When in doubt, ask in an issue before you build. "Thanks for asking
 first" is a common reply.
 
@@ -10,7 +10,7 @@ first" is a common reply.
 | Do | Don't |
 |---|---|
 | Put a widget or tile that can be its own app in `addons/`, as a module card (#704, #1086, #1226) | Build it into `launcher/`, which stays small, offline and under a size budget for 1 GB TVs (#173, #309) |
-| Put a whole launcher, a restyle, a port or a big feature in your own repo, plus one row in SHOWCASE.md (#773, #1229) | Send a 2,000-line PR to the core and hope it fits (#1109, #1138) |
+| Put a whole launcher, a restyle, a port or a big feature in your own repo (#773, #1229) | Send a 2,000-line PR to the core and hope it fits (#1109, #1138) |
 | Search open and merged PRs first, and build on what's there (#972, #1279) | Add a second key, map or add-on for something main already does: two would fight (#864, #1173, #1288, #271) |
 | Send one idea per PR, and split the rest out (#326, #488, #1235) | Mix a TV list, a launcher change and a theme in one PR (#268, #325) |
 
@@ -95,15 +95,6 @@ first" is a common reply.
 | Run the same safety checks as `disable.sh` before anything that disables (#434) | Add a second install or update path for the launcher; `launcher/build-and-install.sh` is the one way in (#1170) |
 | Keep tools to what the main install path needs, and anything optional out of `tools/requirements.txt` (#564, #1206) | Write tests that pin the exact wording of prose, or that are always true (#745, #858, #891) |
 
-## Showcase rows (`SHOWCASE.md`)
-
-- **Do** run it on a real TV first, keep the row to one short sentence at the bottom of its section, and say what
-  it connects to and its permissions (#338, #1349).
-- **Do** add a LICENSE file to your repo: the showcase asks for open source (#222).
-- **Do** tell your users when a feature sends data to a third party, such as an IP-location service (#365).
-- **Don't** reword someone else's row (#856).
-- **Don't** expect a row for anything root-based or that gets around app-store protection (#347).
-
 ## Keeping a PR mergeable
 
 - **Rebase when asked.** Main moves fast. PRs that conflict and get no reply for about three days are closed, and
@@ -114,4 +105,4 @@ first" is a common reply.
   `.gitignore` churn (#640, #1148).
 - **Write code comments in English** (#402).
 - **Don't edit generated tables or counts** in the README; they come from each folder's `tv.json`
-  (CONTRIBUTING).
+  ([`docs/workflows/tv-list.md`](workflows/tv-list.md)).

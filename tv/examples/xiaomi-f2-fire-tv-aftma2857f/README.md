@@ -27,8 +27,7 @@ disabled here because they weren't watched, then Disney+ and Pluto TV were turne
 the list, so applying it leaves them alone unless you uncomment them.
 
 **Home: not by debloat.** `com.amazon.tv.launcher` is protected and keeps HOME. An Apple TV-style home screen
-runs on this set over it with the accessibility-watcher approach in SHOWCASE.md ("Fire TV → Apple TV front
-end"); the TV's own Settings (`MainSettingsActivity`), Inputs and Live TV stay reachable that way.
+runs on this set over it with an accessibility watcher; the TV's own Settings (`MainSettingsActivity`), Inputs and Live TV stay reachable that way.
 
 ## Undo
 

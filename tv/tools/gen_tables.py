@@ -85,7 +85,7 @@ def load(root, allow_missing=False):
                 continue
             what = "is missing" if not path.exists() else "is not a file"
             problems.append(f"{where} {what}: it holds the folder's row in the README tables "
-                            f"(see CONTRIBUTING.md, step 4)")
+                            f"(see docs/workflows/tv-list.md, step 4)")
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -211,8 +211,7 @@ def between(text, name, body, path):
 def word_for(word, n):
     """The form of a count word that goes after n. A word is one string, or (one, few, many) for a
     language that changes the noun with the number, East Slavic style: 1, 21, 31 take the first form,
-    2-4, 22-24 the second, everything else (11-14 too) the third. README.uk.md said "387 модель
-    телевізорів · 103 брендів" with one fixed form; it is "387 моделей телевізорів · 103 бренди"."""
+    2-4, 22-24 the second, everything else (11-14 too) the third: "387 моделей телевізорів · 103 бренди", not one fixed form."""
     if isinstance(word, str):
         return word
     one, few, many = word
