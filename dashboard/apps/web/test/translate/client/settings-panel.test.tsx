@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { DEFAULT_SETTINGS, type TranslateSettings } from "@polaris-app/translate/src/model/schemas";
 
 const saved: unknown[] = [];
@@ -44,7 +44,10 @@ async function open(): Promise<void> {
     await act(async () => {});
 }
 
-const names = () => screen.getAllByRole("switch").map((one) => one.getAttribute("aria-label"));
+/** The engine switches only: the list of engines, not the length limit below it. */
+const engineSwitches = () =>
+    within(screen.getByRole("group", { name: "Engines" })).getAllByRole("switch");
+const names = () => engineSwitches().map((one) => one.getAttribute("aria-label"));
 
 describe("the engines' order", () => {
     it("lists them in the order they are tried", async () => {
@@ -74,7 +77,7 @@ describe("the engines' order", () => {
 
     it("moves one by dragging it onto another row", async () => {
         await open();
-        const rows = screen.getAllByRole("switch").map((one) => one.closest("[draggable]")!);
+        const rows = engineSwitches().map((one) => one.closest("[draggable]")!);
         const data = new Map<string, string>();
         const dataTransfer = {
             setData: (type: string, value: string) => data.set(type, value),

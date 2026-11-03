@@ -56,8 +56,28 @@ describe("readSettings", () => {
         ).toEqual({
             engines: { browser: true, polar: true, deepl: false, google: true },
             order: ["browser", "deepl", "google", "polar"],
-            defaultTarget: "en"
+            defaultTarget: "en",
+            charLimit: null
         });
+    });
+
+    it("reads the length limit leniently: off unless a whole number in range", () => {
+        expect(readSettings({ charLimit: 2000 }).charLimit).toBe(2000);
+        for (const raw of ["2000", 99, 1.5, -1, 10_000_001, null, undefined]) {
+            expect(readSettings({ charLimit: raw }).charLimit).toBeNull();
+        }
+    });
+
+    it("accepts settings saved without a limit as no limit, and refuses one out of range", () => {
+        const base = {
+            engines: DEFAULT_SETTINGS.engines,
+            order: DEFAULT_SETTINGS.order,
+            defaultTarget: "en"
+        };
+        const parsed = settingsInput.safeParse(base);
+        expect(parsed.success && parsed.data.charLimit).toBeNull();
+        expect(settingsInput.safeParse({ ...base, charLimit: 50 }).success).toBe(false);
+        expect(settingsInput.safeParse({ ...base, charLimit: 5000 }).success).toBe(true);
     });
 
     it("keeps a stored order, drops what it does not know, and appends what it lacks", () => {

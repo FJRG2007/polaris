@@ -6,7 +6,8 @@
  * order is the list itself, set by dragging a row (or its arrows, from the
  * keyboard), as the AI keys are. An administrator's page, reached
  * from the app's menu under Polaris apps like every other app's settings.
- * Save waits for a change; the keys themselves are on the Integrations screen,
+ * An optional limit on one translation is off unless the administrator
+ * turns it on. Save waits for a change; the keys themselves are on the Integrations screen,
  * which the page links to.
  */
 
@@ -16,8 +17,37 @@ import { useLanguageOptions } from "./language-options";
 import { unwrap, useTranslateLocale, useTranslateT } from "./i18n";
 import { saveSettingsAction, settingsAction } from "../actions/translate";
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
-import type { EngineId, TranslateSettings } from "../model/schemas";
-import { Button, Card, SearchableSelect, Skeleton, Switch, isDirty, useToast } from "@polaris/ui";
+import {
+    CHAR_LIMIT_MAX,
+    CHAR_LIMIT_MIN,
+    type EngineId,
+    type TranslateSettings
+} from "../model/schemas";
+import {
+    Button,
+    Card,
+    Input,
+    SearchableSelect,
+    Skeleton,
+    Switch,
+    isDirty,
+    useToast
+} from "@polaris/ui";
+
+/** The limit a newly switched-on field starts at. */
+const LIMIT_START = 5000;
+
+/** What the limit field says, as a limit: null when off, NaN when it is not one. */
+export function limitOf(text: string | null): number | null {
+    if (text === null) return null;
+    const value = Number(text.trim());
+    return text.trim() &&
+        Number.isInteger(value) &&
+        value >= CHAR_LIMIT_MIN &&
+        value <= CHAR_LIMIT_MAX
+        ? value
+        : Number.NaN;
+}
 
 const NAME = {
     browser: "engine.browser",
@@ -42,6 +72,7 @@ export function SettingsPanel() {
     const [draft, setDraft] = useState<TranslateSettings | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [limitText, setLimitText] = useState<string | null>(null);
 
     const load = () => {
         setFailed(null);
@@ -49,21 +80,33 @@ export function SettingsPanel() {
             .then((answer) => {
                 setLoaded(answer.settings);
                 setDraft(answer.settings);
+                setLimitText(
+                    answer.settings.charLimit === null ? null : String(answer.settings.charLimit)
+                );
             })
             .catch((caught: Error) => setFailed(caught.message));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- read once, on arrival
     useEffect(load, []);
 
-    const changed = loaded !== null && draft !== null && isDirty(loaded, draft);
+    const limit = limitOf(limitText);
+    const limitValid = limit === null || !Number.isNaN(limit);
+    const edited = draft && limitValid ? { ...draft, charLimit: limit } : draft;
+    const changed =
+        loaded !== null &&
+        draft !== null &&
+        (!limitValid || (edited !== null && isDirty(loaded, edited)));
 
     const save = async () => {
-        if (!draft || !changed) return;
+        if (!edited || !changed || !limitValid) return;
         setSaving(true);
         try {
-            const answer = await unwrap(() => saveSettingsAction(draft), t("errors.saveFailed"));
+            const answer = await unwrap(() => saveSettingsAction(edited), t("errors.saveFailed"));
             setLoaded(answer.settings);
             setDraft(answer.settings);
+            setLimitText(
+                answer.settings.charLimit === null ? null : String(answer.settings.charLimit)
+            );
             toast.show({ title: t("settings.saved") });
         } catch (caught) {
             toast.show({ title: t("errors.saveFailed"), body: (caught as Error).message });
@@ -166,17 +209,59 @@ export function SettingsPanel() {
                             emptyText={t("lang.none")}
                         />
                     </div>
+                    <div className="max-w-sm space-y-1.5">
+                        <div className="flex min-w-0 items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium">{t("settings.limit")}</p>
+                                <p id={`${ids}-limit`} className="text-xs text-muted-foreground">
+                                    {t("settings.limitHint")}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={limitText !== null}
+                                onChange={(on) => setLimitText(on ? String(LIMIT_START) : null)}
+                                aria-label={t("settings.limitOn")}
+                                aria-describedby={`${ids}-limit`}
+                            />
+                        </div>
+                        {limitText !== null ? (
+                            <>
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={CHAR_LIMIT_MIN}
+                                    max={CHAR_LIMIT_MAX}
+                                    step={1}
+                                    value={limitText}
+                                    onChange={(event) => setLimitText(event.target.value)}
+                                    aria-label={t("settings.limitChars")}
+                                    aria-invalid={!limitValid}
+                                />
+                                {!limitValid ? (
+                                    <p className="text-xs text-destructive">
+                                        {t("settings.limitInvalid", {
+                                            min: CHAR_LIMIT_MIN,
+                                            max: CHAR_LIMIT_MAX
+                                        })}
+                                    </p>
+                                ) : null}
+                            </>
+                        ) : null}
+                    </div>
                 </>
             )}
             <div className="flex flex-wrap justify-end gap-2">
                 <Button
                     variant="outline"
-                    onClick={() => setDraft(loaded)}
+                    onClick={() => {
+                        setDraft(loaded);
+                        setLimitText(loaded?.charLimit == null ? null : String(loaded.charLimit));
+                    }}
                     disabled={!changed || saving}
                 >
                     {t("settings.cancel")}
                 </Button>
-                <Button onClick={() => void save()} disabled={!changed || saving}>
+                <Button onClick={() => void save()} disabled={!changed || !limitValid || saving}>
                     {t("settings.save")}
                 </Button>
             </div>

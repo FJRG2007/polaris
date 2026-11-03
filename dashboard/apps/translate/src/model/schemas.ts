@@ -6,12 +6,23 @@
 import { z } from "zod";
 import { AUTO, LANGUAGE_CODES } from "./languages";
 
-/** The longest single text, in characters. */
-export const TEXT_MAX = 5000;
-/** The most texts in one request (later phases send a page's paragraphs). */
+/**
+ * The longest single text in one request, in characters. A technical cap on a
+ * request, never a limit the reader meets: the screen cuts a longer text into
+ * pieces (`model/chunk.ts`) and sends them a request at a time.
+ */
+export const TEXT_MAX = 50_000;
+/** The most texts in one request. */
 export const TEXTS_MAX = 50;
 /** The most characters in one request, across its texts. */
-export const TOTAL_MAX = 20_000;
+export const TOTAL_MAX = 50_000;
+
+/** How much of a translation the history keeps of each side. */
+export const HISTORY_TEXT_MAX = 5000;
+
+/** The smallest and largest limit an administrator may set on one translation. */
+export const CHAR_LIMIT_MIN = 100;
+export const CHAR_LIMIT_MAX = 10_000_000;
 
 /** How many translations one person keeps. The oldest go on every write. */
 export const HISTORY_MAX = 100;
@@ -62,12 +73,12 @@ export type DetectInput = z.infer<typeof detectInput>;
 /** One translation to keep. The target may run longer than its source. */
 export const rememberInput = z
     .object({
-        sourceText: z.string().trim().min(1).max(TEXT_MAX),
+        sourceText: z.string().trim().min(1).max(HISTORY_TEXT_MAX),
         targetText: z
             .string()
             .trim()
             .min(1)
-            .max(TEXT_MAX * 2),
+            .max(HISTORY_TEXT_MAX * 2),
         from: languageCode,
         to: languageCode,
         engine: engineId
@@ -93,7 +104,12 @@ export const settingsInput = z
             .array(engineId)
             .length(ENGINE_IDS.length)
             .refine((ids) => new Set(ids).size === ids.length, { message: "errors.invalid" }),
-        defaultTarget: languageCode
+        defaultTarget: languageCode,
+        /**
+         * The most characters one translation may have, or null for no limit
+         * (the default). Absent from a client older than the setting: no limit.
+         */
+        charLimit: z.number().int().min(CHAR_LIMIT_MIN).max(CHAR_LIMIT_MAX).nullable().default(null)
     })
     .strict();
 
@@ -121,8 +137,19 @@ export function readOrder(raw: unknown): EngineId[] {
 export const DEFAULT_SETTINGS: TranslateSettings = {
     engines: { browser: true, polar: true, deepl: true, google: true },
     order: [...DEFAULT_ORDER],
-    defaultTarget: "en"
+    defaultTarget: "en",
+    charLimit: null
 };
+
+/** A stored limit, read leniently: anything but a whole number in range is no limit. */
+export function readCharLimit(raw: unknown): number | null {
+    return typeof raw === "number" &&
+        Number.isInteger(raw) &&
+        raw >= CHAR_LIMIT_MIN &&
+        raw <= CHAR_LIMIT_MAX
+        ? raw
+        : null;
+}
 
 /**
  * Stored settings, read field by field: a value saved by an older version, or
@@ -147,6 +174,7 @@ export function readSettings(raw: unknown): TranslateSettings {
             google: flag("google")
         },
         order: readOrder(stored.order),
-        defaultTarget: target.success ? target.data : DEFAULT_SETTINGS.defaultTarget
+        defaultTarget: target.success ? target.data : DEFAULT_SETTINGS.defaultTarget,
+        charLimit: readCharLimit(stored.charLimit)
     };
 }

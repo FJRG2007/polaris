@@ -15,17 +15,38 @@ export interface ServerStatusView {
     defaultTarget: string;
     /** The administrator's order; missing from a status cached before it existed. */
     order?: EngineId[];
+    /** The most characters one translation may have; null or missing is no limit. */
+    charLimit?: number | null;
+    /** Whether pictures and recordings can be read here; missing from an older cache. */
+    reads?: { images: boolean; audio: boolean };
 }
 
 /** An answer the server refused, carrying the sentence it gave. */
 export class ServerEngineError extends Error {
     public readonly code: string;
+    /** Seconds the server asked to wait before trying again, when it said. */
+    public readonly retryAfter: number | null;
 
-    public constructor(code: string, message: string) {
+    public constructor(code: string, message: string, retryAfter: number | null = null) {
         super(message);
         this.name = "ServerEngineError";
         this.code = code;
+        this.retryAfter = retryAfter;
     }
+}
+
+/** The refusal in `response`, carrying its sentence and any wait it asked for. */
+function refusal(
+    response: Response,
+    answer: { error?: string; message?: string },
+    fallback: string
+): ServerEngineError {
+    const wait = Number(response.headers.get("retry-after"));
+    return new ServerEngineError(
+        answer.error ?? "failed",
+        answer.message ?? fallback,
+        Number.isFinite(wait) && wait > 0 ? wait : null
+    );
 }
 
 async function post<T>(
@@ -44,8 +65,7 @@ async function post<T>(
         error?: string;
         message?: string;
     } & T;
-    if (!response.ok)
-        throw new ServerEngineError(answer.error ?? "failed", answer.message ?? fallback);
+    if (!response.ok) throw refusal(response, answer, fallback);
     return answer;
 }
 
@@ -78,4 +98,25 @@ export function createServerEngine(id: ServerEngineId, fallback: string): Transl
             return answer.language;
         }
     };
+}
+
+/** A file posted as it is to one of the reading routes; the answer, or the sentence refusing it. */
+export async function postFile<T>(
+    path: string,
+    file: Blob,
+    fallback: string,
+    signal?: AbortSignal
+): Promise<T> {
+    const response = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": file.type || "application/octet-stream" },
+        body: file,
+        signal
+    });
+    const answer = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+    } & T;
+    if (!response.ok) throw refusal(response, answer, fallback);
+    return answer;
 }
