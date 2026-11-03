@@ -568,6 +568,9 @@ export async function serverImages(targetId: string) {
                       : null;
             return {
                 ...image,
+                // Every one of these runs beside Polaris itself, so only there
+                // can the feature behind it be turned off from here.
+                sidecars: target.kind === "local" ? image.sidecars : [],
                 home,
                 scan: scan ? { ...scan, summary: safeJson(scan.summary) } : null
             };

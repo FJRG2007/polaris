@@ -102,7 +102,20 @@
         "noApps": "No apps on this server yet.",
         "open": "Open",
         "openOwn": "Open in Management",
-        "openDeploy": "Open in Deploy"
+        "openDeploy": "Open in Deploy",
+        "startedBy": "Started by {feature}",
+        "turnOff": "Turn off",
+        "turnOffTitle": "Turn off {feature}?",
+        "turnOffBody": "Its container is removed. Turn it on again from its own page.",
+        "feature": {
+            "tunnel-ngrok": "ngrok tunnel",
+            "tunnel-cloudflare": "Cloudflare tunnel",
+            "share-tunnel": "Share link tunnel",
+            "backup-tunnel": "Backup access tunnel",
+            "app-tunnel-named": "Service named tunnel",
+            "app-tunnel-quick": "Service quick tunnel",
+            "app-tunnel-ngrok": "Service ngrok tunnel"
+        }
     },
     "history": "Recent scans",
     "noScans": "No scans yet.",
@@ -135,7 +148,8 @@
         "imageMissing": "The image this app runs is no longer on the server. Redeploy the app, then scan again.",
         "noRoom": "Not enough free disk on the server to check this image. Free some space, then try again.",
         "scannerFailed": "The vulnerability scanner stopped with an error. Try again.",
-        "reportUnreadable": "The scanner's report could not be read. Update Polaris from Settings, then scan again."
+        "reportUnreadable": "The scanner's report could not be read. Update Polaris from Settings, then scan again.",
+        "sidecarRefused": "It could not be turned off. Try again from its own page."
     },
     "alerts": {
         "title": "{count, plural, one {A new serious vulnerability in {app}} other {# new serious vulnerabilities in {app}}}",

@@ -13,7 +13,17 @@ import { hostUi } from "@polaris/app-host/client";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { FindingsTable, type ImageFinding } from "./findings-table";
-import { Badge, Button, Card, CardBody, EmptyState, Skeleton, TagList } from "@polaris/ui";
+import type { Sidecar } from "@polaris/deploy";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    ConfirmDeleteDialog,
+    EmptyState,
+    Skeleton,
+    TagList
+} from "@polaris/ui";
 
 type Images = Extract<Awaited<ReturnType<typeof actions.serverImagesAction>>, { ok: true }>["data"];
 type Submit = (
@@ -44,6 +54,8 @@ export function ImagesPanel({
     const [open, setOpen] = useState<string | null>(null);
     const [findings, setFindings] = useState<ImageFinding[] | null>(null);
     const [findingsFailed, setFindingsFailed] = useState(false);
+    const [turningOff, setTurningOff] = useState<Sidecar | null>(null);
+    const [turnOffPending, setTurnOffPending] = useState(false);
 
     // Read through the shared live read, so two tabs on this server ask once
     // between them while a scan is running, and a revisit paints the rows it
@@ -170,6 +182,31 @@ export function ImagesPanel({
                                                       </span>
                                                       {image.users.join(", ")}
                                                   </span>
+                                                  {(image.sidecars ?? []).map((sidecar) => (
+                                                      <span
+                                                          key={sidecar.project}
+                                                          className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground"
+                                                      >
+                                                          <span
+                                                              className="min-w-0 truncate"
+                                                              title={sidecar.project}
+                                                          >
+                                                              {t("images.startedBy", {
+                                                                  feature: t(
+                                                                      `images.feature.${sidecar.feature}`
+                                                                  )
+                                                              })}
+                                                          </span>
+                                                          <Button
+                                                              size="xs"
+                                                              variant="ghost"
+                                                              className="shrink-0"
+                                                              onClick={() => setTurningOff(sidecar)}
+                                                          >
+                                                              {t("images.turnOff")}
+                                                          </Button>
+                                                      </span>
+                                                  ))}
                                               </td>
                                               <td className="hidden px-2 py-1.5 lg:table-cell">
                                                   <Badge
@@ -290,6 +327,40 @@ export function ImagesPanel({
                         </tbody>
                     </table>
                 )}
+                <ConfirmDeleteDialog
+                    open={turningOff !== null}
+                    onOpenChange={(next) => {
+                        if (!next && !turnOffPending) setTurningOff(null);
+                    }}
+                    kind={t("images.turnOff")}
+                    name={turningOff?.project ?? ""}
+                    title={
+                        turningOff
+                            ? t("images.turnOffTitle", {
+                                  feature: t(`images.feature.${turningOff.feature}`)
+                              })
+                            : null
+                    }
+                    description={t("images.turnOffBody")}
+                    confirmLabel={t("images.turnOff")}
+                    pending={turnOffPending}
+                    onConfirm={() => {
+                        const sidecar = turningOff;
+                        if (!sidecar) return;
+                        setTurnOffPending(true);
+                        void submit(async () => {
+                            const result = await actions.turnOffSidecarAction({
+                                feature: sidecar.feature,
+                                project: sidecar.project
+                            });
+                            if (result.ok) await load();
+                            return result;
+                        }).finally(() => {
+                            setTurnOffPending(false);
+                            setTurningOff(null);
+                        });
+                    }}
+                />
             </CardBody>
         </Card>
     );
