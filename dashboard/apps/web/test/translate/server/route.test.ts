@@ -18,7 +18,9 @@ const mocks = vi.hoisted(() => ({
     serverDetect: vi.fn(async () => "pt-br"),
     // Nothing set up to read pictures or recordings unless a test says so.
     serverMediaStatus: vi.fn(async () => ({ images: false, audio: false })),
-    serverReadImage: vi.fn(async () => ({ lines: [{ text: "SALIDA", box: [0.1, 0.2, 0.3, 0.05] }] })),
+    serverReadImage: vi.fn(async () => ({
+        lines: [{ text: "SALIDA", box: [0.1, 0.2, 0.3, 0.05] }]
+    })),
     serverTranscribe: vi.fn(async () => ({ text: "hola" }))
 }));
 
@@ -227,11 +229,17 @@ describe("POST /api/translate/image", () => {
         expect(await response.json()).toEqual({
             lines: [{ text: "SALIDA", box: [0.1, 0.2, 0.3, 0.05] }]
         });
-        expect(mocks.serverReadImage).toHaveBeenCalledWith("user-1", expect.any(Uint8Array), "image/png");
+        expect(mocks.serverReadImage).toHaveBeenCalledWith(
+            "user-1",
+            expect.any(Uint8Array),
+            "image/png"
+        );
     });
 
     it("refuses what is not a picture, and a body past the cap", async () => {
-        expect((await IMAGE(file("/api/translate/image", new Uint8Array([1, 2, 3])))).status).toBe(415);
+        expect((await IMAGE(file("/api/translate/image", new Uint8Array([1, 2, 3])))).status).toBe(
+            415
+        );
         const big = new Uint8Array(8 * 1024 * 1024 + 1);
         big.set(PNG);
         expect((await IMAGE(file("/api/translate/image", big))).status).toBe(413);
@@ -254,8 +262,12 @@ describe("POST /api/translate/transcribe", () => {
     });
 
     it("refuses a recording too long, or one that is not audio", async () => {
-        expect((await TRANSCRIBE(file("/api/translate/transcribe?durationMs=999999999", OGG))).status).toBe(400);
-        expect((await TRANSCRIBE(file("/api/translate/transcribe?durationMs=10", PNG))).status).toBe(415);
+        expect(
+            (await TRANSCRIBE(file("/api/translate/transcribe?durationMs=999999999", OGG))).status
+        ).toBe(400);
+        expect(
+            (await TRANSCRIBE(file("/api/translate/transcribe?durationMs=10", PNG))).status
+        ).toBe(415);
         expect(mocks.serverTranscribe).not.toHaveBeenCalled();
     });
 

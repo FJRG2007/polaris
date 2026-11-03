@@ -183,7 +183,10 @@ export function DocumentMode({
                 <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <FileText className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-                        <p className="min-w-0 flex-1 truncate text-sm font-medium" title={phase.name}>
+                        <p
+                            className="min-w-0 flex-1 truncate text-sm font-medium"
+                            title={phase.name}
+                        >
                             {t("document.ready", { name: phase.name })}
                         </p>
                         <Button asChild size="sm">
@@ -191,7 +194,11 @@ export function DocumentMode({
                                 {t("document.download")}
                             </a>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setPhase({ kind: "idle" })}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPhase({ kind: "idle" })}
+                        >
                             {t("document.another")}
                         </Button>
                     </div>
@@ -218,12 +225,18 @@ export function DocumentMode({
                         role="progressbar"
                         aria-valuemin={0}
                         aria-valuemax={100}
-                        aria-valuenow={Math.round(phase.kind === "translating" && phase.total > 0 ? (phase.done / phase.total) * 100 : 0)}
+                        aria-valuenow={Math.round(
+                            phase.kind === "translating" && phase.total > 0
+                                ? (phase.done / phase.total) * 100
+                                : 0
+                        )}
                         className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
                     >
                         <div
                             className="h-full rounded-full bg-primary transition-[width]"
-                            style={{ width: `${phase.kind === "translating" && phase.total > 0 ? (phase.done / phase.total) * 100 : 0}%` }}
+                            style={{
+                                width: `${phase.kind === "translating" && phase.total > 0 ? (phase.done / phase.total) * 100 : 0}%`
+                            }}
                         />
                     </div>
                     <Button variant="outline" size="sm" className="self-end" onClick={cancel}>

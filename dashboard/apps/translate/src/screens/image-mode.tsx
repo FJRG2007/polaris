@@ -12,7 +12,14 @@ import { ImageUp, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { IMAGE_MAX_BYTES, sniffImage } from "../model/media";
 import { Button, CopyButton, SegmentedControl, Skeleton, cn } from "@polaris/ui";
-import { ReadsNotice, TextOverlay, hasLocalReader, readImageText, type ImageLine, type Reads } from "./reads";
+import {
+    ReadsNotice,
+    TextOverlay,
+    hasLocalReader,
+    readImageText,
+    type ImageLine,
+    type Reads
+} from "./reads";
 
 type View = "overlay" | "side";
 
@@ -197,12 +204,7 @@ export function ImageMode({
                             <X className="size-4 shrink-0" aria-hidden />
                         </Button>
                     </div>
-                    <div
-                        className={cn(
-                            "grid min-w-0 gap-3",
-                            view === "side" && "lg:grid-cols-2"
-                        )}
-                    >
+                    <div className={cn("grid min-w-0 gap-3", view === "side" && "lg:grid-cols-2")}>
                         <div className="relative mx-auto w-fit max-w-full">
                             {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
                             <img
@@ -212,7 +214,11 @@ export function ImageMode({
                                 className="block max-h-[70vh] max-w-full rounded-lg border border-border"
                             />
                             {view === "overlay" && lines ? (
-                                <TextOverlay lines={lines} translated={translated} height={height} />
+                                <TextOverlay
+                                    lines={lines}
+                                    translated={translated}
+                                    height={height}
+                                />
                             ) : null}
                         </div>
                         {view === "side" ? (
@@ -240,7 +246,10 @@ export function ImageMode({
                         ) : null}
                     </div>
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
-                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" role="status">
+                        <span
+                            className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                            role="status"
+                        >
                             {error ? (
                                 <span className="text-destructive">{error}</span>
                             ) : reading ? (

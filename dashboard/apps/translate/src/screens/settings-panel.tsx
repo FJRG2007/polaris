@@ -41,7 +41,10 @@ const LIMIT_START = 5000;
 export function limitOf(text: string | null): number | null {
     if (text === null) return null;
     const value = Number(text.trim());
-    return text.trim() && Number.isInteger(value) && value >= CHAR_LIMIT_MIN && value <= CHAR_LIMIT_MAX
+    return text.trim() &&
+        Number.isInteger(value) &&
+        value >= CHAR_LIMIT_MIN &&
+        value <= CHAR_LIMIT_MAX
         ? value
         : Number.NaN;
 }
@@ -77,7 +80,9 @@ export function SettingsPanel() {
             .then((answer) => {
                 setLoaded(answer.settings);
                 setDraft(answer.settings);
-                setLimitText(answer.settings.charLimit === null ? null : String(answer.settings.charLimit));
+                setLimitText(
+                    answer.settings.charLimit === null ? null : String(answer.settings.charLimit)
+                );
             })
             .catch((caught: Error) => setFailed(caught.message));
     };
@@ -99,7 +104,9 @@ export function SettingsPanel() {
             const answer = await unwrap(() => saveSettingsAction(edited), t("errors.saveFailed"));
             setLoaded(answer.settings);
             setDraft(answer.settings);
-            setLimitText(answer.settings.charLimit === null ? null : String(answer.settings.charLimit));
+            setLimitText(
+                answer.settings.charLimit === null ? null : String(answer.settings.charLimit)
+            );
             toast.show({ title: t("settings.saved") });
         } catch (caught) {
             toast.show({ title: t("errors.saveFailed"), body: (caught as Error).message });

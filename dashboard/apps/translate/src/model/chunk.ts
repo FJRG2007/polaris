@@ -92,7 +92,10 @@ export function batchesOf(cores: readonly string[], limit: EngineLimit): number[
     let current: number[] = [];
     let chars = 0;
     cores.forEach((core, index) => {
-        if (current.length > 0 && (current.length >= limit.maxTexts || chars + core.length > limit.maxChars)) {
+        if (
+            current.length > 0 &&
+            (current.length >= limit.maxTexts || chars + core.length > limit.maxChars)
+        ) {
             batches.push(current);
             current = [];
             chars = 0;
@@ -147,7 +150,9 @@ export async function translateInChunks(
         texts: split.map((pieces) =>
             pieces
                 .map((piece) =>
-                    piece.core ? `${piece.lead}${translated.get(piece)!.trim()}${piece.trail}` : `${piece.lead}${piece.trail}`
+                    piece.core
+                        ? `${piece.lead}${translated.get(piece)!.trim()}${piece.trail}`
+                        : `${piece.lead}${piece.trail}`
                 )
                 .join("")
         ),

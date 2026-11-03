@@ -106,7 +106,9 @@ export async function translateReusing(
     }
     return {
         text: parts
-            .map((part, index) => (index % 2 === 1 || !part.trim() ? part : cache.pieces.get(part)!))
+            .map((part, index) =>
+                index % 2 === 1 || !part.trim() ? part : cache.pieces.get(part)!
+            )
             .join(""),
         answer
     };

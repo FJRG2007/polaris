@@ -33,7 +33,11 @@ interface Recognition {
     lang: string;
     interimResults: boolean;
     continuous: boolean;
-    onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
+    onresult:
+        | ((event: {
+              results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>;
+          }) => void)
+        | null;
     onerror: ((event: { error: string }) => void) | null;
     onend: (() => void) | null;
     start(): void;
@@ -65,7 +69,8 @@ function durationOf(file: Blob): Promise<number | null> {
             resolve(value);
         };
         audio.preload = "metadata";
-        audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) ? audio.duration : null);
+        audio.onloadedmetadata = () =>
+            done(Number.isFinite(audio.duration) ? audio.duration : null);
         audio.onerror = () => done(null);
         audio.src = url;
     });
@@ -121,11 +126,15 @@ export function AudioMode({
         try {
             const answer = await translate([source], undefined, pair);
             setTurns((now) =>
-                now.map((turn) => (turn.id === id ? { ...turn, target: answer.texts[0] ?? "" } : turn))
+                now.map((turn) =>
+                    turn.id === id ? { ...turn, target: answer.texts[0] ?? "" } : turn
+                )
             );
         } catch (caught) {
             setTurns((now) =>
-                now.map((turn) => (turn.id === id ? { ...turn, error: (caught as Error).message } : turn))
+                now.map((turn) =>
+                    turn.id === id ? { ...turn, error: (caught as Error).message } : turn
+                )
             );
         }
     };
@@ -147,7 +156,8 @@ export function AudioMode({
         const type = sniffAudio(head);
         if (!type) return setError(t("errors.audioType"));
         const seconds = await durationOf(file);
-        if (seconds !== null && seconds > AUDIO_MAX_SECONDS) return setError(t("errors.audioTooLong"));
+        if (seconds !== null && seconds > AUDIO_MAX_SECONDS)
+            return setError(t("errors.audioTooLong"));
         setBusy(true);
         try {
             // The declared type is the one read from the bytes, not the file's name.
@@ -203,7 +213,10 @@ export function AudioMode({
         const chunks: Blob[] = [];
         const started = Date.now();
         const made = new MediaRecorder(media);
-        const stopAt = window.setTimeout(() => made.state === "recording" && made.stop(), AUDIO_MAX_SECONDS * 1000);
+        const stopAt = window.setTimeout(
+            () => made.state === "recording" && made.stop(),
+            AUDIO_MAX_SECONDS * 1000
+        );
         made.ondataavailable = (event) => chunks.push(event.data);
         made.onstop = async () => {
             window.clearTimeout(stopAt);
@@ -277,7 +290,12 @@ export function AudioMode({
                         size="sm"
                         variant={listening === side ? "primary" : "outline"}
                         onClick={() => talk(side)}
-                        disabled={!canTalk || busy || (listening !== null && listening !== side) || (native && side === "a" && !from)}
+                        disabled={
+                            !canTalk ||
+                            busy ||
+                            (listening !== null && listening !== side) ||
+                            (native && side === "a" && !from)
+                        }
                         className="min-w-0"
                     >
                         {listening === side ? (
@@ -286,7 +304,9 @@ export function AudioMode({
                             <Mic className="size-4 shrink-0" aria-hidden />
                         )}
                         <span className="truncate">
-                            {listening === side ? t("audio.stop") : t("audio.talk", { language: sideName(side) })}
+                            {listening === side
+                                ? t("audio.stop")
+                                : t("audio.talk", { language: sideName(side) })}
                         </span>
                     </Button>
                 ))}
@@ -343,20 +363,32 @@ export function AudioMode({
                                 turn.side === "a" ? "self-start bg-card" : "self-end bg-muted/40"
                             )}
                         >
-                            <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{turn.source}</p>
+                            <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                                {turn.source}
+                            </p>
                             {turn.error ? (
                                 <p className="text-sm text-destructive">{turn.error}</p>
                             ) : turn.target === null ? (
                                 <Skeleton className="h-4 w-40 max-w-full" />
                             ) : (
                                 <div className="flex min-w-0 items-start gap-1">
-                                    <p className="min-w-0 flex-1 text-base [overflow-wrap:anywhere]">{turn.target}</p>
+                                    <p className="min-w-0 flex-1 text-base [overflow-wrap:anywhere]">
+                                        {turn.target}
+                                    </p>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => speak(turn)}
-                                        aria-label={speaking === turn.id ? t("actions.stop") : t("audio.listen")}
-                                        title={speaking === turn.id ? t("actions.stop") : t("audio.listen")}
+                                        aria-label={
+                                            speaking === turn.id
+                                                ? t("actions.stop")
+                                                : t("audio.listen")
+                                        }
+                                        title={
+                                            speaking === turn.id
+                                                ? t("actions.stop")
+                                                : t("audio.listen")
+                                        }
                                     >
                                         {speaking === turn.id ? (
                                             <Square className="size-4 shrink-0" aria-hidden />

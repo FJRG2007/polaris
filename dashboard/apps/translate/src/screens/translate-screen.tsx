@@ -45,11 +45,7 @@ import { useLanguageOptions } from "./language-options";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
 import { readCache, unwrap, useTranslateLocale, useTranslateT, writeCache } from "./i18n";
-import {
-    createServerEngine,
-    fetchServerStatus,
-    type ServerStatusView
-} from "./server-engine";
+import { createServerEngine, fetchServerStatus, type ServerStatusView } from "./server-engine";
 import { createBrowserEngine, hasBrowserTranslator, type BrowserScope } from "./browser-engine";
 import {
     DEFAULT_SETTINGS,

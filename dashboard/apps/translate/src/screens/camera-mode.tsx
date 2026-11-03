@@ -14,7 +14,14 @@ import { useTranslateT } from "./i18n";
 import { Button, CopyButton } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, CameraOff, Film, Pause, Play } from "lucide-react";
-import { ReadsNotice, TextOverlay, hasLocalReader, readImageText, type ImageLine, type Reads } from "./reads";
+import {
+    ReadsNotice,
+    TextOverlay,
+    hasLocalReader,
+    readImageText,
+    type ImageLine,
+    type Reads
+} from "./reads";
 
 /** How often a frame is read: the device's detector is quick, the server's model is not. */
 const LOCAL_EVERY_MS = 2000;
@@ -172,13 +179,17 @@ export function CameraMode({
                 fallback: t("errors.readFailed")
             });
             const missing = [
-                ...new Set(found.map((line) => line.text).filter((text) => !known.current.has(text)))
+                ...new Set(
+                    found.map((line) => line.text).filter((text) => !known.current.has(text))
+                )
             ];
             // A long session meets many lines; what it keeps stays bounded.
             if (known.current.size > 500) known.current = new Map();
             if (missing.length > 0) {
                 const answer = await translate(missing);
-                missing.forEach((text, index) => known.current.set(text, answer.texts[index] ?? ""));
+                missing.forEach((text, index) =>
+                    known.current.set(text, answer.texts[index] ?? "")
+                );
             }
             setLines(found);
             setTranslated(found.map((line) => known.current.get(line.text) ?? ""));
@@ -261,9 +272,15 @@ export function CameraMode({
                     ref={video}
                     muted
                     playsInline
-                    className={running ? "block max-h-[70vh] max-w-full rounded-lg border border-border bg-black" : "hidden"}
+                    className={
+                        running
+                            ? "block max-h-[70vh] max-w-full rounded-lg border border-border bg-black"
+                            : "hidden"
+                    }
                 />
-                {running ? <TextOverlay lines={lines} translated={translated} height={height} /> : null}
+                {running ? (
+                    <TextOverlay lines={lines} translated={translated} height={height} />
+                ) : null}
             </div>
             <p className="text-xs text-muted-foreground" role="status">
                 {error ? (

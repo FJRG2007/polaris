@@ -69,7 +69,11 @@ describe("readSettings", () => {
     });
 
     it("accepts settings saved without a limit as no limit, and refuses one out of range", () => {
-        const base = { engines: DEFAULT_SETTINGS.engines, order: DEFAULT_SETTINGS.order, defaultTarget: "en" };
+        const base = {
+            engines: DEFAULT_SETTINGS.engines,
+            order: DEFAULT_SETTINGS.order,
+            defaultTarget: "en"
+        };
         const parsed = settingsInput.safeParse(base);
         expect(parsed.success && parsed.data.charLimit).toBeNull();
         expect(settingsInput.safeParse({ ...base, charLimit: 50 }).success).toBe(false);

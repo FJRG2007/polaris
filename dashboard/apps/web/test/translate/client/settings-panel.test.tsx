@@ -45,7 +45,8 @@ async function open(): Promise<void> {
 }
 
 /** The engine switches only: the list of engines, not the length limit below it. */
-const engineSwitches = () => within(screen.getByRole("group", { name: "Engines" })).getAllByRole("switch");
+const engineSwitches = () =>
+    within(screen.getByRole("group", { name: "Engines" })).getAllByRole("switch");
 const names = () => engineSwitches().map((one) => one.getAttribute("aria-label"));
 
 describe("the engines' order", () => {

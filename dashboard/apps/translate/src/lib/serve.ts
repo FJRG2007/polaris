@@ -23,8 +23,7 @@ import type {
 } from "../model/schemas";
 
 /** Why a request got no translation, as the route answers it. */
-export type ServeFailure =
-    "noEngine" | "unavailable" | "limit" | "paused" | "failed" | "overLimit";
+export type ServeFailure = "noEngine" | "unavailable" | "limit" | "paused" | "failed" | "overLimit";
 
 const STATUS: Readonly<Record<ServeFailure, number>> = {
     noEngine: 409,

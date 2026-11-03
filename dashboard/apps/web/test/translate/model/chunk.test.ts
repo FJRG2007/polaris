@@ -61,7 +61,11 @@ describe("translateInChunks", () => {
             texts: batch.map((text) => `<${text}>`),
             detected: null
         }));
-        const answer = await translateInChunks(["  hola \n", "   ", "adiós"], ENGINE_LIMITS.deepl, send);
+        const answer = await translateInChunks(
+            ["  hola \n", "   ", "adiós"],
+            ENGINE_LIMITS.deepl,
+            send
+        );
         expect(send).toHaveBeenCalledTimes(1);
         expect(send.mock.calls[0]![0]).toEqual(["hola", "adiós"]);
         expect(answer.texts).toEqual(["  <hola> \n", "   ", "<adiós>"]);

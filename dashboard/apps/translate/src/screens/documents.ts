@@ -156,7 +156,11 @@ async function openOffice(bytes: Uint8Array): Promise<DocumentJob> {
                 zip.file(part.name, part.read.apply(translated.slice(at, at + count)));
                 at += count;
             }
-            return zip.generateAsync({ type: "blob", mimeType: shape.mime, compression: "DEFLATE" });
+            return zip.generateAsync({
+                type: "blob",
+                mimeType: shape.mime,
+                compression: "DEFLATE"
+            });
         }
     };
 }
@@ -224,6 +228,8 @@ export async function openDocument(bytes: Uint8Array): Promise<DocumentJob> {
 
 /** The name the translation is saved under: the original's, tagged with the language. */
 export function translatedName(original: string, language: string, extension: string): string {
-    const base = original.replace(/\.[^./\\]+$/, "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_") || "document";
+    const base =
+        original.replace(/\.[^./\\]+$/, "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_") ||
+        "document";
     return `${base}.${language}${extension}`;
 }

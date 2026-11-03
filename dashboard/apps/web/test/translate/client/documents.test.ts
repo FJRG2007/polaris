@@ -12,7 +12,7 @@ import {
     xmlSegments
 } from "@polaris-app/translate/src/screens/documents";
 
-const W = "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"";
+const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
 const DOCX = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Hola </w:t></w:r><w:r><w:t>mundo</w:t></w:r></w:p><w:p><w:r><w:t> </w:t></w:r></w:p><w:p><w:r><w:t>Adiós</w:t></w:r></w:p></w:body></w:document>`;
 
 describe("xmlSegments", () => {
@@ -25,12 +25,12 @@ describe("xmlSegments", () => {
         expect(out).toContain(">Hello world</w:t>");
         expect(out).toContain(">Goodbye</w:t>");
         expect(out).not.toContain("mundo");
-        expect(out).toContain("xml:space=\"preserve\"");
+        expect(out).toContain('xml:space="preserve"');
     });
 
     it("leaves a spreadsheet's phonetic guide out of the text", () => {
         const xml =
-            "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><si><t>東京</t><rPh><t>トウキョウ</t></rPh></si></sst>";
+            '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>東京</t><rPh><t>トウキョウ</t></rPh></si></sst>';
         expect(xmlSegments(xml, { paragraph: "si", text: "t", skip: "rPh" }).segments).toEqual([
             "東京"
         ]);
