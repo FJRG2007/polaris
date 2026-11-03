@@ -30,7 +30,7 @@ import { hostUi } from "@polaris/app-host/client";
 import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
-import type { RoomView } from "../../lib/room-kinds";
+import type { LabelView, RoomView } from "../../lib/room-kinds";
 
 const { runAction } = hostUi.runAction;
 const { RelativeTime } = hostUi.relativeTime;
@@ -44,6 +44,8 @@ interface Listing {
     readonly devices: DeviceView[];
     /** Absent from a listing cached before rooms could be named. */
     readonly rooms?: RoomView[];
+    /** Absent from a listing cached before labels could be named. */
+    readonly labels?: LabelView[];
 }
 
 /** Its own screen, for somebody the central list is not open to: the New menu
@@ -132,7 +134,8 @@ export function UnmovedAutomations({
             const next = {
                 automations: result.automations ?? [],
                 devices: result.devices ?? [],
-                rooms: result.rooms ?? []
+                rooms: result.rooms ?? [],
+                labels: result.labels ?? []
             };
             setListing(next);
             writeSnapshot(key, next);
@@ -143,7 +146,12 @@ export function UnmovedAutomations({
     }, [placeId]);
 
     const lookup = useMemo<words.DeviceLookup>(() => {
-        return words.lookupOf(listing?.devices ?? [], listing?.rooms ?? []);
+        return words.lookupOf(
+            listing?.devices ?? [],
+            listing?.rooms ?? [],
+            [],
+            listing?.labels ?? []
+        );
     }, [listing]);
 
     const shown = useMemo(

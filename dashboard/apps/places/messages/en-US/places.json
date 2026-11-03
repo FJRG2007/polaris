@@ -758,7 +758,11 @@
         "relayNoVoice": "The camera relay would not take a voice",
         "relayUpdating": "The camera relay is updating so it can carry your voice. Try again in a minute",
         "relayOld": "The camera relay is out of date. Update Polaris in Settings to talk through cameras",
-        "talkNotPlayed": "The camera would not play a voice"
+        "talkNotPlayed": "The camera would not play a voice",
+        "labelGone": "Label not found",
+        "labelTaken": "A label with that name is already here",
+        "labelsFull": "This place has all the labels it can",
+        "labelElsewhere": "That label is at another place"
     },
     "connections": {
         "nuki-web": {
@@ -1956,7 +1960,23 @@
         "floorPlaceholder": "Ground floor",
         "batteryLine": "Low battery at",
         "batteryLineHint": "At or under this share its battery counts as low, for automations and the overview. Leave it empty to use {percent}%, the default for this kind of device.",
-        "batteryLineFlag": "The device also reports a low battery itself, which counts whatever this says."
+        "batteryLineFlag": "The device also reports a low battery itself, which counts whatever this says.",
+        "labels": "Labels",
+        "labelsHint": "Name part of a room, or the same thing in several, so an automation can turn them on together.",
+        "loadingLabels": "Reading the labels...",
+        "labelsFailed": "The labels could not be read. They stay as they are.",
+        "addLabel": "Add a label",
+        "newLabel": "New label",
+        "newLabelPlaceholder": "Ceiling, Night lights",
+        "createLabel": "Create label",
+        "removeLabel": "Take {label} off",
+        "editLabels": "Edit labels",
+        "doneEditingLabels": "Done",
+        "renameLabel": "Rename {label}",
+        "saveLabelName": "Save the name of {label}",
+        "deleteLabel": "Delete {label}",
+        "confirmDeleteLabel": "Delete everywhere",
+        "deleteLabelUsed": "{count, plural, one {# automation names it and will stop acting on it.} other {# automations name it and will stop acting on it.}}"
     },
     "connect": {
         "reconnectTitle": "Reconnect {name}",
@@ -2156,7 +2176,10 @@
             "sunAfter": "After {edge}, until midnight",
             "sunBefore": "Before {edge}, from midnight",
             "sunBetween": "After {after} and before {before}",
-            "triggeredBy": "Triggered by {count, plural, one {trigger} other {triggers}} {numbers}"
+            "triggeredBy": "Triggered by {count, plural, one {trigger} other {triggers}} {numbers}",
+            "everywhere": "the whole place",
+            "kindsInPlace": "{kinds} in {place}",
+            "except": "{set}, except {count, plural, one {one} other {#}}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -2213,7 +2236,7 @@
             "toggleUnknown": "Its state was not known, so there was nothing to switch over."
         },
         "errors": {
-            "placeGone": "That room or floor is no longer here.",
+            "placeGone": "That room, floor or label is no longer here.",
             "privacyTarget": "Choose which cameras.",
             "placeEmpty": "Nothing there can do this yet.",
             "broken": "Something in this card is not right. Remove it and add it again.",
@@ -2257,7 +2280,8 @@
             "upperBelow": "Make it higher than the bottom.",
             "sunEdge": "Choose after, before or both.",
             "noTriggerPicked": "Choose at least one trigger.",
-            "triggerGone": "A trigger it names is gone. Uncheck it."
+            "triggerGone": "A trigger it names is gone. Uncheck it.",
+            "allExcluded": "Everything there is left out."
         },
         "notice": {
             "title": "Automation: {name}"
@@ -2360,7 +2384,7 @@
             "whereChosen": "The ones chosen here",
             "wholeFloor": "All on {floor}",
             "wholeRoom": "All in {room}",
-            "placeGone": "A room no longer here",
+            "placeGone": "A room, floor or label no longer here",
             "at": "At",
             "days": "Days",
             "every": "Every",
@@ -2470,7 +2494,34 @@
             "noTriggers": "No triggers yet. Add a trigger first.",
             "triggerNumber": "Trigger {number}",
             "triggerPosition": "Trigger {number}",
-            "triggerMissing": "Missing trigger. Uncheck it to clear it."
+            "triggerMissing": "Missing trigger. Uncheck it to clear it.",
+            "wholePlace": "Everything at this place",
+            "withLabel": "All labelled {label}",
+            "alsoArea": "Also",
+            "addArea": "Add a room, floor or label",
+            "removeArea": "Remove",
+            "onlyKinds": "Only",
+            "anyKind": "Any kind of device",
+            "addKind": "Add a kind",
+            "removeKind": "Remove",
+            "except": "Except",
+            "addExcept": "Leave something out",
+            "removeExcept": "Put back",
+            "targetNone": "Nothing there answers this yet.",
+            "targetCount": "{count, plural, one {# device} other {# devices}}",
+            "targetExcluded": "{count, plural, one {# excluded} other {# excluded}}",
+            "kindCount": {
+                "lock": "{count, plural, one {# lock} other {# locks}}",
+                "opener": "{count, plural, one {# door opener} other {# door openers}}",
+                "climate": "{count, plural, one {# air conditioner} other {# air conditioners}}",
+                "air": "{count, plural, one {# air purifier} other {# air purifiers}}",
+                "switch": "{count, plural, one {# switch} other {# switches}}",
+                "outlet": "{count, plural, one {# socket} other {# sockets}}",
+                "light": "{count, plural, one {# light} other {# lights}}",
+                "sensor": "{count, plural, one {# sensor} other {# sensors}}",
+                "appliance": "{count, plural, one {# kitchen appliance} other {# kitchen appliances}}",
+                "litter": "{count, plural, one {# litter box} other {# litter boxes}}"
+            }
         },
         "log": {
             "title": "What it did",

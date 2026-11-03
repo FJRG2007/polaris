@@ -45,3 +45,10 @@ export function floorNames(rooms: readonly RoomView[]): string[] {
         (a, b) => a.localeCompare(b, undefined, { numeric: true })
     );
 }
+
+/** A label at a place: a name its devices carry across rooms. */
+export interface LabelView {
+    readonly id: string;
+    readonly placeId: string;
+    readonly name: string;
+}

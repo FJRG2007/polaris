@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { placesT } from "../../lib/i18n";
 import * as rooms from "../../lib/rooms";
+import * as labels from "../../lib/labels";
 import * as places from "../../lib/places";
 import type { Coordinate } from "@polaris/core";
 import * as devices from "../../lib/devices";
@@ -35,7 +36,7 @@ import { moveAutomationNow } from "../../lib/automation-move";
 import { draftGraph } from "../../lib/automation-convert";
 import { autoOffName, issueText } from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
-import type { FloorView, RoomView } from "../../lib/room-kinds";
+import type { FloorView, LabelView, RoomView } from "../../lib/room-kinds";
 
 const { recordAudit } = host.auditService;
 const { sessionCan } = host.session;
@@ -55,6 +56,8 @@ export async function listAutomationsAction(scope?: unknown): Promise<{
     devices?: DeviceView[];
     /** The place's rooms, which a block naming a room or a floor is told by. */
     rooms?: RoomView[];
+    /** The labels at those places, which a block naming a label is told by. */
+    labels?: LabelView[];
     placeId?: string;
     error?: string;
 }> {
@@ -74,16 +77,18 @@ export async function listAutomationsAction(scope?: unknown): Promise<{
                       : []
                   : [current.id];
         const list = ids.length > 0 ? await automations.listAutomations(install.id, ids) : [];
-        const [found, roomList] = list.some((automation) => !automation.movedTo)
+        const [found, roomList, labelList] = list.some((automation) => !automation.movedTo)
             ? await Promise.all([
                   devices.listDevices(install.id, ids.length === 1 ? ids[0] : null),
-                  rooms.listRooms(install.id, ids)
+                  rooms.listRooms(install.id, ids),
+                  labels.listLabels(install.id, ids)
               ])
-            : [[], []];
+            : [[], [], []];
         return {
             list,
             found,
             roomList,
+            labelList,
             placeId: ids.length === 1 ? ids[0] : undefined
         };
     });
@@ -92,6 +97,7 @@ export async function listAutomationsAction(scope?: unknown): Promise<{
         automations: result.value?.list,
         devices: result.value?.found,
         rooms: result.value?.roomList,
+        labels: result.value?.labelList,
         placeId: result.value?.placeId
     };
 }
@@ -107,6 +113,9 @@ export interface EditorContext {
     readonly rooms?: RoomView[];
     /** The place's floors, a floor with no room on it among them. */
     readonly floors?: FloorView[];
+    /** The place's labels, which a block can name or leave out. Absent reads
+     *  as none. */
+    readonly labels?: LabelView[];
     /** Where the place is, for the sun blocks' times. Null until set. */
     readonly location?: Coordinate | null;
     /** The camera privacy targets of the place - its cameras, zones, rooms,
@@ -115,15 +124,17 @@ export interface EditorContext {
 }
 
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
-    const [found, list, roomList, floorList, place, cameraList, setList] = await Promise.all([
-        devices.listDevices(installedAppId, placeId),
-        automations.listAutomations(installedAppId, placeId),
-        rooms.listRooms(installedAppId, placeId),
-        rooms.listFloors(installedAppId, placeId),
-        places.getPlace(installedAppId, placeId),
-        cameras.listCameras(installedAppId, placeId),
-        cameraSets.listCameraSets(installedAppId, placeId)
-    ]);
+    const [found, list, roomList, floorList, labelList, place, cameraList, setList] =
+        await Promise.all([
+            devices.listDevices(installedAppId, placeId),
+            automations.listAutomations(installedAppId, placeId),
+            rooms.listRooms(installedAppId, placeId),
+            rooms.listFloors(installedAppId, placeId),
+            labels.listLabels(installedAppId, placeId),
+            places.getPlace(installedAppId, placeId),
+            cameras.listCameras(installedAppId, placeId),
+            cameraSets.listCameraSets(installedAppId, placeId)
+        ]);
     const privacyTargets = privacyGroups(cameraList, {
         places: new Map(place ? [[place.id, place.name]] : []),
         rooms: new Map(roomList.map((room) => [room.id, room.name])),
@@ -135,6 +146,7 @@ async function editorContext(installedAppId: string, placeId: string): Promise<E
         siblings: list.map((automation) => ({ id: automation.id, name: automation.name })),
         rooms: roomList,
         floors: floorList,
+        labels: labelList,
         location: place?.location ?? null,
         privacyTargets
     };

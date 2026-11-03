@@ -14,10 +14,10 @@ import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { Field, useIssue } from "@polaris/ui/automation";
-import { Button, Input, Select, cn, type SelectOption, DateInput } from "@polaris/ui";
+import { Badge, Button, Input, Select, cn, type SelectOption, DateInput } from "@polaris/ui";
 import { Plus, X } from "lucide-react";
 import { createContext, useContext, useState } from "react";
-import type { RoomView } from "../../lib/room-kinds";
+import type { LabelView, RoomView } from "../../lib/room-kinds";
 
 /** Which device. A device that is no longer at this place stays named as gone
  *  rather than the picker going blank, so the reader sees what to replace. */
@@ -274,8 +274,33 @@ export function floorsOf(rooms: readonly RoomView[]): { id: string; name: string
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
-/** The picker value of a block's room or floor: "room:<id>", "floor:<id>", or
- *  empty for the devices it names. */
+/** What a block's areas are read against in the editor: the place's labels
+ *  and its devices, beside the rooms above. */
+export interface TargetPlace {
+    readonly labels: readonly LabelView[];
+    readonly devices: readonly DeviceView[];
+}
+
+const TargetPlaceContext = createContext<TargetPlace>({ labels: [], devices: [] });
+
+export const TargetPlaceProvider = TargetPlaceContext.Provider;
+
+export function useTargetPlace(): TargetPlace {
+    return useContext(TargetPlaceContext);
+}
+
+type AreaBlock = {
+    readonly kind: string;
+    readonly deviceId: string;
+    readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+    readonly only?: readonly string[];
+    readonly exclude?: readonly { readonly kind: string; readonly id: string }[];
+    readonly behaviour?: auto.Behaviour;
+    readonly quantifier?: auto.Quantifier;
+};
+
+/** The picker value of a block's first area: "room:<id>", "floor:<id>",
+ *  "label:<id>", "place:all", or empty for the devices it names. */
 export function placeValue(block: {
     readonly targets?: readonly { readonly kind: string; readonly id: string }[];
 }): string {
@@ -283,21 +308,90 @@ export function placeValue(block: {
     return first ? `${first.kind}:${first.id}` : "";
 }
 
+function refOf(value: string): { kind: string; id: string } {
+    const at = value.indexOf(":");
+    return { kind: value.slice(0, at), id: value.slice(at + 1) };
+}
+
+/** Every area a block can name, as picker options. */
+function areaOptions(
+    rooms: readonly RoomView[],
+    labels: readonly LabelView[],
+    t: ReturnType<typeof usePlacesT>
+): SelectOption[] {
+    return [
+        { value: `place:${auto.PLACE_TARGET}`, label: t("automations.fields.wholePlace") },
+        ...floorsOf(rooms).map((floor) => ({
+            value: `floor:${floor.id}`,
+            label: t("automations.fields.wholeFloor", { floor: floor.name })
+        })),
+        ...rooms.map((room) => ({
+            value: `room:${room.id}`,
+            label: t("automations.fields.wholeRoom", { room: roomLabel(room, t) })
+        })),
+        ...labels.map((label) => ({
+            value: `label:${label.id}`,
+            label: t("automations.fields.withLabel", { label: label.name })
+        }))
+    ];
+}
+
+/** How many devices a block's areas come to right now, and how many it leaves
+ *  out - the same reading the engine makes on each run. */
+export function targetCount(
+    block: AreaBlock,
+    place: TargetPlace,
+    rooms: readonly RoomView[]
+): { count: number; excluded: number } {
+    const scope: auto.TargetScope = {
+        devices: place.devices,
+        rooms: rooms.map((room) => ({ id: room.id, floorId: room.floorId ?? "" }))
+    };
+    const split = auto.targetBreakdown(block, scope);
+    return { count: split.ids.length, excluded: split.excluded.length };
+}
+
+/** A removable chip for one picked area, kind or left-out thing. */
+function Chip({
+    label,
+    onRemove,
+    disabled,
+    remove
+}: {
+    label: string;
+    onRemove: () => void;
+    disabled?: boolean;
+    remove: string;
+}) {
+    return (
+        <Badge className="min-w-0 max-w-full shrink py-0 pr-0">
+            <span className="min-w-0 truncate" title={label}>
+                {label}
+            </span>
+            <Button
+                size="sm"
+                variant="ghost"
+                className="size-5 shrink-0 p-0"
+                aria-label={`${remove}: ${label}`}
+                title={`${remove}: ${label}`}
+                disabled={disabled}
+                onClick={onRemove}
+            >
+                <X className="size-3.5" />
+            </Button>
+        </Badge>
+    );
+}
+
 /**
- * Which devices a block is about: the ones picked, or every device in a room or
- * on a floor that answers it - read again each time, so a lamp moved into the
- * kitchen counts for the kitchen from then on. Drawn only where the place has
- * rooms. Picking a room keeps the device as the one its choices are drawn from,
- * and how the set counts.
+ * Which devices a block is about: the ones picked, or every device in any mix of
+ * rooms, floors, labels and the whole place that answers it - only of the kinds
+ * kept, less what is left out, read again each time so a lamp added to the
+ * kitchen counts for the kitchen from then on. The count under it is that
+ * reading now. Picking an area keeps the device as the one its choices are
+ * drawn from, and how the set counts.
  */
-export function PlaceTargetField<
-    T extends {
-        readonly deviceId: string;
-        readonly targets?: readonly { readonly kind: string; readonly id: string }[];
-        readonly behaviour?: auto.Behaviour;
-        readonly quantifier?: auto.Quantifier;
-    }
->({
+export function PlaceTargetField<T extends AreaBlock>({
     block,
     role,
     onChange,
@@ -313,37 +407,84 @@ export function PlaceTargetField<
 }) {
     const t = usePlacesT();
     const rooms = useRooms();
-    if (rooms.length === 0) return null;
+    const place = useTargetPlace();
+    const areas = auto.placeTargets(block);
+    const devicesNamed = (block.targets ?? []).filter((ref) => ref.kind === "device");
     const value = placeValue(block);
+    const every = areaOptions(rooms, place.labels, t);
+    const nameOf = (ref: { kind: string; id: string }): string => {
+        const found = every.find((option) => option.value === `${ref.kind}:${ref.id}`);
+        if (found) return String(found.label);
+        if (ref.kind === "device")
+            return (
+                place.devices.find((device) => device.id === ref.id)?.name ??
+                t("automations.missingDevice")
+            );
+        return t("automations.fields.placeGone");
+    };
     const options: SelectOption[] = [
         { value: "", label: t("automations.fields.whereChosen") },
-        ...floorsOf(rooms).map((floor) => ({
-            value: `floor:${floor.id}`,
-            label: t("automations.fields.wholeFloor", { floor: floor.name })
-        })),
-        ...rooms.map((room) => ({
-            value: `room:${room.id}`,
-            label: t("automations.fields.wholeRoom", { room: roomLabel(room, t) })
-        }))
+        ...every.filter(
+            (option) => !areas.slice(1).some((ref) => `${ref.kind}:${ref.id}` === option.value)
+        )
     ];
     if (value && !options.some((option) => option.value === value)) {
         options.push({ value, label: t("automations.fields.placeGone"), disabled: true });
     }
     const field = role === "trigger" ? "behaviour" : "quantifier";
-    const pick = (next: string) => {
-        const { targets: _was, behaviour: _b, quantifier: _q, ...rest } = block;
-        if (!next) {
+    const counted = role === "trigger" ? block.behaviour : block.quantifier;
+    const write = (
+        nextAreas: readonly { kind: string; id: string }[],
+        only: readonly string[] | undefined,
+        exclude: readonly { kind: string; id: string }[] | undefined
+    ) => {
+        const {
+            targets: _was,
+            behaviour: _b,
+            quantifier: _q,
+            only: _only,
+            exclude: _exclude,
+            ...rest
+        } = block;
+        const distinct = nextAreas.filter(
+            (ref, index) =>
+                nextAreas.findIndex((other) => other.kind === ref.kind && other.id === ref.id) ===
+                index
+        );
+        if (distinct.length === 0) {
             onChange(rest as unknown as T);
             return;
         }
-        const [kind, id] = next.split(":") as ["room" | "floor", string];
-        const counted = role === "trigger" ? block.behaviour : block.quantifier;
         onChange({
             ...rest,
-            targets: [{ kind, id }],
+            targets: [...distinct, ...devicesNamed],
+            ...(only && only.length > 0 ? { only } : {}),
+            ...(exclude && exclude.length > 0 ? { exclude } : {}),
             ...(counted && role ? { [field]: counted } : {})
         } as unknown as T);
     };
+    const pickFirst = (next: string) => {
+        if (!next) return write([], undefined, undefined);
+        write([refOf(next), ...areas.slice(1)], block.only, block.exclude);
+    };
+    const room = auto.LIMITS.targets - areas.length - devicesNamed.length;
+    const free = every.filter(
+        (option) => !areas.some((ref) => `${ref.kind}:${ref.id}` === option.value)
+    );
+    const only = block.only ?? [];
+    const exclude = block.exclude ?? [];
+    const kindsLeft = kinds.DEVICE_KINDS.filter((kind) => !only.includes(kind));
+    const excludable: SelectOption[] = [
+        ...every
+            .filter((option) => !option.value.startsWith("place:"))
+            .filter((option) => !exclude.some((ref) => `${ref.kind}:${ref.id}` === option.value)),
+        ...place.devices
+            .filter(
+                (device) => !exclude.some((ref) => ref.kind === "device" && ref.id === device.id)
+            )
+            .map((device) => ({ value: `device:${device.id}`, label: device.name }))
+    ];
+    const { count, excluded } = targetCount(block, place, rooms);
     return (
         <>
             <Field label={t("automations.fields.where")} path={[...path, "targets", 0, "id"]}>
@@ -354,18 +495,163 @@ export function PlaceTargetField<
                         disabled={disabled}
                         options={options}
                         className={invalid ? "border-danger-edge" : undefined}
-                        onValueChange={pick}
+                        onValueChange={pickFirst}
                     />
                 )}
             </Field>
             {value && role && (
                 <SetCountField
                     role={role}
-                    count={role === "trigger" ? block.behaviour : block.quantifier}
+                    count={counted}
                     path={path}
                     disabled={disabled}
-                    onChange={(count) => onChange({ ...block, [field]: count } as T)}
+                    onChange={(next) => onChange({ ...block, [field]: next } as T)}
                 />
+            )}
+            {value && (
+                <div className="grid min-w-0 gap-3 sm:col-span-2 sm:grid-cols-2">
+                    <Field label={t("automations.fields.alsoArea")} path={[...path, "targets"]}>
+                        {(fieldId) => (
+                            <div className="grid min-w-0 gap-1.5">
+                                {areas.length > 1 && (
+                                    <div className="flex min-w-0 flex-wrap gap-1">
+                                        {areas.slice(1).map((ref) => (
+                                            <Chip
+                                                key={`${ref.kind}:${ref.id}`}
+                                                label={nameOf(ref)}
+                                                remove={t("automations.fields.removeArea")}
+                                                disabled={disabled}
+                                                onRemove={() =>
+                                                    write(
+                                                        areas.filter((each) => each !== ref),
+                                                        block.only,
+                                                        block.exclude
+                                                    )
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                <Select
+                                    id={fieldId}
+                                    value=""
+                                    disabled={disabled || room < 1 || free.length === 0}
+                                    placeholder={t("automations.fields.addArea")}
+                                    options={free}
+                                    onValueChange={(next) =>
+                                        next &&
+                                        write([...areas, refOf(next)], block.only, block.exclude)
+                                    }
+                                />
+                            </div>
+                        )}
+                    </Field>
+                    <Field label={t("automations.fields.onlyKinds")} path={[...path, "only"]}>
+                        {(fieldId) => (
+                            <div className="grid min-w-0 gap-1.5">
+                                {only.length > 0 && (
+                                    <div className="flex min-w-0 flex-wrap gap-1">
+                                        {only.map((kind) => (
+                                            <Chip
+                                                key={kind}
+                                                label={t(
+                                                    `devices.kinds.${kind as kinds.DeviceKind}`
+                                                )}
+                                                remove={t("automations.fields.removeKind")}
+                                                disabled={disabled}
+                                                onRemove={() =>
+                                                    write(
+                                                        areas,
+                                                        only.filter((each) => each !== kind),
+                                                        block.exclude
+                                                    )
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                <Select
+                                    id={fieldId}
+                                    value=""
+                                    disabled={disabled || kindsLeft.length === 0}
+                                    placeholder={
+                                        only.length > 0
+                                            ? t("automations.fields.addKind")
+                                            : t("automations.fields.anyKind")
+                                    }
+                                    options={kindsLeft.map((kind) => ({
+                                        value: kind,
+                                        label: t(`devices.kinds.${kind}`)
+                                    }))}
+                                    onValueChange={(next) =>
+                                        next && write(areas, [...only, next], block.exclude)
+                                    }
+                                />
+                            </div>
+                        )}
+                    </Field>
+                    <Field label={t("automations.fields.except")} path={[...path, "exclude"]}>
+                        {(fieldId, invalid) => (
+                            <div className="grid min-w-0 gap-1.5">
+                                {exclude.length > 0 && (
+                                    <div className="flex min-w-0 flex-wrap gap-1">
+                                        {exclude.map((ref) => (
+                                            <Chip
+                                                key={`${ref.kind}:${ref.id}`}
+                                                label={nameOf(ref)}
+                                                remove={t("automations.fields.removeExcept")}
+                                                disabled={disabled}
+                                                onRemove={() =>
+                                                    write(
+                                                        areas,
+                                                        block.only,
+                                                        exclude.filter((each) => each !== ref)
+                                                    )
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                <Select
+                                    id={fieldId}
+                                    value=""
+                                    disabled={
+                                        disabled ||
+                                        excludable.length === 0 ||
+                                        exclude.length >= auto.LIMITS.targets
+                                    }
+                                    placeholder={t("automations.fields.addExcept")}
+                                    options={excludable}
+                                    className={invalid ? "border-danger-edge" : undefined}
+                                    onValueChange={(next) =>
+                                        next &&
+                                        write(areas, block.only, [
+                                            ...exclude,
+                                            refOf(next) as { kind: auto.ExcludeKind; id: string }
+                                        ])
+                                    }
+                                />
+                            </div>
+                        )}
+                    </Field>
+                    <p
+                        className={cn(
+                            "self-end text-xs",
+                            count === 0 ? "text-danger" : "text-muted-foreground"
+                        )}
+                        aria-live="polite"
+                    >
+                        {count === 0
+                            ? t("automations.fields.targetNone")
+                            : only.length === 1
+                              ? t(`automations.fields.kindCount.${only[0] as kinds.DeviceKind}`, {
+                                    count
+                                })
+                              : t("automations.fields.targetCount", { count })}
+                        {excluded > 0 &&
+                            `, ${t("automations.fields.targetExcluded", { count: excluded })}`}
+                    </p>
+                </div>
             )}
         </>
     );

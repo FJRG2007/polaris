@@ -20,6 +20,7 @@ import * as live from "./device-live";
 import * as kinds from "./device-kinds";
 import { HomeError } from "./home-error";
 import * as rooms from "./rooms";
+import * as labels from "./labels";
 import * as accounts from "./device-accounts";
 import * as litterAlerts from "./litter-alerts";
 import { DriverError, type DeviceHistoryEntry } from "./drivers/contract";
@@ -76,7 +77,8 @@ const DEVICE_FIELDS = {
     light: true,
     appliance: true,
     litter: true,
-    stateAt: true
+    stateAt: true,
+    labels: { select: { labelId: true }, take: labels.LABEL_LIMITS.perDevice }
 } as const;
 
 type DeviceRow = {
@@ -105,6 +107,7 @@ type DeviceRow = {
     appliance: Prisma.JsonValue | null;
     litter: Prisma.JsonValue | null;
     stateAt: Date | null;
+    labels?: { labelId: string }[];
 };
 
 /** Settings to store, as the column takes them: SQL NULL for a device that has
@@ -182,6 +185,7 @@ function toView(row: DeviceRow): kinds.DeviceView {
         zone: row.zone ?? "",
         placeId: row.placeId,
         roomId: row.roomId,
+        labelIds: (row.labels ?? []).map((label) => label.labelId),
         model: row.model ?? "",
         firmware: row.firmware ?? "",
         state: kinds.deviceState(row.state),
@@ -259,6 +263,9 @@ export interface DeviceEdit {
     /** Where its battery reads as low, or null for its kind's line; absent
      *  leaves it as it is. */
     readonly batteryLowPercent?: number | null;
+    /** The labels it carries, each one of its place's; absent leaves them as
+     *  they are. */
+    readonly labelIds?: readonly string[];
 }
 
 export async function updateDevice(
@@ -276,19 +283,25 @@ export async function updateDevice(
     } else if (roomId === undefined && current.placeId !== edit.placeId) {
         roomId = null;
     }
-    const row = await prisma.placeDevice.update({
-        where: { id },
-        data: {
-            name: edit.name,
-            zone: edit.zone || null,
-            placeId: edit.placeId,
-            controllable: edit.controllable,
-            ...(roomId !== undefined ? { roomId } : {}),
-            ...(edit.batteryLowPercent !== undefined
-                ? { batteryLowPercent: edit.batteryLowPercent }
-                : {})
-        },
-        select: DEVICE_FIELDS
+    const row = await prisma.$transaction(async (tx) => {
+        // Labels are a place's: moved to another, it drops the old place's.
+        if (current.placeId !== edit.placeId) await labels.dropForeignLabels(tx, id, edit.placeId);
+        if (edit.labelIds !== undefined)
+            await labels.setDeviceLabels(tx, installedAppId, id, edit.placeId, edit.labelIds);
+        return tx.placeDevice.update({
+            where: { id },
+            data: {
+                name: edit.name,
+                zone: edit.zone || null,
+                placeId: edit.placeId,
+                controllable: edit.controllable,
+                ...(roomId !== undefined ? { roomId } : {}),
+                ...(edit.batteryLowPercent !== undefined
+                    ? { batteryLowPercent: edit.batteryLowPercent }
+                    : {})
+            },
+            select: DEVICE_FIELDS
+        });
     });
     const view = toView(row);
     // Renamed or moved to another place: every open screen hears it, and the

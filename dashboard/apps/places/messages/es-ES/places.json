@@ -758,7 +758,11 @@
         "relayNoVoice": "El relé de cámaras no aceptó la voz",
         "relayUpdating": "El relé de cámaras se está actualizando para poder llevar tu voz. Vuelve a probar en un minuto",
         "relayOld": "El relé de cámaras está desactualizado. Actualiza Polaris en Ajustes para hablar a través de las cámaras",
-        "talkNotPlayed": "La cámara no reprodujo la voz"
+        "talkNotPlayed": "La cámara no reprodujo la voz",
+        "labelGone": "Etiqueta eliminada",
+        "labelTaken": "Ya hay una etiqueta con ese nombre",
+        "labelsFull": "Este lugar ya tiene todas las etiquetas posibles",
+        "labelElsewhere": "Esa etiqueta es de otro lugar"
     },
     "connections": {
         "nuki-web": {
@@ -1956,7 +1960,23 @@
         "floorPlaceholder": "Planta baja",
         "batteryLine": "Batería baja al",
         "batteryLineHint": "Con esta carga o menos su batería cuenta como baja, para automatizaciones y el resumen. Déjalo vacío para usar {percent}%, el valor por defecto de este tipo.",
-        "batteryLineFlag": "El dispositivo también avisa él mismo de batería baja, y eso cuenta diga lo que diga esto."
+        "batteryLineFlag": "El dispositivo también avisa él mismo de batería baja, y eso cuenta diga lo que diga esto.",
+        "labels": "Etiquetas",
+        "labelsHint": "Nombra parte de una sala, o lo mismo en varias, para que una automatización las encienda juntas.",
+        "loadingLabels": "Leyendo las etiquetas...",
+        "labelsFailed": "No se pudieron leer las etiquetas. Se quedan como están.",
+        "addLabel": "Etiquetar",
+        "newLabel": "Etiqueta",
+        "newLabelPlaceholder": "Techo, Luces de noche",
+        "createLabel": "Crear etiqueta",
+        "removeLabel": "Quitar {label}",
+        "editLabels": "Editar lista",
+        "doneEditingLabels": "Listo",
+        "renameLabel": "Renombrar {label}",
+        "saveLabelName": "Guardar el nombre de {label}",
+        "deleteLabel": "Eliminar {label}",
+        "confirmDeleteLabel": "Eliminar en todo",
+        "deleteLabelUsed": "{count, plural, one {# automatización la usa y dejará de actuar sobre ella.} other {# automatizaciones la usan y dejarán de actuar sobre ella.}}"
     },
     "connect": {
         "reconnectTitle": "Reconectar {name}",
@@ -2156,7 +2176,10 @@
             "sunAfter": "Tras {edge}, hasta medianoche",
             "sunBefore": "Hasta {edge}, desde medianoche",
             "sunBetween": "Tras {after} y hasta {before}",
-            "triggeredBy": "Lanzada por {count, plural, one {el disparador} other {los disparadores}} {numbers}"
+            "triggeredBy": "Lanzada por {count, plural, one {el disparador} other {los disparadores}} {numbers}",
+            "everywhere": "todo el lugar",
+            "kindsInPlace": "{kinds} en {place}",
+            "except": "{set}, salvo {count, plural, one {uno} other {#}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -2213,7 +2236,7 @@
             "toggleUnknown": "No se sabía su estado, así que no había nada que cambiar."
         },
         "errors": {
-            "placeGone": "Esa sala o planta ya no está.",
+            "placeGone": "Esa sala, planta o etiqueta ya no está.",
             "privacyTarget": "Elige qué cámaras.",
             "placeEmpty": "Nada de ahí puede hacer esto.",
             "broken": "Algo en esta tarjeta no está bien. Quítala y vuelve a añadirla.",
@@ -2257,7 +2280,8 @@
             "upperBelow": "Ponlo por encima del inicio.",
             "sunEdge": "Elige tras, hasta o ambos.",
             "noTriggerPicked": "Elige al menos un disparador.",
-            "triggerGone": "Nombra un disparador que ya no está. Desmárcalo."
+            "triggerGone": "Nombra un disparador que ya no está. Desmárcalo.",
+            "allExcluded": "Todo lo de ahí queda fuera."
         },
         "notice": {
             "title": "Automatización: {name}"
@@ -2360,7 +2384,7 @@
             "whereChosen": "Los elegidos aquí",
             "wholeFloor": "Todo en {floor}",
             "wholeRoom": "Todo en {room}",
-            "placeGone": "Una sala que ya no está",
+            "placeGone": "Una sala, planta o etiqueta que ya no está",
             "at": "A las",
             "days": "Días",
             "every": "Cada",
@@ -2470,7 +2494,34 @@
             "noTriggers": "Aún no hay disparadores. Añade uno antes.",
             "triggerNumber": "Disparador {number}",
             "triggerPosition": "Disparador {number}",
-            "triggerMissing": "Disparador que falta. Desmárcalo para quitarlo."
+            "triggerMissing": "Disparador que falta. Desmárcalo para quitarlo.",
+            "wholePlace": "Todo en este lugar",
+            "withLabel": "Todo con la etiqueta {label}",
+            "alsoArea": "Además",
+            "addArea": "Añadir sala, planta o etiqueta",
+            "removeArea": "Quitar",
+            "onlyKinds": "Solo",
+            "anyKind": "Cualquier dispositivo",
+            "addKind": "Añadir tipo",
+            "removeKind": "Quitar",
+            "except": "Excepto",
+            "addExcept": "Dejar algo fuera",
+            "removeExcept": "Incluir",
+            "targetNone": "Nada de ahí responde a esto aún.",
+            "targetCount": "{count, plural, one {# dispositivo} other {# dispositivos}}",
+            "targetExcluded": "{count, plural, one {# excluido} other {# excluidos}}",
+            "kindCount": {
+                "lock": "{count, plural, one {# cerradura} other {# cerraduras}}",
+                "opener": "{count, plural, one {# abrepuertas} other {# abrepuertas}}",
+                "climate": "{count, plural, one {# aire acondicionado} other {# aires acondicionados}}",
+                "air": "{count, plural, one {# purificador} other {# purificadores}}",
+                "switch": "{count, plural, one {# interruptor} other {# interruptores}}",
+                "outlet": "{count, plural, one {# enchufe} other {# enchufes}}",
+                "light": "{count, plural, one {# luz} other {# luces}}",
+                "sensor": "{count, plural, one {# sensor} other {# sensores}}",
+                "appliance": "{count, plural, one {# electrodoméstico} other {# electrodomésticos}}",
+                "litter": "{count, plural, one {# arenero} other {# areneros}}"
+            }
         },
         "log": {
             "title": "Qué hizo",

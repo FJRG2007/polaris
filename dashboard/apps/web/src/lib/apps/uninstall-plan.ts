@@ -87,6 +87,7 @@ export const INSTALL_SCOPED_MODELS = [
     "placeDevice",
     "placeRoom",
     "placeFloor",
+    "placeLabel",
     "cameraSet",
     "placePanel",
     "camera",

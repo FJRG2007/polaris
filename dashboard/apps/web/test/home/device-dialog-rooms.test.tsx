@@ -24,6 +24,13 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
         calls.push({ action: "room", args });
         return { room: { id: "room-2", placeId: "place-1", name: "Hall", floor: "Ground floor" } };
     },
+    listLabelsAction: async () => ({
+        labels: [{ id: "label-1", placeId: "place-1", name: "Ceiling" }]
+    }),
+    saveLabelAction: async (...args: unknown[]) => {
+        calls.push({ action: "label", args });
+        return { label: { id: "label-2", placeId: "place-1", name: "Night" } };
+    },
     saveDeviceAction: async (...args: unknown[]) => {
         calls.push({ action: "device", args });
         return { device: lamp };
@@ -103,7 +110,8 @@ describe("a device's room", () => {
                     zone: "",
                     placeId: "place-1",
                     controllable: true,
-                    roomId: "room-1"
+                    roomId: "room-1",
+                    labelIds: []
                 }
             ]
         });
@@ -128,5 +136,46 @@ describe("a device's room", () => {
         const saved = calls.at(-1)!;
         expect(saved.action).toBe("device");
         expect((saved.args[1] as { roomId: string }).roomId).toBe("room-2");
+    });
+});
+
+describe("a device's labels", () => {
+    function open() {
+        render(
+            withMessages(
+                <DeviceDialog device={lamp} places={PLACES} onClose={() => {}} onSaved={() => {}} />
+            )
+        );
+    }
+
+    it("are picked from the place's labels and saved with the device", async () => {
+        open();
+        await painted();
+        fireEvent.click(screen.getByRole("combobox", { name: "Add a label" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Ceiling" }));
+        expect(screen.getByRole("button", { name: "Take Ceiling off" })).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const saved = calls.at(-1)!;
+        expect(saved.action).toBe("device");
+        expect((saved.args[1] as { labelIds: string[] }).labelIds).toEqual(["label-1"]);
+    });
+
+    it("can be made there and carried at once", async () => {
+        open();
+        await painted();
+        fireEvent.change(screen.getByRole("textbox", { name: "New label" }), {
+            target: { value: "  Night " }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Create label" }));
+        await painted();
+        expect(calls.find((call) => call.action === "label")?.args).toEqual([
+            null,
+            { placeId: "place-1", name: "Night" }
+        ]);
+        expect(screen.getByRole("button", { name: "Take Night off" })).toBeTruthy();
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(
+            false
+        );
     });
 });

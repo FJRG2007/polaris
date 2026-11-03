@@ -301,15 +301,43 @@ export const LIMITS = {
 
 export type { Behaviour, Quantifier };
 
-/** What a block's set can name: a device, or every device in a room or on a
- *  floor that answers what the block asks. */
-export const TARGET_KINDS = ["device", "room", "floor"] as const;
+/** What a block's set can name: a device, or every device in a room, on a
+ *  floor, carrying a label or anywhere at the place that answers what the block
+ *  asks. A "place" target's id is `PLACE_TARGET`: the block's own place. */
+export const TARGET_KINDS = ["device", "room", "floor", "label", "place"] as const;
 export type TargetKind = (typeof TARGET_KINDS)[number];
+
+/** The targets that stand for every device in them, read again on each run. */
+export const AREA_KINDS = ["room", "floor", "label", "place"] as const;
+export type AreaKind = (typeof AREA_KINDS)[number];
+
+/** What can be left out of what a block's areas hold. */
+export const EXCLUDE_KINDS = ["device", "room", "floor", "label"] as const;
+export type ExcludeKind = (typeof EXCLUDE_KINDS)[number];
+
+/** The id a "place" target carries: the place the automation is at. */
+export const PLACE_TARGET = "all";
 
 const targetsSchema = z
     .array(targetRefSchema.extend({ kind: z.enum(TARGET_KINDS) }))
     .max(LIMITS.targets, "automations.errors.tooMany")
     .optional();
+
+/** Devices, rooms, floors or labels whose devices a block never counts. */
+const excludeSchema = z
+    .array(targetRefSchema.extend({ kind: z.enum(EXCLUDE_KINDS) }))
+    .max(LIMITS.targets, "automations.errors.tooMany")
+    .optional();
+
+/** Only these kinds of device out of what a block's areas hold - "the lights of
+ *  the kitchen". Absent or empty is every kind that answers the block. */
+const onlySchema = z
+    .array(z.enum(kinds.DEVICE_KINDS))
+    .max(kinds.DEVICE_KINDS.length, "automations.errors.tooMany")
+    .optional();
+
+/** The fields every block about devices carries for its set. */
+const targetFields = { only: onlySchema, exclude: excludeSchema, targets: targetsSchema };
 
 /**
  * The devices a trigger or a condition is about. `deviceId` is the one every
@@ -328,13 +356,35 @@ export function deviceTargets(block: {
     return [...new Set(ids)];
 }
 
-/** The rooms and floors a block names, in the order it names them. */
+/** The rooms, floors, labels and whole place a block names, in its order. */
 export function placeTargets(block: {
     readonly targets?: readonly { readonly kind: string; readonly id: string }[];
-}): { kind: "room" | "floor"; id: string }[] {
+}): { kind: AreaKind; id: string }[] {
     return (block.targets ?? []).flatMap((ref) =>
-        ref.kind === "room" || ref.kind === "floor" ? [{ kind: ref.kind, id: ref.id }] : []
+        (AREA_KINDS as readonly string[]).includes(ref.kind)
+            ? [{ kind: ref.kind as AreaKind, id: ref.id }]
+            : []
     );
+}
+
+/** The devices, rooms, floors and labels a block leaves out. */
+export function excludedTargets(block: {
+    readonly exclude?: readonly { readonly kind: string; readonly id: string }[];
+}): { kind: ExcludeKind; id: string }[] {
+    return (block.exclude ?? []).flatMap((ref) =>
+        (EXCLUDE_KINDS as readonly string[]).includes(ref.kind)
+            ? [{ kind: ref.kind as ExcludeKind, id: ref.id }]
+            : []
+    );
+}
+
+/** Whether a block's devices are only known once its place is read: it names
+ *  an area, or leaves something out. */
+export function expands(block: {
+    readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+    readonly exclude?: readonly { readonly kind: string; readonly id: string }[];
+}): boolean {
+    return placeTargets(block).length > 0 || excludedTargets(block).length > 0;
 }
 
 /** What a room or a floor is resolved against: the devices at the place with
@@ -345,14 +395,18 @@ export interface TargetScope {
         readonly kind: string;
         readonly controllable?: boolean;
         readonly roomId?: string | null;
+        /** The labels it carries. Absent is none. */
+        readonly labelIds?: readonly string[];
     }[];
     readonly rooms: readonly { readonly id: string; readonly floorId?: string }[];
 }
 
-type TargetBlock = {
+export type TargetBlock = {
     readonly kind: string;
     readonly deviceId: string;
     readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+    readonly only?: readonly string[];
+    readonly exclude?: readonly { readonly kind: string; readonly id: string }[];
 };
 
 /** Whether a device answers what a block asks of it: the attribute it watches,
@@ -375,37 +429,84 @@ function answersBlock(block: TargetBlock, device: TargetScope["devices"][number]
     return attributesFor(device.kind).includes(asked.attribute ?? "state");
 }
 
-/**
- * The devices a block is about once its rooms and floors are read: the devices
- * it names, then each device in a room or on a floor it names that answers what
- * it asks, each once. A block naming no room nor floor is `deviceTargets`. One
- * that does keeps `deviceId` only for a build from before rooms could be named,
- * so a device that has since left the room is not counted for it.
- */
-export function resolvedTargets(block: TargetBlock, scope: TargetScope): string[] {
-    const places = placeTargets(block);
-    if (places.length === 0) return deviceTargets(block);
+/** Whether a device is in an area: its room, its room's floor, a label it
+ *  carries, or anywhere at the place. */
+function within(
+    area: { readonly kind: string; readonly id: string },
+    device: TargetScope["devices"][number],
+    floorOf: ReadonlyMap<string, string>
+): boolean {
+    const roomId = device.roomId ?? "";
+    switch (area.kind) {
+        case "room":
+            return roomId !== "" && roomId === area.id;
+        case "floor":
+            return roomId !== "" && floorOf.get(roomId) === area.id;
+        case "label":
+            return (device.labelIds ?? []).includes(area.id);
+        case "place":
+            return true;
+        default:
+            return false;
+    }
+}
+
+/** A block's devices, and the ones it found but leaves out, as the engine
+ *  reads them and the editor counts them. */
+export function targetBreakdown(
+    block: TargetBlock,
+    scope: TargetScope
+): { ids: string[]; excluded: string[] } {
+    const areas = placeTargets(block);
+    const exclude = excludedTargets(block);
+    if (areas.length === 0 && exclude.length === 0)
+        return { ids: deviceTargets(block), excluded: [] };
     const floorOf = new Map(scope.rooms.map((room) => [room.id, room.floorId ?? ""]));
-    const ids = (block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id);
-    for (const place of places) {
+    const only = new Set(block.only ?? []);
+    // A block naming an area keeps `deviceId` only for a build from before areas
+    // could be named, so a device that has since left the room is not counted.
+    const found =
+        areas.length > 0
+            ? (block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id)
+            : deviceTargets(block);
+    for (const area of areas) {
         for (const device of scope.devices) {
-            const roomId = device.roomId ?? "";
-            if (!roomId) continue;
-            const inside =
-                place.kind === "room" ? roomId === place.id : floorOf.get(roomId) === place.id;
-            if (inside && answersBlock(block, device)) ids.push(device.id);
+            if (only.size > 0 && !only.has(device.kind)) continue;
+            if (within(area, device, floorOf) && answersBlock(block, device)) found.push(device.id);
         }
     }
-    return [...new Set(ids.filter((id) => id.length > 0))];
+    const byId = new Map(scope.devices.map((device) => [device.id, device]));
+    const left = (id: string): boolean => {
+        const device = byId.get(id);
+        return exclude.some((ref) =>
+            ref.kind === "device" ? ref.id === id : device ? within(ref, device, floorOf) : false
+        );
+    };
+    const ids: string[] = [];
+    const excluded: string[] = [];
+    for (const id of new Set(found.filter((each) => each.length > 0)))
+        (left(id) ? excluded : ids).push(id);
+    return { ids, excluded };
+}
+
+/**
+ * The devices a block is about once its areas are read: the devices it names,
+ * then each device in a room, on a floor, with a label or at the place that it
+ * names, of a kind it keeps and answering what it asks - less everything it
+ * leaves out, each once. A block naming no area and leaving nothing out is
+ * `deviceTargets`. Read on every run, so a light added to the room later counts.
+ */
+export function resolvedTargets(block: TargetBlock, scope: TargetScope): string[] {
+    return targetBreakdown(block, scope).ids;
 }
 
 /** A block with its rooms and floors read into the devices they hold, as the
  *  engine runs it: its first as its device, the rest as its set. A room with
  *  nothing in it that answers leaves the block about no device at all. */
 export function resolveTargets<T extends TargetBlock>(block: T, scope: TargetScope): T {
-    if (placeTargets(block).length === 0) return block;
+    if (!expands(block)) return block;
     const ids = resolvedTargets(block, scope);
-    const { targets: _was, ...rest } = block;
+    const { targets: _was, only: _only, exclude: _exclude, ...rest } = block;
     return {
         ...rest,
         deviceId: ids[0] ?? "",
@@ -413,23 +514,26 @@ export function resolveTargets<T extends TargetBlock>(block: T, scope: TargetSco
     } as unknown as T;
 }
 
-/** The rooms and floors an automation names, anywhere in it. */
-export function namedPlaces(
-    definition: AutomationDefinition
-): { kind: "room" | "floor"; id: string }[] {
-    const blocks: unknown[] = [
+function blocksOf(definition: AutomationDefinition): TargetBlock[] {
+    return [
         ...definition.triggers,
         ...definition.conditions.groups.flatMap((group) => group.items),
         ...definition.actions
-    ];
-    return blocks.flatMap((block) =>
-        placeTargets(block as { targets?: { kind: string; id: string }[] })
-    );
+    ] as unknown as TargetBlock[];
 }
 
-/** Whether anything in an automation names a room or a floor. */
+/** The rooms, floors, labels and place an automation names or leaves out,
+ *  anywhere in it. */
+export function namedPlaces(definition: AutomationDefinition): { kind: string; id: string }[] {
+    return blocksOf(definition).flatMap((block) => [
+        ...placeTargets(block),
+        ...excludedTargets(block).filter((ref) => ref.kind !== "device")
+    ]);
+}
+
+/** Whether anything in an automation is only known once its place is read. */
 export function namesPlaces(definition: AutomationDefinition): boolean {
-    return namedPlaces(definition).length > 0;
+    return blocksOf(definition).some((block) => expands(block));
 }
 
 /** An automation with every room and floor it names read into devices. */
@@ -650,7 +754,7 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("change"),
         deviceId: deviceRef,
-        targets: targetsSchema,
+        ...targetFields,
         /** For a set: each device's change, the first one's, or the last one's. */
         behaviour: behaviourSchema.optional(),
         attribute,
@@ -664,7 +768,7 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("stays"),
         deviceId: deviceRef,
-        targets: targetsSchema,
+        ...targetFields,
         behaviour: behaviourSchema.optional(),
         attribute,
         is: needed,
@@ -677,7 +781,7 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("threshold"),
         deviceId: deviceRef,
-        targets: targetsSchema,
+        ...targetFields,
         behaviour: behaviourSchema.optional(),
         /** "between" fires on coming into `value`..`upper`, "outside" on leaving it. */
         direction: z.enum(THRESHOLD_DIRECTIONS),
@@ -705,7 +809,7 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
-        targets: targetsSchema,
+        ...targetFields,
         /** For a set: any of its devices, or all of them. */
         quantifier: quantifierSchema.optional(),
         attribute,
@@ -719,7 +823,7 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("reading"),
         deviceId: deviceRef,
-        targets: targetsSchema,
+        ...targetFields,
         quantifier: quantifierSchema.optional(),
         op: z.enum(COMPARISONS),
         value: amount,
@@ -771,7 +875,7 @@ export const actionSchema = z.discriminatedUnion("kind", [
         kind: z.literal("device"),
         deviceId: deviceRef,
         /** More devices, a room or a floor, each told the same. */
-        targets: targetsSchema,
+        ...targetFields,
         do: z.enum(STEP_DEVICE_ACTIONS, {
             errorMap: () => ({ message: "automations.errors.action" })
         }),
@@ -789,7 +893,7 @@ export const actionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("wait"),
         deviceId: deviceRef,
-        targets: targetsSchema,
+        ...targetFields,
         /** For a set: until any of its devices is that way, or all of them. */
         quantifier: quantifierSchema.optional(),
         attribute,
@@ -1197,6 +1301,8 @@ export interface AutomationIssue {
 export type AutomationDevice = Pick<DeviceView, "id" | "kind" | "name" | "controllable"> & {
     /** The room it is in, which a block naming a room or a floor reads. */
     readonly roomId?: string | null;
+    /** The labels it carries, which a block naming a label reads. */
+    readonly labelIds?: readonly string[];
     /** What an air conditioner accepts, where it is known. */
     readonly climate?: kinds.ClimateSettings | null;
     /** What a purifier accepts, where it is known. */
@@ -1221,6 +1327,9 @@ export function deviceIssues(
         /** The place's floors, which a floor is checked against; absent reads a
          *  floor as there only while a room is on it. */
         readonly floors?: readonly { readonly id: string }[];
+        /** The place's labels, which a label is checked against. Absent leaves
+         *  labels unchecked. */
+        readonly labels?: readonly { readonly id: string }[];
     }
 ): AutomationIssue[] {
     const byId = new Map(devices.map((device) => [device.id, device]));
@@ -1232,28 +1341,50 @@ export function deviceIssues(
         placeTargets(block).length > 0
             ? (block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id)
             : deviceTargets(block);
-    /** A room or a floor that is gone, or that holds nothing answering the block. */
+    /** Whether a room, floor or label a block names is still at the place.
+     *  Undefined is not known from here. */
+    const knownArea = (ref: { kind: string; id: string }): boolean | undefined => {
+        const rooms = context.rooms;
+        if (ref.kind === "place") return true;
+        if (ref.kind === "label") return context.labels?.some((label) => label.id === ref.id);
+        if (!rooms) return undefined;
+        if (ref.kind === "room") return rooms.some((room) => room.id === ref.id);
+        return context.floors
+            ? context.floors.some((floor) => floor.id === ref.id)
+            : rooms.some((room) => room.floorId === ref.id);
+    };
+    /** An area that is gone, one that holds nothing answering the block, a
+     *  left-out thing that is gone, and a block that leaves out all it had. */
     const places = (block: TargetBlock, path: (string | number)[]) => {
         const rooms = context.rooms;
-        if (!rooms || placeTargets(block).length === 0) return;
+        if (!rooms || !expands(block)) return;
         const scope: TargetScope = { devices, rooms };
         (block.targets ?? []).forEach((ref, index) => {
-            if (ref.kind !== "room" && ref.kind !== "floor") return;
+            if (!(AREA_KINDS as readonly string[]).includes(ref.kind)) return;
             const field = [...path, "targets", index, "id"];
-            const known =
-                ref.kind === "room"
-                    ? rooms.some((room) => room.id === ref.id)
-                    : context.floors
-                      ? context.floors.some((floor) => floor.id === ref.id)
-                      : rooms.some((room) => room.floorId === ref.id);
-            if (!known) {
+            const known = knownArea(ref);
+            if (known === false) {
                 issues.push({ path: field, message: "automations.errors.placeGone" });
                 return;
             }
-            const alone = { ...block, targets: [{ kind: ref.kind, id: ref.id }] };
-            if (resolvedTargets(alone, scope).length === 0)
+            const alone = { ...block, targets: [{ kind: ref.kind, id: ref.id }], exclude: [] };
+            if (known && resolvedTargets(alone, scope).length === 0)
                 issues.push({ path: field, message: "automations.errors.placeEmpty" });
         });
+        (block.exclude ?? []).forEach((ref, index) => {
+            const gone = ref.kind === "device" ? !byId.has(ref.id) : knownArea(ref) === false;
+            if (!gone) return;
+            issues.push({
+                path: [...path, "exclude", index, "id"],
+                message:
+                    ref.kind === "device"
+                        ? "automations.errors.deviceGone"
+                        : "automations.errors.placeGone"
+            });
+        });
+        const split = targetBreakdown(block, scope);
+        if (split.ids.length === 0 && split.excluded.length > 0)
+            issues.push({ path: [...path, "exclude"], message: "automations.errors.allExcluded" });
     };
 
     /** Where a complaint about one device of a block goes: its own field for the
@@ -1531,9 +1662,19 @@ export function blankStep(kind: StepKind): Step {
 function single<T extends object>(block: T): T {
     if (!("targets" in block)) return block;
     const { targets: _was, ...rest } = block as T & { targets?: unknown };
-    // A room or a floor stays: it is read again for whatever the new device asks.
+    // An area stays, with what it keeps and leaves out: it is read again for
+    // whatever the new device asks.
     const places = placeTargets(block as { targets?: { kind: string; id: string }[] });
-    return (places.length > 0 ? { ...rest, targets: places } : rest) as T;
+    if (places.length > 0) return { ...rest, targets: places } as T;
+    const {
+        only: _only,
+        exclude: _exclude,
+        ...bare
+    } = rest as typeof rest & {
+        only?: unknown;
+        exclude?: unknown;
+    };
+    return bare as unknown as T;
 }
 
 /** A trigger pointed at `device`, with what it looks at reset to what that device has. */

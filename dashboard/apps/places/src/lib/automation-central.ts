@@ -23,6 +23,7 @@ import { homeInstall } from "./access";
 import * as auto from "./automation-kinds";
 import * as nodes from "./automation-nodes";
 import { parseTarget } from "./privacy-kinds";
+import { targetScope } from "./automation-scope";
 import { host, type AppHostTypes } from "@polaris/app-host";
 import { automationEngine, mayOperate } from "./automation-runtime";
 import { MAX_DEPTH, RECHECK_MS, type AutomationRecord } from "./automation-engine";
@@ -251,24 +252,8 @@ const deviceNode: ServerNode<DeviceConfig> = {
 };
 
 /** A record's rooms and floors, read into devices (a step names them by room). */
-async function placeScope(record: AutomationRecord): Promise<auto.TargetScope> {
-    const [devices, rooms] = await Promise.all([
-        prisma.placeDevice.findMany({
-            where: {
-                installedAppId: record.installedAppId,
-                placeId: record.placeId,
-                roomId: { not: null }
-            },
-            select: { id: true, kind: true, controllable: true, roomId: true },
-            take: 1000
-        }),
-        prisma.placeRoom.findMany({
-            where: { installedAppId: record.installedAppId, placeId: record.placeId },
-            select: { id: true, floorId: true },
-            take: 500
-        })
-    ]);
-    return { devices, rooms: rooms.map((room) => ({ id: room.id, floorId: room.floorId ?? "" })) };
+function placeScope(record: AutomationRecord): Promise<auto.TargetScope> {
+    return targetScope(record.installedAppId, record.placeId);
 }
 
 const waitNode: ServerNode<WaitConfig> = {

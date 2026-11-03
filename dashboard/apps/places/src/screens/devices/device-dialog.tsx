@@ -48,6 +48,7 @@ import {
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
 import { usePlaceRooms } from "../use-place-rooms";
+import { DeviceLabelsField, usePlaceLabels } from "./device-labels";
 import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
@@ -77,6 +78,8 @@ export function DeviceDialog({
     // The rooms of the place it is at, read again when another place is picked.
     const [rooms, setRooms] = usePlaceRooms(device ? placeId : "");
     const [roomName, setRoomName] = useState("");
+    const [labelIds, setLabelIds] = useState<string[]>([]);
+    const placeLabels = usePlaceLabels(device ? placeId : "");
     const [floor, setFloor] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -88,6 +91,7 @@ export function DeviceDialog({
         setPlaceId(device.placeId ?? "");
         setControllable(device.controllable);
         setRoomId(device.roomId ?? "");
+        setLabelIds([...(device.labelIds ?? [])]);
         setBatteryLine(device.batteryLowPercent ? String(device.batteryLowPercent) : "");
         setRoomName("");
         setFloor("");
@@ -124,9 +128,18 @@ export function DeviceDialog({
                     placeId: device.placeId ?? "",
                     controllable: device.controllable,
                     roomId: device.roomId ?? "",
-                    batteryLine: device.batteryLowPercent ? String(device.batteryLowPercent) : ""
+                    batteryLine: device.batteryLowPercent ? String(device.batteryLowPercent) : "",
+                    labels: [...(device.labelIds ?? [])].sort().join(",")
                 },
-                { name, zone, placeId, controllable, roomId, batteryLine: lineTyped }
+                {
+                    name,
+                    zone,
+                    placeId,
+                    controllable,
+                    roomId,
+                    batteryLine: lineTyped,
+                    labels: [...labelIds].sort().join(",")
+                }
             ));
     const canSubmit =
         name.trim().length > 0 &&
@@ -178,6 +191,11 @@ export function DeviceDialog({
                     placeId: placeId || null,
                     controllable,
                     roomId: placeId ? room : null,
+                    // Labels are a place's: a device at none, or one whose place's
+                    // labels could not be read, leaves them to the server.
+                    ...(placeId && placeLabels.labels !== null && !placeLabels.failed
+                        ? { labelIds }
+                        : {}),
                     ...(hasBattery ? { batteryLowPercent: lineValue } : {})
                 }),
             setError
@@ -244,6 +262,7 @@ export function DeviceDialog({
                             onValueChange={(next) => {
                                 setPlaceId(next);
                                 setRoomId("");
+                                setLabelIds([]);
                             }}
                             aria-label={t("deviceDialog.place")}
                             options={[
@@ -275,6 +294,18 @@ export function DeviceDialog({
                                 {t("deviceDialog.roomHint")}
                             </span>
                         </div>
+                    )}
+
+                    {placeId && (
+                        <DeviceLabelsField
+                            placeId={placeId}
+                            labels={placeLabels.labels}
+                            setLabels={placeLabels.setLabels}
+                            failed={placeLabels.failed}
+                            value={labelIds}
+                            onChange={setLabelIds}
+                            disabled={saving}
+                        />
                     )}
 
                     {placeId && making && (

@@ -11173,6 +11173,7 @@ model Place {
     automations PlaceAutomation[]
     rooms       PlaceRoom[]
     floors      PlaceFloor[]
+    labels      PlaceLabel[]
     cameraSets  CameraSet[]
     panels      PlacePanel[]
 
@@ -11225,6 +11226,42 @@ model PlaceFloor {
 
     @@unique([placeId, name])
     @@index([installedAppId])
+}
+
+/// A name a place's devices can carry across rooms - "Ceiling", "Night lights",
+/// "Window side" - so an automation can name part of a room, or the same kind
+/// of thing in several, the way a room names all of one. A device carries up
+/// to 20 of them; deleting one leaves its devices where they are.
+model PlaceLabel {
+    id             String @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent of not
+    // linking installs by foreign key.
+    installedAppId String @db.Uuid
+    placeId        String @db.Uuid
+    name           String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place   Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
+    devices PlaceDeviceLabel[]
+
+    @@unique([placeId, name])
+    @@index([installedAppId])
+}
+
+/// Which labels a device carries. Goes with the device and with the label.
+model PlaceDeviceLabel {
+    deviceId String @db.Uuid
+    labelId  String @db.Uuid
+
+    createdAt DateTime @default(now())
+
+    device PlaceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+    label  PlaceLabel  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+    @@id([deviceId, labelId])
+    @@index([labelId])
 }
 
 // A room at a place, which devices can be put in.
@@ -11754,6 +11791,7 @@ model PlaceDevice {
     account     PlaceDeviceAccount?     @relation(fields: [accountId], references: [id], onDelete: Cascade)
     events      PlaceDeviceEvent[]
     observation PlaceDeviceObservation?
+    labels      PlaceDeviceLabel[]
 
     // One device per id per account. A sync runs on a schedule and on demand, and
     // the two overlapping must not leave a house with the same door twice. Per

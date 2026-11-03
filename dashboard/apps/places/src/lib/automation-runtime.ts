@@ -30,6 +30,7 @@ import {
     wornFilter
 } from "./device-kinds";
 import { prismaAutomationStore } from "./automation-store";
+import { targetScope } from "./automation-scope";
 import { parseTarget } from "./privacy-kinds";
 import {
     createEngine,
@@ -132,24 +133,7 @@ export function automationEngine(): AutomationEngine {
         },
         central: async (automation, firingKey, cause, depth) =>
             (await import("./automation-central")).fireCentral(automation, firingKey, cause, depth),
-        async places(installedAppId, placeId) {
-            const [devices, rooms] = await Promise.all([
-                prisma.placeDevice.findMany({
-                    where: { installedAppId, placeId, roomId: { not: null } },
-                    select: { id: true, kind: true, controllable: true, roomId: true },
-                    take: 1000
-                }),
-                prisma.placeRoom.findMany({
-                    where: { installedAppId, placeId },
-                    select: { id: true, floorId: true },
-                    take: 500
-                })
-            ]);
-            return {
-                devices,
-                rooms: rooms.map((room) => ({ id: room.id, floorId: room.floorId ?? "" }))
-            };
-        },
+        places: (installedAppId, placeId) => targetScope(installedAppId, placeId),
         devices: {
             async read(installedAppId, deviceId) {
                 const row = await prisma.placeDevice.findFirst({

@@ -463,7 +463,9 @@ export const deviceEditSchema = z.object({
     roomId: z.string().trim().max(64).nullable().optional(),
     /** Where its battery reads as low, 1-99; null is its kind's line. Absent
      *  leaves it as it is, so a screen from before this saves without one. */
-    batteryLowPercent: batteryLineSchema.nullable().optional()
+    batteryLowPercent: batteryLineSchema.nullable().optional(),
+    /** The labels it carries; absent leaves them as they are. */
+    labelIds: z.array(z.string().trim().min(1).max(64)).max(20).optional()
 });
 
 export type DeviceEditInput = z.infer<typeof deviceEditSchema>;
@@ -500,6 +502,16 @@ export function normalizeDeviceInput<T extends Record<string, unknown>>(input: T
 }
 
 export type RoomCreateInput = z.infer<typeof roomCreateSchema>;
+
+/** A label's name, as both sides of the wire check it. */
+export const labelInputSchema = z.object({
+    name: z.string().trim().min(1, "Give it a name").max(40)
+});
+
+/** A new label, at the place it is for. */
+export const labelCreateSchema = labelInputSchema.extend({
+    placeId: z.string().trim().min(1).max(64)
+});
 
 /** A floor's name, as both sides of the wire check it. */
 export const floorInputSchema = z.object({

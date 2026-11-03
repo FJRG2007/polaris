@@ -31,6 +31,7 @@ import { NearbyRefusal, reportedLocation, type NearbyRefused } from "../lib/near
 import { normalizePlaceLocation, placeLocationSchema } from "../lib/place-kinds";
 import * as people from "../lib/people";
 import * as rooms from "../lib/rooms";
+import * as labels from "../lib/labels";
 import * as automations from "../lib/automations";
 import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
@@ -2093,6 +2094,58 @@ export async function saveFloorAction(
         targetId: result.value?.id ?? String(floorId)
     });
     return { floor: result.value };
+}
+
+/** A place's labels, for the device dialog and the room screen. */
+export async function listLabelsAction(
+    placeId: string
+): Promise<{ labels?: labels.LabelView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => labels.listLabels(install.id, String(placeId)));
+    if (result.error) return { error: result.error };
+    return { labels: result.value };
+}
+
+/** A new label at a place (no id), or a label's new name. */
+export async function saveLabelAction(
+    labelId: string | null,
+    input: unknown
+): Promise<{ label?: labels.LabelView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const normalized = schemas.normalizeRoomInput((input ?? {}) as Record<string, unknown>);
+    const parsed = labelId
+        ? schemas.labelInputSchema.safeParse(normalized)
+        : schemas.labelCreateSchema.safeParse(normalized);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
+    const data = parsed.data;
+    const result = await guard(() =>
+        labelId
+            ? labels.renameLabel(install.id, String(labelId), data.name)
+            : labels.createLabel(install.id, data as { placeId: string; name: string })
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: labelId ? "places.label.update" : "places.label.create",
+        targetType: "placeLabel",
+        targetId: result.value?.id ?? String(labelId)
+    });
+    return { label: result.value };
+}
+
+/** Remove a label. Its devices stay as they are, without it. */
+export async function deleteLabelAction(labelId: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(() => labels.deleteLabel(install.id, String(labelId)));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.label.delete",
+        targetType: "placeLabel",
+        targetId: String(labelId)
+    });
+    return {};
 }
 
 /** How many automations name each room and floor of a place, for the remove

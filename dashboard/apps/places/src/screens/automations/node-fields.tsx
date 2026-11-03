@@ -22,7 +22,7 @@ import { RoomsProvider } from "./add-block";
 import * as auto from "../../lib/automation-kinds";
 import * as nodes from "../../lib/automation-nodes";
 import type { DeviceView } from "../../lib/device-kinds";
-import type { RoomView } from "../../lib/room-kinds";
+import type { LabelView, RoomView } from "../../lib/room-kinds";
 import { ConditionGroupCard, StepCard, TriggerCard } from "./automation-editor";
 
 const { runAction } = hostUi.runAction;
@@ -38,11 +38,13 @@ interface Listing {
     readonly placeId: string;
     readonly devices: DeviceView[];
     readonly rooms: RoomView[];
+    readonly labels: LabelView[];
     readonly siblings: { id: string; name: string }[];
     readonly privacyTargets: { target: string; label: string }[];
 }
 
 const NO_ROOMS: RoomView[] = [];
+const NO_LABELS: LabelView[] = [];
 
 /** The config a card's block is saved as: the block without its id. */
 function configOf<B extends { id: string }>(block: B, placeId: unknown): Record<string, unknown> {
@@ -98,6 +100,7 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
                 placeId: result.context.placeId,
                 devices: result.context.devices,
                 rooms: result.context.rooms ?? NO_ROOMS,
+                labels: result.context.labels ?? NO_LABELS,
                 siblings: result.context.siblings,
                 privacyTargets: result.context.privacyTargets ?? []
             });
@@ -212,5 +215,13 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
         );
     }
 
-    return <RoomsProvider value={listing.rooms ?? NO_ROOMS}>{body}</RoomsProvider>;
+    return (
+        <RoomsProvider value={listing.rooms ?? NO_ROOMS}>
+            <fields.TargetPlaceProvider
+                value={{ labels: listing.labels, devices: listing.devices }}
+            >
+                {body}
+            </fields.TargetPlaceProvider>
+        </RoomsProvider>
+    );
 }
