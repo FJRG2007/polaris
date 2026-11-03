@@ -781,7 +781,6 @@
         },
         "weather": {
             "tool": "Tiempo consultado",
-            "now": "Ahora",
             "asOf": "A las {time}",
             "feelsLike": "Sensación {value}",
             "wind": "Viento {value}",

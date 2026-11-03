@@ -847,7 +847,7 @@ export function offsetText(minutes: number): string {
 function timeMarkdown(view: TimeView, now: number): string {
     const instant = timeInstant(view, now);
     const offsets = timeOffsets(view, instant);
-    return view.places
+    const lines = view.places
         .map((place, index) => {
             const when = new Intl.DateTimeFormat("en-US", {
                 timeZone: place.zone,
@@ -858,6 +858,7 @@ function timeMarkdown(view: TimeView, now: number): string {
             return `- **${inline(place.label)}** (${place.zone}): ${when}${offset}`;
         })
         .join("\n");
+    return view.at ? lines : `Current time, as of ${new Date(instant).toISOString()}:\n${lines}`;
 }
 
 /** A converted amount as text: a currency in its own format, a unit after its

@@ -781,7 +781,6 @@
         },
         "weather": {
             "tool": "Checked the weather",
-            "now": "Now",
             "asOf": "As of {time}",
             "feelsLike": "Feels like {value}",
             "wind": "Wind {value}",

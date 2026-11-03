@@ -118,8 +118,20 @@ export function convertUnit(value: number, from: string, to: string): number | n
     return (value * left[1]) / right[1];
 }
 
-/** Whether `actual` is `expected` within a hundredth of it (rounding the model
- *  did to show the figure is fine; a wrong factor is not). */
+/** How many decimals `value` was written with. */
+function writtenDecimals(value: number): number | null {
+    const text = String(Math.abs(value));
+    if (!/^\d+(\.\d+)?$/.test(text)) return null;
+    return text.split(".")[1]?.length ?? 0;
+}
+
+/** Whether `actual` is `expected` within a hundredth of it, or is `expected`
+ *  rounded to the decimals `actual` was written with (rounding the model did to
+ *  show the figure is fine; a wrong factor is not). */
 export function closeTo(actual: number, expected: number): boolean {
-    return Math.abs(actual - expected) <= Math.max(1e-9, Math.abs(expected) * 0.01);
+    const decimals = writtenDecimals(actual);
+    const rounding = decimals === null ? 0 : 0.5 * 10 ** -decimals;
+    return (
+        Math.abs(actual - expected) <= Math.max(1e-9, Math.abs(expected) * 0.01, rounding) + 1e-9
+    );
 }

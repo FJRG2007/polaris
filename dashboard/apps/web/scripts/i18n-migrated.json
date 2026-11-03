@@ -2246,6 +2246,7 @@
         "web/src/components/polar/visuals/visual-view.tsx",
         "web/src/components/polar/visuals/visual-chart.tsx",
         "web/src/components/polar/visuals/visual-diagram.tsx",
+        "web/src/components/polar/visuals/visual-cards.tsx",
         "web/src/components/polar/polar-code.tsx",
         "web/src/components/polar/polar-code-context.tsx",
         "web/src/components/polar/polar-composer.tsx",

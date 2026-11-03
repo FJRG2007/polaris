@@ -11,6 +11,7 @@ const visuals = await import("@/lib/polar/visuals");
 const { convertUnit } = await import("@/lib/polar/units");
 const zones = await import("@/lib/polar/zones");
 const { polarVisualTools } = await import("@/lib/polar/visual-tool");
+const { polarSystemPrompt } = await import("@/lib/polar/prompt");
 
 const translation = {
     view: {
@@ -124,6 +125,17 @@ describe("the answer cards", () => {
         expect(JSON.stringify(result.error?.issues)).toContain("6.2137119");
     });
 
+    it("takes a conversion rounded to the decimals it was written with", () => {
+        const rounded = (from: object, to: object) =>
+            parses(withView(unitConversion, { from, to }));
+        expect(rounded({ value: 33, unit: "F" }, { value: 0.6, unit: "C" })).toBe(true);
+        expect(rounded({ value: 1, unit: "ft" }, { value: 0.3, unit: "m" })).toBe(true);
+        expect(rounded({ value: 100, unit: "ft" }, { value: 30, unit: "m" })).toBe(true);
+        expect(rounded({ value: 33, unit: "F" }, { value: 0.7, unit: "C" })).toBe(false);
+        expect(rounded({ value: 1, unit: "ft" }, { value: 0.35, unit: "m" })).toBe(false);
+        expect(rounded({ value: 100, unit: "ft" }, { value: 33, unit: "m" })).toBe(false);
+    });
+
     it("leaves unknown units unchecked", () => {
         expect(
             parses(
@@ -142,6 +154,15 @@ describe("the answer cards", () => {
         for (const kind of ["translation", "weather", "time", "conversion"])
             expect(description).toContain(`${kind} (`);
         expect(description).toContain("polar_weather");
+    });
+});
+
+describe("the prompt", () => {
+    it("names polar_weather only while the web can be read", () => {
+        expect(polarSystemPrompt("Ana", null, "", true)).toContain("polar_weather");
+        const off = polarSystemPrompt("Ana", null, "", false);
+        expect(off).not.toContain("polar_weather");
+        expect(off).toContain("the weather cannot be read");
     });
 });
 
@@ -239,6 +260,15 @@ describe("as text", () => {
             /^- \*\*Tokyo\*\* \(Asia\/Tokyo\): Nov 3, 2026, 11:00\sPM \(\+8 h\)$/
         );
         expect(lines[2]).toMatch(/7:30\sPM \(\+4 h 30 min\)$/);
+    });
+
+    it("says a time with no moment of its own is the current time, and when it was read", () => {
+        const now = markdown({ view: { ...time.view, at: undefined } }).split("\n");
+        expect(now[0]).toMatch(
+            /^Current time, as of \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z:$/
+        );
+        expect(now).toHaveLength(4);
+        expect(markdown(time)).not.toContain("Current time");
     });
 
     it("writes a conversion with its formula, and a currency with its rate and source", () => {

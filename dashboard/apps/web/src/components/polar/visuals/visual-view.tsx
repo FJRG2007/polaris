@@ -113,7 +113,7 @@ export function PolarVisualView({ visual }: { visual: PolarVisual }) {
                 ) : null}
                 <MessageAction
                     label={copied ? t("visual.copied") : t("visual.copy")}
-                    onClick={() => void copy(markdown)}
+                    onClick={() => void copy(visualMarkdown(visual))}
                 >
                     <CopyIcon copied={copied} />
                 </MessageAction>
