@@ -14,7 +14,7 @@
 # Inputs come from com.tcl.tvinput.
 #
 # TESTING, honestly: applied in three rounds on 2026-10-20 and used for a few hours only, which is
-# shorter than CONTRIBUTING.md asks. What was actually checked, each after a reboot: Netflix and
+# shorter than docs/workflows/tv-list.md asks. What was actually checked, each after a reboot: Netflix and
 # YouTube open and play, HDMI input switching works, the Live TV source picker works, Wi-Fi survives,
 # picture/sound settings open, the firmware update check still runs, the screensaver still starts.
 # The full list was also restored (tools/restore.sh) and re-applied once, so the undo path is tested

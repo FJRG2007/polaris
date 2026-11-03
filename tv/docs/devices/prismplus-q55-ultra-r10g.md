@@ -21,7 +21,7 @@ Neither was disabled to test whether this firmware would boot without it.
 
 ## Home and the physical remote
 
-The stock-home query continued to resolve to Google TV Home. CleanYourTV worked
+The stock-home query continued to resolve to Google TV Home. Polaris TV worked
 through its existing `HomeKeyService` redirect, rather than becoming the resolved
 stock HOME component. These existing settings were used together:
 
@@ -40,7 +40,7 @@ the helper; configuration alone does not enable the accessibility service.
 With key filtering initially off, Home appeared to work before reboot, but the
 owner's physical Home presses returned to the original Google home after reboot.
 After enabling key filtering and `power_on_home_always`, the owner opened YouTube
-and confirmed that one Home press, then two more, stayed on CleanYourTV. Holding
+and confirmed that one Home press, then two more, stayed on Polaris TV. Holding
 Volume Up still raised the volume continuously. These settings were changed
 together, so the test does not isolate which setting fixed the return to stock.
 
@@ -89,7 +89,7 @@ does not establish that its feature was tested.
   days of normal use were not verified. No claim is made for another firmware.
 
 Original package/settings backups and the tool-generated recovery record were
-kept privately. To undo the Home redirect, turn off CleanYourTV's Home helper in
+kept privately. To undo the Home redirect, turn off Polaris TV's Home helper in
 Android's accessibility settings, leaving any other accessibility services alone;
 the stock Home and setup packages are already enabled. Use the recorded list with
 the repository's [restore procedure](../restore.md) to undo package changes.

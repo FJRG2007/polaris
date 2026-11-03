@@ -24,7 +24,7 @@ Not confirmed: `pm list users` also shows `configured_user` (10) and `new_user` 
 ## Second unit: 55C845X2, the remote's buttons and their cost
 
 - **TV:** TCL 55C845X2, same product (`G08_4K_GB`) and firmware (`V8-0012T01-LF1V667`, AU04) as above. Remote `BT_RC833_U1`.
-- **Tested:** 2026-10-27 and 28, one owner, with the CleanYourTV launcher as Home and `HOME_KEY_SERVICE=1`.
+- **Tested:** 2026-10-27 and 28, one owner, with the Polaris TV launcher as Home and `HOME_KEY_SERVICE=1`.
 - **Disabled:** a subset of this list in three batches, plus launcherx. The batches were tracking and ads (`com.tcl.ttvs`,
   `com.tcl.interactive`, `com.tcl.partnercustomizer`, `com.tcl.tv.tclhome_passive`), unused preloads (Play Games,
   YouTube Music, Play Movies & TV, the feedback apps, `com.google.android.partnersetup`,

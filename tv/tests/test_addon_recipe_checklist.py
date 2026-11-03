@@ -131,12 +131,6 @@ class CheckerTest(unittest.TestCase):
                       "tests/test_addons.py no longer requires the row to show the screenshot; the row step's\n"
                       "wording can go")
 
-    def test_the_addon_workflow_still_refuses_a_folder_without_its_wrapper(self):
-        text = ADDON_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("addons/$a/gradlew", text,
-                      ".github/workflows/addons.yml no longer refuses a folder without gradlew; the recipe's\n"
-                      "wrapper step can go")
-
     def test_the_local_properties_check_still_asks_git_about_the_file(self):
         text = LOCAL_PROPERTIES_TESTS.read_text(encoding="utf-8")
         self.assertIn("check-ignore", text,

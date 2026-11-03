@@ -143,7 +143,7 @@ class RecoveryRecordTest(unittest.TestCase):
         )
 
     def record(self):
-        files = list((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        files = list((self.home / ".polaris-tv").glob("recovery-*.json"))
         self.assertLessEqual(len(files), 1, "one record per TV and list")
         return json.loads(files[0].read_text()) if files else None
 
@@ -198,7 +198,7 @@ class RecoveryRecordTest(unittest.TestCase):
 
     def test_corrupt_record_is_not_overwritten(self):
         self.tv()
-        folder = self.home / ".cleanyourtv"
+        folder = self.home / ".polaris-tv"
         # Take a record, then damage it the way an interrupted copy would.
         self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
         path = next(folder.glob("recovery-*.json"))
@@ -388,10 +388,10 @@ class RecoveryRecordTest(unittest.TestCase):
         for field, edit in edits.items():
             for script in ("restore.sh", "disable.sh"):
                 with self.subTest(field=field, script=script):
-                    shutil.rmtree(self.home / ".cleanyourtv", ignore_errors=True)
+                    shutil.rmtree(self.home / ".polaris-tv", ignore_errors=True)
                     self.tv()
                     self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
-                    path = next((self.home / ".cleanyourtv").glob("recovery-*.json"))
+                    path = next((self.home / ".polaris-tv").glob("recovery-*.json"))
                     record = json.loads(path.read_text())
                     edit(record)
                     path.write_text(json.dumps(record))

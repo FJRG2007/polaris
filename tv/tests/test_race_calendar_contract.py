@@ -31,9 +31,9 @@ from tools import race_calendar
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TVHOME = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
-RACE_WEEKEND = TVHOME / "RaceWeekend.java"
-CONFIG = TVHOME / "Config.java"
+LAUNCHER_SRC = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
+RACE_WEEKEND = LAUNCHER_SRC / "RaceWeekend.java"
+CONFIG = LAUNCHER_SRC / "Config.java"
 PAGE = ROOT / "themes" / "README.md"
 
 SWITCH = re.compile(r'case "([^"]+)":')

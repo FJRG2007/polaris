@@ -45,7 +45,7 @@ class OldChooserRecordTest(unittest.TestCase):
         """The record the older save() left on a TV whose Home had no default, and its path."""
         self.tv(home=chooser.CHOOSER_ANSWER)
         self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
-        path = next((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        path = next((self.home / ".polaris-tv").glob("recovery-*.json"))
         record = json.loads(path.read_text())
         record["home"] = CHOOSER
         record["packages"]["android"] = "enabled"
@@ -123,7 +123,7 @@ class OldChooserRecordTest(unittest.TestCase):
         for case, edits in cases.items():
             for script in ("restore.sh", "disable.sh"):
                 with self.subTest(case=case, script=script):
-                    shutil.rmtree(self.home / ".cleanyourtv", ignore_errors=True)
+                    shutil.rmtree(self.home / ".polaris-tv", ignore_errors=True)
                     path = self.write_old_record(**edits)
                     before = path.read_bytes()
                     result = self.run_script(script, str(self.list_path))

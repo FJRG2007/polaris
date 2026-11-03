@@ -1,4 +1,4 @@
-001.jpg is an original illustration drawn for CleanYourTV and released CC0 1.0, no photo and no third-party
+001.jpg is an original illustration drawn for Polaris TV and released CC0 1.0, no photo and no third-party
 material. The other wallpapers are photos from Wikimedia Commons, each under its own licence (CC0, public domain, CC BY or CC BY-SA), not the
 repository's MIT licence. Changes made to every photo (002-008): cropped to 16:9 with the subject moved up and to the right,
 where Home leaves the picture uncovered, resized to 1920x1080, colour-graded toward a night look (cooler shadows on
@@ -32,8 +32,8 @@ first-Home flight, the ghost on Settings) are from Microsoft's Fluent Emoji 3D, 
 Microsoft Corporation: https://github.com/microsoft/fluentui-emoji. The lit and dark pumpkins are the same picture
 with the carved face recoloured; see `launcher/ICONS-LICENSE-FLUENT-EMOJI.txt`.
 
-`screenshot.jpg` is Home on a real TV with this theme pushed, cut to 1280x720 from the same capture the README
-card shows at 1920x1080 (`docs/new-home-halloween.jpg`), on the Xiaomi Mi TV 4A (MiTV-MOOQ1, Android 10) that
+`screenshot.jpg` is Home on a real TV with this theme pushed, cut to 1280x720 from the same capture as
+`docs/new-home-halloween.jpg` (1920x1080), on the Xiaomi Mi TV 4A (MiTV-MOOQ1, Android 10) that
 `addons/haunted/README.md` records its test on. It was a mock-up, built from the first wallpaper and app tiles cut
 from `themes/dussehra/screenshot.jpg`, until the theme was run on that set; no part of the file comes from another
 theme now, and `docs/DOS-AND-DONTS.md` keeps that rule for every theme's picture.

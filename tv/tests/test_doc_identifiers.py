@@ -1,8 +1,8 @@
-"""No page gives a MAC address or an Android ID: AGENTS.md names both beside the IP addresses it keeps out.
+"""No page gives a MAC address or an Android ID: both are identifiers, like the IP addresses kept out.
 
-AGENTS.md ("Hard rules") asks for "no secrets or identifiers in commits, lists or screenshots: no IP
-addresses, Wi-Fi names, account emails, serial numbers, Android IDs, MAC addresses or ADB keys", and
-CODE_OF_CONDUCT.md counts a device's identifiers as private information. `tests/test_doc_addresses.py`
+The rule is "no secrets or identifiers in commits, lists or screenshots: no IP
+addresses, Wi-Fi names, account emails, serial numbers, Android IDs, MAC addresses or ADB keys"
+(docs/DOS-AND-DONTS.md, "No personal details"). `tests/test_doc_addresses.py`
 reads the IP half of that sentence, and a person's home folder; the same sentence's MAC address and
 Android ID halves were read by no test at all, so a page could carry either and stay green.
 

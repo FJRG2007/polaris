@@ -3,7 +3,7 @@
 A volume cap for the night: from 20:00 to 07:00 (or all day, or never) the TV's media volume can't go above the
 level you set. A press of Volume Up, an app that starts loud or a loud advert is brought back down to the cap at
 once. The cap never raises a quieter volume, and headphones can stay uncapped, since they don't wake the room. For
-the [Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md): once you answer
+the [Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md): once you answer
 **Show card** its tile reads "Quiet Hours" with a violet glow. On any other Android TV home it is an ordinary app.
 
 ![Quiet Hours on a TV](screenshot.jpg)

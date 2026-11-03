@@ -7,8 +7,8 @@ never existed. CI runs the unit tests and the shell helpers, so a link like that
 the reader who clicks it, and only when they are on the page that has it. This walks every `.md`
 file once and fails on the ones that lead nowhere.
 
-The same goes for the `#section` a link carries. `README.nl.md` keeps its sections in Dutch (`## Snel
-aan de slag`) and its links in the English page's words (`#quick-start`), which only works because
+The same goes for the `#section` a link carries. A translated page can keep its sections in its own language
+(`## Snel aan de slag`) and its links in the English page's words (`#quick-start`), which only works because
 each Dutch heading has an `<a id="quick-start"></a>` above it: a link whose anchor nothing on the
 page gives does nothing at all when it is clicked - the browser stays exactly where it is, with
 nothing to see. So the anchors every page gives are worked out here from its headings in GitHub's
@@ -43,7 +43,7 @@ HTML_ATTR = re.compile(r"(?:href|src)=\"([^\"]+)\"")
 FENCE = re.compile(r"```.*?```", re.S)
 HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.M)
 HEADING_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
-# The anchor a page states by hand: README.nl.md puts one above each Dutch heading, in the English
+# The anchor a page states by hand: a translated page puts one above each heading, in the English
 # page's words, so the links that came across with the text still land on their section.
 EXPLICIT_ANCHOR = re.compile(r"<a\s+(?:id|name)=\"([^\"]+)\"", re.I)
 EXTERNAL = ("http://", "https://", "mailto:", "data:", "#", "<")
@@ -154,19 +154,6 @@ class RepositoryLinksTest(unittest.TestCase):
         message = "\n".join(f"{page} -> {target}" for page, target in dangling)
         self.assertEqual([], dangling, "anchors no section on the page gives:\n" + message)
 
-    def test_the_dutch_front_page_gives_the_english_anchors_its_links_use(self):
-        # README.nl.md is the page this rule was written for: its headings are Dutch and its links
-        # are the English page's, so the ids it states by hand are the only thing that makes them
-        # land. A section added there without its <a id> reads as a link that does nothing.
-        page = ROOT / "README.nl.md"
-        text = FENCE.sub("", page.read_text(encoding="utf-8"))
-        used = {unquote(target.partition("#")[2]).strip().lower()
-                for target in targets(text)
-                if target.startswith("#") and len(target) > 1}
-        self.assertGreaterEqual(len(used), 4, f"only {len(used)} in-page anchors read")
-        self.assertEqual(set(), used - anchors(page), "links with no section to land on")
-        self.assertGreaterEqual(len(EXPLICIT_ANCHOR.findall(text)), 10, "the ids the page states")
-
     def test_the_walk_reaches_the_pages_it_claims_to(self):
         # A walk that read nothing passes every check above; these are the counts it starts from.
         pages = list(markdown_files(ROOT))
@@ -222,7 +209,7 @@ class AnchorTest(unittest.TestCase):
             )
 
     def test_an_anchor_stated_by_hand_counts_as_a_section(self):
-        # The shape README.nl.md is built on: a Dutch heading, an English id above it, English links.
+        # The shape a translated page is built on: a Dutch heading, an English id above it, English links.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "nl.md").write_text(
@@ -251,7 +238,7 @@ class AnchorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "note.md").write_text(
-                "[issue](https://github.com/Gathin23/cleanyourtv/issues/795#issuecomment-1)\n"
+                "issue\n"
                 "[top](#)\n",
                 encoding="utf-8")
             self.assertEqual([], dangling_anchors(root))

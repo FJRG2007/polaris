@@ -25,9 +25,7 @@ The sweep reads the pages a reader follows - README*.md, docs/, themes/, example
 span or a code-block line that runs a tool with an argument, and judges what stands in front of the
 script: a Python (its path or a variable the page sets to one), or the script's own 100755 mode. A span
 that is only the path (`tools/gen_tables.py`, which a maintainer runs after merging) is a mention, not a
-command. PROMPT.md and .github/maintainer/MAINTAINER.md run `tools/relay.py` and `tools/gen_tables.py`
-bare too and are the maintainer's files (AGENTS.md, "Safety rules ... CI and workflows"), so they are not
-in the sweep.
+command.
 
 Needs no TV and no interpreter: the modes are git's and the pages are read.
 

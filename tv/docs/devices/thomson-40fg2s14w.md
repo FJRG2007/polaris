@@ -1,7 +1,7 @@
 # Thomson 40FG2S14W (Expressluck `nagata`, CVTE board, Android TV 14): the launcher runs, Home stays with Google TV
 
-Two owner-reported ADB sessions on one unit: the first ([#1035](https://github.com/Gathin23/cleanyourtv/issues/1035))
-installed and ran the launcher, the second ([#1350](https://github.com/Gathin23/cleanyourtv/issues/1350)) ran the
+Two owner-reported ADB sessions on one unit: the first (#1035)
+installed and ran the launcher, the second (#1350) ran the
 read-only boot checks below and changed nothing. The
 replacement launcher installed and opened, and its five-app dock and D-pad navigation worked. What did not work
 is Home: on this board Home stays with Google TV for as long as the stock launcher is enabled, which is the
@@ -16,7 +16,7 @@ profile either.
 | System | Android TV 14 (SDK 34) |
 | Firmware | build `UKNV.260317.001` |
 | Stock Home | `com.google.android.apps.tv.launcherx` |
-| CVTE components | `com.cvte.tv.at` present, so the board counts as CVTE for the [rule in PROMPT.md](../../PROMPT.md) even though its stock launcher is Google's |
+| CVTE components | `com.cvte.tv.at` present, so the board counts as CVTE (stock launcher stays enabled) even though its stock launcher is Google's |
 
 ## Home
 
@@ -34,14 +34,14 @@ profile either.
   gone, #741](../TROUBLESHOOTING.md)), so `setupwraith` and the stock launcher were both re-enabled and Home
   went back to Google TV.
 - The two checks in [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) that decide whether the stock launcher can be
-  disabled without a boot that never finishes were run afterwards ([#1350](https://github.com/Gathin23/cleanyourtv/issues/1350),
+  disabled without a boot that never finishes were run afterwards (#1350,
   [below](#the-two-boot-checks-run-afterwards)). They answer the fallback half - this board has two - and not
   the Home-before-unlock half, and the boot itself has still not been tried on this board. Treat the set as
   debloat-only.
 
 ## The two boot checks, run afterwards
 
-A later session on the same set ([#1350](https://github.com/Gathin23/cleanyourtv/issues/1350)) ran the two
+A later session on the same set (#1350) ran the two
 read-only checks the [CVTE bullet](../TROUBLESHOOTING.md) asks for, and changed nothing on the TV: no fallback
 was launched, the stock launcher was not disabled, and no handover was attempted.
 
@@ -69,7 +69,7 @@ say whether Home can start before the first unlock.
 What that session leaves open is the boot the CVTE rule is about: with the stock launcher disabled, does this
 set finish booting, and does Home survive the next reboot. Neither was tried, so the set stays debloat-only.
 
-Debloat-only is not the same as unusable. The owner reports afterwards ([#1350](https://github.com/Gathin23/cleanyourtv/issues/1350),
+Debloat-only is not the same as unusable. The owner reports afterwards (#1350,
 24 Oct 2026) that normal use of the launcher on this set, with the stock launcher left enabled, works: it opens
 and runs, and Home still goes to Google TV. Neither `FallbackHome` activity was launched for it and a boot with
 the stock launcher disabled has still not been tried, so that report says the debloat-only setup is day-to-day

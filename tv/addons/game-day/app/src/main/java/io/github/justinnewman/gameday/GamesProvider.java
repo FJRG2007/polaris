@@ -8,7 +8,7 @@ import android.database.MatrixCursor;
 import android.net.Uri;
 
 /**
- * Each team's next game, for the Clean Your TV launcher's game_day panel (docs/modules.md). Read-only and
+ * Each team's next game, for the Polaris TV launcher's game_day panel (docs/modules.md). Read-only and
  * exported without a permission: it holds only what Home shows anyway (who plays, when, the colour), never a link.
  * One row per calendar, sorted by start; an empty cursor means nothing within a week.
  */

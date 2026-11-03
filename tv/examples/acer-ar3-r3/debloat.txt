@@ -33,7 +33,7 @@
 # - com.realtek.power, com.realtek.energymode, com.realtek.display.monitor, com.realtek.hw.configprovider,
 #   com.realtek.media.notification, com.realtek.mdnsoffload, com.android.tv.mdnsoffloadmanager.
 # - com.realtek.factorytools, com.apps.factory.ui: factory menus, never launched (do not open them either;
-#   see PROMPT.md and docs/TROUBLESHOOTING.md on CVTE/Haier factory menus flipping a factory-mode flag).
+#   see docs/TROUBLESHOOTING.md on CVTE/Haier factory menus flipping a factory-mode flag).
 # - com.apps.ota, com.apps.authota: the firmware updater, left enabled; keep unless you have a reason not to.
 # - com.google.android.tv.remote.service, com.google.android.tv.dfuservice, com.google.android.presetup.bluetoothpair,
 #   com.android.bluetooth, com.android.localtransport: remote pairing, firmware updates and Bluetooth.

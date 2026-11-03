@@ -25,20 +25,20 @@ On stock retail firmware, the vendor actively restricts ADB debugging via custom
 - Decompilation of `SettingsProvider.apk` reveals logic that forces `adb_enabled = 0`, `adb_wifi_enabled = 0`, and `development_settings_enabled = 0` whenever `!Build.IS_DEBUGGABLE`.
 - Because `adb_enabled` remains `0`, `AdbDebuggingManager` in `system_server` stays dormant. It never displays the on-screen key confirmation dialog, leaving incoming network ADB connections permanently `unauthorized`.
 
-Mitigating this vendor restriction requires gaining an initial privileged shell or external key provisioning, which falls outside CleanYourTV's scope as a reversible, non-root debloater.
+Mitigating this vendor restriction requires gaining an initial privileged shell or external key provisioning, which falls outside Polaris TV's scope as a reversible, non-root debloater.
 
 For environments where an authorized ADB connection is already established, the sections below document the verified launcher configuration and safe package list.
 
 ---
 
-## CleanYourTV Launcher Takeover
+## Polaris TV Launcher Takeover
 
-1. **Build**: CleanYourTV (`app.polaris.tv`) compiles cleanly for API 34.
+1. **Build**: Polaris TV (`app.polaris.tv`) compiles cleanly for API 34.
 2. **Install**:
    ```bash
-   adb push app-release.apk /sdcard/cleanyourtv.apk
-   adb shell pm install -r /sdcard/cleanyourtv.apk
-   adb shell rm -f /sdcard/cleanyourtv.apk
+   adb push app-release.apk /sdcard/polaris-tv.apk
+   adb shell pm install -r /sdcard/polaris-tv.apk
+   adb shell rm -f /sdcard/polaris-tv.apk
    ```
 3. **Set Default Home**:
    ```bash

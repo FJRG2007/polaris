@@ -27,7 +27,7 @@ Command Line Tools Python is blocked by Local Network privacy ("No route to host
 TV_HOST=<player-ip> tools/restore.sh examples/freebox-player-pop/debloat.txt net.oqee.launcher
 ```
 
-It re-enables the packages from the list and gives Home back to OQEE. It replays the state recorded before the first change (`~/.cleanyourtv/recovery-*.json`, so
+It re-enables the packages from the list and gives Home back to OQEE. It replays the state recorded before the first change (`~/.polaris-tv/recovery-*.json`, so
 keep that file).
 
 ## Re-enable one app

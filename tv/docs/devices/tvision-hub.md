@@ -1,6 +1,6 @@
 # TVision Hub (SEI Robotics, S905X2): a one-session report with a working list
 
-Report from [#577](https://github.com/Gathin23/cleanyourtv/issues/577): one session, same-day
+Report from #577: one session, same-day
 results only. That is why the seven packages are recorded here instead of `examples/` -
 CONTRIBUTING asks for a few days of living with a list, and nobody has rebooted, stood by or
 restored this one yet.

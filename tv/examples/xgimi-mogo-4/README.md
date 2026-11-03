@@ -1,10 +1,10 @@
 # XGIMI MoGo 4 (Google TV 14 portable projector)
 
 Model `WK08K`, device `altai`, MediaTek, 1.8 GB RAM, firmware `UKNV.260612.001.15630599`, French
-unit. Both halves work: the debloat list and the Clean Your TV launcher as Home.
+unit. Both halves work: the debloat list and the Polaris TV launcher as Home.
 
 **Tested on 24 October 2026, one session of a few hours including one reboot** — not the several
-days [CONTRIBUTING](../../CONTRIBUTING.md) asks for. Every entry below was applied and checked on
+days CONTRIBUTING asks for. Every entry below was applied and checked on
 the real unit; what is not proven is that nothing surfaces after days of use.
 
 Same board as [`xgimi-mogo-3-pro`](../xgimi-mogo-3-pro/), one firmware build older, so that list

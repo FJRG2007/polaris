@@ -61,7 +61,7 @@ class AddressChangeWarningTest(unittest.TestCase):
         return self.sent()
 
     def records(self):
-        return sorted(p.name.split("-", 2)[1] for p in (self.home / ".cleanyourtv").glob("recovery-*.json"))
+        return sorted(p.name.split("-", 2)[1] for p in (self.home / ".polaris-tv").glob("recovery-*.json"))
 
     def test_the_first_record_says_nothing_about_another_address(self):
         self.tv()
@@ -87,13 +87,13 @@ class AddressChangeWarningTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, "the record is written and the list still runs")
         self.assertIn("warning:", result.stderr)
-        [old] = (self.home / ".cleanyourtv").glob("recovery-192.168.1.50-*.json")
+        [old] = (self.home / ".polaris-tv").glob("recovery-192.168.1.50-*.json")
         self.assertIn(str(old), result.stderr, "the record that still describes the TV before cleanup")
         self.assertIn("1 of the packages disabled now are recorded there as enabled", result.stderr)
         self.assertIn("com.example.enabled", result.stderr)
         self.assertIn("tools/restore.sh", result.stderr)
-        [new] = (self.home / ".cleanyourtv").glob("recovery-192.168.1.11-*.json")
-        self.assertIn(f"~/.cleanyourtv/{new.name}", result.stderr, "where to move it to")
+        [new] = (self.home / ".polaris-tv").glob("recovery-192.168.1.11-*.json")
+        self.assertIn(f"~/.polaris-tv/{new.name}", result.stderr, "where to move it to")
         self.assertIn("both records stay", result.stderr, "a second set on the same list is not an error")
         self.assertEqual(self.records(), ["192.168.1.11", "192.168.1.50"])
         self.assertIn("pm disable-user --user 0 com.example.enabled", self.sent())
@@ -129,12 +129,12 @@ class AddressChangeWarningTest(unittest.TestCase):
         other.write_text("# Another TV\ncom.example.enabled\n")
         result = self.disable("192.168.1.11", list_path=other)
         self.assertNotIn("warning:", result.stderr, "a record for another list is another TV's state")
-        self.assertEqual(len(list((self.home / ".cleanyourtv").glob("recovery-*.json"))), 2)
+        self.assertEqual(len(list((self.home / ".polaris-tv").glob("recovery-*.json"))), 2)
 
     def test_a_record_that_cannot_be_read_does_not_stop_the_run(self):
         self.tv()
         self.disable("192.168.1.50")
-        [old] = (self.home / ".cleanyourtv").glob("recovery-192.168.1.50-*.json")
+        [old] = (self.home / ".polaris-tv").glob("recovery-192.168.1.50-*.json")
         old.write_text("{not json")
         self.tv(**CLEANED_TV)
         result = self.disable("192.168.1.11")
@@ -160,7 +160,7 @@ class ThePageAndTheCodeAgreeTest(unittest.TestCase):
 
     def test_the_page_names_the_record_the_fresh_copy_and_the_way_out(self):
         bullet = self.page_bullet()
-        for phrase in ("~/.cleanyourtv/recovery-<address>-<list hash>.json",
+        for phrase in ("~/.polaris-tv/recovery-<address>-<list hash>.json",
                        "already disabled, left alone by undo",
                        "`tools/disable.sh` now says so on stderr",
                        "Run `tools/restore.sh` at the old address first",

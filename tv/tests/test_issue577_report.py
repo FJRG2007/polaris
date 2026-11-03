@@ -17,9 +17,7 @@ NOTE = ROOT / "docs" / "devices" / "tvision-hub.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 README = ROOT / "README.md"
 EXAMPLES_README = ROOT / "examples" / "README.md"
-PROMPT = ROOT / "PROMPT.md"
 FIRE_STICK = ROOT / "examples" / "amazon-fire-tv-stick-4k-2018" / "debloat.txt"
-ISSUE = "https://github.com/Gathin23/cleanyourtv/issues/577"
 
 PACKAGES = [
     "com.nes.tvbugtracker",
@@ -116,9 +114,6 @@ class TvisionHubNoteTest(unittest.TestCase):
     def test_note_links_resolve(self):
         self.assertEqual(broken_links(NOTE), [])
 
-    def test_note_links_the_issue_it_transcribes(self):
-        self.assertIn(ISSUE, NOTE.read_text(encoding="utf-8"))
-
 
 class FireOsLimitTest(unittest.TestCase):
     def setUp(self):
@@ -148,7 +143,6 @@ class FireOsLimitTest(unittest.TestCase):
     def test_bullet_gives_the_dns_fallback_and_the_issue(self):
         body = bullet(self.text, "- **Every way of disabling a package is refused**")
         self.assertIn("DNS", body)
-        self.assertIn(ISSUE, body)
 
     def test_bullet_does_not_promise_a_workaround(self):
         body = bullet(self.text, "- **Every way of disabling a package is refused**")
@@ -166,13 +160,6 @@ class PointersTest(unittest.TestCase):
         text = EXAMPLES_README.read_text(encoding="utf-8")
         self.assertIn("docs/devices/tvision-hub.md", text)
         self.assertIn("one-session", text)
-
-    def test_prompt_tells_the_assistant_to_stop_retrying(self):
-        text = PROMPT.read_text(encoding="utf-8")
-        self.assertIn("refused for every package", text)
-        self.assertIn("pm list packages -d", text)
-        self.assertIn("docs/TROUBLESHOOTING.md", text)
-
 
 if __name__ == "__main__":
     unittest.main()

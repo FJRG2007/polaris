@@ -14,7 +14,7 @@
         android:banner="@drawable/banner"
         android:supportsRtl="true">
 
-        <!-- `settings put secure screensaver_components com.gathin.newsdream/.NewsDream` (setup.sh does it). -->
+        <!-- `settings put secure screensaver_components app.polaris.tv.newsdream/.NewsDream` (setup.sh does it). -->
         <service
             android:name=".NewsDream"
             android:label="@string/dream_name"
@@ -27,7 +27,7 @@
             <meta-data android:name="android.service.dream" android:resource="@xml/dream" />
         </service>
 
-        <!-- The card on cleanyourtv's Home (docs/modules.md): the headlines at once, Back to leave. -->
+        <!-- The card on Polaris TV's Home (docs/modules.md): the headlines at once, Back to leave. -->
         <activity
             android:name=".NewsActivity"
             android:exported="true"
@@ -55,7 +55,7 @@
              ordinary apps don't, so no other app can change the feeds. -->
         <provider
             android:name=".FilesProvider"
-            android:authorities="com.gathin.newsdream.files"
+            android:authorities="app.polaris.tv.newsdream.files"
             android:exported="true"
             android:permission="android.permission.WRITE_SECURE_SETTINGS" />
     </application>

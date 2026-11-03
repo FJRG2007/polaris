@@ -1,6 +1,6 @@
 # Coocaa 14K / 8S61 (China domestic, Android 4.4.2) — disable guard, debloat not feasible
 
-Report for the mainland-China Coocaa firmware on the oldest family member seen so far. Source: [#1261](https://github.com/Gathin23/cleanyourtv/issues/1261). Related family reports — #417 (8R145 / K3 Pro, Android 11), #692 (8R40_K5C, Android 8), #537 (7S60_A5, Android 8) — do **not** transfer: this board is four Android versions older, runs an MStar SoC instead of a Realtek one, and is the only one with an active debloat guard.
+Report for the mainland-China Coocaa firmware on the oldest family member seen so far. Source: #1261. Related family reports — #417 (8R145 / K3 Pro, Android 11), #692 (8R40_K5C, Android 8), #537 (7S60_A5, Android 8) — do **not** transfer: this board is four Android versions older, runs an MStar SoC instead of a Realtek one, and is the only one with an active debloat guard.
 
 > **Warning:** `pm disable-user` fails on every package with a framework exception, and `pm block`, which does execute, can wedge the boot (system_server unresponsive, adbd stuck offline, only the mains switch recovers). If a boot wedges, the recovery window is the first ~40 seconds of the next boot, while system_server is still limping: connect and `pm unblock` everything.
 

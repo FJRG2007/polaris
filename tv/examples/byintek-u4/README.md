@@ -2,7 +2,7 @@
 
 Skyworth board `RG_HS352_D1E8_SW_B10` (HiSilicon Hi3751V350, 1 GB RAM), firmware 1.01.08 (build
 2025-09). Serial numbers of this version start with `BYU4B01C`. Both halves work: the debloat list and
-the Clean Your TV launcher as Home. Tested on 19 October 2026.
+the Polaris TV launcher as Home. Tested on 19 October 2026.
 
 | File | What it is |
 |---|---|

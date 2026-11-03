@@ -1,19 +1,17 @@
 """The README's Tools table lists every tool that ships in tools/.
 
-AGENTS.md asks a new tool to get its row "where the others are", and that table is where a reader of
+docs/workflows/docs-notes.md asks a new tool to get its row "where the others are", and that table is where a reader of
 the front page finds a tool at all. Two tools were missing from it: tools/bench.py, the benchmark
-that AGENTS.md and tools/trace.md already send contributors to for key latency, jank and cold start
+that tools/trace.md already sends contributors to for key latency, jank and cold start
 numbers, and tools/adb-closed.py, which the closing step in the README quoted inline and nowhere
 else. Nobody notices a missing row, so this test reads the table the way a reader does.
 
-Three kinds of file are not expected in the table, and none is a judgement call about the tool:
+Two kinds of file are not expected in the table, and none is a judgement call about the tool:
 
-  * README_STATS, README_FEATURED and README_CARD draw the README's card image in CI, not something
-    a reader runs; the card's alt text is what points at them.
   * SCENES_WALLPAPERS and BLOCKY_WALLPAPERS draw the wallpapers of themes/scenes and themes/blocky and are
     linked from themes/README.md, which is the only place a theme author needs them.
   * GEN_TABLES writes the README's TV tables and brand line after a merge, a maintainer's step; the
-    markers around those tables name it, and so do CONTRIBUTING.md and MAINTAINER.md.
+    markers around those tables name it.
 
 A PowerShell twin (.ps1) is listed by the row of its .sh script, as the table's theme.sh row already
 serves theme.ps1. Its suffix is trimmed before the lookup, so a twin without its script is reported.
@@ -31,13 +29,10 @@ README = ROOT / "README.md"
 TABLE_HEADER = "| Tool | What it does |"
 TOOL_PATH = re.compile(r"tools/([\w.-]+\.(?:py|sh|ps1))")
 
-README_STATS = "readme_stats.py"        # the three that draw docs/card.jpg
-README_FEATURED = "readme_featured.py"
-README_CARD = "readme_card.py"
 SCENES_WALLPAPERS = "scenes_wallpapers.py"   # themes/scenes/wallpapers, linked from themes/README.md
 BLOCKY_WALLPAPERS = "blocky_wallpapers.py"   # themes/blocky/wallpapers, linked from themes/README.md
 GEN_TABLES = "gen_tables.py"            # the TV tables, from examples/*/tv.json
-NOT_IN_TABLE = {README_STATS, README_FEATURED, README_CARD, SCENES_WALLPAPERS, BLOCKY_WALLPAPERS, GEN_TABLES}
+NOT_IN_TABLE = {SCENES_WALLPAPERS, BLOCKY_WALLPAPERS, GEN_TABLES}
 
 
 def table_rows(text):
@@ -138,8 +133,8 @@ class CheckerTest(unittest.TestCase):
         self.assertEqual(unlisted({"disable.ps1"}, listed(self.rows)), [])
         self.assertEqual(unlisted({"theme.ps1"}, listed(self.rows)), ["theme.ps1"])
 
-    def test_a_card_renderer_or_the_wallpaper_script_is_not_reported(self):
-        self.assertEqual(unlisted({README_CARD, SCENES_WALLPAPERS}, listed(self.rows)), [])
+    def test_the_wallpaper_script_is_not_reported(self):
+        self.assertEqual(unlisted({SCENES_WALLPAPERS}, listed(self.rows)), [])
 
     def test_a_table_that_is_not_there_reads_as_empty(self):
         self.assertEqual(table_rows("## Tools\n\nNone yet.\n"), [])

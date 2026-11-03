@@ -18,6 +18,12 @@ public class OrderTest {
     private static final List<String> DOCK = Arrays.asList("com.plexapp.android", "com.netflix.ninja");
 
     @Test
+    public void anOrderSavedBeforeTheRenameStillReads() {
+        Order back = Order.decode("tv" + "home-order 1\ndock x\na/.A\nb/.B\n");
+        assertEquals(Arrays.asList("a/.A", "b/.B"), back.keys);
+    }
+
+    @Test
     public void roundTrips() {
         Order o = new Order(Order.dockKey(DOCK), Arrays.asList("b/.B", "a/.A", "c/.C"));
         Order back = Order.decode(Order.encode(o));
@@ -29,7 +35,7 @@ public class OrderTest {
     public void dockedRoundTrips() {
         Order o = new Order(Order.dockKey(DOCK), Arrays.asList("b/.B", "a/.A", "c/.C"), 2);
         String text = Order.encode(o);
-        assertEquals("tvhome-order 1\ndock com.plexapp.android,com.netflix.ninja\ndocked 2\nb/.B\na/.A\nc/.C\n", text);
+        assertEquals("polaris-tv-order 1\ndock com.plexapp.android,com.netflix.ninja\ndocked 2\nb/.B\na/.A\nc/.C\n", text);
         Order back = Order.decode(text);
         assertEquals(2, back.docked);
         assertEquals(o.keys, back.keys);
@@ -37,7 +43,7 @@ public class OrderTest {
 
     @Test
     public void anOrderWithoutDockedLeavesTheDockToDockApps() {
-        Order back = Order.decode("tvhome-order 1\ndock x\na/.A\nb/.B\n");
+        Order back = Order.decode("polaris-tv-order 1\ndock x\na/.A\nb/.B\n");
         assertEquals(-1, back.docked);
         assertEquals(Arrays.asList("a/.A", "b/.B"), back.keys);
         assertEquals(-1, Order.docked(back, Collections.singletonList("x")));
@@ -54,9 +60,9 @@ public class OrderTest {
 
     @Test
     public void rejectsABadDockedLine() {
-        assertNull(Order.decode("tvhome-order 1\ndock x\ndocked two\na/.A\n"));
-        assertNull(Order.decode("tvhome-order 1\ndock x\ndocked -1\na/.A\n"));
-        assertNull(Order.decode("tvhome-order 1\ndock x\ndocked 3\na/.A\n"));   // more docked than keys
+        assertNull(Order.decode("polaris-tv-order 1\ndock x\ndocked two\na/.A\n"));
+        assertNull(Order.decode("polaris-tv-order 1\ndock x\ndocked -1\na/.A\n"));
+        assertNull(Order.decode("polaris-tv-order 1\ndock x\ndocked 3\na/.A\n"));   // more docked than keys
     }
 
     @Test
@@ -71,10 +77,10 @@ public class OrderTest {
         assertNull(Order.decode(null));
         assertNull(Order.decode(""));
         assertNull(Order.decode("{\"version\":2}"));
-        assertNull(Order.decode("tvhome-order 2\ndock x\na/.A\n"));
-        assertNull(Order.decode("tvhome-order 1\na/.A\n"));                 // no dock line
-        assertNull(Order.decode("tvhome-order 1\ndock x\na/.A\n\nb/.B\n"));  // blank key in the middle
-        assertNull(Order.decode("tvhome-order 1\ndock x\na/.A\na/.A\n"));    // duplicate key
+        assertNull(Order.decode("polaris-tv-order 2\ndock x\na/.A\n"));
+        assertNull(Order.decode("polaris-tv-order 1\na/.A\n"));                 // no dock line
+        assertNull(Order.decode("polaris-tv-order 1\ndock x\na/.A\n\nb/.B\n"));  // blank key in the middle
+        assertNull(Order.decode("polaris-tv-order 1\ndock x\na/.A\na/.A\n"));    // duplicate key
     }
 
     @Test

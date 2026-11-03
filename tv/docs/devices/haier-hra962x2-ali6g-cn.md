@@ -1,6 +1,6 @@
 # Haier HRA962X2_2G_ALI6G_A (China): launcher, physical Home and settings overlay
 
-One-day field report, tested on 2026-10-21 using a locally adapted CleanYourTV
+One-day field report, tested on 2026-10-21 using a locally adapted Polaris TV
 v2.5.0 launcher. **The stock v2.5.0 APK does not include the Home/boot/settings
 adaptations described below.** This is a reproducible device note, not a claim
 that all Haier TVs work the same way or a several-day debloat recommendation.
@@ -40,11 +40,11 @@ normal installer, then accept its on-screen confirmations:
 
 ```sh
 adb connect <tv-ip>:5555
-adb -s <tv-ip>:5555 push launcher.apk /sdcard/Download/CleanYourTV.apk
+adb -s <tv-ip>:5555 push launcher.apk /sdcard/Download/Polaris TV.apk
 adb -s <tv-ip>:5555 shell am start -W \
   -a android.intent.action.VIEW \
   -t application/vnd.android.package-archive \
-  -d file:///sdcard/Download/CleanYourTV.apk -f 0x10000001
+  -d file:///sdcard/Download/Polaris TV.apk -f 0x10000001
 ```
 
 The package installer initially showed `正在检查安装包` (checking the package),
@@ -179,7 +179,7 @@ adb -s <tv-ip>:5555 shell am startservice \
 
 This opened an overlay with **图像 / 声音 / 节能 / 系统** (Picture / Sound /
 Energy saving / System). Back dismissed the overlay and returned to the
-CleanYourTV homepage. The local fix routed the top-right Settings button,
+Polaris TV homepage. The local fix routed the top-right Settings button,
 Launcher settings' TV-settings item, the remote settings key, and the quick
 panel's TV-settings row through one helper. The **top-right button and Back**
 were exercised on the installed update; the other routes share the helper

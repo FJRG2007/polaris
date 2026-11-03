@@ -61,7 +61,7 @@ class NoTVHostTest(unittest.TestCase):
         self.home.mkdir()
         self.list_path = self.base / "debloat.txt"
         self.list_path.write_text("# My TV\ncom.example.enabled\ncom.example.already_off\n")
-        self.records = self.home / ".cleanyourtv"
+        self.records = self.home / ".polaris-tv"
 
     def write_record(self, host=ADDRESS):
         self.records.mkdir(exist_ok=True)
@@ -96,7 +96,7 @@ class NoTVHostTest(unittest.TestCase):
         self.assertNotIn("pm enable", result.stderr + result.stdout)
 
     def test_a_run_without_tv_host_writes_no_record_of_its_own(self):
-        """Nothing in ~/.cleanyourtv/ is touched: a name is looked under, never made up."""
+        """Nothing in ~/.polaris-tv/ is touched: a name is looked under, never made up."""
         self.write_record()
         before = {path.name: path.read_text() for path in self.records.iterdir()}
         result = self.run_recovery("--commands", str(self.list_path))

@@ -5,7 +5,7 @@ out. One minute before, a small countdown shows over whatever is playing with **
 **Turn off now**; if nobody answers, the TV goes to standby. Back leaves the warning but not the timer.
 
 Package `io.github.luyzfernando08.sleeptimer`. You see it as **Sleep Timer** (Portuguese: **Desligar**). On
-cleanyourtv's Home it is also a module card, **Sleep Timer**, which opens the picker. A remote button mapped to
+Polaris TV's Home it is also a module card, **Sleep Timer**, which opens the picker. A remote button mapped to
 its quick bar (the launcher's `app_keys`: `hold:178:io.github.luyzfernando08.sleeptimer/.QuickActivity`) opens a
 small bar at the bottom over whatever is playing: Left/Right pick the time, OK closes it. `.BedtimeActivity` in its
 place is bedtime in one press: a 30-minute timer plus the Brightness add-on's night mode when it is installed, both

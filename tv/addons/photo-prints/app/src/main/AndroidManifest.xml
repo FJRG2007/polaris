@@ -13,7 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Prints">
 
-        <!-- The tile, and the card on cleanyourtv's Home (docs/modules.md): the slideshow, at once. -->
+        <!-- The tile, and the card on Polaris TV's Home (docs/modules.md): the slideshow, at once. -->
         <activity
             android:name=".SlideshowActivity"
             android:exported="true">

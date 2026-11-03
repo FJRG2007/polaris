@@ -7,8 +7,8 @@ writes `addons/<name>/local.properties` there:
 
     sdk.dir=/home/<you>/Android/Sdk
 
-That is the contributor's own home directory, and CONTRIBUTING.md and AGENTS.md both keep personal
-paths out of a contribution ("No secrets or identifiers ... no IP addresses, Wi-Fi names ..."). It is
+That is the contributor's own home directory, and docs/DOS-AND-DONTS.md keeps personal
+details out of a contribution ("No personal details. No LAN IPs, Wi-Fi names ..."). It is
 also not a file anything links to, so `git add -A` after a build would commit it by accident. `*.apk`
 and `*.aab` are ignored by the root .gitignore and `.gradle/` and `build/` by each folder's own, which
 is why a plain `./gradlew assembleRelease` leaves nothing to commit - but `local.properties` was

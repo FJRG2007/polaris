@@ -2,7 +2,7 @@
 # Android TV 11 (SDK 30), build RP1A.200622.001, incremental AR07 (software V8-R51AT01-LF1V138,
 # built 2026-03-12, security patch 2025-12-05). The fingerprint still says
 # TCL/G07_4K_GB_NF/G07:11/RP1A.200622.001/AR20:user/release-keys; ro.build.version.incremental says AR07.
-# Tested on 2026-10-25. Launcher replacement (CleanYourTV Home) and package
+# Tested on 2026-10-25. Launcher replacement (Polaris TV Home) and package
 # persistence verified after reboot.
 #
 # Note: com.tcl.notereminder resets to enabled after reboot on this firmware

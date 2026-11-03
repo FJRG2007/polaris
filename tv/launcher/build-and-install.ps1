@@ -69,9 +69,9 @@ Write-Host "Stock launcher: $StockLauncher"
 $disableStock = if ($StockLauncher -eq 'none') { 'echo stock launcher left alone' } else { "pm disable-user --user 0 $StockLauncher" }
 
 $apk = 'app\build\outputs\apk\release\app-release.apk'
-& $py -I ..\tools\b64push.py $apk /data/local/tmp/tvhome.apk
+& $py -I ..\tools\b64push.py $apk /data/local/tmp/polaris-tv.apk
 if ($LASTEXITCODE -ne 0) { throw 'APK upload failed' }
-$out = & $py -I ..\tools\tv.py 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk'
+$out = & $py -I ..\tools\tv.py 'pm install -r /data/local/tmp/polaris-tv.apk; rm -f /data/local/tmp/polaris-tv.apk'
 Write-Host $out
 if ($LASTEXITCODE -ne 0 -or "$out" -notmatch 'Success') { throw 'pm install failed; the stock launcher was left untouched' }
 # Stop the instance Android restarted mid-update, which can come up non-occluding (see build-and-install.sh,
@@ -128,9 +128,9 @@ function Undo-Handover {
     $back = Get-HomeNow
     if ($enableExit -eq 0 -and $setHomeExit -eq 0 -and $back -like "$StockLauncher/*") { Write-Warning "$StockLauncher owns Home again."; return $true }
     $homeDir = if ($env:USERPROFILE) { $env:USERPROFILE } elseif ($env:HOME) { $env:HOME } else { (Get-Location).Path }
-    $rec = Join-Path $homeDir ("cleanyourtv-handover-" + ($TvHost -replace '[^A-Za-z0-9._-]', '_') + '.txt')
+    $rec = Join-Path $homeDir ("polaris-tv-handover-" + ($TvHost -replace '[^A-Za-z0-9._-]', '_') + '.txt')
     $lines = @(
-        "# cleanyourtv: the launcher handover on $TvHost did not finish. From the repo root:",
+        "# polaris-tv: the launcher handover on $TvHost did not finish. From the repo root:",
         "tools\venv\Scripts\python.exe tools\tv.py 'pm enable --user 0 $StockLauncher'   # with `$env:TV_HOST='$TvHost'",
         "tools\venv\Scripts\python.exe tools\tv.py 'cmd package set-home-activity --user 0 `$(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME $StockLauncher | tail -n 1)'",
         "# then check: tools\venv\Scripts\python.exe tools\tv.py '$homeQuery'"

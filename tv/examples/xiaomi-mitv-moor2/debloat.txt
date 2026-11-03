@@ -18,7 +18,7 @@
 # Tested: all 22 packages below are disabled on this TV (`pm list packages -d` confirms it) with the
 # launcher from launcher/ in place and owning Home. They went off in one session, nothing crashed
 # during it and nothing has had to be re-enabled since. That is a first-day report, not the few days
-# of living with it that CONTRIBUTING.md asks for, so treat the list as provisional. The packages
+# of living with it that docs/workflows/tv-list.md asks for, so treat the list as provisional. The packages
 # under DO NOT DISABLE were ruled out by reading dumpsys, not by disabling them and seeing what
 # broke.
 #

@@ -5,10 +5,10 @@ few bats drifting across now and then, a ghost that fades in and floats up every
 glow flickering in the bottom-right corner and a small clock. The photos are in the app (seven, 1280x720, about
 1 MB together) and everything is drawn on one Canvas at about 20 frames a second, so it is light enough for a 1 GB TV.
 
-On cleanyourtv's Home it is also a module card, **Haunted**: press OK on it to start it at once, and Back to leave.
+On Polaris TV's Home it is also a module card, **Haunted**: press OK on it to start it at once, and Back to leave.
 
-- Package: `com.gathin.haunted`
-- Author: CleanYourTV contributors
+- Package: `app.polaris.tv.haunted`
+- Author: Polaris TV contributors
 - Tested on: Xiaomi Mi TV 4A (MiTV-MOOQ1), Android 10, 29 Oct 2026: crossfade, bats, ghost, glow and clock all show; 3,021 frames, 0.4% janky, 99th percentile 5 ms; any key wakes it
 
 ## Permissions
@@ -26,7 +26,7 @@ TV_HOST=<tv ip> addons/haunted/build-and-install.sh
 ```
 
 On Windows: `addons\haunted\build-and-install.ps1 -TvHost <tv ip>`. Add `START=1` (or `-Start`) to see it now. The
-script keeps the screensaver the TV had before, in `/data/local/tmp/cyt-haunted-before`.
+script keeps the screensaver the TV had before, in `/data/local/tmp/polaris-tv-haunted-before`.
 
 Or by hand, as for any add-on:
 
@@ -45,7 +45,7 @@ TV_HOST=<tv ip> addons/haunted/build-and-install.sh --uninstall
 ```
 
 puts the previous screensaver back and removes the app. Without the script: pick another screensaver in Settings, then
-`TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'pm uninstall com.gathin.haunted'`.
+`TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'pm uninstall app.polaris.tv.haunted'`.
 
 ## Change the look
 

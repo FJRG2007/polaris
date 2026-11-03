@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Writes the TV tables, the brand grid and the counts from each examples/<folder>/tv.json.
 
-    gen_tables.py [--root DIR]                 rewrite README.md, the translated READMEs that carry its brand
-                                               block, examples/README.md and tools/readme_stats.py
+    gen_tables.py [--root DIR]                 rewrite README.md and examples/README.md
     gen_tables.py --check                      write nothing; exit 1 when a file is out of date
-    gen_tables.py --font Fredoka.ttf           also redraw docs/stats.png and docs/card.jpg if a count moved
     gen_tables.py --adopt PATCH                write tv.json for folders that have none, from the table rows
                                                in PATCH (an old-style PR diff), then rewrite as above
 
@@ -24,33 +22,26 @@ line). One optional key: "readme_os", a README table's OS cell when it is not "o
 folders in the same order, alphabetical by "tv" (case ignored), so a brand's models sit together.
 
 The full table lives in examples/README.md between <!-- tv-table:start ... --> and <!-- tv-table:end -->.
-README.md has no table of its own: its brand grid (the TOP brands with the most lists, linked to the site's
-search, and the rest in a <details>) sits between <!-- tv-brands:start ... --> and <!-- tv-brands:end -->.
-README.nl.md, README.de.md, README.uk.md and README.tr.md carry the same brand block and the same counts in
-their own words ("N tv-modellen · B merken · L talen · ", "N TV-Modelle · B Marken · L Sprachen · ",
-and the Ukrainian and Turkish words in TRANSLATIONS below), and a README that still has tv-table markers
-gets the short table there too. Everything outside the markers is hand-written.
-The counts are the card's alt text ("N TV models · B brands · L languages · "), the "| **L languages** |"
-feature row and STATS in tools/readme_stats.py. Exit codes: 0 up to date (or written), 1 out of date
-(--check), or a count moved and --font could not draw one of the pictures (the tables are written; the
-picture is not - redraw it before committing), 2 what it was given cannot be read: a tv.json, a marker, or
-the path in --root or --adopt (nothing is written then).
+README.md has no table of its own: its brand grid (the TOP brands with the most lists, and the rest in a
+<details>) sits between <!-- tv-brands:start ... --> and <!-- tv-brands:end -->. A README that still has
+tv-table markers gets the short table there too.
+Everything outside the markers is hand-written.
+The counts are a "N TV models · B brands · L languages · " line, if a page has one, and the
+"| **L languages** |" feature row. Exit codes: 0 up to date (or written), 1 out of date (--check), 2 what it
+was given cannot be read: a tv.json, a marker, or the path in --root or --adopt (nothing is written then).
 """
 import argparse
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 KEYS = ("tv", "os", "brand", "notes")
 OPTIONAL = ("readme_os",)
 WIDTH = 120  # the brand lines under the grid wrap before this many characters
 TOP = 30  # brands in the README's grid
 COLUMNS = 6  # the grid's columns: 30 brands make 5 rows
-SEARCH = "https://cleanyour.tv/tvs?q="  # the site's TV search; a brand cell links to its results
-# The three words README.md states its counts in, in the order the card's alt text gives them.
+# The three words README.md states its counts in, in the order its counts line gives them.
 WORDS = ("TV models", "brands", "languages")
 README_HEADER = ["| TV | OS |", "|---|---|"]
 EXAMPLES_HEADER = ["| Folder | TV | OS | Notes |", "|---|---|---|---|"]
@@ -94,7 +85,7 @@ def load(root, allow_missing=False):
                 continue
             what = "is missing" if not path.exists() else "is not a file"
             problems.append(f"{where} {what}: it holds the folder's row in the README tables "
-                            f"(see CONTRIBUTING.md, step 4)")
+                            f"(see docs/workflows/tv-list.md, step 4)")
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -180,7 +171,7 @@ def brand_lines(entries):
     top, rest = ranked[:TOP], ranked[TOP:]
     out = []
     if top:
-        cells = [f"[{b}]({SEARCH}{quote(b, safe='')}) · {tv[b]}" for b in top]
+        cells = [f"{b} · {tv[b]}" for b in top]
         cells += [""] * (-len(cells) % COLUMNS)
         out += ["|" + " |" * COLUMNS, "|" + "---|" * COLUMNS]
         out += ["| " + " | ".join(cells[i:i + COLUMNS]) + " |" for i in range(0, len(cells), COLUMNS)]
@@ -220,8 +211,7 @@ def between(text, name, body, path):
 def word_for(word, n):
     """The form of a count word that goes after n. A word is one string, or (one, few, many) for a
     language that changes the noun with the number, East Slavic style: 1, 21, 31 take the first form,
-    2-4, 22-24 the second, everything else (11-14 too) the third. README.uk.md said "387 модель
-    телевізорів · 103 брендів" with one fixed form; it is "387 моделей телевізорів · 103 бренди"."""
+    2-4, 22-24 the second, everything else (11-14 too) the third: "387 моделей телевізорів · 103 бренди", not one fixed form."""
     if isinstance(word, str):
         return word
     one, few, many = word
@@ -239,7 +229,7 @@ def word_pattern(word):
 
 
 def counts(text, entries, root, words=WORDS):
-    """The three numbers a page states, in that page's own words: the card's alt text and the row."""
+    """The three numbers a page states, in that page's own words: the counts line and the row."""
     n, b, l = len(entries), len(brands(entries)), languages(root)
     models, brand_word, language_word = words
     text = re.sub(rf"\b\d+ {word_pattern(models)} · \d+ {word_pattern(brand_word)} · \d+ {word_pattern(language_word)} · ",
@@ -249,29 +239,9 @@ def counts(text, entries, root, words=WORDS):
                   rf"\g<1>{l} {word_for(language_word, l)}\g<2>", text, flags=re.M)
 
 
-def stats(text, entries, root):
-    for value, label in ((len(entries), "TV MODELS"), (len(brands(entries)), "BRANDS"),
-                         (languages(root), "LANGUAGES")):
-        text = re.sub(rf'\("\d+", "{label}"\)', f'("{value}", "{label}")', text)
-    return text
-
-
-OWNED = ("README.md", "examples/README.md", "tools/readme_stats.py")
-# The translated READMEs that carry the brand block too, written when the file is there - and the three
-# words each of them states its counts in, for the card's alt text ("345 TV models · 93 brands · 29
-# languages · ") and the "| **29 languages** |" row. The brand block is generated, so those numbers have
-# to move with it: README.nl.md was added to this script as it stood and said "316 tv-modellen · 89
-# merken · 28 talen" over a grid built from 345 lists in 93 brands, because counts() only knew the
-# English words. A page listed here without its words would drift the same way, so
-# tests/test_gen_tables_translated_counts.py reads them - and holds every page that carries the markers to
-# being written, which is how README.de.md came here: it copied the block by hand when the German page
-# landed, so its grid said "Xiaomi · 32" and "+49 more brands" over 97 brands while README.md said 34 and
-# +53, and no run moved it.
-TRANSLATIONS = {"README.nl.md": ("tv-modellen", "merken", "talen"),
-                "README.de.md": ("TV-Modelle", "Marken", "Sprachen"),
-                "README.uk.md": (("модель телевізорів", "моделі телевізорів", "моделей телевізорів"),
-                                 ("бренд", "бренди", "брендів"), ("мова", "мови", "мов")),
-                "README.tr.md": ("TV modeli", "marka", "dil")}
+OWNED = ("README.md", "examples/README.md")
+# Other pages that carry the brand block, with the words each states its counts in. None today.
+TRANSLATIONS = {}
 
 
 def readme(text, entries, root, path, words=WORDS):
@@ -293,7 +263,6 @@ def render(root, texts=None):
            for p in ["README.md"] + paths[len(OWNED):]}
     out["examples/README.md"] = between(now["examples/README.md"], "tv-table", examples_rows(entries),
                                         "examples/README.md")
-    out["tools/readme_stats.py"] = stats(now["tools/readme_stats.py"], entries, root)
     return out
 
 
@@ -387,7 +356,7 @@ def read_inputs(root, patch):
     """
     if not root.is_dir():
         return None, f"--root '{root}': not a folder. Nothing was read or written."
-    # examples/ is what it reads; the three OWNED files are the parts of the checkout it writes.
+    # examples/ is what it reads; the OWNED files are the parts of the checkout it writes.
     needs = ["examples"] + list(OWNED)
     missing = [f"{n}/" if n == "examples" else n for n in needs if not (root / n).exists()]
     if missing:
@@ -403,40 +372,14 @@ def read_inputs(root, patch):
         return None, f"--adopt: cannot read '{patch}': {e.strerror}. Nothing was written."
 
 
-def redraw(root, font):
-    """Draw docs/stats.png then docs/card.jpg through the two card scripts; a line saying what stopped, or None.
-
-    This is the one place the script starts two other programs, and each of them answers a font that is not
-    Fredoka's variable TTF - the Google Fonts zip renamed, a static single-weight file beside it - or a venv
-    without Pillow (requirements.txt has none; docs/workflows/press.md installs requirements-perf.txt) with
-    its own line and exit 1. With check=True that line was then followed by a CalledProcessError traceback
-    that named the font path as a command, after the tables had already been rewritten: a run that read like
-    "nothing was drawn" had changed two files, and the pictures it promised were not there.
-    """
-    for script, out in (("tools/readme_stats.py", "docs/stats.png"),
-                        ("tools/readme_card.py", "docs/card.jpg")):
-        done = subprocess.run([sys.executable, script, font, out], cwd=root)
-        if done.returncode:
-            return (f"{out} was not redrawn: {script} exited {done.returncode} and its line above says why. "
-                    f"The tables are written; redraw the picture once that is fixed, with "
-                    f"python3 {script} <Fredoka.ttf> {out}, and commit it with the tables.")
-    return None
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--root", default=str(Path(__file__).resolve().parents[1]))
     ap.add_argument("--check", action="store_true", help="write nothing; exit 1 when a file is out of date")
-    ap.add_argument("--font", help="Fredoka TTF (variable, from Google Fonts; not in this repo): redraw "
-                                   "docs/stats.png and docs/card.jpg when a count changed")
     ap.add_argument("--adopt", metavar="PATCH", help="write missing tv.json files from the rows in PATCH first")
     a = ap.parse_args(argv)
     if a.check and a.adopt is not None:
         ap.error("--check and --adopt cannot be used together")
-    if a.font and not Path(a.font).is_file():
-        # The scripts this hands the font to exit with their own line, but subprocess.run(check=True) would
-        # then turn that into a CalledProcessError traceback, which names neither the file nor where it is.
-        ap.error(f"cannot open the font at {a.font}: Fredoka (variable TTF, Google Fonts) is not in this repo")
     root = Path(a.root)
     patch, problem = read_inputs(root, a.adopt)
     if problem:
@@ -461,18 +404,6 @@ def main(argv=None):
     except Problem as e:
         print(e, file=sys.stderr)
         return 2
-    if "tools/readme_stats.py" in changed:
-        if a.font:
-            # The font was checked from where this runs; the scripts run in the checkout, so hand them the full path.
-            font = str(Path(a.font).resolve())
-            stopped = redraw(root, font)
-            if stopped:
-                print(stopped, file=sys.stderr)
-                return 1
-            changed += ["docs/stats.png", "docs/card.jpg"]
-        else:
-            print("A count changed: redraw docs/stats.png and docs/card.jpg (--font Fredoka.ttf, or "
-                  "tools/readme_stats.py and tools/readme_card.py).")
     print("Updated: " + ", ".join(changed) if changed else "Up to date.")
     return 0
 

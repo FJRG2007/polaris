@@ -1,9 +1,7 @@
 # Switches on a TV
 
 Every new key a theme can set (the Keys table in [`themes/README.md`](../themes/README.md)) gets a
-screenshot of what it does on a real TV, and this table is where they are listed: the repo and
-[cleanyour.tv/addons#switches](https://cleanyour.tv/addons#switches) both show them from here. Most
-keys from before this rule still have none; a screenshot for one of them is welcome.
+screenshot of what it does on a real TV, and this table is where they are listed. Most keys from before this rule still have none; a screenshot for one of them is welcome.
 
 ## Adding a key
 

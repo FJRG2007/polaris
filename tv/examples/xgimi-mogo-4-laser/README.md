@@ -1,10 +1,10 @@
 # XGIMI MoGo 4 Laser (Google TV 14 portable projector)
 
 Model `WK03K`, device `altai`, MediaTek, 1.8 GB RAM, firmware `UKNV.260910.001.16312074`, French
-unit. Both halves work: the debloat list and the Clean Your TV launcher as Home.
+unit. Both halves work: the debloat list and the Polaris TV launcher as Home.
 
 **Tested on 25 October 2026, one session of a few hours, then a reboot** — not the several days
-[CONTRIBUTING](../../CONTRIBUTING.md) asks for. Every entry was applied and checked on the real unit;
+CONTRIBUTING asks for. Every entry was applied and checked on the real unit;
 what is not proven is that nothing surfaces after days of use.
 
 This is the laser version of the [`xgimi-mogo-4`](../xgimi-mogo-4/) (WK08K, LED): same board, a newer

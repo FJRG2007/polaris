@@ -1,6 +1,6 @@
 # Xiaomi Mi Box S (MIBOX4), second unit
 
-A second Mi Box S, done with `PROMPT.md` and `examples/xiaomi-mi-box-s/debloat.txt` on 2026-10-21.
+A second Mi Box S, done with `examples/xiaomi-mi-box-s/debloat.txt` on 2026-10-21.
 Same build as the first unit: `Xiaomi/oneday/oneday:9/PI/3933:user/release-keys`, security patch
 2021-07-05, SDK 28, 2 GB RAM, 1920x1080, `ro.adb.secure=1`. Done with `tools/tv.py` (no adb binary)
 and the `.ps1` scripts.
@@ -57,7 +57,7 @@ so `config.xml` stays at its defaults.
 
 ## Fourth unit (2026-10-24)
 
-A fourth Mi Box S, done on Windows with Claude and a plain-language version of `PROMPT.md`, no terminal
+A fourth Mi Box S, done on Windows with Claude and plain-language instructions, no terminal
 for the owner. Same build as the first three: `Xiaomi/oneday/oneday:9/PI/3933:user/release-keys`, SDK 28,
 2 GB RAM, 1920x1080 at 320 dpi, 5 GB `/data`. The launcher is 2.6.0 (`0bb7f7ed`); nothing in `launcher/`
 was changed. The theme is [`examples/xiaomi-mi-box-s/theme/`](../../examples/xiaomi-mi-box-s/theme/README.md).
@@ -159,4 +159,4 @@ local file (`file:///C:/.../gradle-8.9-bin.zip`) for that one build let it finis
 put back with `git checkout` afterwards. `tools/venv` is also needed before the script runs
 (`python -m venv tools\venv` then `tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt`).
 
-Lived with: one day so far on the fourth unit; still to soak for a few days as CONTRIBUTING.md asks.
+Lived with: one day so far on the fourth unit; still to soak for a few days as [`docs/workflows/tv-list.md`](../workflows/tv-list.md) asks.

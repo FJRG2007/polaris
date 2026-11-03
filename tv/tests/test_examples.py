@@ -119,14 +119,12 @@ class ExampleListsTest(unittest.TestCase):
             self.fail(str(e))
 
     def test_readme_table_has_one_row_per_list(self):
-        # README.md has no TV table of its own any more: it points at examples/README.md and the site's
-        # search. A translation that still carries the short table has one row per list.
+        # README.md has no TV table of its own any more: it points at examples/README.md.
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("[examples/README.md](examples/README.md)", readme)
-        self.assertIn("https://cleanyour.tv/tvs", readme)
         example_rows = table_rows(EXAMPLES / "README.md", "| Folder |")
         example_tvs = sorted(r.split("|")[2].strip() for r in example_rows)
-        for name in ("README.md", "README.nl.md"):
+        for name in ("README.md",):
             if "\n| TV | OS |\n" not in (ROOT / name).read_text(encoding="utf-8"):
                 continue
             readme_rows = table_rows(ROOT / name, "| TV | OS |")

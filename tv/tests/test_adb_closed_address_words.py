@@ -1,6 +1,6 @@
 """tools/adb-closed.py names a first word that is a URL or a path, instead of asking it.
 
-The closing step in PROMPT.md, AGENTS.md and the README FAQ runs `tools/adb-closed.py <tv ip> [port]`,
+The closing step in the README runs `tools/adb-closed.py <tv ip> [port]`,
 and an address pasted from a browser (or a page opened at it) reached the socket, where the answer was
 about something else:
 

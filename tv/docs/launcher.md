@@ -70,7 +70,7 @@ The launcher's own page has these rows, top to bottom:
 
 **Change the default home:** Launcher settings and the optional Default-home tile
 (`show_home_settings_shortcut`) open Android's home picker. Choose the original launcher to stop using
-CleanYourTV as Home, or CleanYourTV to return. The original launcher must be enabled; if the install
+Polaris TV as Home, or Polaris TV to return. The original launcher must be enabled; if the install
 script disabled it, run the [restore script](../README.md#restoring-your-tv) first. Some TVs provide no
 home picker.
 
@@ -96,8 +96,7 @@ weekends, festival greetings and the Shamsi date. Other languages keep their ori
 Any TV app can declare its own tile (label, caption, glow). The launcher asks you once per app, keeps it
 hidden by default, and remembers the answer for that app's signing key and card name. Hold OK on Settings
 and choose Module cards to change your mind. How to make one: [`docs/modules.md`](modules.md); the
-contract: [`docs/specs/card.md`](specs/card.md). Ready-made ones are in [`addons/`](../addons/), and
-[cleanyour.tv/addons](https://cleanyour.tv/addons) shows the themes, switches and add-ons together.
+contract: [`docs/specs/card.md`](specs/card.md). Ready-made ones are in [`addons/`](../addons/).
 
 ## Clock screensaver
 

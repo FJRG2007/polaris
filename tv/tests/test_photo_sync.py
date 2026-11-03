@@ -16,7 +16,7 @@ from pathlib import Path
 
 pictures = Path(os.environ["FAKE_PICTURES"])
 stage = Path(os.environ["FAKE_STAGE"])
-uri = "content://com.gathin.photodream.files/pictures/"
+uri = "content://app.polaris.tv.photodream.files/pictures/"
 if Path(__file__).name == "b64push.py":
     source, target = sys.argv[1:]
     shutil.copyfile(source, stage / Path(target).name)
@@ -32,7 +32,7 @@ else:
             print(hashlib.md5(p.read_bytes()).hexdigest() + "  " + p.name)
     elif "content write --uri " + uri in command:
         name = command.split(uri, 1)[1].split()[0]
-        source = stage / ("cyt-screensaver-" + name)
+        source = stage / ("polaris-tv-screensaver-" + name)
         shutil.copyfile(source, pictures / name)
         source.unlink()
     elif "content delete --uri " + uri in command:

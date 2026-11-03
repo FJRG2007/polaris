@@ -55,6 +55,6 @@ com.google.android.play.games                # Play Games
 # Casting stack not used (Chromecast kept)
 com.smartdevice.dtv.icast                    # Miracast + DLNA
 
-# Handover (applied after the list above; needed only if you install the Clean Your TV launcher)
+# Handover (applied after the list above; needed only if you install the Polaris TV launcher)
 com.google.android.tungsten.setupwraith      # RecoveryActivity otherwise steals Home; needs FORCE_SETUPWRAITH=1 when the saved Wi-Fi is not setupwraith's
 com.google.android.apps.tv.launcherx         # stock Google TV home; app.polaris.tv is Home now

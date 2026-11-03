@@ -5,7 +5,7 @@ tube warming up, then snow and hiss as if the set were off the air, and after a 
 whatever was on screen. Any key ends it at once and is not passed on. Separate from the launcher.
 
 Package `io.github.luyzfernando08.tvstatic`. You see it as **TV Static** (Portuguese: **Chiado**). On
-cleanyourtv's Home it is also a module card, **TV Static**, which opens its settings.
+Polaris TV's Home it is also a module card, **TV Static**, which opens its settings.
 
 ## Settings
 

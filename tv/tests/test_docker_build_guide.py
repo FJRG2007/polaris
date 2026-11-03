@@ -42,7 +42,7 @@ INSTALL_PS1 = ROOT / "launcher" / "build-and-install.ps1"
 TABLE_HEADER = re.compile(r"^\|\s*Variable\s*\|\s*Default\s*\|\s*What it changes\s*\|\s*$", re.M)
 # A separator row: pipes, dashes and the odd colon, and nothing that names a setting.
 SEPARATOR = re.compile(r"^[\s|:-]+$")
-# IMAGE="${IMAGE:-cleanyourtv-android-build}" - an empty fallback is a variable the twin reads but
+# IMAGE="${IMAGE:-polaris-tv-android-build}" - an empty fallback is a variable the twin reads but
 # leaves unset (HOST_KEY_DIR), so the reader keeps the name and drops the empty default.
 SH_DEFAULT = re.compile(r'^(?P<name>[A-Z][A-Z0-9_]*)="\$\{(?P=name):-(?P<value>[^}]*)\}"', re.M)
 PS1_DEFAULT = re.compile(r"\$(?P<var>\w+) = if \(\$env:(?P<name>[A-Z][A-Z0-9_]*)\) "
@@ -308,17 +308,17 @@ class ReaderTest(unittest.TestCase):
         self.assertEqual({}, table("# Building in Docker\n\nNothing here.\n"))
 
     def test_the_shell_reader_keeps_an_unset_variable_out_of_the_defaults(self):
-        source = ('IMAGE="${IMAGE:-cyt-image}"\n'
+        source = ('IMAGE="${IMAGE:-polaris-tv-image}"\n'
                   'KEY_DIR="${KEY_DIR:-/gradle/.android}"\n'
                   'HOST_KEY_DIR="${HOST_KEY_DIR:-}"\n'
                   'ROOT="$(cd "$(dirname "$0")/.." && pwd)"\n')
-        self.assertEqual({"IMAGE": "cyt-image", "KEY_DIR": "/gradle/.android"}, sh_defaults(source))
+        self.assertEqual({"IMAGE": "polaris-tv-image", "KEY_DIR": "/gradle/.android"}, sh_defaults(source))
 
     def test_the_powershell_reader_reads_the_default_out_of_the_inline_form(self):
-        source = ("$Image = if ($env:IMAGE) { $env:IMAGE } else { 'cyt-image' }\n"
+        source = ("$Image = if ($env:IMAGE) { $env:IMAGE } else { 'polaris-tv-image' }\n"
                   "$KeyDir = if ($env:KEY_DIR) { $env:KEY_DIR } else { '/gradle/.key' }\n"
                   "$Project = 'launcher'\n")
-        self.assertEqual({"IMAGE": "cyt-image", "KEY_DIR": "/gradle/.key"}, ps1_defaults(source))
+        self.assertEqual({"IMAGE": "polaris-tv-image", "KEY_DIR": "/gradle/.key"}, ps1_defaults(source))
 
     def test_the_mount_reader_takes_the_key_dir_forced_after_the_mount(self):
         source = ('KEY_DIR="${KEY_DIR:-/gradle/.android}"\n'

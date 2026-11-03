@@ -2,14 +2,14 @@
 
 `tools/disable.sh`, `disable.ps1` and `check.py --fix` refused the core Android packages of an original
 Mi TV Stick (#884) and nothing else until a Haier H50H5F restarted in a loop after a debloat with
-`com.cltv.mal` off (#1578). The guard covers four TV middleware packages now, PROMPT.md says so, and
+`com.cltv.mal` off (#1578). The guard covers four TV middleware packages now, and
 `docs/TROUBLESHOOTING.md` is where an owner whose set is stuck reads what the tools refuse: its #884
 bullet enumerated every guarded name except those four, and the #1578 bullet under it lists
 `com.cltv.mal` among eight packages without saying it is one of the guarded names today.
 
 Both are pinned here against the guard itself, so a name that reaches CORE_RE without the page - or a
-page that claims a name the guard does not hold - fails: the four names are read out of PROMPT.md's
-sentence, refused through recovery.core_packages(), matched against the bash and PowerShell copies of
+page that claims a name the guard does not hold - fails: the four names are
+refused through recovery.core_packages(), matched against the bash and PowerShell copies of
 the pattern, and required in the bullet. The names on the #1578 list that are *not* guarded are pinned
 too, because the bullet says so: `com.cltv.hybrid` (Live TV) and the tuner inputs are what tested lists
 keep or turn off by hand, not what the tools refuse.
@@ -85,20 +85,10 @@ class GuardedMiddlewareTest(unittest.TestCase):
 
     def test_the_core_bullet_cites_the_haier_issue_and_the_message(self):
         text = core_bullet()
-        self.assertIn("issues/1578", text,
+        self.assertIn("#1578", text,
                       "the bullet names the middleware without saying why, or linking #1578")
         self.assertIn("core Android or TV middleware", text,
                       "the bullet does not quote the message a refusal of one of the four prints")
-
-    def test_the_prompt_md_sentence_names_the_same_four(self):
-        text = (ROOT / "PROMPT.md").read_text(encoding="utf-8")
-        block = re.search(r"TV\s+middleware \(([^)]*)\)", text)
-        self.assertIsNotNone(block, "PROMPT.md no longer describes the TV middleware packages")
-        named = re.findall(r"`(com\.[a-z0-9.]+)`", block.group(1))
-        self.assertEqual(sorted(MIDDLEWARE), sorted(set(named)),
-                         "PROMPT.md and this test disagree about what the middleware is")
-        for name in named:
-            self.assertIn(f"`{name}`", core_bullet(), f"PROMPT.md names {name} and the page does not")
 
     def test_the_loop_bullet_says_which_of_its_eight_names_is_guarded(self):
         text = loop_bullet()

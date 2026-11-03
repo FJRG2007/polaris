@@ -118,7 +118,7 @@ did anything. Scancodes from `tools/tv.py 'getevent -lt'` (names from `Generic.k
 The keycodes Android gives Globoplay and Disney+ are TCL's own and show up in no log here, so they are mapped by
 scancode. A button can open any installed app, not only its own; on this unit Prime and Globoplay went to apps the
 owner uses, and the TCL button to an HDMI port with an `input:` entry (needs the launcher change from
-[#766](https://github.com/Gathin23/cleanyourtv/pull/766)). HDMI 1 to 4 are `…/HW1413744128`, `…/HW1413744384`,
+#766). HDMI 1 to 4 are `…/HW1413744128`, `…/HW1413744384`,
 `…/HW1413744640` and `…/HW1413745664` (`hdmi_port=N` in `dumpsys tv_input`); `…/HW1413743104` is AV. All six
 were confirmed with the real remote.
 
@@ -181,7 +181,7 @@ Three things seen on this unit, not yet checked on the others:
   `app.polaris.tv/.HomeKeyService` still listed. Setting the flag back to `1` alone did not bind it; clearing
   the list and writing it back (as `build-and-install` does) did. Until that is fixed, the remapped buttons need
   that toggle over ADB after every power-on. The same state as
-  [#1047](https://github.com/Gathin23/cleanyourtv/issues/1047) (docs/TROUBLESHOOTING.md).
+  #1047 (docs/TROUBLESHOOTING.md).
 - **With `HomeKeyService` bound, one volume tap moves two steps.** Holding still repeats, and with the service
   unbound a tap is one step again. `getevent` shows one press per tap, so the firmware seems to apply the volume
   key both before the filter and when the service hands it back.

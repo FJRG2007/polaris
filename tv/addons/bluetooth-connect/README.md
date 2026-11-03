@@ -2,7 +2,7 @@
 
 The TV's Bluetooth settings offer Connect and Unpair for a speaker, but no Disconnect. This add-on lists the paired
 speakers and headphones, each with its state, and OK on one connects it or, when it is connected, disconnects it.
-Nothing is unpaired. For the [Clean Your TV](../../README.md) launcher it declares a
+Nothing is unpaired. For the [Polaris TV](../../README.md) launcher it declares a
 [module card](../../docs/modules.md): once you answer **Show card** its tile reads "Bluetooth" with a teal glow. On
 any other Android TV home it is an ordinary app.
 

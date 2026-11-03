@@ -93,7 +93,7 @@ tv() { "$PY" -I tv.py "$@"; }
 # A provider write creates the file as the launcher, and it cannot truncate a file the shell owns either, so
 # remove our copy first. cp stays as the fallback for firmware without the provider.
 URI=content://$PKG.theme
-TMP=/data/local/tmp/cyt-theme
+TMP=/data/local/tmp/polaris-tv-theme
 # A file's staging path; wallpapers/a.jpg is staged as $TMP-wallpapers-a.jpg.
 stage() { echo "$TMP-${1//\//-}"; }
 # Android 8 and 9 have no `content write`: they print the usage and "[ERROR] Unsupported operation: write" but
@@ -122,7 +122,7 @@ THEME="${THEME_ARG:?usage: theme.sh <theme folder> | --reset}"
 # A folder that is not a theme, a file the launcher would drop, a wallpaper name the push refuses: each is a
 # run that stops before anything is sent, which the header gives 2, not 1 - the status of a push that ran and
 # failed. The three answered 1 while their own last sentence said "Nothing was sent to the TV.", so an owner
-# (or an assistant following PROMPT.md) read a command line it could fix as the TV refusing the theme.
+# (or an assistant) read a command line it could fix as the TV refusing the theme.
 [ -f "$THEME/config.json" ] || { echo "no config.json in $THEME. Nothing was sent to the TV." >&2; exit 2; }
 # What the launcher makes of the file: Config.read() answers "no overlay" for anything that is not a JSON
 # object, so an array, a number or a string is a theme the TV drops - and it replaces the theme the set had,

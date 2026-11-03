@@ -26,7 +26,7 @@
     <string name="vpn">VPN</string>
     <string name="vpn_off">VPN mati</string>
     <string name="home_settings">Pilih Beranda utama</string>
-    <string name="home_settings_help">Pilih beranda asli untuk berhenti menggunakan CleanYourTV sebagai Beranda, atau CleanYourTV untuk kembali. Antarmuka asli harus aktif dan TV Anda harus menyediakan pemilih beranda; gunakan skrip pemulihan terlebih dahulu jika sebelumnya dinonaktifkan.</string>
+    <string name="home_settings_help">Pilih beranda asli untuk berhenti menggunakan Polaris TV sebagai Beranda, atau Polaris TV untuk kembali. Antarmuka asli harus aktif dan TV Anda harus menyediakan pemilih beranda; gunakan skrip pemulihan terlebih dahulu jika sebelumnya dinonaktifkan.</string>
     <string name="launcher_settings">Setelan antarmuka</string>
     <string name="native_settings">Setelan pabrikan</string>
     <string name="columns_label">App per baris</string>

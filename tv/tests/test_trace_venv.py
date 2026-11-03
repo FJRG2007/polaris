@@ -40,7 +40,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-MARKER = "CLEANYOURTV_TRACE_PY_VENV"
+MARKER = "POLARIS_TV_TRACE_PY_VENV"
 
 # tools/venv/bin/python, as the tests make it: it records what it was started with and stops there. A
 # re-exec that never happened leaves no file, which is how "the venv was not started" is checked.
@@ -150,7 +150,7 @@ class TraceVenvTest(unittest.TestCase):
 
     def load_script(self):
         """The copy beside the stub venv, imported as a module (tests/test_trace.py does the same)."""
-        spec = importlib.util.spec_from_file_location("cyt_trace_venv", self.script)
+        spec = importlib.util.spec_from_file_location("polaris_tv_trace_venv", self.script)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module

@@ -5,7 +5,7 @@ product `BeyondTV5`, device `BeyondTV`, and the North American RTD2851 client. T
 `PPR1.180610.011 AP13` on Android TV 9, with the 2020-11-01 security patch.
 
 The tested packages are in [`debloat.txt`](debloat.txt). The owner reports that both TVs ran this setup
-for several days without issues, and CleanYourTV remained Home after reboot. The stock launcher is
+for several days without issues, and Polaris TV remained Home after reboot. The stock launcher is
 disabled only after the launcher build script confirms the handover.
 
 ## Firmware behavior and scope

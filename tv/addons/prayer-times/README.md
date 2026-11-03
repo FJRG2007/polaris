@@ -2,10 +2,10 @@
 
 Today's five prayer times and sunrise for one city, full screen on the TV, with the next prayer highlighted and a
 countdown to it, plus today's Gregorian and Hijri dates. Each prayer has its Arabic and English name. For the
-[Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md), so once you answer
+[Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md), so once you answer
 **Show card** its tile reads "Prayer Times" with a green glow; on any other Android TV home it is an ordinary app.
 
-![The prayer times page](https://raw.githubusercontent.com/majnioui/cleanyourtv-contrib/pr-assets/addon-prayer-times/prayer-times.png)
+![The prayer times page](https://raw.githubusercontent.com/majnioui/polaris-tv-contrib/pr-assets/addon-prayer-times/prayer-times.png)
 
 - **Data** comes from [Aladhan](https://aladhan.com/), which needs no account or key.
 - **The city and the calculation method** are set before you build, in `app/src/main/res/values/config.xml`:

@@ -66,14 +66,14 @@ class RecordPerLanAddressTest(unittest.TestCase):
         return self.sent(), result.stderr
 
     def records(self):
-        return sorted(p.name.rsplit("-", 1)[0] for p in (self.home / ".cleanyourtv").glob("recovery-*.json"))
+        return sorted(p.name.rsplit("-", 1)[0] for p in (self.home / ".polaris-tv").glob("recovery-*.json"))
 
     def rename_record(self, old_tag, new_tag):
-        [path] = (self.home / ".cleanyourtv").glob(f"recovery-{old_tag}-*.json")
+        [path] = (self.home / ".polaris-tv").glob(f"recovery-{old_tag}-*.json")
         path.rename(path.with_name(path.name.replace(f"recovery-{old_tag}-", f"recovery-{new_tag}-")))
 
     def set_created(self, tag, created):
-        [path] = (self.home / ".cleanyourtv").glob(f"recovery-{tag}-*.json")
+        [path] = (self.home / ".polaris-tv").glob(f"recovery-{tag}-*.json")
         record = json.loads(path.read_text())
         record["created"] = created
         path.write_text(json.dumps(record))
@@ -114,7 +114,7 @@ class RecordPerLanAddressTest(unittest.TestCase):
         # They may be this TV before and after cleanup, or two TVs that had the address in turn.
         self.tv()
         self.disable("192.168.1.50")
-        records = self.home / ".cleanyourtv"
+        records = self.home / ".polaris-tv"
         [first] = records.glob("recovery-192.168.1.50-*.json")
         first.with_name(first.name.replace("192.168.1.50-", "192.168.1.50_5555-")).write_text(first.read_text())
         for script in ("disable.sh", "restore.sh"):

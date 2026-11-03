@@ -23,7 +23,7 @@ but its additional package choices have not been validated on this 50PUS7303.
 ## Tested package choices
 
 The 50PUS7303 setup disabled the seven feedback, tutorial, promotional, logging and recommendation
-packages in the first sections of [debloat.txt](debloat.txt). The stock launcher was replaced by CleanYourTV.
+packages in the first sections of [debloat.txt](debloat.txt). The stock launcher was replaced by Polaris TV.
 It also disabled Inscape ACR and the Philips DAC pair (`org.droidtv.candeebug`, `org.droidtv.gel`),
 which the list now disables on both models, and the five packages shown as commented options at the
 end of that file: store-demo stickers, Twitter sharing, the NetTV app gallery, Prime Video and Alexa.
@@ -35,7 +35,7 @@ Netflix checks are not test claims for the 50PUS7303.
 
 ## Home and Philips Sources
 
-The original Home was `com.google.android.tvlauncher`; CleanYourTV is now Home. Live TV is
+The original Home was `com.google.android.tvlauncher`; Polaris TV is now Home. Live TV is
 `org.droidtv.playtv`.
 
 `org.droidtv.eum` (Philips Help) must remain enabled for the Philips Sources menu on this set. With it

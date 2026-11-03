@@ -12,7 +12,7 @@
 #
 # Tested the same day on one set, with the real remote: Home opens the new launcher, Netflix / YouTube
 # launch, HDMI 1 and Live TV switch from the launcher's Inputs menu, voice button works.
-# The home screen on the test set was a small custom launcher built from PROMPT.md, not launcher/ from
+# The home screen on the test set was a small custom launcher an assistant built, not launcher/ from
 # this repo; the package list does not depend on which launcher replaces Home.
 # Not a multi-day soak.
 #

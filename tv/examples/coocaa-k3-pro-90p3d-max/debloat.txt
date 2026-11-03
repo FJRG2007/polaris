@@ -20,7 +20,7 @@
 # the TV still shows the "Allow USB debugging?" prompt. The ADB toggle resets on every
 # reboot - re-enable it from the factory menu after rebooting.
 #
-# Launcher notes (for anyone porting cleanyourtv to this set):
+# Launcher notes (for anyone porting Polaris TV to this set):
 # 1. Almost no app declares a leanback entry on this firmware: the Home grid starts
 #    nearly empty (only the app store resolves LEANBACK_LAUNCHER). The TV app
 #    (com.skyworth.tv), local media (com.tianci.localmedia), TV manager

@@ -2,7 +2,7 @@
 
 `docs/specs/card.md` is the contract an app declares its card against, and `Cards.java` refuses a
 card whole: one character outside the set a field allows and `parse()` throws, `read()` catches it per
-card and logs it under `TvHomeCards`, and the app falls back to its ordinary tile. Nothing in the
+card and logs it under `PolarisTvCards`, and the app falls back to its ordinary tile. Nothing in the
 repository read the cards the tree itself ships - `grep -rn module_card tests/` found the string in
 two files and neither opens one - so addons/bluetooth-connect's caption, "Connect / disconnect",
 carried a slash, which no caption may use:
@@ -24,7 +24,7 @@ on the activity that already carries `LEANBACK_LAUNCHER`, that it is `exported` 
 package declares one card - and `Cards.read()` refuses all of that in words a TV owner never sees
 (`card activity is not exported and enabled`, `card activity has no LEANBACK_LAUNCHER intent filter`,
 `no <meta-data android:name="app.polaris.tv.card" android:resource=...>`, `declares a second card`),
-one `TvHomeCards` line per Home. So an add-on could ship the card file this file reads, point its
+one `PolarisTvCards` line per Home. So an add-on could ship the card file this file reads, point its
 `meta-data` at another activity, drop `android:exported`, or leave the `DOCK_CARD` filter off the
 activity the launcher queries and the card would never appear - with every test here green. This file
 now reads each add-on's `AndroidManifest.xml` beside its card and holds the declaration to those rules,
@@ -286,7 +286,7 @@ class CardReaderTest(unittest.TestCase):
         self.assertIn("not #RRGGBB", reasons[0])
 
     def test_a_reserved_label_is_named(self):
-        for label in ("Home", "HDMI 2", "Live TV", "cleanyourtv"):
+        for label in ("Home", "HDMI 2", "Live TV", "polaristv"):
             with self.subTest(label=label):
                 reasons = self.check('<card spec="1" label="%s" />' % label)
                 self.assertEqual(len(reasons), 1, reasons)

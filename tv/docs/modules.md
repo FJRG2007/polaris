@@ -42,7 +42,7 @@ Then create `res/xml/module_card.xml`:
   the label in an update makes the owner decide again, so pick it once.
 - `caption`: optional, up to 32 characters from the same set as `label` — letters, digits, space and
   `. & + ' -`, so a `/`, a comma or a colon is not read. A character outside the set drops the whole
-  card rather than showing it without the caption (`logcat -s TvHomeCards` says `caption has
+  card rather than showing it without the caption (`logcat -s PolarisTvCards` says `caption has
   characters outside A-Z a-z 0-9 space . & + ' -`). The
   endorsement words refused in labels are refused here too. The
   name line under the tile is one line; label and caption together show about 26 characters on a
@@ -82,7 +82,7 @@ Useful checks:
 adb shell pm dump io.github.udhaykumarbala.retro | grep -B2 -A6 DOCK_CARD
 
 # Why was a card rejected? One line per reason.
-adb logcat -s TvHomeCards
+adb logcat -s PolarisTvCards
 ```
 
 Then: answer Keep hidden and check the app keeps its ordinary tile; hold OK on Settings, open the

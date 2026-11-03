@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.gathin.photodream'
+    namespace 'app.polaris.tv.photodream'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.gathin.photodream'
+        applicationId 'app.polaris.tv.photodream'
         // DreamService with a hardware bitmap and TextureView: Android 8 and up, as the launcher.
         minSdk 26
         targetSdk 34

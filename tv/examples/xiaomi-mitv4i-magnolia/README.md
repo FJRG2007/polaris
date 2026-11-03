@@ -49,7 +49,7 @@ All packages are disabled via `pm disable-user --user 0` (nothing is uninstalled
 
 Measured on real hardware before and after debloat + launcher handover:
 
-| Metric | Stock | Debloated + CleanYourTV | Change |
+| Metric | Stock | Debloated + Polaris TV | Change |
 |---|---|---|---|
 | **Available RAM** | ~336 MB | **~426 MB** | **+90 MB (+27%)** |
 | **Swap / ZRAM Used** | ~143 MB / 256 MB (56%) | **~40 MB / 256 MB (15%)** | **-72% swap pressure** |

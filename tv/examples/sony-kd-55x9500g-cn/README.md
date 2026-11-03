@@ -26,4 +26,4 @@ the CN unit has a different stock launcher and application set.
 Additional apps removed later by personal preference are not part of this
 shared disable list. No core Android packages are listed.
 
-Background and installation report: [discussion #589](https://github.com/Gathin23/cleanyourtv/discussions/589).
+Background and installation report: discussion #589.

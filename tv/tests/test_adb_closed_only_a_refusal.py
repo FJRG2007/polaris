@@ -1,12 +1,12 @@
 """tools/adb-closed.py says "closed" only when the TV refused the connection.
 
-Exit 0 is what the closing step in PROMPT.md, AGENTS.md and the README FAQ accepts as done, and three cases
+Exit 0 is what the README's closing step accepts as done, and three cases
 gave it for a port nobody had checked:
 
   * Nothing answered in 3 s. That was "closed, unless the TV is off or not at this address", exit 0, but
     port 5555 times out with ADB still on: a TV asleep or rebooting, at a new address, on another VLAN,
     behind a VPN's firewall, or out of reach from an assistant's sandbox (docs/TROUBLESHOOTING.md,
-    tools/relay.md). PROMPT.md already says only "Connection refused" proves the port closed. Now it is
+    tools/relay.md). The README already says only "Connection refused" proves the port closed. Now it is
     exit 2, "could not check", on stderr.
   * A relay's TV_PORT exported for the tools (TV_HOST=127.0.0.1 TV_PORT=15555, or TV_PORT=15555 left
     behind on its own), then `adb-closed.py <tv ip>` at the closing step: it would check the TV's IP on
@@ -267,7 +267,7 @@ class TheDocsTest(unittest.TestCase):
 
 
 class RunsAsTheDocsTypeItTest(unittest.TestCase):
-    # PROMPT.md, AGENTS.md, SHOWCASE.md and examples/hy320/README.md type `tools/adb-closed.py <tv ip>`,
+    # The README and examples/hy320/README.md type `tools/adb-closed.py <tv ip>`,
     # with no interpreter in front. It needs only the standard library, so its shebang's python3 will do.
     def test_git_has_adb_closed_py_as_executable(self):
         # What a clone gets: the mode in git, not the mode of this checkout's file.

@@ -34,7 +34,7 @@ firmware update), `tools/privacy.py`, `tools/bench.py`, `tools/trace.py`,
 `tools/theme_restart.py`, `tools/b64push.py`, `tools/recovery.py` and `tools/manage.py`.
 Their existing safety checks still run, and on a set whose only network ADB is Wireless
 debugging this is how the check after an update runs without opening the plaintext port with
-`adb tcpip 5555`. Back up first and follow `PROMPT.md` before changing a TV. For example:
+`adb tcpip 5555`. Back up first (see the README) before changing a TV. For example:
 
 ```bash
 tools/venv/bin/python -I tools/tv.py --screenshot shots/before.png

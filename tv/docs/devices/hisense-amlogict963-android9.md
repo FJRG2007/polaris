@@ -2,7 +2,7 @@
 
 This is an owner-observed launcher note, **not a tested debloat list**. The
 retail model could not be established from the TV's software; use the device
-and build below to decide whether another set is comparable. The CleanYourTV
+and build below to decide whether another set is comparable. The Polaris TV
 reference launcher was not installed on this set.
 
 | Field | Observed value |
@@ -36,7 +36,7 @@ This differs from the [Hisense 65D62QH on MT9653 / Android 11](hisense-65d62qh.m
 where leaving `com.jamdeo.tv.vod` enabled reclaimed Home. That set's package
 list and launcher procedure should not be copied to this Android 9 build.
 The result here establishes a preferred-Home handover with a third-party
-launcher; it does not establish that the CleanYourTV launcher, the input panel,
+launcher; it does not establish that the Polaris TV launcher, the input panel,
 voice, casting or HDMI-CEC work the same way.
 
 No vendor package was evaluated for a debloat list in this session. In

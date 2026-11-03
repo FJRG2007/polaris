@@ -173,5 +173,5 @@ com.google.android.tvrecommendations    # populates the stock Google TV home scr
 #   earlier draft of this list offered all eight as opt-in. That was also wrong - a debloat list is
 #   for bloat, and none of these is bloat: they're normal device functionality (factory reset,
 #   diagnostics, finding a lost remote, Wi-Fi setup, network troubleshooting, remote/power/HDMI-CEC
-#   input), the same category CONTRIBUTING.md excludes for AOSP's own core packages. They're not in
+#   input), the same category as AOSP's own core packages, which no list disables. They're not in
 #   this file in any form.

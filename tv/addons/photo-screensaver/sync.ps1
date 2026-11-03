@@ -25,24 +25,26 @@ if (Test-Path $Folder) { $Folder = (Resolve-Path $Folder).Path }
 Set-Location (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'tools')
 $py = 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
-$pkg = 'com.gathin.photodream'
+$pkg = 'app.polaris.tv.photodream'
 $dream = "$pkg/.PhotoDream"
 $dir = "/sdcard/Android/data/$pkg/files/pictures"
 $uri = "content://$pkg.files/pictures"
-$tmp = '/data/local/tmp/cyt-screensaver'
+$tmp = '/data/local/tmp/polaris-tv-screensaver'
 # The screensaver the TV had before the first run, so -Off can put it back.
-$before = '/data/local/tmp/cyt-screensaver-before'
+$before = '/data/local/tmp/polaris-tv-screensaver-before'
+# The record's name before the rename, adopted when found.
+$adopt = "if [ -f /data/local/tmp/cyt-screensaver-before ]; then mv -f /data/local/tmp/cyt-screensaver-before $before; fi;"
 $types = '^\.(jpg|jpeg|png|webp|mp4)$'
 function Tv([string]$cmd) { & $py -I tv.py $cmd; if ($LASTEXITCODE) { throw "tv.py failed: $cmd" } }
 
 if ($IdleMinutes -lt 0 -or $IdleMinutes -gt 1440) { throw '-IdleMinutes takes 1 to 1440' }
 if ($Seconds -lt 5 -or $Seconds -gt 3600) { throw '-Seconds takes 5 to 3600' }
-if (-not ((Tv "pm path $pkg; true") -match 'package:')) { throw "the photo screensaver is not on the TV: run addons\photo-screensaver\build-and-install.ps1 first" }
 
 if ($Off) {
-    Tv "if [ -f $before ]; then { read c; read e; } < $before; if [ `"`$c`" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components `"`$c`"; fi; [ `"`$e`" = null ] || settings put secure screensaver_enabled `"`$e`"; rm -f $before; fi; rm -f $dir/* 2>/dev/null; content delete --uri $uri 2>/dev/null; echo screensaver: `$(settings get secure screensaver_components)"
+    Tv "$adopt if [ -f $before ]; then { read c; read e; } < $before; if [ `"`$c`" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components `"`$c`"; fi; [ `"`$e`" = null ] || settings put secure screensaver_enabled `"`$e`"; rm -f $before; fi; rm -f $dir/* 2>/dev/null; content delete --uri $uri 2>/dev/null; echo screensaver: `$(settings get secure screensaver_components)"
     exit 0
 }
+if (-not ((Tv "pm path $pkg; true") -match 'package:')) { throw "the photo screensaver is not on the TV: run addons\photo-screensaver\build-and-install.ps1 first" }
 
 if (-not (Test-Path $Folder -PathType Container)) {
     throw "no folder $Folder. Create it and put your pictures (jpg, png, webp) and MP4 clips in it, or pass another folder."
@@ -82,7 +84,7 @@ foreach ($f in $files) {
 }
 
 Tv "printf '%s' $Seconds > $tmp-seconds.txt; content write --uri content://$pkg.files/seconds.txt < $tmp-seconds.txt; rm -f $tmp-seconds.txt" | Out-Null
-Tv "[ -f $before ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $before; settings put secure screensaver_components $dream; settings put secure screensaver_enabled 1" | Out-Null
+Tv "$adopt [ -f $before ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $before; settings put secure screensaver_components $dream; settings put secure screensaver_enabled 1" | Out-Null
 if ($IdleMinutes -gt 0) { Tv "settings put system screen_off_timeout $($IdleMinutes * 60000)" | Out-Null }
 $count = (Tv "ls $dir 2>/dev/null | wc -l").Trim()
 Write-Host "Screensaver: Photos with $count file(s) on the TV, $Seconds s each ($sent sent). Undo with: addons\photo-screensaver\sync.ps1 -TvHost $TvHost -Off"

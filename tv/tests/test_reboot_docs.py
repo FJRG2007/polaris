@@ -96,7 +96,7 @@ class EveryPageUsesTheModeTest(unittest.TestCase):
         marker = "- **`tools/tv.py reboot` never comes back.**"
         self.assertTrue(marker in text, "TROUBLESHOOTING has to name the hang a reader will hit")
         bullet = text.split(marker, 1)[1].split("\n- **", 1)[0]
-        for token in ("adbd", "CLSE", "issues/995", "TCL 65C935", "G05_4K_GB",
+        for token in ("adbd", "CLSE", "#995", "TCL 65C935", "G05_4K_GB",
                       "Google TV 11", "AR2101", "tools/tv.py --reboot", "tools/tv.py --probe"):
             with self.subTest(token=token):
                 self.assertIn(token, bullet)

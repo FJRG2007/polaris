@@ -4,7 +4,7 @@ A welcome screen of your own for the TV: your picture (a logo, a family photo, a
 and a line of text such as "Welcome to the Den", full screen for a few seconds or until Back or OK. Pick the picture,
 how it's scaled (Fit, Fill, Stretch or Original) and where it sits, see it in a live 16:9 preview beside the
 settings, and preview it full screen. A Compatibility screen says plainly what this TV allows without root and what
-it doesn't. For the [Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md):
+it doesn't. For the [Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md):
 once you answer **Show card** its tile reads "Startup & Branding" with an amber glow. On any other Android TV home it
 is an ordinary app.
 

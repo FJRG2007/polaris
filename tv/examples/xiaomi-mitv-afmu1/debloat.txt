@@ -5,7 +5,7 @@
 # One list from two owners (#740 and #749) who reported the same stick: same board, product and firmware.
 # Everything below was disabled on at least one of those units; where only one disabled it, or where the two
 # chose differently, the line says so. Both ran it for a day, in batches with a reboot in between, so treat
-# the package set as provisional (CONTRIBUTING.md) until it has been used for a few days.
+# the package set as provisional (docs/workflows/tv-list.md) until it has been used for a few days.
 #
 # Apply:   TV_HOST=<stick ip> tools/disable.sh examples/xiaomi-mitv-afmu1/debloat.txt
 # Undo:    TV_HOST=<stick ip> tools/restore.sh examples/xiaomi-mitv-afmu1/debloat.txt com.google.android.apps.tv.launcherx

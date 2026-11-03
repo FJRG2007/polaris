@@ -93,7 +93,7 @@
 # (Netflix ESN/config), Chromecast (mediashell), firmware updates
 # (versionUpdateApp, rc.ota).
 # Also left alone on the 32S6500S unit, none of them tested further: com.tcl.factory.view (a BootUpReceive
-# receiver and a .MainMenu activity; the name alone puts it in PROMPT.md's "never even open a factory
+# receiver and a .MainMenu activity; the name alone puts it in the "never even open a factory
 # package" category, so it was left exactly as found, neither disabled nor started - treat it the same way
 # on any TCL set until someone reports what it actually does), com.google.android.sss.authbridge and
 # com.tcl.systemuioverlay (both gave dumpsys almost nothing to go on), and com.android.ListenNetStateService

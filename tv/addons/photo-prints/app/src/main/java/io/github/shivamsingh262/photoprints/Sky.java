@@ -1,7 +1,7 @@
 package io.github.shivamsingh262.photoprints;
 
 /**
- * Time-of-day sky palette, the same one the cleanyourtv launcher paints behind Home, so the screensaver looks like
+ * Time-of-day sky palette, the same one the Polaris TV launcher paints behind Home, so the screensaver looks like
  * part of it.
  *
  * Pure maths, no Android types and no clock of its own: the caller passes minutes since midnight. The colours are

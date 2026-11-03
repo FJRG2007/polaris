@@ -26,7 +26,6 @@ ROOT = Path(__file__).resolve().parents[1]
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 EXAMPLES = ROOT / "examples"
 HEADING = "## Xiaomi CN firmware: Settings freezes or crashes after the debloat"
-ISSUE = "https://github.com/Gathin23/cleanyourtv/issues/1310"
 PACKAGE = "mitv.service"
 # The sentence the China-market lists use for "this one stays on".
 DO_NOT_TOUCH = "mitv.service is the core MiTV service: do not touch it"
@@ -88,7 +87,7 @@ class TheNoteTest(unittest.TestCase):
         self.assertTrue(self.note.strip(), "the section is empty")
 
     def test_names_the_device_and_the_report(self):
-        for needed in ("MiTV-ASTP0", "mulan", "Android 9", "com.xiaomi.mitv.settings", ISSUE):
+        for needed in ("MiTV-ASTP0", "mulan", "Android 9", "com.xiaomi.mitv.settings"):
             with self.subTest(needed=needed):
                 self.assertIn(needed, self.note)
 

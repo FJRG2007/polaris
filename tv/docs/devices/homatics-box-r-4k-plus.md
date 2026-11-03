@@ -25,7 +25,7 @@ also reported 5555; a property is not proof that a service is listening there.
 
 The original Home was `com.google.android.tvlauncher/.MainActivity`. Before installation,
 the only other HOME claimant was Settings' `FallbackHome`; setupwraith did not claim
-HOME and was left enabled. The standard installer started CleanYourTV before handing
+HOME and was left enabled. The standard installer started Polaris TV before handing
 over Home and disabling the stock launcher. A five-app dock was applied with the theme
 tool. Screenshot capture needed time for the first new frame to settle after restart.
 

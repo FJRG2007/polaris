@@ -4,7 +4,7 @@ A screensaver in the style of the film's digital rain: columns of mirrored half-
 a black screen, each with a bright head and a green trail that fades behind it, while a few glyphs in the trails
 change as they fall. It is drawn on the TV at about 20 frames a second, with no pictures or fonts to download.
 
-On cleanyourtv's Home it is also a module card, **Digital Rain**: press OK on it to start the rain at once, and
+On Polaris TV's Home it is also a module card, **Digital Rain**: press OK on it to start the rain at once, and
 Back to leave.
 
 - Package: `io.github.dennisoleary.digitalrain`

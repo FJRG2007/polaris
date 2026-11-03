@@ -28,9 +28,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import gen_tables  # noqa: E402  (needs tools/ on the path first)
 
 RECIPE = ROOT / "docs" / "workflows" / "tv-list.md"
-CONTRIBUTING = ROOT / "CONTRIBUTING.md"
 RECIPE_SECTION = "# Workflow: Add or update a TV list"
-CONTRIBUTING_SECTION = "## 1. Add your TV model"
 STEP = re.compile(r"^(\d+)\.\s+(.*)$")
 HEADING = re.compile(r"^#{1,6} ")
 # The step that asks for the file: it opens with "Add `examples/<folder>/tv.json`". A later step may
@@ -42,8 +40,8 @@ ASK_FOR_FILE = re.compile(r"^Add `examples/[^`]*tv\.json`")
 def section(text, head):
     """The lines under a heading, up to the next heading of any level. Empty when the heading is gone.
 
-    Both pages keep their recipe under one heading - `# Add or update a TV list` is the whole page,
-    CONTRIBUTING's is section 1 of four - so the reader stops at whichever heading comes next.
+    The recipe is the whole page under `# Add or update a TV list`, so the reader stops at whichever
+    heading comes next.
     """
     out, inside = [], False
     for line in text.split("\n"):
@@ -114,13 +112,6 @@ class TvJsonKeysInTheRecipeTest(unittest.TestCase):
                 self.assertIn(f"`{key}`", step,
                               f"docs/workflows/tv-list.md asks for tv.json but never names {key!r}")
 
-    def test_contributing_names_every_key_the_loader_accepts(self):
-        step = tv_json_step(CONTRIBUTING, CONTRIBUTING_SECTION)
-        for key in gen_tables.KEYS + gen_tables.OPTIONAL:
-            with self.subTest(key=key):
-                self.assertIn(f"`{key}`", step,
-                              f"CONTRIBUTING.md asks for tv.json but never names {key!r}")
-
     def test_the_example_in_the_recipe_is_a_file_the_loader_accepts(self):
         blocks = fenced_json(RECIPE, RECIPE_SECTION)
         self.assertEqual(len(blocks), 1, f"expected one tv.json example, read {len(blocks)}")
@@ -161,11 +152,9 @@ class TvJsonKeysInTheRecipeTest(unittest.TestCase):
                 gen_tables.load(root)
             self.assertIn("not_a_key", str(caught.exception))
 
-    def test_both_pages_are_the_ones_read(self):
+    def test_the_recipe_page_is_the_one_read(self):
         # A renamed heading would make section() empty and every key check pass by reading nothing.
         self.assertGreaterEqual(len(steps(section(RECIPE.read_text(encoding="utf-8"), RECIPE_SECTION))), 5)
-        self.assertGreaterEqual(len(steps(section(CONTRIBUTING.read_text(encoding="utf-8"),
-                                                  CONTRIBUTING_SECTION))), 5)
 
 
 class StepReaderTest(unittest.TestCase):

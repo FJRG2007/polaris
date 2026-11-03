@@ -1,6 +1,6 @@
 """tools/adb-closed.py names macOS Local Network privacy when EHOSTUNREACH hides the port.
 
-The closing step accepts only this tool's "closed" (PROMPT.md, AGENTS.md, the README FAQ), so it is the
+The closing step accepts only this tool's "closed" (the README's closing step), so it is the
 one check an owner is told to trust. On macOS the kernel reports a process that Local Network privacy
 keeps off the subnet as EHOSTUNREACH - "No route to host", the same errno as a TV that is switched off
 or on another network. tools/tv.py has named the permission at connect time since #1982; this is the
@@ -38,7 +38,7 @@ NOTE = "On macOS this is also what Local Network privacy looks like."
 
 
 def load():
-    spec = importlib.util.spec_from_file_location("cyt_adb_closed_platform", SCRIPT)
+    spec = importlib.util.spec_from_file_location("polaris_tv_adb_closed_platform", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.gathin.newsdream'
+    namespace 'app.polaris.tv.newsdream'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.gathin.newsdream'
+        applicationId 'app.polaris.tv.newsdream'
         // Android 8 and up, as the launcher.
         minSdk 26
         targetSdk 34

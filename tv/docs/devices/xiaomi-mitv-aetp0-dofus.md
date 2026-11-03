@@ -37,8 +37,8 @@ PY=tools/venv/bin/python
 "$PY" -I tools/tv.py 'pm path com.ts.launcher'
 "$PY" -I tools/tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'
 (cd launcher && ./gradlew assembleRelease -PlauncherApplicationId=com.ts.launcher)
-"$PY" -I tools/b64push.py launcher/app/build/outputs/apk/release/app-release.apk /data/local/tmp/tvhome-allowlist.apk
-"$PY" -I tools/tv.py 'pm install -r /data/local/tmp/tvhome-allowlist.apk'
+"$PY" -I tools/b64push.py launcher/app/build/outputs/apk/release/app-release.apk /data/local/tmp/polaris-tv-allowlist.apk
+"$PY" -I tools/tv.py 'pm install -r /data/local/tmp/polaris-tv-allowlist.apk'
 "$PY" -I tools/tv.py 'am start -W -n com.ts.launcher/app.polaris.tv.MainActivity'
 ```
 

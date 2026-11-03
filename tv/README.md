@@ -1,45 +1,20 @@
-<p align="center">
-  <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
-</p>
+# Polaris TV
 
-<p align="center">
-  Read in: <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">正體中文</a> · <a href="README.vi.md">Tiếng Việt</a> · <a href="README.ja.md">日本語</a> · <a href="README.it.md">Italiano</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.de.md">Deutsch</a> · <a href="README.uk.md">Українська</a> · <a href="README.tr.md">Türkçe</a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/Gathin23/cleanyourtv/stargazers"><img src="https://img.shields.io/github/stars/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Stars"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/pulls?q=is%3Amerged"><img src="https://img.shields.io/github/issues-search?query=repo%3AGathin23%2Fcleanyourtv%20is%3Apr%20is%3Amerged&style=flat&cacheSeconds=1800&label=merged%20PRs&color=cfffcf&labelColor=15181e" alt="Merged PRs"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/network/members"><img src="https://img.shields.io/github/forks/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Forks"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/graphs/contributors"><img src="https://img.shields.io/github/contributors/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Contributors"></a>
-  <a href="https://buymeacoffee.com/gathint"><img src="https://img.shields.io/badge/support-%E2%9D%A4-ff5e8a?style=flat&labelColor=15181e" alt="Support, buy me a coffee"></a>
-  <a href="https://www.producthunt.com/products/cleanyourtv"><img src="https://img.shields.io/badge/Product%20Hunt-upvote%20%E2%96%B2-da552f?style=flat&logo=producthunt&logoColor=white&labelColor=15181e" alt="CleanYourTV on Product Hunt"></a>
-</p>
-
-<p align="center">
-  <a href="https://trendshift.io/repositories/310225"><img src="docs/trending-badge.png" alt="#1 trending repo of the week, Oct 19–25 2026, via trendshift.io" width="360"></a>
-</p>
-
-<p align="center">
-  <a href="docs/PRESS.md"><img src="docs/card.jpg" alt="416 TV models · 106 brands · 31 languages · 572 KB launcher. Featured in TechCrunch, TechRadar, Tom's Guide, Mashable, Android Authority, XDA, FlatpanelsHD, It's FOSS, Phandroid, GIGAZINE, Xataka, WinFuture, Frandroid, Macitynet, Techaeris, TechPP and 396 more: 412 articles from 54 countries. Before: stock Google TV home with a sponsored ad. After: the Clean Your TV launcher." width="800"></a>
-</p>
+An Android TV and Google TV home screen with no ads, and the tools that strip a TV's bloat over
+Wi-Fi. It is part of [Polaris](../README.md) and works on its own; [POLARIS.md](POLARIS.md) has what it adds.
 
 ## Start here
 
 | You have | Go to |
 |---|---|
 | **An Android TV or Google TV** | [Quick start](#quick-start): a coding assistant does the work in about fifteen minutes. |
-| **A Samsung, LG, Roku, Vizio or Hisense VIDAA TV** | [cleanyour.tv/not-android](https://cleanyour.tv/not-android): CleanYourTV can't run there, but you can turn off the tracking with your remote. |
-| **A phone or laptop, no coding agent** | One of the [community apps](https://cleanyour.tv/app) for Android phones, Mac and Windows, made by independent developers. |
+| **A Samsung, LG, Roku, Vizio or Hisense VIDAA TV** | Polaris TV can't run there, but you can turn off the tracking with your remote, in the TV's own privacy settings. |
 | **Want to see it first** | [What you get](#what-you-get): screenshots of the new home screen. |
-
-**Official links:** [cleanyour.tv](https://cleanyour.tv) and this repo. Other domains using the name, such as
-cleanyourtv.com, are not run by this project ([#1004](https://github.com/Gathin23/cleanyourtv/issues/1004)).
-CleanYourTV publishes no app in any app store, and clean-your-tv.net is not ours either.
 
 [How it works](#how-it-works) · [Quick start](#quick-start) · [What you get](#what-you-get) ·
 [Supported TVs](#supported-tvs) · [Doing it by hand](#doing-it-by-hand) · [The launcher](#the-launcher) ·
 [Restoring](#restoring-your-tv) · [Firmware updates](#after-a-firmware-update) ·
-[Questions](#questions-people-ask) · [Contributing](#contributing)
+[Questions](#questions-people-ask)
 
 ## How it works
 
@@ -54,16 +29,15 @@ developer options, allow your computer once, and the rest is standard Android to
 
 **No root, no cable, nothing uninstalled, and a one-line restore if you change your mind.**
 
-The bloat differs by brand, so the prompt has your coding assistant discover it on your TV and ask
-before touching anything you might use.
+The bloat differs by brand, so it is discovered on your TV, and nothing you might use is touched without
+asking first.
 
 ## Quick start
 
 | You have | Do this |
 |---|---|
-| **A computer** | Use the prompt with a coding assistant: the three steps below. |
+| **A computer** | Let a coding assistant run the three steps below. |
 | **A computer, no coding assistant** | Run the three steps yourself: the commands are in [Doing it by hand](#doing-it-by-hand). |
-| **A phone or laptop, no coding assistant** | Pick one of the [community apps](https://cleanyour.tv/app): free, open-source apps built on these TV lists by independent developers. |
 
 The three steps below are written for a coding assistant: the computer needs to be on the same Wi-Fi as
 the TV, with a shell on it, plus Python 3, a JDK from 17 through 22, and Android SDK platform 34
@@ -71,12 +45,12 @@ with build-tools 34 (the assistant builds the launcher there).
 Without an assistant, [Doing it by hand](#doing-it-by-hand)
 is the same job, run by you, and it has the install commands.
 
-Any of these work: Claude Code (on [0G Private Computer](https://pc.0g.ai/?utm_source=cleanyourtv&utm_medium=github&utm_campaign=readme) or an [Anthropic plan](https://claude.com/pricing)), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli) or [Antigravity CLI](https://antigravity.google/product/antigravity-cli).
+Any of these work: Claude Code (on an [Anthropic plan](https://claude.com/pricing)), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli) or [Antigravity CLI](https://antigravity.google/product/antigravity-cli).
 
 | Where | What to do |
 |---|---|
 | **1. On the TV** | Settings → Device Preferences → About → press OK on **Build** seven times → back → Developer options → **USB debugging** on. If you see a Network or ADB debugging toggle, turn that on too. Keep the TV on. |
-| **2. On your computer** | Clone the repo and open that folder in your assistant (`git clone https://github.com/Gathin23/cleanyourtv`), then paste [`PROMPT.md`](PROMPT.md) and fill in your TV model. |
+| **2. On your computer** | Clone the repo (`git clone https://github.com/FJRG2007/polaris`), open its `tv/` folder in your assistant, and ask it to follow [Doing it by hand](#doing-it-by-hand) for your TV model. |
 | **3. Follow along** | Accept "Allow USB debugging?" on the TV, then answer the checklist: which apps you use, the dock size and app order, whether to keep the voice assistant, Chromecast and updates. |
 
 Cloning matters: the assistant reuses this repo's `tools/disable.sh` and `launcher/build-and-install.sh`
@@ -122,7 +96,7 @@ Anything running **Android TV** or **Google TV**.
 | **Android TV, Google TV** | The debloat and the launcher. |
 | **Fire TV** | The debloat half only, since Fire OS will not hand Home to a third-party launcher. And on the 2015 Fire TV Box (Fire OS 5) even that half fails: every `pm` route is refused. |
 | **A few China-market TCL sets** | They refuse to install any launcher at all; their lists say so in the header. |
-| **Samsung (Tizen), LG (webOS), Roku, Vizio, Hisense VIDAA** | Not supported (no ADB). Turn off the tracking instead: [cleanyour.tv/not-android](https://cleanyour.tv/not-android). See [SHOWCASE.md](SHOWCASE.md#other-platforms-fire-tv-and-lg-webos) for four webOS ports, and [docs/devices/samsung-tizen.md](docs/devices/samsung-tizen.md) for what a 2021 Samsung set answers over Wi-Fi (no ADB, so no `pm disable-user`) if you are weighing a Tizen port. |
+| **Samsung (Tizen), LG (webOS), Roku, Vizio, Hisense VIDAA** | Not supported (no ADB). Turn off the tracking instead, in the TV's own privacy settings. See [docs/devices/samsung-tizen.md](docs/devices/samsung-tizen.md) for what a 2021 Samsung set answers over Wi-Fi (no ADB, so no `pm disable-user`) if you are weighing a Tizen port. |
 
 Tested lists from contributors, one folder per model in [`examples/`](examples/). The brands with the
 most lists, each linked to its models on the website:
@@ -131,11 +105,11 @@ most lists, each linked to its models on the website:
 
 | | | | | | |
 |---|---|---|---|---|---|
-| [TCL](https://cleanyour.tv/tvs?q=TCL) · 81 | [Sony](https://cleanyour.tv/tvs?q=Sony) · 46 | [Xiaomi](https://cleanyour.tv/tvs?q=Xiaomi) · 41 | [Philips](https://cleanyour.tv/tvs?q=Philips) · 22 | [Skyworth](https://cleanyour.tv/tvs?q=Skyworth) · 15 | [Hisense](https://cleanyour.tv/tvs?q=Hisense) · 14 |
-| [SHARP](https://cleanyour.tv/tvs?q=SHARP) · 10 | [Amazon Fire TV](https://cleanyour.tv/tvs?q=Amazon%20Fire%20TV) · 9 | [Panasonic](https://cleanyour.tv/tvs?q=Panasonic) · 7 | [BenQ](https://cleanyour.tv/tvs?q=BenQ) · 6 | [Haier](https://cleanyour.tv/tvs?q=Haier) · 6 | [JVC](https://cleanyour.tv/tvs?q=JVC) · 6 |
-| [Acer](https://cleanyour.tv/tvs?q=Acer) · 4 | [OnePlus](https://cleanyour.tv/tvs?q=OnePlus) · 4 | [Thomson](https://cleanyour.tv/tvs?q=Thomson) · 4 | [Toshiba](https://cleanyour.tv/tvs?q=Toshiba) · 4 | [Google](https://cleanyour.tv/tvs?q=Google) · 3 | [Grundig](https://cleanyour.tv/tvs?q=Grundig) · 3 |
-| [Motorola](https://cleanyour.tv/tvs?q=Motorola) · 3 | [Nokia](https://cleanyour.tv/tvs?q=Nokia) · 3 | [NVIDIA Shield](https://cleanyour.tv/tvs?q=NVIDIA%20Shield) · 3 | [onn](https://cleanyour.tv/tvs?q=onn) · 3 | [RCA](https://cleanyour.tv/tvs?q=RCA) · 3 | [Redmi](https://cleanyour.tv/tvs?q=Redmi) · 3 |
-| [Vu](https://cleanyour.tv/tvs?q=Vu) · 3 | [Artel](https://cleanyour.tv/tvs?q=Artel) · 2 | [CHiQ](https://cleanyour.tv/tvs?q=CHiQ) · 2 | [EKO](https://cleanyour.tv/tvs?q=EKO) · 2 | [FFalcon](https://cleanyour.tv/tvs?q=FFalcon) · 2 | [Hitachi](https://cleanyour.tv/tvs?q=Hitachi) · 2 |
+| TCL · 81 | Sony · 46 | Xiaomi · 41 | Philips · 22 | Skyworth · 15 | Hisense · 14 |
+| SHARP · 10 | Amazon Fire TV · 9 | Panasonic · 7 | BenQ · 6 | Haier · 6 | JVC · 6 |
+| Acer · 4 | OnePlus · 4 | Thomson · 4 | Toshiba · 4 | Google · 3 | Grundig · 3 |
+| Motorola · 3 | Nokia · 3 | NVIDIA Shield · 3 | onn · 3 | RCA · 3 | Redmi · 3 |
+| Vu · 3 | Artel · 2 | CHiQ · 2 | EKO · 2 | FFalcon · 2 | Hitachi · 2 |
 
 <details>
 <summary>+62 more brands and 14 projector brands</summary>
@@ -153,11 +127,11 @@ Alwtniet, Anker Nebula, BYINTEK, Epson, Formovie, Gadnic, HOTACK, HY320, JMGO, M
 
 <!-- tv-brands:end -->
 
-**Find your TV:** search [cleanyour.tv/tvs](https://cleanyour.tv/tvs) or the full table in
+**Find your TV:** the full table is in
 [examples/README.md](examples/README.md).
 
-Your TV not here? The prompt discovers the bloat itself. Add your list afterwards and the next
-person with your model skips that step: [CONTRIBUTING.md](CONTRIBUTING.md).
+Your TV not here? [Doing it by hand](#doing-it-by-hand) finds the bloat on the TV itself. Add your list to
+`examples/` afterwards and the next person with your model skips that step.
 
 ## Doing it by hand
 
@@ -286,8 +260,6 @@ set is in [Troubleshooting](docs/TROUBLESHOOTING.md).
 | **Clock screensaver** | A drifting clock over the glow, so nothing burns in |
 | **Remote keys** | Keeps the Input, YouTube and gear buttons working after the stock launcher is gone |
 
-Themes, switches and add-ons together, with screenshots: [cleanyour.tv/addons](https://cleanyour.tv/addons).
-
 **More:** [docs/launcher.md](docs/launcher.md) has the launcher settings page row by row, changing the
 default home, the languages, remote keys, the Clock screensaver, navigation and building it yourself.
 
@@ -302,7 +274,7 @@ TV_HOST=192.168.1.50 tools/restore.sh examples/<your tv>/debloat.txt com.google.
 
 | What | How |
 |---|---|
-| **A record comes first** | Before `tools/disable.sh` changes anything it writes down what the TV looked like, in `~/.cleanyourtv/`. |
+| **A record comes first** | Before `tools/disable.sh` changes anything it writes down what the TV looked like, in `~/.polaris-tv/`. |
 | **Restore replays it** | A package you had disabled yourself stays disabled, and Home goes back to the component that owned it. |
 | **The launcher stays installed** | Remove it from the TV's Settings → Apps if you want it gone. |
 | **No computer?** | If the TV is unreachable, its own Settings → Apps page can re-enable packages too. |
@@ -336,25 +308,6 @@ three that matter most:
   - Stuck already? `tools/tv.py 'pm enable --user 0 com.google.android.apps.tv.launcherx'`.
 
 ## Questions people ask
-
-<details>
-<summary><b>I don't code and don't have a laptop. Can I still do this?</b></summary>
-
-Yes. Independent developers have built free, open-source apps on CleanYourTV's TV lists that do the cleanup
-over Wi-Fi, with no coding agent. Each shows a plan first, only switches apps off, and can put everything back:
-
-| App | For | By |
-|---|---|---|
-| [Clean Your TV app](https://github.com/udhaykumarbala/cleanyourtv-app) | Android phone | [@udhaykumarbala](https://github.com/udhaykumarbala) |
-| [Tellyscope](https://github.com/man15h/tellyscope) | Android phone | [@man15h](https://github.com/man15h) |
-| [TidyTV](https://github.com/jolan94/tidytv) | Android phone, Google Play | [@jolan94](https://github.com/jolan94) |
-| [CleanMyTV](https://github.com/wingedpanther/cleanmytv) | Mac and Windows | [@wingedpanther](https://github.com/wingedpanther) |
-
-These apps are independent projects, not affiliated with or endorsed by CleanYourTV or its maintainer, and each
-is provided as is under its own license. Report app problems in that app's repo. More at
-[cleanyour.tv/app](https://cleanyour.tv/app).
-
-</details>
 
 <details>
 <summary><b>Is this safe? Can it brick the TV?</b></summary>
@@ -452,7 +405,7 @@ More, with the paths for Google TV, Android TV and Fire OS:
 
 Not from this repo. Chromecast built-in stays for Android phones. For iPhones,
 [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server) works; an install
-script for it is in [PR #84](https://github.com/Gathin23/cleanyourtv/pull/84).
+script for it is in PR #84.
 
 </details>
 
@@ -464,52 +417,21 @@ control what goes on your TV. That needs the JDK and Android SDK named there. No
 
 </details>
 
-## The story
-
-On 17 October 2026 I posted [a before and after](https://x.com/gathint/status/2111379569030939102) of my
-parents' TV, cleaned up by Claude Code over Wi-Fi. It reached 8.6M views, people started doing the same to
-their own TVs, and their replies turned into the lists here: 170+ TV models from 200+ contributors in the
-first four days. The repo was called tv-vibehack until the 19th; old links work.
-
-Two weeks on, it was the #1 trending repository on GitHub for the week of 19–25 October, with over 46K stars
-and 5.7K forks, and 1.4M views and 260K clones in 14 days. The lists now cover 416 TV models from 106 brands.
-The coverage: 412 articles from 54 countries and 229 videos on YouTube and Bilibili, all in [docs/PRESS.md](docs/PRESS.md)
-(numbers as of 30 October 2026).
-
 ## Contributing
 
-The most useful contribution is your TV's debloat list, so the next person with that model does
-not have to rediscover it. [CONTRIBUTING.md](CONTRIBUTING.md) has the format and the testing we ask for.
-Contributing through a coding agent? [AGENTS.md](AGENTS.md) gives it the same rules.
+The most useful contribution is your TV's debloat list: a folder in [`examples/`](examples/) with its
+`debloat.txt` and a `tv.json`, described at the top of [`tools/gen_tables.py`](tools/gen_tables.py).
 
-| How to help | What it means |
-|---|---|
-| **Your TV's debloat list** | The most useful one: the next person with that model skips the discovery. |
-| **Launcher and prompt** | Launcher improvements and sharper prompt wording are welcome too. |
-| **Built something on top?** | A launcher, a port, a theme: add it to [SHOWCASE.md](SHOWCASE.md), where a hundred and eighty-six projects already live, sorted into home screens, forks, add-ons, tools and other platforms, with an index by TV brand. |
-
-The people whose work is in this repo:
-
-<a href="https://github.com/Gathin23/cleanyourtv/graphs/contributors"><img src="https://contrib.rocks/image?repo=Gathin23/cleanyourtv&columns=16&max=400" alt="Contributors"></a>
-
-<details>
-<summary><strong>Star history</strong></summary>
-
-<a href="https://star-history.com/#Gathin23/cleanyourtv&Date"><img src="https://api.star-history.com/svg?repos=Gathin23/cleanyourtv&type=Date" alt="Star history chart" width="640"></a>
-
-</details>
-
-## Contact
-
-| For | Where |
-|---|---|
-| **Questions about your TV** | [GitHub Discussions](https://github.com/Gathin23/cleanyourtv/discussions) |
-| **Press and queries** | [hello@itsgathin.com](mailto:hello@itsgathin.com) |
-| **Security issues** | Report them privately through the [Security tab](https://github.com/Gathin23/cleanyourtv/security), see [`SECURITY.md`](SECURITY.md) |
+Each kind of change has its own steps: [a TV list](docs/workflows/tv-list.md),
+[a theme](docs/workflows/theme.md), [an add-on](docs/workflows/addon.md),
+[a launcher switch](docs/workflows/launcher-switch.md), [a translation](docs/workflows/translation.md),
+[docs and troubleshooting notes](docs/workflows/docs-notes.md) and
+[a performance check](docs/workflows/perf-ab.md). [`docs/DOS-AND-DONTS.md`](docs/DOS-AND-DONTS.md) lists
+the reasons a change most often comes back.
 
 ## Legal
 
-- CleanYourTV is an independent open-source project. It is not affiliated with, endorsed by or sponsored
+- Polaris TV is an independent open-source project. It is not affiliated with, endorsed by or sponsored
   by any TV maker or platform. Brand and model names are used only to say which TV a list was tested on,
   and remain the trademarks of their owners.
 - It works only through settings the TV itself offers to its owner: Developer options, ADB debugging and
@@ -518,9 +440,11 @@ The people whose work is in this repo:
   software, firmware or APKs.
 - Nothing is uninstalled, and `tools/restore.sh` puts everything back. You run it on a TV you own, at your
   own risk, and changing a TV's software may affect its warranty or support.
-- Everything here is provided as is, without warranty of any kind, under the MIT licence below.
+- Everything here is provided as is, without warranty of any kind, under the licence below.
 
 ## Licence
 
-MIT, see [`LICENSE`](LICENSE). The Outfit typeface is under the SIL Open Font License, see
-`launcher/FONT-LICENSE-OFL.txt`.
+Polaris TV is part of Polaris and is covered by its licence: [`LICENSE`](../LICENSE) and
+[`NOTICE.md`](../NOTICE.md). Code that came under the MIT licence keeps its notice in
+[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md). The Outfit typeface is under the SIL Open Font
+License, see `launcher/FONT-LICENSE-OFL.txt`.

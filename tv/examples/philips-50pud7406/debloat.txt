@@ -45,8 +45,8 @@
 #    network is your own.
 # 3. lowmemorykiller is active even at idle with one app playing ("low watermark is breached and
 #    thrashing"); this is a 1.38 GB low_ram set, so every background service removed helps.
-# 4. Do not open com.mediatek.tv.factory or mediatek.factorymenu.ui to see what they do (see
-#    PROMPT.md); they are left alone.
+# 4. Do not open com.mediatek.tv.factory or mediatek.factorymenu.ui to see what they do; they
+#    are left alone.
 # 5. Boot to Live TV (EU unit). After a full reboot, Home comes up and about 0.2 s later system_server
 #    sends android.mtk.intent.action.ACTION_REQUEST_TOP_RESUME to
 #    com.mediatek.wwtv.tvcenter/.nav.TurnkeyUiMainActivity, so the TV lands in Live TV. Neither

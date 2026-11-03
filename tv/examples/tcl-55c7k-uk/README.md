@@ -3,7 +3,7 @@
 TCL C7K QD-Mini LED, device `G08`, model "Smart TV Pro", firmware `UTT2.250416.001 AU02`, MediaTek, about
 2.4 GB RAM. Three units have run this list: a 55C7K-UK on Wi-Fi (the first, see the header of `debloat.txt`), a
 50C7K on Ethernet in Poland and a C6K on Ethernet in Brazil (both below). Both halves work on this set: the
-debloat list and the Clean Your TV launcher as Home.
+debloat list and the Polaris TV launcher as Home.
 
 | File | What it is |
 |---|---|

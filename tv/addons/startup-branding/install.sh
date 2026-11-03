@@ -25,4 +25,4 @@ OUT=$(tv 'pm install -r /data/local/tmp/startup-branding.apk; rm -f /data/local/
 echo "$OUT"
 case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; esac
 tv "am start -n $PKG/.MainActivity >/dev/null; echo opened"
-echo "Installed. Startup & Branding is open on the TV; on the Clean Your TV launcher, answer Show for its card."
+echo "Installed. Startup & Branding is open on the TV; on the Polaris TV launcher, answer Show for its card."

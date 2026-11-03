@@ -2,10 +2,9 @@
 
 `docs/workflows/tv-list.md` step 6 welcomes a `README.md` in a list folder and says two of its claims
 are read back against the list beside it (the package count and the undo). A path is the third, and
-nothing read it: `tests/test_markdown_links.py` walks the links in every page, and
-`tests/test_agents_md.py` walks the paths named in `AGENTS.md` and in `docs/workflows/*.md`, so a path
+nothing read it: `tests/test_markdown_links.py` walks the links in every page, so a path
 written in backticks inside `examples/<folder>/README.md` - the page an owner with this exact set reads -
-was read by neither. `examples/xiaomi-mitv-moor0/README.md` passed the key helper to
+was read by nothing. `examples/xiaomi-mitv-moor0/README.md` passed the key helper to
 `launcher/build-and-install`, without the `.sh` the command at the top of the same page writes, and the
 file that keeps Home and the remote buttons working on that set was a name `bash` answers
 "No such file or directory" for.
@@ -16,22 +15,35 @@ config.json), a Windows twin written with backslashes, a placeholder (`examples/
 `$TV_HOST`), or an Android component (`app.polaris.tv/.MainActivity`). Backticks inside a fenced block
 are read too, since a path written that way is a command either way; the fence's own lines are not walked
 as commands, because one there can name a folder the reader makes (`themes/mine`), which is not a claim
-about this tree. Folders `.gitignore` names are skipped the way `tests/test_agents_md.py` skips them, so
+about this tree. Folders `.gitignore` names are skipped, so
 the venv a clone builds (`tools/venv/bin/python`) is not read as a missing file.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
 import re
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_agents_md import ignored_prefixes  # noqa: E402  (the .gitignore folders both walks skip)
-
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"
+
+
+def ignored_prefixes():
+    """Folders .gitignore names: they exist on a contributor's machine, not in a clone.
+
+    A name whose last part has no extension counts as a folder too (`tools/venv` is written without a
+    trailing `/`).
+    """
+    folders = []
+    for line in (ROOT / ".gitignore").read_text(encoding="utf-8").split("\n"):
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            continue
+        last = entry.rsplit("/", 1)[-1]
+        if entry.endswith("/") or ("*" not in entry and "." not in last):
+            folders.append(entry.rstrip("/"))
+    return folders
 
 # The folders a path has to start with to be about this checkout. `examples/README.md` and the docs
 # pages are read elsewhere; this is the folder README half.

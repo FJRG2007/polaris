@@ -2,7 +2,7 @@
 
 Chengdu Hotack's L018, sold as "Smart Projector". The firmware calls itself `ADT-3`, build
 `Projector.20260530.1707`, with the LuminaOS launcher (`com.htc.luminaos`). Both halves work: the
-debloat list and the Clean Your TV launcher as Home. Applied on 24 October 2026.
+debloat list and the Polaris TV launcher as Home. Applied on 24 October 2026.
 
 | File | What it is |
 |---|---|
@@ -24,7 +24,7 @@ All commands run from the repo root.
    live only inside it.
 4. Push the config: `TV_HOST=<projector ip> tools/theme.sh examples/hotack-l018`
 
-Done when HOME shows the Clean Your TV launcher and its Settings pill opens the LuminaOS settings screen.
+Done when HOME shows the Polaris TV launcher and its Settings pill opens the LuminaOS settings screen.
 
 ## config.json
 
@@ -42,7 +42,7 @@ and `columns` to the file for your own apps.
 
 - **Projector settings over ADB.**
   `am start -n com.htc.luminaos/com.htc.luminaos.activity.MainSettingActivity` opens them without
-  switching Home; HOME still returns to the Clean Your TV launcher.
+  switching Home; HOME still returns to the Polaris TV launcher.
 - **`tools/bench.py`.** This firmware logs `TvWindowManager: key event key = <KEYCODE>` instead of
   `injectKeyEvent`. So `bench.py` does not measure the return to Home here, and times key response from
   just before the key is sent.

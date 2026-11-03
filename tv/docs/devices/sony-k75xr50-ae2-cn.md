@@ -7,7 +7,7 @@ this firmware has no Google services at all, its stock Home is Dangbei, and its 
 China picture/sound stack. Those differences matter more than the model name, so they get their own note.
 
 One session, one unit, one reboot, 37 packages disabled and the reference launcher installed. That is a
-note, not an `examples/` list - [`CONTRIBUTING.md`](../../CONTRIBUTING.md) asks for a few days of living
+note, not an `examples/` list - [`docs/workflows/tv-list.md`](../workflows/tv-list.md) asks for a few days of living
 with a list first, and nothing here was reboot-soaked or repeated on a second set.
 
 ## Identify the firmware, not the retail name

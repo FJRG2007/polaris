@@ -3,7 +3,7 @@
 `docs/workflows/perf-ab.md` sends a contributor to `tools/trace.md`, `tools/flamechart.md` and
 `tools/screendiff.md`, and each of those pages reads as the reference for its tool: the option tables are what
 a reader looks in, and there is no `--help` in a page. Six options were in no page at all, `--package` among
-them, so a fork built under another package name - SHOWCASE.md lists several - measured `app.polaris.tv`,
+them, so a fork built under another package name measured `app.polaris.tv`,
 and the report printed `-` for every step without saying the package was never in the trace.
 
 Run from the repository root: python3 -m unittest discover -s tests -v

@@ -22,7 +22,7 @@
 # settings apps and all com.mediatek.*: they drive HDMI, the tuner, Bravia Sync, updates and the remote.
 # Chromecast built-in (mediashell) and firmware updates kept.
 #
-# setupwraith is still enabled on this unit: Home already resolves to CleanYourTV. Disable
+# setupwraith is still enabled on this unit: Home already resolves to Polaris TV. Disable
 # com.google.android.tungsten.setupwraith if the Google TV setup wizard retakes Home after a reboot.
 # Closest sibling list: examples/sony-bravia-4k-vh2/ (VH2 / KD-55X80J).
 # Same Android platform (BRAVIA_VH1) as the PA-firmware notes in
@@ -35,7 +35,7 @@
 # Sony's HbbTV player, not packages, so they have no tile of their own: docs/devices/sony-youview-uk-catchup.md says
 # how to launch them and how to give each a Home tile.
 #
-# Lived with for weeks on a KD-55XH9096 (Spain/EU) with CleanYourTV; Live TV, HDMI Inputs, Ethernet
+# Lived with for weeks on a KD-55XH9096 (Spain/EU) with Polaris TV; Live TV, HDMI Inputs, Ethernet
 # and Chromecast still work. If something breaks, re-enable it with `pm enable <package>` and please report it.
 
 # ACR viewing tracker
@@ -85,7 +85,7 @@ com.android.printspooler
 # com.youview.poa                            # KEPT on UK sets: Freeview Play, which hosts BBC iPlayer, ITVX, Channel 4 and 5.
 #                                              Disabled, those four vanish from the TV. Uncomment on a non-UK unit.
 
-# Stock leanback Home (CleanYourTV owns HOME)
+# Stock leanback Home (Polaris TV owns HOME)
 com.google.android.tvlauncher
 
 # Off by owner's choice (re-enable if you use them)

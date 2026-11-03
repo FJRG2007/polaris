@@ -202,15 +202,15 @@ class CheckCommandLineTest(unittest.TestCase):
         self.assertEqual(named.returncode, 1, named.stdout + named.stderr)
         self.assertIn(f"Home is {LAUNCHERX}/.home.HomeActivity, not {CUSTOM}", named.stdout)
         # One letter short: it used to turn the Home check off and report "nothing drifted", exit 0.
-        typo = self.run_check(str(self.list_path), "com.gathin.tvhom")
+        typo = self.run_check(str(self.list_path), "app.polaris.t")
         self.assertEqual(typo.returncode, 2, typo.stdout + typo.stderr)
-        self.assertIn("com.gathin.tvhom is not installed on this TV", typo.stderr)
+        self.assertIn("app.polaris.t is not installed on this TV", typo.stderr)
         self.assertNotIn("nothing drifted", typo.stdout)
         self.assert_untouched(typo)
 
     def test_fix_with_a_launcher_that_is_not_installed_changes_nothing(self):
         self.drifted_home()
-        result = self.run_check("--fix", str(self.list_path), "com.gathin.tvhom")
+        result = self.run_check("--fix", str(self.list_path), "app.polaris.t")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("is not installed on this TV", result.stderr)
         self.assert_untouched(result)

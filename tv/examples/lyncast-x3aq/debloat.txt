@@ -4,16 +4,16 @@
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/lyncast-x3aq/debloat.txt
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/lyncast-x3aq/debloat.txt com.htc.luminaos
 #
-# Tested on retail unit, reboot-checked: CleanYourTV (app.polaris.tv) set as default Home
+# Tested on retail unit, reboot-checked: Polaris TV (app.polaris.tv) set as default Home
 # via cmd package set-home-activity persists across cold reboots with LuminaOS kept enabled.
 # Keystone, autofocus, remote pairing and HDMI inputs remain operational.
 #
 # ADB NOTE: Stock firmware actively reverts adb_enabled to 0 in SettingsProvider on user builds,
 # preventing standard ADB authorization. Mitigating this vendor restriction requires external
-# key provisioning or privileged access, which is outside the scope of CleanYourTV's non-root debloater.
+# key provisioning or privileged access, which is outside the scope of Polaris TV's non-root debloater.
 #
 # WARNING: Do NOT disable com.htc.luminaos completely! It hosts the projector's keystone correction
-# receivers and remote pairings. CleanYourTV becomes Home via set-home-activity without disabling LuminaOS.
+# receivers and remote pairings. Polaris TV becomes Home via set-home-activity without disabling LuminaOS.
 #
 # Telemetry, stock bloat and unneeded services:
 com.android.ytb

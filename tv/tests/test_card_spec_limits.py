@@ -9,8 +9,8 @@ remembered, XML events, nesting depth, attributes on `<card>` - and the decision
 format version and logcat tag were stated in the page and in `Cards.java` and read from neither side.
 A launcher that lowered `MAX_SHOWN` to 6, or raised `MAX_RECORDS` to 256, left the page telling a card
 author 8 and 128 with the suite green, and a card built to the page is one the launcher cuts with a
-single `TvHomeCards` log line. The same file is what the troubleshooting step in docs/modules.md sends
-a reader to (`logcat -s TvHomeCards`), so the tag and the record's version are read here too.
+single `PolarisTvCards` log line. The same file is what the troubleshooting step in docs/modules.md sends
+a reader to (`logcat -s PolarisTvCards`), so the tag and the record's version are read here too.
 
 Only the numbers and names are pinned, never the prose around them: a page that rewrites its sentences
 passes, a page whose number no longer matches the constant fails and names both.

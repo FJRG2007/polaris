@@ -2,7 +2,7 @@
 
 Indonesian set sold under Haier's AQUA brand, product `AQ9676EU`, firmware `UKN7.260716.049` (MediaTek,
 CVTE-family board). 4K panel with the UI rendered at 1920x1080 (`wm size` override is the factory default).
-Both halves work on this set: the debloat list and the Clean Your TV launcher as Home. Tested on
+Both halves work on this set: the debloat list and the Polaris TV launcher as Home. Tested on
 24 October 2026 on one set, including two reboots, with the real remote. Same-day test, not a multi-day soak.
 A close sibling of [`haier-hr9216eu`](../haier-hr9216eu/) (MatrixTV GE, EU).
 

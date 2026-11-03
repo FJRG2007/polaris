@@ -10,7 +10,7 @@
 # launcher from launcher/ in place and owning Home. They went off in batches of 3-6, a screenshot was
 # taken after every batch and nothing crashed. Inputs (HDMI 1/2, AV, Live TV) reads correctly, the
 # Netflix and SmartTube dock tiles both launch, and mitv.service / overseaservice / livetv stayed up.
-# That is a first-day report, not the few days of living with it that CONTRIBUTING.md asks for, so
+# That is a first-day report, not the few days of living with it that docs/workflows/tv-list.md asks for, so
 # treat the list as provisional.
 #
 # HOME on this build: app.polaris.tv owns Home only once com.google.android.tungsten.setupwraith is

@@ -1,7 +1,7 @@
 # Durabrand DB Android TV 4K (`DURAT32ISDB`, dupont): a one-day owner report
 
 Owner report from
-[#470](https://github.com/Gathin23/cleanyourtv/issues/470): one session and one day of use, no
+#470: one session and one day of use, no
 launcher installed. It is **not** a tested list in the `examples/` sense - CONTRIBUTING asks for
 several days of living with a list before it goes there - so the packages and the two traps that
 came with them are recorded here instead, and this note can graduate to `examples/` once the owner
@@ -53,7 +53,7 @@ end of that session.
 - `com.google.android.tvrecommendations` and `com.haier.launcher.haiermatrix` come back on every
   boot: `com.at.factory.factorymanager` calls `enableApp` for both, and the second is a system app
   re-enabled during the boot package scan. Disabling them looks like it worked until the next
-  restart. ([PR #434](https://github.com/Gathin23/cleanyourtv/pull/434) is the tool that reports
+  restart. (PR #434 is the tool that reports
   this kind of drift; until it is merged, check by hand with
   `tools/tv.py 'pm list packages -d | grep -E "tvrecommendations|haiermatrix"'` after a reboot.)
 - `com.haier.tv.hmagicboard` receives the remote's hot keys, and `com.cvte.tv.hkcfac` is the

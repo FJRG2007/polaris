@@ -4,7 +4,7 @@ This is an owner report from 2026-10-26, with a read-back on 2026-10-27. It is
 not a debloat list and not an upstream launcher option. It records a
 keyboard-layout overlay that gives the remote's Settings key a job again on a
 set where `HomeKeyService` breaks held-volume repeat
-([#1680](https://github.com/Gathin23/cleanyourtv/issues/1680)).
+(#1680).
 
 ## Observed firmware
 
@@ -17,13 +17,13 @@ set where `HomeKeyService` breaks held-volume repeat
 | Firmware build | `BRAVIA_VH22_EU-user 12 STT2.230505.001.S136 682241 release-keys` |
 | Remote | `SONY TV VRC 001`, vendor `054c`, product `0x0eae` (Bluetooth) |
 
-The retail model was not recorded. The launcher is CleanYourTV v3.0.0 as Home,
+The retail model was not recorded. The launcher is Polaris TV v3.0.0 as Home,
 with no accessibility service enabled.
 
 ## The problem it works around
 
 With `HomeKeyService` bound, holding Volume on this set moves one step instead
-of ramping, as in [#1680](https://github.com/Gathin23/cleanyourtv/issues/1680)
+of ramping, as in #1680
 and the [key-repeat section](../TROUBLESHOOTING.md#a-key-helper-is-bound-and-a-held-remote-button-stopped-repeating)
 of the troubleshooting guide; the issue also reports that `consume_volume_keys`
 does not help. With the helper off, volume ramps again, but the Settings key
@@ -90,7 +90,7 @@ On the physical remote:
 - Held Volume ramps.
 - The mapping survived a reboot.
 
-A second VH22 owner in [#1680](https://github.com/Gathin23/cleanyourtv/issues/1680)
+A second VH22 owner in #1680
 used the same idea for the TV key as well, and reports it held across a
 standby/wake and a remote reconnect.
 

@@ -1,6 +1,6 @@
 """The Haier H50H5F restart-loop bullet (#1578) must not present the attached list as the agent's work.
 
-The report attached the six files PROMPT.md has the agent save before changing anything, and the reply
+The report attached the six files the tools save before changing anything, and the reply
 on the issue named eight packages from its disabled list. On the Haier-built AQUA MatrixTV EE 50, five of
 those eight are disabled from the factory, so the list may be the TV's state before the debloat. The
 bullet says so, keeps the way back that holds either way (the factory reset in the recovery menu), and
@@ -63,7 +63,7 @@ class HaierLoopBulletTest(unittest.TestCase):
         self.assertIn(TITLE, section)
 
     def test_bullet_names_the_set_and_the_report(self):
-        for token in ("Haier H50H5F", "Google TV 14", "seen once", "issues/1578"):
+        for token in ("Haier H50H5F", "Google TV 14", "seen once", "#1578"):
             with self.subTest(token=token):
                 self.assertIn(token, self.loop)
 
@@ -75,7 +75,7 @@ class HaierLoopBulletTest(unittest.TestCase):
         self.assertNotIn("`com.cltv.mal`**", self.loop, "the bold symptom must not name a cause")
 
     def test_bullet_says_the_list_may_be_the_backup(self):
-        self.assertIn("PROMPT.md", self.loop)
+        self.assertIn("the backup the tools", self.loop)
         self.assertIn("before changing anything", self.loop)
         self.assertIn("may be the TV's state before the debloat", self.loop)
 
@@ -114,7 +114,7 @@ class ReadmeSafetyAnswerTest(unittest.TestCase):
         faq = FAQ.read_text(encoding="utf-8")
         long_answer = faq.split("## Is this safe? Can it brick the TV?", 1)[1].split("\n## ", 1)[0]
         long_answer = re.sub(r"\s+", " ", long_answer)
-        for token in ("factory reset from its recovery menu", "issues/1578", "issues/1592",
+        for token in ("factory reset from its recovery menu", "#1578", "#1592",
                       "(TROUBLESHOOTING.md#working-on-the-tv)"):
             with self.subTest(token=token):
                 self.assertIn(token, long_answer)

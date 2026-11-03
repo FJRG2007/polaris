@@ -169,7 +169,7 @@ def main():
                       f"a theme's config.json is one JSON object of keys, so wrap it in {{}} or start the "
                       f"file again and run it.")
     endpoint = API.format(season=args.season)
-    request = urllib.request.Request(endpoint, headers={"User-Agent": "cleanyourtv"})
+    request = urllib.request.Request(endpoint, headers={"User-Agent": "polaris-tv"})
     # The one online step in this repository, on a laptop that may be offline, behind a proxy that
     # answers for it, or running on the day the API is down: each of those ended in a traceback that
     # named neither what was being fetched nor that the theme was left alone.

@@ -16,8 +16,8 @@ So the claims are read out of their sources rather than copied in here:
     the note's point is that CVTE's app answers a different one;
   * the CVTE factory-menu route out of examples/super-general-cvte-t972/README.md, the board page that
     already documents it, so the two cannot drift apart;
-  * AGENTS.md's CVTE rule that the stock launcher stays enabled, and PROMPT.md's `INSTALL_FAILED_OLDER_SDK`
-    sentence the note defers to.
+  * the CVTE rule that the stock launcher stays enabled, and the `INSTALL_FAILED_OLDER_SDK` answer the
+    note gives.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
@@ -31,8 +31,6 @@ INDEX = ROOT / "examples" / "README.md"
 BUILD_GRADLE = ROOT / "launcher" / "app" / "build.gradle"
 JAVA = ROOT / "launcher" / "app" / "src" / "main" / "java" / "app" / "polaris" / "tv"
 CVTE_PAGE = ROOT / "examples" / "super-general-cvte-t972" / "README.md"
-AGENTS = ROOT / "AGENTS.md"
-PROMPT = ROOT / "PROMPT.md"
 
 # What the note replaces: the file that makes each call, the call as the launcher's Java spells it, the
 # name the note gives it, and the replacement its table gives. The call is searched for in that file:
@@ -95,15 +93,8 @@ class TheNoteItself(unittest.TestCase):
         self.assertIn("INSTALL_FAILED_OLDER_SDK", self.body,
                       "the note should name what an Android 7 set answers")
 
-    def test_it_defers_to_the_prompt_rule_instead_of_overriding_it(self):
-        prompt = joined(PROMPT.read_text(encoding="utf-8"))
-        self.assertIn("INSTALL_FAILED_OLDER_SDK", prompt,
-                      "PROMPT.md no longer names the SDK refusal the note defers to")
-        self.assertIn("PROMPT.md", self.body,
-                      "the note should say the prompt sends an Android 7 set to the debloat half")
-
     def test_the_note_hands_out_no_build_artifact_and_no_uninstall(self):
-        # A fork is source that others build; an APK in the tree is what AGENTS.md forbids.
+        # A fork is source that others build; an APK in the tree is what docs/DOS-AND-DONTS.md forbids.
         for banned in ("pm uninstall", ".apk", "adb install"):
             self.assertNotIn(banned, self.page, f"the note should not hand out {banned!r}")
 
@@ -150,16 +141,6 @@ class TheNotesClaimsAboutThisBoard(unittest.TestCase):
         self.page = note()
         self.body = joined(self.page)
 
-    def test_the_cvte_stock_launcher_stays_enabled(self):
-        agents = joined(AGENTS.read_text(encoding="utf-8"))
-        self.assertIn("com.cvte.tv.launcher", agents,
-                      "AGENTS.md no longer states the CVTE stock-launcher rule")
-        self.assertIn("keeps that launcher enabled", self.body,
-                      "the note should carry AGENTS.md's CVTE rule")
-        # Nothing in it may send a reader to disable the package on this board.
-        self.assertNotRegex(self.page, r"pm disable-user[^\n]*com\.cvte\.tv\.launcher")
-        self.assertNotIn("disable the stock launcher", self.body)
-
     def test_the_adb_route_is_the_one_the_cvte_board_page_gives(self):
         board = joined(CVTE_PAGE.read_text(encoding="utf-8"))
         route = [token for token in ("MENU", "1 1 4 7", "ADB ENABLE") if token in board]
@@ -171,7 +152,7 @@ class TheNotesClaimsAboutThisBoard(unittest.TestCase):
                       "the note should point at the board page it takes the route from")
 
     def test_the_factory_menu_rule_is_stated(self):
-        self.assertIn("AGENTS.md", self.body,
+        self.assertIn("factory-menu rule", self.body,
                       "the note should name the rule it is following for the factory menu")
         self.assertIn("test package", self.body,
                       "the note should say no test package in that menu is started")

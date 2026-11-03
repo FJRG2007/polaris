@@ -1,6 +1,6 @@
 """A first run of tools/docker-build.ps1 builds the image instead of stopping on the probe.
 
-#2890: on Windows 11 with Windows PowerShell 5.1, with no `cleanyourtv-android-build` image yet,
+#2890: on Windows 11 with Windows PowerShell 5.1, with no `polaris-tv-android-build` image yet,
 `tools\\docker-build.ps1` stopped at `docker image inspect $Image *> $null` and built nothing. The script sets
 `$ErrorActionPreference = 'Stop'`, and PowerShell 5.1 turns a native command's redirected stderr into an
 ErrorRecord (NativeCommandError); the image does not exist yet, so docker writes "No such image" to stderr,
@@ -46,7 +46,7 @@ DOCKERFILE_DIR = TOOLS / "docker"
 PWSH = shutil.which("pwsh") or ""
 BASH = shutil.which("bash") or ""
 
-IMAGE = "cleanyourtv-android-build"
+IMAGE = "polaris-tv-android-build"
 STOP = "$ErrorActionPreference = 'Stop'"
 CONTINUE = "$ErrorActionPreference = 'Continue'"
 

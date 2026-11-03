@@ -1,6 +1,6 @@
 """Every key the launcher reads from config.xml has a row in the Keys table in themes/README.md.
 
-The switch recipe in AGENTS.md asks for a row in that table for every key it adds, because the table
+The switch recipe in docs/workflows/launcher-switch.md asks for a row in that table for every key it adds, because the table
 is what a theme author reads and the launcher itself says nothing: an unknown key is ignored, so a
 reader who sets one the table never names has no way to tell a typo from a key that does not exist.
 `settings_fallback_components`, the list SystemSettings.java walks when nothing usable answers the

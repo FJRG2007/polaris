@@ -14,7 +14,7 @@
 #
 # Tested the same day on one set: Home opens, Netflix / YouTube / Prime Video / Apple TV launch,
 # the Inputs menu still lists Antenna, Cable, Satellite, ATV, AV and HDMI 1-3, HDMI 1 switches.
-# The home screen on the test set was a small custom launcher built from PROMPT.md, not launcher/ from
+# The home screen on the test set was a small custom launcher an assistant built, not launcher/ from
 # this repo; the package list does not depend on which launcher replaces Home.
 # After a reboot with this whole list disabled: com.mediatek.tv.service, tvinput and autopair start and
 # stay up, the crash buffer is empty, the Input key opens the input switcher, Home opens the new launcher.

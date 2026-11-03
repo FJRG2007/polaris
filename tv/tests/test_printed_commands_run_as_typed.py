@@ -29,7 +29,7 @@ VENV_PYTHON = "tools/venv/bin/python"
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(f"cyt_printed_{name}", ROOT / "tools" / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(f"polaris_tv_printed_{name}", ROOT / "tools" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

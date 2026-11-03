@@ -13,7 +13,7 @@
 # Inputs come from com.tcl.tvinput (2x HDMI, AV, tuner).
 #
 # Applied in three rounds on 2026-10-18 and lived with for one day so far (shorter than
-# CONTRIBUTING.md asks; I'll report back if anything breaks). Rebooted after each round.
+# docs/workflows/tv-list.md asks; I'll report back if anything breaks). Rebooted after each round.
 # Checked after the full list: launcher/ comes up as Home after a reboot, YouTube and Netflix open,
 # switching to HDMI 2 (PS5) works, the remote's Input key opens the source picker.
 # Checked after the first two rounds: Disney+, picture settings, the firmware update check.

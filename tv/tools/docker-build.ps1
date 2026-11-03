@@ -13,8 +13,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Project = $Project.TrimEnd('\', '/') -replace '\\', '/'
-$Image = if ($env:IMAGE) { $env:IMAGE } else { 'cleanyourtv-android-build' }
-$Volume = if ($env:GRADLE_VOLUME) { $env:GRADLE_VOLUME } else { 'cleanyourtv-gradle' }
+$Image = if ($env:IMAGE) { $env:IMAGE } else { 'polaris-tv-android-build' }
+$Volume = if ($env:GRADLE_VOLUME) { $env:GRADLE_VOLUME } else { 'polaris-tv-gradle' }
 # Where the debug signing key lives inside the container; see tools/docker-build.md.
 $KeyDir = if ($env:KEY_DIR) { $env:KEY_DIR } else { '/gradle/.android' }
 

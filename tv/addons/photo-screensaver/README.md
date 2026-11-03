@@ -5,8 +5,8 @@ and MP4 clips, separate from the launcher. Pictures go in filename order, each s
 and crossfading into the next after 20 seconds (or what you set). A clip plays once, muted and cropped to
 fill the screen, then the loop moves on; a lone clip loops. Any key wakes the TV back to where it was.
 
-Package `com.gathin.photodream`. You see it as **Photos** (Dutch: **Foto's**) in the TV's screensaver
-settings. On cleanyourtv's Home it is also a module card, **Photos**: OK starts the same slideshow at once,
+Package `app.polaris.tv.photodream`. You see it as **Photos** (Dutch: **Foto's**) in the TV's screensaver
+settings. On Polaris TV's Home it is also a module card, **Photos**: OK starts the same slideshow at once,
 holding OK (or Menu) opens the settings, Back leaves.
 
 ## Options
@@ -80,7 +80,7 @@ is decoded at screen size. On a TCL 43P69K (1.5 GB) a 1080p clip played with the
   `api.open-meteo.com` every 30 minutes while the screensaver runs, and the temperature and weather code
   come back, with whether it is day. Nothing else goes out; with the weather off, the app makes no network connection at all.
 - No storage permission and no background service: the pictures stay on the TV in the app's own folder
-  (`Android/data/com.gathin.photodream/files/pictures`), removed with the app.
+  (`Android/data/app.polaris.tv.photodream/files/pictures`), removed with the app.
 - **`SlideshowActivity`** (exported) is the module card; **`SettingsActivity`** (exported) is opened by the
   TV's screensaver settings. Both only show the slideshow or change its options.
 - **`FilesProvider`** (exported) is how `sync.sh` writes the pictures, so the app owns them: on TCL G10 a

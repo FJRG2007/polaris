@@ -12,8 +12,8 @@ same story carried word for word by two papers (agency copy) is shown once.
 Left and Right on the remote page back and forth through the headlines, at once, and the timer starts again. Any other
 key wakes the TV back to where it was.
 
-Package `com.gathin.newsdream`. You see it as **News** (Danish: **Nyheder**) in the TV's screensaver settings. On
-cleanyourtv's Home it is also a module card, **News**: OK shows the headlines at once, Left and Right page through
+Package `app.polaris.tv.newsdream`. You see it as **News** (Danish: **Nyheder**) in the TV's screensaver settings. On
+Polaris TV's Home it is also a module card, **News**: OK shows the headlines at once, Left and Right page through
 them, and any other key goes back to Home, as in the screensaver.
 
 ![The news screensaver on a Philips TV: a TV 2 headline with its QR code](screenshot.jpg)
@@ -112,7 +112,7 @@ No pictures and no web view: one screen of text views, a list of at most 60 shor
 | `INTERNET` | To fetch the feeds you set, over HTTPS, while the screensaver or the card is on screen. |
 
 That is all. What goes out is a plain GET for each feed address, with the user agent
-`cleanyourtv-news/1.0`; each news site sees the TV's IP address, as with any visit. No account, no telemetry, no ads,
+`polaris-tv-news/1.0`; each news site sees the TV's IP address, as with any visit. No account, no telemetry, no ads,
 no background service, no location. Feeds, seconds and the cached headlines stay in the app's own storage (backups
 are off). The provider that `setup.sh` writes through requires `WRITE_SECURE_SETTINGS`, which the ADB shell has and
 apps don't, so no other app can change the feeds.

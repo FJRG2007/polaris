@@ -1,6 +1,6 @@
 """tools/tv.py --screenshot judges the file it saves to before it opens the TV.
 
-PROMPT.md, AGENTS.md and CONTRIBUTING.md all hand out `--screenshot shots/01.png`, and #364 taught the
+Pages here hand out `--screenshot shots/01.png`, and #364 taught the
 command to make the folder that is not there yet. The other shapes a destination takes were judged
 nowhere, so they all came back as the answer this client keeps for the TV: `mkdir shots` followed by
 `--screenshot shots` - or a name typed with its trailing separator - reached adb_shell's pull, which

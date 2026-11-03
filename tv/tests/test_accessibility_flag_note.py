@@ -107,7 +107,7 @@ class AccessibilityFlagNoteTest(unittest.TestCase):
         self.assertIn("Android 14", self.note)
 
     def test_bullet_links_the_issue(self):
-        self.assertIn("[#1047](https://github.com/Gathin23/cleanyourtv/issues/1047)", self.note)
+        self.assertIn("#1047", self.note)
 
     def test_bullet_says_restore_key_services_does_not_cover_it(self):
         self.assertIn("restore_key_services", self.note)
@@ -144,7 +144,7 @@ class AccessibilityFlagNoteTest(unittest.TestCase):
         self.assertEqual(broken, [], "the bullet must not link a page that does not exist")
         for target in LINK.findall(self.note):
             if target.startswith(("http://", "https://")):
-                self.assertEqual(target, "https://github.com/Gathin23/cleanyourtv/issues/1047")
+                self.fail(f"the note links outside the repository: {target}")
 
     def test_bullet_extraction_stops_at_the_next_bullet(self):
         sample = "\n".join([START + " one", "  two", "- **Next** three"])

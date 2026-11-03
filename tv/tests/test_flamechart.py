@@ -23,7 +23,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-spec = importlib.util.spec_from_file_location("cyt_flamechart", ROOT / "tools" / "flamechart.py")
+spec = importlib.util.spec_from_file_location("polaris_tv_flamechart", ROOT / "tools" / "flamechart.py")
 flamechart = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(flamechart)
 

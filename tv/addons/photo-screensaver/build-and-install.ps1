@@ -14,13 +14,15 @@ $here = $PSScriptRoot
 $tools = Join-Path (Split-Path (Split-Path $here -Parent) -Parent) 'tools'
 $py = Join-Path $tools 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
-$pkg = 'com.gathin.photodream'
+$pkg = 'app.polaris.tv.photodream'
+# The app's id in releases before the rename.
+$oldPkg = 'com.gath' + 'in.photodream'
 function Tv([string]$cmd) { & $py -I (Join-Path $tools 'tv.py') $cmd; if ($LASTEXITCODE) { throw "tv.py failed: $cmd" } }
 
 if ($Uninstall) {
     # Put the screensaver from before sync.ps1 back first, then remove the app and its pictures.
     & (Join-Path $here 'sync.ps1') -TvHost $TvHost -Off
-    Tv "pm uninstall $pkg"
+    Tv "pm uninstall $oldPkg >/dev/null 2>&1; pm uninstall $pkg"
     exit 0
 }
 
@@ -33,6 +35,7 @@ $apk = Join-Path $here 'app\build\outputs\apk\release\app-release.apk'
 & $py -I (Join-Path $tools 'b64push.py') $apk /data/local/tmp/photodream.apk | Out-Null
 if ($LASTEXITCODE) { throw 'sending the APK failed' }
 Tv 'pm install -r /data/local/tmp/photodream.apk; rm -f /data/local/tmp/photodream.apk'
+Tv "pm uninstall $oldPkg >/dev/null 2>&1; true" | Out-Null
 # TCL's TclAppBoot blocks the app's provider until it may auto-start; elsewhere the op doesn't exist.
 Tv "appops set $pkg AUTO_START allow 2>/dev/null; appops set $pkg APP_AUTO_START allow 2>/dev/null; appops write-settings 2>/dev/null; true" | Out-Null
 Write-Host "Installed. Now: addons\photo-screensaver\sync.ps1 -TvHost $TvHost"

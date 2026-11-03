@@ -217,7 +217,7 @@ class RestoreReferencesTest(unittest.TestCase):
                          "repo, so the command fails before anything reaches the TV")
         self.assertEqual([], [name for _, name in read_script_references(ROOT)],
                          "a list folder ships no script of its own (docs/workflows/tv-list.md step 6, "
-                         "AGENTS.md's hard rules, MAINTAINER.md's 'dropped on merge', and "
+                         "docs/DOS-AND-DONTS.md, and "
                          "tests/test_list_folders_ship_lists_only.py), so no page or list header names one")
 
     def test_a_restore_that_names_the_launcher_names_the_list(self):
@@ -319,7 +319,7 @@ class RestoreReferencesTest(unittest.TestCase):
         self.assertEqual([], references("tools/restore.sh examples/gone/debloat.txt", APPLY))
 
     def test_a_translated_placeholder_is_not_a_reference(self):
-        # README.it.md, README.ja.md and README.vi.md: README.md's examples/<your tv>/debloat.txt.
+        # A translated page's form of README.md's examples/<your tv>/debloat.txt.
         self.assertEqual([], references("TV_HOST=192.168.1.50 tools/restore.sh "
                                         "\"examples/il-tuo-modello/debloat.txt\" com.x.y"))
 

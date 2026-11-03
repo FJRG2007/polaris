@@ -56,7 +56,7 @@ The reference launcher works smoothly when built with application ID `com.coocaa
    tools/tv.py 'setprop persist.service.homepage.cls app.polaris.tv.MainActivity'
    tools/tv.py 'cmd package set-home-activity com.coocaa.tvhome/app.polaris.tv.MainActivity'
    ```
-4. Remote Home key will now cleanly open CleanYourTV launcher.
+4. Remote Home key will now cleanly open Polaris TV launcher.
 
 ### Undo Launcher Handover
 

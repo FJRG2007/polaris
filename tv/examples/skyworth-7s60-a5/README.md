@@ -1,7 +1,7 @@
 # Skyworth 7S60_A5 (Coocaa OS, China market, Android 8)
 
 Skyworth 7S60_A5, board 6A658B (`sky8S34`, armeabi-v7a, about 1.9 GB RAM), Coocaa OS on Android 8.0,
-build `OPR5.170623.014` / `022.008.220`. Both halves work: the debloat list, and the Clean Your TV
+build `OPR5.170623.014` / `022.008.220`. Both halves work: the debloat list, and the Polaris TV
 launcher as Home. Coocaa OS is what Skyworth ships on its China-market sets, and it does not hand
 Home over the way Android TV does, so the launcher needs three extra steps, explained below.
 
@@ -49,8 +49,8 @@ PY=tools/venv/bin/python
    ```bash
    tools/disable.sh examples/skyworth-7s60-a5/debloat.txt
    (cd launcher && ./gradlew assembleRelease -PlauncherApplicationId=com.coocaa.tvhome)
-   "$PY" -I tools/b64push.py launcher/app/build/outputs/apk/release/app-release.apk /data/local/tmp/tvhome.apk
-   "$PY" -I tools/tv.py 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk'
+   "$PY" -I tools/b64push.py launcher/app/build/outputs/apk/release/app-release.apk /data/local/tmp/polaris-tv.apk
+   "$PY" -I tools/tv.py 'pm install -r /data/local/tmp/polaris-tv.apk; rm -f /data/local/tmp/polaris-tv.apk'
    "$PY" -I tools/tv.py 'am start -W -n com.coocaa.tvhome/app.polaris.tv.MainActivity'
    ```
 

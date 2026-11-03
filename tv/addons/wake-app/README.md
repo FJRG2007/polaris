@@ -4,7 +4,7 @@ Opens the app you choose every time the screen turns on, so the TV wakes straigh
 TV app or whatever you watch first, instead of the home screen. Separate from the launcher.
 
 Package `io.github.luyzfernando08.wakeapp`. You see it as **Open on wake** (Portuguese: **Abrir ao ligar**).
-On cleanyourtv's Home it is also a module card, **Open on wake**, which opens its settings.
+On Polaris TV's Home it is also a module card, **Open on wake**, which opens its settings.
 
 ## Settings
 
@@ -20,7 +20,7 @@ Open the card (or the app's own tile). OK on a row changes it:
 
 Choosing another app clears the link, since a link belongs to the app it was meant for.
 
-Home screens (any launcher, including cleanyourtv's) are left out of the list and never opened, even if one is set
+Home screens (any launcher, including Polaris TV's) are left out of the list and never opened, even if one is set
 from the install script: waking into a launcher that opens the app that opens the launcher would loop.
 
 Nothing opens on a screen that turns on and off again inside the wait, and not twice within 5 seconds. After a

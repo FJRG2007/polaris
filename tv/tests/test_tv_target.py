@@ -27,7 +27,7 @@ def load_tv(env):
     signer.PythonRSASigner = lambda pub, priv: None
     stubs.update({"adb_shell.adb_device": device, "adb_shell.auth.keygen": keygen,
                   "adb_shell.auth.sign_pythonrsa": signer})
-    spec = importlib.util.spec_from_file_location("cyt_tv_target_test", SCRIPT)
+    spec = importlib.util.spec_from_file_location("polaris_tv_tv_target_test", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     clean_env = {k: v for k, v in os.environ.items() if k not in ("TV_HOST", "TV_PORT")}
     clean_env.update(env)

@@ -72,19 +72,19 @@ Install: `adb install -r app/build/outputs/apk/debug/app-debug.apk`. Write down 
 - [ ] Dispatcharr: server address and an output profile; with the TV's network not allowed, the 403 message appears.
 - [ ] Streaming apps: installed known apps are pre-ticked; "Show every TV app" lists the rest; the Home shortcut opens the app; uninstall the app and it disappears from Home.
 
-### 6. CleanYourTV module card
-On a TV running CleanYourTV (app.polaris.tv) or a fork that keeps its card category:
+### 6. Polaris TV module card
+On a TV running Polaris TV (app.polaris.tv) or a fork that keeps its card category:
 
 ```bash
 adb shell pm dump io.github.maxhayim.tvhub | grep -B2 -A6 DOCK_CARD
 adb shell input keyevent KEYCODE_HOME
-adb logcat -d -s TvHomeCards
+adb logcat -d -s PolarisTvCards
 ```
 
 - [ ] The prompt names TV Hub, its package and the key's first twelve hex digits. **Keep hidden** leaves the ordinary tile.
 - [ ] Hold OK on Settings > Module cards: set TV Hub to Shown; the card replaces the tile, shows "TV Hub · Live channels" focused, and glows blue in the dock.
 - [ ] OK on the card opens TV Hub; holding OK opens App info.
-- [ ] `adb logcat -d -s TvHomeCards` has no rejection line for io.github.maxhayim.tvhub.
+- [ ] `adb logcat -d -s PolarisTvCards` has no rejection line for io.github.maxhayim.tvhub.
 - [ ] Uninstall: the card is gone; reinstall the same build: no new prompt.
 
 ### 7. Platforms

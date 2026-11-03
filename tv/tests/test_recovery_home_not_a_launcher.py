@@ -36,7 +36,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import recovery  # noqa: E402
 import test_recovery_record as records  # noqa: E402
 
-spec = importlib.util.spec_from_file_location("cyt_check", ROOT / "tools" / "check.py")
+spec = importlib.util.spec_from_file_location("polaris_tv_check", ROOT / "tools" / "check.py")
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 
@@ -77,7 +77,7 @@ class RecoveryHomeNotALauncherTest(unittest.TestCase):
     def test_a_home_that_is_no_launcher_is_not_recorded(self):
         for home in NO_LAUNCHER_HOMES:
             with self.subTest(home=home):
-                shutil.rmtree(self.home / ".cleanyourtv", ignore_errors=True)
+                shutil.rmtree(self.home / ".polaris-tv", ignore_errors=True)
                 self.tv_on(home)
                 result = self.run_script("disable.sh", str(self.list_path))
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -95,7 +95,7 @@ class RecoveryHomeNotALauncherTest(unittest.TestCase):
         for home in (f"{LAUNCHERX}/.home.HomeActivity", records.STOCK_HOME,
                      f"{recovery.CUSTOM_LAUNCHER}/.MainActivity"):
             with self.subTest(home=home):
-                shutil.rmtree(self.home / ".cleanyourtv", ignore_errors=True)
+                shutil.rmtree(self.home / ".polaris-tv", ignore_errors=True)
                 self.tv_on(home)
                 self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
                 self.assertEqual(self.record()["home"], home)
@@ -126,7 +126,7 @@ class RecoveryHomeNotALauncherTest(unittest.TestCase):
         """The record an older save() left on a TV whose Home was `home`, and its path."""
         self.tv()
         self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
-        path = next((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        path = next((self.home / ".polaris-tv").glob("recovery-*.json"))
         record = json.loads(path.read_text())
         record["packages"].pop("com.google.android.tvlauncher")
         record["home"] = home
@@ -138,7 +138,7 @@ class RecoveryHomeNotALauncherTest(unittest.TestCase):
     def test_restore_reads_an_old_record_with_such_a_home_as_no_home(self):
         for home in NO_LAUNCHER_HOMES:
             with self.subTest(home=home):
-                shutil.rmtree(self.home / ".cleanyourtv", ignore_errors=True)
+                shutil.rmtree(self.home / ".polaris-tv", ignore_errors=True)
                 path = self.write_old_record(home)
                 before = path.read_bytes()
                 result = self.run_script("restore.sh", str(self.list_path), LAUNCHERX)

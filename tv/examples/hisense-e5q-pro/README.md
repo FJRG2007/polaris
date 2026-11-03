@@ -13,7 +13,7 @@ The existing [debloat.txt](debloat.txt) keeps stock Home, Live TV and OTA enable
 | System UI / updater version | `V0000.00.01A.Q0702` |
 | Security patch | `2022-09-05` |
 
-Device report: [#1436](https://github.com/Gathin23/cleanyourtv/issues/1436).
+Device report: #1436.
 Original setup sources:
 [Toutiao instructions](https://www.toutiao.com/zixun/7522310789718607891/) and
 [Bilibili video](https://www.bilibili.com/video/BV1WRSMBHEEP/).

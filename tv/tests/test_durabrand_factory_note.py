@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTE = ROOT / "docs" / "devices" / "durabrand-durat32isdb.md"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 EXAMPLES_README = ROOT / "examples" / "README.md"
-PROMPT = ROOT / "PROMPT.md"
 FACTORY = "com.cvte.tv.hkcfac"
 
 DISABLED = [
@@ -60,7 +59,7 @@ class DurabrandNoteTest(unittest.TestCase):
         self.assertTrue(NOTE.is_file(), "docs/devices entry missing")
         text = NOTE.read_text(encoding="utf-8")
         for token in ("DURAT32ISDB", "dupont", "m7332", "RTM6.230109.232", "Android TV 11",
-                      "2023-08-01", "issues/470"):
+                      "2023-08-01", "#470"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
 
@@ -113,7 +112,7 @@ class TroubleshootingTrapTest(unittest.TestCase):
 
     def test_trap_names_the_cause_and_the_damage(self):
         for token in (FACTORY, "customer_factory_mode", "vendor.mtk.factory.disable.input",
-                      "fdata.ini", "HDMI-CEC", "issues/470",
+                      "fdata.ini", "HDMI-CEC", "#470",
                       "com.google.android.katniss", "com.google.android.apps.mediashell"):
             with self.subTest(token=token):
                 self.assertIn(token, self.trap)
@@ -145,24 +144,6 @@ class IndexAndPromptTest(unittest.TestCase):
         self.assertIn("docs/devices/durabrand-durat32isdb.md", section)
         self.assertIn("DURAT32ISDB", section)
         self.assertEqual(broken_links(EXAMPLES_README), [])
-
-    def test_prompt_tells_the_assistant_not_to_open_factory_menus(self):
-        text = PROMPT.read_text(encoding="utf-8")
-        lines = text.split("\n")
-        starts = [i for i, line in enumerate(lines)
-                  if line.startswith("- ") and "factory" in line.lower()]
-        self.assertTrue(starts, "PROMPT.md has no line about factory menus")
-        warn = []
-        for start in starts:
-            for line in lines[start:]:
-                if warn and (line.startswith("- ") or line.startswith("## ") or not line.strip()):
-                    break
-                warn.append(line)
-        joined = " ".join(warn)
-        self.assertIn("dumpsys package", joined)
-        self.assertIn("TROUBLESHOOTING", joined)
-        self.assertIn(FACTORY, joined)
-
 
 if __name__ == "__main__":
     unittest.main()

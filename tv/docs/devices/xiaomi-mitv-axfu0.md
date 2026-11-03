@@ -52,9 +52,9 @@ The television uses a Xiaomi Bluetooth Voice Remote with dedicated buttons for P
 
 ### Keycode Map
 
-| Button | Keycode / Action | CleanYourTV Integration |
+| Button | Keycode / Action | Polaris TV Integration |
 |---|---|---|
-| Home | `KEYCODE_HOME` (3) | Opens CleanYourTV home screen |
+| Home | `KEYCODE_HOME` (3) | Opens Polaris TV home screen |
 | Back | `KEYCODE_BACK` (4) | Standard back navigation |
 | Settings | `KEYCODE_SETTINGS` (176) / `KEYCODE_MENU` (82) | Maps directly to TV quick settings |
 | Live TV / Guide | `KEYCODE_GUIDE` (172) / `KEYCODE_TV` (170) | Launches native EPG / Live TV |
@@ -91,4 +91,4 @@ With ~970 MB available to Android OS, aggressive bloat reduction yields noticeab
 3. **Launcher Configuration Recommendations**:
    - Enable icon-only buttons (`icon_only_buttons` and `icon_only_inputs` set to `true`) for a minimalist, lightweight top bar.
    - The sky backdrop (`sky_intensity` set to `60`) renders cleanly with hardware acceleration without impacting frame rates.
-   - Use CleanYourTV's minimalist screensaver instead of `com.google.android.apps.tv.dreamx` to prevent background network downloads of 4K artwork into RAM.
+   - Use Polaris TV's minimalist screensaver instead of `com.google.android.apps.tv.dreamx` to prevent background network downloads of 4K artwork into RAM.

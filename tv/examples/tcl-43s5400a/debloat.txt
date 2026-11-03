@@ -12,7 +12,7 @@
 # Inputs: com.tcl.tvinput (2x HDMI, AV, tuner).
 #
 # Applied on 2026-10-21 with verification screenshots after each batch:
-# - CleanYourTV launcher boots as default Home screen.
+# - Polaris TV launcher boots as default Home screen.
 # - YouTube, Vidio, Jellyfin, and Netflix open and play cleanly.
 # - HDMI 1, HDMI 2, AV, and Live TV switch properly via launcher's Inputs menu.
 # - Free RAM increased from ~100 MB to ~328 MB.

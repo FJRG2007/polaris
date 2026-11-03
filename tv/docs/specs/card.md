@@ -75,7 +75,7 @@ A label is rejected when:
 - it is one of the names the launcher's own UI uses, in English or in the TV's language: what its
   pills and dialogs say (`Home`, `Settings`, `Inputs`, `Wi-Fi`, `Live TV`, `App library`,
   `Choose default home`), the name of the clock screensaver in the TV's screensaver picker (`Clock`),
-  `Default home` word for word, the app's own name `Polaris TV`, and the two project names `cleanyourtv`
+  `Default home` word for word, the app's own name `Polaris TV`, and the two project names `polaristv`
   and `tv-vibehack`;
 - it names an input the Inputs menu shows: `HDMI` and anything starting with it, `AV`;
 - while the prompt is due (a new card, or one whose signing key or label changed): it equals the label of
@@ -177,14 +177,14 @@ any violation drops that one card, with a log line and no other effect.
 
 ## Rejections
 
-Every rejected card produces one line in logcat under the tag `TvHomeCards`, with the package and
+Every rejected card produces one line in logcat under the tag `PolarisTvCards`, with the package and
 the reason, for example:
 
 ```
-W TvHomeCards: io.example.spoof: label 'Retro' is the name of another installed app
-W TvHomeCards: io.example.deep: XML nested deeper than 2
-W TvHomeCards: io.example.big: label is longer than 24 characters
+W PolarisTvCards: io.example.spoof: label 'Retro' is the name of another installed app
+W PolarisTvCards: io.example.deep: XML nested deeper than 2
+W PolarisTvCards: io.example.big: label is longer than 24 characters
 ```
 
-Read them with `adb logcat -s TvHomeCards` (or `tools/tv.py 'logcat -d -s TvHomeCards'`). A rejected
+Read them with `adb logcat -s PolarisTvCards` (or `tools/tv.py 'logcat -d -s PolarisTvCards'`). A rejected
 card has no other effect: the app keeps its ordinary tile.

@@ -54,8 +54,8 @@ final class Cards {
     static final String CATEGORY = "app.polaris.tv.category.DOCK_CARD";
     static final String META_DATA = "app.polaris.tv.card";
     static final int SPEC_SUPPORTED = 1;
-    /** logcat tag for every rejection: `logcat -s TvHomeCards`. */
-    static final String TAG = "TvHomeCards";
+    /** logcat tag for every rejection: `logcat -s PolarisTvCards`. */
+    static final String TAG = "PolarisTvCards";
 
     // Limits. Declared: cards read per resume. Shown: cards rendered as tiles. Records: decisions remembered.
     static final int MAX_DECLARED = 32;
@@ -79,7 +79,7 @@ final class Cards {
     private static final String[] RESERVED_ANYWHERE = {"verified", "official"};
     /** Names the launcher's own UI renders (pills, tiles, the Inputs menu): rejected as a whole label. */
     private static final Set<String> RESERVED_EXACT = new HashSet<>(Arrays.asList(
-            "tvvibehack", "cleanyourtv", "settings", "inputs", "livetv", "home", "defaulthome", "wifi", "av"));
+            "tvvibehack", "polaristv", "settings", "inputs", "livetv", "home", "defaulthome", "wifi", "av"));
     /** "HDMI", "HDMI 1", "HDMI2"... */
     private static final String RESERVED_PREFIX = "hdmi";
 

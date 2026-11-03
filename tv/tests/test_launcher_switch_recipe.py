@@ -1,6 +1,6 @@
 """docs/workflows/launcher-switch.md asks for everything `tests/test_switches.py` refuses a switch without.
 
-The recipe is the page AGENTS.md's workflow list and CONTRIBUTING's routing table send a new switch author
+The recipe is the page the README's Contributing section sends a new switch author
 to, and its numbered steps are the checklist they follow. Step 3 asked for a row in the Keys table of
 `themes/README.md` and said nothing about `docs/switches.md`, while `tests/test_switches.py` fails a key in
 that table with no screenshot row there - so a switch built by following the page exactly landed a red

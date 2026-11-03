@@ -33,13 +33,13 @@ the core bigger or change how it behaves. You install an add-on only if you want
 | [Ad Blocking](ad-blocking/) | Your Pi-hole (6 or 5) or AdGuard Home on the TV: today's queries and blocked share, and one OK to pause blocking for five minutes | [@maxhayim](https://github.com/maxhayim) | MOKA R8G (Android 14) | `INTERNET` (your blocker only) | <img src="ad-blocking/screenshot.jpg" width="240" alt="Ad Blocking on a TV"> |
 | [Startup & Branding](startup-branding/) | A welcome screen of your own: your picture, a background colour and a line of text, full screen for a few seconds or until Back or OK, with a live preview, Fit/Fill/Stretch/Original scaling and a compatibility check of what the TV allows without root | [@maxhayim](https://github.com/maxhayim) | MOKA M1G (Android TV 11) | None | <img src="startup-branding/screenshot.jpg" width="240" alt="Startup & Branding on a TV"> |
 | [World Clock](world-clock/) | One to six offline clocks with dates, UTC offsets and day differences; city search and D-pad controls | [@SaviorOneZero](https://github.com/SaviorOneZero) | Samsung C71KW-200 / AT&T Osprey (Android TV 11) | None | <img src="world-clock/screenshot.jpg" width="240" alt="World Clock on a TV"> |
-| [Flock](flock/) | An interactive flocking simulation using separation, alignment and cohesion, controlled with the TV remote | CleanYourTV contributors | TCL 32S5K (Android TV 14) | None | <img src="flock/screenshot.jpg" width="240" alt="Flock on TCL Android TV"> |
+| [Flock](flock/) | An interactive flocking simulation using separation, alignment and cohesion, controlled with the TV remote | Polaris TV contributors | TCL 32S5K (Android TV 14) | None | <img src="flock/screenshot.jpg" width="240" alt="Flock on TCL Android TV"> |
 | [News screensaver](news-screensaver/) | Headlines from your own RSS and Atom feeds as the TV's screensaver and as a card, one at a time with source, age, a QR code to the article and Left/Right paging; feeds (with names), seconds per headline and idle time are set with `setup.sh` or on the TV | [@modist](https://github.com/modist) | Philips 2021/22 UHD Android TV (Android 11) | `INTERNET` | <img src="news-screensaver/screenshot.jpg" width="240" alt="News screensaver on a TV"> |
 | [Digital Rain](digital-rain/) | A Matrix-style screensaver: mirrored katakana and digits falling in green trails with bright heads, drawn on the TV with no network; the card starts it at once | [@dennis-oleary](https://github.com/dennis-oleary) | NVIDIA SHIELD Android TV Pro 2019 (Android TV 11) | None | <img src="digital-rain/screenshot.jpg" width="240" alt="Digital Rain on a TV"> |
 | [Bluetooth Toggle](bluetooth-toggle/) | For Android 12 and older (13 and newer do not let apps switch Bluetooth). A one-press Bluetooth switch: the tile turns Bluetooth off or on, a small panel says which, and Pair accessory is one press away | [@justin-newman](https://github.com/justin-newman) | Hisense 75U75N (hengshan), Google TV 12 | Bluetooth (`BLUETOOTH_CONNECT`) | <img src="bluetooth-toggle/screenshot.jpg" width="240" alt="Bluetooth Toggle on a TV"> |
 | [TV Inspector](tv-inspector/) | What the remote sends (key name, key code, scan code, device) and what the TV can play: display modes, HDR, video decoders, audio outputs and formats, input devices; every line also in logcat for a `tv.json` or a bug report | [@shaharukhs](https://github.com/shaharukhs) | Sansui TV (Skyworth eleonas, MediaTek MT9676), Android TV 14 | None | <img src="tv-inspector/screenshot.jpg" width="240" alt="TV Inspector on a TV"> |
 | [Game Day](game-day/) | Each team's next game on Home, counted down ("Puck drop in 2h 18m", then "Live now"), from calendar links you add: any team, any sport, no scores; one turn per team, rotating, with the theme's F1 weekend | [@justin-newman](https://github.com/justin-newman) | Hisense 75U75N (hengshan), Google TV 12 | `INTERNET` (your calendar links only) | <img src="game-day/screenshot.jpg" width="240" alt="Game Day on a TV"> |
-| [Haunted](haunted/) | A Halloween screensaver (and a card that starts it): the theme's night photos crossfading, bats drifting across, a ghost floating up, a flickering jack-o'-lantern glow and a small clock, drawn on the TV with no network | CleanYourTV contributors | Not yet tested on a real TV | None | <img src="haunted/screenshot.jpg" width="240" alt="Haunted on a TV"> |
+| [Haunted](haunted/) | A Halloween screensaver (and a card that starts it): the theme's night photos crossfading, bats drifting across, a ghost floating up, a flickering jack-o'-lantern glow and a small clock, drawn on the TV with no network | Polaris TV contributors | Not yet tested on a real TV | None | <img src="haunted/screenshot.jpg" width="240" alt="Haunted on a TV"> |
 
 A widget, an info tile, a storage or smart-home card: if it can live as its own small app, it can live
 here. See the rules below.
@@ -122,14 +122,14 @@ TV_HOST=<tv ip> tools/venv/bin/python -I tools/manage.py install weather
 - **Tested on a real TV.** Say which one in the README and in the table above.
 - **A screenshot.** `addons/<name>/screenshot.jpg`: the add-on on a real TV, its card in the grid or
   its own screen, as a JPEG, 16:9 (1280×720 is plenty) and under 300 KB, shown in the table's
-  Screenshot column. It is what people see first here and on [cleanyour.tv/addons](https://cleanyour.tv/addons).
+  Screenshot column. It is what people see first here.
   Take it with `tools/tv.py --screenshot shot.png` (or `adb exec-out screencap -p > shot.png`), then
   `sips -s format jpeg -s formatOptions 85 -z 720 1280 shot.png --out screenshot.jpg` on a Mac.
   Blur anything personal: Wi-Fi names, people, addresses. Add-ons marked "wanted" in the table came
   before this rule; a screenshot for one of them is welcome.
 - **The author maintains it.** Issues about an add-on are assigned to its author. An add-on that
   breaks on current Android TV versions, or goes unmaintained, may be removed. Its history stays in
-  git, and you can keep it going in a fork listed in [`SHOWCASE.md`](../SHOWCASE.md).
+  git, and you can keep it going in a fork.
 
 ## Adding one
 

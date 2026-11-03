@@ -47,10 +47,10 @@ import time
 
 PACKAGE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$")
 COMPONENT = re.compile(r"^[A-Za-z][A-Za-z0-9_.]*/[A-Za-z0-9_.$]+$")
-REMOTE = "/data/misc/perfetto-traces/cleanyourtv.pftrace"   # the folder perfetto may write to on Android 9 and 10
+REMOTE = "/data/misc/perfetto-traces/polaris-tv.pftrace"   # the folder perfetto may write to on Android 9 and 10
 # Set on the run that starts again under tools/venv's Python, so a venv without the package answers with
 # the line to run instead of starting a third process. tv.py carries the same marker for the same reason.
-VENV_MARKER = "CLEANYOURTV_TRACE_PY_VENV"
+VENV_MARKER = "POLARIS_TV_TRACE_PY_VENV"
 NAV_KEYS = ("RIGHT RIGHT RIGHT LEFT LEFT LEFT DOWN RIGHT DOWN LEFT DOWN UP "
             "UP RIGHT UP LEFT DOWN DOWN RIGHT RIGHT UP UP UP LEFT").split()
 START_MARGIN_S = 3    # recording starts in the background; give it time before the first step

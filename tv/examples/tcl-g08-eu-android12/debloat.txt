@@ -9,12 +9,12 @@
 # HDMI/Live TV and opens the source menu normally.
 #
 # Second unit: TCL 75Q7C (G08_4K_GB, same model "Smart TV Pro"), firmware STT2.221228.001 AS36, Spain, on
-# Ethernet, 25 October 2026, with the Clean Your TV launcher as Home (README). The list below applied unchanged
+# Ethernet, 25 October 2026, with the Polaris TV launcher as Home (README). The list below applied unchanged
 # (com.tcl.browser is not on AS36). AS36 also has five TCL packages the first AS34 set did not: they are at the
 # end, disabled on that set for one day only.
 #
 # Third unit: TCL 50C805X1 (G08_4K_GB, same model "Smart TV Pro"), firmware STT2.221228.001 AS34 like the first,
-# France, on Wi-Fi, 23 to 26 October 2026 with the Clean Your TV launcher as Home (README); all disabled
+# France, on Wi-Fi, 23 to 26 October 2026 with the Polaris TV launcher as Home (README); all disabled
 # packages still disabled after two reboots. This AS34 set ships AirplayAPK and the five "AS36" packages too, so
 # those preloads are not tied to the build. Four of them are now in the list; com.tcl.guard stays commented.
 # com.tcl.browser is not on this set either. Kept by the owner: tts, airplaydaemon, magiconnectfree.

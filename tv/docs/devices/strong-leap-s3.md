@@ -6,9 +6,9 @@ as [`wanbo-x5-pro`](../../examples/wanbo-x5-pro/debloat.txt) and
 [`byintek-t5-max`](../../examples/byintek-t5-max/debloat.txt), but a box (device `YDA`) on an older build
 (`C3.0.12`, where those two are `C3.3.5`).
 
-The owner followed [`PROMPT.md`](../../PROMPT.md) on Windows 11 and applied the list by hand with
+The owner worked on Windows 11 and applied the list by hand with
 `pm disable-user`, not through `tools/disable.sh`. **So this is not an `examples/` list.** It was applied on one day and
-checked after a reboot; [`CONTRIBUTING.md`](../../CONTRIBUTING.md) asks for a few days first. What carries to
+checked after a reboot; [`docs/workflows/tv-list.md`](../workflows/tv-list.md) asks for a few days first. What carries to
 another unit is the ordering, the quirks and the remote buttons below.
 
 ## Identify the firmware

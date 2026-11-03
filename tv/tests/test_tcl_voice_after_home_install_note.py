@@ -204,7 +204,7 @@ class ThePageAnswersIt(unittest.TestCase):
         bullet = bullet_naming("BeyondTV2", "reboot", "installed")
         assert bullet is not None
         self.assertNotRegex(bullet.lower(), r"uninstall",
-                            "AGENTS.md keeps uninstalling out of every page: the bullet may only say to "
+                            "docs/DOS-AND-DONTS.md keeps uninstalling out of every page: the bullet may only say to "
                             "reboot")
 
 

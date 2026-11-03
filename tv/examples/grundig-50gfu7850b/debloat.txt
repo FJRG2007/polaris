@@ -26,7 +26,7 @@
 # Inputs & HDMI-CEC:
 # Android TV Settings > Device Preferences > Inputs pre-assigns generic labels ("Game console", "Blu-ray")
 # to HDMI ports, which hides real device names. Clearing them via `settings put secure tv_input_custom_labels '""'`
-# lets CleanYourTV show HDMI-CEC devices natively (e.g. "PlayStation 5", "BD HTS") under the Inputs menu.
+# lets Polaris TV show HDMI-CEC devices natively (e.g. "PlayStation 5", "BD HTS") under the Inputs menu.
 #
 # Owner's choices: Chromecast kept; voice assistant, YouTube Music, Play Games, and TTS off.
 # Self-installed streaming apps untouched.

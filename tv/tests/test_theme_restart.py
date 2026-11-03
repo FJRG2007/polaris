@@ -81,15 +81,15 @@ class TV:
         cmd = command.split('; rc=$?;', 1)[0]
         if self.fail and self.fail in cmd:
             raise OSError('simulated broken transport')
-        if cmd.startswith('cyt_restore() { '):
-            restore = cmd.split('cyt_restore() { ', 1)[1].split('; };', 1)[0]
+        if cmd.startswith('polaris_tv_restore() { '):
+            restore = cmd.split('polaris_tv_restore() { ', 1)[1].split('; };', 1)[0]
             off = re.search(r"(settings --user \d+ put secure enabled_accessibility_services '' && settings --user \d+ put secure accessibility_enabled 0) && sleep 2", cmd)[1]
             try:
                 self.shell(off)
                 getattr(self, 'remote_pause', self.pause)(2)
             finally:
                 self.shell(restore)
-            return '\n__CYT_THEME_RC__0\n'
+            return '\n__POLARIS_TV_THEME_RC__0\n'
         output = ''
         for piece in cmd.split(' && '):
             args = shlex.split(piece)
@@ -123,7 +123,7 @@ class TV:
                 output += ''.join(service(x, user=self.user, connected=x in self.bound)
                                   for x in restart.components(self.value)
                                   if x.startswith('app.polaris.tv/'))
-        return output + '\n__CYT_THEME_RC__0\n'
+        return output + '\n__POLARIS_TV_THEME_RC__0\n'
 
 
 class BindingProbe(unittest.TestCase):

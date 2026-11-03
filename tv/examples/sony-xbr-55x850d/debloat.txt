@@ -1,6 +1,6 @@
 # Sony BRAVIA XBR-55X850D — Android TV 8.0.0 / API 26, Sony firmware 6.827
 # Android's generic model label is "BRAVIA 4K 2015"; match the retail model/firmware too.
-# Tested with CleanYourTV v2.3, source 6bcd649bfd6fb4ed0e448c369a258b672a0a1a0b.
+# Tested with Polaris TV v2.3, source 6bcd649bfd6fb4ed0e448c369a258b672a0a1a0b.
 # Roku Ultra LT supplies streaming; this is an owner's short-term tested list, not every Sony.
 #
 # Apply: TV_HOST=<tv ip> tools/disable.sh examples/sony-xbr-55x850d/debloat.txt

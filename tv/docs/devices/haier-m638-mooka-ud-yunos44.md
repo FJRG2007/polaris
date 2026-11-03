@@ -9,10 +9,10 @@ thread: record what this firmware does and does not respond to, so the next YunO
 spend an evening rediscovering it.
 
 The unit's debloat half is effectively unreachable from the shell on YunOS 4.4. The launcher half  
-is unreachable for the same reason `PROMPT.md` already spells out for sets below `minSdk 26`:  
+is unreachable for the reason that applies to every set below `minSdk 26`:  
 this firmware is API 19. Both halves of the project therefore decline on this set, and the  
 practical guidance is the TV's own privacy toggles plus router-level DNS blocking, as  
-`PROMPT.md` already points to for Fire OS 5 sets with the same `pm disable-user` failure mode.
+for Fire OS 5 sets with the same `pm disable-user` failure mode.
 
 ## Identify the firmware
 
@@ -115,7 +115,7 @@ exec app_process $base/bin com.android.commands.pm.Pm "$@"
 ```
 
 So YunOS patches `PackageManagerService.setEnabledSetting` (and the `block` equivalent) to  
-silently drop shell-originated calls. This is the same failure mode `PROMPT.md` describes for  
+silently drop shell-originated calls. This is the same failure mode as on  
 Fire OS 5, but on every package — not just system ones, and including third-party `/data/app`  
 packages.
 
@@ -134,8 +134,8 @@ maintainer's position is disable-only, and `pm uninstall -k` is not added to the
 point of recording them here is so the next YunOS owner knows what does and does not respond,  
 without having to spend an evening rediscovering it.
 
-The fallback on a set where the disable half is unreachable is the one `PROMPT.md` already  
-points to for Fire OS 5 with the same `pm disable-user` failure: the TV's own privacy toggles in  
+The fallback on a set where the disable half is unreachable is the one  
+for Fire OS 5 with the same `pm disable-user` failure: the TV's own privacy toggles in  
 Settings, plus router-level DNS blocking of the ad/telemetry domains. YunOS 4.4 predates Android  
 9's Private DNS, so DNS filtering has to happen upstream of the TV, not on it.
 
@@ -178,7 +178,7 @@ sequence. The menu's `ADB 调试开关` ("ADB debugging switch") entry is the on
 on this firmware; there is no Developer options → Network debugging or Wireless debugging entry.  
 The same menu contains `工厂初始化` ("factory init"), `EEP初始化` ("EEP init"), `整机工厂`  
 ("whole-unit factory"), `OPC调整`, `设置屏参配置` and `设置 MAC 地址` entries, which is the  
-same class of trap `PROMPT.md` warns about for `com.cvte.tv.hkcfac` and `com.at.factory.*` on  
+same class of trap as `com.cvte.tv.hkcfac` and `com.at.factory.*` on  
 CVTE boards: opening them can flip factory-mode flags that disable Input, CEC, Play services or  
 the tuner. Do not enter them on this set; the ADB switch is the only entry that is safe to  
 toggle.
@@ -190,7 +190,7 @@ launched either.
 ## Validation scope
 
 - One unit, one probe, on 2026-10-26 over ADB on the LAN. No reboot campaign was run; the  
-  "reboot re-enables some packages" behaviour `PROMPT.md` describes for TCL Android 9 was not  
+  "reboot re-enables some packages" behaviour seen on TCL Android 9 was not  
   tested, since the disable half does not take effect in the first place on this firmware.
 - The factory-disabled state of `com.yunos.tv.remoteassistant` is reported as shipped; whether  
   it was set at the factory or by a prior owner could not be distinguished on a second-hand set.

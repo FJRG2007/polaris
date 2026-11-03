@@ -172,7 +172,7 @@ class HandoverTest(unittest.TestCase):
         return result, state
 
     def record(self):
-        files = list(self.home.glob("cleanyourtv-handover-*.txt"))
+        files = list(self.home.glob("polaris-tv-handover-*.txt"))
         self.assertLessEqual(len(files), 1)
         return files[0].read_text() if files else None
 

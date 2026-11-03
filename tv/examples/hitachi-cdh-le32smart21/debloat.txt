@@ -18,7 +18,7 @@
 # Inputs menu; switching to HDMI 2 was confirmed on screen.
 #
 # Applied in batches on one real unit on 2026-10-19, each batch checked with screenshots. Tested on one
-# day only (shorter than CONTRIBUTING.md asks); I will report back if anything breaks.
+# day only (shorter than docs/workflows/tv-list.md asks); I will report back if anything breaks.
 # Checked after the full list: launcher/ (v2.3) installed with pm install and is Home after a reboot;
 # Netflix and YouTube open and play; Settings and Wi-Fi are fine; the remote's real Home, Input and Back
 # buttons all work; the firmware updater opens (Settings > Device Preferences > About > Software update >

@@ -1,8 +1,8 @@
 """Every wallpaper is credited in its theme's CREDITS.md, and credited to the picture that is there.
 
 `docs/DOS-AND-DONTS.md` states the rule for a theme's pictures ("Use your own pictures, or ones with a
-stated free licence (CC0, CC BY), credited in `CREDITS.md`", [#1114](https://github.com/Gathin23/cleanyourtv/pull/1114),
-[#1260](https://github.com/Gathin23/cleanyourtv/issues/1260)), `themes/CREATE_A_THEME.md` step 2 sends an
+stated free licence (CC0, CC BY), credited in `CREDITS.md`", #1114,
+#1260), `themes/CREATE_A_THEME.md` step 2 sends an
 author to `themes/sweden/CREDITS.md` for the format, and five of the nine theme rows in
 `themes/README.md` end by pointing a reader at one. Nothing read the six files: `tests/test_theme_wallpapers.py`
 judges every picture's shape, weight and suffix, `tests/test_scenes_captions.py` every name under the

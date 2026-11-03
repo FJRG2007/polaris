@@ -5,7 +5,7 @@
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
 #
 # Tested on one unit over Ethernet: setupwraith owned saved Wi-Fi networks and claimed HOME;
-# disabling it over Ethernet allowed CleanYourTV to become HOME. Do not disable it over Wi-Fi.
+# disabling it over Ethernet allowed Polaris TV to become HOME. Do not disable it over Wi-Fi.
 
 # Batch 1 - telemetry and analytics
 com.tcl.ttvs                           # TCL BI/awareness/identifier services

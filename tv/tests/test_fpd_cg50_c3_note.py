@@ -26,7 +26,6 @@ def read(relative):
 
 NOTE = read("docs/devices/fpd-cg50-c3.md")
 TROUBLE = read("docs/TROUBLESHOOTING.md")
-PROMPT = read("PROMPT.md")
 EXAMPLES_README = read("examples/README.md")
 
 PACKAGES = [
@@ -95,27 +94,6 @@ def bullet_containing(text, needle):
     return matches[0]
 
 
-def prompt_bullet(needle):
-    """PROMPT.md bullets start with a plain `- `, not `- **`, so they need their own reader."""
-    found, current = [], None
-    for line in PROMPT.splitlines():
-        if line.startswith("- "):
-            if current is not None:
-                found.append(current)
-            current = line
-        elif current is not None and (line.startswith("  ") or not line.strip()):
-            current += "\n" + line
-        else:
-            if current is not None:
-                found.append(current)
-            current = None
-    if current is not None:
-        found.append(current)
-    matches = [b for b in found if needle in b]
-    assert len(matches) == 1, f"expected one prompt bullet with {needle!r}, found {len(matches)}"
-    return re.sub(r"\s+", " ", matches[0])
-
-
 class NoteKeepsTheListOutOfExamplesTest(unittest.TestCase):
     def test_no_examples_folder_for_a_one_day_list(self):
         self.assertFalse((ROOT / "examples" / "fpd-cg50-c3").exists(),
@@ -123,7 +101,7 @@ class NoteKeepsTheListOutOfExamplesTest(unittest.TestCase):
 
     def test_the_note_says_why(self):
         self.assertIn("not an `examples/` list", NOTE)
-        self.assertIn("CONTRIBUTING.md", NOTE)
+        self.assertIn("docs/workflows/tv-list.md", NOTE)
         self.assertIn("one day", NOTE.lower())
 
     def test_limits_section_is_honest(self):
@@ -250,13 +228,6 @@ class DocsPointersTest(unittest.TestCase):
         self.assertIn("getevent -lt", bullet)
         self.assertIn("HOME_KEY_SERVICE=1", bullet)
         self.assertIn("devices/fpd-cg50-c3.md", bullet)
-
-    def test_prompt_tells_the_assistant_the_same(self):
-        bullet = prompt_bullet("stock launcher also answers the remote's app buttons")
-        self.assertIn("`KEY_UNKNOWN`", bullet)
-        self.assertIn("`KEY_PROGRAM`", bullet)
-        self.assertIn("settings_key_scancodes", bullet)
-        self.assertIn("only `config.xml`", bullet)
 
     def test_examples_index_links_the_note_once(self):
         pointers = [l for l in EXAMPLES_README.splitlines() if "../docs/devices/fpd-cg50-c3.md" in l]

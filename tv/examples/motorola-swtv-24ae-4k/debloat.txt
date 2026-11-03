@@ -6,7 +6,7 @@
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/motorola-swtv-24ae-4k/debloat.txt com.google.android.apps.tv.launcherx
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
 #
-# Applied 2026-10-22 in batches with a screenshot after each, then the CleanYourTV launcher. Home, D-pad,
+# Applied 2026-10-22 in batches with a screenshot after each, then the Polaris TV launcher. Home, D-pad,
 # Inputs, YouTube, casting and the clock screensaver checked, and everything held over several reboots.
 #
 # Stock launcher:   com.google.android.apps.tv.launcherx

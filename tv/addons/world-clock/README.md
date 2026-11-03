@@ -1,6 +1,6 @@
 # World Clock
 
-Optional offline CleanYourTV add-on. It opens from a normal Android TV tile or a
+Optional offline Polaris TV add-on. It opens from a normal Android TV tile or a
 spec-1 module card. The first view contains **Local, London and Sydney**. It is an independent
 Android app; no launcher source, configuration, signing identity or Home behavior changes.
 
@@ -42,7 +42,7 @@ updates per second. Reduced motion keeps everything stationary and schedules no 
 Clock brightness changes text opacity only; it does not write system brightness. Android may also
 dim an actual screensaver according to the TV's power policy. No screen-on flag or wake lock is used.
 
-CleanYourTV's Home-only idle clock (`home_idle_clock_minutes`) is separate from Android's selected
+Polaris TV's Home-only idle clock (`home_idle_clock_minutes`) is separate from Android's selected
 screensaver. Selecting World Clock replaces the Android dream, not that explicit Home Activity.
 The Home-only timer defaults to 0/off; leave it off when using the Android screensaver. This add-on
 never edits the launcher, its theme, Home role or settings. TV firmware without a screensaver chooser

@@ -45,7 +45,7 @@ What happened:
 `tools/theme.sh examples/vidda-c1s-mt9669` was not tried. Dock apps are left out: pick your own.
 
 To give Home back to 聚好看: hold OK on Settings in the launcher, then Launcher settings, then Choose
-default home. Switch the CleanYourTV accessibility service off in the TV's accessibility settings to stop
+default home. Switch the Polaris TV accessibility service off in the TV's accessibility settings to stop
 the power-on redirect.
 
 ## Closing ADB

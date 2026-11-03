@@ -24,7 +24,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("cyt_trace", ROOT / "tools" / "trace.py")
+spec = importlib.util.spec_from_file_location("polaris_tv_trace", ROOT / "tools" / "trace.py")
 trace = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(trace)
 

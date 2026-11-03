@@ -4,7 +4,7 @@ Your [Home Assistant](https://www.home-assistant.io) on the TV: a glance of weat
 then scenes, lights and switches, climate, temperature and humidity sensors, doors and windows, and locks, in
 sections you work with the remote. OK runs a scene or switches a light; ◀ ▶ dims a light by 10 % or moves a
 thermostat by half a degree. A community add-on, not made by or affiliated with the Home Assistant project. For
-the [Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md): once you answer
+the [Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md): once you answer
 **Show card** its tile reads "Smart Home" with a blue glow. On any other Android TV home it is an ordinary app.
 
 ![Smart Home on a TV, with the glance header](screenshot.jpg)

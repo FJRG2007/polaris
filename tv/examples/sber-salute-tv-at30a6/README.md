@@ -4,7 +4,7 @@ CVTE board `TP.T962D4.PC756` (Amlogic T962D4, platform `t5w`, Mali-G31), 2 GB RA
 partition, panel `LE43VA_V430DJ1_Q01`, codename `at30a6`, `ro.cvte.customer=SBER`. Firmware StarOS
 1.101.84-B28350 on Android 13, build `TP1A.220905.004.A2` from 15 February 2026. No Google services.
 
-Both halves work: the debloat list and the Clean Your TV launcher as Home. Tested 19–23 October 2026: the
+Both halves work: the debloat list and the Polaris TV launcher as Home. Tested 19–23 October 2026: the
 content apps and screen sharing since the 19th, the rest of the list since the 21st, with several restarts.
 The steps were done by hand over `adb`, with the same commands the scripts below run.
 

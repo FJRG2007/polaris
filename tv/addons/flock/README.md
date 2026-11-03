@@ -44,8 +44,11 @@ Requires JDK 17 and Android SDK 34, like the other add-ons in this repository. F
 cd addons/flock
 ./gradlew --no-daemon testReleaseUnitTest assembleRelease
 adb install -r app/build/outputs/apk/release/app-release.apk
-adb shell am start -n io.github.cleanyourtv.flock/.FlockActivity
+adb shell am start -n app.polaris.tv.flock/.FlockActivity
 ```
+
+Flock used a different app id before; a TV that has that earlier copy shows two Flocks after this install.
+Remove the old one from the TV's app settings, or with `adb uninstall` and the id `adb shell pm list packages flock` shows.
 
 The app can also be opened from its module card. The launcher asks whether to show the card the first
 time; you can change that choice later in **Module cards** in launcher settings.

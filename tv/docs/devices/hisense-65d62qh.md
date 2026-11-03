@@ -113,7 +113,7 @@ mWakefulness=Awake
 Display Power: state=ON
 mCurrentFocus=null
 mFocusedApp=null
-$ ps -A | grep gathin        (no output — the launcher process does not exist)
+$ ps -A | grep polaris       (no output — the launcher process does not exist)
 ```
 
 The power menu still drew, so the display and SystemUI were fine; there was simply no window. The TV

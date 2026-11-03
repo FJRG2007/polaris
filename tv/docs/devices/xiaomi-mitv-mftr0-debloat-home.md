@@ -62,7 +62,7 @@ One owner's unit took a silent OTA on 2026-10-24 from OS2.0 to **`OS3.0.28.0.UFT
 (HyperOS TV 3), Android 14 (SDK 34)** (`persist.os2.upgraded=true`, and
 `persist.sys.boot.reason.history` ending in `reboot,ota,...`). Everything above was
 written on OS2.0.23.0 / Android 11 and still describes that build. The report is
-[#1355](https://github.com/Gathin23/cleanyourtv/issues/1355): one unit, one session,
+#1355: one unit, one session,
 nothing re-run here. That unit ran a plain third-party home app (`app.orchard.tv`,
 MAIN + HOME + DEFAULT) with PatchWall left enabled - not the allowlist identity this
 repo installs on CN Xiaomi sets, so this section records what an ordinary third-party

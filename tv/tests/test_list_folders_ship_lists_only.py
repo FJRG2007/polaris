@@ -2,8 +2,8 @@
 
 `docs/workflows/tv-list.md` step 6 is the recipe a list PR follows, and it says: "Do not add install or
 restore scripts, Private DNS or AdGuard setup, or `pm uninstall` steps: the folder only disables, and
-`tools/disable.sh` and `tools/restore.sh` do the rest." `AGENTS.md`'s hard rules ("no install or restore
-scripts, inside a list folder") and `docs/DOS-AND-DONTS.md`'s Don't column say the same, and
+`tools/disable.sh` and `tools/restore.sh` do the rest." `docs/DOS-AND-DONTS.md`'s Don't column ("Ship a folder's own install or restore scripts")
+says the same, and
 `.github/maintainer/MAINTAINER.md` names `pm uninstall` steps in a list folder as rework.
 
 `examples/epson-ls800` was the one folder that did not keep to it. Its `restore.sh` re-enabled the list,

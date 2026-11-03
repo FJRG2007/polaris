@@ -31,7 +31,7 @@
 #    Keeping launcherx on prevents setupwraith's RecoveryActivity (HOME priority 1) from taking Home and
 #    preserves remote app hotkeys.
 #  - Home redirection: config.json sets stock_home_redirect to com.google.android.apps.tv.launcherx, handled
-#    by HomeKeyService (Settings > Accessibility). Home pressed anywhere bounces straight back to CleanYourTV.
+#    by HomeKeyService (Settings > Accessibility). Home pressed anywhere bounces straight back to Polaris TV.
 #  - Remote keys: Settings button sends scancode 646 ("scan:646:settings" in app_keys). Remote app keys:
 #    scan:485 (YouTube) and scan:490 (Prime Video) in app_keys.
 #  - Additional bloat discovered and disabled: BRAVIA CAM services (camerafwupdate, settings, distancealert,

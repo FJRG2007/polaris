@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.gathin.haunted'
+    namespace 'app.polaris.tv.haunted'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.gathin.haunted'
+        applicationId 'app.polaris.tv.haunted'
         minSdk 26
         targetSdk 34
         versionCode 1

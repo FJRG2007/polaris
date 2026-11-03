@@ -1,13 +1,13 @@
 # FPD CG50-C3: a one-day list, and a remote with two buttons Android never maps
 
 The `FPD CG50-C3` is a 50-inch set sold in Canada. The brand is not the builder: `ro.product.model`
-is `EcoTV Pro A`, device `hongkong`, product `FPD_4KHA0`, on a MediaTek SoC. The owner ran
-[`PROMPT.md`](../../PROMPT.md) with Claude Code on Windows 11 (the PowerShell scripts and `tools/tv.py`)
+is `EcoTV Pro A`, device `hongkong`, product `FPD_4KHA0`, on a MediaTek SoC. The owner used
+Claude Code on Windows 11 (the PowerShell scripts and `tools/tv.py`)
 and reports that the debloat, the launcher install, the HOME handover, the remote remap and AdGuard
 Private DNS all worked, with ADB closed at the end.
 
 He also says when: the list was applied the day he wrote #475. So **this is not an `examples/` list**.
-[`CONTRIBUTING.md`](../../CONTRIBUTING.md) asks for a few days of living with a list before it goes there,
+[`docs/workflows/tv-list.md`](../workflows/tv-list.md) asks for a few days of living with a list before it goes there,
 and nothing here was reboot-soaked or repeated on a second unit. The package block below is his, quoted
 as he posted it; the sections after it are the parts that carry to another set, which is why the file
 exists at all.

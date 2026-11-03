@@ -3,7 +3,7 @@
 The README's "Gotchas we hit", later its "Troubleshooting" section, moved to docs/TROUBLESHOOTING.md on
 19 October 2026 (c49561eb). Seven list headers still said "(README, Troubleshooting)", "(see README
 gotchas)" or "See the README troubleshooting section", among them examples/xiaomi-mi-tv-4a, the list
-CONTRIBUTING.md and docs/workflows/tv-list.md tell contributors to copy. The README has no such heading
+docs/workflows/tv-list.md tells contributors to copy. The README has no such heading
 any more, so the reader searches the front page and finds "When something goes wrong" with three
 bullets. The pairing recipe and the keyboard fix are not among them, and the setupwraith bullet is a
 summary that sends the reader on to docs/TROUBLESHOOTING.md.

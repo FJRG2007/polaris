@@ -1,7 +1,7 @@
 """tools/tv.py --screenshot: capture on the TV, pull the file, and say when it is empty.
 
-PROMPT.md tells the agent to look at a screenshot after every change, and CONTRIBUTING.md asks for
-one in a launcher PR, but tools/tv.py had no screenshot command, so every agent wrote its own. In
+An agent should look at a screenshot after every change, and docs/workflows/launcher-switch.md asks for
+screenshots in a launcher PR, but tools/tv.py had no screenshot command, so every agent wrote its own. In
 #364 (CHiQ AI PONT, Android 11) that hand-rolled helper crashed on a `shots/` folder that did not
 exist yet, and the capture step stopped the whole prompt. The command therefore has to create the
 folder, run `screencap` on the TV and pull the PNG (never `exec-out`, which returns a broken file on
@@ -76,7 +76,7 @@ def load_tv():
     signer.PythonRSASigner = lambda pub, priv: None
     stubs.update({"adb_shell.adb_device": device, "adb_shell.auth.keygen": keygen,
                   "adb_shell.auth.sign_pythonrsa": signer})
-    spec = importlib.util.spec_from_file_location("cyt_tv", SCRIPT)
+    spec = importlib.util.spec_from_file_location("polaris_tv_tv", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     os.environ.setdefault("TV_HOST", "192.0.2.1")   # TEST-NET-1: nothing ever answers there
     with mock.patch.dict(sys.modules, stubs):

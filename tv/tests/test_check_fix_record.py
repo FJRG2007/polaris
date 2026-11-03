@@ -67,7 +67,7 @@ class CheckFixRecordTest(unittest.TestCase):
         self.state_path.write_text(json.dumps(state))
 
     def record_file(self):
-        files = list((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        files = list((self.home / ".polaris-tv").glob("recovery-*.json"))
         self.assertEqual(len(files), 1, files)
         return files[0]
 
