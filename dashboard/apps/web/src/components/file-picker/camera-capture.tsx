@@ -59,10 +59,11 @@ export function CameraCapture({
         let gone = false;
         void (async () => {
             try {
-                const media = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: kinds.video
-                });
+                const media = kinds.video
+                    ? await navigator.mediaDevices
+                          .getUserMedia({ video: true, audio: true })
+                          .catch(() => navigator.mediaDevices.getUserMedia({ video: true }))
+                    : await navigator.mediaDevices.getUserMedia({ video: true });
                 if (gone) return media.getTracks().forEach((track) => track.stop());
                 stream.current = media;
                 if (video.current) {
@@ -76,7 +77,13 @@ export function CameraCapture({
         })();
         return () => {
             gone = true;
-            if (recorder.current?.state === "recording") recorder.current.stop();
+            const made = recorder.current;
+            if (made) {
+                made.ondataavailable = null;
+                made.onstop = null;
+                if (made.state === "recording") made.stop();
+            }
+            recorder.current = null;
             stream.current?.getTracks().forEach((track) => track.stop());
             stream.current = null;
         };

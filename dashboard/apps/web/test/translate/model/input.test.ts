@@ -71,6 +71,20 @@ describe("pastedFile", () => {
         );
     });
 
+    it("leaves text copied from an office app as text, though a picture of it came along", () => {
+        expect(
+            pastedFile([
+                item("string", "text/plain"),
+                item("string", "text/html"),
+                item("string", "text/rtf"),
+                item("file", "image/png", picture)
+            ])
+        ).toBeNull();
+        expect(
+            pastedFile([item("string", "text/rtf"), item("file", "image/png", picture)])
+        ).toBeNull();
+    });
+
     it("prefers the picture over another copied file", () => {
         expect(
             pastedFile([item("file", "application/pdf", doc), item("file", "image/png", picture)])

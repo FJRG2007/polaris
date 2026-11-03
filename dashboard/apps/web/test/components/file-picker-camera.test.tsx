@@ -9,6 +9,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { CameraCapture } from "@/components/file-picker/camera-capture";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { cameraAvailable, cameraKinds } from "@/components/file-picker/camera-kinds";
 
@@ -155,5 +156,96 @@ describe("the picker's Camera tab", () => {
         const photo = new File([new Uint8Array([1])], "photo.jpg", { type: "image/jpeg" });
         await userEvent.upload(document.querySelector("input[capture]") as HTMLInputElement, photo);
         expect(onPick).toHaveBeenCalledWith([{ kind: "upload", file: photo }]);
+    });
+});
+
+describe("the camera on a computer", () => {
+    class FakeRecorder {
+        static made: FakeRecorder[] = [];
+        state = "inactive";
+        mimeType = "video/webm";
+        ondataavailable: ((event: { data: Blob }) => void) | null = null;
+        onstop: (() => void) | null = null;
+        constructor() {
+            FakeRecorder.made.push(this);
+        }
+        start() {
+            this.state = "recording";
+        }
+        stop() {
+            this.state = "inactive";
+            this.ondataavailable?.({ data: new Blob([new Uint8Array([1])]) });
+            this.onstop?.();
+        }
+    }
+
+    function camera(refuseMicrophone: boolean) {
+        const track = { stop: vi.fn() };
+        const asked: MediaStreamConstraints[] = [];
+        Object.defineProperty(navigator, "mediaDevices", {
+            configurable: true,
+            value: {
+                getUserMedia: async (constraints: MediaStreamConstraints) => {
+                    asked.push(constraints);
+                    if (constraints.audio && refuseMicrophone) throw new Error("NotAllowedError");
+                    return { getTracks: () => [track] };
+                }
+            }
+        });
+        vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+        FakeRecorder.made = [];
+        vi.stubGlobal("MediaRecorder", FakeRecorder);
+        return { asked, track };
+    }
+
+    it("still takes photos and silent video when the microphone is refused", async () => {
+        const { asked } = camera(true);
+        render(
+            <CameraCapture
+                kinds={{ photo: "image/jpeg", video: true }}
+                phone={false}
+                onFiles={() => {}}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await waitFor(() =>
+            expect(
+                (screen.getByRole("button", { name: "Record a video" }) as HTMLButtonElement)
+                    .disabled
+            ).toBe(false)
+        );
+        expect(asked).toEqual([{ video: true, audio: true }, { video: true }]);
+    });
+
+    it("discards a video still recording when the camera is closed", async () => {
+        const { track } = camera(false);
+        const onFiles = vi.fn();
+        const view = render(
+            <CameraCapture kinds={{ photo: null, video: true }} phone={false} onFiles={onFiles} />,
+            { wrapper: MessagesWrapper }
+        );
+        const record = screen.getByRole("button", { name: "Record a video" }) as HTMLButtonElement;
+        await waitFor(() => expect(record.disabled).toBe(false));
+        await userEvent.click(record);
+        expect(FakeRecorder.made[0]?.state).toBe("recording");
+        view.unmount();
+        expect(FakeRecorder.made[0]?.state).toBe("inactive");
+        expect(track.stop).toHaveBeenCalled();
+        expect(onFiles).not.toHaveBeenCalled();
+    });
+
+    it("hands back a video when Stop is pressed", async () => {
+        camera(false);
+        const onFiles = vi.fn();
+        render(
+            <CameraCapture kinds={{ photo: null, video: true }} phone={false} onFiles={onFiles} />,
+            { wrapper: MessagesWrapper }
+        );
+        const record = screen.getByRole("button", { name: "Record a video" }) as HTMLButtonElement;
+        await waitFor(() => expect(record.disabled).toBe(false));
+        await userEvent.click(record);
+        await userEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+        expect(onFiles).toHaveBeenCalledTimes(1);
+        expect((onFiles.mock.calls[0]?.[0] as File[])[0]?.type).toBe("video/webm");
     });
 });

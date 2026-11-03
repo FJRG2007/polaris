@@ -163,6 +163,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [canRecord, setCanRecord] = useState(false);
     const [nativeDictation, setNativeDictation] = useState(false);
     const stopDictation = useRef<(() => void) | null>(null);
+    const dictationStarting = useRef(false);
 
     const [history, setHistory] = useState<HistoryEntry[] | null>(() =>
         readCache<HistoryEntry[]>("history")
@@ -487,12 +488,16 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const canDictate = serverDictation || nativeDictation;
     const dictate = async () => {
         if (dictating) return stopDictation.current?.();
+        if (dictationStarting.current) return;
         if (serverDictation) {
             let media: MediaStream;
+            dictationStarting.current = true;
             try {
                 media = await navigator.mediaDevices.getUserMedia({ audio: true });
             } catch {
                 return toast.show({ title: t("audio.micDenied") });
+            } finally {
+                dictationStarting.current = false;
             }
             const chunks: Blob[] = [];
             const started = Date.now();
@@ -738,11 +743,11 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     }
                 }}
                 onDrop={(event) => {
-                    const file = event.dataTransfer.files[0];
-                    if (!file) return;
+                    if (![...event.dataTransfer.types].includes("Files")) return;
                     event.preventDefault();
                     setDragging(false);
-                    take(file);
+                    const file = event.dataTransfer.files[0];
+                    if (file) take(file);
                 }}
             >
                 {dragging ? (

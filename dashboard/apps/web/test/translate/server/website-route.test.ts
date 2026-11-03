@@ -59,6 +59,39 @@ describe("POST /api/translate/website", () => {
         expect(mocks.safeUrl).toHaveBeenCalledWith("https://example.com/a");
     });
 
+    it("decodes a page in the charset its own meta tag declares when the header names none", async () => {
+        const page = (head: string, body: number[]) =>
+            new Uint8Array([...new TextEncoder().encode(head), ...body]);
+        mocks.follow.mockResolvedValueOnce(
+            new Response(page('<meta charset="windows-1251"><p>', [0xcf, 0xf0, 0xe8]), {
+                headers: { "content-type": "text/html" }
+            })
+        );
+        expect((await (await POST(ask({ url: "https://example.com" }))).json()).html).toBe(
+            '<meta charset="windows-1251"><p>При'
+        );
+        mocks.follow.mockResolvedValueOnce(
+            new Response(
+                page(
+                    '<meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS"><p>',
+                    [0x93, 0xfa, 0x96, 0x7b]
+                ),
+                { headers: { "content-type": "text/html" } }
+            )
+        );
+        expect((await (await POST(ask({ url: "https://example.com" }))).json()).html).toContain(
+            "日本"
+        );
+        mocks.follow.mockResolvedValueOnce(
+            new Response(page('<meta charset="shift_jis"><p>', [0xc3, 0xa9]), {
+                headers: { "content-type": "text/html; charset=utf-8" }
+            })
+        );
+        expect((await (await POST(ask({ url: "https://example.com" }))).json()).html).toContain(
+            "<p>é"
+        );
+    });
+
     it("refuses an address that is not http(s) before fetching anything", async () => {
         expect((await POST(ask({ url: "javascript:alert(1)" }))).status).toBe(400);
         expect((await POST(ask({ url: "file:///etc/passwd" }))).status).toBe(400);

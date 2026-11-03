@@ -60,11 +60,18 @@ export interface PastedItem {
 /**
  * What a paste carries for the box: a file it can translate (a copied picture,
  * a copied file), or null for text, which the text box takes as it always did.
- * A copied picture often arrives with its HTML or alt text beside it; the
- * picture wins, which is what the person copying it meant.
+ * A copied picture often arrives with its HTML beside it; the picture wins,
+ * which is what the person copying it meant. Text copied from Word, Excel or
+ * OneNote arrives with a picture of itself beside its plain text; the text
+ * wins there, so pasted text stays text.
  */
 export function pastedFile(items: ArrayLike<PastedItem> | null | undefined): File | null {
-    const files = Array.from(items ?? []).filter((item) => item.kind === "file");
+    const all = Array.from(items ?? []);
+    const carriesText = all.some(
+        (item) => item.kind === "string" && (item.type === "text/plain" || item.type === "text/rtf")
+    );
+    if (carriesText) return null;
+    const files = all.filter((item) => item.kind === "file");
     const ordered = [
         ...files.filter((item) => item.type.startsWith("image/")),
         ...files.filter((item) => !item.type.startsWith("image/"))

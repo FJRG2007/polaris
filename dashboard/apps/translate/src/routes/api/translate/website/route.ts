@@ -18,14 +18,42 @@ import { websiteRequest } from "../../../../model/input";
 /** The most of a page read, in bytes. */
 const PAGE_MAX_BYTES = 2 * 1024 * 1024;
 
-function charsetOf(contentType: string): string {
-    const named = /charset=["']?([\w-]+)/i.exec(contentType)?.[1]?.toLowerCase() ?? "utf-8";
+/** How much of a page is searched for its own `<meta charset>`. */
+const META_SNIFF_BYTES = 1024;
+
+function decoderFor(label: string | undefined, fromPage = false): TextDecoder | null {
+    if (!label) return null;
+    const named = label.toLowerCase();
     try {
-        new TextDecoder(named);
-        return named;
+        return new TextDecoder(fromPage && named.startsWith("utf-16") ? "utf-8" : named);
     } catch {
-        return "utf-8";
+        return null;
     }
+}
+
+/**
+ * The page's text in its own encoding: a byte order mark, else the header's
+ * charset, else the one the page declares in its first kilobyte
+ * (`<meta charset>` or `http-equiv`), else UTF-8, the order the HTML spec
+ * sniffs in.
+ */
+function decodePage(contentType: string, bytes: Uint8Array): string {
+    const head = new TextDecoder("windows-1252").decode(bytes.subarray(0, META_SNIFF_BYTES));
+    const declared = /<meta[^>]+charset\s*=\s*["']?\s*([\w.:-]+)/i.exec(head)?.[1];
+    const marked =
+        bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
+            ? "utf-8"
+            : bytes[0] === 0xfe && bytes[1] === 0xff
+              ? "utf-16be"
+              : bytes[0] === 0xff && bytes[1] === 0xfe
+                ? "utf-16le"
+                : undefined;
+    const decoder =
+        decoderFor(marked) ??
+        decoderFor(/charset=["']?([\w.:-]+)/i.exec(contentType)?.[1]) ??
+        decoderFor(declared, true) ??
+        new TextDecoder("utf-8");
+    return decoder.decode(bytes);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -55,7 +83,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     const bytes = await host.safeFetch.readCapped(response, PAGE_MAX_BYTES);
     if (!bytes) return refuse("tooLarge", t("website.tooLarge"), 413);
-    const html = new TextDecoder(charsetOf(contentType)).decode(bytes);
+    const html = decodePage(contentType, bytes);
     return Response.json(
         { url: url.toString(), html },
         { headers: { "cache-control": "no-store" } }
