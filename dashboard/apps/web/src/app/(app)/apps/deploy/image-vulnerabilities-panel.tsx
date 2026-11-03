@@ -11,6 +11,7 @@ import { Button } from "@polaris/ui";
 import { Loader2 } from "lucide-react";
 import { useProjectCan } from "./access-context";
 import { useCallback, useEffect, useState } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ImageFindingRow, ImageScanView } from "@/lib/security/image-findings";
 import { scanServiceImageAction, serviceImageFindingsAction } from "./image-scan-actions";
@@ -35,36 +36,45 @@ type Loaded =
 export function ImageVulnerabilitiesPanel({ applicationId }: { applicationId: string }) {
     const t = useTranslations("imageScans");
     const can = useProjectCan();
-    const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
+    const [busy, setBusy] = useState(false);
     const [pending, setPending] = useState(false);
     const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
-    const read = useCallback(
-        async (quiet = false) => {
-            if (!quiet) setLoaded({ status: "loading" });
-            const result = await serviceImageFindingsAction(applicationId).catch(
-                () => ({ error: "failed" }) as const
-            );
-            if ("error" in result) {
-                if (!quiet) setLoaded({ status: "failed" });
-                return;
-            }
-            setLoaded({ status: "ready", ...result });
-        },
-        [applicationId]
-    );
-
-    useEffect(() => {
-        void read();
-    }, [read]);
+    // Read through the shared live read, so two tabs on this service ask once
+    // between them while a scan is running, and a tab that comes back to it
+    // paints the last findings it showed straight away.
+    const load = useCallback(async () => {
+        const result = await serviceImageFindingsAction(applicationId).catch(
+            () => ({ error: "failed" }) as const
+        );
+        if ("error" in result) throw new Error("failed");
+        return result;
+    }, [applicationId]);
+    const live = useLiveRead({
+        load,
+        cacheKey: `deploy-image-findings:${applicationId}`,
+        intervalMs: 8000,
+        // Polled only while a scan is waiting or running, as before.
+        paused: !busy
+    });
+    // A failed read over findings already on screen keeps them; a retry over
+    // nothing shows the skeleton again until it answers.
+    // A kept copy whose first read failed is a failed first read: the panel
+    // renders what it rendered before there was a kept copy at all.
+    const firstFailed = live.kept && live.stale !== null;
+    const loaded: Loaded =
+        live.data && !firstFailed
+            ? { status: "ready", ...live.data }
+            : (live.error !== null || firstFailed) && !live.refreshing
+              ? { status: "failed" }
+              : { status: "loading" };
+    const read = live.refresh;
 
     const scan = loaded.status === "ready" ? loaded.scan : null;
-    const busy = scanBusy(scan);
+    const scanning = scanBusy(scan);
     useEffect(() => {
-        if (!busy) return;
-        const timer = setInterval(() => void read(true), 8000);
-        return () => clearInterval(timer);
-    }, [busy, read]);
+        setBusy(scanning);
+    }, [scanning]);
 
     async function scanNow() {
         setPending(true);
@@ -78,7 +88,7 @@ export function ImageVulnerabilitiesPanel({ applicationId }: { applicationId: st
             return;
         }
         setMessage({ text: t("queued"), error: false });
-        await read(true);
+        read();
     }
 
     const image = loaded.status === "ready" ? loaded.image : null;
@@ -102,7 +112,7 @@ export function ImageVulnerabilitiesPanel({ applicationId }: { applicationId: st
                         size="xs"
                         variant="outline"
                         className="ml-auto shrink-0"
-                        disabled={!mayScan || pending || busy || !image}
+                        disabled={!mayScan || pending || scanning || !image}
                         title={
                             !mayScan ? t("noScanRight") : !image ? t("notRunningHint") : undefined
                         }

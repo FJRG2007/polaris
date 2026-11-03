@@ -73,8 +73,19 @@ export function ProjectDetail({
     );
     useEffect(() => {
         if (!settling) return;
-        const timer = setInterval(refresh, 3000);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") refresh();
+        }, 3000);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") refresh();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settling]);
 

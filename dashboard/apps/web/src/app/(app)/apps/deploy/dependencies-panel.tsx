@@ -9,6 +9,7 @@
 
 import { relativeTime } from "@/lib/relative-time";
 import { useCallback, useEffect, useState } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
 import { useDisplayFormat } from "@/components/display-format";
 import { serviceDependenciesAction } from "./dependency-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -23,39 +24,48 @@ type Loaded =
 export function DependenciesPanel({ applicationId }: { applicationId: string }) {
     const t = useTranslations("deployService");
     const format = useDisplayFormat();
-    const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
+    const [busy, setBusy] = useState(false);
 
-    const read = useCallback(
-        async (quiet = false) => {
-            if (!quiet) setLoaded({ status: "loading" });
-            const result = await serviceDependenciesAction(applicationId).catch(() => ({
-                error: "failed"
-            }));
-            if ("error" in result && result.error) {
-                if (!quiet) setLoaded({ status: "failed" });
-                return;
-            }
-            const ok = result as {
-                scan?: DependencyScanView | null;
-                findings?: DependencyFinding[];
-            };
-            setLoaded({ status: "ready", scan: ok.scan ?? null, findings: ok.findings ?? [] });
-        },
-        [applicationId]
-    );
+    // Read through the shared live read, so two tabs on this service ask once
+    // between them while a scan is running, and a tab that comes back to it
+    // paints the last table it showed straight away.
+    const load = useCallback(async () => {
+        const result = await serviceDependenciesAction(applicationId).catch(() => ({
+            error: "failed"
+        }));
+        if ("error" in result && result.error) throw new Error("failed");
+        const ok = result as {
+            scan?: DependencyScanView | null;
+            findings?: DependencyFinding[];
+        };
+        return { scan: ok.scan ?? null, findings: ok.findings ?? [] };
+    }, [applicationId]);
+    const live = useLiveRead({
+        load,
+        cacheKey: `deploy-dependencies:${applicationId}`,
+        intervalMs: 8000,
+        // Polled only while a scan is waiting or running, as before.
+        paused: !busy
+    });
+    // A failed read over a table already on screen keeps the table; a retry
+    // over nothing shows the skeleton again until it answers.
+    // A kept copy whose first read failed is a failed first read: the panel
+    // renders what it rendered before there was a kept copy at all.
+    const firstFailed = live.kept && live.stale !== null;
+    const loaded: Loaded =
+        live.data && !firstFailed
+            ? { status: "ready", ...live.data }
+            : (live.error !== null || firstFailed) && !live.refreshing
+              ? { status: "failed" }
+              : { status: "loading" };
+    const read = live.refresh;
 
-    useEffect(() => {
-        void read();
-    }, [read]);
-
-    const busy =
+    const scanning =
         loaded.status === "ready" &&
         (loaded.scan?.state === "queued" || loaded.scan?.state === "running");
     useEffect(() => {
-        if (!busy) return;
-        const timer = setInterval(() => void read(true), 8000);
-        return () => clearInterval(timer);
-    }, [busy, read]);
+        setBusy(scanning);
+    }, [scanning]);
 
     const labels: VulnerabilityTableLabels = {
         failed: t("dependencies.failed"),

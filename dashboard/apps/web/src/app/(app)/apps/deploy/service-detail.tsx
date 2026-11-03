@@ -817,8 +817,19 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     // three seconds with nothing left to learn.
     useEffect(() => {
         if (!items?.some((item) => !isSettled(item))) return;
-        const timer = setInterval(reload, 3000);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") reload();
+        }, 3000);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") reload();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [items]);
 
