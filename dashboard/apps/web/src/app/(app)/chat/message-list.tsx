@@ -67,6 +67,10 @@ import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView, ChatQuoteView } from "@/lib/chat/messages";
 import type { ChatReferenceView } from "@/lib/chat/references";
 import { RichText } from "@/components/rich-text/rich-text";
+import type { ChatTranslationPrefs } from "@polaris/core";
+import { translatesIncoming } from "@/lib/text-translation/logic";
+import { useTextTranslator } from "@/components/text-translation/provider";
+import { TranslateButton, TranslatableText, TranslationNote } from "./translated-body";
 import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
@@ -316,6 +320,10 @@ export interface MessageListProps {
     /** The space's own emoji, to draw in the text and offer for reactions.
      *  Null outside a space, where every token reads as its name. */
     emoji?: SpaceEmojiScope | null;
+    /** This reader's live translation here: with `incoming` on, what the
+     *  others write is shown in the reader's language as it comes into view.
+     *  Absent is off. */
+    liveTranslation?: ChatTranslationPrefs;
 }
 
 export function MessageList({
@@ -338,7 +346,8 @@ export function MessageList({
     onDelete,
     onMention,
     emoji = null,
-    coverMedia = false
+    coverMedia = false,
+    liveTranslation
 }: MessageListProps) {
     useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
     const { refresh } = useChat();
@@ -474,6 +483,7 @@ export function MessageList({
                                 quick={quick}
                                 emoji={emoji}
                                 message={message}
+                                liveTranslation={liveTranslation}
                                 grouped={grouped}
                                 // The ticks go under the last message of a block and
                                 // nowhere else. Somebody who has read the newest of
@@ -743,7 +753,8 @@ function Message({
     onNickname,
     onError,
     quick,
-    emoji
+    emoji,
+    liveTranslation
 }: {
     message: ChatMessageView;
     grouped: boolean;
@@ -791,6 +802,7 @@ function Message({
     quick: readonly string[];
     /** The space's own emoji - see `MessageListProps`. */
     emoji: SpaceEmojiScope | null;
+    liveTranslation?: ChatTranslationPrefs;
 }) {
     const t = useTranslations("chat");
     const format = useDisplayFormat();
@@ -830,6 +842,12 @@ function Message({
             : undefined
     );
     const coverAll = useContext(CoverMedia);
+    const translator = useTextTranslator();
+    const live = Boolean(
+        translator &&
+        liveTranslation &&
+        translatesIncoming(message, viewerId, liveTranslation, translator.target)
+    );
 
     // Something Polaris said rather than somebody: joined, left, was added.
     // Indented to where message text starts rather than to the avatar gutter,
@@ -1087,14 +1105,16 @@ function Message({
                             </p>
                         ) : (
                             <div className="text-sm">
-                                <RichText
-                                    value={message.body}
-                                    origin={baseUrl}
-                                    references={referenced(message)}
-                                    customEmoji={emojiSet}
-                                    jumboEmoji
-                                    flaggedLinks={message.flaggedLinks}
-                                />
+                                <TranslatableText id={message.id} body={message.body} live={live}>
+                                    <RichText
+                                        value={message.body}
+                                        origin={baseUrl}
+                                        references={referenced(message)}
+                                        customEmoji={emojiSet}
+                                        jumboEmoji
+                                        flaggedLinks={message.flaggedLinks}
+                                    />
+                                </TranslatableText>
                                 {/* Under the last message of a block only. Five ticks
                             down a run of five messages say the same thing five
                             times, and seeing the newest is seeing the rest. */}
@@ -1116,6 +1136,11 @@ function Message({
                                         (edited)
                                     </button>
                                 )}
+                                <TranslationNote
+                                    id={message.id}
+                                    body={message.body}
+                                    translated={message.translated}
+                                />
                             </div>
                         )}
 
@@ -1376,6 +1401,7 @@ function Message({
                                     <CornerUpLeft className="size-3.5" />
                                 </button>
                             )}
+                            <TranslateButton message={message} />
                             {onOpenThread && (
                                 <button
                                     type="button"
