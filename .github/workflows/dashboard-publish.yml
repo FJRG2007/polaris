@@ -61,6 +61,9 @@ on:
   # CVE that base has since been patched for. The sidecars kept a vulnerable Node
   # for exactly that reason after the web image had been fixed. A scheduled run
   # rebuilds all, the same as a manual one, so a patched base reaches every image.
+  # Every build step pulls its base fresh (`pull: true`), and the scheduled run
+  # also skips the layer cache (`no-cache`): otherwise a cached `apt-get upgrade`
+  # or `apk upgrade` layer keeps the packages it installed the first time.
   schedule:
     - cron: "23 3 * * 1"
   workflow_dispatch:
@@ -334,6 +337,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/docker/Dockerfile
           build-args: |
@@ -359,6 +364,8 @@ jobs:
       - name: Export the app bundles
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/docker/Dockerfile
           target: app-bundles
@@ -401,6 +408,8 @@ jobs:
         continue-on-error: true
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/docker/Dockerfile
           target: next-cache-out
@@ -466,6 +475,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard/mdns
           push: ${{ env.PUBLISH == 'true' }}
           tags: ghcr.io/fjrg2007/polaris-mdns:latest
@@ -508,6 +519,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: .
           file: crates/polaris-hostd/Dockerfile
           platforms: ${{ matrix.platform }}
@@ -586,6 +599,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard/docker/updater
           platforms: linux/amd64,linux/arm64
           push: ${{ env.PUBLISH == 'true' }}
@@ -618,6 +633,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/messaging-bridge/Dockerfile
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge
@@ -658,6 +675,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/edge-guard/Dockerfile
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard
@@ -698,6 +717,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/hytale/Dockerfile
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hytale
@@ -731,6 +752,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/camera-relay/Dockerfile
           # A camera can be on an arm board at the far end of the house, so the
@@ -771,6 +794,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/matter-bridge/Dockerfile
           # The bridge runs beside the relay, so it follows the same machines.
@@ -810,6 +835,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/mqtt-broker/Dockerfile
           platforms: linux/amd64,linux/arm64
@@ -848,6 +875,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/dns-blocker/Dockerfile
           platforms: linux/amd64,linux/arm64
@@ -880,6 +909,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/vpn/Dockerfile
           platforms: linux/amd64,linux/arm64
@@ -912,6 +943,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/vision/Dockerfile
           # Detection is the work most likely to be sent to a small board in a
@@ -954,6 +987,8 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           context: dashboard
           file: dashboard/services/face/Dockerfile
           # Same reach as the worker: this is the other half of the same job, and
