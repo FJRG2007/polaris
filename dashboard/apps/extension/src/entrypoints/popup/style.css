@@ -1231,7 +1231,6 @@ button.copied {
     overflow-wrap: anywhere;
 }
 
-.problem.inline,
 .add-name {
     display: flex;
     flex-direction: column;
@@ -1239,6 +1238,7 @@ button.copied {
     min-width: 0;
 }
 
+.problem.inline,
 .add-server .check {
     margin: 0;
 }
