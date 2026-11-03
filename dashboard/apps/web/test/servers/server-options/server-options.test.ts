@@ -17,6 +17,8 @@ vi.mock("@/lib/deploy-project-access", () => ({
     requireEnvironmentAccess: (...args: unknown[]) => requireEnvironmentAccess(...args)
 }));
 
+vi.unmock("@/app/(app)/server-options-actions");
+
 const { listServerOptionsAction } = await import("@/app/(app)/server-options-actions");
 const { encodeServerCursor, findLocalHost } = await import("@/lib/server-options");
 const { SERVER_OPTIONS_MAX_PAGE, SERVER_OPTIONS_PAGE } =

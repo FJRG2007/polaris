@@ -210,7 +210,8 @@ const EAGER_UI = [
     "appAppsInstalledIdAccessActions.installAccessAction",
     "appAppsInstalledIdAccessActions.revokeInstallAccessAction",
     "appAppsInstalledIdAccessActions.shareInstallAction",
-    "arcadeInvite.gameInviteAccess"
+    "arcadeInvite.gameInviteAccess",
+    "serverPicker.dropServerOptions"
 ];
 
 function sourceOf(module: string): string {

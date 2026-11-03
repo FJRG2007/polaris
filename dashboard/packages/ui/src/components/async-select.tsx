@@ -285,7 +285,7 @@ function AsyncPicker<T>({
                     <div
                         ref={scroller}
                         aria-busy={list.loadingMore}
-                        className="min-h-0 flex-1 overflow-y-auto"
+                        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
                     >
                         <div className="relative w-full" style={{ height: virtual.getTotalSize() }}>
                             {drawn.map((slot) => {

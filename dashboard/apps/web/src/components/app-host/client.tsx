@@ -35,7 +35,6 @@ import { relativeTime } from "@/lib/relative-time";
 import { IntegrationLogo } from "@/components/logos";
 import { TpLinkMark } from "@/components/brand-icons";
 import { CopyButton } from "@/components/copy-button";
-import { dropServerOptions, ServerMultiPicker, ServerPicker } from "@/components/server-picker";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { subscribeSharedStream } from "@/lib/shared-stream";
@@ -95,6 +94,21 @@ const GameInviteDialog = dynamic(
 );
 const gameInviteAccess = () =>
     import("@/app/(app)/chat/activity-card-actions").then((module) => module.gameInviteAccess());
+
+/** The server pickers read their pages through a server action, which nothing
+ *  that merely renders a screen should pay for. */
+const ServerPicker = dynamic(
+    () => import("@/components/server-picker").then((module) => module.ServerPicker),
+    { ssr: false }
+);
+
+const ServerMultiPicker = dynamic(
+    () => import("@/components/server-picker").then((module) => module.ServerMultiPicker),
+    { ssr: false }
+);
+
+const dropServerOptions = () =>
+    import("@/components/server-picker").then((module) => module.dropServerOptions());
 
 const Avatar = dynamic(() => import("@/components/avatar").then((module) => module.Avatar), {
     ssr: false
