@@ -1,11 +1,19 @@
-/** One Polaris app's administrator settings. */
+/**
+ * One Polaris app's administrator settings: the address the app's menu and
+ * page open. A native app draws its settings here; an installable app draws
+ * them among its own routes, named by `settingsAt` in its catalog entry, and
+ * this sends the reader there - so every app's settings have the same address
+ * whichever code draws them.
+ */
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { appSettingsPath } from "@/lib/apps/app-settings";
 import { PageHeader } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
+import { hasAppInstall } from "@/app/(app)/apps/marketplace/store-installs";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -17,10 +25,13 @@ export default async function PolarisAppSettingsPage({
 }: {
     params: Promise<{ appId: string }>;
 }) {
-    await requireAdmin();
+    const user = await requireAdmin();
     const { appId } = await params;
     const app = findStoreApp(appId);
-    if (!app || appId !== "vpn") notFound();
+    if (!app?.settingsAt) notFound();
+    if (!(await hasAppInstall(user, app.id))) redirect(`/admin/apps/${encodeURIComponent(app.id)}`);
+    if (app.settingsAt !== appSettingsPath(app.id)) redirect(app.settingsAt);
+    if (app.id !== "vpn") notFound();
     const t = await getTranslations("marketplace");
     return (
         <Messages namespaces={["vpn"]}>

@@ -211,6 +211,14 @@ export interface AppManifest {
      * lands here instead, and so does every link that names the install.
      */
     opensAt?: string;
+    /**
+     * Where an administrator changes how this app works for the whole Polaris,
+     * for an app that has such settings. It is what the app's menu under
+     * Management > Polaris apps offers as Settings, and where
+     * /admin/apps/<id>/settings sends them - a native app's own page there, or
+     * an installable app's settings screen among its own routes.
+     */
+    settingsAt?: string;
     /** Declared but not yet installable - shown locked in the marketplace. */
     comingSoon?: boolean;
     /**
@@ -310,6 +318,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         category: "Productivity",
         icon: CalendarDays,
         opensAt: "/calendar",
+        settingsAt: "/calendar/admin",
         summary: "Your calendars and the ones you link, with invitations and booking pages.",
         description:
             "Keep calendars in Polaris and see Google, Outlook, iCloud and any CalDAV calendar beside them, synced both ways. Day, week, month, year and agenda views, repeating events, reminders, invitations people answer from their inbox, finding a time that suits everybody, sharing with people and teams, public links, and booking pages for anybody outside Polaris.", // i18n-ignore
@@ -384,6 +393,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         category: "Productivity",
         icon: Languages,
         opensAt: "/translate",
+        settingsAt: "/translate/settings",
         summary: "Translate text between languages, in the browser or with your own keys.",
         description:
             "Type or paste text and read it in another language as you write, with the language detected for you. Translation runs in the browser where it can, on Polar's model, or on DeepL and Google Cloud with your own keys, and the screen always says which one answered. Your recent translations are kept for you alone. Uninstalling keeps nothing running.", // i18n-ignore
@@ -514,6 +524,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         category: "Tools",
         icon: Waypoints,
         opensAt: "/vpn",
+        settingsAt: "/admin/apps/vpn/settings",
         summary: "A private VPN for your people, on your own servers.",
         keywords: VPN_KEYWORDS,
         description:

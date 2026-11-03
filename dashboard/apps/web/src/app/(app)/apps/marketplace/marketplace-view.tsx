@@ -30,6 +30,7 @@ import { AppMark } from "@/components/app-mark";
 import { replacedLogos } from "@/lib/apps/replaces";
 import { BuiltInAppsSection } from "@polaris/ui/built-in-apps";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
+import { appSettingsHref } from "@/lib/apps/app-settings";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { BuiltInAlternativeNote } from "./built-in-alternative";
@@ -174,6 +175,7 @@ export function MarketplaceView({
             disabled={installingId !== null}
             featured={featuredCard}
             openable={openable}
+            settingsHref={scope === "polaris" ? appSettingsHref(app) : null}
             onInstall={() => (app.deployTemplate ? setDeploying(app) : install(app))}
             onConfigure={() => setWizardApp(app)}
             onUninstall={setRemoving}
@@ -259,7 +261,11 @@ export function MarketplaceView({
             {error && <p className="text-sm text-danger">{error}</p>}
 
             {browsing && installed.length > 0 && (
-                <InstalledSection installed={installed} onUninstall={setRemoving} />
+                <InstalledSection
+                    installed={installed}
+                    admin={scope === "polaris"}
+                    onUninstall={setRemoving}
+                />
             )}
 
             {scope === "polaris" && <BuiltInSection query={query} />}
@@ -374,9 +380,12 @@ function ownInstalls<T extends InstalledAppReaderView>(installed: readonly T[]):
 
 function InstalledSection({
     installed,
+    admin,
     onUninstall
 }: {
     installed: StoreInstallRow[];
+    /** The administrators' Polaris apps screen, where an app's settings are offered. */
+    admin: boolean;
     onUninstall: (item: StoreInstallRow) => void;
 }) {
     const t = useTranslations("marketplace");
@@ -400,6 +409,13 @@ function InstalledSection({
                             key: "details",
                             label: t("card.details"),
                             onSelect: () => router.push(listingHref(manifest))
+                        });
+                    const settings = admin && manifest ? appSettingsHref(manifest) : null;
+                    if (settings)
+                        entries.push({
+                            key: "settings",
+                            label: t("detail.settings"),
+                            onSelect: () => router.push(settings)
                         });
                     // Offered from the same check the uninstall action makes, so a
                     // reader the server would refuse is never shown it.
@@ -520,6 +536,7 @@ function StoreCard({
     disabled,
     featured,
     openable,
+    settingsHref,
     onInstall,
     onConfigure,
     onUninstall
@@ -533,6 +550,9 @@ function StoreCard({
     disabled: boolean;
     featured: boolean;
     openable: ReadonlySet<string>;
+    /** Where an administrator changes how the app works here, for an app that
+     *  has such settings, offered once it is installed. */
+    settingsHref: string | null;
     onInstall: () => void;
     onConfigure: () => void;
     onUninstall: (item: StoreInstallRow) => void;
@@ -552,6 +572,12 @@ function StoreCard({
     const entries: OverflowEntry[] = [
         { key: "details", label: t("card.details"), onSelect: () => router.push(detailHref) }
     ];
+    if (settingsHref && installs.length > 0)
+        entries.push({
+            key: "settings",
+            label: t("detail.settings"),
+            onSelect: () => router.push(settingsHref)
+        });
     if (action.kind === "install" && action.configurable)
         entries.push({
             key: "configure",

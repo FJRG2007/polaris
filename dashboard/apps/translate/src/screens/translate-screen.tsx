@@ -28,7 +28,7 @@ import {
     useToast,
     type SearchableSelectOption
 } from "@polaris/ui";
-import { SettingsDialog } from "./settings-dialog";
+import { useLanguageOptions } from "./language-options";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
 import { readCache, unwrap, useTranslateLocale, useTranslateT, writeCache } from "./i18n";
@@ -47,13 +47,7 @@ import {
     type ServerEngineId
 } from "../model/schemas";
 import { forgetAction, forgetAllAction, historyAction, rememberAction } from "../actions/translate";
-import {
-    AUTO,
-    LANGUAGE_CODES,
-    languageName,
-    normalizeDetected,
-    type SourceLanguage
-} from "../model/languages";
+import { AUTO, languageName, normalizeDetected, type SourceLanguage } from "../model/languages";
 
 /** How long typing has to pause before a request leaves. */
 const DEBOUNCE_MS = 450;
@@ -88,19 +82,6 @@ function isLoaded(loaded: Loaded | null, now: Loaded): boolean {
     );
 }
 
-function useLanguageOptions(locale: string): SearchableSelectOption[] {
-    return useMemo(
-        () =>
-            LANGUAGE_CODES.map((code) => ({
-                value: code,
-                label: languageName(code, locale),
-                // Found by its English name and code too, whatever the screen's language.
-                keywords: `${languageName(code, "en")} ${code}`
-            })).sort((a, b) => String(a.label).localeCompare(String(b.label), locale)),
-        [locale]
-    );
-}
-
 export function TranslateScreen({ manager }: { manager: boolean }) {
     const t = useTranslateT();
     const locale = useTranslateLocale();
@@ -112,7 +93,6 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     );
     const [statusFailed, setStatusFailed] = useState(false);
     const [browser, setBrowser] = useState(false);
-    const [settingsOpen, setSettingsOpen] = useState(false);
 
     const [from, setFrom] = useState<SourceLanguage>(AUTO);
     const [to, setTo] = useState<string | null>(null);
@@ -395,9 +375,11 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 description={t("description")}
                 actions={
                     manager ? (
-                        <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
-                            <Settings2 className="size-4 shrink-0" aria-hidden />
-                            {t("actions.settings")}
+                        <Button asChild variant="outline" size="sm">
+                            <Link href="/admin/apps/translate/settings">
+                                <Settings2 className="size-4 shrink-0" aria-hidden />
+                                {t("actions.settings")}
+                            </Link>
                         </Button>
                     ) : null
                 }
@@ -631,14 +613,6 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 pending={clearPending}
                 onConfirm={() => void clearAll()}
             />
-            {manager ? (
-                <SettingsDialog
-                    open={settingsOpen}
-                    onOpenChange={setSettingsOpen}
-                    onSaved={() => void loadStatus()}
-                    languages={languages}
-                />
-            ) : null}
         </div>
     );
 }
