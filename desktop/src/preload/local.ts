@@ -13,7 +13,7 @@ import { CHANNELS, type PolarisLocal, type PushEvent, type TvInstallState } from
 const bridge: PolarisLocal = {
     connect: {
         state: () => ipcRenderer.invoke(CHANNELS.connectState),
-        submit: (address) => ipcRenderer.invoke(CHANNELS.connectSubmit, address),
+        submit: (address, name) => ipcRenderer.invoke(CHANNELS.connectSubmit, { address, name: name ?? "" }),
         check: (address) => ipcRenderer.invoke(CHANNELS.connectCheck, address),
         switchTo: (origin) => ipcRenderer.invoke(CHANNELS.connectSwitch, origin),
         rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
