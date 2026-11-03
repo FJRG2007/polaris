@@ -30,7 +30,12 @@ import {
     vendorNote
 } from "../../lib/vendors";
 import { usePlacesT } from "../use-places-t";
-import { MATTER_VENDOR, matterCodeIssue, parseMatterPath } from "../../lib/matter-code";
+import {
+    MATTER_VENDOR,
+    leavesMatterBridge,
+    matterCodeIssue,
+    parseMatterPath
+} from "../../lib/matter-code";
 import { usePlaceRooms } from "../use-place-rooms";
 import type { PlacesTranslator } from "../../lib/i18n";
 import {
@@ -238,7 +243,10 @@ export function CameraDialog({
     /** A Matter camera is added with the code its own app shares, once; after
      *  that it is where the bridge keeps it and the code is never asked again. */
     const matter = vendorId === MATTER_VENDOR;
-    const matterAdded = matter && parseMatterPath(form.mainPath) !== null;
+    const matterAdded =
+        matter &&
+        parseMatterPath(form.mainPath) !== null &&
+        !(camera && leavesMatterBridge(camera, { vendor: vendorId, reachVia: form.reachVia }));
     const codeIssue = matter && !matterAdded ? matterCodeIssue(form.password) : null;
     /** Whether this camera could ever report its own movement. */
     const ownAlerts = reportsOwnAlerts(form.vendor);

@@ -54,6 +54,32 @@ describe("Matter pairing codes", () => {
     });
 });
 
+describe("a Matter camera that changes machine", () => {
+    const added = { vendor: "matter", mainPath: "/cameras/7/1", reachVia: "server:a" };
+
+    it("leaves its bridge when it moves to another machine or another make", () => {
+        expect(code.leavesMatterBridge(added, { vendor: "matter", reachVia: "server:b" })).toBe(
+            true
+        );
+        expect(code.leavesMatterBridge(added, { vendor: "matter", reachVia: "direct" })).toBe(true);
+        expect(code.leavesMatterBridge(added, { vendor: "generic", reachVia: "server:a" })).toBe(
+            true
+        );
+    });
+
+    it("stays on it for any other edit, and only once it has been added", () => {
+        expect(code.leavesMatterBridge(added, { vendor: "matter", reachVia: "server:a" })).toBe(
+            false
+        );
+        expect(
+            code.leavesMatterBridge(
+                { ...added, mainPath: "" },
+                { vendor: "matter", reachVia: "server:b" }
+            )
+        ).toBe(false);
+    });
+});
+
 describe("Matter bridge signalling", () => {
     const target = { nodeId: 12, endpointId: 1 };
 

@@ -28,6 +28,7 @@ import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "./dete
 import { host } from "@polaris/app-host";
 import * as rooms from "./rooms";
 import { endCameraTalk } from "./talk";
+import { MATTER_VENDOR, leavesMatterBridge } from "./matter-code";
 
 const { dropGrantsFor } = host.accessGrants;
 
@@ -350,13 +351,23 @@ export async function updateCamera(
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({
         where: { id, installedAppId },
-        select: { id: true, placeId: true, address: true, vendor: true, reachVia: true }
+        select: {
+            id: true,
+            placeId: true,
+            address: true,
+            vendor: true,
+            reachVia: true,
+            mainPath: true
+        }
     });
     if (!existing) throw new HomeError("Camera not found");
     const moved = existing.address !== input.address || existing.vendor !== input.vendor;
     const roomId = await settledRoom(installedAppId, input, existing.placeId);
     const vendor = cameraVendor(input.vendor);
-    const paths = resolvePaths(input);
+    const rejoins = leavesMatterBridge(existing, input) && input.vendor === MATTER_VENDOR;
+    if (rejoins && !input.password)
+        throw new HomeError("Type the pairing code the camera's app shared");
+    const paths = rejoins ? { mainPath: "", subPath: "" } : resolvePaths(input);
     // A battery camera is not dialled by the availability pass, and that pass is
     // the only thing that clears an outage. One moved onto a battery make while
     // it was down would keep the clock it was carrying for good: every screen

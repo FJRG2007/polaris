@@ -39,7 +39,7 @@ import * as privacy from "../lib/privacy";
 import * as tapoControls from "../lib/tapo-controls";
 import * as talk from "../lib/talk";
 import * as matter from "../lib/matter-bridge";
-import { MATTER_VENDOR } from "../lib/matter-code";
+import { MATTER_VENDOR, leavesMatterBridge } from "../lib/matter-code";
 import { tapoCommandSchema, type TapoControls } from "../lib/camera-control-kinds";
 import * as cameraSets from "../lib/camera-sets";
 import {
@@ -622,9 +622,14 @@ export async function saveCameraAction(
             if (!allowed.has(parsed.data.storageTarget))
                 throw new Error("That storage is not one of yours");
         }
-        return id
-            ? cameras.updateCamera(install.id, id, parsed.data)
-            : cameras.createCamera(install.id, parsed.data);
+        if (!id) return cameras.createCamera(install.id, parsed.data);
+        const before = await cameras.getCamera(install.id, id);
+        const saved = await cameras.updateCamera(install.id, id, parsed.data);
+        if (before && leavesMatterBridge(before, saved)) {
+            const bridge = await matter.matterBridge(relay.relayServerFor(before.reachVia));
+            if (bridge) await matter.forgetMatter(bridge, before.mainPath);
+        }
+        return saved;
     });
     if (result.error || !result.value)
         return { error: result.error ?? (await say("actions.cameraNotSaved")) };

@@ -101,3 +101,25 @@ export function matterRelaySource(bridgeUrl: string, path: string, token: string
     const ws = bridgeUrl.replace(/^http/, "ws").replace(/\/$/, "");
     return `webrtc:${ws}${path}/webrtc?${new URLSearchParams({ token }).toString()}`;
 }
+
+/** The machine whose bridge a camera reached this way is commissioned on. */
+function bridgeMachineOf(reachVia: string): string {
+    return reachVia.startsWith("server:") ? reachVia.slice("server:".length) : "local";
+}
+
+/**
+ * Whether a save takes an added Matter camera off the bridge that holds it: a
+ * node id only means something on the fabric that commissioned it, so a camera
+ * moved to another machine, or to another make, has to leave that fabric and,
+ * if it stays a Matter camera, be added again with a new code.
+ */
+export function leavesMatterBridge(
+    before: { vendor: string; mainPath: string | null; reachVia: string },
+    after: { vendor: string; reachVia: string }
+): boolean {
+    if (before.vendor !== MATTER_VENDOR || !parseMatterPath(before.mainPath)) return false;
+    return (
+        after.vendor !== MATTER_VENDOR ||
+        bridgeMachineOf(before.reachVia) !== bridgeMachineOf(after.reachVia)
+    );
+}

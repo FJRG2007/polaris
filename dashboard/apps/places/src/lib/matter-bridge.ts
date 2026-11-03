@@ -155,6 +155,25 @@ export async function addMatterCamera(
     target: CameraTarget
 ): Promise<void> {
     if (parseMatterPath(streamPathOf(target.mainUrl))) return;
+    const running = adding.get(target.id);
+    if (running) return running;
+    const attempt = commissionOnce(installedAppId, ownerId, actorId, target).finally(() =>
+        adding.delete(target.id)
+    );
+    adding.set(target.id, attempt);
+    return attempt;
+}
+
+/** The camera being added right now, by id: a pairing window takes one
+ *  commission, so a second start waits on the first instead of racing it. */
+const adding = new Map<string, Promise<void>>();
+
+async function commissionOnce(
+    installedAppId: string,
+    ownerId: string,
+    actorId: string,
+    target: CameraTarget
+): Promise<void> {
     if (!target.password) throw new HomeError("Type the pairing code the camera's app shared");
     const bridge = await ensureMatterBridge(ownerId, actorId, relayServerFor(target.reachVia));
     const path = await commissionMatter(bridge, target.password, target.address);
