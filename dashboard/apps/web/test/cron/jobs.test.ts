@@ -123,6 +123,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would take two base backups of the same instance, and
             // two replication checks could each find a copy stopped and start one.
             "database-archives",
+            // Two passes would list the same machine and race to remove the same
+            // dead sidecar containers.
+            "dead-containers",
             // Two passes would each read the same due rules; the claim on each
             // rule's next firing is the second guard, not the only one.
             "deploy-automations",
