@@ -20,8 +20,10 @@ import type {
     DeviceCommand,
     DeviceAction,
     DeviceKind,
+    DeviceReach,
     DeviceState,
-    DoorState
+    DoorState,
+    SwitchSettings
 } from "../device-kinds";
 
 /** The fields a connection asked for, by the key the registry gave them. Opaque
@@ -81,6 +83,12 @@ export interface DeviceSnapshot {
     readonly appliance?: ApplianceView | null;
     /** What a litter box is doing, how full it is and who used it. */
     readonly litter?: LitterView | null;
+    /** A switch's or a socket's settings beside on and off, as far as it
+     *  reports them: power-on state, indicator, child lock, timer. */
+    readonly switchSettings?: SwitchSettings | null;
+    /** Whether it was read on this network or through the maker's cloud, for
+     *  a make that can be reached both ways. Absent for every other make. */
+    readonly reach?: DeviceReach | null;
 }
 
 /** One thing that happened, as the vendor's own record of it. */

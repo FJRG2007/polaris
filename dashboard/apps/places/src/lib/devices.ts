@@ -77,6 +77,8 @@ const DEVICE_FIELDS = {
     light: true,
     appliance: true,
     litter: true,
+    switchSettings: true,
+    reach: true,
     stateAt: true,
     labels: { select: { labelId: true }, take: labels.LABEL_LIMITS.perDevice }
 } as const;
@@ -106,6 +108,8 @@ type DeviceRow = {
     light: Prisma.JsonValue | null;
     appliance: Prisma.JsonValue | null;
     litter: Prisma.JsonValue | null;
+    switchSettings: Prisma.JsonValue | null;
+    reach: string | null;
     stateAt: Date | null;
     labels?: { labelId: string }[];
 };
@@ -170,6 +174,22 @@ function litterColumn(
     return parsed ? (parsed as Prisma.InputJsonValue) : Prisma.DbNull;
 }
 
+/** A switch's or a socket's settings, as stored. Null for every other kind. */
+function switchSettingsOf(
+    row: Pick<DeviceRow, "kind" | "switchSettings">
+): kinds.SwitchSettings | null {
+    return kinds.isSwitchSettingsKind(kinds.deviceKind(row.kind))
+        ? kinds.switchSettingsView(row.switchSettings)
+        : null;
+}
+
+function switchSettingsColumn(
+    view: kinds.SwitchSettings | null | undefined
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    const parsed = view ? kinds.switchSettingsView(view) : null;
+    return parsed ? (parsed as Prisma.InputJsonValue) : Prisma.DbNull;
+}
+
 function climateOf(row: DeviceRow): kinds.ClimateView | null {
     if (kinds.deviceKind(row.kind) !== "climate") return null;
     const settings = kinds.climateSettings(row.climate);
@@ -204,6 +224,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         light: lightOf(row),
         appliance: applianceOf(row),
         litter: litterOf(row),
+        switchSettings: switchSettingsOf(row),
+        reach: kinds.deviceReach(row.reach),
         accountId: row.accountId
     };
 }
@@ -335,7 +357,7 @@ export async function actOnDevice(
     command?: kinds.DeviceCommand
 ): Promise<kinds.DeviceView> {
     const device = await requireDevice(installedAppId, id);
-    if (!kinds.actionsFor(device.kind).includes(action)) {
+    if (!kinds.acceptsAction(device.kind, action)) {
         const what = kinds.DEVICE_KIND_LABELS[kinds.deviceKind(device.kind)].toLowerCase();
         throw new HomeError(`A ${what} cannot be told to ${kinds.DEVICE_ACTION_VERBS[action]}`);
     }
@@ -358,7 +380,8 @@ export async function actOnDevice(
         climate: kinds.climateSettings(device.climate),
         air: airOf(device),
         light: lightOf(device),
-        litter: litterOf(device)
+        litter: litterOf(device),
+        switchSettings: switchSettingsOf(device)
     };
     if (kinds.needsCommand(action)) {
         if (!command || command.action !== action) throw new HomeError("Say what to set it to");
@@ -426,7 +449,9 @@ export async function actOnDevice(
               ? { light: lightColumn(applied.light) }
               : "litter" in applied
                 ? { litter: litterColumn(applied.litter) }
-                : { air: airColumn(applied.air) }
+                : "switchSettings" in applied
+                  ? { switchSettings: switchSettingsColumn(applied.switchSettings) }
+                  : { air: airColumn(applied.air) }
         : kinds.needsCommand(action) ||
             action === "stop" ||
             kinds.deviceKind(device.kind) === "litter"
@@ -567,6 +592,8 @@ async function syncAccount(
                 light: lightColumn(snapshot.light),
                 appliance: applianceColumn(snapshot.appliance),
                 litter: litterColumn(snapshot.litter),
+                switchSettings: switchSettingsColumn(snapshot.switchSettings),
+                reach: snapshot.reach ?? null,
                 stateAt: new Date()
             };
             const saved = await prisma.placeDevice.upsert({

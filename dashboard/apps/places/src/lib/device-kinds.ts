@@ -43,11 +43,21 @@ import {
     type LightCommand,
     type LightSettings
 } from "./light-kinds";
+import {
+    applySwitch,
+    isSwitchSettingsKind,
+    switchCommandIssue,
+    switchCommandSchema,
+    type DeviceReach,
+    type SwitchCommand,
+    type SwitchSettings
+} from "./switch-kinds";
 
 export * from "./air-kinds";
 export * from "./appliance-kinds";
 export * from "./litter-kinds";
 export * from "./light-kinds";
+export * from "./switch-kinds";
 
 /** What a device does, which is what decides the buttons it gets. */
 export const DEVICE_KINDS = [
@@ -411,6 +421,19 @@ export function actionsFor(kind: string): readonly DeviceAction[] {
     return KIND_ACTIONS[deviceKind(kind)];
 }
 
+/**
+ * Whether a device of this kind may be told this. Its buttons, plus a switch's
+ * or a socket's settings, which are a panel of their own rather than a button:
+ * kept out of `actionsFor` so no row, card, link or automation grows a
+ * "Change a setting" button for a wall switch.
+ */
+export function acceptsAction(kind: string, action: DeviceAction): boolean {
+    return (
+        actionsFor(kind).includes(action) ||
+        (action === "set-option" && isSwitchSettingsKind(deviceKind(kind)))
+    );
+}
+
 /** Whether a kind is worked by one switch rather than a row of buttons: it has
  *  on and off and nothing else drawn as a button, so the control is where it is
  *  now. A light's brightness and colour are sliders under its switch. */
@@ -653,7 +676,8 @@ export function applyClimate(settings: ClimateSettings, command: ClimateCommand)
 
 /** One change to a device that takes a setting: an air conditioner's or a
  *  purifier's. The two share action words and differ in what they carry. */
-export type DeviceCommand = ClimateCommand | AirCommand | LightCommand | LitterCommand;
+export type DeviceCommand =
+    ClimateCommand | AirCommand | LightCommand | LitterCommand | SwitchCommand;
 
 /** The shape of a setting as it arrives from anywhere, either kind's. Which kind
  *  it has to be is the device's to decide: `commandIssue` checks it again
@@ -662,7 +686,8 @@ export const deviceCommandSchema = z.union([
     climateCommandSchema,
     airCommandSchema,
     lightCommandSchema,
-    litterCommandSchema
+    litterCommandSchema,
+    switchCommandSchema
 ]);
 
 /** What a device holds that a command is checked against. */
@@ -674,6 +699,8 @@ export interface CommandTarget {
     readonly light?: LightSettings | null;
     /** A litter box's; optional like a light's. */
     readonly litter?: LitterView | null;
+    /** A switch's or a socket's settings; optional like a light's. */
+    readonly switchSettings?: SwitchSettings | null;
 }
 
 /** The command, read as the device's own kind's, or null when it is not one. */
@@ -685,6 +712,7 @@ export function commandFor(
     | { kind: "air"; command: AirCommand }
     | { kind: "light"; command: LightCommand }
     | { kind: "litter"; command: LitterCommand }
+    | { kind: "switch"; command: SwitchCommand }
     | null {
     const which = deviceKind(kind);
     if (which === "climate") {
@@ -702,6 +730,10 @@ export function commandFor(
     if (which === "litter") {
         const parsed = litterCommandSchema.safeParse(command);
         return parsed.success ? { kind: "litter", command: parsed.data } : null;
+    }
+    if (isSwitchSettingsKind(which)) {
+        const parsed = switchCommandSchema.safeParse(command);
+        return parsed.success ? { kind: "switch", command: parsed.data } : null;
     }
     return null;
 }
@@ -731,6 +763,8 @@ export function commandIssue(device: CommandTarget, command: DeviceCommand): str
     if (!read) return "That device cannot be told to do that";
     if (read.kind === "light") return lightCommandIssue(device.light ?? null, read.command);
     if (read.kind === "litter") return litterCommandIssue(device.litter ?? null, read.command);
+    if (read.kind === "switch")
+        return switchCommandIssue(device.switchSettings ?? null, read.command);
     return read.kind === "climate"
         ? climateCommandIssue(device.climate, read.command)
         : airCommandIssue(device.air, read.command);
@@ -746,6 +780,7 @@ export function applyCommand(
     | { air: AirSettings }
     | { light: LightSettings }
     | { litter: LitterView }
+    | { switchSettings: SwitchSettings }
     | null {
     const read = commandFor(device.kind, command);
     if (!read) return null;
@@ -753,6 +788,10 @@ export function applyCommand(
         return device.light ? { light: applyLight(device.light, read.command) } : null;
     if (read.kind === "litter")
         return device.litter ? { litter: applyLitter(device.litter, read.command) } : null;
+    if (read.kind === "switch")
+        return device.switchSettings
+            ? { switchSettings: applySwitch(device.switchSettings, read.command) }
+            : null;
     if (read.kind === "climate")
         return device.climate ? { climate: applyClimate(device.climate, read.command) } : null;
     return device.air ? { air: applyAir(device.air, read.command) } : null;
@@ -862,6 +901,12 @@ export interface DeviceView {
     readonly appliance?: ApplianceView | null;
     /** What a litter box is doing. Null, or absent, for every other kind. */
     readonly litter?: LitterView | null;
+    /** A switch's or a socket's settings beside on and off, where it reports
+     *  any. Null, or absent, for every other kind. */
+    readonly switchSettings?: SwitchSettings | null;
+    /** Whether it answers on this network or only through its maker's cloud.
+     *  Null, or absent, where the make has no such choice. */
+    readonly reach?: DeviceReach | null;
     /** The account it is read through, for reading that account again. Null on a
      *  device connected to nothing; absent where a view was built without it. */
     readonly accountId?: string | null;

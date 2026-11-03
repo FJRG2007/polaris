@@ -32,6 +32,8 @@ import type {
     ClimateUnit,
     DeviceAction
 } from "../device-kinds";
+import * as kinds from "../device-kinds";
+import type { TuyaReach } from "./tuya-local";
 import { TuyaError } from "../integrations/tuya-api";
 import { DriverError, type DeviceSnapshot } from "./contract";
 
@@ -135,18 +137,24 @@ function climateSnapshot(
 
 /** Every row a set of Tuya devices becomes: one per switch on each device Places
  *  can honestly operate, one per air conditioner, and nothing for the rest. An
- *  air conditioner is read with its specification, where it was fetched. */
+ *  air conditioner is read with its specification, where it was fetched. Each
+ *  row says how its device was reached, where `reach` knows. */
 export function tuyaSnapshots(
     devices: readonly TuyaDeviceShape[],
-    specs: ReadonlyMap<string, TuyaSpec | null> = new Map()
+    specs: ReadonlyMap<string, TuyaSpec | null> = new Map(),
+    reach: ReadonlyMap<string, TuyaReach> = new Map()
 ): DeviceSnapshot[] {
     const snapshots: DeviceSnapshot[] = [];
     for (const device of devices) {
         const kind = CATEGORY_KINDS[device.category];
         if (!kind) continue;
         const byCode = new Map(device.status.map((point) => [point.code, point.value]));
+        const reached = tuyaReachWord(reach.get(device.id));
         if (kind === "climate") {
-            snapshots.push(climateSnapshot(device, byCode, specs.get(device.id) ?? null));
+            snapshots.push({
+                ...climateSnapshot(device, byCode, specs.get(device.id) ?? null),
+                reach: reached
+            });
             continue;
         }
         const codes = switchCodes([...byCode.keys()]);
@@ -169,11 +177,138 @@ export function tuyaSnapshots(
                 doorState: "none",
                 batteryPercent: battery,
                 batteryCritical: false,
-                online: device.online
+                online: device.online,
+                switchSettings: kinds.isSwitchSettingsKind(kind)
+                    ? tuyaSwitchSettings(byCode, code)
+                    : null,
+                reach: reached
             });
         }
     }
     return snapshots;
+}
+
+/** How a device was read, as the word a row stores. */
+export function tuyaReachWord(reach: TuyaReach | undefined): kinds.DeviceReach | null {
+    if (!reach) return null;
+    if (reach.route === "local") return "local";
+    if (reach.reason === "key") return "cloud-key";
+    if (reach.reason === "no-key") return "cloud-only";
+    return "cloud";
+}
+
+// --- a switch's settings beside on and off ---------------------------------------
+
+/**
+ * Tuya's standard points for a wall switch or a socket (categories `kg`, `cz`,
+ * `pc`): `relay_status` (what it does when power comes back), `light_mode` (its
+ * status light: `none`, `relay`, `pos`) or `switch_backlight` (a backlight, on
+ * or off), `child_lock`, and a timer per gang, `countdown_<n>` beside
+ * `switch_<n>`, in seconds. `relay_status` comes in three spellings depending
+ * on the firmware, each read and written back in the spelling the device uses.
+ */
+const POWER_ON_SPELLINGS: readonly Readonly<Record<kinds.PowerOnState, string>>[] = [
+    { off: "power_off", on: "power_on", last: "last" },
+    { off: "off", on: "on", last: "memory" },
+    { off: "0", on: "1", last: "2" }
+];
+
+const LIGHT_MODES: Readonly<Record<string, kinds.IndicatorMode>> = {
+    none: "off",
+    relay: "status",
+    pos: "position"
+};
+
+function powerOnOf(raw: unknown): kinds.PowerOnState | null {
+    if (typeof raw !== "string" && typeof raw !== "number") return null;
+    for (const spelling of POWER_ON_SPELLINGS) {
+        for (const [state, word] of Object.entries(spelling) as [kinds.PowerOnState, string][]) {
+            if (word === String(raw)) return state;
+        }
+    }
+    return null;
+}
+
+/** The timer beside a gang: `countdown_2` for `switch_2`, `countdown` (or
+ *  `countdown_1`) for a lone `switch`. */
+function countdownCodes(code: string): string[] {
+    const gang = /^switch_(\d+)$/.exec(code)?.[1];
+    if (gang) return [`countdown_${gang}`];
+    return code === "switch" ? ["countdown", "countdown_1"] : [];
+}
+
+/** One gang's settings, from its device's points: only what it reports. */
+export function tuyaSwitchSettings(
+    byCode: ReadonlyMap<string, unknown>,
+    code: string
+): kinds.SwitchSettings | null {
+    let indicator: kinds.IndicatorMode | null = null;
+    let indicators: kinds.IndicatorMode[] = [];
+    if (byCode.has("light_mode")) {
+        indicators = ["off", "status", "position"];
+        indicator = LIGHT_MODES[String(byCode.get("light_mode"))] ?? null;
+    } else if (typeof byCode.get("switch_backlight") === "boolean") {
+        indicators = ["off", "on"];
+        indicator = byCode.get("switch_backlight") ? "on" : "off";
+    }
+    const lock = byCode.get("child_lock");
+    const timer = countdownCodes(code).find((candidate) => byCode.has(candidate));
+    const seconds = timer ? numberOf(byCode.get(timer)) : null;
+    return kinds.switchSettingsView({
+        powerOn: byCode.has("relay_status") ? powerOnOf(byCode.get("relay_status")) : null,
+        indicator,
+        indicators,
+        childLock: typeof lock === "boolean" ? lock : null,
+        countdown: seconds === null ? null : Math.max(0, Math.round(seconds))
+    });
+}
+
+/**
+ * What to send for one setting on one gang, in the device's own codes and
+ * spelling. `status` is what the device last reported, which is how the
+ * spelling and the indicator point are chosen; with nothing reported, its
+ * specification where it can be read, and Tuya's standard spelling after that.
+ */
+export function tuyaSwitchCommands(
+    code: string,
+    command: kinds.SwitchCommand,
+    status: ReadonlyMap<string, unknown>,
+    spec: TuyaSpec | null
+): { code: string; value: unknown }[] {
+    const fn = (point: string) => spec?.functions.find((entry) => entry.code === point);
+    const offered = (point: string) => status.has(point) || !!fn(point);
+    const refused = () => new HomeError("That setting is not one this device has");
+    switch (command.setting) {
+        case "power-on": {
+            const current = String(status.get("relay_status"));
+            const range = enumOf(fn("relay_status"));
+            const spelling =
+                POWER_ON_SPELLINGS.find((words) => Object.values(words).includes(current)) ??
+                POWER_ON_SPELLINGS.find((words) =>
+                    Object.values(words).some((word) => range.includes(word))
+                ) ??
+                POWER_ON_SPELLINGS[0]!;
+            return [{ code: "relay_status", value: spelling[command.value] }];
+        }
+        case "indicator": {
+            const backlight = !offered("light_mode") && offered("switch_backlight");
+            if (backlight || command.value === "on") {
+                if (command.value !== "on" && command.value !== "off") throw refused();
+                return [{ code: "switch_backlight", value: command.value === "on" }];
+            }
+            const word = Object.entries(LIGHT_MODES).find(([, mode]) => mode === command.value);
+            if (!word) throw refused();
+            return [{ code: "light_mode", value: word[0] }];
+        }
+        case "child-lock":
+            return [{ code: "child_lock", value: command.on }];
+        case "countdown": {
+            const codes = countdownCodes(code);
+            const timer = codes.find(offered) ?? codes[0];
+            if (!timer) throw refused();
+            return [{ code: timer, value: command.seconds }];
+        }
+    }
 }
 
 /** What to send for one press on one row: the device, and its data point set to
@@ -400,18 +535,33 @@ export async function tuyaSpecsFor(
     return found;
 }
 
-/** What to send for one press on one row, of any kind Places draws. */
+/** What to send for one press on one row, of any kind Places draws. `status`
+ *  is what a device last reported, where it is known, for a switch's settings. */
 export async function tuyaActionFor(
     device: { readonly externalId: string; readonly kind: string },
     action: DeviceAction,
-    command: ClimateCommand | undefined,
-    fetch: (deviceId: string) => Promise<unknown>
+    command: kinds.DeviceCommand | undefined,
+    fetch: (deviceId: string) => Promise<unknown>,
+    status: (deviceId: string) => TuyaDeviceShape["status"] | null = () => null
 ): Promise<{ deviceId: string; commands: { code: string; value: unknown }[] }> {
+    if (action === "set-option" && kinds.isSwitchSettingsKind(device.kind)) {
+        const parsed = kinds.switchCommandSchema.safeParse(command);
+        if (!parsed.success) throw new HomeError("Say what to set it to");
+        const { deviceId, code } = splitAddress(device.externalId);
+        const reported = new Map(
+            (status(deviceId) ?? []).map((point) => [point.code, point.value] as const)
+        );
+        // The specification is only asked for when nothing was reported to go
+        // by, and a cloud that cannot be reached leaves the standard spelling.
+        const spec =
+            reported.size > 0 ? null : await tuyaSpecFor(deviceId, fetch).catch(() => null);
+        return { deviceId, commands: tuyaSwitchCommands(code, parsed.data, reported, spec) };
+    }
     if (device.kind !== "climate") return tuyaCommandFor(device.externalId, action);
     const spec = await tuyaSpecFor(device.externalId, fetch);
     return {
         deviceId: device.externalId,
-        commands: tuyaClimateCommands(action, command, spec)
+        commands: tuyaClimateCommands(action, kinds.climateCommandOf(command), spec)
     };
 }
 

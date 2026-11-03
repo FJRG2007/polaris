@@ -17,7 +17,6 @@
 
 import { z } from "zod";
 import { HomeError } from "../home-error";
-import { climateCommandOf } from "../device-kinds";
 import * as tuya from "../integrations/tuya-sharing";
 import { TuyaError } from "../integrations/tuya-api";
 import * as local from "./tuya-local";
@@ -145,7 +144,7 @@ export const tuyaAppDriver: DeviceDriver = {
             const specs = cloud
                 ? await tuyaSpecsFor(all, (id) => tuya.tuyaSharedSpecification(session, id))
                 : new Map();
-            return tuyaSnapshots(all, specs);
+            return tuyaSnapshots(all, specs, read.reach);
         });
     },
 
@@ -155,8 +154,9 @@ export const tuyaAppDriver: DeviceDriver = {
             const { deviceId, commands } = await tuyaActionFor(
                 device,
                 action,
-                climateCommandOf(command),
-                (id) => tuya.tuyaSharedSpecification(session, id)
+                command,
+                (id) => tuya.tuyaSharedSpecification(session, id),
+                (id) => local.tuyaLocalStatus(accountOf(credentials), credentials, id)
             );
             if (await local.tuyaLocalAct(accountOf(credentials), credentials, deviceId, commands))
                 return;

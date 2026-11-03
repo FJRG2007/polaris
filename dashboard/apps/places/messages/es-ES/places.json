@@ -1775,7 +1775,32 @@
             "litterLow": "Poca arena",
             "litterLevel": "Arena {percent}%"
         },
-        "colorValue": "Tono {hue} grados, saturación {saturation}%"
+        "colorValue": "Tono {hue} grados, saturación {saturation}%",
+        "reach": {
+            "local": "Conectado en tu red",
+            "cloud": "No está en esta red, se usa la nube",
+            "cloud-key": "Rechazó su clave local, se usa la nube",
+            "cloud-only": "Este equipo solo funciona por la nube"
+        },
+        "switchSettings": {
+            "powerOn": {
+                "off": "Apagado",
+                "on": "Encender",
+                "last": "Como estaba"
+            },
+            "indicator": {
+                "off": "Apagada",
+                "on": "Encendida",
+                "status": "Luce encendido",
+                "position": "Luce apagado"
+            },
+            "countdown": {
+                "off": "Ninguno",
+                "minutes": "{minutes} min",
+                "hours": "{hours} h",
+                "hoursMinutes": "{hours} h {minutes} min"
+            }
+        }
     },
     "devicesView": {
         "rooms": "Salas",
@@ -1903,7 +1928,16 @@
             "dumpConfirm": "Vaciar arena",
             "cancel": "Cancelar"
         },
-        "batteryLine": "baja al {percent}%"
+        "batteryLine": "baja al {percent}%",
+        "switchSettings": {
+            "title": "Ajustes",
+            "powerOn": "Tras un corte",
+            "indicator": "Luz indicadora",
+            "childLock": "Bloqueo niños",
+            "countdownWhenOn": "Se apaga en",
+            "countdownWhenOff": "Se enciende en",
+            "left": "Quedan {time}"
+        }
     },
     "roomsDialog": {
         "title": "Salas y plantas",

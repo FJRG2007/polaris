@@ -13,7 +13,6 @@
  */
 
 import { HomeError } from "../home-error";
-import { climateCommandOf } from "../device-kinds";
 import * as tuya from "../integrations/tuya-api";
 import * as local from "./tuya-local";
 import { DriverError, type Credentials, type DeviceDriver } from "./contract";
@@ -69,7 +68,7 @@ export const tuyaCloudDriver: DeviceDriver = {
             const specs = cloud
                 ? await tuyaSpecsFor(read.devices, (id) => tuya.tuyaSpecification(keys, id))
                 : new Map();
-            return tuyaSnapshots(read.devices, specs);
+            return tuyaSnapshots(read.devices, specs, read.reach);
         });
     },
 
@@ -79,8 +78,9 @@ export const tuyaCloudDriver: DeviceDriver = {
             const { deviceId, commands } = await tuyaActionFor(
                 device,
                 action,
-                climateCommandOf(command),
-                (id) => tuya.tuyaSpecification(keys, id)
+                command,
+                (id) => tuya.tuyaSpecification(keys, id),
+                (id) => local.tuyaLocalStatus(accountOf(credentials), credentials, id)
             );
             if (await local.tuyaLocalAct(accountOf(credentials), credentials, deviceId, commands))
                 return;

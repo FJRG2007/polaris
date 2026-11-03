@@ -75,7 +75,11 @@ const storedSchema = z.record(
 function bookOf(account: string, credentials: Credentials): Book {
     let book = books.get(account);
     if (!book) {
-        book = { known: new Map(), where: new Map(), refused: new Set(), shapes: [],
+        book = {
+            known: new Map(),
+            where: new Map(),
+            refused: new Set(),
+            shapes: [],
             lookedAt: Number.NEGATIVE_INFINITY,
             locating: null
         };
@@ -252,8 +256,16 @@ export async function tuyaLocalRead(
         let read: TuyaDeviceShape | null = null;
         if (entry && where) {
             try {
-                const dps = await lan.readTuyaLocal({ id: device.id, localKey: entry.key, ...where });
-                read = { ...device, online: true, status: statusFromDps(entry, dps, device.status) };
+                const dps = await lan.readTuyaLocal({
+                    id: device.id,
+                    localKey: entry.key,
+                    ...where
+                });
+                read = {
+                    ...device,
+                    online: true,
+                    status: statusFromDps(entry, dps, device.status)
+                };
             } catch (caught) {
                 forgetPlace(book, device.id, caught);
             }
@@ -299,6 +311,18 @@ export async function tuyaLocalAct(
         forgetPlace(book, deviceId, caught);
         return false;
     }
+}
+
+/** What a device last reported, as the account listed it, or null before
+ *  the first list: how a setting is spelled back to it (`tuyaSwitchCommands`). */
+export function tuyaLocalStatus(
+    account: string,
+    credentials: Credentials,
+    deviceId: string
+): TuyaDeviceShape["status"] | null {
+    return (
+        bookOf(account, credentials).shapes.find((shape) => shape.id === deviceId)?.status ?? null
+    );
 }
 
 /** Wait for a look in progress; for tests. */
