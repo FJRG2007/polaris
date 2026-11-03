@@ -694,6 +694,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     translate={translate}
                     reads={reads}
                     manager={manager}
+                    to={targetLanguage}
                     file={input.file}
                 />
             ) : input.kind === "camera" || input.kind === "video" ? (

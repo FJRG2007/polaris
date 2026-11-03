@@ -144,6 +144,7 @@ export function TextOverlay({
                 line.box ? (
                     <span
                         key={index}
+                        dir="auto"
                         className="absolute overflow-hidden rounded-sm bg-background/90 px-0.5 leading-tight text-foreground shadow-sm [overflow-wrap:anywhere]"
                         style={{
                             left: `${line.box[0] * 100}%`,

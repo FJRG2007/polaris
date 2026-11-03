@@ -12,9 +12,10 @@ import { ImageUp, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { IMAGE_MAX_BYTES, sniffImage } from "../model/media";
 import { Button, CopyButton, SegmentedControl, Skeleton, cn } from "@polaris/ui";
+import { isRightToLeft } from "../model/languages";
+import { TranslatedPicture } from "./translated-picture";
 import {
     ReadsNotice,
-    TextOverlay,
     hasLocalReader,
     readImageText,
     type ImageLine,
@@ -24,17 +25,20 @@ import { hostUi } from "@polaris/app-host/client";
 
 const { useChooseFiles } = hostUi.filePicker;
 
-type View = "overlay" | "side";
+type View = "translated" | "original";
 
 export function ImageMode({
     translate,
     reads,
     manager,
+    to,
     file
 }: {
     translate: Translate;
     reads: Reads;
     manager: boolean;
+    /** The language translated into, for the direction the text is drawn in. */
+    to: string;
     /** A file handed over by the box (dropped, pasted or chosen), opened on arrival. */
     file?: File | null;
 }) {
@@ -46,8 +50,7 @@ export function ImageMode({
     const [translated, setTranslated] = useState<string[] | null>(null);
     const [reading, setReading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [view, setView] = useState<View>("overlay");
-    const [height, setHeight] = useState(0);
+    const [view, setView] = useState<View>("translated");
     const [local, setLocal] = useState(false);
     const [dragging, setDragging] = useState(false);
     const ticket = useRef(0);
@@ -74,7 +77,7 @@ export function ImageMode({
             });
             if (mine !== ticket.current) return;
             setLines(found);
-            if (!found.some((line) => line.box)) setView("side");
+            setView("translated");
         } catch (caught) {
             if (mine === ticket.current) setError((caught as Error).message);
         } finally {
@@ -108,14 +111,6 @@ export function ImageMode({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- open reads the latest state itself
     }, [file]);
 
-    useEffect(() => {
-        const element = picture.current;
-        if (!element) return;
-        const observer = new ResizeObserver(() => setHeight(element.clientHeight));
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [url]);
-
     const clear = () => {
         ++ticket.current;
         setUrl(null);
@@ -130,6 +125,8 @@ export function ImageMode({
     const original = (lines ?? []).map((line) => line.text).join("\n");
     const translation = (translated ?? []).join("\n");
     const boxed = (lines ?? []).some((line) => line.box);
+    const rightToLeft = isRightToLeft(to);
+    const painted = boxed && translated !== null && view === "translated";
 
     const pick = () =>
         void chooseFiles({
@@ -175,8 +172,8 @@ export function ImageMode({
                                 value={view}
                                 onValueChange={setView}
                                 options={[
-                                    { value: "overlay", label: t("image.overlay") },
-                                    { value: "side", label: t("image.side") }
+                                    { value: "translated", label: t("image.translated") },
+                                    { value: "original", label: t("image.originalPicture") }
                                 ]}
                             />
                         ) : null}
@@ -193,47 +190,48 @@ export function ImageMode({
                             <X className="size-4 shrink-0" aria-hidden />
                         </Button>
                     </div>
-                    <div className={cn("grid min-w-0 gap-3", view === "side" && "lg:grid-cols-2")}>
-                        <div className="relative mx-auto w-fit max-w-full">
-                            {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL */}
+                    <div className="mx-auto w-fit max-w-full">
+                        {painted ? (
+                            <TranslatedPicture
+                                url={url}
+                                lines={lines!}
+                                translated={translated!}
+                                rightToLeft={rightToLeft}
+                                label={t("image.altTranslated")}
+                            />
+                        ) : (
+                            // eslint-disable-next-line @next/next/no-img-element -- a local object URL
                             <img
                                 ref={picture}
                                 src={url}
                                 alt={t("image.alt")}
                                 className="block max-h-[70vh] max-w-full rounded-lg border border-border"
                             />
-                            {view === "overlay" && lines ? (
-                                <TextOverlay
-                                    lines={lines}
-                                    translated={translated}
-                                    height={height}
-                                />
+                        )}
+                    </div>
+                    <section className="flex min-w-0 flex-col rounded-lg border border-border bg-muted/40">
+                        <div
+                            dir={rightToLeft ? "rtl" : "ltr"}
+                            className="min-h-16 whitespace-pre-wrap px-2.5 py-2 text-base [overflow-wrap:anywhere]"
+                        >
+                            {translated ? (
+                                translation
+                            ) : reading || (lines && lines.length > 0) ? (
+                                <div className="space-y-2">
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-4 w-2/3" />
+                                </div>
                             ) : null}
                         </div>
-                        {view === "side" ? (
-                            <section className="flex min-w-0 flex-col rounded-lg border border-border bg-muted/40">
-                                <div className="min-h-32 flex-1 whitespace-pre-wrap px-2.5 py-2 text-base [overflow-wrap:anywhere]">
-                                    {translated ? (
-                                        translation
-                                    ) : reading || (lines && lines.length > 0) ? (
-                                        <div className="space-y-2">
-                                            <Skeleton className="h-4 w-3/4" />
-                                            <Skeleton className="h-4 w-2/3" />
-                                            <Skeleton className="h-4 w-1/2" />
-                                        </div>
-                                    ) : null}
-                                </div>
-                                <details className="border-t border-border px-2.5 py-1.5 text-sm">
-                                    <summary className="cursor-pointer text-xs text-muted-foreground">
-                                        {t("image.original")}
-                                    </summary>
-                                    <p className="whitespace-pre-wrap py-1 [overflow-wrap:anywhere]">
-                                        {original}
-                                    </p>
-                                </details>
-                            </section>
-                        ) : null}
-                    </div>
+                        <details className="border-t border-border px-2.5 py-1.5 text-sm">
+                            <summary className="cursor-pointer text-xs text-muted-foreground">
+                                {t("image.original")}
+                            </summary>
+                            <p dir="auto" className="whitespace-pre-wrap py-1 [overflow-wrap:anywhere]">
+                                {original}
+                            </p>
+                        </details>
+                    </section>
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
                         <span
                             className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
