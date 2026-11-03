@@ -89,7 +89,7 @@ function openMenu(
 describe("the account menu", () => {
     it("lists every host under Host, with the one in front ticked", () => {
         openMenu();
-        expect(screen.getByText("Server")).toBeTruthy();
+        expect(screen.getByText("Host")).toBeTruthy();
         const rows = screen.getAllByRole("menuitemradio");
         expect(rows.map((row) => row.textContent)).toEqual([LONG, "work.example.com"]);
         expect(rows.map((row) => row.getAttribute("aria-checked"))).toEqual(["true", "false"]);
@@ -143,7 +143,7 @@ describe("the account menu", () => {
     it("opens the hosts screen to add, rename and remove", () => {
         const onOpen = vi.fn();
         openMenu(STATUS, onOpen);
-        fireEvent.click(screen.getByRole("menuitem", { name: "Manage servers" }));
+        fireEvent.click(screen.getByRole("menuitem", { name: "Manage hosts" }));
         expect(onOpen).toHaveBeenCalledWith("servers");
     });
 
@@ -155,7 +155,7 @@ describe("the account menu", () => {
 
     it("reads in Spanish", () => {
         openMenu(STATUS, () => {}, "es-ES");
-        expect(screen.getByText("Servidor")).toBeTruthy();
-        expect(screen.getByRole("menuitem", { name: "Gestionar servidores" })).toBeTruthy();
+        expect(screen.getByText("Host")).toBeTruthy();
+        expect(screen.getByRole("menuitem", { name: "Gestionar hosts" })).toBeTruthy();
     });
 });

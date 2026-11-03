@@ -1232,6 +1232,13 @@ button.copied {
 }
 
 .problem.inline,
+.add-name {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
 .add-server .check {
     margin: 0;
 }

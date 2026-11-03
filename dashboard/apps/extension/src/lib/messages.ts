@@ -463,9 +463,10 @@ export type Request =
      *
      * Sent after the popup has asked the browser for the address, from the
      * press - the worker only checks the answer. The account in front is set
-     * aside, not signed out, so switching back finds it where it was.
+     * aside, not signed out, so switching back finds it where it was. A name,
+     * when one was typed, is kept with it as a rename would.
      */
-    | { readonly kind: "addServer"; readonly typed: string }
+    | { readonly kind: "addServer"; readonly typed: string; readonly name?: string }
     /**
      * Put another known server in front: the account on it that was set aside
      * last, or that server's "connect this browser" when nobody is signed in

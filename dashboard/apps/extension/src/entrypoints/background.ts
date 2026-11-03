@@ -3421,13 +3421,25 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "addServer": {
                 const origin = readOrigin(request.typed);
                 if (!origin) return { ok: false, error: await say("errors.notAnAddress") };
+                const name = servers.normalizeServerName(request.name ?? "");
+                if (servers.serverNameProblem(name)) {
+                    return {
+                        ok: false,
+                        error: await say("errors.serverNameTooLong", { max: servers.SERVER_NAME_MAX })
+                    };
+                }
                 // Checked, never requested - the popup asked, from the press.
                 if (!(await holdsOrigin(origin))) {
                     return { ok: false, error: await say("errors.noPermission") };
                 }
                 const refusal = await notPolaris(origin);
                 if (refusal) return { ok: false, error: refusal };
-                await inTurn(() => bringServer(origin));
+                await inTurn(async () => {
+                    await bringServer(origin);
+                    if (!name) return;
+                    const saved = servers.withServer(await savedServers(), origin);
+                    await saveServers(servers.renameServer(saved, origin, name));
+                });
                 return { ok: true, status: await status() };
             }
 
