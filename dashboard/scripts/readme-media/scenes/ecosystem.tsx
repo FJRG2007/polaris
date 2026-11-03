@@ -1,9 +1,11 @@
 /**
  * One Polaris on every device it has a client for: the desktop app, a phone
- * (the installable web app), the servers it runs on, and the browser
- * extension. Each screen is another scene, drawn in a frame of its own at that
- * device's size, so the phone shows the phone layout. There is no TV client,
- * so there is no TV here.
+ * (the installable web app), the servers it runs on, the browser extension and
+ * a TV. Each screen is another scene, drawn in a frame of its own at that
+ * device's size, so the phone shows the phone layout. The TV is the Polaris TV
+ * launcher's home (tv/launcher, `MainActivity`): greeting, clock and date, the
+ * Polaris pill with the account's unread count beside Settings, then a row of
+ * apps. There is no watch client, so there is no watch here.
  */
 
 import type { ReactNode } from "react";
@@ -150,45 +152,11 @@ function Phone({ ctx, scene }: { ctx: SceneContext; scene: string }) {
     );
 }
 
-/** A server: the front of a rack unit, and the screen Polaris watches it from. */
+/** A server: the screen Polaris watches it from. */
 function Server({ ctx, scene }: { ctx: SceneContext; scene: string }) {
     const tone = tones(ctx);
     return (
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
-            {[0, 1].map((unit) => (
-                <div
-                    key={unit}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        height: 18,
-                        padding: "0 10px",
-                        borderRadius: 4,
-                        background: "#1f2126",
-                        border: "1px solid #2e3036"
-                    }}
-                >
-                    <i style={{ width: 6, height: 6, borderRadius: 9, background: "#22c55e" }} />
-                    <i
-                        style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 9,
-                            background: unit ? "#22c55e" : "#38bdf8"
-                        }}
-                    />
-                    <span
-                        style={{
-                            flex: 1,
-                            height: 6,
-                            marginLeft: 8,
-                            background:
-                                "repeating-linear-gradient(90deg, #3a3d44 0 3px, transparent 3px 6px)"
-                        }}
-                    />
-                </div>
-            ))}
+        <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
             <div
                 style={{
                     flex: 1,
@@ -201,6 +169,131 @@ function Server({ ctx, scene }: { ctx: SceneContext; scene: string }) {
             >
                 <SceneWindow ctx={ctx} scene={scene} {...DESKTOP} title={scene} />
             </div>
+        </div>
+    );
+}
+
+/** A TV on its stand, showing the Polaris TV launcher's home. */
+function Tv({ ctx }: { ctx: SceneContext }) {
+    const tone = tones(ctx);
+    const apps = [
+        ["#7632ec", ctx.say("Polaris", "Polaris")],
+        ["#0f766e", ctx.say("Live TV", "TV en directo")],
+        ["#b45309", ctx.say("Music", "Música")],
+        ["#1d4ed8", ctx.say("Photos", "Fotos")]
+    ] as const;
+    const pill = {
+        display: "flex",
+        alignItems: "center",
+        gap: "0.8cqw",
+        padding: "0.9cqw 2.2cqw",
+        borderRadius: 99,
+        background: "rgb(255 255 255 / 0.08)",
+        border: "1px solid rgb(255 255 255 / 0.14)",
+        fontSize: "2.2cqw",
+        color: "#f1f1f3"
+    } as const;
+    return (
+        <div
+            style={{
+                width: "100%",
+                height: "100%",
+                containerType: "size",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center"
+            }}
+        >
+            <div
+                style={{
+                    width: "min(100cqw, calc((100cqh - 18px) * 16 / 9))",
+                    aspectRatio: "16 / 9",
+                    boxSizing: "border-box",
+                    padding: 6,
+                    borderRadius: 10,
+                    background: "#0b0b0d",
+                    border: `2px solid ${tone.edge}`,
+                    boxShadow: "0 18px 40px rgb(0 0 0 / 0.3)",
+                    display: "flex"
+                }}
+            >
+                <div
+                    style={{
+                        flex: 1,
+                        minWidth: 0,
+                        containerType: "inline-size",
+                        borderRadius: 4,
+                        overflow: "hidden",
+                        padding: "5cqw 6cqw",
+                        display: "flex",
+                        flexDirection: "column",
+                        color: "#f1f1f3",
+                        background:
+                            "radial-gradient(circle at 30% 35%, rgb(118 50 236 / 0.55), transparent 60%), #0d0b16"
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.6cqw" }}>
+                        <div style={{ flex: 1 }}>
+                            <div
+                                style={{ fontSize: "1.6cqw", letterSpacing: "0.2em", opacity: 0.6 }}
+                            >
+                                {ctx.say("GOOD EVENING", "BUENAS TARDES")}
+                            </div>
+                            <div style={{ fontSize: "6.5cqw", fontWeight: 300, lineHeight: 1.1 }}>
+                                {ctx.say("8:30", "20:30")}
+                                <span
+                                    style={{ fontSize: "2cqw", marginLeft: "0.6cqw", opacity: 0.7 }}
+                                >
+                                    {ctx.say("PM", "")}
+                                </span>
+                            </div>
+                        </div>
+                        <span style={pill}>Polaris 3</span>
+                        <span style={pill}>{ctx.say("Settings", "Ajustes")}</span>
+                    </div>
+                    <div style={{ flex: 1 }} />
+                    <div style={{ fontSize: "4.2cqw", marginBottom: "1.6cqw" }}>{apps[0][1]}</div>
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(4, 1fr)",
+                            gap: "1.6cqw",
+                            padding: "1.2cqw",
+                            borderRadius: "1.8cqw",
+                            background: "rgb(255 255 255 / 0.05)",
+                            border: "1px solid rgb(255 255 255 / 0.1)"
+                        }}
+                    >
+                        {apps.map(([color, name], index) => (
+                            <div
+                                key={name}
+                                style={{
+                                    aspectRatio: "16 / 9",
+                                    borderRadius: "1.2cqw",
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontSize: "2.4cqw",
+                                    fontWeight: 600,
+                                    background: color,
+                                    outline: index === 0 ? "2px solid #ffffff" : "none",
+                                    outlineOffset: 1
+                                }}
+                            >
+                                {name}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <i
+                style={{
+                    width: 70,
+                    height: 10,
+                    background: tone.edge,
+                    borderRadius: "0 0 6px 6px"
+                }}
+            />
         </div>
     );
 }
@@ -235,11 +328,11 @@ function Ecosystem({ ctx }: { ctx: SceneContext }) {
                 padding: phone ? 16 : 40,
                 background: tones(ctx).page,
                 color: tones(ctx).text,
-                gridTemplateColumns: phone ? "1fr 1fr" : "1.6fr 1fr 0.62fr",
-                gridTemplateRows: phone ? "1fr 1fr 0.9fr" : "1.25fr 1fr",
+                gridTemplateColumns: phone ? "1fr 1fr" : "1.3fr 1fr 0.62fr",
+                gridTemplateRows: phone ? "1fr 0.7fr 0.7fr 0.9fr" : "1.15fr 1fr",
                 gridTemplateAreas: phone
-                    ? '"app app" "phone server" "extension extension"'
-                    : '"app app phone" "server extension phone"'
+                    ? '"app app" "phone tv" "phone server" "extension extension"'
+                    : '"app tv phone" "server extension phone"'
             }}
         >
             <Tile ctx={ctx} area="app" name={ctx.say("Desktop app", "App de escritorio")}>
@@ -247,6 +340,9 @@ function Ecosystem({ ctx }: { ctx: SceneContext }) {
             </Tile>
             <Tile ctx={ctx} area="phone" name={ctx.say("Phone", "Móvil")}>
                 <Phone ctx={ctx} scene="tasks" />
+            </Tile>
+            <Tile ctx={ctx} area="tv" name={ctx.say("Smart TV", "Smart TV")}>
+                <Tv ctx={ctx} />
             </Tile>
             <Tile ctx={ctx} area="server" name={ctx.say("Your servers", "Tus servidores")}>
                 <Server ctx={ctx} scene="watch" />

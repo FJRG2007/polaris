@@ -21,6 +21,7 @@ const POLL_ROUTES: Record<string, { action: string; args: readonly string[] }> =
         args: ["installId"]
     },
     "/api/chat/calls-unavailable": { action: "callsUnavailableAction", args: [] },
+    "/api/chat/calls-outside": { action: "callsOutsideAction", args: [] },
     "/api/chat/elsewhere": { action: "conversationsElsewhereAction", args: [] },
     "/api/chat/meeting-list": { action: "listMeetingsAction", args: [] },
     "/api/chat/profile": { action: "profileAction", args: ["channelId", "userId"] },

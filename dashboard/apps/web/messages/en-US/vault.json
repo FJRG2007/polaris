@@ -209,11 +209,20 @@
         },
         "hints": {
             "title": "Mr, Ms, Dr",
-            "address2": "Optional"
+            "address2": "Optional",
+            "middleName": "A second first name, not a surname",
+            "lastName": "Every surname, both if you have two"
         },
         "fromAccount": "Fill in from my account",
         "fromAccountFailed": "Could not read your account. Try again.",
-        "pickEmail": "Or pick one of your addresses"
+        "pickEmail": "Or pick one of your addresses",
+        "searchCountry": "Search countries",
+        "noCountry": "No country by that name",
+        "pickCountry": "Choose a country",
+        "searchRegion": "Search regions",
+        "noRegion": "Nothing by that name",
+        "pickRegion": "Choose one",
+        "useTyped": "Use \"{typed}\""
     },
     "item": {
         "expiry": {

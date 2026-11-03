@@ -209,11 +209,20 @@
         },
         "hints": {
             "title": "Sr, Sra, Dr",
-            "address2": "Opcional"
+            "address2": "Opcional",
+            "middleName": "Otro nombre de pila, no un apellido",
+            "lastName": "Todos tus apellidos, los dos si tienes dos"
         },
         "fromAccount": "Rellenar con mi cuenta",
         "fromAccountFailed": "No se pudo leer tu cuenta. Reintenta.",
-        "pickEmail": "O elige uno de tus correos"
+        "pickEmail": "O elige uno de tus correos",
+        "searchCountry": "Buscar país",
+        "noCountry": "Ningún país con ese nombre",
+        "pickCountry": "Elige un país",
+        "searchRegion": "Buscar región",
+        "noRegion": "Nada con ese nombre",
+        "pickRegion": "Elige una",
+        "useTyped": "Usar \"{typed}\""
     },
     "item": {
         "expiry": {

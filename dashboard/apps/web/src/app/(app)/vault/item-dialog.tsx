@@ -50,11 +50,13 @@ import {
     type VaultItem
 } from "./vault-model";
 import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
+import { CountryField, RegionField } from "./identity-place-fields";
+import { countryCodeOf } from "./identity-places";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
 import { accountIdentityAction } from "./vault-actions";
 import type { AccountIdentity } from "@/lib/vault/account-identity";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -137,6 +139,7 @@ export function ItemDialog({
 }) {
     const t = useTranslations("vault");
     const tc = useTranslations("common");
+    const locale = useLocale();
     const problem = (said: string | null): string | null => {
         if (!said) return null;
         const key = PROBLEM_KEYS[said];
@@ -992,22 +995,60 @@ export function ItemDialog({
                                                 )}
                                             >
                                                 {t(identityLabelKey(field))}
-                                                <Input
-                                                    value={draft.identity[field] ?? ""}
-                                                    onChange={(event) =>
-                                                        patch({
-                                                            identity: {
-                                                                ...draft.identity,
-                                                                [field]: event.target.value
-                                                            }
-                                                        })
-                                                    }
-                                                    placeholder={(() => {
-                                                        const hint = identityHintKey(field);
-                                                        return hint ? t(hint) : undefined;
-                                                    })()}
-                                                    autoComplete="off"
-                                                />
+                                                {field === "country" ? (
+                                                    <CountryField
+                                                        value={draft.identity.country ?? ""}
+                                                        onChange={(country) =>
+                                                            patch({
+                                                                identity: {
+                                                                    ...draft.identity,
+                                                                    country,
+                                                                    // A region of the old country is not one of the new.
+                                                                    state:
+                                                                        country ===
+                                                                        (countryCodeOf(
+                                                                            draft.identity
+                                                                                .country ?? "",
+                                                                            [locale]
+                                                                        ) ?? draft.identity.country)
+                                                                            ? (draft.identity
+                                                                                  .state ?? "")
+                                                                            : ""
+                                                                }
+                                                            })
+                                                        }
+                                                    />
+                                                ) : field === "state" ? (
+                                                    <RegionField
+                                                        value={draft.identity.state ?? ""}
+                                                        country={draft.identity.country ?? ""}
+                                                        onChange={(state) =>
+                                                            patch({
+                                                                identity: {
+                                                                    ...draft.identity,
+                                                                    state
+                                                                }
+                                                            })
+                                                        }
+                                                    />
+                                                ) : (
+                                                    <Input
+                                                        value={draft.identity[field] ?? ""}
+                                                        onChange={(event) =>
+                                                            patch({
+                                                                identity: {
+                                                                    ...draft.identity,
+                                                                    [field]: event.target.value
+                                                                }
+                                                            })
+                                                        }
+                                                        placeholder={(() => {
+                                                            const hint = identityHintKey(field);
+                                                            return hint ? t(hint) : undefined;
+                                                        })()}
+                                                        autoComplete="off"
+                                                    />
+                                                )}
                                                 {field === "email" && accountEmails.length > 1 ? (
                                                     <Select
                                                         value={

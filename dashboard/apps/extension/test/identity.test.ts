@@ -4,6 +4,7 @@ import {
     accountIdentity,
     blankIdentity,
     cardOf,
+    countryForBox,
     shelfIdentities,
     type OpenIdentity
 } from "../src/lib/identity";
@@ -86,5 +87,23 @@ describe("the account as an identity", () => {
     it("offers nothing for an account that said nothing", () => {
         expect(accountIdentity(null)).toBeNull();
         expect(accountIdentity({ name: " ", email: null })).toBeNull();
+    });
+});
+
+describe("the country an identity types into a box", () => {
+    it("keeps the code for a box that asks for one", () => {
+        expect(countryForBox("ES", "country", "en")).toBe("ES");
+        expect(countryForBox("ES", "shipping country", "en")).toBe("ES");
+    });
+
+    it("names the country in the page's language for any other box", () => {
+        expect(countryForBox("ES", "", "es")).toBe("España");
+        expect(countryForBox("ES", "country-name", "en")).toBe("Spain");
+    });
+
+    it("leaves text that is not a code as it was stored", () => {
+        expect(countryForBox("Spain", "", "en")).toBe("Spain");
+        expect(countryForBox("ZZ", "", "en")).toBe("ZZ");
+        expect(countryForBox("", "", "en")).toBe("");
     });
 });
