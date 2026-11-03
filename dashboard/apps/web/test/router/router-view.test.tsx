@@ -342,7 +342,9 @@ describe("RouterSection", () => {
         const form = await screen.findByRole("dialog");
         const tag = within(form).getByRole("radio", { name: "VLAN" });
         expect(tag.getAttribute("aria-checked")).toBe("true");
-        expect((within(form).getByRole("textbox", { name: "VLAN tagging" }) as HTMLInputElement).value).toBe("10");
+        expect(
+            (within(form).getByRole("textbox", { name: "VLAN tagging" }) as HTMLInputElement).value
+        ).toBe("10");
         fireEvent.click(within(form).getByRole("radio", { name: "Untagged" }));
         expect(
             within(form).getByText(
@@ -363,7 +365,9 @@ describe("RouterSection", () => {
         readRouterAction.mockResolvedValue({ plan: ONE_PORT, reading: VPS });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(
-            await screen.findByText("ens6 untagged is used by both internet line 1 and the Test network.")
+            await screen.findByText(
+                "ens6 untagged is used by both internet line 1 and the Test network."
+            )
         ).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Move Test to VLAN 10" }));
         await screen.findByRole("button", { name: "Discard" });

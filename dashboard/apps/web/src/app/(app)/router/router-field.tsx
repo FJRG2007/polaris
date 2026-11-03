@@ -94,9 +94,7 @@ export function VlanField({
     const t = useTranslations("router");
     const [text, setText] = useState(value === null ? "" : String(value));
     const others = links.filter((link) => !(link.kind === self.kind && link.key === self.key));
-    const [mode, setMode] = useState<"untagged" | "tagged">(
-        value === null ? "untagged" : "tagged"
-    );
+    const [mode, setMode] = useState<"untagged" | "tagged">(value === null ? "untagged" : "tagged");
     const tagged = mode === "tagged";
     const taken = vlanTakenBy(links, self, port, value);
     const bad = tagged && (value === null || vlanError(value) !== null);

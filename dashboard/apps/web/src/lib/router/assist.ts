@@ -78,8 +78,7 @@ export function clashFix(
     clash: PortClash
 ): { lanId: string; vlan: number } | null {
     const movable = clash.links.filter(
-        (link) =>
-            link.kind === "network" && !plan.lans.find(({ id }) => id === link.key)?.wifi
+        (link) => link.kind === "network" && !plan.lans.find(({ id }) => id === link.key)?.wifi
     );
     const pick = movable[movable.length - 1];
     if (!pick) return null;

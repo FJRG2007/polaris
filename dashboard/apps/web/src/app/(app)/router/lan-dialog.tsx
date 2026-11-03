@@ -6,7 +6,13 @@
 import { useState } from "react";
 import * as ui from "@polaris/ui";
 import { Field, HelpNote, VlanField } from "./router-field";
-import { hostCount, nextFreeVlan, vlanError, vlanTakenBy, type PortLink } from "@/lib/router/assist";
+import {
+    hostCount,
+    nextFreeVlan,
+    vlanError,
+    vlanTakenBy,
+    type PortLink
+} from "@/lib/router/assist";
 import { Plus, Trash2 } from "lucide-react";
 import type { MachinesAnswer } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -207,7 +213,9 @@ export function LanDialog({
                         <Field
                             id="lan-subnet"
                             label={`${t("subnet")} *`}
-                            hint={room === null ? t("subnetHint") : t("subnetRoom", { count: room })}
+                            hint={
+                                room === null ? t("subnetHint") : t("subnetRoom", { count: room })
+                            }
                             error={
                                 subnetBad
                                     ? t("badSubnet")

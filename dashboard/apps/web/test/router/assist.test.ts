@@ -81,9 +81,9 @@ describe("field checks", () => {
         const self = { kind: "network" as const, key: "new" };
         expect(assist.vlanTakenBy(links, self, "ens6", null)?.kind).toBe("line");
         expect(assist.vlanTakenBy(links, self, "ens6", 10)).toBeNull();
-        expect(assist.vlanTakenBy(links, { kind: "network", key: LAN.id }, "ens6", null)?.kind).toBe(
-            "line"
-        );
+        expect(
+            assist.vlanTakenBy(links, { kind: "network", key: LAN.id }, "ens6", null)?.kind
+        ).toBe("line");
     });
 
     it("refuses a tag outside 2 to 4094", () => {

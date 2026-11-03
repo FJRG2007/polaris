@@ -480,7 +480,9 @@ function RouterEditor({
                                                 </ui.Badge>
                                             )}
                                             {lan.isolated ? (
-                                                <ui.Badge variant="neutral">{t("isolated")}</ui.Badge>
+                                                <ui.Badge variant="neutral">
+                                                    {t("isolated")}
+                                                </ui.Badge>
                                             ) : null}
                                             {lan.wifi ? (
                                                 <ui.Badge variant="neutral" title={t("wifiName")}>
@@ -514,14 +516,19 @@ function RouterEditor({
                                     </td>
                                     <td className="py-2 pr-3">{devices ?? "-"}</td>
                                     <td className="py-2 text-right whitespace-nowrap">
-                                        <IconButton label={t("edit")} onClick={() => setEditingLan(lan)}>
+                                        <IconButton
+                                            label={t("edit")}
+                                            onClick={() => setEditingLan(lan)}
+                                        >
                                             <Pencil />
                                         </IconButton>
                                         <IconButton
                                             label={t("remove")}
                                             onClick={() =>
                                                 change({
-                                                    lans: plan.lans.filter(({ id }) => id !== lan.id)
+                                                    lans: plan.lans.filter(
+                                                        ({ id }) => id !== lan.id
+                                                    )
                                                 })
                                             }
                                         >
@@ -554,7 +561,14 @@ function RouterEditor({
                     <p className="text-sm text-muted-foreground">{t("noForwards")}</p>
                 ) : (
                     <Table
-                        head={[t("protocol"), t("openPort"), t("toAddress"), t("toPort"), t("networkCol"), ""]}
+                        head={[
+                            t("protocol"),
+                            t("openPort"),
+                            t("toAddress"),
+                            t("toPort"),
+                            t("networkCol"),
+                            ""
+                        ]}
                     >
                         {plan.forwards.map((forward, at) => (
                             <tr key={at} className="border-t border-border">
@@ -816,7 +830,10 @@ function PortTable({
                                             key={`${link.kind}-${link.key}`}
                                             className="flex min-w-0 items-center gap-2 text-xs"
                                         >
-                                            <span className="min-w-0 truncate" title={whoIs(t, link)}>
+                                            <span
+                                                className="min-w-0 truncate"
+                                                title={whoIs(t, link)}
+                                            >
                                                 {link.kind === "line"
                                                     ? t("roleLine", { n: link.name })
                                                     : t("roleNetwork", { name: link.name })}
@@ -841,7 +858,15 @@ function PortTable({
 }
 
 /** A machine with one wired port: a line and a network can only share it on a VLAN. */
-function OnePortNote({ t, port, links }: { t: Translate; port: string; links: readonly PortLink[] }) {
+function OnePortNote({
+    t,
+    port,
+    links
+}: {
+    t: Translate;
+    port: string;
+    links: readonly PortLink[];
+}) {
     const line = links.find((link) => link.kind === "line" && link.port === port);
     return (
         <div className="flex min-w-0 flex-col gap-1 rounded-md border border-border bg-surface p-3 text-sm">
@@ -888,12 +913,20 @@ function ClashNote({
             <p className="text-xs">{t("clashWhy")}</p>
             <div className="flex flex-wrap items-center gap-2">
                 {fix && moved ? (
-                    <ui.Button size="sm" variant="secondary" onClick={() => onFix(fix.lanId, fix.vlan)}>
+                    <ui.Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onFix(fix.lanId, fix.vlan)}
+                    >
                         {t("clashFix", { name: moved.name, vlan: fix.vlan })}
                     </ui.Button>
                 ) : null}
                 {!fix && line ? (
-                    <ui.Button size="sm" variant="secondary" onClick={() => onEditLine(Number(line.key))}>
+                    <ui.Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onEditLine(Number(line.key))}
+                    >
                         {t("editLine")}
                     </ui.Button>
                 ) : null}
