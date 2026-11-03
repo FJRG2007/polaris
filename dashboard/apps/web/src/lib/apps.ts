@@ -11,6 +11,7 @@ import type { GrantSubject, OrgPermission, Permission } from "@polaris/core";
 import {
     BatteryCharging,
     Activity,
+    Languages,
     Archive,
     Bell,
     Bot,
@@ -461,6 +462,19 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/status-pages",
         permission: "status.manage",
         requiresApp: "status-pages"
+    },
+    {
+        /**
+         * Text between languages, in the browser, on Polar's model or with the
+         * owner's DeepL and Google keys. Installable.
+         */
+        id: "translate",
+        category: "work",
+        label: "Translate", // i18n-ignore
+        description: "Translate text between languages", // i18n-ignore
+        icon: Languages,
+        href: "/translate",
+        requiresApp: "translate"
     },
     {
         id: "notes",

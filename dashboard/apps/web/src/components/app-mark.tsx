@@ -60,6 +60,7 @@ const OWN_APPS: Readonly<Record<string, string>> = {
     crm: "crm",
     arcade: "arcade",
     "status-pages": "status-pages",
+    translate: "translate",
     "dns-blocker": "dns-blocker",
     vpn: "vpn",
     home: "home",

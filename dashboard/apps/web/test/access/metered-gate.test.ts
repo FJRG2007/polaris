@@ -174,7 +174,7 @@ describe("the ways of reaching a metered service", () => {
                 seen.add(path);
                 const text = readFileSync(path, "utf8");
                 const reaches =
-                    /new DymoAPI\(|from "dymo-api"|api\.tpeoficial\.com|virustotal\.com\/api|api\.criminalip\.io/.test(
+                    /new DymoAPI\(|from "dymo-api"|api\.tpeoficial\.com|virustotal\.com\/api|api\.criminalip\.io|deepl\.com\/v2|translation\.googleapis\.com/.test(
                         text
                     );
                 if (reaches) offenders.push(relative(WEB, path).split(sep).join("/"));
@@ -182,7 +182,9 @@ describe("the ways of reaching a metered service", () => {
         }
         expect(offenders.sort()).toEqual([
             "src/lib/integrations/criminalip.ts",
+            "src/lib/integrations/deepl.ts",
             "src/lib/integrations/dymo.ts",
+            "src/lib/integrations/google-translate.ts",
             "src/lib/integrations/virustotal.ts"
         ]);
     });
