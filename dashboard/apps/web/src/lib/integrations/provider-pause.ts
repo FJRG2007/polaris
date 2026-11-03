@@ -57,27 +57,37 @@ function settingKey(provider: string): string {
 
 /**
  * Count one request against today, or answer false when the day's are gone.
+ * A provider billed per character also counts the `chars` sent, and stops once
+ * the day's characters are spent.
  *
  * Separate from `takeLookup`, which shares the budget out between callers in
  * memory and starts again with the process. This one survives that, so a dashboard
  * restarting in a loop cannot spend a fresh budget on every start. Every lost swap
  * means somebody else counted, so this ends by the time the day's are gone.
  */
-async function spendToday(provider: BudgetedProvider): Promise<boolean> {
+async function spendToday(provider: BudgetedProvider, chars = 0): Promise<boolean> {
     const key = `integration.spent.${provider}`;
     const day = new Date().toISOString().slice(0, 10);
-    const limit = LOOKUP_BUDGET[provider].perDay;
+    const { perDay, charsPerDay } = LOOKUP_BUDGET[provider];
     for (;;) {
         const stored = await getSetting(key);
         let count = 0;
+        let sent = 0;
         try {
-            const parsed = JSON.parse(stored ?? "{}") as { day?: unknown; count?: unknown };
+            const parsed = JSON.parse(stored ?? "{}") as {
+                day?: unknown;
+                count?: unknown;
+                chars?: unknown;
+            };
             if (parsed.day === day && typeof parsed.count === "number") count = parsed.count;
+            if (parsed.day === day && typeof parsed.chars === "number") sent = parsed.chars;
         } catch {
             // Unreadable counts as a new day: the in-memory budget still stands.
         }
-        if (count >= limit) return false;
-        if (await swapSetting(key, stored, JSON.stringify({ day, count: count + 1 }))) return true;
+        if (count >= perDay) return false;
+        if (charsPerDay !== undefined && sent >= charsPerDay) return false;
+        const next = JSON.stringify({ day, count: count + 1, chars: sent + Math.max(0, chars) });
+        if (await swapSetting(key, stored, next)) return true;
     }
 }
 
@@ -150,15 +160,24 @@ export function pauseReasonFor(caught: unknown): PauseReason | null {
     return "unavailable";
 }
 
-/** Make one request to a paid provider, or none if it is paused. */
+/** The characters a per-character provider bills for `texts`. */
+export function billedChars(texts: readonly string[]): number {
+    return texts.reduce((sum, text) => sum + text.length, 0);
+}
+
+/**
+ * Make one request to a paid provider, or none if it is paused. `chars` is what
+ * the request is billed for, by a provider that bills per character.
+ */
 export async function whileServing<T>(
     provider: BudgetedProvider,
     name: string,
-    ask: () => Promise<T>
+    ask: () => Promise<T>,
+    chars = 0
 ): Promise<T> {
     const pause = await storedPause(provider);
     if (pause && pause.until > Date.now()) throw new ProviderPaused(provider, pause.reason);
-    if (!(await spendToday(provider))) {
+    if (!(await spendToday(provider, chars))) {
         await stopForToday(provider, name);
         throw new ProviderPaused(provider, "budget");
     }

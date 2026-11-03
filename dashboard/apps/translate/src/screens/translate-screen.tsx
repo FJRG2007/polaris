@@ -39,7 +39,7 @@ import {
     type ServerStatusView
 } from "./server-engine";
 import { createBrowserEngine, hasBrowserTranslator, type BrowserScope } from "./browser-engine";
-import { DEFAULT_SETTINGS, TEXT_MAX, type EngineId, type ServerEngineId } from "../model/schemas";
+import { DEFAULT_SETTINGS, HISTORY_MAX, TEXT_MAX, type EngineId, type ServerEngineId } from "../model/schemas";
 import { forgetAction, forgetAllAction, historyAction, rememberAction } from "../actions/translate";
 import { AUTO, LANGUAGE_CODES, languageName, normalizeDetected, type SourceLanguage } from "../model/languages";
 
@@ -56,6 +56,25 @@ const ENGINE_KEY = {
     deepl: "engine.deepl",
     google: "engine.google"
 } as const;
+
+/** A translation put on screen whole, from the history or a swap: no engine is asked for it again. */
+interface Loaded {
+    source: string;
+    from: SourceLanguage;
+    to: string;
+    /** The engine the reader had chosen; choosing another asks it. */
+    chosen: EngineId | null;
+}
+
+function isLoaded(loaded: Loaded | null, now: Loaded): boolean {
+    return (
+        loaded !== null &&
+        loaded.source === now.source &&
+        loaded.from === now.from &&
+        loaded.to === now.to &&
+        loaded.chosen === now.chosen
+    );
+}
 
 function useLanguageOptions(locale: string): SearchableSelectOption[] {
     return useMemo(
@@ -158,8 +177,16 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 
     // Translate on a pause in typing; a newer request cancels the older one.
     const latest = useRef(0);
+    const loaded = useRef<Loaded | null>(null);
     useEffect(() => {
         const text = source;
+        if (isLoaded(loaded.current, { source: text, from, to: targetLanguage, chosen })) {
+            ++latest.current;
+            setPending(false);
+            setError(null);
+            return;
+        }
+        loaded.current = null;
         if (!text.trim() || !engineId) {
             setTarget("");
             setPending(false);
@@ -214,6 +241,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     useEffect(() => {
         const sourceLanguage = from === AUTO ? detected : from;
         if (!answeredBy || !target.trim() || !source.trim() || !sourceLanguage || pending) return;
+        if (isLoaded(loaded.current, { source, from, to: targetLanguage, chosen })) return;
         const timer = window.setTimeout(() => {
             void rememberAction({
                 sourceText: source.trim().slice(0, TEXT_MAX),
@@ -225,14 +253,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 if (!answer.ok) return;
                 setHistory((current) => {
                     const rest = (current ?? []).filter((entry) => entry.id !== answer.entry.id);
-                    const next = [answer.entry, ...rest].slice(0, 50);
+                    const next = [answer.entry, ...rest].slice(0, HISTORY_MAX);
                     writeCache("history", next);
                     return next;
                 });
             });
         }, REMEMBER_MS);
         return () => window.clearTimeout(timer);
-    }, [answeredBy, target, source, from, detected, targetLanguage, pending]);
+    }, [answeredBy, target, source, from, detected, targetLanguage, pending, chosen]);
 
     const detect = async () => {
         if (!source.trim() || !engineId) return;
@@ -253,10 +281,17 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const swapFrom = from === AUTO ? detected : from;
     const swap = () => {
         if (!swapFrom) return;
-        setFrom(targetLanguage as SourceLanguage);
+        const nextFrom = targetLanguage as SourceLanguage;
+        const nextSource = target.slice(0, TEXT_MAX);
+        loaded.current =
+            nextSource === target && source
+                ? { source: nextSource, from: nextFrom, to: swapFrom, chosen }
+                : null;
+        setFrom(nextFrom);
         setTo(swapFrom);
-        setSource(target);
-        setTarget(source);
+        setSource(nextSource);
+        setTarget(loaded.current ? source : "");
+        setDetected(null);
     };
 
     const listen = () => {
@@ -276,10 +311,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     };
 
     const open = (entry: HistoryEntry) => {
-        setFrom(entry.fromLang as SourceLanguage);
+        const entryFrom = entry.fromLang as SourceLanguage;
+        loaded.current = { source: entry.sourceText, from: entryFrom, to: entry.toLang, chosen };
+        setFrom(entryFrom);
         setTo(entry.toLang);
         setSource(entry.sourceText);
         setTarget(entry.targetText);
+        setDetected(null);
+        setAnsweredBy(entry.engine as EngineId);
     };
 
     const remove = async (entry: HistoryEntry) => {

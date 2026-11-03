@@ -114,6 +114,15 @@ describe("POST /api/translate", () => {
         expect((await response.json()).error).toBe("noEngine");
     });
 
+    it("tells only an administrator what to set up", async () => {
+        mocks.settings = JSON.stringify({ engines: { deepl: false, polar: false } });
+        const reader = await (await POST(post({ texts: ["hola"], to: "en" }))).json();
+        expect(reader.message).not.toMatch(/key|DeepL|Google/);
+        mocks.user = { id: "user-1", isAdmin: true };
+        const admin = await (await POST(post({ texts: ["hola"], to: "en" }))).json();
+        expect(admin.message).toMatch(/DeepL/);
+    });
+
     it("says a provider is paused in words, not internals", async () => {
         mocks.serverTranslate.mockRejectedValueOnce(
             Object.assign(new Error("translation engine paused"), {

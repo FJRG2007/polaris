@@ -30,6 +30,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = await body(request, translateInput);
     if (input instanceof Response) return input;
     const served = await translateOnServer(user.id, input);
-    if (!served.ok) return failureResponse(served.failure);
+    if (!served.ok) return failureResponse(served.failure, user.isAdmin);
     return Response.json({ texts: served.texts, engine: served.engine, detected: served.detected });
 }

@@ -18,7 +18,7 @@
  */
 
 import { z } from "zod";
-import { whileServing } from "@/lib/integrations/provider-pause";
+import { billedChars, whileServing } from "@/lib/integrations/provider-pause";
 
 const BASE = "https://translation.googleapis.com/language/translate/v2";
 const TIMEOUT_MS = 20_000;
@@ -63,31 +63,41 @@ export async function googleTranslate(
     target: string,
     source: string | null = null
 ): Promise<GoogleAnswer> {
-    return whileServing("google-translate", "Google Cloud Translation", async () => {
-        const answer = await post(key, "", {
-            q: texts,
-            target,
-            format: "text",
-            ...(source ? { source } : {})
-        });
-        const parsed = translateSchema.safeParse(answer);
-        if (!parsed.success || parsed.data.data.translations.length !== texts.length) {
-            throw failure(502);
-        }
-        const translations = parsed.data.data.translations;
-        return {
-            texts: translations.map((entry) => entry.translatedText),
-            detected: translations[0]?.detectedSourceLanguage ?? null
-        };
-    });
+    return whileServing(
+        "google-translate",
+        "Google Cloud Translation",
+        async () => {
+            const answer = await post(key, "", {
+                q: texts,
+                target,
+                format: "text",
+                ...(source ? { source } : {})
+            });
+            const parsed = translateSchema.safeParse(answer);
+            if (!parsed.success || parsed.data.data.translations.length !== texts.length) {
+                throw failure(502);
+            }
+            const translations = parsed.data.data.translations;
+            return {
+                texts: translations.map((entry) => entry.translatedText),
+                detected: translations[0]?.detectedSourceLanguage ?? null
+            };
+        },
+        billedChars(texts)
+    );
 }
 
 /** The language `text` is written in, or null when Google cannot tell. */
 export async function googleDetect(key: string, text: string): Promise<string | null> {
-    return whileServing("google-translate", "Google Cloud Translation", async () => {
-        const parsed = detectSchema.safeParse(await post(key, "/detect", { q: [text] }));
-        if (!parsed.success) throw failure(502);
-        const language = parsed.data.data.detections[0]?.[0]?.language;
-        return language && language !== "und" ? language : null;
-    });
+    return whileServing(
+        "google-translate",
+        "Google Cloud Translation",
+        async () => {
+            const parsed = detectSchema.safeParse(await post(key, "/detect", { q: [text] }));
+            if (!parsed.success) throw failure(502);
+            const language = parsed.data.data.detections[0]?.[0]?.language;
+            return language && language !== "und" ? language : null;
+        },
+        billedChars([text])
+    );
 }

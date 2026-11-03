@@ -12,8 +12,8 @@
 import { prisma } from "@polaris/db";
 import { HISTORY_MAX, type RememberInput } from "../model/schemas";
 
-/** How many entries the screen shows. */
-export const HISTORY_PAGE = 50;
+/** How many entries the screen shows: every one kept. */
+export const HISTORY_PAGE = HISTORY_MAX;
 
 /** How long after the last write a growing text still counts as the same one. */
 const SAME_TEXT_MS = 2 * 60 * 1000;

@@ -18,7 +18,7 @@
  */
 
 import { z } from "zod";
-import { whileServing } from "@/lib/integrations/provider-pause";
+import { billedChars, whileServing } from "@/lib/integrations/provider-pause";
 
 /** The whole request may be 128 KiB; texts are capped well under it upstream. */
 const TIMEOUT_MS = 20_000;
@@ -62,29 +62,34 @@ export async function deeplTranslate(
     target: string,
     source: string | null = null
 ): Promise<DeeplAnswer> {
-    return whileServing("deepl", "DeepL", async () => {
-        const response = await fetch(deeplEndpoint(key), {
-            method: "POST",
-            headers: {
-                authorization: `DeepL-Auth-Key ${key.trim()}`,
-                "content-type": "application/json"
-            },
-            body: JSON.stringify({
-                text: texts,
-                target_lang: target,
-                ...(source ? { source_lang: source } : {})
-            }),
-            signal: AbortSignal.timeout(TIMEOUT_MS)
-        });
-        if (!response.ok) throw failure(response.status);
-        const parsed = answerSchema.safeParse(await response.json());
-        if (!parsed.success || parsed.data.translations.length !== texts.length) {
-            throw failure(502);
-        }
-        const first = parsed.data.translations[0]?.detected_source_language;
-        return {
-            texts: parsed.data.translations.map((entry) => entry.text),
-            detected: first ? first.toLowerCase() : null
-        };
-    });
+    return whileServing(
+        "deepl",
+        "DeepL",
+        async () => {
+            const response = await fetch(deeplEndpoint(key), {
+                method: "POST",
+                headers: {
+                    authorization: `DeepL-Auth-Key ${key.trim()}`,
+                    "content-type": "application/json"
+                },
+                body: JSON.stringify({
+                    text: texts,
+                    target_lang: target,
+                    ...(source ? { source_lang: source } : {})
+                }),
+                signal: AbortSignal.timeout(TIMEOUT_MS)
+            });
+            if (!response.ok) throw failure(response.status);
+            const parsed = answerSchema.safeParse(await response.json());
+            if (!parsed.success || parsed.data.translations.length !== texts.length) {
+                throw failure(502);
+            }
+            const first = parsed.data.translations[0]?.detected_source_language;
+            return {
+                texts: parsed.data.translations.map((entry) => entry.text),
+                detected: first ? first.toLowerCase() : null
+            };
+        },
+        billedChars(texts)
+    );
 }

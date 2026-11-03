@@ -14,6 +14,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = await body(request, detectInput);
     if (input instanceof Response) return input;
     const served = await detectOnServer(user.id, input);
-    if (!served.ok) return failureResponse(served.failure);
+    if (!served.ok) return failureResponse(served.failure, user.isAdmin);
     return Response.json({ language: served.language, engine: served.engine });
 }

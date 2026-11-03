@@ -41,9 +41,11 @@ export const translateInput = z
     .strict()
     .refine((input) => someText(input.texts), { message: "empty", path: ["texts"] })
     .refine((input) => input.texts.reduce((sum, text) => sum + text.length, 0) <= TOTAL_MAX, {
+        // i18n-ignore a code for the caller; the route answers in the reader's words
         message: "too long",
         path: ["texts"]
     })
+    // i18n-ignore a code for the caller; the route answers in the reader's words
     .refine((input) => input.from !== input.to, { message: "same language", path: ["to"] });
 
 export type TranslateInput = z.infer<typeof translateInput>;

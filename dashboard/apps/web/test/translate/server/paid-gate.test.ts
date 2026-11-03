@@ -60,6 +60,22 @@ describe.each([
     });
 });
 
+describe("the day's characters", () => {
+    it("are counted per request and stop the provider once spent", async () => {
+        answer(200, { translations: [{ text: "x" }, { text: "y" }] });
+        const day = new Date().toISOString().slice(0, 10);
+        await deeplTranslate("key", ["abcd", "ef"], "EN-US");
+        expect(JSON.parse(settings.get("integration.spent.deepl") ?? "{}")).toMatchObject({
+            count: 1,
+            chars: 6
+        });
+        settings.set("integration.spent.deepl", JSON.stringify({ day, count: 1, chars: 1_000_000 }));
+        await expect(deeplTranslate("key", ["a"], "EN-US")).rejects.toThrow();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(settings.get("integration.pause.deepl")).toContain("budget");
+    });
+});
+
 describe("DeepL", () => {
     it("treats its quota-exceeded answer as out of credits", async () => {
         answer(456);

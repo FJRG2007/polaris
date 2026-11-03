@@ -35,6 +35,12 @@ const MESSAGE: Readonly<Record<ServeFailure, TranslateKey>> = {
     failed: "errors.failed"
 };
 
+/** What a reader who is not an administrator is told instead: nothing to set up. */
+const READER_MESSAGE: Readonly<Partial<Record<ServeFailure, TranslateKey>>> = {
+    noEngine: "errors.noEngineReader",
+    paused: "errors.pausedReader"
+};
+
 export interface ServerStatus {
     settings: TranslateSettings;
     /** The server engines the owner allows that can answer, in the order tried. */
@@ -49,10 +55,15 @@ export async function serverStatus(userId: string): Promise<ServerStatus> {
     return { settings, engines: usableServerEngines(available, settings) };
 }
 
-/** A failure as the route's JSON answer, in the reader's words. */
-export async function failureResponse(failure: ServeFailure): Promise<Response> {
+/**
+ * A failure as the route's JSON answer, in the reader's words. Only an
+ * administrator is told what to set up; anybody else, that the administrators
+ * look after it.
+ */
+export async function failureResponse(failure: ServeFailure, admin: boolean): Promise<Response> {
     const t = await translateT();
-    return Response.json({ error: failure, message: t(MESSAGE[failure]) }, { status: STATUS[failure] });
+    const key = admin ? MESSAGE[failure] : (READER_MESSAGE[failure] ?? MESSAGE[failure]);
+    return Response.json({ error: failure, message: t(key) }, { status: STATUS[failure] });
 }
 
 /** What an engine threw, as a failure code. Anything unexpected is logged. */

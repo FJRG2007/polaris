@@ -45,10 +45,12 @@ export async function body<T extends z.ZodTypeAny>(
     const t = await translateT();
     const declared = Number(request.headers.get("content-length") ?? 0);
     if (declared > BODY_MAX) {
+        // i18n-ignore a code for the caller; `message` carries the words
         return Response.json({ error: "tooLarge", message: t("errors.tooLong") }, { status: 413 });
     }
     const text = await request.text();
     if (text.length > BODY_MAX) {
+        // i18n-ignore a code for the caller; `message` carries the words
         return Response.json({ error: "tooLarge", message: t("errors.tooLong") }, { status: 413 });
     }
     let raw: unknown;

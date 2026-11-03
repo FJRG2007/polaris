@@ -91,7 +91,7 @@ describe("the history", () => {
         const kept = newest("u1");
         expect(kept).toHaveLength(HISTORY_MAX);
         expect(kept[0]?.sourceText).toBe(`text ${HISTORY_MAX + 4}`);
-        expect((await listHistory("u1")).length).toBe(50);
+        expect((await listHistory("u1")).length).toBe(HISTORY_MAX);
     });
 
     it("replaces the entry a text started as while it is still being typed", async () => {
