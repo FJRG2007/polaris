@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { reportsOwnAlerts } from "./vendors";
+import { MATTER_VENDOR, matterCodeIssue, normalizeMatterCode } from "./matter-code";
 import { BATTERY_LINE_LIMITS } from "./automation-kinds";
 import {
     POWER_SOURCES,
@@ -50,6 +51,10 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     if (typeof value.mainPath === "string") value.mainPath = normalizeStreamPath(value.mainPath);
     if (typeof value.subPath === "string") value.subPath = normalizeStreamPath(value.subPath);
     if (typeof value.username === "string") value.username = value.username.trim();
+    // A Matter pairing code is stored as the bridge reads it: no spaces or
+    // dashes, a QR text upper-cased.
+    if (value.vendor === MATTER_VENDOR && typeof value.password === "string")
+        value.password = normalizeMatterCode(value.password);
     // The model narrows how the camera can be reached; it does not overrule how
     // it IS reached. A wired Tapo answers RTSP and TP-Link's own protocol both,
     // and a camera that has been streaming over one of them for months must not
@@ -232,7 +237,20 @@ const cameraFieldsSchema = z.object({
  * then defaults to the camera's own alerts - the exact dead setting the rule
  * exists to keep out of the database.
  */
-export const cameraInputSchema = cameraFieldsSchema.transform((value) => ({
+export const cameraInputSchema = cameraFieldsSchema
+    .superRefine((value, context) => {
+        // The same check the form makes while the code is typed: a code with a
+        // wrong check digit is refused here, not after a minute of the camera
+        // not answering. Absent is fine - an added camera keeps no code to send.
+        if (value.vendor !== MATTER_VENDOR || !value.password) return;
+        if (matterCodeIssue(value.password) !== null)
+            context.addIssue({
+                code: "custom",
+                path: ["password"],
+                message: "That pairing code is not one a Matter camera gives"
+            });
+    })
+    .transform((value) => ({
     ...value,
     detector: settledDetector(value.vendor, value.detector)
 }));

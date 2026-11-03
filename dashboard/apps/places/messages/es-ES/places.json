@@ -145,6 +145,7 @@
             "dahua-other": "Cualquier Dahua",
             "generic-other": "Otra cosa",
             "hikvision-other": "Cualquier Hikvision",
+            "matter-other": "Cámara o timbre Matter",
             "onvif-other": "Cámara ONVIF",
             "reolink-other": "Cualquier Reolink",
             "tapo-other": "Otra cámara Tapo",
@@ -331,6 +332,11 @@
         "hikvision": {
             "label": "Hikvision"
         },
+        "matter": {
+            "label": "Cámara o timbre Matter",
+            "method": "Matter",
+            "note": "Para una cámara o videotimbre compatible con Matter. Polaris se une como una app más, con el código de vinculación que comparte la app de la cámara, así que esa app sigue funcionando como antes."
+        },
         "onvif": {
             "label": "Cámara ONVIF",
             "note": "Polaris le pregunta a la cámara qué emite. Casi todas las cámaras de los últimos diez años responden."
@@ -452,7 +458,12 @@
         "keepForHint": "Días. Lo que fijes sobrevive a esto.",
         "enabled": "Encendida",
         "enabledHint": "Apagada significa que Polaris no se conecta a ella en absoluto.",
-        "addCamera": "Añadir cámara"
+        "addCamera": "Añadir cámara",
+        "matterCode": "Código de vinculación",
+        "matterCodeHint": "En la app de la cámara, compártela con otra app (Matter). Escribe el código de 11 cifras que muestra.",
+        "matterAdded": "Añadida. Para vincularla de nuevo, quita la cámara y añádela con un código nuevo.",
+        "matterCodeFormat": "Escribe el código de 11 cifras, o el que empieza por MT:",
+        "matterCodeCheck": "Hay una cifra mal. Compara el código con el de la app de la cámara"
     },
     "activity": {
         "none": "Ningún detector ha informado sobre esta cámara. Si acabas de guardarla, dale un minuto: el proceso pide sus cámaras cada medio minuto.",
@@ -733,6 +744,16 @@
         "cameraOff": "Esta cámara está apagada",
         "cameraPrivate": "Esta cámara es privada",
         "relayStarting": "El relé de cámaras aún se está iniciando",
+        "matterBridgeSilent": "El puente Matter se ha instalado pero aún no responde",
+        "matterBridgeStarting": "El puente Matter aún se está iniciando",
+        "matterCodeMissing": "Escribe el código de vinculación que compartió la app de la cámara",
+        "matterNotAdded": "Esta cámara Matter aún no se ha añadido",
+        "matterCodeInvalid": "Ese código de vinculación no es de una cámara Matter",
+        "matterCodeRefused": "La cámara rechazó ese código de vinculación. Vuelve a compartirla desde la app de la cámara",
+        "matterNoAnswer": "La cámara no respondió. Vuelve a compartirla desde su app y añádela en unos minutos",
+        "matterNotCertified": "La cámara no pudo demostrar que es un dispositivo Matter certificado",
+        "matterNotCamera": "Ese código de vinculación es de un dispositivo Matter que no es una cámara",
+        "matterAddFailed": "No se pudo añadir la cámara. Vuelve a compartirla desde su app e inténtalo otra vez",
         "relayNotAnswering": "El relé de cámaras no responde",
         "relayNoVoice": "El relé de cámaras no aceptó la voz",
         "relayUpdating": "El relé de cámaras se está actualizando para poder llevar tu voz. Vuelve a probar en un minuto",

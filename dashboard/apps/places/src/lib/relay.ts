@@ -23,6 +23,8 @@ import { streamPathOf } from "./stream-path";
 import { RELAY_LOG_TAIL, UNEXPLAINED, explainRelayFailure, relaySaid } from "./relay-failure";
 import { HomeError } from "./home-error";
 import { talkStreamName } from "./talk-audio";
+import { MATTER_VENDOR } from "./matter-code";
+import { matterBridge, relaySourceFor } from "./matter-bridge";
 import type { CameraTarget } from "./cameras";
 import {
     assertServer,
@@ -188,8 +190,15 @@ export async function publishCamera(
         mainPath: mainPathOf(camera),
         subPath: subPathOf(camera)
     };
+    const matter = vendor === MATTER_VENDOR ? await matterSource(camera) : null;
     for (const quality of ["main", "sub"] as const) {
-        const source = relaySource(shape, quality, auth);
+        // A Matter camera gives one WebRTC session, so its small stream is the
+        // relay's own copy of the good one rather than a second session.
+        const source = matter
+            ? quality === "main"
+                ? matter
+                : `${RELAY_LOOPBACK_RTSP}/${streamName(camera.id, "main")}`
+            : relaySource(shape, quality, auth);
         const query = new URLSearchParams({ name: streamName(camera.id, quality), src: source });
         const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, {
             method: "PUT"
@@ -204,6 +213,16 @@ export async function publishCamera(
     // close. Pointing the warm connection at the stream again moves it over and
     // lets the old one stop.
     await warmStream(endpoint, streamName(camera.id, "main"), options.warm === true);
+}
+
+/** The relay's source for a Matter camera, through the bridge on the same
+ *  machine. Refused until the camera has been added to that bridge. */
+async function matterSource(camera: CameraTarget): Promise<string> {
+    const path = mainPathOf(camera);
+    if (!path.startsWith("/cameras/")) throw new HomeError("This Matter camera has not been added yet");
+    const bridge = await matterBridge(relayServerFor(camera.reachVia));
+    if (!bridge) throw new HomeError("The Matter bridge is still starting");
+    return relaySourceFor(bridge, path);
 }
 
 /**

@@ -185,6 +185,14 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         ptz: true
     },
     {
+        // A Matter camera or video doorbell. Added with the code its own app
+        // shares and watched through the Matter bridge; its main path is where
+        // the bridge keeps it, set once it has been added.
+        id: "matter",
+        mainPath: "",
+        noOnvif: true
+    },
+    {
         id: "generic",
         mainPath: ""
     }
