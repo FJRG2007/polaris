@@ -86,7 +86,12 @@ async function requireLocalApp(appId: string, ownerId: string): Promise<void> {
 /** The cloudflared sidecar spec: forward the edge to Traefik with the app's internal
  *  tunnel host, so every request traverses the edge (and its access log) instead of
  *  hitting the container port directly. */
-function tunnelSpec(project: string, service: string, origin: string, hostHeader: string): ComposeSpec {
+function tunnelSpec(
+    project: string,
+    service: string,
+    origin: string,
+    hostHeader: string
+): ComposeSpec {
     return {
         project,
         services: [
@@ -102,7 +107,14 @@ function tunnelSpec(project: string, service: string, origin: string, hostHeader
                 // Quick tunnel: no token, no account - cloudflared mints a random
                 // trycloudflare.com hostname and forwards it to Traefik, overriding the
                 // Host header so the edge routes it to this app (and logs the request).
-                command: ["tunnel", "--no-autoupdate", "--url", origin, "--http-host-header", hostHeader],
+                command: [
+                    "tunnel",
+                    "--no-autoupdate",
+                    "--url",
+                    origin,
+                    "--http-host-header",
+                    hostHeader
+                ],
                 networks: [PROXY_NETWORK],
                 restart: "unless-stopped"
             }
@@ -119,9 +131,13 @@ function tunnelSpec(project: string, service: string, origin: string, hostHeader
 async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<string | null> {
     let buffer = "";
     try {
-        await ports.logs(service, (chunk) => {
-            buffer += chunk.toString("utf8");
-        }, { tail: 1000, follow: false });
+        await ports.logs(
+            service,
+            (chunk) => {
+                buffer += chunk.toString("utf8");
+            },
+            { tail: 1000, follow: false }
+        );
     } catch {
         return null;
     }
@@ -201,7 +217,10 @@ export async function stopQuickTunnel(appId: string, ownerId: string): Promise<v
 
 /** Whether the tunnel is up and its current public URL (refreshed from the live
  *  container's logs, since the URL changes on every (re)start). Best-effort. */
-export async function getQuickTunnelStatus(appId: string, ownerId: string): Promise<QuickTunnelStatus> {
+export async function getQuickTunnelStatus(
+    appId: string,
+    ownerId: string
+): Promise<QuickTunnelStatus> {
     const app = await prisma.application.findFirst({
         where: { id: appId, environment: { project: { ownerId } } },
         select: { id: true }
@@ -210,7 +229,9 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
     const { service } = names(appId);
     const ports = new HostdPorts();
     try {
-        const info = (await ports.inspect(service)) as { State?: { Running?: boolean; StartedAt?: string } };
+        const info = (await ports.inspect(service)) as {
+            State?: { Running?: boolean; StartedAt?: string };
+        };
         if (!info?.State?.Running) {
             await forgetTunnel(appId);
             return { running: false, url: null, reachable: false };
@@ -224,7 +245,8 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
         let probed: string | null = null;
         if (startedAt && stored.startedAt === startedAt && stored.url) {
             probed = stored.url;
-            if (await tunnelReachable(stored.url)) return { running: true, url: stored.url, reachable: true };
+            if (await tunnelReachable(stored.url))
+                return { running: true, url: stored.url, reachable: true };
         }
         // First status, or the cached URL has gone dead. Re-read from the fresh logs and
         // record this instance so subsequent checks are cheap. If the URL has already
@@ -233,7 +255,11 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
         const url = (await readUrlFromLogs(ports, service)) ?? stored.url;
         await markTunnelLive(appId, url, startedAt);
         if (!url) return { running: true, url: null, reachable: false };
-        return { running: true, url, reachable: url === probed ? false : await tunnelReachable(url) };
+        return {
+            running: true,
+            url,
+            reachable: url === probed ? false : await tunnelReachable(url)
+        };
     } catch {
         return { running: false, url: (await getStored(appId)).url, reachable: false };
     } finally {
@@ -276,7 +302,8 @@ export async function reconcileQuickTunnels(): Promise<void> {
                 State?: { Running?: boolean };
                 Config?: { Cmd?: string[] };
             };
-            onEdge = Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).includes(expectedOrigin);
+            onEdge =
+                Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).includes(expectedOrigin);
         } catch {
             // Not running - startQuickTunnel below recreates it.
         } finally {
@@ -290,7 +317,10 @@ export async function reconcileQuickTunnels(): Promise<void> {
 }
 
 async function getStored(appId: string): Promise<StoredTunnel> {
-    const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: urlKey(appId) },
+        select: { value: true }
+    });
     return row ? parseStoredTunnel(row.value) : { url: null, startedAt: null };
 }
 
@@ -299,7 +329,11 @@ async function getStored(appId: string): Promise<StoredTunnel> {
  *  and what syncAppRoutes keys the edge route on, so it is written the moment the sidecar
  *  is up - a null url marks a live tunnel whose URL cloudflared has not printed yet. The
  *  startedAt lets a later status check tell this instance's URL is still current. */
-async function markTunnelLive(appId: string, url: string | null, startedAt: string | null): Promise<void> {
+async function markTunnelLive(
+    appId: string,
+    url: string | null,
+    startedAt: string | null
+): Promise<void> {
     const key = urlKey(appId);
     const value = JSON.stringify({ url: url ?? null, startedAt: startedAt ?? null });
     await prisma.setting.upsert({
