@@ -20,6 +20,7 @@ import type {
     AppAutomationsFilter,
     AppDeckAction,
     AppExtension,
+    TextTranslationOffer,
     AppFavorite,
     AppJob,
     AppMcpTool,
@@ -714,6 +715,23 @@ export function headerSlots(appIds: readonly string[]): AppSlot[] {
         }
     }
     return slots;
+}
+
+/**
+ * The text translation the apps this person reaches offer, the first one that
+ * answers - or null, and every Translate entry in the core screens stays away.
+ * Read from the extensions in memory: no query.
+ */
+export function textTranslator(appIds: readonly string[]): TextTranslationOffer | null {
+    for (const extension of extensions()) {
+        if (!extension.textTranslation || !appIds.includes(extension.id)) continue;
+        try {
+            return { ...extension.textTranslation(), appId: extension.id };
+        } catch (caught) {
+            console.error(`polaris: ${extension.id} could not say how it translates:`, caught);
+        }
+    }
+    return null;
 }
 
 /** Whether any installed app keeps sanctions its servers put on players, which

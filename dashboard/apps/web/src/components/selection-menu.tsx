@@ -15,7 +15,7 @@
  * only the browser's menu has.
  */
 
-import { ClipboardPaste, Copy, Search, TextSelect } from "lucide-react";
+import { ClipboardPaste, Copy, Languages, Search, TextSelect } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
     AppLogo,
@@ -34,6 +34,15 @@ import { openSearch } from "@/lib/search/open-search";
 import * as selectionMenu from "@/lib/selection-menu";
 import { usePolar } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { TextTranslationOffer } from "@/lib/app-extensions/types";
+import {
+    TextTranslationProvider,
+    useTextTranslator
+} from "@/components/text-translation/provider";
+import {
+    SelectionTranslation,
+    type SelectionToTranslate
+} from "@/components/text-translation/selection-translation";
 
 type PasteState = "granted" | "prompt" | "denied" | "unsupported";
 
@@ -133,14 +142,34 @@ function selectAll(menu: OpenMenu): void {
     selection.addRange(range);
 }
 
-export function SelectionMenu({ children }: { children: ReactNode }) {
+/**
+ * The menu, and the translation the reader's installed apps offer it - null
+ * where they have none, and the Translate entries are not drawn.
+ */
+export function SelectionMenu({
+    translator,
+    children
+}: {
+    translator?: TextTranslationOffer | null;
+    children: ReactNode;
+}) {
+    return (
+        <TextTranslationProvider offer={translator ?? null}>
+            <SelectionMenuFor>{children}</SelectionMenuFor>
+        </TextTranslationProvider>
+    );
+}
+
+function SelectionMenuFor({ children }: { children: ReactNode }) {
     const t = useTranslations("common");
     const toast = useToast();
     const polar = usePolar();
     const paste = usePasteState();
+    const translates = useTextTranslator() !== null;
     const [menu, setMenu] = useState<OpenMenu | null>(null);
-    const live = useRef({ polar, toast, t });
-    live.current = { polar, toast, t };
+    const [translating, setTranslating] = useState<SelectionToTranslate | null>(null);
+    const live = useRef({ polar, toast, t, translates });
+    live.current = { polar, toast, t, translates };
 
     useEffect(() => {
         // Captured first, before any menu of the page's own opens, so that menu
@@ -191,7 +220,7 @@ export function SelectionMenu({ children }: { children: ReactNode }) {
     const extras = useCallback((): readonly MenuExtra[] => {
         const found = selectionMenu.lastSelection();
         if (!found) return [];
-        const { polar, t } = live.current;
+        const { polar, t, translates } = live.current;
         const items: MenuExtra[] = [
             {
                 id: "selection-copy",
@@ -200,6 +229,15 @@ export function SelectionMenu({ children }: { children: ReactNode }) {
                 onSelect: () => void copy(found.text)
             }
         ];
+        if (translates) {
+            const at = selectionMenu.selectionPoint(found, document);
+            items.push({
+                id: "selection-translate",
+                label: t("textTranslation.translateSelection"),
+                icon: <Languages />,
+                onSelect: () => setTranslating({ ...at, text: found.text })
+            });
+        }
         if (polar.allowed) {
             items.push({
                 id: "selection-ask-polar",
@@ -276,6 +314,17 @@ export function SelectionMenu({ children }: { children: ReactNode }) {
                             <Search />
                             {t("selectionMenu.search")}
                         </DropdownMenuItem>
+                        {translates ? (
+                            <DropdownMenuItem
+                                data-selection-translate
+                                onSelect={() =>
+                                    setTranslating({ x: menu.x, y: menu.y, text: menu.found.text })
+                                }
+                            >
+                                <Languages />
+                                {t("textTranslation.translate")}
+                            </DropdownMenuItem>
+                        ) : null}
                         {polar.allowed ? (
                             <DropdownMenuItem
                                 data-selection-ask-polar
@@ -292,6 +341,7 @@ export function SelectionMenu({ children }: { children: ReactNode }) {
                     </DropdownMenuContent>
                 ) : null}
             </DropdownMenu>
+            <SelectionTranslation selection={translating} onClose={() => setTranslating(null)} />
         </MenuExtrasProvider>
     );
 }
