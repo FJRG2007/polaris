@@ -27,6 +27,7 @@ import {
     Globe,
     Languages,
     MessagesSquare,
+    Ghost,
     Mic,
     Paperclip,
     Settings2,
@@ -58,7 +59,14 @@ import { CameraMode } from "./camera-mode";
 import { DocumentMode } from "./document-mode";
 import { WebsiteMode } from "./website-mode";
 import { hostUi } from "@polaris/app-host/client";
-import { INPUT_ACCEPT, pastedFile, routeFile, websiteOf, type InputKind } from "../model/input";
+import {
+    INPUT_ACCEPT,
+    linkedRequest,
+    pastedFile,
+    routeFile,
+    websiteOf,
+    type InputKind
+} from "../model/input";
 import type { Reads } from "./reads";
 import { PIECE_MAX } from "../model/chunk";
 import { runTranslation, translateReusing, type PieceCache, type Translate } from "./run";
@@ -164,6 +172,17 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [nativeDictation, setNativeDictation] = useState(false);
     const stopDictation = useRef<(() => void) | null>(null);
     const dictationStarting = useRef(false);
+
+    // While on, nothing translated is kept in the history. It stays on until it
+    // is turned off, as Polar's temporary chats do.
+    const [temporary, setTemporary] = useState(false);
+
+    // A link into Translate ("Open in Translate"): `?text=` fills the box, `?to=` the language.
+    useEffect(() => {
+        const asked = linkedRequest(window.location.search);
+        if (asked.text) setSource(asked.text);
+        if (asked.to) setTo(asked.to);
+    }, []);
 
     const [history, setHistory] = useState<HistoryEntry[] | null>(() =>
         readCache<HistoryEntry[]>("history")
@@ -322,6 +341,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     // Keep a translation once it has stayed on screen for a moment.
     useEffect(() => {
         const sourceLanguage = from === AUTO ? detected : from;
+        if (temporary) return;
         if (!answeredBy || !target.trim() || !source.trim() || !sourceLanguage || pending) return;
         if (isLoaded(loaded.current, { source, from, to: targetLanguage, chosen })) return;
         const timer = window.setTimeout(() => {
@@ -342,7 +362,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             });
         }, REMEMBER_MS);
         return () => window.clearTimeout(timer);
-    }, [answeredBy, target, source, from, detected, targetLanguage, pending, chosen]);
+    }, [answeredBy, target, source, from, detected, targetLanguage, pending, chosen, temporary]);
 
     const detect = async () => {
         if (!source.trim() || !engineId) return;
@@ -586,16 +606,40 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 title={t("title")}
                 description={t("description")}
                 actions={
-                    manager ? (
-                        <Button asChild variant="outline" size="sm">
-                            <Link href="/admin/apps/translate/settings">
-                                <Settings2 className="size-4 shrink-0" aria-hidden />
-                                {t("actions.settings")}
-                            </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant={temporary ? "secondary" : "ghost"}
+                            size="icon"
+                            aria-pressed={temporary}
+                            aria-label={temporary ? t("temporary.off") : t("temporary.on")}
+                            title={temporary ? t("temporary.off") : t("temporary.on")}
+                            onClick={() => setTemporary(!temporary)}
+                        >
+                            <Ghost className="size-4 shrink-0" aria-hidden />
                         </Button>
-                    ) : null
+                        {manager ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href="/admin/apps/translate/settings">
+                                    <Settings2 className="size-4 shrink-0" aria-hidden />
+                                    {t("actions.settings")}
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </div>
                 }
             />
+            {temporary ? (
+                <div
+                    role="status"
+                    className="mb-3 flex min-w-0 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+                >
+                    <Ghost className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 flex-1">{t("temporary.notice")}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setTemporary(false)}>
+                        {t("temporary.stop")}
+                    </Button>
+                </div>
+            ) : null}
 
             {nothing ? (
                 <EmptyState

@@ -44,6 +44,12 @@
         "addGoogle": "Clave de Google",
         "polar": "Activar Polar"
     },
+    "temporary": {
+        "on": "Modo temporal",
+        "off": "Desactivar modo temporal",
+        "notice": "Modo temporal activo: nada de lo que traduces queda en tu historial.",
+        "stop": "Desactivar"
+    },
     "history": {
         "title": "Historial",
         "empty": "Tus traducciones aparecen aquí.",

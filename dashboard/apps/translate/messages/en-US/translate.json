@@ -44,6 +44,12 @@
         "addGoogle": "Add a Google key",
         "polar": "Set up Polar"
     },
+    "temporary": {
+        "on": "Temporary mode",
+        "off": "Turn off temporary mode",
+        "notice": "Temporary mode is on: nothing you translate is kept in your history.",
+        "stop": "Turn off"
+    },
     "history": {
         "title": "History",
         "empty": "Your translations show up here.",
