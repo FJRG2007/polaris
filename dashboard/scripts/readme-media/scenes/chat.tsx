@@ -53,9 +53,17 @@ function post() {
     sendFrame(STREAM, { kind: "posted", seq: delivered, channels: [CHANNEL_ID] });
 }
 
-/** What a chat screen reads through routes (`chat-polls.ts`, the soundboard picker). */
+/** What a chat screen reads through routes (`chat-polls.ts`, the soundboard picker,
+ *  and the conversation list, which is a plain route of its own). */
 export function chatApi(ctx: SceneContext) {
     return {
+        "GET /api/chat/lists": () => ({
+            channels: chatChannels(ctx),
+            spaces: chatSpaces(ctx),
+            categories: chatCategories(ctx),
+            blocked: [],
+            friends: []
+        }),
         "GET /api/chat/voice-presence": () => ({ inRoom: voicePresence() }),
         "GET /api/chat/channels/:id/live-call": () => ({ live: null }),
         "GET /api/chat/meetings/:id/soundboard": () => ({ board: callSoundboard(ctx) }),
@@ -77,6 +85,7 @@ export function chatActions(ctx: SceneContext, channelId: string) {
         listChannelsAction: () => ({ channels }),
         chatRulesAction: () => ({ rules: {} }),
         callsUnavailableAction: () => null,
+        callsOutsideAction: () => null,
         readChannelAction: () => ({
             page: { messages: conversation(ctx, channelId), olderThan: null },
             channel: channels.find((one) => one.id === channelId)
