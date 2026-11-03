@@ -1358,7 +1358,7 @@ function PasswordField({
     id,
     done,
     onCopy,
-    onRefused
+    onNote
 }: {
     id: string;
     /** Whether the password was just copied. */
