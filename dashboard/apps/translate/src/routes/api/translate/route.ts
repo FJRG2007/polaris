@@ -2,8 +2,8 @@
  * `/api/translate`, the one way every surface translates on the server: this
  * app's screen today, Chat, Polar and the extension later.
  *
- * GET answers which server engines can answer the caller and the default
- * target language. POST `{ texts[], from, to, engine? }` answers
+ * GET answers which server engines can answer the caller, the order the
+ * administrator set and the default target language. POST `{ texts[], from, to, engine? }` answers
  * `{ texts[], engine, detected }`: `from` "auto" has the engine detect the
  * source, and a named `engine` is used or refused, never swapped for another.
  * Signed in (session or API key), rate limited per person, body validated.
@@ -20,7 +20,8 @@ export async function GET(): Promise<Response> {
     return Response.json({
         engines: status.engines,
         browser: status.settings.engines.browser,
-        defaultTarget: status.settings.defaultTarget
+        defaultTarget: status.settings.defaultTarget,
+        order: status.settings.order
     });
 }
 

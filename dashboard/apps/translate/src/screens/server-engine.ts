@@ -4,7 +4,7 @@
  */
 
 import { AUTO } from "../model/languages";
-import type { ServerEngineId } from "../model/schemas";
+import type { EngineId, ServerEngineId } from "../model/schemas";
 import type { EngineResult, TranslateEngine } from "../model/engines";
 
 export const TRANSLATE_API = "/api/translate";
@@ -13,6 +13,8 @@ export interface ServerStatusView {
     engines: ServerEngineId[];
     browser: boolean;
     defaultTarget: string;
+    /** The administrator's order; missing from a status cached before it existed. */
+    order?: EngineId[];
 }
 
 /** An answer the server refused, carrying the sentence it gave. */
