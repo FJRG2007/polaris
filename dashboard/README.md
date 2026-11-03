@@ -31,6 +31,7 @@ dashboard/
 │   ├── places/     # @polaris-app/places, an installable app: cameras, devices, people, alerts
 │   ├── calendar/   # @polaris-app/calendar, an installable app: calendars, sync, booking
 │   ├── status-pages/     # @polaris-app/status-pages, an installable app: public uptime pages, custom domains
+│   ├── translate/        # @polaris-app/translate, an installable app: text translation, browser/Polar/DeepL/Google
 │   ├── security-scans/   # @polaris-app/security-scans, part of Servers on every install (loaded as a bundle): one-shot scanner containers over hostd and SSH
 │   ├── cloud-servers/    # @polaris-app/cloud-servers, part of Servers on every install (loaded as a bundle): create and manage VMs at outside cloud providers
 │   ├── landing/    # marketing site (Astro)

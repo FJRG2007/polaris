@@ -32,7 +32,12 @@ import { SettingsDialog } from "./settings-dialog";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
 import { readCache, unwrap, useTranslateLocale, useTranslateT, writeCache } from "./i18n";
-import { createServerEngine, fetchServerStatus, type ServerStatusView } from "./server-engine";
+import {
+    ServerEngineError,
+    createServerEngine,
+    fetchServerStatus,
+    type ServerStatusView
+} from "./server-engine";
 import { createBrowserEngine, hasBrowserTranslator, type BrowserScope } from "./browser-engine";
 import { DEFAULT_SETTINGS, TEXT_MAX, type EngineId, type ServerEngineId } from "../model/schemas";
 import { forgetAction, forgetAllAction, historyAction, rememberAction } from "../actions/translate";
@@ -188,7 +193,8 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     return;
                 } catch (caught) {
                     if (controller.signal.aborted || ticket !== latest.current) return;
-                    lastError = caught instanceof Error ? caught.message : null;
+                    // Only the server words its refusals for the reader.
+                    lastError = caught instanceof ServerEngineError ? caught.message : null;
                     // The browser could not do it: the next engine tries,
                     // unless the reader chose this one.
                 }
@@ -196,7 +202,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             if (ticket !== latest.current) return;
             setPending(false);
             setDownload(null);
-            setError(lastError && !lastError.startsWith("no ") ? lastError : t("errors.failed"));
+            setError(lastError ?? t("errors.failed"));
         }, DEBOUNCE_MS);
         return () => {
             window.clearTimeout(timer);

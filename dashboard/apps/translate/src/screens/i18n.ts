@@ -2,12 +2,15 @@
  * Translate's words in the browser, in the language the page is drawn in.
  */
 
+import { useMemo } from "react";
 import { hostUi } from "@polaris/app-host/client";
 import { translateCatalogs } from "../../messages";
 import type { TranslateTranslator } from "../lib/i18n";
 
+/** Stable while the language is: the screen's effects depend on it. */
 export function useTranslateT(): TranslateTranslator {
-    return translateCatalogs.translator(hostUi.i18nProvider.useLocale(), "translate");
+    const locale = hostUi.i18nProvider.useLocale();
+    return useMemo(() => translateCatalogs.translator(locale, "translate"), [locale]);
 }
 
 export function useTranslateLocale(): string {

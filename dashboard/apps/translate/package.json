@@ -5,7 +5,8 @@
     "type": "module",
     "description": "Translate: text between languages, in the browser, on Polar's model or with DeepL and Google Cloud keys. An installable Polaris app.",
     "polaris": {
-        "id": "translate"
+        "id": "translate",
+        "extension": "src/lib/translate-extension.ts#translateExtension"
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",
