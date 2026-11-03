@@ -35,6 +35,7 @@ import { relativeTime } from "@/lib/relative-time";
 import { IntegrationLogo } from "@/components/logos";
 import { TpLinkMark } from "@/components/brand-icons";
 import { CopyButton } from "@/components/copy-button";
+import { dropServerOptions, ServerMultiPicker, ServerPicker } from "@/components/server-picker";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { subscribeSharedStream } from "@/lib/shared-stream";
@@ -204,6 +205,7 @@ export const clientHost = {
     metricsHistory: { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS },
     relativeTime: { RelativeTime, relativeTime },
     runAction: { runAction },
+    serverPicker: { dropServerOptions, ServerMultiPicker, ServerPicker },
     sessionScope: { useSessionScope },
     sharedStream: { subscribeSharedStream },
     shortcuts: { ShortcutSettings, ShortcutsDialog },

@@ -2250,6 +2250,8 @@ model Host {
     dataJumps     DataConnection[] @relation("DataConnectionSshJump")
 
     @@index([ownerId])
+    // A server picker reads a page of one account's servers in name order.
+    @@index([ownerId, name, id])
 }
 
 /// A named set of servers, so a rule can be written once for "the VPS boxes" or
