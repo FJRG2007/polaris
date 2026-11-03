@@ -47,7 +47,9 @@ export default async function VaultClientsPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("clients.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("clients.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("clients.intro")}</p>
             </div>
 
@@ -106,10 +108,7 @@ export default async function VaultClientsPage() {
                             <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs">
                                 {cliCommand}
                             </code>
-                            <CopyButton
-                                value={cliCommand}
-                                label={t("clients.cliCopy")}
-                            />
+                            <CopyButton value={cliCommand} label={t("clients.cliCopy")} />
                         </div>
                     </div>
                 </CardBody>
@@ -166,7 +165,10 @@ export default async function VaultClientsPage() {
                                             {t.rich("clients.lastUsed", {
                                                 label: client.label,
                                                 time: () => (
-                                                    <RelativeTime key="time" iso={client.lastSeenAt} />
+                                                    <RelativeTime
+                                                        key="time"
+                                                        iso={client.lastSeenAt}
+                                                    />
                                                 )
                                             })}
                                         </p>
