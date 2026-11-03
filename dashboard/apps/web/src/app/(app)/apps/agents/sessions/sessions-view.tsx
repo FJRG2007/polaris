@@ -93,8 +93,19 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
     const live = sessions.some((session) => !core.isSessionOver(session.state));
     useEffect(() => {
         if (!live) return;
-        const timer = setInterval(() => router.refresh(), REFRESH_MS);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") router.refresh();
+        }, REFRESH_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") router.refresh();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [live, router]);
 
     const ordered = [...sessions].sort((a, b) => ORDER[a.state] - ORDER[b.state]);

@@ -129,10 +129,19 @@ export function StatsPanel() {
         // cadence. Both are cleared together, so leaving the panel mid-pair does
         // not leave a timer behind.
         const soon = setTimeout(() => void sample(), FIRST_PAIR_MS);
-        const timer = setInterval(() => void sample(), POLL_MS);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") void sample();
+        }, POLL_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") void sample();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             clearTimeout(soon);
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [sample]);
 

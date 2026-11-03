@@ -23,8 +23,19 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const timer = window.setInterval(() => router.refresh(), POLL_MS);
-        return () => window.clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === "visible") router.refresh();
+        }, POLL_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") router.refresh();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [router]);
 
     async function onCancel() {

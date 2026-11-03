@@ -394,10 +394,19 @@ export function ChatProvider({
                 stopped = true;
             };
         }
-        const timer = setInterval(ask, CALLS_RECHECK_MS);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") ask();
+        }, CALLS_RECHECK_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") ask();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             stopped = true;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [may.call, callsAreOff]);
 
@@ -417,10 +426,19 @@ export function ChatProvider({
                 });
         };
         ask();
-        const timer = setInterval(ask, CALLS_OUTSIDE_RECHECK_MS);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") ask();
+        }, CALLS_OUTSIDE_RECHECK_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") ask();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             stopped = true;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [may.call]);
 

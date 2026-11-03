@@ -221,8 +221,19 @@ function RouterEditor({
     const { poll } = read;
 
     useEffect(() => {
-        const timer = setInterval(poll, STATUS_POLL_MS);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") poll();
+        }, STATUS_POLL_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") poll();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [poll]);
 
     const saved = read.data?.plan ?? null;

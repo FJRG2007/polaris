@@ -52,8 +52,19 @@ export function AppUnavailable({
     // becomes the app the moment it is running.
     useEffect(() => {
         if (!updating) return;
-        const timer = setInterval(() => router.refresh(), 3_000);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") router.refresh();
+        }, 3_000);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") router.refresh();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [updating, router]);
 
     const updateHere = () =>

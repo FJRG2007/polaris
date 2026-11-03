@@ -52,8 +52,19 @@ export function EdgePanel({ hostId }: { hostId: string }) {
     const elsewhere = state?.settingUp === true && !busy;
     useEffect(() => {
         if (!elsewhere) return;
-        const timer = setInterval(() => void ask(), 10_000);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") void ask();
+        }, 10_000);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") void ask();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [elsewhere, ask]);
 
     const prepare = async () => {

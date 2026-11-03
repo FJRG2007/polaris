@@ -109,8 +109,19 @@ export function SessionDetail({
 
     useEffect(() => {
         if (over) return;
-        const timer = setInterval(() => router.refresh(), REFRESH_MS);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") router.refresh();
+        }, REFRESH_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") router.refresh();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [over, router]);
 
     useEffect(() => {
@@ -140,11 +151,20 @@ export function SessionDetail({
                 .catch(() => undefined);
         };
         read();
-        const timer = setInterval(read, REFRESH_MS);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") read();
+        }, REFRESH_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") read();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             stopped = true;
             controller.abort();
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [session.id, session.state, shared]);
 

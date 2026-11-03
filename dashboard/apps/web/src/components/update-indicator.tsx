@@ -39,10 +39,19 @@ export function UpdateIndicator() {
             }
         }
         poll();
-        const timer = setInterval(poll, POLL_INTERVAL_MS);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") poll();
+        }, POLL_INTERVAL_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") poll();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             active = false;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, []);
 
