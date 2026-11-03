@@ -39,7 +39,7 @@ export function describeUpdateCheck(check: UpdateCheck): string {
         case "ready":
             return `Polaris ${check.version} is installed. Restart Polaris to start using it.`;
         case "available":
-            return `Polaris ${check.version} is available. This copy cannot install it by itself: download it from its page.`;
+            return `Polaris ${check.version} is available. This copy cannot install it by itself: open its download page to get it.`;
         case "failed":
             return `Could not check for updates. ${check.reason}`;
         case "unsupported":

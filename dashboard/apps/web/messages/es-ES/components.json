@@ -1113,7 +1113,8 @@
             "ready": "Polaris {version} está instalada. Reinicia para usarla.",
             "available": "Ya salió Polaris {version}. Descárgala desde aquí.",
             "failed": "No se pudo comprobar. Inténtalo de nuevo más tarde.",
-            "unsupported": "Esta copia de Polaris no se actualiza sola."
+            "unsupported": "Esta copia de Polaris no se actualiza sola.",
+            "restartFailed": "Polaris no pudo reiniciarse. Ciérrala y vuelve a abrirla."
         }
     },
     "logViewer": {

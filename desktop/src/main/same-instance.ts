@@ -59,9 +59,10 @@ const memory = new Map<string, { readonly same: string | null; readonly until: n
  * answered with a certificate this computer does not trust.
  */
 export async function sameInstanceAs(origin: string, saved: readonly SavedServer[], untrusted: boolean): Promise<string | null> {
-    const held = memory.get(origin);
-    if (held && held.until > Date.now()) return held.same;
     const others = saved.filter((server) => server.origin !== origin);
+    const key = [origin, untrusted ? "untrusted" : "trusted", ...others.map((server) => server.origin)].join(" ");
+    const held = memory.get(key);
+    if (held && held.until > Date.now()) return held.same;
     const records = await Promise.all(others.map((server) => knownInstance(server.origin)));
     const known: KnownInstance[] = others.flatMap((server, index) => {
         const record = records[index];
@@ -71,6 +72,6 @@ export async function sameInstanceAs(origin: string, saved: readonly SavedServer
         findSameInstance([origin], known, (url, init) => on.fetch(url, { ...init, credentials: "omit" }), TIMEOUT_MS);
     const same = untrusted ? await acceptingCertificateOf(new URL(origin).hostname, compare) : await compare(session.defaultSession);
     if (memory.size >= 50) memory.delete(memory.keys().next().value!);
-    memory.set(origin, { same: same?.origin ?? null, until: Date.now() + CACHE_MS });
+    memory.set(key, { same: same?.origin ?? null, until: Date.now() + CACHE_MS });
     return same?.origin ?? null;
 }

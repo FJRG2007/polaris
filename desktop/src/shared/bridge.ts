@@ -238,6 +238,8 @@ export interface PolarisLocal {
         checkForUpdates(): Promise<UpdateCheck>;
         /** Restart into the version that is installed and waiting. */
         restartToUpdate(): Promise<Outcome>;
+        /** Open the download page of the version found; false when there is none. */
+        openUpdatePage(): Promise<boolean>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -374,6 +376,7 @@ export const CHANNELS = {
     connectClose: "local:connect-close",
     connectCheckUpdates: "local:connect-check-updates",
     connectRestart: "local:connect-restart",
+    connectUpdatePage: "local:connect-update-page",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

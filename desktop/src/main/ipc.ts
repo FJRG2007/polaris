@@ -62,6 +62,8 @@ export interface IpcHost extends PushHost {
     readonly updates: Pick<UpdateReadyState, "current" | "install" | "offer">;
     /** Ask for a newer version now, from a press. */
     readonly checkUpdates: () => Promise<UpdateCheck>;
+    /** Open the download page of the version announced, if there is one. */
+    readonly openUpdatePage: () => boolean;
 }
 
 /** A server named by the list: an address in the one stored form. */
@@ -439,6 +441,8 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectCheckUpdates, (event) => (from(event, "connect") ? host.checkUpdates() : null));
     // Takes nothing, as from the page: only into what the app installed itself.
     ipcMain.handle(CHANNELS.connectRestart, (event) => (from(event, "connect") ? host.updates.install() : REFUSED));
+    // Takes nothing: only the page of the version the app itself announced.
+    ipcMain.handle(CHANNELS.connectUpdatePage, (event) => from(event, "connect") && host.openUpdatePage());
     ipcMain.handle(CHANNELS.connectClose, (event) => {
         if (from(event, "connect")) host.closeConnect();
     });

@@ -23,7 +23,8 @@ const bridge: PolarisLocal = {
         setOpenAtLogin: (open) => ipcRenderer.invoke(CHANNELS.connectOpenAtLogin, open),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),
         checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.connectCheckUpdates)),
-        restartToUpdate: () => ipcRenderer.invoke(CHANNELS.connectRestart)
+        restartToUpdate: () => ipcRenderer.invoke(CHANNELS.connectRestart),
+        openUpdatePage: () => ipcRenderer.invoke(CHANNELS.connectUpdatePage)
     },
     apiKey: {
         state: () => ipcRenderer.invoke(CHANNELS.keyState),

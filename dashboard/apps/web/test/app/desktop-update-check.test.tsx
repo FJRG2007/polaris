@@ -105,6 +105,23 @@ describe("Check for updates on the Desktop app page", () => {
         expect(installUpdate).toHaveBeenCalledOnce();
     });
 
+    it("says a restart that was refused", async () => {
+        install(
+            fakeBridge({
+                checkForUpdates: vi.fn(async () => ({ kind: "ready", version: "0.1.15" })),
+                installUpdate: vi.fn(async () => ({ ok: false as const, error: "nothing waiting" }))
+            })
+        );
+        await show();
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Restart to update" }));
+        });
+        expect(screen.getByRole("alert").textContent).toContain("Polaris could not restart");
+    });
+
     it("says a check that threw could not be made", async () => {
         install(
             fakeBridge({

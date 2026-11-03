@@ -277,6 +277,7 @@ async function alreadyListed(origin: string, verdict: ServerVerdict): Promise<st
     const untrusted = verdict.kind === "unreachable" && isCertificateError(netErrorCode(verdict.cause ?? ""));
     if (verdict.kind !== "polaris" && !untrusted) return null;
     const saved = savedServers();
+    if (saved.some((server) => server.origin === origin)) return null;
     const same = await sameInstanceAs(origin, saved, untrusted).catch(() => null);
     const row = same ? listServers(saved, current).find((server) => server.origin === same) : undefined;
     return row ? sameInstanceWords(row) : null;
@@ -458,7 +459,12 @@ function start(): void {
             updates,
             checkUpdates: () =>
                 updateWatch?.checkNow() ??
-                Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const)
+                Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
+            openUpdatePage: () => {
+                if (!menuUpdate) return false;
+                menuUpdate.open();
+                return true;
+            }
         });
 
         installScreenShare(server);

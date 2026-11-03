@@ -1113,7 +1113,8 @@
             "ready": "Polaris {version} is installed. Restart to use it.",
             "available": "Polaris {version} is out. Download it from this page.",
             "failed": "Could not check for updates. Try again later.",
-            "unsupported": "This copy of Polaris does not update itself."
+            "unsupported": "This copy of Polaris does not update itself.",
+            "restartFailed": "Polaris could not restart. Close it and open it again."
         }
     },
     "logViewer": {

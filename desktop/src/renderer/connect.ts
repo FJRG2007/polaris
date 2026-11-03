@@ -320,11 +320,13 @@ void window.polarisLocal.connect.preferences().catch(() => null).then((preferenc
 
 const checkUpdates = byId<HTMLButtonElement>("check-updates");
 const restartUpdate = byId<HTMLButtonElement>("restart-update");
+const updatePage = byId<HTMLButtonElement>("update-page");
 const updateStatus = byId<HTMLParagraphElement>("update-status");
 checkUpdates.addEventListener("click", () => {
     if (checkUpdates.getAttribute("aria-disabled") === "true") return;
     available(checkUpdates, false);
     restartUpdate.hidden = true;
+    updatePage.hidden = true;
     updateStatus.className = "hint";
     updateStatus.textContent = "Checking for updates...";
     void window.polarisLocal.connect
@@ -334,7 +336,18 @@ checkUpdates.addEventListener("click", () => {
             updateStatus.textContent = describeUpdateCheck(found);
             updateStatus.className = found.kind === "failed" ? "error" : "hint";
             restartUpdate.hidden = found.kind !== "ready";
+            updatePage.hidden = found.kind !== "available";
             available(checkUpdates, true);
+        });
+});
+updatePage.addEventListener("click", () => {
+    void window.polarisLocal.connect
+        .openUpdatePage()
+        .catch(() => false)
+        .then((opened) => {
+            if (opened) return;
+            updateStatus.textContent = "The download page could not be opened. Check for updates again.";
+            updateStatus.className = "error";
         });
 });
 restartUpdate.addEventListener("click", () => {

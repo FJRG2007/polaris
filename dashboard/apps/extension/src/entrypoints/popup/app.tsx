@@ -122,6 +122,7 @@ function useUpdate(): UpdateState & { readonly apply: (state: UpdateState) => vo
 type Checked =
     | { readonly kind: "checking" }
     | { readonly kind: "current" }
+    | { readonly kind: "storeDownloading"; readonly version: string | null }
     | { readonly kind: "storeReady"; readonly version: string | null }
     | { readonly kind: "throttled" }
     | { readonly kind: "failed" };
@@ -134,6 +135,29 @@ type Checked =
 function CheckUpdates({ onChecked }: { onChecked: (state: UpdateState) => void }): React.JSX.Element {
     const t = useWords();
     const [checked, setChecked] = useState<Checked | null>(null);
+    const downloading = checked?.kind === "storeDownloading";
+    useEffect(() => {
+        if (!downloading) return;
+        const updates = (browser.runtime as unknown as {
+            onUpdateAvailable?: {
+                addListener: (listener: (details: { version?: unknown }) => void) => void;
+                removeListener: (listener: (details: { version?: unknown }) => void) => void;
+            };
+        }).onUpdateAvailable;
+        if (!updates) return;
+        const ready = (details: { version?: unknown }): void =>
+            setChecked((now) => ({
+                kind: "storeReady",
+                version:
+                    typeof details.version === "string"
+                        ? details.version
+                        : now && "version" in now
+                          ? now.version
+                          : null
+            }));
+        updates.addListener(ready);
+        return () => updates.removeListener(ready);
+    }, [downloading]);
     const press = async (): Promise<void> => {
         if (checked?.kind === "checking") return;
         setChecked({ kind: "checking" });
@@ -145,7 +169,7 @@ function CheckUpdates({ onChecked }: { onChecked: (state: UpdateState) => void }
         onChecked({ notice: reply.update, pending: reply.pending, latest: reply.latest });
         const { store, storeVersion, polaris } = reply.checked;
         const running = browser.runtime.getManifest().version;
-        if (store === "update_available") setChecked({ kind: "storeReady", version: storeVersion });
+        if (store === "update_available") setChecked({ kind: "storeDownloading", version: storeVersion });
         else if (reply.pending || (reply.update && reply.update.kind !== "desktop")) setChecked(null);
         else if (store === "throttled") setChecked({ kind: "throttled" });
         else if (store === "no_update" || (polaris && reply.latest && !isNewer(reply.latest, running)))
@@ -161,6 +185,8 @@ function CheckUpdates({ onChecked }: { onChecked: (state: UpdateState) => void }
                         {t("popup.version.restart")}
                     </button>
                 </>
+            ) : checked?.kind === "storeDownloading" ? (
+                <span>{t("popup.version.storeDownloading", { version: checked.version ?? "" })}</span>
             ) : (
                 <>
                     {checked && checked.kind !== "checking" ? <span>{t(`popup.version.${checked.kind}`)}</span> : null}

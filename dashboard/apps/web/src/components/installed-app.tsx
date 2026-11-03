@@ -78,11 +78,13 @@ function UsingDesktop({ version }: { version: string }) {
     const [checking, setChecking] = useState(false);
     const [found, setFound] = useState<DesktopUpdateCheck | null>(null);
     const [restarting, setRestarting] = useState(false);
+    const [restartFailed, setRestartFailed] = useState(false);
     const check = desktop?.checkForUpdates;
 
     const run = async (): Promise<void> => {
         if (!check) return;
         setChecking(true);
+        setRestartFailed(false);
         try {
             setFound(readDesktopUpdateCheck(await check()));
         } catch {
@@ -95,8 +97,12 @@ function UsingDesktop({ version }: { version: string }) {
     const restart = async (): Promise<void> => {
         if (!desktop?.installUpdate) return;
         setRestarting(true);
+        setRestartFailed(false);
         try {
-            await desktop.installUpdate();
+            const outcome = await desktop.installUpdate();
+            if (!outcome.ok) setRestartFailed(true);
+        } catch {
+            setRestartFailed(true);
         } finally {
             setRestarting(false);
         }
@@ -124,7 +130,11 @@ function UsingDesktop({ version }: { version: string }) {
                             {t("installApp.restart")}
                         </Button>
                     ) : null}
-                    {found ? (
+                    {restartFailed ? (
+                        <p className="min-w-0 text-sm text-destructive" role="alert">
+                            {t("installApp.check.restartFailed")}
+                        </p>
+                    ) : found ? (
                         <p className="min-w-0 text-sm text-muted-foreground" role="status">
                             {found.kind === "current"
                                 ? t("installApp.check.current", { version: found.version })
