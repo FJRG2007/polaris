@@ -19,6 +19,7 @@ import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
 import type { InstallRequest, InstallResult } from "./install-tools";
 import type { UpdateReady } from "./update-ready";
+import type { UpdateCheck } from "./update-check";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
@@ -132,6 +133,9 @@ export interface PolarisDesktop {
     onUpdateReady(listener: (update: UpdateReady) => void): () => void;
     /** Restart into the waiting update. */
     installUpdate(): Promise<Outcome>;
+    /** Ask for a newer version of this app now and say what was found. Newer
+     *  than `installUpdate`: a page feature-detects it. */
+    checkForUpdates?(): Promise<UpdateCheck>;
     /** This computer's VPN. A refusal's `error` is a word, for the page to say. */
     readonly vpn: {
         deviceName(): Promise<string>;
@@ -230,6 +234,10 @@ export interface PolarisLocal {
         setOpenAtLogin(open: boolean): Promise<boolean>;
         /** Put the settings away. */
         close(): Promise<void>;
+        /** Ask for a newer version of this app now and say what was found. */
+        checkForUpdates(): Promise<UpdateCheck>;
+        /** Restart into the version that is installed and waiting. */
+        restartToUpdate(): Promise<Outcome>;
     };
     readonly apiKey: {
         state(): Promise<{ readonly server: string; readonly canKeep: boolean; }>;
@@ -346,6 +354,7 @@ export const CHANNELS = {
     updateReady: "desktop:update-ready",
     updateCurrent: "desktop:update-current",
     installUpdate: "desktop:install-update",
+    checkUpdates: "desktop:check-updates",
     vpnDeviceName: "desktop:vpn-device-name",
     vpnKey: "desktop:vpn-key",
     vpnUp: "desktop:vpn-up",
@@ -363,6 +372,8 @@ export const CHANNELS = {
     connectRemove: "local:connect-remove",
     connectCheck: "local:connect-check",
     connectClose: "local:connect-close",
+    connectCheckUpdates: "local:connect-check-updates",
+    connectRestart: "local:connect-restart",
     keyState: "local:key-state",
     keySubmit: "local:key-submit",
     keyCancel: "local:key-cancel",

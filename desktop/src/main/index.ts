@@ -23,7 +23,7 @@ import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
-import { watchForUpdates, type Update } from "./updates";
+import { watchForUpdates, type FirstCheck, type Update } from "./updates";
 import { updateBeforeOpening, type Opening } from "./update-first";
 import { UpdateReadyState } from "./update-ready";
 import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
@@ -49,6 +49,8 @@ import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared
 const START = "/home";
 
 let current: string | null = null;
+/** The updater, once it is watching: what "Check for updates" asks. */
+let updateWatch: FirstCheck | null = null;
 let main: BrowserWindow | null = null;
 let connect: BrowserWindow | null = null;
 /** The settings laid over the Polaris window, when there is one to lay them on. */
@@ -453,7 +455,10 @@ function start(): void {
             removeServer,
             closeConnect,
             openServers: openConnect,
-            updates
+            updates,
+            checkUpdates: () =>
+                updateWatch?.checkNow() ??
+                Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const)
         });
 
         installScreenShare(server);
@@ -510,7 +515,7 @@ function start(): void {
         };
         /** The update the app was about to restart into, unannounced until it opens. */
         let heldBack: Update | null = null;
-        const first = watchForUpdates((update) => {
+        const first = (updateWatch = watchForUpdates((update) => {
             menuUpdate = {
                 version: update.version,
                 open: () => void shell.openExternal(update.page),
@@ -524,7 +529,7 @@ function start(): void {
                 return;
             }
             announce(update);
-        });
+        }));
 
         void updateBeforeOpening(first, {
             attempted: updateAttempted,
