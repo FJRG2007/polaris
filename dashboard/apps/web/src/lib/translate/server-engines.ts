@@ -20,6 +20,7 @@ import { PLAIN_TURN } from "@/lib/polar/automatic";
 import { automaticChoice } from "@/lib/polar/shared";
 import { resolvePolarModel } from "@/lib/polar/models";
 import { deeplTranslate } from "@/lib/integrations/deepl";
+import { deeplSource, deeplTarget, googleCode } from "@/lib/translate/provider-codes";
 import { answerUsage, recordPolarUsage } from "@/lib/polar/usage";
 import { googleDetect, googleTranslate } from "@/lib/integrations/google-translate";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -77,27 +78,6 @@ export async function serverEngineStatus(userId: string): Promise<Record<ServerE
         keyOf("google").then(Boolean, () => false)
     ]);
     return { polar, deepl, google };
-}
-
-/** DeepL's spelling of a target: upper case, and English and Portuguese need a variant. */
-export function deeplTarget(code: string): string {
-    const upper = code.toUpperCase();
-    if (upper === "EN") return "EN-US";
-    if (upper === "PT") return "PT-PT";
-    if (upper === "ZH") return "ZH-HANS";
-    return upper;
-}
-
-/** DeepL's spelling of a source: the language alone, never a variant. */
-export function deeplSource(code: string): string {
-    return code.split("-")[0]!.toUpperCase();
-}
-
-/** Google's spelling: `zh-CN`/`zh-TW` for the two scripts, everything else as is. */
-export function googleCode(code: string): string {
-    if (code === "zh-Hans" || code === "zh") return "zh-CN";
-    if (code === "zh-Hant") return "zh-TW";
-    return code;
 }
 
 /** A provider failure as a reader's code: a pause says so, the rest failed. */
