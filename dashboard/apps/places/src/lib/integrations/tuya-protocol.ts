@@ -353,7 +353,8 @@ const statusSchema = z.union([
 export function dpsOf(decoded: unknown): Record<string, unknown> | null {
     const parsed = statusSchema.safeParse(decoded);
     if (!parsed.success) return null;
-    return "dps" in parsed.data ? parsed.data.dps : parsed.data.data.dps;
+    const data = parsed.data as { dps?: Record<string, unknown>; data?: { dps: Record<string, unknown> } };
+    return data.dps ?? data.data?.dps ?? null;
 }
 
 /** The first message of a 3.4/3.5 session: our nonce, under the local key. */

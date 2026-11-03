@@ -483,6 +483,8 @@ const sharedDeviceSchema = z.object({
     name: text,
     category: text,
     product_name: text,
+    /** The key the device encrypts its local protocol with (`tuya-local`). */
+    local_key: z.string().max(64).nullish(),
     online: z
         .boolean()
         .nullish()
@@ -529,6 +531,17 @@ export async function tuyaSharedSpecification(
         session,
         "GET",
         `/v1.1/m/life/${encodeURIComponent(deviceId)}/specifications`
+    );
+    return result;
+}
+
+/** Which data point number each code is, for speaking to the device locally
+ *  - the device-sharing SDK's `update_device_strategy_info`. */
+export async function tuyaSharedDpMap(session: TuyaSession, deviceId: string): Promise<unknown> {
+    const { result } = await call(
+        session,
+        "GET",
+        `/v1.0/m/life/devices/${encodeURIComponent(deviceId)}/status`
     );
     return result;
 }

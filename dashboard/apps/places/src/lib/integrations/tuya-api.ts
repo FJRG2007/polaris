@@ -83,6 +83,8 @@ const deviceSchema = z.object({
     category: z.string().default(""),
     product_name: z.string().default(""),
     model: z.string().default(""),
+    /** The key the device encrypts its local protocol with (`tuya-local`). */
+    local_key: z.string().max(64).optional(),
     online: z.boolean().default(false),
     status: z.array(statusSchema).default([])
 });
@@ -329,6 +331,22 @@ export async function tuyaSpecification(
         credentials,
         "GET",
         `/v1.0/devices/${encodeURIComponent(deviceId)}/specifications`,
+        { accessToken: token }
+    );
+}
+
+/** A device's specification with each point's `dp_id`: which number every
+ *  code is on the local protocol (`GET /v1.1/devices/{device_id}/specifications`,
+ *  as tinytuya reads it). */
+export async function tuyaDpSpecification(
+    credentials: TuyaCredentials,
+    deviceId: string
+): Promise<unknown> {
+    const { token } = await tuyaToken(credentials);
+    return call(
+        credentials,
+        "GET",
+        `/v1.1/devices/${encodeURIComponent(deviceId)}/specifications`,
         { accessToken: token }
     );
 }

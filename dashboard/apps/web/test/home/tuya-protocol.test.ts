@@ -125,7 +125,7 @@ describe("Tuya local protocol", () => {
 
     it("refuses a frame whose CRC does not check", () => {
         const broken = hex("v33_status_reply");
-        broken[20] ^= 0xff;
+        broken[20] = broken[20]! ^ 0xff;
         expect(() => parseFrame(broken)).toThrow();
     });
 
@@ -186,7 +186,7 @@ describe("Tuya local protocol", () => {
 
     it("refuses a 3.5 frame that was tampered with", () => {
         const broken = hex("v35_status_reply");
-        broken[40] ^= 1;
+        broken[40] = broken[40]! ^ 1;
         expect(() => parseFrame(broken, parseOptionsFor(agreed("3.5")))).toThrow();
     });
 

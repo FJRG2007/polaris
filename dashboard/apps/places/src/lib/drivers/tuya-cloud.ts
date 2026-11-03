@@ -15,7 +15,8 @@
 import { HomeError } from "../home-error";
 import { climateCommandOf } from "../device-kinds";
 import * as tuya from "../integrations/tuya-api";
-import type { Credentials, DeviceDriver } from "./contract";
+import * as local from "./tuya-local";
+import { DriverError, type Credentials, type DeviceDriver } from "./contract";
 import { tuyaActionFor, tuyaSnapshots, tuyaSpecsFor, tuyaSpeaking } from "./tuya-vocabulary";
 
 export const TUYA_CLOUD = "tuya-cloud";
@@ -43,12 +44,32 @@ export const tuyaCloudDriver: DeviceDriver = {
         await tuyaSpeaking(() => tuya.listTuyaDevices(credentialsOf(credentials)));
     },
 
+    async renew(credentials) {
+        return local.tuyaLocalRenewal(accountOf(credentials), credentials);
+    },
+
     async list(credentials) {
         const keys = credentialsOf(credentials);
+        const source = {
+            dpMap: async (id: string) => local.dpMapOf(await tuya.tuyaDpSpecification(keys, id))
+        };
+        let cloud: tuya.TuyaDevice[] | null;
+        let offline: unknown = null;
+        try {
+            cloud = await tuyaSpeaking(() => tuya.listTuyaDevices(keys));
+        } catch (caught) {
+            // With the internet down the devices on this network still answer.
+            if (!(caught instanceof DriverError) || caught.kind !== "unreachable") throw caught;
+            cloud = null;
+            offline = caught;
+        }
+        const read = await local.tuyaLocalRead(accountOf(credentials), credentials, cloud, source);
+        if (!read) throw offline;
         return tuyaSpeaking(async () => {
-            const devices = await tuya.listTuyaDevices(keys);
-            const specs = await tuyaSpecsFor(devices, (id) => tuya.tuyaSpecification(keys, id));
-            return tuyaSnapshots(devices, specs);
+            const specs = cloud
+                ? await tuyaSpecsFor(read.devices, (id) => tuya.tuyaSpecification(keys, id))
+                : new Map();
+            return tuyaSnapshots(read.devices, specs);
         });
     },
 
@@ -61,7 +82,14 @@ export const tuyaCloudDriver: DeviceDriver = {
                 climateCommandOf(command),
                 (id) => tuya.tuyaSpecification(keys, id)
             );
+            if (await local.tuyaLocalAct(accountOf(credentials), credentials, deviceId, commands))
+                return;
             await tuya.tuyaCommand(keys, deviceId, commands);
         });
     }
 };
+
+/** Which account a set of credentials is, for the keys and places kept. */
+function accountOf(credentials: Credentials): string {
+    return `${TUYA_CLOUD}:${credentials.accessId ?? ""}`;
+}

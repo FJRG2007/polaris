@@ -20,7 +20,8 @@ import { HomeError } from "../home-error";
 import { climateCommandOf } from "../device-kinds";
 import * as tuya from "../integrations/tuya-sharing";
 import { TuyaError } from "../integrations/tuya-api";
-import type { Credentials, DeviceDriver } from "./contract";
+import * as local from "./tuya-local";
+import { DriverError, type Credentials, type DeviceDriver } from "./contract";
 import { tuyaActionFor, tuyaSnapshots, tuyaSpecsFor, tuyaSpeaking } from "./tuya-vocabulary";
 
 export const TUYA_APP = "tuya-app";
@@ -96,16 +97,19 @@ export const tuyaAppDriver: DeviceDriver = {
 
     async renew(credentials) {
         const session = sessionOf(credentials);
-        if (!tuya.tuyaNeedsRefresh(session)) return null;
+        const keys = local.tuyaLocalRenewal(accountOf(credentials), credentials);
+        if (!tuya.tuyaNeedsRefresh(session)) return keys;
         try {
-            return toCredentials(await tuya.refreshTuyaSession(session));
+            const renewed = toCredentials(await tuya.refreshTuyaSession(session));
+            const lanKeys = keys?.[local.LAN_KEYS_FIELD] ?? credentials[local.LAN_KEYS_FIELD];
+            return lanKeys ? { ...renewed, [local.LAN_KEYS_FIELD]: lanKeys } : renewed;
         } catch (caught) {
             if (
                 caught instanceof TuyaError &&
                 caught.kind === "unreachable" &&
                 session.expiresAt > Date.now()
             ) {
-                return null;
+                return keys;
             }
             return tuyaSpeaking(() => Promise.reject(caught));
         }
@@ -119,20 +123,28 @@ export const tuyaAppDriver: DeviceDriver = {
 
     async list(credentials) {
         const session = sessionOf(credentials);
+        const account = accountOf(credentials);
+        const source = {
+            dpMap: async (id: string) => local.dpMapOf(await tuya.tuyaSharedDpMap(session, id))
+        };
+        let cloud: tuya.TuyaSharedDevice[] | null;
+        let offline: unknown = null;
+        try {
+            cloud = await tuyaSpeaking(() => listAll(session));
+        } catch (caught) {
+            // With the internet down the devices on this network still answer:
+            // the last list, read from each of them.
+            if (!(caught instanceof DriverError) || caught.kind !== "unreachable") throw caught;
+            cloud = null;
+            offline = caught;
+        }
+        const read = await local.tuyaLocalRead(account, credentials, cloud, source);
+        if (!read) throw offline;
         return tuyaSpeaking(async () => {
-            const homes = await tuya.listTuyaHomes(session);
-            // One device shared into two homes of the same account is one
-            // device, and two rows of it would be two switches for one light.
-            const devices = new Map<string, tuya.TuyaSharedDevice>();
-            for (const home of homes) {
-                for (const device of await tuya.listTuyaHomeDevices(session, home.id)) {
-                    if (!devices.has(device.id)) devices.set(device.id, device);
-                }
-            }
-            const all = [...devices.values()];
-            const specs = await tuyaSpecsFor(all, (id) =>
-                tuya.tuyaSharedSpecification(session, id)
-            );
+            const all = read.devices;
+            const specs = cloud
+                ? await tuyaSpecsFor(all, (id) => tuya.tuyaSharedSpecification(session, id))
+                : new Map();
             return tuyaSnapshots(all, specs);
         });
     },
@@ -146,11 +158,33 @@ export const tuyaAppDriver: DeviceDriver = {
                 climateCommandOf(command),
                 (id) => tuya.tuyaSharedSpecification(session, id)
             );
+            if (await local.tuyaLocalAct(accountOf(credentials), credentials, deviceId, commands))
+                return;
             await tuya.sendTuyaCommands(session, deviceId, commands);
         });
     },
 
     async forget(credentials) {
+        local.forgetTuyaLocal(accountOf(credentials));
         await tuyaSpeaking(() => tuya.expireTuyaTerminal(sessionOf(credentials)));
     }
 };
+
+/** Which account a set of credentials is, for the keys and places kept. */
+function accountOf(credentials: Credentials): string {
+    return `${TUYA_APP}:${credentials.uid || credentials.userCode || ""}`;
+}
+
+/** Every device on the account, once each. */
+async function listAll(session: tuya.TuyaSession): Promise<tuya.TuyaSharedDevice[]> {
+    const homes = await tuya.listTuyaHomes(session);
+    // One device shared into two homes of the same account is one
+    // device, and two rows of it would be two switches for one light.
+    const devices = new Map<string, tuya.TuyaSharedDevice>();
+    for (const home of homes) {
+        for (const device of await tuya.listTuyaHomeDevices(session, home.id)) {
+            if (!devices.has(device.id)) devices.set(device.id, device);
+        }
+    }
+    return [...devices.values()];
+}
