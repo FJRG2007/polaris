@@ -32,7 +32,7 @@ interface Turn {
     error: string | null;
 }
 
-interface Recognition {
+export interface Recognition {
     lang: string;
     interimResults: boolean;
     continuous: boolean;
@@ -47,9 +47,9 @@ interface Recognition {
     stop(): void;
 }
 
-type RecognitionClass = new () => Recognition;
+export type RecognitionClass = new () => Recognition;
 
-function recognitionClass(): RecognitionClass | null {
+export function recognitionClass(): RecognitionClass | null {
     const scope = globalThis as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
     const api = scope.SpeechRecognition ?? scope.webkitSpeechRecognition;
     return typeof api === "function" ? (api as RecognitionClass) : null;

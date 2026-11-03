@@ -185,7 +185,10 @@
         "translateSite": "Traducir este sitio web",
         "drop": "Suelta el archivo para traducirlo",
         "backToText": "Volver al texto",
-        "unsupported": "Ese archivo no se puede traducir aquí"
+        "unsupported": "Ese archivo no se puede traducir aquí",
+        "dictate": "Dictar",
+        "dictateStop": "Dejar de dictar",
+        "dictateUnavailable": "El dictado no está disponible aquí"
     },
     "website": {
         "address": "Dirección del sitio",

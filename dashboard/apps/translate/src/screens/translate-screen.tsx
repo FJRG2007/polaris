@@ -27,6 +27,7 @@ import {
     Globe,
     Languages,
     MessagesSquare,
+    Mic,
     Paperclip,
     Settings2,
     Square,
@@ -49,7 +50,9 @@ import {
     useToast,
     type SearchableSelectOption
 } from "@polaris/ui";
-import { AudioMode } from "./audio-mode";
+import { AudioMode, recognitionClass, speechCode, type Recognition } from "./audio-mode";
+import { postFile } from "./server-engine";
+import { AUDIO_MAX_SECONDS } from "../model/media";
 import { ImageMode } from "./image-mode";
 import { CameraMode } from "./camera-mode";
 import { DocumentMode } from "./document-mode";
@@ -156,6 +159,10 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [download, setDownload] = useState<number | null>(null);
     const [speaking, setSpeaking] = useState(false);
     const [canSpeak, setCanSpeak] = useState(false);
+    const [dictating, setDictating] = useState(false);
+    const [canRecord, setCanRecord] = useState(false);
+    const [nativeDictation, setNativeDictation] = useState(false);
+    const stopDictation = useRef<(() => void) | null>(null);
 
     const [history, setHistory] = useState<HistoryEntry[] | null>(() =>
         readCache<HistoryEntry[]>("history")
@@ -178,6 +185,11 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     useEffect(() => {
         setBrowser(hasBrowserTranslator(self as unknown as BrowserScope));
         setCanSpeak(typeof window.speechSynthesis !== "undefined");
+        setCanRecord(
+            typeof navigator.mediaDevices?.getUserMedia === "function" &&
+                typeof MediaRecorder !== "undefined"
+        );
+        setNativeDictation(recognitionClass() !== null);
         void loadStatus();
         void unwrap(() => historyAction(), t("errors.historyFailed"))
             .then((answer) => {
@@ -185,7 +197,10 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 writeCache("history", answer.entries);
             })
             .catch(() => setHistory((current) => current ?? []));
-        return () => window.speechSynthesis?.cancel();
+        return () => {
+            window.speechSynthesis?.cancel();
+            stopDictation.current?.();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
     }, []);
 
@@ -461,6 +476,83 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 
     const typedSite = input.kind === "text" ? websiteOf(source) : null;
 
+    // Dictation into the box: the same transcription the conversation uses on
+    // the server, and the browser's own recognition only where that is not set up.
+    const append = (heard: string) => {
+        const text = heard.trim();
+        if (!text) return;
+        setSource((now) => (now && !/\s$/.test(now) ? `${now} ${text}` : now + text));
+    };
+    const serverDictation = canRecord && (status?.reads?.audio ?? false);
+    const canDictate = serverDictation || nativeDictation;
+    const dictate = async () => {
+        if (dictating) return stopDictation.current?.();
+        if (serverDictation) {
+            let media: MediaStream;
+            try {
+                media = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch {
+                return toast.show({ title: t("audio.micDenied") });
+            }
+            const chunks: Blob[] = [];
+            const started = Date.now();
+            const made = new MediaRecorder(media);
+            const stopAt = window.setTimeout(
+                () => made.state === "recording" && made.stop(),
+                AUDIO_MAX_SECONDS * 1000
+            );
+            made.ondataavailable = (event) => chunks.push(event.data);
+            made.onstop = async () => {
+                window.clearTimeout(stopAt);
+                media.getTracks().forEach((track) => track.stop());
+                setDictating(false);
+                stopDictation.current = null;
+                const blob = new Blob(chunks, {
+                    type: made.mimeType.split(";")[0] || "audio/webm"
+                });
+                if (blob.size === 0) return;
+                const durationMs = Math.min(AUDIO_MAX_SECONDS * 1000, Date.now() - started);
+                try {
+                    const answer = await postFile<{ text: string }>(
+                        `/api/translate/transcribe?durationMs=${durationMs}`,
+                        blob,
+                        t("errors.transcribeFailed")
+                    );
+                    append(answer.text);
+                } catch (caught) {
+                    toast.show({ title: (caught as Error).message });
+                }
+            };
+            stopDictation.current = () => made.state === "recording" && made.stop();
+            setDictating(true);
+            made.start();
+            return;
+        }
+        const Api = recognitionClass();
+        if (!Api) return;
+        const heard: Recognition = new Api();
+        heard.lang = speechCode(from === AUTO ? locale : from);
+        heard.interimResults = false;
+        heard.continuous = true;
+        heard.onresult = (event) => {
+            const results = Array.from(event.results);
+            const last = results[results.length - 1];
+            if (last?.isFinal) append(last[0]?.transcript ?? "");
+        };
+        heard.onerror = (event) => {
+            if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+                toast.show({ title: t("audio.micDenied") });
+            }
+        };
+        heard.onend = () => {
+            setDictating(false);
+            stopDictation.current = null;
+        };
+        stopDictation.current = () => heard.stop();
+        setDictating(true);
+        heard.start();
+    };
+
     const sourceOptions: SearchableSelectOption[] = [
         {
             value: AUTO,
@@ -689,6 +781,33 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                             title={t("input.attach")}
                         >
                             <Paperclip className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                        <Button
+                            variant={dictating ? "secondary" : "ghost"}
+                            size="icon"
+                            onClick={() => void dictate()}
+                            disabled={!canDictate}
+                            aria-pressed={dictating}
+                            aria-label={
+                                !canDictate
+                                    ? t("input.dictateUnavailable")
+                                    : dictating
+                                      ? t("input.dictateStop")
+                                      : t("input.dictate")
+                            }
+                            title={
+                                !canDictate
+                                    ? t("input.dictateUnavailable")
+                                    : dictating
+                                      ? t("input.dictateStop")
+                                      : t("input.dictate")
+                            }
+                        >
+                            {dictating ? (
+                                <Square className="size-4 shrink-0 text-destructive" aria-hidden />
+                            ) : (
+                                <Mic className="size-4 shrink-0" aria-hidden />
+                            )}
                         </Button>
                         <Button
                             variant="ghost"
