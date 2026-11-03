@@ -50,6 +50,7 @@ export function ThreadPanel({
     roomMentions = true,
     highlightId = null,
     emoji = null,
+    translation = core.NO_CHAT_TRANSLATION,
     onClose,
     onChanged
 }: {
@@ -72,6 +73,9 @@ export function ThreadPanel({
     onChanged: () => void;
     /** The space's own emoji, from the conversation the thread hangs off. */
     emoji?: SpaceEmojiScope | null;
+    /** This reader's live translation of the conversation, which a thread in
+     *  it follows too. */
+    translation?: core.ChatTranslationPrefs;
 }) {
     const t = useTranslations("chat");
     const { may } = useChat();
@@ -190,6 +194,7 @@ export function ThreadPanel({
                         <MessageList
                             emoji={emoji}
                             messages={messages}
+                            liveTranslation={translation}
                             viewerId={viewerId}
                             canPost={canPost}
                             canModerate={canModerate}
@@ -243,6 +248,7 @@ export function ThreadPanel({
                     disabled={!canPost}
                     attachable={may.attach}
                     placeholder={t("thread.replyInThisThread")}
+                    translateOutgoing={translation.outgoing}
                     // A poll belongs in a thread as readily as anywhere else: a side
                     // conversation is exactly where somebody asks the room to pick
                     // between the two things being argued about.
@@ -265,13 +271,14 @@ export function ThreadPanel({
                         await load();
                         onChanged();
                     }}
-                    onSend={async (body, files) => {
+                    onSend={async (body, files, _sounds, _spoilers, _kept, _report, sent) => {
                         if (files.length > 0) {
                             // A reply with files takes the same route a message does,
                             // with the thread named on it.
                             const form = new FormData();
                             form.set("body", body);
                             form.set("parentId", root.id);
+                            if (sent) form.set("translation", JSON.stringify(sent));
                             for (const file of files) form.append("files", file);
                             const response = await fetch(
                                 `/api/chat/channels/${root.channelId}/messages`,
@@ -297,7 +304,8 @@ export function ThreadPanel({
                                     actions.sendAction({
                                         channelId: root.channelId,
                                         body,
-                                        parentId: root.id
+                                        parentId: root.id,
+                                        translation: sent
                                     }),
                                 setError
                             );

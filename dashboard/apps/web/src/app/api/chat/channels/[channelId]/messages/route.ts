@@ -118,7 +118,11 @@ const fieldsSchema = z.object({
     // case of sending a screenshot.
     body: z.string().trim().max(core.MAX_CHAT_MESSAGE),
     parentId: z.string().uuid().nullable(),
-    replyToId: z.string().uuid().nullable()
+    replyToId: z.string().uuid().nullable(),
+    /** Set when live translation rewrote what was typed - see
+     *  `core.chatSentTranslationSchema`. A field that does not read as one
+     *  refuses the message rather than sending it unmarked. */
+    translation: core.chatSentTranslationSchema.nullable()
 });
 
 /** How long each file plays for and what it looks like, by position. */
@@ -151,6 +155,19 @@ function readSounds(field: FormDataEntryValue | null): unknown {
         return JSON.parse(field);
     } catch {
         return [];
+    }
+}
+
+/** The translation note, absent as null. Unreadable is undefined, which the
+ *  schema refuses: a message that says it was translated and cannot be read
+ *  as one is not sent as if it had not been. */
+function readTranslation(field: FormDataEntryValue | null): unknown {
+    if (field === null || field === "") return null;
+    if (typeof field !== "string") return undefined;
+    try {
+        return JSON.parse(field);
+    } catch {
+        return undefined;
     }
 }
 
@@ -212,7 +229,8 @@ export async function POST(
     const fields = fieldsSchema.safeParse({
         body: String(form.get("body") ?? ""),
         parentId: form.get("parentId") ? String(form.get("parentId")) : null,
-        replyToId: form.get("replyToId") ? String(form.get("replyToId")) : null
+        replyToId: form.get("replyToId") ? String(form.get("replyToId")) : null,
+        translation: readTranslation(form.get("translation"))
     });
     if (!fields.success)
         return Response.json(
@@ -378,7 +396,8 @@ export async function POST(
                 // message that is only a file has one. What it stands for is
                 // said by the attachment beneath it.
                 body: fields.data.body || " ",
-                parentId: fields.data.parentId
+                parentId: fields.data.parentId,
+                ...(fields.data.translation ? { translation: fields.data.translation } : {})
             },
             stored,
             fields.data.replyToId ? { messageId: fields.data.replyToId, forwarded: false } : null

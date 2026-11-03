@@ -1667,7 +1667,8 @@ export function ChannelView({
         sounds: readonly RecordedSound[] = [],
         spoilers: readonly number[] = [],
         fromDrive: readonly KeptPick[] = [],
-        report?: (progress: SendProgress) => void
+        report?: (progress: SendProgress) => void,
+        translation?: core.ChatSentTranslation
     ): Promise<SendOutcome> => {
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
@@ -1706,6 +1707,7 @@ export function ChannelView({
             const form = new FormData();
             form.set("body", body);
             if (replyingTo) form.set("replyToId", replyingTo.id);
+            if (translation) form.set("translation", JSON.stringify(translation));
             // Which of them arrive covered, by position. Sent only when there
             // are any, which is nearly never - an empty field on every message
             // in Polaris to say "none" is a field nobody needed.
@@ -1759,7 +1761,7 @@ export function ChannelView({
             refresh();
             return;
         }
-        await sendText(body);
+        await sendText(body, translation);
     };
 
     /**
@@ -1787,7 +1789,7 @@ export function ChannelView({
         return answering;
     };
 
-    const sendText = async (body: string) => {
+    const sendText = async (body: string, translation?: core.ChatSentTranslation) => {
         const draft = draftMessage({
             id: `pending:${++drafts.current}`,
             channelId,
@@ -1813,7 +1815,7 @@ export function ChannelView({
             () =>
                 elsewhere
                     ? actions.forwardAction({ messageId: elsewhere, channelId, note: body })
-                    : actions.sendAction({ channelId, body, replyToId: answering }),
+                    : actions.sendAction({ channelId, body, replyToId: answering, translation }),
             setError
         );
         if (result?.error || !result?.id) {
@@ -2086,6 +2088,7 @@ export function ChannelView({
                     <MessageList
                         emoji={emojiScope}
                         messages={shown}
+                        liveTranslation={channel?.translation}
                         coverMedia={channel?.contentMode === "spoiler"}
                         viewerId={viewerId}
                         canPost={canPost}
@@ -2291,6 +2294,7 @@ export function ChannelView({
                         }}
                         onCancelEdit={() => setEditing(null)}
                         onSend={send}
+                        translateOutgoing={channel.translation.outgoing}
                         canShareFromDrive
                         onSchedule={scheduleMessage}
                         onPoll={createPoll}
@@ -2747,6 +2751,7 @@ export function ChannelView({
                     canPost={canPost}
                     canModerate={canModerate}
                     roomMentions={channel.mayMentionRoom}
+                    translation={channel.translation}
                     highlightId={threadHighlight}
                     onClose={() => setThread(null)}
                     onChanged={() => void catchUp()}
