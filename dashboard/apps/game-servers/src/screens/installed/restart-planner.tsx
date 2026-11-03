@@ -104,8 +104,19 @@ export function RestartPlanner({
     // own, when the server empties or the time comes.
     useEffect(() => {
         if (!pending) return;
-        const timer = setInterval(() => void load(), WATCH_BOOKED_MS);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") void load();
+        }, WATCH_BOOKED_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") void load();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [pending, load]);
 
     useEffect(() => {

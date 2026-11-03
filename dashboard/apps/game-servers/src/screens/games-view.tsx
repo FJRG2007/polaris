@@ -323,8 +323,19 @@ export function GamesView({
     const copying = servers.some((server) => server.copy && server.copy.stage !== "failed");
     useEffect(() => {
         if (!copying) return;
-        const timer = setInterval(() => router.refresh(), COPY_POLL_MS);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") router.refresh();
+        }, COPY_POLL_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") router.refresh();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [copying, router]);
 
     function duplicateRefusal(server: list.GameServerSeed): string {

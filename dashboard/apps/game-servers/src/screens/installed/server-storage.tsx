@@ -114,8 +114,22 @@ export function ServerStorage({
 
     const working = view?.move ? WORKING.has(view.move.state) : false;
     useEffect(() => {
-        const timer = setInterval(() => void load(), working ? 3_000 : 30_000);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(
+            () => {
+                if (document.visibilityState === "visible") void load();
+            },
+            working ? 3_000 : 30_000
+        );
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") void load();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [load, working]);
 
     if (!loaded) {

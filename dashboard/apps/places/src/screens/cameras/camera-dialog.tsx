@@ -273,10 +273,19 @@ export function CameraDialog({
         // The worker publishes twice a minute; asking on the same cadence means
         // somebody walking in front of their own camera with this open sees it
         // register rather than having to close and reopen.
-        const timer = setInterval(() => void ask(), 15_000);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") void ask();
+        }, 15_000);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") void ask();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             cancelled = true;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [camera?.id]);
 

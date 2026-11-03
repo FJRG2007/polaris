@@ -257,10 +257,19 @@ export function GameConsole({
                 if (live) setSchedules(answer.schedules);
             });
         read();
-        const timer = window.setInterval(read, SCHEDULES_EVERY_MS);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === "visible") read();
+        }, SCHEDULES_EVERY_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") read();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             live = false;
             window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [installedAppId]);
 

@@ -299,10 +299,19 @@ export function MinecraftChallenges({
                     // Tried again on the next beat.
                 });
         read();
-        const timer = setInterval(read, 30_000);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") read();
+        }, 30_000);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") read();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             alive = false;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [installedAppId]);
 

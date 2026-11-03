@@ -54,8 +54,19 @@ export function DomainSection({
     // says when it starts working without being refreshed.
     useEffect(() => {
         if (!domain || !status || status.state === "ready") return;
-        const timer = setInterval(check, RECHECK_MS);
-        return () => clearInterval(timer);
+        // Not while the tab is hidden: nobody is looking, and it reads once on
+        // the way back instead.
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") check();
+        }, RECHECK_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") check();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [domain, status?.state]);
 
