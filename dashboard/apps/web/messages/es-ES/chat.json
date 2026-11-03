@@ -931,12 +931,12 @@
         "description": "Polaris graba la pantalla o ventana que elijas y pone el vídeo en tu mensaje. Hasta {time} y {size} MB.",
         "recorded": "{time}, {size} MB",
         "errors": {
-            "unsupported": "{surface, select, app {Esta app no puede grabar vídeo. Prueba desde un navegador.} other {Este navegador no puede grabar vídeo. Prueba con otro navegador.}}",
+            "unsupported": "{clientKind, select, desktop {Esta app no puede grabar vídeo. Prueba desde un navegador.} other {Este navegador no puede grabar vídeo. Prueba con otro navegador.}}",
             "withoutCamera": "Grabando sin la cámara: no se pudo abrir.",
             "withoutMicrophone": "Grabando sin el micrófono: no se pudo abrir.",
-            "noPicture": "{surface, select, app {Esta app no pudo componer la imagen. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.}}",
-            "notStarted": "{surface, select, app {Esta app no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.}}",
-            "notEncoded": "{surface, select, app {Esta app no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.}}",
+            "noPicture": "{clientKind, select, desktop {Esta app no pudo componer la imagen. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.}}",
+            "notStarted": "{clientKind, select, desktop {Esta app no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.}}",
+            "notEncoded": "{clientKind, select, desktop {Esta app no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.}}",
             "tooLarge": "Detenida: la grabación llegó al tamaño máximo de un mensaje."
         }
     },
@@ -1350,7 +1350,7 @@
         "sending": "Enviando",
         "sendToTheConversation": "Enviar a la conversación",
         "notRecorded": "No se grabó la llamada",
-        "notRecordedWhy": "{surface, select, app {Vuelve a intentarlo o graba desde un navegador.} other {Vuelve a intentarlo o graba desde otro navegador.}}",
+        "notRecordedWhy": "{clientKind, select, desktop {Vuelve a intentarlo o graba desde un navegador.} other {Vuelve a intentarlo o graba desde otro navegador.}}",
         "close": "Cerrar",
         "errors": {
             "unsupported": "{surface, select, app {Esta app no puede grabar vídeo.} other {Este navegador no puede grabar vídeo.}}",

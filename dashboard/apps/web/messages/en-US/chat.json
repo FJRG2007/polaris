@@ -931,12 +931,12 @@
         "description": "Polaris records the screen or window you pick and puts the video in your message. Up to {time} and {size} MB.",
         "recorded": "{time}, {size} MB",
         "errors": {
-            "unsupported": "{surface, select, app {This app cannot record video. Try it from a browser.} other {This browser cannot record video. Try another browser.}}",
+            "unsupported": "{clientKind, select, desktop {This app cannot record video. Try it from a browser.} other {This browser cannot record video. Try another browser.}}",
             "withoutCamera": "Recording without the camera: it could not be opened.",
             "withoutMicrophone": "Recording without the microphone: it could not be opened.",
-            "noPicture": "{surface, select, app {This app could not put the picture together. Try again, or use a browser.} other {This browser could not put the picture together. Try again, or use another browser.}}",
-            "notStarted": "{surface, select, app {This app could not start recording the screen. Try again, or use a browser.} other {This browser could not start recording the screen. Try again, or use another browser.}}",
-            "notEncoded": "{surface, select, app {This app could not record the screen, so nothing was saved. Try again, or use a browser.} other {This browser could not record the screen, so nothing was saved. Try again, or use another browser.}}",
+            "noPicture": "{clientKind, select, desktop {This app could not put the picture together. Try again, or use a browser.} other {This browser could not put the picture together. Try again, or use another browser.}}",
+            "notStarted": "{clientKind, select, desktop {This app could not start recording the screen. Try again, or use a browser.} other {This browser could not start recording the screen. Try again, or use another browser.}}",
+            "notEncoded": "{clientKind, select, desktop {This app could not record the screen, so nothing was saved. Try again, or use a browser.} other {This browser could not record the screen, so nothing was saved. Try again, or use another browser.}}",
             "tooLarge": "Stopped: the recording reached the size a message can carry."
         }
     },
@@ -1350,7 +1350,7 @@
         "sending": "Sending",
         "sendToTheConversation": "Send to the conversation",
         "notRecorded": "The call was not recorded",
-        "notRecordedWhy": "{surface, select, app {Try again, or record from a browser.} other {Try again, or record from another browser.}}",
+        "notRecordedWhy": "{clientKind, select, desktop {Try again, or record from a browser.} other {Try again, or record from another browser.}}",
         "close": "Close",
         "errors": {
             "unsupported": "{surface, select, app {This app cannot record video.} other {This browser cannot record video.}}",
