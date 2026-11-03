@@ -1779,7 +1779,7 @@
         "reach": {
             "local": "Conectado en tu red",
             "cloud": "No está en esta red, se usa la nube",
-            "cloud-key": "Rechazó su clave local, se usa la nube",
+            "cloud-key": "Rechazó la conexión local, se usa la nube",
             "cloud-only": "Este equipo solo funciona por la nube"
         },
         "switchSettings": {

@@ -24,8 +24,8 @@ import { z } from "zod";
 import type { Credentials } from "./contract";
 import * as lan from "../integrations/tuya-lan";
 import { subnetTargets } from "../integrations/lan-unit";
-import type { TuyaDeviceShape } from "./tuya-vocabulary";
 import type { TuyaVersion } from "../integrations/tuya-protocol";
+import { tuyaDraws, type TuyaDeviceShape } from "./tuya-vocabulary";
 
 /** The credentials field the keys travel in. */
 export const LAN_KEYS_FIELD = "lanKeys";
@@ -39,6 +39,18 @@ const LISTEN_MS = 4_000;
 /** How many (address, device, version) guesses one look may make on a network
  *  where announcements do not arrive. */
 const MAX_GUESSES = 90;
+
+/** How many looks may guess at a device without finding it before it is left
+ *  to its own announcements: a device in another home is never on this
+ *  network, and every guess is a connection some device here has to turn away. */
+const MAX_GUESSED_LOOKS = 3;
+
+/** How long a device whose map came back empty waits before it is asked for
+ *  again. */
+const MAP_RETRY_MS = 24 * 60 * 60 * 1000;
+
+/** How many devices are read at once. */
+const READ_CONCURRENCY = 8;
 
 const VERSIONS_TRIED: readonly TuyaVersion[] = ["3.4", "3.5", "3.3"];
 
@@ -54,12 +66,16 @@ interface Known {
     key: string;
     /** Their data point numbers, by code. */
     dps: Record<string, number>;
+    /** When the map was last asked for, where it was since this process started. */
+    mappedAt?: number;
 }
 
 interface Book {
     known: Map<string, Known>;
     where: Map<string, { address: string; version: TuyaVersion }>;
     refused: Set<string>;
+    /** Looks that guessed at a device and did not find it, by id. */
+    missedLooks: Map<string, number>;
     shapes: TuyaDeviceShape[];
     lookedAt: number;
     locating: Promise<void> | null;
@@ -79,6 +95,7 @@ function bookOf(account: string, credentials: Credentials): Book {
             known: new Map(),
             where: new Map(),
             refused: new Set(),
+            missedLooks: new Map(),
             shapes: [],
             lookedAt: Number.NEGATIVE_INFINITY,
             locating: null
@@ -130,30 +147,39 @@ export interface TuyaLocalSource {
     dpMap(deviceId: string): Promise<Record<string, number>>;
 }
 
-/** Learn the keys in a fresh list from the account. */
+/** Learn the keys in a fresh list from the account, for the devices Places
+ *  draws. A map that came back empty is asked for again only after
+ *  `MAP_RETRY_MS`. */
 async function learn(
     book: Book,
     devices: readonly (TuyaDeviceShape & { readonly local_key?: string | null })[],
-    source: TuyaLocalSource
+    source: TuyaLocalSource,
+    now: number
 ): Promise<void> {
     book.shapes = [...devices];
     for (const device of devices) {
         const key = device.local_key;
-        if (!key || key.length !== 16) continue;
+        if (!key || key.length !== 16 || !tuyaDraws(device)) continue;
         const known = book.known.get(device.id);
-        if (known && known.key === key && Object.keys(known.dps).length > 0) continue;
+        if (known && known.key === key) {
+            if (Object.keys(known.dps).length > 0) continue;
+            if (known.mappedAt !== undefined && now - known.mappedAt < MAP_RETRY_MS) continue;
+        }
         if (known && known.key !== key) {
             book.refused.delete(device.id);
             book.where.delete(device.id);
+            book.missedLooks.delete(device.id);
         }
         const dps = await source.dpMap(device.id).catch(() => ({}));
-        book.known.set(device.id, { key, dps });
+        book.known.set(device.id, { key, dps, mappedAt: now });
     }
 }
 
 /** Look for the devices not yet found: announcements first, then, where none
  *  arrive (a container on a bridge network), the addresses on this network
- *  that answer on Tuya's port, tried against each key. */
+ *  that answer on Tuya's port, tried against each key - until a device has
+ *  been guessed at for `MAX_GUESSED_LOOKS` looks without being found, after
+ *  which only its own announcement finds it. */
 async function locate(book: Book, now: number): Promise<void> {
     const missing = () =>
         [...book.known.keys()].filter((id) => !book.where.has(id) && !book.refused.has(id));
@@ -162,24 +188,34 @@ async function locate(book: Book, now: number): Promise<void> {
     for (const heard of await lan.listenForTuya(LISTEN_MS).catch(() => [])) {
         if (book.known.has(heard.id)) {
             book.where.set(heard.id, { address: heard.address, version: heard.version ?? "3.3" });
+            book.missedLooks.delete(heard.id);
         }
     }
-    if (missing().length === 0) return;
+    const misses = (id: string) => book.missedLooks.get(id) ?? 0;
+    const guessable = missing()
+        .filter((id) => misses(id) < MAX_GUESSED_LOOKS)
+        .sort((a, b) => misses(a) - misses(b));
+    if (guessable.length === 0) return;
     const taken = new Set([...book.where.values()].map((entry) => entry.address));
     const open = (await lan.probeTuyaPorts(await subnetTargets().catch(() => []))).filter(
         (address) => !taken.has(address)
     );
     let guesses = 0;
-    for (const address of open) {
-        for (const id of missing()) {
+    for (const id of guessable) {
+        const entry = book.known.get(id)!;
+        let found = false;
+        for (const address of open) {
+            if (taken.has(address)) continue;
             if (guesses >= MAX_GUESSES) return;
-            const entry = book.known.get(id)!;
-            const found = await firstVersion(address, id, entry.key, () => (guesses += 1));
-            if (found) {
-                book.where.set(id, { address, version: found });
+            const version = await firstVersion(address, id, entry.key, () => (guesses += 1));
+            if (version) {
+                book.where.set(id, { address, version });
+                taken.add(address);
+                found = true;
                 break;
             }
         }
+        if (!found) book.missedLooks.set(id, misses(id) + 1);
     }
 }
 
@@ -236,7 +272,7 @@ export async function tuyaLocalRead(
     now: number = Date.now()
 ): Promise<{ devices: TuyaDeviceShape[]; reach: Map<string, TuyaReach> } | null> {
     const book = bookOf(account, credentials);
-    if (devices) await learn(book, devices, source);
+    if (devices) await learn(book, devices, source, now);
     else if (book.shapes.length === 0) return null;
     // Looking is slow next to a read (a few seconds of listening, a guess per
     // address), so it runs beside the reads rather than in front of them: what
@@ -248,20 +284,22 @@ export async function tuyaLocalRead(
                 book.locating = null;
             });
     }
-    const reach = new Map<string, TuyaReach>();
-    const out: TuyaDeviceShape[] = [];
-    for (const device of book.shapes) {
-        const entry = book.known.get(device.id);
-        const where = book.where.get(device.id);
-        let read: TuyaDeviceShape | null = null;
-        if (entry && where) {
+    const shapes = book.shapes;
+    const reads = new Array<TuyaDeviceShape | null>(shapes.length).fill(null);
+    let next = 0;
+    const worker = async () => {
+        for (let index = next++; index < shapes.length; index = next++) {
+            const device = shapes[index]!;
+            const entry = book.known.get(device.id);
+            const where = book.where.get(device.id);
+            if (!entry || !where) continue;
             try {
                 const dps = await lan.readTuyaLocal({
                     id: device.id,
                     localKey: entry.key,
                     ...where
                 });
-                read = {
+                reads[index] = {
                     ...device,
                     online: true,
                     status: statusFromDps(entry, dps, device.status)
@@ -270,18 +308,23 @@ export async function tuyaLocalRead(
                 forgetPlace(book, device.id, caught);
             }
         }
+    };
+    await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, shapes.length) }, worker));
+    const reach = new Map<string, TuyaReach>();
+    const out: TuyaDeviceShape[] = [];
+    shapes.forEach((device, index) => {
+        const read = reads[index] ?? null;
         reach.set(device.id, reachOf(book, device.id, read !== null));
         out.push(read ?? (devices ? device : { ...device, online: false }));
-    }
+    });
     return { devices: out, reach };
 }
 
+/** A device that stopped answering where it was: looked for at the next look,
+ *  like any other device not yet found, rather than straight away. */
 function forgetPlace(book: Book, id: string, caught: unknown): void {
     book.where.delete(id);
     if (caught instanceof lan.TuyaLanError && caught.reason === "key") book.refused.add(id);
-    // Looked for again on the next read, not in ten minutes: it may only have
-    // moved address.
-    book.lookedAt = Number.NEGATIVE_INFINITY;
 }
 
 /**
@@ -305,7 +348,9 @@ export async function tuyaLocalAct(
         dps[String(dp)] = command.value;
     }
     try {
-        await lan.writeTuyaLocal({ id: deviceId, localKey: entry.key, ...where }, dps);
+        await lan.writeTuyaLocal({ id: deviceId, localKey: entry.key, ...where }, dps, {
+            once: true
+        });
         return true;
     } catch (caught) {
         forgetPlace(book, deviceId, caught);

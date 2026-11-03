@@ -14,11 +14,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as protocol from "@polaris-app/places/src/lib/integrations/tuya-protocol";
 
 const heard = vi.hoisted(() => ({ list: [] as { id: string; address: string }[] }));
+const probes = vi.hoisted(() => ({ count: 0, open: [] as string[] }));
 
 vi.mock("@polaris-app/places/src/lib/integrations/tuya-lan", async (importOriginal) => {
     const actual =
         await importOriginal<typeof import("@polaris-app/places/src/lib/integrations/tuya-lan")>();
-    return { ...actual, listenForTuya: async () => heard.list, probeTuyaPorts: async () => [] };
+    return {
+        ...actual,
+        listenForTuya: async () => heard.list,
+        probeTuyaPorts: async () => {
+            probes.count += 1;
+            return probes.open;
+        }
+    };
 });
 vi.mock("@polaris-app/places/src/lib/integrations/lan-unit", () => ({
     subnetTargets: async () => []
@@ -117,11 +125,18 @@ const target = (version: protocol.TuyaVersion) => ({
 });
 
 let device: FakeDevice;
+let connections = 0;
 beforeEach(() => {
     device = new FakeDevice("3.3");
-    lan.setTuyaConnector(() => device.socket());
+    connections = 0;
+    lan.setTuyaConnector(() => {
+        connections += 1;
+        return device.socket();
+    });
     local.forgetTuyaLocal();
     heard.list = [];
+    probes.count = 0;
+    probes.open = [];
 });
 afterEach(() => lan.setTuyaConnector());
 
@@ -195,9 +210,56 @@ describe("local first, cloud when it cannot", () => {
         );
         expect(device.dps["2"]).toBe(false);
         device.reachable = false;
+        connections = 0;
         expect(await local.tuyaLocalAct("a", {}, ID, [{ code: "switch_1", value: true }])).toBe(
             false
         );
+        expect(connections).toBe(1);
+    });
+
+    it("stops guessing at a device that is never on this network", async () => {
+        const LOOK = 10 * 60 * 1000;
+        device.reachable = false;
+        probes.open = [ADDRESS];
+        for (let look = 0; look < 5; look += 1) {
+            await local.tuyaLocalRead("a", {}, [cloudShape], source, 1 + look * LOOK);
+            await local.settleTuyaLocal("a");
+        }
+        expect(probes.count).toBe(3);
+        announced();
+        device.reachable = true;
+        await local.tuyaLocalRead("a", {}, [cloudShape], source, 1 + 5 * LOOK);
+        await local.settleTuyaLocal("a");
+        const found = await local.tuyaLocalRead("a", {}, [cloudShape], source, 2 + 5 * LOOK);
+        expect(found!.reach.get(ID)).toEqual({ route: "local", reason: null });
+    });
+
+    it("does not look again straight away for a device that stopped answering", async () => {
+        announced();
+        await local.tuyaLocalRead("a", {}, [cloudShape], source, 1);
+        await local.settleTuyaLocal("a");
+        device.reachable = false;
+        heard.list = [];
+        await local.tuyaLocalRead("a", {}, [cloudShape], source, 2);
+        await local.settleTuyaLocal("a");
+        expect(probes.count).toBe(0);
+    });
+
+    it("asks for a map once a day where it came back empty, and never for a device Places does not draw", async () => {
+        const asked: string[] = [];
+        const empty = {
+            dpMap: async (id: string) => {
+                asked.push(id);
+                return {};
+            }
+        };
+        const camera = { ...cloudShape, id: "bfcamera0000000001", category: "sp" };
+        await local.tuyaLocalRead("a", {}, [cloudShape, camera], empty, 1);
+        await local.tuyaLocalRead("a", {}, [cloudShape, camera], empty, 2);
+        expect(asked).toEqual([ID]);
+        await local.tuyaLocalRead("a", {}, [cloudShape, camera], empty, 1 + 24 * 60 * 60 * 1000);
+        expect(asked).toEqual([ID, ID]);
+        await local.settleTuyaLocal("a");
     });
 
     it("keeps reading what answers locally with the cloud unreachable", async () => {
@@ -223,9 +285,9 @@ describe("local first, cloud when it cannot", () => {
     });
 
     it("reads data point numbers from either API's answer", () => {
-        expect(
-            local.dpMapOf({ status: [{ code: "switch_1", dp_id: 1 }], functions: [] })
-        ).toEqual({ switch_1: 1 });
+        expect(local.dpMapOf({ status: [{ code: "switch_1", dp_id: 1 }], functions: [] })).toEqual({
+            switch_1: 1
+        });
         expect(
             local.dpMapOf({
                 dpStatusRelationDTOS: [{ dpId: 38, statusCode: "relay_status", supportLocal: true }]

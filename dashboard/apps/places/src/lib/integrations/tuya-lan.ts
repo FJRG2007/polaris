@@ -159,7 +159,11 @@ async function withLink<T>(
     };
 
     try {
-        await waitFor(() => open, Math.min(CONNECT_MS, answerMs), "The device could not be reached");
+        await waitFor(
+            () => open,
+            Math.min(CONNECT_MS, answerMs),
+            "The device could not be reached"
+        );
         if (target.version !== "3.3") {
             const nonce = randomBytes(16);
             socket.write(protocol.negotiationStart(session, nonce));
@@ -217,27 +221,30 @@ export function readTuyaLocal(
         withLink(
             target,
             async (link) => {
-            const { cmd, payload } = protocol.queryMessage(link.session, target.id);
-            link.send(cmd, payload);
-            let dps: Record<string, unknown> | null = null;
-            await link.next((frame) => {
-                if (!STATUS_CMDS.has(frame.cmd)) return false;
-                dps = dpsIn(link, frame);
-                return dps !== null;
-            });
-            return dps!;
+                const { cmd, payload } = protocol.queryMessage(link.session, target.id);
+                link.send(cmd, payload);
+                let dps: Record<string, unknown> | null = null;
+                await link.next((frame) => {
+                    if (!STATUS_CMDS.has(frame.cmd)) return false;
+                    dps = dpsIn(link, frame);
+                    return dps !== null;
+                });
+                return dps!;
             },
             options.guess ? GUESS_MS : ANSWER_MS
         );
     return options.guess ? attempt() : twice(attempt);
 }
 
-/** Set data points, by number; resolves once the device has acknowledged. */
+/** Set data points, by number; resolves once the device has acknowledged.
+ *  `once` for a caller with somewhere else to send it, which a second wait
+ *  only delays. */
 export function writeTuyaLocal(
     target: TuyaLanTarget,
-    dps: Readonly<Record<string, unknown>>
+    dps: Readonly<Record<string, unknown>>,
+    options: { readonly once?: boolean } = {}
 ): Promise<void> {
-    return twice(() =>
+    const attempt = () =>
         withLink(target, async (link) => {
             const { cmd, payload } = protocol.controlMessage(link.session, target.id, dps);
             link.send(cmd, payload);
@@ -247,8 +254,8 @@ export function writeTuyaLocal(
             if (answer.retcode !== null && answer.retcode !== 0) {
                 throw new TuyaLanError("The device refused that", "key");
             }
-        })
-    );
+        });
+    return options.once ? attempt() : twice(attempt);
 }
 
 /**

@@ -464,13 +464,62 @@ export async function actOnDevice(
         data: { ...settled, stateAt: new Date() },
         select: DEVICE_FIELDS
     });
+    const unit =
+        applied && "switchSettings" in applied && command
+            ? await settleUnitSwitches(installedAppId, device, command)
+            : [];
     // A socket told to go on is on now, and whatever is watching it hears so
     // now rather than at the next sync.
-    await tellAutomations(installedAppId, [row]);
+    await tellAutomations(installedAppId, [row, ...unit]);
     const acted = toView(row);
-    live.announceDevices(installedAppId, [acted]);
+    live.announceDevices(installedAppId, [acted, ...unit.map(toView)]);
     await followUp(installedAppId, device.accountId, device.id);
     return acted;
+}
+
+/** The most gangs one unit is read as having. */
+const UNIT_PARTS_LIMIT = 16;
+
+/**
+ * A setting the whole unit shares - child lock, power-on, indicator - written
+ * to its other gangs as well: rows of the same account named `<unit>#<part>`,
+ * which is how a driver splits one device into several rows.
+ */
+async function settleUnitSwitches(
+    installedAppId: string,
+    device: DeviceRow & { externalId: string },
+    command: kinds.DeviceCommand
+): Promise<DeviceRow[]> {
+    const parsed = kinds.switchCommandSchema.safeParse(command);
+    if (!parsed.success || !kinds.isUnitSwitchSetting(parsed.data)) return [];
+    const hash = device.externalId.lastIndexOf("#");
+    if (hash <= 0 || !device.accountId) return [];
+    const siblings = await prisma.placeDevice.findMany({
+        where: {
+            installedAppId,
+            accountId: device.accountId,
+            id: { not: device.id },
+            externalId: { startsWith: device.externalId.slice(0, hash + 1) }
+        },
+        select: DEVICE_FIELDS,
+        take: UNIT_PARTS_LIMIT
+    });
+    const settled: DeviceRow[] = [];
+    for (const sibling of siblings) {
+        const settings = switchSettingsOf(sibling);
+        if (!settings || kinds.switchCommandIssue(settings, parsed.data)) continue;
+        settled.push(
+            await prisma.placeDevice.update({
+                where: { id: sibling.id },
+                data: {
+                    switchSettings: switchSettingsColumn(kinds.applySwitch(settings, parsed.data)),
+                    stateAt: new Date()
+                },
+                select: DEVICE_FIELDS
+            })
+        );
+    }
+    return settled;
 }
 
 /**

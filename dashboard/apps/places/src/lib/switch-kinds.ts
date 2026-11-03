@@ -145,6 +145,13 @@ export function switchCommandIssue(
     }
 }
 
+/** Whether a setting is the whole unit's rather than one gang's: a wall switch
+ *  has one child lock, one power-on rule and one indicator, and a timer per
+ *  gang. */
+export function isUnitSwitchSetting(command: SwitchCommand): boolean {
+    return command.setting !== "countdown";
+}
+
 export function applySwitch(view: SwitchSettings, command: SwitchCommand): SwitchSettings {
     switch (command.setting) {
         case "power-on":

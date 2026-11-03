@@ -1779,7 +1779,7 @@
         "reach": {
             "local": "Reached on your network",
             "cloud": "Not found on this network, using the cloud",
-            "cloud-key": "Its local key was refused, using the cloud",
+            "cloud-key": "Refused a local connection, using the cloud",
             "cloud-only": "This device only works through the cloud"
         },
         "switchSettings": {

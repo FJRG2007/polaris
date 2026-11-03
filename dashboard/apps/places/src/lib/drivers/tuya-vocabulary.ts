@@ -418,6 +418,11 @@ export async function tuyaSpecFor(
     return parsed.data;
 }
 
+/** Whether Places draws devices of this category at all. */
+export function tuyaDraws(device: Pick<TuyaDeviceShape, "category">): boolean {
+    return CATEGORY_KINDS[device.category] !== undefined;
+}
+
 /** Whether a device is read as an air conditioner, and so needs its
  *  specification to be understood. */
 export function needsSpec(device: Pick<TuyaDeviceShape, "category">): boolean {

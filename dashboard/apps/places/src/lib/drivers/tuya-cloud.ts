@@ -86,6 +86,10 @@ export const tuyaCloudDriver: DeviceDriver = {
                 return;
             await tuya.tuyaCommand(keys, deviceId, commands);
         });
+    },
+
+    async forget(credentials) {
+        local.forgetTuyaLocal(accountOf(credentials));
     }
 };
 
