@@ -53,6 +53,10 @@
             "types": "./dist/variable-groups.d.ts",
             "import": "./dist/variable-groups.js"
         },
+        "./geo": {
+            "types": "./dist/geo.d.ts",
+            "import": "./dist/geo.js"
+        },
         "./instance-fallback": {
             "types": "./dist/instance-fallback.d.ts",
             "import": "./dist/instance-fallback.js"
@@ -61,7 +65,7 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },

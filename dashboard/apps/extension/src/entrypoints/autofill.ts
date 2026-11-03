@@ -46,13 +46,37 @@ import {
     readGeneratorOptions,
     type GeneratorOptions
 } from "@/lib/generator";
-import { emptyProfile, PROFILE_PARTS, readForm, type PageFields } from "@/lib/fields";
-import { countryForBox, wholeName } from "@/lib/identity";
+import {
+    emptyProfile,
+    placePart,
+    PROFILE_PARTS,
+    readForm,
+    type PageFields,
+    type PlacePart
+} from "@/lib/fields";
+import {
+    identityRows,
+    NAME_SLOTS,
+    previewKey,
+    replacedSlots,
+    slotValue,
+    type FillSlot
+} from "@/lib/identity";
+import {
+    countryText,
+    isPlaceholder,
+    pickCountry,
+    pickRegion,
+    placeLocales,
+    type PlaceOption
+} from "@/lib/place-match";
 import { fieldVisible } from "@/lib/field-visible";
+import { drawRow, type Face } from "@/lib/menu-row";
 import { enterSendsLogin } from "@/lib/enter-submit";
 import {
     changeNeeds,
     describeInput,
+    describeSelect,
     frameOffset,
     isInput,
     scanInputs,
@@ -129,6 +153,11 @@ const MARK = 18;
  *  page that knows nothing about it. */
 const BRAND = "hsl(258 82% 62%)";
 
+/** How long a region dropdown is waited for to hold the identity's region after
+ *  the country was changed, and how often it is looked at meanwhile. */
+const REGION_WAIT_MS = 2_000;
+const REGION_POLL_MS = 100;
+
 /** The three things a mark can be for. */
 type Role = "login" | "generate" | "code";
 
@@ -184,7 +213,10 @@ async function start(): Promise<void> {
             oneTimeCodeBoxes: [],
             fullName: null,
             givenName: null,
+            middleName: null,
             familyName: null,
+            firstSurname: null,
+            secondSurname: null,
             profile: emptyProfile(),
             usernameAsks: null,
             purpose: "none"
@@ -418,9 +450,14 @@ async function start(): Promise<void> {
                     list(
                         field,
                         [
-                            choice(t("inline.unlock"), reply.error, () => {
-                                void askBackground({ kind: "openUnlock" });
-                            })
+                            choice(
+                                t("inline.unlock"),
+                                reply.error,
+                                () => {
+                                    void askBackground({ kind: "openUnlock" });
+                                },
+                                { kind: "glyph", glyph: "lock" }
+                            )
                         ],
                         reply.error
                     );
@@ -493,9 +530,71 @@ async function start(): Promise<void> {
                 void show(role, field, true);
                 return;
             }
+            // A box of somebody's name, contact or address that no mark sits
+            // on - a checkout's address, a profile's phone - drops the
+            // identities down the way a browser offers its saved addresses.
+            // The username box is the login mark's, above.
+            const slot = slotOf(field);
+            if (slot === null || slot === "login") return;
+            offeredOn.add(field);
+            void showIdentities(field);
         },
         true
     );
+
+    /** What the box asks for, as an identity fills it, or null for a box that
+     *  is no part of one. */
+    const slotOf = (field: HTMLInputElement): FillSlot | null => {
+        const { fields } = seen;
+        if (field === at(fields.username)) return "login";
+        for (const slot of NAME_SLOTS) if (field === at(fields[slot])) return slot;
+        for (const part of PROFILE_PARTS) if (field === at(fields.profile[part])) return part;
+        return null;
+    };
+
+    /** The identities alone, dropped down under a box of one. Only when there
+     *  is one to offer, and not on a box that was filled or left meanwhile. */
+    const showIdentities = async (field: HTMLInputElement): Promise<void> => {
+        if (open) return;
+        open = true;
+        try {
+            const before = field.value;
+            const offered = await identityChoices(field);
+            if (offered.length === 0) return;
+            if (field.value !== before || field.ownerDocument.activeElement !== field) return;
+            list(field, offered, "");
+        } finally {
+            open = false;
+        }
+    };
+
+    /**
+     * One row per identity, leading with what it would type into this box:
+     * its email on an email box, its street on an address box, its whole name
+     * on a name box - so somebody with a home and a work identity picks the
+     * address rather than guessing which identity holds it. Identities that
+     * would type the same thing are one row. Only the cards travel to the
+     * page here; the identity itself crosses once it is picked.
+     */
+    const identityChoices = async (field: HTMLInputElement): Promise<Choice[]> => {
+        const reply = await askBackground({ kind: "identities" });
+        const cards = reply.ok && "identities" in reply ? reply.identities : [];
+        const key = previewKey(slotOf(field), seen.fields.usernameAsks);
+        return identityRows(cards, key, t("inline.identityDefault")).map((row) =>
+            choice(
+                row.label,
+                row.detail,
+                () => {
+                    void askBackground({ kind: "identity", id: row.card.id }).then((answer) => {
+                        if (answer.ok && "identity" in answer) {
+                            void fillIdentity(answer.identity, field);
+                        }
+                    });
+                },
+                { kind: "glyph", glyph: "identity" }
+            )
+        );
+    };
 
     /**
      * What to offer on a form for an account that is not in the vault yet.
@@ -508,32 +607,21 @@ async function start(): Promise<void> {
      */
     const newAccount = async (field: HTMLInputElement): Promise<Choice[]> => {
         const { fields } = seen;
-        const offered: Choice[] = [];
-
-        const reply = await askBackground({ kind: "identities" });
-        const cards = reply.ok && "identities" in reply ? reply.identities : [];
-        for (const card of cards) {
-            const detail = [card.detail, card.isDefault ? t("inline.identityDefault") : card.vault]
-                .filter(Boolean)
-                .join(" - ");
-            offered.push(
-                choice(card.name, detail, () => {
-                    void askBackground({ kind: "identity", id: card.id }).then((answer) => {
-                        if (answer.ok && "identity" in answer) fillIdentity(answer.identity, field);
-                    });
-                })
-            );
-        }
+        const offered: Choice[] = await identityChoices(field);
 
         const passwordBox =
             at(fields.newPassword) ?? (fields.purpose === "signup" ? at(fields.password) : null);
         if (passwordBox) {
             const options = await savedOptions();
             offered.push(
-                choice(t("inline.makePassword"), t("inline.makePasswordDetail"), () =>
-                    offerGenerated(passwordBox, options, made.inBox(passwordBox), (value) =>
-                        useGenerated(passwordBox, value)
-                    )
+                choice(
+                    t("inline.makePassword"),
+                    t("inline.makePasswordDetail"),
+                    () =>
+                        offerGenerated(passwordBox, options, made.inBox(passwordBox), (value) =>
+                            useGenerated(passwordBox, value)
+                        ),
+                    { kind: "glyph", glyph: "key" }
                 )
             );
         }
@@ -541,39 +629,108 @@ async function start(): Promise<void> {
     };
 
     /**
-     * An identity into the boxes that ask for it. Only into empty ones, and the
-     * box the menu was opened on: what was typed by hand elsewhere is theirs.
+     * An identity into the boxes that ask for it.
+     *
+     * Into the empty ones, which leaves what was typed by hand elsewhere alone;
+     * and always into the box the menu was opened on. Opened on a box of the
+     * address or of the name, that whole group is replaced as well, filled or
+     * not, so choosing the work address over the home one does not leave the
+     * street of one with the city of the other (`replacedSlots`).
      */
-    const fillIdentity = (values: IdentityValues, field: HTMLInputElement): void => {
+    const fillIdentity = async (values: IdentityValues, field: HTMLInputElement): Promise<void> => {
         const { fields } = seen;
-        const into = (box: HTMLInputElement | null, value: string): void => {
-            if (box && value !== "" && (box.value === "" || box === field)) put(box, value);
+        const replace = replacedSlots(slotOf(field));
+        const locales = placeLocales(
+            field.ownerDocument.documentElement.lang || null,
+            navigator.languages ?? [navigator.language]
+        );
+        const into = (box: HTMLInputElement | null, slot: FillSlot): void => {
+            if (!box) return;
+            const stored = slotValue(values, slot, fields.usernameAsks);
+            // A country box that takes text gets the name in the page's own
+            // language, or what was stored where that cannot be resolved.
+            const value =
+                slot === "country" && stored !== "" ? countryText(stored, locales) : stored;
+            if (box.value === value) return;
+            const forced = box === field || replace.has(slot);
+            // The rest of a replaced group is cleared where this identity has
+            // nothing for it; the box itself is never emptied by a pick.
+            if (value === "" ? !forced || box === field : !forced && box.value !== "") return;
+            // Typing moves the cursor through each box, and the menu must not
+            // drop down again on every one of them.
+            offeredOn.add(box);
+            put(box, value);
         };
-        // The username box asks for whatever the page says it does; a box that
-        // says nothing is, on a sign-up, most often an email.
-        const login =
-            fields.usernameAsks === "phone"
-                ? values.phone
-                : fields.usernameAsks === "username"
-                  ? values.username || values.email
-                  : values.email || values.username;
-        into(at(fields.username), login);
-        const whole = wholeName(values);
-        into(at(fields.fullName), whole);
-        into(at(fields.givenName), values.firstName);
-        into(at(fields.familyName), values.lastName);
-        for (const part of PROFILE_PARTS) {
-            const box = at(fields.profile[part]);
-            into(
-                box,
-                part === "country" && box
-                    ? countryForBox(
-                          values.country,
-                          box.autocomplete,
-                          document.documentElement.lang || navigator.language
-                      )
-                    : values[part]
-            );
+        into(at(fields.username), "login");
+        for (const slot of NAME_SLOTS) into(at(fields[slot]), slot);
+        for (const part of PROFILE_PARTS) into(at(fields.profile[part]), part);
+        await fillPlaces(values, field, replace, locales);
+    };
+
+    /**
+     * The country and region where the page asks for them in a dropdown.
+     *
+     * Found here, at fill time, rather than by the scan: the scan's pipeline is
+     * the boxes a mark or a menu can sit on, which a `<select>` never is, and a
+     * dropdown read now has the options it holds now - which, for a region list
+     * the page fills in after the country changes, is the only reading worth
+     * having. Looked for in the form of the box the menu was opened on, or the
+     * whole document of that box when it is in no form. A select inside another
+     * shadow root is not reached, and a dropdown drawn from `<div>`s by a
+     * script (one with no `<select>` behind it) cannot be filled generically
+     * and is left alone.
+     */
+    const fillPlaces = async (
+        values: IdentityValues,
+        field: HTMLInputElement,
+        replace: ReadonlySet<FillSlot>,
+        locales: readonly string[]
+    ): Promise<void> => {
+        const find = (part: PlacePart): HTMLSelectElement | null => {
+            const pool = field.form
+                ? [...field.form.elements]
+                : [...field.ownerDocument.querySelectorAll("select")];
+            for (const element of pool) {
+                if (element.nodeName !== "SELECT") continue;
+                const select = element as HTMLSelectElement;
+                if (placePart(describeSelect(select)) === part) return select;
+            }
+            return null;
+        };
+        const settable = (select: HTMLSelectElement, part: PlacePart): boolean => {
+            if (replace.has(part)) return true;
+            const chosen = select.options[select.selectedIndex];
+            return !chosen || isPlaceholder(optionOf(chosen));
+        };
+
+        let countryChanged = false;
+        const country = find("country");
+        if (country && values.country.trim() !== "" && settable(country, "country")) {
+            const index = pickCountry(optionsOf(country), values.country, locales);
+            if (index !== -1 && index !== country.selectedIndex) {
+                putSelect(country, index);
+                countryChanged = true;
+            }
+        }
+
+        if (values.state.trim() === "") return;
+        // True when there is nothing more to do: set, already right, or not
+        // this pick's to change.
+        const region = (): boolean => {
+            const select = find("state");
+            if (!select) return false;
+            if (!settable(select, "state")) return true;
+            const index = pickRegion(optionsOf(select), values.state);
+            if (index === -1) return false;
+            if (index !== select.selectedIndex) putSelect(select, index);
+            return true;
+        };
+        // A region list that follows the country is emptied and refilled by
+        // the page once the country changes, often after a request. Looked at
+        // again for a moment, and then given up on: the rest is filled already.
+        const until = Date.now() + (countryChanged ? REGION_WAIT_MS : 0);
+        while (!region() && Date.now() < until) {
+            await new Promise((resolve) => setTimeout(resolve, REGION_POLL_MS));
         }
     };
 
@@ -938,6 +1095,35 @@ function put(field: HTMLInputElement, value: string): void {
     field.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/** One `<option>`, as the place rules read it. */
+function optionOf(option: HTMLOptionElement): PlaceOption {
+    return { value: option.value, text: option.text, disabled: option.disabled };
+}
+
+/** Every option of a dropdown, in order, as the place rules read them. */
+function optionsOf(select: HTMLSelectElement): PlaceOption[] {
+    return [...select.options].map(optionOf);
+}
+
+/**
+ * Choose an option the way a person would: through the setter of the select's
+ * own window, then announced, for the reason `put` gives. The index is set
+ * after the value, because two options can share a value and the value alone
+ * chooses the first of them.
+ */
+function putSelect(select: HTMLSelectElement, index: number): void {
+    const option = select.options[index];
+    if (!option) return;
+    const kind =
+        (select.ownerDocument.defaultView as (Window & typeof globalThis) | null)
+            ?.HTMLSelectElement ?? HTMLSelectElement;
+    const descriptor = Object.getOwnPropertyDescriptor(kind.prototype, "value");
+    descriptor?.set?.call(select, option.value);
+    if (select.selectedIndex !== index) select.selectedIndex = index;
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 /**
  * Type a code into its box, or one digit into each box of a split one.
  *
@@ -1090,10 +1276,17 @@ interface Choice {
     readonly label: string;
     readonly detail: string;
     readonly pick: () => void;
+    /** What the row leads with: the initials of what it names, by default. */
+    readonly face: Face;
 }
 
-function choice(label: string, detail: string, pick: () => void): Choice {
-    return { label, detail, pick };
+function choice(
+    label: string,
+    detail: string,
+    pick: () => void,
+    face: Face = { kind: "initials", name: label }
+): Choice {
+    return { label, detail, pick, face };
 }
 
 function menu(
@@ -1126,26 +1319,7 @@ function list(field: HTMLInputElement, items: readonly Choice[], empty: string):
     }
 
     for (const item of items) {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.style.cssText = `
-            display: block;
-            width: 100%;
-            border: 0;
-            background: transparent;
-            color: inherit;
-            font: inherit;
-            text-align: left;
-            padding: 8px 12px;
-            cursor: pointer;
-        `;
-        const name = document.createElement("span");
-        name.textContent = item.label;
-        name.style.cssText = "display:block;";
-        const who = document.createElement("span");
-        who.textContent = item.detail;
-        who.style.cssText = "display:block;font-size:12px;color:hsl(222 10% 66%);";
-        row.append(name, who);
+        const row = drawRow(document, item.label, item.detail, item.face);
         row.addEventListener("mouseenter", () => {
             row.style.background = "hsl(225 12% 13%)";
         });

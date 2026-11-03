@@ -171,10 +171,16 @@ export interface PageFields extends FoundFields {
     /** Every box the code goes in, in order: one for an ordinary code box,
      *  one per digit for a split one, none when the page asks for no code. */
     readonly oneTimeCodeBoxes: readonly number[];
-    /** Where somebody's own name goes on a sign-up: whole, or in two halves. */
+    /** Where somebody's own name goes on a sign-up: whole, or in parts. A
+     *  middle name is a second given name; the family name is the whole of
+     *  it, and the two surnames are its halves where the form asks for each
+     *  apart, as Spanish forms do. */
     readonly fullName: number | null;
     readonly givenName: number | null;
+    readonly middleName: number | null;
     readonly familyName: number | null;
+    readonly firstSurname: number | null;
+    readonly secondSurname: number | null;
     /** The rest of what a sign-up asks about somebody, each its own box or null.
      *  Never the username box above, a password, a code or a name. */
     readonly profile: Readonly<Record<ProfilePart, number | null>>;
@@ -223,15 +229,15 @@ const PROFILE_TOKENS: Readonly<Record<string, ProfilePart>> = {
  *  address line before the first, because "address line 2" says "address". */
 const PROFILE_WORDS: readonly (readonly [ProfilePart, RegExp])[] = [
     ["email", /e-?mail|correo/i],
-    ["phone", /phone|tel[eé]fono|tel|m[oó]vil|mobile|celular/i],
-    ["postalCode", /zip|postal|post.?code|cp/i],
-    ["address2", /address.?(?:line)?.?2|apt|apartment|suite|piso|puerta|bloque/i],
-    ["address1", /address|street|direcci[oó]n|calle|domicilio/i],
-    ["city", /city|town|ciudad|localidad|municipio|poblaci[oó]n/i],
-    ["state", /state|province|county|region|provincia|estado|regi[oó]n/i],
+    ["phone", /phone|tel[eé]fono|\btel\b|m[oó]vil|mobile|celular/i],
+    ["postalCode", /\bzip|postal|post.?code|\bcp\b/i],
+    ["address2", /address.?(?:line)?.?2|\bapt\b|apartment|suite|piso|puerta|bloque/i],
+    ["address1", /address|street|direcci[oó]n|\bcalle\b|domicilio/i],
+    ["city", /\bcity\b|\btown\b|ciudad|localidad|municipio|poblaci[oó]n/i],
+    ["state", /\bstate\b|province|county|region|provincia|estado|regi[oó]n/i],
     ["country", /country|pa[ií]s/i],
     ["company", /company|empresa|organi[sz]ation|organizaci[oó]n|business name/i],
-    ["username", /user.?name|usuario|nick|handle|alias/i]
+    ["username", /user.?name|usuario|nick|handle|\balias\b/i]
 ];
 
 /** No box for any part, which is a page before anything has been read. */
@@ -244,6 +250,30 @@ export function emptyProfile(): Record<ProfilePart, number | null> {
 
 /** The types a part of an identity is typed into. */
 const PROFILE_TYPES = new Set(["text", "email", "tel", "search", "number", "url"]);
+
+/** The parts of an identity a dropdown can be filled with. */
+export type PlacePart = "country" | "state";
+
+/**
+ * Which part a `<select>` asks for: the country or the region, or null for any
+ * other dropdown. Read like `profilePart` - the page's own token, then the same
+ * words - with `type` being the select's own (`select-one`); a list that takes
+ * several answers is never one of these.
+ */
+export function placePart(field: FieldFacts | undefined): PlacePart | null {
+    if (!field || field.type !== "select-one" || !field.usable) return null;
+    const token = tokenOf(field);
+    if (token !== "" && token !== "off") {
+        const part = PROFILE_TOKENS[token];
+        return part === "country" || part === "state" ? part : null;
+    }
+    if (NOT_A_LOGIN.test(field.words)) return null;
+    for (const [part, words] of PROFILE_WORDS) {
+        if (part !== "country" && part !== "state") continue;
+        if (words.test(field.words)) return part;
+    }
+    return null;
+}
 
 /** Which part of an identity a box asks for, or null. The page's own token
  *  first, then the box's type, then the words it carries. */
@@ -391,7 +421,7 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
             (index): index is number => index !== null
         )
     );
-    const names = (["full", "given", "family"] as const).map(nameBox);
+    const names = NAME_KINDS.map(nameBox);
     for (const index of names) if (index !== null) taken.add(index);
     const profile = emptyProfile();
     for (const index of usable) {
@@ -413,15 +443,20 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
         oneTimeCodeBoxes,
         fullName: names[0] ?? null,
         givenName: names[1] ?? null,
-        familyName: names[2] ?? null,
+        middleName: names[2] ?? null,
+        familyName: names[3] ?? null,
+        firstSurname: names[4] ?? null,
+        secondSurname: names[5] ?? null,
         profile,
         usernameAsks,
         purpose
     };
 }
 
-/** Which part of somebody's name a box asks for. */
-type NameKind = "full" | "given" | "family";
+/** Which part of somebody's name a box asks for, in the order `readForm`
+ *  reports them. */
+const NAME_KINDS = ["full", "given", "middle", "family", "firstSurname", "secondSurname"] as const;
+type NameKind = (typeof NAME_KINDS)[number];
 
 // `fname` and `lname` as words of their own: inside `fullname` the letters
 // `lname` are there too, and a full-name box read as a surname got only the
@@ -429,6 +464,15 @@ type NameKind = "full" | "given" | "family";
 const GIVEN_WORDS = /first.?name|given.?name|\bfname\b|\bnombre\b(?! completo| de usuario)/i;
 const FAMILY_WORDS = /last.?name|surname|family.?name|\blname\b|apellido/i;
 const FULL_WORDS = /full.?name|nombre completo|(?:^|\s)name(?:\s|$)/i;
+// A second given name, never a surname: "segundo nombre" says "nombre", and is
+// asked before the given name for that reason.
+const MIDDLE_WORDS = /middle.?name|\bmname\b|segundo nombre/i;
+// The two halves of a Spanish family name, asked before the whole of it,
+// because both say "apellido" and "surname" too.
+const FIRST_SURNAME_WORDS =
+    /primer apellido|first surname|first last.?name|apellido.?1\b|1\S{0,2} ?apellido|apellido paterno|surname.?1\b/i;
+const SECOND_SURNAME_WORDS =
+    /segundo apellido|second surname|second last.?name|apellido.?2\b|2\S{0,2} ?apellido|apellido materno|surname.?2\b/i;
 
 /** Which part of a name this box is for, or null for a box that is not one. The
  *  page's own token first, then the words it carries. */
@@ -437,10 +481,14 @@ function nameKind(field: FieldFacts | undefined): NameKind | null {
     const token = tokenOf(field);
     if (token === "name") return "full";
     if (token === "given-name") return "given";
+    if (token === "additional-name") return "middle";
     if (token === "family-name") return "family";
     if (token !== "" && token !== "off") return null;
     if (NOT_A_LOGIN.test(field.words) || /user|login|company|empresa/i.test(field.words))
         return null;
+    if (MIDDLE_WORDS.test(field.words)) return "middle";
+    if (FIRST_SURNAME_WORDS.test(field.words)) return "firstSurname";
+    if (SECOND_SURNAME_WORDS.test(field.words)) return "secondSurname";
     if (FAMILY_WORDS.test(field.words)) return "family";
     if (GIVEN_WORDS.test(field.words)) return "given";
     if (FULL_WORDS.test(field.words)) return "full";

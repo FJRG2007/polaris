@@ -198,7 +198,7 @@ export function upFrom(node: Node): Node | null {
 }
 
 /** The text of the elements an `aria-labelledby` names, in the field's own tree. */
-function labelledBy(field: HTMLInputElement): string {
+function labelledBy(field: HTMLInputElement | HTMLSelectElement): string {
     const ids = (field.getAttribute("aria-labelledby") ?? "").split(/\s+/).filter(Boolean);
     if (ids.length === 0) return "";
     const root = field.getRootNode() as Document | ShadowRoot;
@@ -232,12 +232,12 @@ function formWords(field: HTMLInputElement): string {
 }
 
 /** Whether a box is on screen and can be typed into right now. */
-function usable(field: HTMLInputElement): boolean {
+function usable(field: HTMLInputElement | HTMLSelectElement): boolean {
     const box = field.getBoundingClientRect();
     const view = field.ownerDocument.defaultView ?? window;
     return (
         !field.disabled &&
-        !field.readOnly &&
+        !("readOnly" in field && field.readOnly) &&
         field.getAttribute("aria-hidden") !== "true" &&
         box.width >= 2 &&
         box.height >= 2 &&
@@ -276,5 +276,39 @@ export function describeInput(field: HTMLInputElement): FieldFacts {
         // rules' own fallbacks, and the panel only feeds `formWords`.
         form: field.form ?? null,
         formWords: formWords(field)
+    };
+}
+
+/**
+ * One `<select>`, as the rules read it - the same words an input carries.
+ *
+ * Usable is looser than for a box: a styled dropdown library (select2, Choices
+ * and the like) keeps the page's real `<select>` in the form, shrunk to a pixel
+ * or clipped, and draws its own list over it. That select is still the one the
+ * form submits and the library listens to, so it counts as long as it is laid
+ * out at all and not disabled.
+ */
+export function describeSelect(field: HTMLSelectElement): FieldFacts {
+    const view = field.ownerDocument.defaultView ?? window;
+    return {
+        type: field.type.toLowerCase(),
+        autocomplete: (field.getAttribute("autocomplete") ?? "").toLowerCase(),
+        words: [
+            field.name,
+            field.id,
+            field.title,
+            field.getAttribute("aria-label") ?? "",
+            labelledBy(field),
+            ...[...(field.labels ?? [])].map((label) => label.textContent ?? "")
+        ]
+            .join(" ")
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/_/g, " ")
+            .toLowerCase(),
+        usable:
+            !field.disabled &&
+            field.getClientRects().length > 0 &&
+            view.getComputedStyle(field).visibility !== "hidden",
+        form: field.form ?? null
     };
 }
