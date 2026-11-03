@@ -134,7 +134,7 @@ class ThomsonNoteTest(unittest.TestCase):
         self.assertTrue(NOTE.is_file(), "docs/devices note missing")
         text = note_text()
         for token in ("40FG2S14W", "nagata", "Expressluck", "UKNV.260317.001", "Android TV 14",
-                      "34", "com.cvte.tv.at", STOCK, "issues/1035"):
+                      "34", "com.cvte.tv.at", STOCK, "#1035"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
 

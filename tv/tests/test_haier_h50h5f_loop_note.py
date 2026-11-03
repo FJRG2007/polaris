@@ -63,7 +63,7 @@ class HaierLoopBulletTest(unittest.TestCase):
         self.assertIn(TITLE, section)
 
     def test_bullet_names_the_set_and_the_report(self):
-        for token in ("Haier H50H5F", "Google TV 14", "seen once", "issues/1578"):
+        for token in ("Haier H50H5F", "Google TV 14", "seen once", "#1578"):
             with self.subTest(token=token):
                 self.assertIn(token, self.loop)
 
@@ -114,7 +114,7 @@ class ReadmeSafetyAnswerTest(unittest.TestCase):
         faq = FAQ.read_text(encoding="utf-8")
         long_answer = faq.split("## Is this safe? Can it brick the TV?", 1)[1].split("\n## ", 1)[0]
         long_answer = re.sub(r"\s+", " ", long_answer)
-        for token in ("factory reset from its recovery menu", "issues/1578", "issues/1592",
+        for token in ("factory reset from its recovery menu", "#1578", "#1592",
                       "(TROUBLESHOOTING.md#working-on-the-tv)"):
             with self.subTest(token=token):
                 self.assertIn(token, long_answer)

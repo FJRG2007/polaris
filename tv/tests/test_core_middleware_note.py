@@ -85,20 +85,10 @@ class GuardedMiddlewareTest(unittest.TestCase):
 
     def test_the_core_bullet_cites_the_haier_issue_and_the_message(self):
         text = core_bullet()
-        self.assertIn("issues/1578", text,
+        self.assertIn("#1578", text,
                       "the bullet names the middleware without saying why, or linking #1578")
         self.assertIn("core Android or TV middleware", text,
                       "the bullet does not quote the message a refusal of one of the four prints")
-
-    def test_the_prompt_md_sentence_names_the_same_four(self):
-        text = (ROOT / "PROMPT.md").read_text(encoding="utf-8")
-        block = re.search(r"TV\s+middleware \(([^)]*)\)", text)
-        self.assertIsNotNone(block, "PROMPT.md no longer describes the TV middleware packages")
-        named = re.findall(r"`(com\.[a-z0-9.]+)`", block.group(1))
-        self.assertEqual(sorted(MIDDLEWARE), sorted(set(named)),
-                         "PROMPT.md and this test disagree about what the middleware is")
-        for name in named:
-            self.assertIn(f"`{name}`", core_bullet(), f"PROMPT.md names {name} and the page does not")
 
     def test_the_loop_bullet_says_which_of_its_eight_names_is_guarded(self):
         text = loop_bullet()

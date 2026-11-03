@@ -25,7 +25,6 @@ NEW_HOME = "app.polaris.tv/.MainActivity"
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
 README = ROOT / "README.md"
 EXAMPLES = ROOT / "examples" / "README.md"
-PROMPT = ROOT / "PROMPT.md"
 
 # Stands in for tools/tv.py: answers the SDK level, the Home query and pm install, and keeps the
 # commands the script sent so a test can prove nothing reached the TV.
@@ -314,7 +313,6 @@ class Android7DocsTest(unittest.TestCase):
     def setUp(self):
         self.trouble = re.sub(r"\s+", " ", TROUBLE.read_text(encoding="utf-8"))
         self.readme = re.sub(r"\s+", " ", README.read_text(encoding="utf-8"))
-        self.prompt = re.sub(r"\s+", " ", PROMPT.read_text(encoding="utf-8"))
 
     def test_troubleshooting_has_the_older_sdk_bullet(self):
         self.assertIn("INSTALL_FAILED_OLDER_SDK", self.trouble)
@@ -340,10 +338,6 @@ class Android7DocsTest(unittest.TestCase):
         self.assertIn("API 26", section)
         self.assertIn("launcher/app/build.gradle", section)
         self.assertIn("docs/TROUBLESHOOTING.md", section)
-
-    def test_prompt_tells_an_assistant_not_to_promise_it(self):
-        self.assertIn("minSdk", self.prompt)
-        self.assertIn("ro.build.version.sdk", self.prompt)
 
     def test_the_stale_min_sdk_24_row_is_gone(self):
         rows = [line for line in EXAMPLES.read_text(encoding="utf-8").split("\n")

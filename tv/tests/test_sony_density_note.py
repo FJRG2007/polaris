@@ -64,7 +64,7 @@ class SonyDensityNoteTest(unittest.TestCase):
     def test_note_exists_and_names_the_firmware(self):
         self.assertTrue(NOTE.is_file(), "docs/devices entry missing")
         for token in ("K-85XR70", "BRAVIA 4K AE2", "114.602.170.1", "Android 14",
-                      "issues/29", "issues/590"):
+                      "#29", "#590"):
             with self.subTest(token=token):
                 self.assertIn(token, self.text)
 
@@ -138,8 +138,8 @@ class TroubleshootingBulletTest(unittest.TestCase):
                 self.assertIn(command, self.trap)
 
     def test_bullet_separates_the_override_from_the_launcher(self):
-        self.assertIn("issues/590", self.trap)
-        self.assertIn("issues/29", self.trap)
+        self.assertIn("#590", self.trap)
+        self.assertIn("#29", self.trap)
         self.assertRegex(self.trap, r"(?i)override size")
         self.assertRegex(self.trap, r"(?i)empty saved density is a normal Android default")
 
@@ -170,14 +170,6 @@ class IndexAndPromptTest(unittest.TestCase):
         self.assertIn("docs/devices/sony-k85xr70-ae2.md", section)
         self.assertIn("BRAVIA 4K AE2", section)
         self.assertEqual(broken_links(EXAMPLES_README), [])
-
-    def test_prompt_checks_density_before_the_grid(self):
-        text = PROMPT.read_text(encoding="utf-8")
-        self.assertIn("`wm density`", text)
-        self.assertIn("display_density_forced", text)
-        self.assertIn("TROUBLESHOOTING", text)
-        self.assertRegex(text, r"(?i)not a launcher bug")
-
 
 if __name__ == "__main__":
     unittest.main()

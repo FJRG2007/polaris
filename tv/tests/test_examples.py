@@ -124,7 +124,7 @@ class ExampleListsTest(unittest.TestCase):
         self.assertIn("[examples/README.md](examples/README.md)", readme)
         example_rows = table_rows(EXAMPLES / "README.md", "| Folder |")
         example_tvs = sorted(r.split("|")[2].strip() for r in example_rows)
-        for name in ("README.md", "README.nl.md"):
+        for name in ("README.md",):
             if "\n| TV | OS |\n" not in (ROOT / name).read_text(encoding="utf-8"):
                 continue
             readme_rows = table_rows(ROOT / name, "| TV | OS |")

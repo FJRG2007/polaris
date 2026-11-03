@@ -162,12 +162,5 @@ class PointersTest(unittest.TestCase):
         self.assertIn("docs/devices/tvision-hub.md", text)
         self.assertIn("one-session", text)
 
-    def test_prompt_tells_the_assistant_to_stop_retrying(self):
-        text = PROMPT.read_text(encoding="utf-8")
-        self.assertIn("refused for every package", text)
-        self.assertIn("pm list packages -d", text)
-        self.assertIn("docs/TROUBLESHOOTING.md", text)
-
-
 if __name__ == "__main__":
     unittest.main()

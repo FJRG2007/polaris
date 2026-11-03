@@ -2,7 +2,7 @@
 
 docs/DOS-AND-DONTS.md is the maintainer's own list of the reasons a pull request most often came
 back for changes or was closed, one example per line, and nothing in the repository named it - not
-CONTRIBUTING.md, which is what a contributor reads first, not README.md, not AGENTS.md - so a
+README.md's Contributing section, which is what a contributor reads first - so a
 `grep -rn DOS-AND-DONTS` over the tree found the page itself and nothing else, and it was reachable
 only by listing docs/ on GitHub. The page states the rule it broke: "No screenshots or reports in
 docs/ that nothing links to". tests/test_device_notes_index.py holds the reports under docs/devices/
@@ -28,7 +28,7 @@ from test_device_notes_index import EXTERNAL, destinations, markdown_files  # no
 
 # The page of reasons, and the page a contributor reads before anything else.
 RULES_PAGE = "docs/DOS-AND-DONTS.md"
-CONTRIBUTING = "CONTRIBUTING.md"
+CONTRIBUTING = "README.md"
 
 
 def relative(root, path):
@@ -70,9 +70,8 @@ class DocsPagesReachableTest(unittest.TestCase):
         self.assertEqual([], unlinked,
                          "pages under docs/ that nothing links to: " + ", ".join(unlinked))
 
-    def test_contributing_links_the_page_of_reasons_a_pr_comes_back(self):
-        # Pinned where a contributor starts rather than anywhere in the tree: CONTRIBUTING.md is the
-        # page the reasons are a short form of, and its own text hands a reader to AGENTS.md beside it.
+    def test_the_contributing_section_links_the_page_of_reasons_a_pr_comes_back(self):
+        # Pinned where a contributor starts rather than anywhere in the tree: README.md's Contributing section.
         self.assertTrue((ROOT / RULES_PAGE).is_file(), f"{RULES_PAGE} is gone")
         linked = referrers(ROOT).get(RULES_PAGE, set())
         self.assertIn(CONTRIBUTING, linked,

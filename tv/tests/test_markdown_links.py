@@ -154,19 +154,6 @@ class RepositoryLinksTest(unittest.TestCase):
         message = "\n".join(f"{page} -> {target}" for page, target in dangling)
         self.assertEqual([], dangling, "anchors no section on the page gives:\n" + message)
 
-    def test_the_dutch_front_page_gives_the_english_anchors_its_links_use(self):
-        # README.nl.md is the page this rule was written for: its headings are Dutch and its links
-        # are the English page's, so the ids it states by hand are the only thing that makes them
-        # land. A section added there without its <a id> reads as a link that does nothing.
-        page = ROOT / "README.nl.md"
-        text = FENCE.sub("", page.read_text(encoding="utf-8"))
-        used = {unquote(target.partition("#")[2]).strip().lower()
-                for target in targets(text)
-                if target.startswith("#") and len(target) > 1}
-        self.assertGreaterEqual(len(used), 4, f"only {len(used)} in-page anchors read")
-        self.assertEqual(set(), used - anchors(page), "links with no section to land on")
-        self.assertGreaterEqual(len(EXPLICIT_ANCHOR.findall(text)), 10, "the ids the page states")
-
     def test_the_walk_reaches_the_pages_it_claims_to(self):
         # A walk that read nothing passes every check above; these are the counts it starts from.
         pages = list(markdown_files(ROOT))

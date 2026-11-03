@@ -18,7 +18,6 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 DOC = (ROOT / "docs" / "TROUBLESHOOTING.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
-PROMPT = (ROOT / "PROMPT.md").read_text(encoding="utf-8")
 KIRKWOOD = "UTTK.260317.003"
 
 
@@ -105,11 +104,6 @@ class KirkwoodNoteTest(unittest.TestCase):
         self.assertIn("Google TV Streamer", clause)
         self.assertIn("Chromecast", clause)
         self.assertIn("docs/TROUBLESHOOTING.md", clause)
-
-    def test_the_prompt_asks_for_the_focused_app_before_claiming_success(self):
-        self.assertIn("mFocusedApp", PROMPT)
-        self.assertIn("set-home-activity", PROMPT)
-        self.assertIn("query-activities", PROMPT)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,6 @@ def flat(text):
 def pages():
     """The pages an owner reads: the READMEs and the other top-level guides, docs/ and the lists."""
     found = sorted(ROOT.glob("README*.md"))
-    found += [ROOT / "PROMPT.md", ROOT / "AGENTS.md", ROOT / "CONTRIBUTING.md"]
     found += sorted(ROOT.glob("tools/*.md")) + sorted((ROOT / "docs").rglob("*.md"))
     found += sorted(p for p in (ROOT / "examples").rglob("*") if p.suffix in (".txt", ".md"))
     return found
