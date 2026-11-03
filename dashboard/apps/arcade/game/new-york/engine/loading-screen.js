@@ -10,7 +10,7 @@ import { formatNumber, localeReady, onLocaleChange, t } from './i18n.js';
 const STAGES = { data: [0, 0.3], build: [0.3, 0.55], compile: [0.55, 1] };
 const ORDER = ['data', 'build', 'compile'];
 const TIP_MS = 5500;
-const KEY_TIPS = ['menu', 'modes', 'map', 'camera', 'boost', 'hud', 'gamepad'];
+const KEY_TIPS = ['menu', 'modes', 'map', 'camera', 'hud', 'gamepad'];
 const TOUCH_TIPS = ['stick', 'look', 'map', 'menu'];
 
 const overlay = document.getElementById('loading-overlay');

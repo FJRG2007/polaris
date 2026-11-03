@@ -16,7 +16,6 @@
             "modes": "Press 1 to 4 to walk, drive, cycle or fly.",
             "map": "Press M for the map, then click a street to go there.",
             "camera": "Press V to switch cameras.",
-            "boost": "Hold Shift to go faster.",
             "hud": "Press H to hide everything but the city.",
             "gamepad": "With a gamepad, Start opens the menu."
         },

@@ -16,7 +16,6 @@
             "modes": "Pulsa del 1 al 4 para andar, conducir, ir en bici o volar.",
             "map": "Pulsa M para ver el mapa y haz clic en una calle para ir allí.",
             "camera": "Pulsa V para cambiar de cámara.",
-            "boost": "Mantén Mayús para ir más rápido.",
             "hud": "Pulsa H para ocultarlo todo menos la ciudad.",
             "gamepad": "Con un mando, Start abre el menú."
         },
