@@ -51,7 +51,7 @@ if TOOLS_PYTHON:
             self.assertRegex(result.stderr, r"\nRan [1-9]\d* tests? in ")
             self.assertEqual("OK", result.stderr.strip().splitlines()[-1], "none skipped:\n" + result.stderr)
 else:
-    spec = importlib.util.spec_from_file_location("cyt_tv_reboot", ROOT / "tools" / "tv.py")
+    spec = importlib.util.spec_from_file_location("polaris_tv_tv_reboot", ROOT / "tools" / "tv.py")
     TV = importlib.util.module_from_spec(spec)
     with mock.patch.dict(os.environ, {"TV_HOST": "192.0.2.1", "TV_PORT": "5555"}):
         spec.loader.exec_module(TV)

@@ -15,17 +15,20 @@ export MSYS_NO_PATHCONV=1
 PKG=app.polaris.tv.haunted
 DREAM=$PKG/.HauntedDream
 # The screensaver the TV had before the first run, so --uninstall can put it back.
-BEFORE=/data/local/tmp/cyt-haunted-before
+BEFORE=/data/local/tmp/polaris-tv-haunted-before
+# What releases before the rename used: the app's old id, and the record's old name, which is adopted.
+OLD_PKG="com.gath""in.haunted"
+ADOPT="if [ -f /data/local/tmp/cyt-haunted-before ]; then mv -f /data/local/tmp/cyt-haunted-before $BEFORE; fi;"
 tv() { "$PY" -I "$TOOLS/tv.py" "$@"; }
 
 if [ "${1:-}" = --uninstall ]; then
-  tv "if [ -f $BEFORE ]; then { read c; read e; } < $BEFORE; if [ \"\$c\" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components \"\$c\"; fi; [ \"\$e\" = null ] || settings put secure screensaver_enabled \"\$e\"; rm -f $BEFORE; fi; pm uninstall $PKG; echo screensaver: \$(settings get secure screensaver_components)"
+  tv "$ADOPT if [ -f $BEFORE ]; then { read c; read e; } < $BEFORE; if [ \"\$c\" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components \"\$c\"; fi; [ \"\$e\" = null ] || settings put secure screensaver_enabled \"\$e\"; rm -f $BEFORE; fi; pm uninstall $OLD_PKG >/dev/null 2>&1; pm uninstall $PKG; echo screensaver: \$(settings get secure screensaver_components)"
   exit 0
 fi
 
 (cd "$HERE" && ./gradlew assembleRelease -q) || { echo "build failed (JDK 17 and Android SDK 34 needed; see launcher/README)" >&2; exit 1; }
 "$PY" -I "$TOOLS/b64push.py" "$HERE/app/build/outputs/apk/release/app-release.apk" /data/local/tmp/haunted.apk >/dev/null
 tv "pm install -r /data/local/tmp/haunted.apk; rm -f /data/local/tmp/haunted.apk"
-tv "[ -f $BEFORE ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $BEFORE; settings put secure screensaver_components $DREAM; settings put secure screensaver_enabled 1" >/dev/null
+tv "pm uninstall $OLD_PKG >/dev/null 2>&1; $ADOPT [ -f $BEFORE ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $BEFORE; settings put secure screensaver_components $DREAM; settings put secure screensaver_enabled 1" >/dev/null
 echo "Installed: Haunted is the screensaver. Undo with: addons/haunted/build-and-install.sh --uninstall"
 [ -z "${START:-}" ] || tv "am start -n com.android.systemui/.Somnambulator >/dev/null; sleep 3; dumpsys dreams | grep mCurrentDreamName"

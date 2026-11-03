@@ -9,6 +9,8 @@ PY=$TOOLS/venv/bin/python
 [ -x "$PY" ] || PY=$TOOLS/venv/Scripts/python.exe
 export MSYS_NO_PATHCONV=1
 PKG=app.polaris.tv.btconnect
+# The app's id in releases before the rename; a TV that has it gets it removed.
+OLD_PKG="com.gath""in.btconnect"
 # Script paths stay relative: with MSYS_NO_PATHCONV, Git Bash would hand Windows Python a /c/... path.
 tv() { "$PY" -I ../../tools/tv.py "$@"; }
 
@@ -20,6 +22,7 @@ if [ -n "${JAVA_HOME:-}" ]; then export PATH="$JAVA_HOME/bin:$PATH"; fi
 OUT=$(tv 'pm install -r /data/local/tmp/bluetooth-connect.apk; rm -f /data/local/tmp/bluetooth-connect.apk')
 echo "$OUT"
 case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; esac
+tv "pm uninstall $OLD_PKG >/dev/null 2>&1; true" >/dev/null
 
 # Nearby devices on Android 12+; Android 11 and older grant BLUETOOTH at install.
 tv "pm grant $PKG android.permission.BLUETOOTH_CONNECT 2>/dev/null; echo permission granted"

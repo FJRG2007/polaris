@@ -13,18 +13,21 @@ PY="$TOOLS/venv/bin/python"
 [ -x "$PY" ] || { echo "run: python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt" >&2; exit 1; }
 export MSYS_NO_PATHCONV=1
 PKG=app.polaris.tv.photodream
+# The app's id in releases before the rename.
+OLD_PKG="com.gath""in.photodream"
 tv() { "$PY" -I "$TOOLS/tv.py" "$@"; }
 
 if [ "${1:-}" = --uninstall ]; then
   # Put the screensaver from before sync.sh back first, then remove the app and its pictures.
   "$HERE/sync.sh" --off
-  tv "pm uninstall $PKG"
+  tv "pm uninstall $OLD_PKG >/dev/null 2>&1; pm uninstall $PKG"
   exit 0
 fi
 
 (cd "$HERE" && ./gradlew assembleRelease -q) || { echo "build failed (JDK 17 and Android SDK 34 needed; see launcher/README)" >&2; exit 1; }
 "$PY" -I "$TOOLS/b64push.py" "$HERE/app/build/outputs/apk/release/app-release.apk" /data/local/tmp/photodream.apk >/dev/null
 tv "pm install -r /data/local/tmp/photodream.apk; rm -f /data/local/tmp/photodream.apk"
+tv "pm uninstall $OLD_PKG >/dev/null 2>&1; true" >/dev/null
 # TCL's TclAppBoot blocks the app's provider until it may auto-start; elsewhere the op doesn't exist.
 tv "appops set $PKG AUTO_START allow 2>/dev/null; appops set $PKG APP_AUTO_START allow 2>/dev/null; appops write-settings 2>/dev/null; true" >/dev/null
 echo "Installed. Now: TV_HOST=$TV_HOST addons/photo-screensaver/sync.sh"

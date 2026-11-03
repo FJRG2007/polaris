@@ -17,12 +17,15 @@ $py = Join-Path $tools 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
 $pkg = 'app.polaris.tv.haunted'
 $dream = "$pkg/.HauntedDream"
-$before = '/data/local/tmp/cyt-haunted-before'
+$before = '/data/local/tmp/polaris-tv-haunted-before'
+# What releases before the rename used: the app's old id, and the record's old name, which is adopted.
+$oldPkg = 'com.gath' + 'in.haunted'
+$adopt = "if [ -f /data/local/tmp/cyt-haunted-before ]; then mv -f /data/local/tmp/cyt-haunted-before $before; fi;"
 function Tv([string]$cmd) { & $py -I (Join-Path $tools 'tv.py') $cmd; if ($LASTEXITCODE) { throw "tv.py failed: $cmd" } }
 
 if ($Uninstall) {
     # Put the screensaver from before the first run back, then remove the app.
-    Tv "if [ -f $before ]; then { read c; read e; } < $before; if [ `"`$c`" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components `"`$c`"; fi; [ `"`$e`" = null ] || settings put secure screensaver_enabled `"`$e`"; rm -f $before; fi; pm uninstall $pkg"
+    Tv "$adopt if [ -f $before ]; then { read c; read e; } < $before; if [ `"`$c`" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components `"`$c`"; fi; [ `"`$e`" = null ] || settings put secure screensaver_enabled `"`$e`"; rm -f $before; fi; pm uninstall $oldPkg >/dev/null 2>&1; pm uninstall $pkg"
     exit 0
 }
 
@@ -35,6 +38,6 @@ $apk = Join-Path $here 'app\build\outputs\apk\release\app-release.apk'
 & $py -I (Join-Path $tools 'b64push.py') $apk /data/local/tmp/haunted.apk | Out-Null
 if ($LASTEXITCODE) { throw 'sending the APK failed' }
 Tv 'pm install -r /data/local/tmp/haunted.apk; rm -f /data/local/tmp/haunted.apk'
-Tv "[ -f $before ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $before; settings put secure screensaver_components $dream; settings put secure screensaver_enabled 1"
+Tv "pm uninstall $oldPkg >/dev/null 2>&1; $adopt [ -f $before ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $before; settings put secure screensaver_components $dream; settings put secure screensaver_enabled 1"
 Write-Host 'Installed: Haunted is the screensaver. Undo with: addons\haunted\build-and-install.ps1 -Uninstall'
 if ($Start) { Tv 'am start -n com.android.systemui/.Somnambulator' }

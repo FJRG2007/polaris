@@ -26,7 +26,7 @@ TV_HOST=<tv ip> addons/haunted/build-and-install.sh
 ```
 
 On Windows: `addons\haunted\build-and-install.ps1 -TvHost <tv ip>`. Add `START=1` (or `-Start`) to see it now. The
-script keeps the screensaver the TV had before, in `/data/local/tmp/cyt-haunted-before`.
+script keeps the screensaver the TV had before, in `/data/local/tmp/polaris-tv-haunted-before`.
 
 Or by hand, as for any add-on:
 

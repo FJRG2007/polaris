@@ -178,13 +178,16 @@ rollback_home() {
   case "$BACK" in
     "$STOCK_LAUNCHER"/*) echo "$STOCK_LAUNCHER owns Home again." >&2; return 0 ;;
   esac
-  REC="${HOME:-$PWD}/polaris-tv-handover-$(printf '%s' "$TV_HOST" | tr -c 'A-Za-z0-9._-' '_').txt"
+  HOST_TAG=$(printf '%s' "$TV_HOST" | tr -c 'A-Za-z0-9._-' '_')
+  REC="${HOME:-$PWD}/polaris-tv-handover-$HOST_TAG.txt"
   {
     echo "# polaris-tv: the launcher handover on $TV_HOST did not finish. From the repo root:"
     echo "TV_HOST=$TV_HOST tools/tv.py 'pm enable --user 0 $STOCK_LAUNCHER'"
     echo "TV_HOST=$TV_HOST tools/tv.py 'cmd package set-home-activity --user 0 \$(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME $STOCK_LAUNCHER | tail -n 1)'"
     echo "# then check: TV_HOST=$TV_HOST tools/tv.py '$HOME_QUERY'"
   } > "$REC" 2>/dev/null || REC=""
+  # The same record under its name before the rename is stale once this one is written.
+  [ -z "$REC" ] || rm -f "${HOME:-$PWD}/clean""yourtv-handover-$HOST_TAG.txt"
   echo "ERROR: recovery is incomplete; Home still resolves to '${BACK:-nothing}'." >&2
   if [ -n "$REC" ]; then echo "The commands that finish it are in $REC; the TV still needs ADB for them." >&2
   else echo "Re-run once the TV answers: pm enable --user 0 $STOCK_LAUNCHER, then set its Home activity." >&2; fi

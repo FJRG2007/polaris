@@ -66,7 +66,7 @@ $revision = [guid]::NewGuid().ToString('N')
 # A provider write creates the file as the launcher, and it cannot truncate a file the shell owns either, so
 # remove our copy first. cp stays as the fallback for firmware without the provider.
 $uri = "content://$pkg.theme"
-$tmp = '/data/local/tmp/cyt-theme'
+$tmp = '/data/local/tmp/polaris-tv-theme'
 # A file's staging path; wallpapers/a.jpg is staged as $tmp-wallpapers-a.jpg.
 function Stage($name) { "$tmp-$($name -replace '/', '-')" }
 # Android 8 and 9 have no `content write`: they print "[ERROR] Unsupported operation: write" but exit 0, so

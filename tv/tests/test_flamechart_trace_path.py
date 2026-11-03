@@ -31,7 +31,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-spec = importlib.util.spec_from_file_location("cyt_flamechart_trace_path", ROOT / "tools" / "flamechart.py")
+spec = importlib.util.spec_from_file_location("polaris_tv_flamechart_trace_path", ROOT / "tools" / "flamechart.py")
 flamechart = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(flamechart)
 # The module flamechart.py itself imported, so patching its opener is what main() calls.

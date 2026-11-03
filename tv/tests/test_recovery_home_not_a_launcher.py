@@ -36,7 +36,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import recovery  # noqa: E402
 import test_recovery_record as records  # noqa: E402
 
-spec = importlib.util.spec_from_file_location("cyt_check", ROOT / "tools" / "check.py")
+spec = importlib.util.spec_from_file_location("polaris_tv_check", ROOT / "tools" / "check.py")
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 

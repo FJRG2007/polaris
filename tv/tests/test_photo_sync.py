@@ -32,7 +32,7 @@ else:
             print(hashlib.md5(p.read_bytes()).hexdigest() + "  " + p.name)
     elif "content write --uri " + uri in command:
         name = command.split(uri, 1)[1].split()[0]
-        source = stage / ("cyt-screensaver-" + name)
+        source = stage / ("polaris-tv-screensaver-" + name)
         shutil.copyfile(source, pictures / name)
         source.unlink()
     elif "content delete --uri " + uri in command:

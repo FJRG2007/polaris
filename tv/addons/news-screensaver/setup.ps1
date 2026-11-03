@@ -33,19 +33,21 @@ if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Sc
 $pkg = 'app.polaris.tv.newsdream'
 $dream = "$pkg/.NewsDream"
 $uri = "content://$pkg.files"
-$tmp = '/data/local/tmp/cyt-news'
+$tmp = '/data/local/tmp/polaris-tv-news'
 # The screensaver the TV had before the first run, so -Off can put it back.
-$before = '/data/local/tmp/cyt-news-before'
+$before = '/data/local/tmp/polaris-tv-news-before'
+# The record's name before the rename, adopted when found.
+$adopt = "if [ -f /data/local/tmp/cyt-news-before ]; then mv -f /data/local/tmp/cyt-news-before $before; fi;"
 function Tv([string]$cmd) { & $py -I tv.py $cmd; if ($LASTEXITCODE) { throw "tv.py failed: $cmd" } }
 
 if ($IdleMinutes -lt 0 -or $IdleMinutes -gt 1440) { throw '-IdleMinutes takes 1 to 1440' }
 if ($Seconds -ne 0 -and ($Seconds -lt 5 -or $Seconds -gt 600)) { throw '-Seconds takes 5 to 600' }
-if (-not ((Tv "pm path $pkg; true") -match 'package:')) { throw 'the news screensaver is not on the TV: run addons\news-screensaver\build-and-install.ps1 first' }
 
 if ($Off) {
-    Tv "if [ -f $before ]; then { read c; read e; } < $before; if [ `"`$c`" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components `"`$c`"; fi; [ `"`$e`" = null ] || settings put secure screensaver_enabled `"`$e`"; rm -f $before; fi; echo screensaver: `$(settings get secure screensaver_components)"
+    Tv "$adopt if [ -f $before ]; then { read c; read e; } < $before; if [ `"`$c`" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components `"`$c`"; fi; [ `"`$e`" = null ] || settings put secure screensaver_enabled `"`$e`"; rm -f $before; fi; echo screensaver: `$(settings get secure screensaver_components)"
     exit 0
 }
+if (-not ((Tv "pm path $pkg; true") -match 'package:')) { throw 'the news screensaver is not on the TV: run addons\news-screensaver\build-and-install.ps1 first' }
 
 if ($DefaultFeeds) {
     Tv "content delete --uri $uri/feeds.txt" | Out-Null
@@ -79,7 +81,7 @@ if ($DefaultFeeds) {
 }
 
 if ($Seconds) { Tv "printf '%s' $Seconds > $tmp-seconds.txt; content write --uri $uri/seconds.txt < $tmp-seconds.txt; rm -f $tmp-seconds.txt" | Out-Null }
-Tv "[ -f $before ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $before; settings put secure screensaver_components $dream; settings put secure screensaver_enabled 1" | Out-Null
+Tv "$adopt [ -f $before ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $before; settings put secure screensaver_components $dream; settings put secure screensaver_enabled 1" | Out-Null
 if ($IdleMinutes) { Tv "settings put system screen_off_timeout $($IdleMinutes * 60000)" | Out-Null }
 Write-Host 'On the TV now:'
 Tv "f=`$(content read --uri $uri/feeds.txt 2>/dev/null); s=`$(content read --uri $uri/seconds.txt 2>/dev/null); echo `"`${f:-(the built-in default feed)}`" | sed 's/^/  feed: /'; echo `"  seconds per headline: `${s:-15}`"; echo `"  screen_off_timeout: `$(( `$(settings get system screen_off_timeout) / 60000 )) min`""

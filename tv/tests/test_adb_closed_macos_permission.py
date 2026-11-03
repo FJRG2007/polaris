@@ -38,7 +38,7 @@ NOTE = "On macOS this is also what Local Network privacy looks like."
 
 
 def load():
-    spec = importlib.util.spec_from_file_location("cyt_adb_closed_platform", SCRIPT)
+    spec = importlib.util.spec_from_file_location("polaris_tv_adb_closed_platform", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

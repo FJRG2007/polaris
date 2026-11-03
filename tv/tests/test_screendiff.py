@@ -34,7 +34,7 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("cyt_screendiff", ROOT / "tools" / "screendiff.py")
+spec = importlib.util.spec_from_file_location("polaris_tv_screendiff", ROOT / "tools" / "screendiff.py")
 screendiff = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(screendiff)
 HAVE_PIL = importlib.util.find_spec("PIL") is not None

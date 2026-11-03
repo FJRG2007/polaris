@@ -76,7 +76,7 @@ def load_tv():
     signer.PythonRSASigner = lambda pub, priv: None
     stubs.update({"adb_shell.adb_device": device, "adb_shell.auth.keygen": keygen,
                   "adb_shell.auth.sign_pythonrsa": signer})
-    spec = importlib.util.spec_from_file_location("cyt_tv", SCRIPT)
+    spec = importlib.util.spec_from_file_location("polaris_tv_tv", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     os.environ.setdefault("TV_HOST", "192.0.2.1")   # TEST-NET-1: nothing ever answers there
     with mock.patch.dict(sys.modules, stubs):

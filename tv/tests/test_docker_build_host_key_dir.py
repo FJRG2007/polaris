@@ -5,8 +5,8 @@ Docker build to sign both with the one native key: `HOST_KEY_DIR=~/.android tool
 Both twins took that value as given and handed it to `docker run -v <value>:/key`, and Docker mounts a
 bind only from an absolute path that is there:
 
-    $ docker run --rm -v /tmp/cyt-nokey-abc:/key <image>
-    $ ls -ld /tmp/cyt-nokey-abc
+    $ docker run --rm -v /tmp/polaris-tv-nokey-abc:/key <image>
+    $ ls -ld /tmp/polaris-tv-nokey-abc
     drwxr-xr-x 2 root root 4096 ...        # created by Docker, empty, owned by root on Linux
 
     $ docker run --rm -v dbr:/key <image>   # a relative path is a volume name, not a folder
@@ -65,7 +65,7 @@ class Repository:
     """A throwaway checkout: the real script, and the Gradle project it looks for."""
 
     def __init__(self):
-        self.folder = Path(tempfile.mkdtemp(prefix="cyt-docker-key-"))
+        self.folder = Path(tempfile.mkdtemp(prefix="polaris-tv-docker-key-"))
         (self.folder / "tools").mkdir()
         (self.folder / "launcher").mkdir()
         (self.folder / "launcher" / "settings.gradle").write_text("", encoding="utf-8")

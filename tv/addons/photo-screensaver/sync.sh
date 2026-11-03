@@ -24,9 +24,11 @@ PKG=app.polaris.tv.photodream
 DREAM=$PKG/.PhotoDream
 DIR=/sdcard/Android/data/$PKG/files/pictures
 URI=content://$PKG.files/pictures
-TMP=/data/local/tmp/cyt-screensaver
+TMP=/data/local/tmp/polaris-tv-screensaver
 # The screensaver the TV had before the first run, so --off can put it back.
-BEFORE=/data/local/tmp/cyt-screensaver-before
+BEFORE=/data/local/tmp/polaris-tv-screensaver-before
+# The record's name before the rename, adopted when found.
+ADOPT="if [ -f /data/local/tmp/cyt-screensaver-before ]; then mv -f /data/local/tmp/cyt-screensaver-before $BEFORE; fi;"
 IDLE_MINUTES="${IDLE_MINUTES:-0}"
 SECONDS_PER_PICTURE="${SECONDS_PER_PICTURE:-20}"
 tv() { "$PY" -I tv.py "$@"; }
@@ -35,13 +37,13 @@ md5() { "$PY" -I -c 'import hashlib,sys; print(hashlib.md5(open(sys.argv[1],"rb"
 [[ "$IDLE_MINUTES" =~ ^[0-9]+$ ]] && [ "$IDLE_MINUTES" -le 1440 ] || { echo "IDLE_MINUTES takes 1 to 1440" >&2; exit 1; }
 [[ "$SECONDS_PER_PICTURE" =~ ^[0-9]+$ ]] && [ "$SECONDS_PER_PICTURE" -ge 5 ] && [ "$SECONDS_PER_PICTURE" -le 3600 ] \
   || { echo "SECONDS_PER_PICTURE takes 5 to 3600" >&2; exit 1; }
-tv "pm path $PKG; true" | grep -q package: \
-  || { echo "the photo screensaver is not on the TV: run addons/photo-screensaver/build-and-install.sh first" >&2; exit 1; }
 
 if [ "$FOLDER" = --off ]; then
-  tv "if [ -f $BEFORE ]; then { read c; read e; } < $BEFORE; if [ \"\$c\" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components \"\$c\"; fi; [ \"\$e\" = null ] || settings put secure screensaver_enabled \"\$e\"; rm -f $BEFORE; fi; rm -f $DIR/* 2>/dev/null; content delete --uri $URI 2>/dev/null; echo screensaver: \$(settings get secure screensaver_components)"
+  tv "$ADOPT if [ -f $BEFORE ]; then { read c; read e; } < $BEFORE; if [ \"\$c\" = null ]; then settings delete secure screensaver_components >/dev/null; else settings put secure screensaver_components \"\$c\"; fi; [ \"\$e\" = null ] || settings put secure screensaver_enabled \"\$e\"; rm -f $BEFORE; fi; rm -f $DIR/* 2>/dev/null; content delete --uri $URI 2>/dev/null; echo screensaver: \$(settings get secure screensaver_components)"
   exit 0
 fi
+tv "pm path $PKG; true" | grep -q package: \
+  || { echo "the photo screensaver is not on the TV: run addons/photo-screensaver/build-and-install.sh first" >&2; exit 1; }
 
 [ -d "$FOLDER" ] || { echo "no folder $FOLDER. Create it and put your pictures (jpg, png, webp) and MP4 clips in it, or pass another folder." >&2; exit 1; }
 FILES=()
@@ -83,7 +85,7 @@ for F in ${FILES[@]+"${FILES[@]}"}; do
 done
 
 tv "printf '%s' $SECONDS_PER_PICTURE > $TMP-seconds.txt; content write --uri content://$PKG.files/seconds.txt < $TMP-seconds.txt; rm -f $TMP-seconds.txt" >/dev/null
-tv "[ -f $BEFORE ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $BEFORE; settings put secure screensaver_components $DREAM; settings put secure screensaver_enabled 1" >/dev/null
+tv "$ADOPT [ -f $BEFORE ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $BEFORE; settings put secure screensaver_components $DREAM; settings put secure screensaver_enabled 1" >/dev/null
 [ "$IDLE_MINUTES" -eq 0 ] || tv "settings put system screen_off_timeout $((IDLE_MINUTES * 60000))" >/dev/null
 COUNT=$(tv "ls $DIR 2>/dev/null | wc -l" | tr -d '\r ')
 echo "Screensaver: Photos with $COUNT file(s) on the TV, $SECONDS_PER_PICTURE s each ($SENT sent). Undo with: addons/photo-screensaver/sync.sh --off"

@@ -122,7 +122,7 @@ class B64PushTest(TempDirTest):
             self.assertIn(f"'{target}", command, "every remote path is single-quoted")
 
     def test_every_command_fits_one_payload_with_a_long_remote_path(self):
-        # tools/theme.sh stages a wallpaper at /data/local/tmp/cyt-theme-wallpapers-<name>.jpg. Over native adb
+        # tools/theme.sh stages a wallpaper at /data/local/tmp/polaris-tv-theme-wallpapers-<name>.jpg. Over native adb
         # (a 4096-byte payload) a chunk sized without that path made `echo '<chunk>' >> <path>` too long:
         # "shell command too long", and no picture of the theme reached the TV.
         data = os.urandom(20000)

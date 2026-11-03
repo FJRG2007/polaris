@@ -25,9 +25,9 @@ ACTION = "android.accessibilityservice.AccessibilityService"
 def shell(dev, command):
     # adb_shell's shell transport does not return the remote exit code. Require a
     # final marker, so a failed settings/start command cannot look like success.
-    output = dev.shell(command + "; rc=$?; printf '\\n__CYT_THEME_RC__%s\\n' \"$rc\"",
+    output = dev.shell(command + "; rc=$?; printf '\\n__POLARIS_TV_THEME_RC__%s\\n' \"$rc\"",
                        read_timeout_s=15)
-    result = re.search(r"\n__CYT_THEME_RC__(\d+)\s*$", output)
+    result = re.search(r"\n__POLARIS_TV_THEME_RC__(\d+)\s*$", output)
     if not result or result[1] != "0":
         raise RuntimeError("TV command failed or returned an incomplete response")
     text = output[:result.start()].strip()
@@ -90,10 +90,10 @@ def cycle(dev, user, saved):
     # a host-side sleep must not strand every accessibility service switched off.
     restore = settings_command(user, saved, 1)
     off = settings_command(user, {}, 0)
-    shell(dev, f"cyt_restore() {{ {restore}; }}; trap cyt_restore EXIT; "
-               f"trap 'cyt_restore; exit 1' HUP INT TERM; {off} && sleep 2; "
-               "cyt_rc=$?; cyt_restore; cyt_restore_rc=$?; trap - EXIT HUP INT TERM; "
-               '[ "$cyt_rc" -eq 0 ] && [ "$cyt_restore_rc" -eq 0 ]')
+    shell(dev, f"polaris_tv_restore() {{ {restore}; }}; trap polaris_tv_restore EXIT; "
+               f"trap 'polaris_tv_restore; exit 1' HUP INT TERM; {off} && sleep 2; "
+               "polaris_tv_rc=$?; polaris_tv_restore; polaris_tv_restore_rc=$?; trap - EXIT HUP INT TERM; "
+               '[ "$polaris_tv_rc" -eq 0 ] && [ "$polaris_tv_restore_rc" -eq 0 ]')
 
 
 def restart(dev, pause=time.sleep):

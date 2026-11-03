@@ -22,7 +22,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 DEVICE_DIR = "/sdcard/Android/data/app.polaris.tv/files"
-STAGE = "/data/local/tmp/cyt-theme"
+STAGE = "/data/local/tmp/polaris-tv-theme"
 
 # --push copies like tv.py does; shell commands run on this machine after the device paths are rewritten.
 FAKE_TV = r'''
@@ -38,7 +38,7 @@ DEVICE_DIR = "/sdcard/Android/data/app.polaris.tv/files"
 
 
 def local(command):
-    return command.replace(DEVICE_DIR, DIR).replace("/data/local/tmp/cyt-theme", TMP)
+    return command.replace(DEVICE_DIR, DIR).replace("/data/local/tmp/polaris-tv-theme", TMP)
 
 
 class Device:

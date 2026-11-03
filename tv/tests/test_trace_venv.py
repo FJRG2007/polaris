@@ -150,7 +150,7 @@ class TraceVenvTest(unittest.TestCase):
 
     def load_script(self):
         """The copy beside the stub venv, imported as a module (tests/test_trace.py does the same)."""
-        spec = importlib.util.spec_from_file_location("cyt_trace_venv", self.script)
+        spec = importlib.util.spec_from_file_location("polaris_tv_trace_venv", self.script)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
