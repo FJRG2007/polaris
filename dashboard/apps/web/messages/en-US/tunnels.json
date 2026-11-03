@@ -56,7 +56,6 @@
         "noServices": "No services found",
         "thisMachine": "{name} (this machine)",
         "serviceOption": "{service} - {project}",
-        "noOtherServer": "Every service runs on this server. A tunnel needs a service on another one.",
         "hostnameInvalid": "Enter a hostname such as app.example.com.",
         "create": "Create tunnel",
         "creating": "Creating",

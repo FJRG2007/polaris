@@ -253,8 +253,9 @@ function parse<S extends z.ZodTypeAny>(schema: S, raw: string | null): z.output<
     }
 }
 
-/** The most servers offered as the relay: the picker searches within these. */
-const RELAY_CHOICES = 1000;
+/** Servers read with the view: only whether there is one, and the default the
+ *  relay path starts on. The picker reads the rest a page at a time. */
+const RELAY_CHOICES = 1;
 
 export async function readConfig(): Promise<BackupConfig> {
     return parse(configSchema, await getSetting(BACKUP_CONFIG_KEY)) ?? DEFAULT_CONFIG;
@@ -304,6 +305,7 @@ export interface BackupView {
         tcp: number[];
         udp: number[];
     } | null;
+    /** The first relay candidate by name, or none: not the whole list. */
     readonly servers: { id: string; name: string }[];
     readonly cloudflare: boolean;
     /** Whether visitors can reach the line itself; null before the first check. */

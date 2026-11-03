@@ -56,7 +56,6 @@
         "noServices": "Sin servicios",
         "thisMachine": "{name} (esta máquina)",
         "serviceOption": "{service} - {project}",
-        "noOtherServer": "Todos los servicios corren en este servidor. Un túnel necesita un servicio en otro.",
         "hostnameInvalid": "Escribe un dominio como app.example.com.",
         "create": "Crear túnel",
         "creating": "Creando",

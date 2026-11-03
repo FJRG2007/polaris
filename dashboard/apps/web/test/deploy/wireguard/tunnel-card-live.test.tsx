@@ -13,6 +13,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 const status = vi.hoisted(() => ({ reply: {} as unknown, calls: 0, ids: [] as string[][] }));
 
+vi.mock("../../../src/app/(app)/deploy-target-options-actions", () => ({
+    listDeployTargetOptionsAction: async () => ({ items: [], next: null }),
+    listServiceOptionsAction: async () => ({ items: [], next: null })
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("../../../src/app/(app)/apps/tunnels/actions", () => ({
     createTunnelAction: vi.fn(),
@@ -46,7 +50,6 @@ const TUNNEL: TunnelView = {
     createdAt: "2026-10-01T00:00:00.000Z"
 };
 
-const OPTIONS = { servers: [], services: [] };
 
 beforeEach(() => {
     status.calls = 0;
@@ -65,7 +68,7 @@ describe("a live tunnel card", () => {
                 txBytes: 1024
             }
         };
-        render(<TunnelsView tunnels={[TUNNEL]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        render(<TunnelsView tunnels={[TUNNEL]} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Connected")).toBeTruthy();
         expect(screen.getByText("Last handshake")).toBeTruthy();
         expect(screen.queryByText("Never")).toBeNull();
@@ -74,7 +77,7 @@ describe("a live tunnel card", () => {
 
     it("until the first handshake, gives the exact rule to add at the provider", async () => {
         status.reply = { status: { health: "waiting", lastHandshake: 0, rxBytes: 0, txBytes: 0 } };
-        render(<TunnelsView tunnels={[TUNNEL]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        render(<TunnelsView tunnels={[TUNNEL]} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Open UDP port 51821 on edge-1")).toBeTruthy();
         expect(screen.getByText("Waiting")).toBeTruthy();
         expect(screen.getByText("Never")).toBeTruthy();
@@ -89,7 +92,7 @@ describe("a live tunnel card", () => {
 
     it("does not send the operator to their firewall when neither server answered", async () => {
         status.reply = { status: { health: "unknown", lastHandshake: 0, rxBytes: 0, txBytes: 0 } };
-        render(<TunnelsView tunnels={[TUNNEL]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        render(<TunnelsView tunnels={[TUNNEL]} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Unknown")).toBeTruthy();
         expect(screen.queryByText(/Open UDP port/)).toBeNull();
     });
@@ -114,7 +117,7 @@ describe("a live tunnel card", () => {
             hostname: "three.example.com",
             paused: true
         };
-        render(<TunnelsView tunnels={[TUNNEL, second, paused]} options={OPTIONS} />, {
+        render(<TunnelsView tunnels={[TUNNEL, second, paused]} />, {
             wrapper: MessagesWrapper
         });
         await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(2));
@@ -124,12 +127,12 @@ describe("a live tunnel card", () => {
 
     it("says the state could not be read instead of spinning forever", async () => {
         status.reply = { error: "The tunnel could not be changed. Try again in a moment." };
-        render(<TunnelsView tunnels={[TUNNEL]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        render(<TunnelsView tunnels={[TUNNEL]} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("The tunnel's state could not be read.")).toBeTruthy();
     });
 
     it("reads nothing for a paused tunnel", async () => {
-        render(<TunnelsView tunnels={[{ ...TUNNEL, paused: true }]} options={OPTIONS} />, {
+        render(<TunnelsView tunnels={[{ ...TUNNEL, paused: true }]} />, {
             wrapper: MessagesWrapper
         });
         await waitFor(() => expect(screen.getByText("Paused")).toBeTruthy());

@@ -1761,5 +1761,13 @@
         "placeholderMany": "Choose servers",
         "search": "Search by name or address",
         "empty": "No server matches"
+    },
+    "servicePicker": {
+        "placeholder": "Choose a service",
+        "search": "Search by service or project",
+        "empty": "No service matches"
+    },
+    "deployTargetPicker": {
+        "search": "Search by name"
     }
 }

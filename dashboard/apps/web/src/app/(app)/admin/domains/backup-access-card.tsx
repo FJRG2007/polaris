@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Button, Checkbox, Select, Skeleton } from "@polaris/ui";
+import { Button, Checkbox, Skeleton } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { holdersCanBeFreed, UNKNOWN_HOLDER } from "@/lib/backup-access/port-holders";
 import {
@@ -25,6 +25,7 @@ import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { DeployTargetPicker } from "@/components/deploy-target-picker";
 import type { BackupConfig, BackupView } from "@/lib/backup-access/service";
 import { INBOUND_FEATURES, carries, type InboundPath } from "@/lib/backup-access/inbound";
 
@@ -173,16 +174,13 @@ export function BackupAccessCard() {
 
                     {view.config.path === "relay" && view.servers.length > 0 ? (
                         <Choice label={t("domains.backup.server")}>
-                            <Select
+                            <DeployTargetPicker
+                                scope="relay"
                                 className="w-64 max-w-full"
                                 aria-label={t("domains.backup.server")}
-                                value={view.config.relayTargetId ?? ""}
+                                value={view.config.relayTargetId}
                                 placeholder={t("domains.backup.server")}
                                 disabled={busy}
-                                options={view.servers.map(({ id, name }) => ({
-                                    value: id,
-                                    label: name
-                                }))}
                                 onValueChange={(id) => void save({ relayTargetId: id })}
                             />
                         </Choice>

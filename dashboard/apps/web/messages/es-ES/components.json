@@ -1761,5 +1761,13 @@
         "placeholderMany": "Elige servidores",
         "search": "Busca por nombre o dirección",
         "empty": "Sin servidores así"
+    },
+    "servicePicker": {
+        "placeholder": "Elige un servicio",
+        "search": "Busca por servicio o proyecto",
+        "empty": "Sin servicios así"
+    },
+    "deployTargetPicker": {
+        "search": "Busca por nombre"
     }
 }

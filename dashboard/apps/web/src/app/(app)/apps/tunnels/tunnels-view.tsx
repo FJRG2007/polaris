@@ -19,7 +19,6 @@ import { removeTunnelAction, setTunnelPausedAction } from "./actions";
 import * as polls from "./tunnels-polls";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import type {
-    TunnelOptions,
     TunnelStatus,
     TunnelView
 } from "@/lib/deploy/wireguard/tunnel-service";
@@ -108,11 +107,9 @@ function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
 }
 
 export function TunnelsView({
-    tunnels,
-    options
+    tunnels
 }: {
     tunnels: TunnelView[];
-    options: TunnelOptions;
 }) {
     const t = useTranslations("tunnels");
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
@@ -122,7 +119,7 @@ export function TunnelsView({
     return (
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex justify-end">
-                <TunnelDialog options={options} />
+                <TunnelDialog />
             </div>
             {shown.length === 0 ? (
                 <EmptyState
