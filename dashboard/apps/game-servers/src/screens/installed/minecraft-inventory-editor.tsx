@@ -247,11 +247,21 @@ export function InventoryEditor({
             () => {
                 // Not while something is in the air: the grid moving under the cursor
                 // is how a drag ends on the slot next to the one somebody aimed at.
-                if (!dragging.current && !pending) void reload();
+                if (!dragging.current && !pending && document.visibilityState === "visible")
+                    void reload();
             },
             slowRead ? SLOW_POLL_MS : POLL_MS
         );
-        return () => clearInterval(timer);
+        // A hidden tab rests; the bag is read again the moment it is looked at.
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible" && !dragging.current && !pending)
+                void reload();
+        };
+        document.addEventListener("visibilitychange", onReturn);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+        };
     }, [live, pending, reload, slowRead]);
 
     /*
@@ -264,7 +274,8 @@ export function InventoryEditor({
         if (!online || live || loading) return;
         void reload();
         const timer = setInterval(() => {
-            if (!dragging.current && !pending) void reload();
+            if (!dragging.current && !pending && document.visibilityState === "visible")
+                void reload();
         }, SLOW_POLL_MS);
         return () => clearInterval(timer);
     }, [online, live, loading, pending, reload]);

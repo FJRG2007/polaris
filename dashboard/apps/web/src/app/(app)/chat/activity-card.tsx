@@ -44,13 +44,22 @@ export function ActivityCard({
                     if (!live) return;
                     setView(found);
                     if (!found || found.ended) window.clearInterval(timer);
-                    else if (timer === undefined) timer = window.setInterval(read, REFRESH_MS);
+                    else if (timer === undefined) timer = window.setInterval(tick, REFRESH_MS);
                 })
                 .catch(() => undefined);
+        // Nobody is looking at a card in a hidden tab; it is read on return.
+        const tick = (): void => {
+            if (document.visibilityState === "visible") read();
+        };
+        const onReturn = (): void => {
+            if (timer !== undefined && document.visibilityState === "visible") read();
+        };
         read();
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             live = false;
             window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
         // The message object is replaced whenever it is woken, which is the
         // signal to read the card again.

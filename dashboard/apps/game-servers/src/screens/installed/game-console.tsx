@@ -280,13 +280,21 @@ export function GameConsole({
                 if (live) setRepeatList(answer.repeats);
             });
         read();
+        // Resting while hidden, like the schedules above, and reading on return.
         const timer = window.setInterval(
-            read,
+            () => {
+                if (document.visibilityState === "visible") read();
+            },
             repeatRunning ? REPEATS_RUNNING_MS : REPEATS_IDLE_MS
         );
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") read();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             live = false;
             window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onReturn);
         };
     }, [installedAppId, repeatRunning]);
 

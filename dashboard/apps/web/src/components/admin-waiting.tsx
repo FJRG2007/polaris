@@ -148,11 +148,21 @@ export function AdminWaitingProvider({
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(recount, SETTLE_MS);
         });
-        const sweep = setInterval(recount, SWEEP_MS);
+        // The sweep is the floor under the stream, for a frame that never came.
+        // A hidden tab skips it - the frames above still recount it - and sweeps
+        // once when it is looked at again.
+        const sweep = setInterval(() => {
+            if (document.visibilityState === "visible") recount();
+        }, SWEEP_MS);
+        const onReturn = (): void => {
+            if (document.visibilityState === "visible") recount();
+        };
+        document.addEventListener("visibilitychange", onReturn);
         return () => {
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;
             clearInterval(sweep);
+            document.removeEventListener("visibilitychange", onReturn);
             stop();
         };
     }, [enabled, scope, shelf, recount, soundChanged]);
