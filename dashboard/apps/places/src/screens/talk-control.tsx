@@ -78,6 +78,20 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
     const toast = useToast();
     const key = `places-talk-${cameraId}`;
     const [state, setState] = useState<"idle" | "starting" | "live">("idle");
+    // Every make but a Tapo has a speaker only when the relay says so; the
+    // button stays away until it has.
+    const [available, setAvailable] = useState(support !== "probe");
+    useEffect(() => {
+        if (support !== "probe") return;
+        let current = true;
+        void actions
+            .talkAvailableAction(cameraId)
+            .then((answer) => current && setAvailable(answer.available))
+            .catch(() => undefined);
+        return () => {
+            current = false;
+        };
+    }, [cameraId, support]);
     const live = useRef<Live | null>(null);
     const mounted = useRef(true);
 
@@ -190,6 +204,7 @@ export function TalkControl({ cameraId, support }: { cameraId: string; support: 
         setState("live");
     }, [cameraId, flush, key, t, toast]);
 
+    if (!available) return null;
     if (support === "rtsp")
         return (
             <ViewerControl

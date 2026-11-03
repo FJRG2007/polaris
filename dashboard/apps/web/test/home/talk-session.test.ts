@@ -16,6 +16,8 @@ let plays: boolean[];
 let refreshed: boolean;
 let bodies: ReadableStream<Uint8Array>[];
 let pushes: { resolve: () => void }[];
+/** What the relay lists for the camera's connection; a way back is a sendonly audio. */
+let medias: string[];
 
 vi.mock("@polaris/db", () => ({
     prisma: { camera: { findFirst: vi.fn(async () => row) } }
@@ -32,6 +34,9 @@ vi.mock("@polaris-app/places/src/lib/relay", () => ({
     relayEndpoint: async () => endpoint,
     relayService: async () => ({ installedAppId: "i", applicationId: "relay-app", ownerId: "o" }),
     talkReadiness: async () => readiness,
+    cameraMedias: async () => medias,
+    backchannelCodec: (listed: string[]) =>
+        listed.some((media) => media.startsWith("audio, sendonly, PCMU")) ? "pcmu" : null,
     prepareTalk: (...args: unknown[]) => prepareTalk(...args),
     playTalk: (...args: unknown[]) => playTalk(...args),
     endTalk: (...args: unknown[]) => endTalk(...args),
@@ -69,6 +74,7 @@ async function readSome(body: ReadableStream<Uint8Array>, count: number): Promis
 
 beforeEach(() => {
     vi.useFakeTimers();
+    medias = [];
     row = { vendor: "tapo-cloud", reachVia: "local", enabled: true, privacy: false };
     endpoint = { baseUrl: "http://relay:1984" };
     readiness = "ready";
@@ -143,6 +149,13 @@ describe("starting a talk", () => {
         row = { vendor: "reolink", reachVia: "local", enabled: true, privacy: false };
         await expect(started()).rejects.toThrow(talk.CANNOT_TALK);
         expect(prepareTalk).not.toHaveBeenCalled();
+    });
+
+    it("talks through any make whose relay connection has a way back, in its codec", async () => {
+        row = { vendor: "reolink", reachVia: "local", enabled: true, privacy: false };
+        medias = ["video, recvonly, H264", "audio, sendonly, PCMU/8000"];
+        await expect(started()).resolves.toBeTruthy();
+        expect(playTalk).toHaveBeenLastCalledWith(endpoint, CAMERA, "pcmu");
     });
 
     it("talks to a battery Tapo too", async () => {

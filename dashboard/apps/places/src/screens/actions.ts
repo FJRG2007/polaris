@@ -1245,6 +1245,15 @@ export async function startTalkAction(
     return { talkId: result.value };
 }
 
+/** Whether this camera's speaker can be reached now: the Talk button shows
+ *  only where it can. */
+export async function talkAvailableAction(cameraId: string): Promise<{ available: boolean }> {
+    const { install } = await requireHome("home.control");
+    const id = cameraIdSchema.safeParse(cameraId);
+    if (!id.success) return { available: false };
+    return { available: await talk.talkAvailable(install.id, id.data) };
+}
+
 export async function stopTalkAction(
     cameraId: string,
     talkId: string

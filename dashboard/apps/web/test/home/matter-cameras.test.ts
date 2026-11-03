@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import * as code from "@polaris-app/places/src/lib/matter-code";
 import * as signaling from "../../../../services/matter-bridge/src/signaling.mjs";
+import { backchannelCodec, talkPlayQuery } from "@polaris-app/places/src/lib/relay";
+import { talkCodecFor } from "@polaris-app/places/src/lib/talk";
+import { talkSupport } from "@polaris-app/places/src/lib/vendors";
 import { parseCameraInput } from "@polaris-app/places/src/lib/schemas";
 import { DEFAULT_DETECTION } from "@polaris-app/places/src/lib/detection";
 import { cameraModel, searchModels, vendorForModel } from "@polaris-app/places/src/lib/camera-models";
@@ -129,6 +132,38 @@ describe("Matter bridge signalling", () => {
         expect(signaling.cameraPath("/cameras/../1")).toBeNull();
         expect(signaling.commissionRefusal("passcode-mismatch")).toBe("passcode-mismatch");
         expect(signaling.commissionRefusal("weird")).toBe("failed");
+    });
+});
+
+describe("talking through any camera with a way back", () => {
+    it("reads the speaker codec off the relay connection, A-law first", () => {
+        expect(backchannelCodec(["video, recvonly, H264", "audio, recvonly, AAC/16000", "audio, sendonly, PCMU/8000, PCMA/8000"])).toBe("pcma");
+        expect(backchannelCodec(["audio, sendonly, PCMU/8000"])).toBe("pcmu");
+        expect(backchannelCodec(["audio, sendonly, OPUS/48000/2"])).toBe("opus");
+        expect(backchannelCodec(["audio, sendonly, MPEG4-GENERIC/16000"])).toBe("aac");
+        expect(backchannelCodec(["video, recvonly, H264", "audio, recvonly, PCMA/8000"])).toBeNull();
+        expect(backchannelCodec([])).toBeNull();
+    });
+
+    it("offers Talk on a Tapo always, on other makes only with a backchannel", () => {
+        expect(talkSupport("tapo-cloud")).not.toBe("no");
+        expect(talkSupport("reolink")).toBe("probe");
+        expect(talkSupport("matter")).toBe("probe");
+        expect(talkCodecFor("probe", ["audio, sendonly, PCMU/8000"])).toBe("pcmu");
+        expect(talkCodecFor("probe", ["audio, recvonly, PCMU/8000"])).toBeNull();
+        expect(talkCodecFor("rtsp", [])).toBeNull();
+        expect(talkCodecFor("yes", [])).toBe("pcma");
+        expect(talkCodecFor("no", ["audio, sendonly, PCMA/8000"])).toBeNull();
+    });
+
+    it("sends A-law straight and transcodes for any other speaker", () => {
+        const direct = new URLSearchParams(talkPlayQuery("cam", true)).get("src") ?? "";
+        expect(direct.startsWith("rtsp://127.0.0.1:8554/")).toBe(true);
+        expect(direct.endsWith("?audio=pcma")).toBe(true);
+        const opus = new URLSearchParams(talkPlayQuery("cam", true, "opus")).get("src") ?? "";
+        expect(opus.startsWith("ffmpeg:rtsp://127.0.0.1:8554/")).toBe(true);
+        expect(opus.endsWith("#audio=opus")).toBe(true);
+        expect(new URLSearchParams(talkPlayQuery("cam", false, "opus")).get("src")).toBe("");
     });
 });
 

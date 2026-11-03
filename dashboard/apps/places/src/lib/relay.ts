@@ -774,19 +774,83 @@ export function pushTalk(
     });
 }
 
+/** The codecs a camera's speaker can be sent in, as the relay can produce them. */
+export type TalkCodec = "pcma" | "pcmu" | "opus" | "aac";
+
+const BACKCHANNEL_CODECS: ReadonlyArray<readonly [string, TalkCodec]> = [
+    ["PCMA", "pcma"],
+    ["PCMU", "pcmu"],
+    ["OPUS", "opus"],
+    ["MPEG4-GENERIC", "aac"]
+];
+
+/**
+ * The codec a camera's speaker takes, read off the relay's connection to it,
+ * or null when that connection has no way back.
+ *
+ * go2rtc lists each media of a source as `kind, direction, codec...`
+ * (pkg/core/media.go, v1.9.15), and a way back to the camera - an RTSP
+ * backchannel (ONVIF Profile T, Reolink, Hikvision, Dahua), a Tapo, a DVRIP or
+ * ISAPI camera, a Matter camera's WebRTC audio - is an audio media it sends on.
+ * A-law first: it is what the talk stream already carries, so it needs no
+ * transcoding. Exported for its test.
+ */
+export function backchannelCodec(medias: readonly unknown[]): TalkCodec | null {
+    const offered = medias
+        .filter((media): media is string => typeof media === "string")
+        .filter((media) => /^audio,\s*sendonly\b/i.test(media))
+        .flatMap((media) =>
+            media
+                .split(",")
+                .slice(2)
+                .map((codec) => codec.trim().split("/")[0]?.toUpperCase() ?? "")
+        );
+    for (const [name, codec] of BACKCHANNEL_CODECS) if (offered.includes(name)) return codec;
+    return null;
+}
+
+/** Every media the relay's current connection to a camera's good stream lists.
+ *  Empty when nothing is connected to it. */
+export async function cameraMedias(endpoint: RelayEndpoint, cameraId: string): Promise<string[]> {
+    const query = new URLSearchParams({ src: streamName(cameraId, "main") });
+    const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, {
+        timeoutMs: 3000
+    }).catch(() => null);
+    if (!response?.ok) return [];
+    const body = (await response.json().catch(() => null)) as {
+        producers?: Array<{ medias?: unknown }>;
+    } | null;
+    return (body?.producers ?? []).flatMap((producer) =>
+        Array.isArray(producer.medias)
+            ? producer.medias.filter((media): media is string => typeof media === "string")
+            : []
+    );
+}
+
 /** The query that points a camera's speaker at its talk stream, or, with an
- *  empty source, stops it. Exported for its test. */
-export function talkPlayQuery(cameraId: string, playing: boolean): string {
+ *  empty source, stops it. A speaker that takes anything but A-law gets the talk
+ *  stream through the relay's own transcoder. Exported for its test. */
+export function talkPlayQuery(
+    cameraId: string,
+    playing: boolean,
+    codec: TalkCodec = "pcma"
+): string {
+    const talk = `${RELAY_LOOPBACK_RTSP}/${talkStreamName(cameraId)}`;
+    const source = codec === "pcma" ? `${talk}?audio=pcma` : `ffmpeg:${talk}#audio=${codec}`;
     return new URLSearchParams({
         dst: streamName(cameraId, "main"),
-        src: playing ? `${RELAY_LOOPBACK_RTSP}/${talkStreamName(cameraId)}?audio=pcma` : ""
+        src: playing ? source : ""
     }).toString();
 }
 
 /** Play the talk stream on the camera's speaker. False when the relay refused,
  *  which is also what it does when the push has not reached it yet. */
-export async function playTalk(endpoint: RelayEndpoint, cameraId: string): Promise<boolean> {
-    const response = await relayFetch(endpoint, `/api/streams?${talkPlayQuery(cameraId, true)}`, {
+export async function playTalk(
+    endpoint: RelayEndpoint,
+    cameraId: string,
+    codec: TalkCodec = "pcma"
+): Promise<boolean> {
+    const response = await relayFetch(endpoint, `/api/streams?${talkPlayQuery(cameraId, true, codec)}`, {
         method: "POST",
         timeoutMs: 8000
     }).catch(() => null);

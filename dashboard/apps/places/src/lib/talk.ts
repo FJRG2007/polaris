@@ -13,8 +13,10 @@
  * nobody has fed for a few seconds is ended, so a closed tab or a dropped
  * connection does not leave the camera's speaker held.
  *
- * Only a Tapo reached over its own protocol has a way in to its speaker; one
- * reached over RTSP has none.
+ * Any camera whose relay connection has a way back can be talked through: a
+ * Tapo over its own protocol, an RTSP or ONVIF camera with a backchannel, a
+ * Matter camera that states a speaker. The relay is what knows, so it is asked
+ * (`backchannelCodec`), and the voice is sent in the codec the speaker takes.
  *
  * Server-only.
  */
@@ -22,7 +24,9 @@
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { HomeError } from "./home-error";
-import { talkSupport } from "./vendors";
+import { talkSupport, type TalkSupport } from "./vendors";
+import { MATTER_VENDOR } from "./matter-code";
+import { matterBridge, matterCanTalk } from "./matter-bridge";
 import { refreshHomeService } from "./side-upgrade";
 import { encodeAlaw, liveWavHeader, TALK_RATE } from "./talk-audio";
 import {
@@ -34,7 +38,10 @@ import {
     relayServerFor,
     relayService,
     talkReadiness,
-    type RelayEndpoint
+    backchannelCodec,
+    cameraMedias,
+    type RelayEndpoint,
+    type TalkCodec
 } from "./relay";
 
 /** A talk nobody has fed for this long is over. */
@@ -64,6 +71,7 @@ interface Talk {
     readonly cameraId: string;
     readonly userId: string;
     readonly endpoint: RelayEndpoint;
+    readonly codec: TalkCodec;
     readonly write: ReadableStreamDefaultController<Uint8Array>;
     readonly abort: AbortController;
     readonly startedAt: number;
@@ -100,19 +108,48 @@ function wait(ms: number): Promise<void> {
 async function talkTarget(
     installedAppId: string,
     cameraId: string
-): Promise<{ endpoint: RelayEndpoint; serverId: string }> {
+): Promise<{ endpoint: RelayEndpoint; serverId: string; codec: TalkCodec }> {
     const camera = await prisma.camera.findFirst({
         where: { id: cameraId, installedAppId },
-        select: { vendor: true, reachVia: true, enabled: true, privacy: true }
+        select: { vendor: true, reachVia: true, enabled: true, privacy: true, mainPath: true }
     });
     if (!camera) throw new HomeError("Camera not found");
-    if (talkSupport(camera.vendor) !== "yes") throw new HomeError(CANNOT_TALK);
+    const support = talkSupport(camera.vendor);
+    if (support === "no") throw new HomeError(CANNOT_TALK);
     if (!camera.enabled) throw new HomeError("This camera is switched off");
     if (camera.privacy) throw new HomeError("This camera is private");
     const serverId = relayServerFor(camera.reachVia);
     const endpoint = await relayEndpoint(serverId);
     if (!endpoint) throw new HomeError("The camera relay is still starting");
-    return { endpoint, serverId };
+    const codec = talkCodecFor(support, await cameraMedias(endpoint, cameraId));
+    if (!codec) throw new HomeError(CANNOT_TALK);
+    if (camera.vendor === MATTER_VENDOR) {
+        // A Matter camera's offer always has a way back; whether anything plays
+        // it is the camera's own statement (Speaker, half or full duplex).
+        const bridge = await matterBridge(serverId);
+        if (!bridge || !(await matterCanTalk(bridge, camera.mainPath ?? "")))
+            throw new HomeError(CANNOT_TALK);
+    }
+    return { endpoint, serverId, codec };
+}
+
+/**
+ * The codec a talk is sent in, or null when the camera has no way back. A Tapo
+ * over its own protocol always takes A-law; every other make only as its relay
+ * connection says. Exported for its test.
+ */
+export function talkCodecFor(support: TalkSupport, medias: readonly unknown[]): TalkCodec | null {
+    if (support === "no") return null;
+    return backchannelCodec(medias) ?? (support === "yes" ? "pcma" : null);
+}
+
+/** Whether the Talk button belongs on this camera now. Never throws: a camera
+ *  that cannot be asked cannot be talked through either. */
+export async function talkAvailable(installedAppId: string, cameraId: string): Promise<boolean> {
+    return talkTarget(installedAppId, cameraId).then(
+        () => true,
+        () => false
+    );
 }
 
 /** A relay that cannot take a voice yet is brought up to date, once, and the
@@ -174,7 +211,7 @@ export async function startTalk(
     starts.set(cameraId, starting);
     try {
         if (current) await finish(current);
-        const { endpoint, serverId } = await talkTarget(installedAppId, cameraId);
+        const { endpoint, serverId, codec } = await talkTarget(installedAppId, cameraId);
         await assertReady(endpoint, serverId);
         await prepareTalk(endpoint, cameraId);
         if (starting.cancelled) throw new HomeError(NOT_TALKING);
@@ -192,6 +229,7 @@ export async function startTalk(
             cameraId,
             userId,
             endpoint,
+            codec,
             write,
             abort: new AbortController(),
             startedAt: Date.now(),
@@ -208,10 +246,10 @@ export async function startTalk(
         );
 
         await wait(PLAY_SETTLE_MS);
-        let playing = !talk.ended && (await playTalk(endpoint, cameraId));
+        let playing = !talk.ended && (await playTalk(endpoint, cameraId, codec));
         if (!playing && !talk.ended) {
             await wait(PLAY_RETRY_MS);
-            playing = !talk.ended && (await playTalk(endpoint, cameraId));
+            playing = !talk.ended && (await playTalk(endpoint, cameraId, codec));
         }
         if (!playing || starting.cancelled) {
             await finish(talk);
