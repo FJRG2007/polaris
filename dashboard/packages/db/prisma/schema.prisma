@@ -11228,16 +11228,10 @@ model PlaceFloor {
     @@index([installedAppId])
 }
 
-// A room at a place, which devices can be put in.
-//
-// The floor it is on is a `PlaceFloor`; `floor` keeps that floor's name beside
-// it, as every room carried before floors were rows of their own, so a build
-// that reads only the name still reads the right one. Deleting a room leaves
-// its devices at the place, in no room.
 /// A name a place's devices can carry across rooms - "Ceiling", "Night lights",
 /// "Window side" - so an automation can name part of a room, or the same kind
-/// of thing in several, the way a room names all of one. A device carries any
-/// number of them; deleting one leaves its devices where they are.
+/// of thing in several, the way a room names all of one. A device carries up
+/// to 20 of them; deleting one leaves its devices where they are.
 model PlaceLabel {
     id             String @id @default(uuid(7)) @db.Uuid
     // The Home install this belongs to, per the InstalledApp precedent of not
@@ -11270,6 +11264,12 @@ model PlaceDeviceLabel {
     @@index([labelId])
 }
 
+// A room at a place, which devices can be put in.
+//
+// The floor it is on is a `PlaceFloor`; `floor` keeps that floor's name beside
+// it, as every room carried before floors were rows of their own, so a build
+// that reads only the name still reads the right one. Deleting a room leaves
+// its devices at the place, in no room.
 model PlaceRoom {
     id             String  @id @default(uuid(7)) @db.Uuid
     // The Home install this belongs to, per the InstalledApp precedent of not

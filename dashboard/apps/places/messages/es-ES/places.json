@@ -1975,7 +1975,8 @@
         "renameLabel": "Renombrar {label}",
         "saveLabelName": "Guardar el nombre de {label}",
         "deleteLabel": "Eliminar {label}",
-        "confirmDeleteLabel": "Eliminar en todo"
+        "confirmDeleteLabel": "Eliminar en todo",
+        "deleteLabelUsed": "{count, plural, one {# automatización la usa y dejará de actuar sobre ella.} other {# automatizaciones la usan y dejarán de actuar sobre ella.}}"
     },
     "connect": {
         "reconnectTitle": "Reconectar {name}",

@@ -77,6 +77,7 @@ export function DeviceLabelsField({
     const [editing, setEditing] = useState(false);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const [uses, setUses] = useState<Record<string, number>>({});
     const typed = making.trim();
     const issueRaw = typed
         ? (labelInputSchema.shape.name.safeParse(typed).error?.issues[0]?.message ?? null)
@@ -88,6 +89,20 @@ export function DeviceLabelsField({
         .filter((label): label is LabelView => label !== undefined);
     const free = list.filter((label) => !value.includes(label.id));
     const full = value.length >= PER_DEVICE;
+
+    useEffect(() => {
+        if (!editing || !placeId) return;
+        let current = true;
+        void actions.placeUsesAction(placeId).then(
+            (result) => {
+                if (current) setUses(result.uses ?? {});
+            },
+            () => undefined
+        );
+        return () => {
+            current = false;
+        };
+    }, [editing, placeId]);
 
     const create = async () => {
         if (!typed || issue || busy) return;
@@ -215,6 +230,7 @@ export function DeviceLabelsField({
                             <LabelRow
                                 key={label.id}
                                 label={label}
+                                uses={uses[label.id] ?? 0}
                                 disabled={disabled}
                                 onRenamed={(renamed) =>
                                     setLabels((current) =>
@@ -241,11 +257,14 @@ export function DeviceLabelsField({
 /** One of the place's labels, renamed in place or removed after a second press. */
 function LabelRow({
     label,
+    uses,
     disabled,
     onRenamed,
     onDeleted
 }: {
     label: LabelView;
+    /** How many of the place's automations name this label. */
+    uses: number;
     disabled?: boolean;
     onRenamed: (label: LabelView) => void;
     onDeleted: () => void;
@@ -335,6 +354,11 @@ function LabelRow({
                     {sure && t("deviceDialog.confirmDeleteLabel")}
                 </Button>
             </div>
+            {sure && uses > 0 && (
+                <span role="status" className="text-xs text-warning">
+                    {t("deviceDialog.deleteLabelUsed", { count: uses })}
+                </span>
+            )}
             {issue && <span className="text-xs text-danger">{issue}</span>}
             {error && (
                 <span role="alert" className="text-xs text-danger">

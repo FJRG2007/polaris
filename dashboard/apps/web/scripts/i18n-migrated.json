@@ -288,6 +288,7 @@
         "places/src/screens/devices/climate-controls.tsx",
         "places/src/screens/devices/connect-dialog.tsx",
         "places/src/screens/devices/device-dialog.tsx",
+        "places/src/screens/devices/device-labels.tsx",
         "places/src/screens/devices/device-panel.tsx",
         "places/src/screens/devices/devices-view.tsx",
         "places/src/screens/devices/found-units.tsx",

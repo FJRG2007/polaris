@@ -422,7 +422,12 @@ export function PlaceTargetField<T extends AreaBlock>({
             );
         return t("automations.fields.placeGone");
     };
-    const options: SelectOption[] = [{ value: "", label: t("automations.fields.whereChosen") }, ...every];
+    const options: SelectOption[] = [
+        { value: "", label: t("automations.fields.whereChosen") },
+        ...every.filter(
+            (option) => !areas.slice(1).some((ref) => `${ref.kind}:${ref.id}` === option.value)
+        )
+    ];
     if (value && !options.some((option) => option.value === value)) {
         options.push({ value, label: t("automations.fields.placeGone"), disabled: true });
     }
@@ -441,13 +446,17 @@ export function PlaceTargetField<T extends AreaBlock>({
             exclude: _exclude,
             ...rest
         } = block;
-        if (nextAreas.length === 0) {
+        const distinct = nextAreas.filter(
+            (ref, index) =>
+                nextAreas.findIndex((other) => other.kind === ref.kind && other.id === ref.id) === index
+        );
+        if (distinct.length === 0) {
             onChange(rest as unknown as T);
             return;
         }
         onChange({
             ...rest,
-            targets: [...nextAreas, ...devicesNamed],
+            targets: [...distinct, ...devicesNamed],
             ...(only && only.length > 0 ? { only } : {}),
             ...(exclude && exclude.length > 0 ? { exclude } : {}),
             ...(counted && role ? { [field]: counted } : {})

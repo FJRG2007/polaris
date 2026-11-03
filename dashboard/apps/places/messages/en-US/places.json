@@ -1975,7 +1975,8 @@
         "renameLabel": "Rename {label}",
         "saveLabelName": "Save the name of {label}",
         "deleteLabel": "Delete {label}",
-        "confirmDeleteLabel": "Delete everywhere"
+        "confirmDeleteLabel": "Delete everywhere",
+        "deleteLabelUsed": "{count, plural, one {# automation names it and will stop acting on it.} other {# automations name it and will stop acting on it.}}"
     },
     "connect": {
         "reconnectTitle": "Reconnect {name}",

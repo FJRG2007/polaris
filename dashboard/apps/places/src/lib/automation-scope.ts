@@ -21,11 +21,13 @@ export async function targetScope(installedAppId: string, placeId: string): Prom
                 roomId: true,
                 labels: { select: { labelId: true } }
             },
+            orderBy: { id: "asc" },
             take: 1000
         }),
         prisma.placeRoom.findMany({
             where: { installedAppId, placeId },
             select: { id: true, floorId: true },
+            orderBy: { id: "asc" },
             take: 500
         })
     ]);
