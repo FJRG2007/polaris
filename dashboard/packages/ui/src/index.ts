@@ -119,6 +119,19 @@ export {
     type SearchableSelectOption,
     type SearchableSelectProps
 } from "./components/searchable-select";
+export {
+    AsyncSelect,
+    AsyncMultiSelect,
+    type AsyncFixedOption,
+    type AsyncSelectProps,
+    type AsyncMultiSelectProps
+} from "./components/async-select";
+export {
+    useAsyncOptions,
+    dropAsyncOptions,
+    type AsyncLoad,
+    type AsyncPage
+} from "./lib/use-async-options";
 export { SegmentedControl, type SegmentedOption } from "./components/segmented-control";
 export {
     MultiSeriesChart,
