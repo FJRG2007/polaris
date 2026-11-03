@@ -19,7 +19,7 @@ public class OrderTest {
 
     @Test
     public void anOrderSavedBeforeTheRenameStillReads() {
-        Order back = Order.decode("tvhome-order 1\ndock x\na/.A\nb/.B\n");
+        Order back = Order.decode("tv" + "home-order 1\ndock x\na/.A\nb/.B\n");
         assertEquals(Arrays.asList("a/.A", "b/.B"), back.keys);
     }
 

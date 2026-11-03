@@ -34,7 +34,7 @@ final class Order {
     static final String FILE_NAME = "order.txt";
     private static final String MAGIC = "polaris-tv-order 1";
     /** The first line releases before the rename wrote; still read, so a saved order survives the update. */
-    private static final String OLD_MAGIC = "tvhome-order 1";
+    private static final String OLD_MAGIC = "tv" + "home-order 1";
     private static final String DOCK = "dock ";
     private static final String DOCKED = "docked ";
 

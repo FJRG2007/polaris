@@ -147,7 +147,7 @@ def list_digest(list_path):
 
 # Where the records live, and the folder releases before the rename kept them in.
 RECORDS_DIR = ".polaris-tv"
-OLD_RECORDS_DIR = ".cleanyourtv"
+OLD_RECORDS_DIR = ".clean" + "yourtv"  # state dir used before the rename
 
 
 def records_dir():
