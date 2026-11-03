@@ -230,7 +230,7 @@
         "emptyTitle": "Aún no hay glosarios",
         "emptyHint": "Un glosario fija cómo sale un término, como el nombre de un producto o una frase de tu equipo.",
         "retry": "Reintentar",
-        "default": "Predeterminado",
+        "default": "Principal",
         "pair": "{from} a {to}",
         "count": "{count, plural, one {# término} other {# términos}}",
         "edit": "Editar glosario",
@@ -252,11 +252,11 @@
         "import": "Importar CSV",
         "imported": "{count, plural, one {# término importado} other {# términos importados}}",
         "importSkipped": "{count, plural, one {Se omitió # fila: estaba vacía o era muy larga.} other {Se omitieron # filas: estaban vacías o eran muy largas.}}",
-        "filter": "Buscar un término",
+        "filter": "Buscar término",
         "source": "Término",
         "target": "Se traduce como",
         "removeTerm": "Quitar término",
-        "addTerm": "Añadir término",
+        "addTerm": "Añadir",
         "errors": {
             "loadFailed": "No se pudieron cargar tus glosarios.",
             "saveFailed": "No se pudo guardar el glosario.",
@@ -266,6 +266,23 @@
             "samePair": "Elige dos idiomas distintos.",
             "importEmpty": "Ese archivo no tiene términos. Cada línea necesita un término y su traducción, separados por coma.",
             "keepInvalid": "Cada palabra con menos de 200 caracteres, y no más de {max}."
+        }
+    },
+    "keyboard": {
+        "shift": "Mayús",
+        "alt": "Símbolos",
+        "backspace": "Borrar",
+        "space": "Espacio",
+        "layout": "Tipo de teclado",
+        "layouts": {
+            "latin": "Latino con tildes",
+            "cyrillic": "Cirílico",
+            "greek": "Griego",
+            "arabic": "Árabe",
+            "hebrew": "Hebreo",
+            "devanagari": "Devanagari (hindi)",
+            "kana": "Kana japonés",
+            "hangul": "Coreano"
         }
     }
 }

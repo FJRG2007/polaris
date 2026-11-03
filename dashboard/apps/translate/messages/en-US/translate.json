@@ -267,5 +267,22 @@
             "importEmpty": "That file has no terms. Each line needs a term and its translation, separated by a comma.",
             "keepInvalid": "Keep each word under 200 characters, and no more than {max} of them."
         }
+    },
+    "keyboard": {
+        "shift": "Shift",
+        "alt": "Symbols",
+        "backspace": "Delete",
+        "space": "Space",
+        "layout": "Keyboard layout",
+        "layouts": {
+            "latin": "Accented Latin",
+            "cyrillic": "Cyrillic",
+            "greek": "Greek",
+            "arabic": "Arabic",
+            "hebrew": "Hebrew",
+            "devanagari": "Devanagari (Hindi)",
+            "kana": "Japanese kana",
+            "hangul": "Korean"
+        }
     }
 }

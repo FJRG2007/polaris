@@ -14,13 +14,7 @@ import { IMAGE_MAX_BYTES, sniffImage } from "../model/media";
 import { Button, CopyButton, SegmentedControl, Skeleton, cn } from "@polaris/ui";
 import { isRightToLeft } from "../model/languages";
 import { TranslatedPicture } from "./translated-picture";
-import {
-    ReadsNotice,
-    hasLocalReader,
-    readImageText,
-    type ImageLine,
-    type Reads
-} from "./reads";
+import { ReadsNotice, hasLocalReader, readImageText, type ImageLine, type Reads } from "./reads";
 import { hostUi } from "@polaris/app-host/client";
 
 const { useChooseFiles } = hostUi.filePicker;
@@ -227,7 +221,10 @@ export function ImageMode({
                             <summary className="cursor-pointer text-xs text-muted-foreground">
                                 {t("image.original")}
                             </summary>
-                            <p dir="auto" className="whitespace-pre-wrap py-1 [overflow-wrap:anywhere]">
+                            <p
+                                dir="auto"
+                                className="whitespace-pre-wrap py-1 [overflow-wrap:anywhere]"
+                            >
                                 {original}
                             </p>
                         </details>

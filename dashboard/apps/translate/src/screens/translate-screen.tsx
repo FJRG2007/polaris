@@ -48,7 +48,10 @@ import {
     Select,
     Skeleton,
     Textarea,
+    VirtualKeyboard,
     cn,
+    layoutForLanguage,
+    type KeyboardLayoutId,
     useToast,
     type SearchableSelectOption
 } from "@polaris/ui";
@@ -174,6 +177,9 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const { termsFor } = useGlossaries();
     // What the last translation applied: a glossary's name, the keep list, or nothing.
     const [termsUsed, setTermsUsed] = useState<string | null>(null);
+    const sourceField = useRef<HTMLTextAreaElement | null>(null);
+    // The on-screen keyboard follows the source language until another layout is picked.
+    const [layoutPicked, setLayoutPicked] = useState<KeyboardLayoutId | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [download, setDownload] = useState<number | null>(null);
@@ -413,6 +419,30 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     };
 
     const swapFrom = from === AUTO ? detected : from;
+
+    useEffect(() => setLayoutPicked(null), [from]);
+    const keyboardLabels = useMemo(
+        () => ({
+            open: t("input.keyboard"),
+            close: t("input.keyboardClose"),
+            shift: t("keyboard.shift"),
+            alt: t("keyboard.alt"),
+            backspace: t("keyboard.backspace"),
+            space: t("keyboard.space"),
+            layout: t("keyboard.layout"),
+            layouts: {
+                latin: t("keyboard.layouts.latin"),
+                cyrillic: t("keyboard.layouts.cyrillic"),
+                greek: t("keyboard.layouts.greek"),
+                arabic: t("keyboard.layouts.arabic"),
+                hebrew: t("keyboard.layouts.hebrew"),
+                devanagari: t("keyboard.layouts.devanagari"),
+                kana: t("keyboard.layouts.kana"),
+                hangul: t("keyboard.layouts.hangul")
+            }
+        }),
+        [t]
+    );
     const swap = () => {
         if (!swapFrom) return;
         const nextFrom = targetLanguage as SourceLanguage;
@@ -851,6 +881,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 ) : null}
                 <section className="flex min-w-0 flex-col rounded-lg border border-border bg-card">
                     <Textarea
+                        ref={sourceField}
                         aria-label={t("pane.source")}
                         placeholder={t("pane.placeholder")}
                         value={source}
@@ -880,6 +911,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         >
                             <Paperclip className="size-4 shrink-0" aria-hidden />
                         </Button>
+                        <VirtualKeyboard
+                            target={sourceField}
+                            layout={
+                                layoutPicked ?? layoutForLanguage(from === AUTO ? detected : from)
+                            }
+                            onLayoutChange={setLayoutPicked}
+                            labels={keyboardLabels}
+                        />
                         <Button
                             variant={dictating ? "secondary" : "ghost"}
                             size="icon"
