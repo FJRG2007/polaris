@@ -1,0 +1,91 @@
+{
+    "title": "Translate",
+    "description": "Type or paste text and read it in another language.",
+    "pane": {
+        "source": "Text to translate",
+        "target": "Translation",
+        "placeholder": "Type or paste text",
+        "empty": "The translation shows up here",
+        "count": "{count} / {max}"
+    },
+    "actions": {
+        "detect": "Detect language",
+        "swap": "Swap languages",
+        "copy": "Copy translation",
+        "listen": "Listen",
+        "stop": "Stop",
+        "clear": "Clear text",
+        "settings": "Settings"
+    },
+    "lang": {
+        "auto": "Detect language",
+        "detected": "{language} (detected)",
+        "search": "Search languages",
+        "none": "No language matches",
+        "from": "Translate from",
+        "to": "Translate into"
+    },
+    "engine": {
+        "label": "Engine",
+        "automatic": "Automatic",
+        "browser": "In your browser",
+        "polar": "Polar's model",
+        "deepl": "DeepL",
+        "google": "Google Cloud",
+        "answeredBy": "Translated by {engine}",
+        "translating": "Translating...",
+        "downloading": "Downloading the language model, {percent}%"
+    },
+    "none": {
+        "title": "No translation engine is available",
+        "manager": "Add a DeepL or Google Cloud key, or set up a model for Polar. Translation in the browser needs desktop Chrome.",
+        "reader": "Ask an administrator to add a DeepL or Google Cloud key, or to set up Polar. Translation in the browser needs desktop Chrome.",
+        "addDeepl": "Add a DeepL key",
+        "addGoogle": "Add a Google key",
+        "polar": "Set up Polar"
+    },
+    "history": {
+        "title": "History",
+        "empty": "Your translations show up here.",
+        "clear": "Clear history",
+        "clearTitle": "Clear your history?",
+        "clearQuestion": "Every translation in your history is removed. This cannot be undone.",
+        "delete": "Remove from history",
+        "open": "Open this translation",
+        "kind": "history"
+    },
+    "settings": {
+        "title": "Translate settings",
+        "description": "Which engines answer here, and the language a translation goes into by default.",
+        "engines": "Engines",
+        "browserHint": "Free, on the reader's device. Desktop Chrome only.",
+        "polarHint": "Uses Polar's model and counts toward its limits.",
+        "deeplHint": "Needs a DeepL key on the Integrations screen.",
+        "googleHint": "Needs a Google Cloud key on the Integrations screen.",
+        "target": "Default language",
+        "save": "Save",
+        "cancel": "Cancel",
+        "saved": "Settings saved",
+        "keys": "Manage keys"
+    },
+    "errors": {
+        "generic": "Something went wrong. Try again.",
+        "invalid": "That request is not valid.",
+        "adminOnly": "Only an administrator can change these settings.",
+        "noEngine": "No translation engine can answer. Add a DeepL or Google Cloud key, or set up Polar.",
+        "noEngineReader": "No translation engine is set up yet. The administrators look after that.",
+        "engineUnavailable": "That engine cannot answer right now.",
+        "limit": "You reached Polar's usage limit for now.",
+        "paused": "That provider is paused after a failure and is tried again shortly.",
+        "pausedReader": "That engine is paused for now. Try again later.",
+        "failed": "The translation did not come back. Try again.",
+        "rate": "Too many translations in a minute. Wait a moment.",
+        "tooLong": "That text is too long to translate at once.",
+        "detectFailed": "The language could not be detected.",
+        "historyFailed": "Your history could not be loaded.",
+        "deleteFailed": "That could not be removed.",
+        "saveFailed": "The settings could not be saved.",
+        "statusFailed": "The engines could not be checked. Translation in the browser still works.",
+        "forbidden": "Your role does not include Translate."
+    }
+}

@@ -131,6 +131,10 @@
             "summary": "Public pages that show whether your services are up.",
             "description": "Publish a page that shows whether your services are up, with 90 days of uptime from HTTP, TCP, DNS and latency checks Polaris runs itself. Post incidents as they unfold and schedule maintenance ahead. Point checks at your own deployed apps or any address. Uninstalling stops the checks and keeps every page."
         },
+        "translate": {
+            "summary": "Translate text between languages, in the browser or with your own keys.",
+            "description": "Type or paste text and read it in another language as you write, with the language detected for you. Translation runs in the browser where it can, on Polar's model, or on DeepL and Google Cloud with your own keys, and the screen always says which one answered. Your recent translations are kept for you alone. Uninstalling keeps nothing running."
+        },
         "crm": {
             "summary": "Companies, people and the deals you are working, in one pipeline.",
             "description": "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back."

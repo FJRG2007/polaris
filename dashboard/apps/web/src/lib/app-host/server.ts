@@ -170,6 +170,7 @@ const load = {
     settingStore: once(() => import("@/lib/setting-store")),
     storageHold: once(() => import("@/lib/storage-moves/hold")),
     storageTarget: once(() => import("@/lib/storage-target")),
+    translateEngines: once(() => import("@/lib/translate/server-engines")),
     wafService: once(() => import("@/lib/waf-service"))
 };
 
@@ -578,6 +579,13 @@ export const serverHost = {
         placeFile: later(load.storageTarget, "placeFile"),
         safeName: later(load.storageTarget, "safeName"),
         storageTargetOptions: later(load.storageTarget, "storageTargetOptions")
+    },
+    // The Translate app's server engines: Polar's model and the paid
+    // providers, whose keys never reach the app.
+    translateEngines: {
+        serverDetect: later(load.translateEngines, "serverDetect"),
+        serverEngineStatus: later(load.translateEngines, "serverEngineStatus"),
+        serverTranslate: later(load.translateEngines, "serverTranslate")
     },
     wafService: {
         resolveWaf: later(load.wafService, "resolveWaf")

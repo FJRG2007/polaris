@@ -15,15 +15,27 @@
  * afternoon, not the provider's limit.
  */
 
-export const BUDGETED_PROVIDERS = ["virustotal", "dymo", "criminalip"] as const;
+export const BUDGETED_PROVIDERS = [
+    "virustotal",
+    "dymo",
+    "criminalip",
+    "deepl",
+    "google-translate"
+] as const;
 export type BudgetedProvider = (typeof BUDGETED_PROVIDERS)[number];
 
 export const LOOKUP_BUDGET: Readonly<
-    Record<BudgetedProvider, { perMinute: number; perDay: number }>
+    Record<BudgetedProvider, { perMinute: number; perDay: number; charsPerDay?: number }>
 > = {
     virustotal: { perMinute: 4, perDay: 500 },
     dymo: { perMinute: 30, perDay: 2000 },
-    criminalip: { perMinute: 30, perDay: 2000 }
+    criminalip: { perMinute: 30, perDay: 2000 },
+    // Translation is asked by people typing, a request per pause, so the day
+    // allows far more of them. Billed per character by the provider, so the day
+    // also holds a ceiling on characters sent; both are Polaris's own guard
+    // against a loop or one busy reader, not the account's quota.
+    deepl: { perMinute: 120, perDay: 10000, charsPerDay: 1_000_000 },
+    "google-translate": { perMinute: 120, perDay: 10000, charsPerDay: 1_000_000 }
 };
 
 const MINUTE_MS = 60 * 1000;

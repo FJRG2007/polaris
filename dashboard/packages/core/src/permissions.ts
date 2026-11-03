@@ -26,6 +26,7 @@ export const PERMISSIONS = [
     "mailserver.manage",
     "calendar.use",
     "crm.use",
+    "translate.use",
     "automations.use",
     "automations.secrets",
     "status.manage",
@@ -120,6 +121,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "mail.use",
         "calendar.use",
         "crm.use",
+        "translate.use",
         "automations.use",
         "automations.secrets",
         "chat.use",
@@ -177,6 +179,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // What an organization's CRM lets somebody do is the organization's
         // roles, never this.
         "crm.use",
+        "translate.use",
         "automations.use",
         "chat.use",
         "chat.spaces",
@@ -243,6 +246,9 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // Opening the CRM at all. A personal CRM is reached by this alone; an
     // organization's records are governed by that organization's roles.
     "crm.use": { area: "CRM", label: "Keep companies, people and deals" },
+    // Opening Translate and its API. Paid engines spend the owner's keys, so a
+    // role can be kept off it.
+    "translate.use": { area: "Translate", label: "Translate text" },
     // An automation acts as whoever published it and is re-checked on every run,
     // so this grants nothing the account could not already do by hand.
     "automations.use": { area: "Automations", label: "Make automations that act for you" },

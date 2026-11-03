@@ -125,6 +125,8 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     discord: brand.DiscordMark,
     spotify: brand.SpotifyMark,
     lastfm: brand.LastfmMark,
+    deepl: brand.DeepLMark,
+    "google-translate": brand.GoogleTranslateMark,
     cloudflare: brand.CloudflareMark,
     ngrok: brand.NgrokMark,
     tailscale: brand.TailscaleMark,

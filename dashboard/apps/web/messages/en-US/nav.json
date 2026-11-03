@@ -163,6 +163,9 @@
         "status-pages": {
             "description": "Public pages that show whether your services are up"
         },
+        "translate": {
+            "description": "Translate text between languages"
+        },
         "automations": {
             "description": "When something happens, do something, across your apps"
         },
@@ -402,7 +405,8 @@
         "Router setup": "Router setup",
         "Connect": "Connect",
         "Join a network": "Join a network",
-        "Network devices": "Network devices"
+        "Network devices": "Network devices",
+        "Translate": "Translate"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

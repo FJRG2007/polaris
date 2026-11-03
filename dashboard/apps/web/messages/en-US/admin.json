@@ -2002,6 +2002,10 @@
             "switch": "Show what people scrobble",
             "hint": "Lets everybody type their Last.fm username under Connected accounts and shows their song beside their name."
         },
+        "translation": {
+            "switch": "Use it in Translate",
+            "hint": "Off, Translate stops offering this service and keeps the key."
+        },
         "tailscale": {
             "switch": "Sign in with this key",
             "hint": "Off, remote access signs in with a link you open instead."
@@ -2166,6 +2170,10 @@
             "chat": {
                 "name": "Chat",
                 "hint": "What conversations and calls here can reach."
+            },
+            "translation": {
+                "name": "Translation",
+                "hint": "The services the Translate app can send text to."
             }
         },
         "catalog": {
@@ -2462,6 +2470,28 @@
                 "links": {
                     "0": {
                         "label": "Get your token"
+                    }
+                }
+            },
+            "deepl": {
+                "summary": "Translate text with DeepL.",
+                "description": "Lets the Translate app send text to DeepL with your key. Free and Pro keys both work. The key stays on this server; usage is billed by DeepL.",
+                "apiKeyLabel": "Authentication key",
+                "apiKeyHelp": "From your DeepL account -> API keys. A key ending in :fx is a Free key.",
+                "links": {
+                    "0": {
+                        "label": "Get your API key"
+                    }
+                }
+            },
+            "googleTranslate": {
+                "summary": "Translate text with Google Cloud Translation.",
+                "description": "Lets the Translate app send text to Google Cloud Translation with your API key. The key stays on this server; usage is billed by Google Cloud.",
+                "apiKeyLabel": "API key",
+                "apiKeyHelp": "Enable the Cloud Translation API on the project, then restrict the key to it.",
+                "links": {
+                    "0": {
+                        "label": "Create an API key"
                     }
                 }
             }
@@ -2870,7 +2900,8 @@
             "crm": "CRM",
             "automations": "Automations",
             "statusPages": "Status pages",
-            "games": "Games"
+            "games": "Games",
+            "translate": "Translate"
         },
         "permissions": {
             "drive": {
@@ -2972,6 +3003,9 @@
             "arcade": {
                 "open": "Open Games",
                 "calls": "Play games in calls"
+            },
+            "translate": {
+                "use": "Translate text"
             }
         }
     },

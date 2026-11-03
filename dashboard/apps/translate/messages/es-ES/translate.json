@@ -1,0 +1,91 @@
+{
+    "title": "Traductor",
+    "description": "Escribe o pega texto y léelo en otro idioma.",
+    "pane": {
+        "source": "Texto que traducir",
+        "target": "Traducción",
+        "placeholder": "Escribe o pega texto",
+        "empty": "La traducción aparece aquí",
+        "count": "{count} / {max}"
+    },
+    "actions": {
+        "detect": "Detectar idioma",
+        "swap": "Invertir idiomas",
+        "copy": "Copiar traducción",
+        "listen": "Escuchar",
+        "stop": "Parar",
+        "clear": "Borrar texto",
+        "settings": "Ajustes"
+    },
+    "lang": {
+        "auto": "Detectar idioma",
+        "detected": "{language} (detectado)",
+        "search": "Buscar idiomas",
+        "none": "Ningún idioma coincide",
+        "from": "Traducir de",
+        "to": "Traducir a"
+    },
+    "engine": {
+        "label": "Motor",
+        "automatic": "Automático",
+        "browser": "En tu navegador",
+        "polar": "Modelo de Polar",
+        "deepl": "DeepL",
+        "google": "Google Cloud",
+        "answeredBy": "Traducido con {engine}",
+        "translating": "Traduciendo...",
+        "downloading": "Descargando el modelo del idioma, {percent}%"
+    },
+    "none": {
+        "title": "No hay ningún motor de traducción",
+        "manager": "Añade una clave de DeepL o de Google Cloud, o configura un modelo para Polar. Traducir en el navegador requiere Chrome de escritorio.",
+        "reader": "Pide a un administrador que añada una clave de DeepL o de Google Cloud, o que configure Polar. Traducir en el navegador requiere Chrome de escritorio.",
+        "addDeepl": "Clave de DeepL",
+        "addGoogle": "Clave de Google",
+        "polar": "Activar Polar"
+    },
+    "history": {
+        "title": "Historial",
+        "empty": "Tus traducciones aparecen aquí.",
+        "clear": "Borrar historial",
+        "clearTitle": "¿Borrar tu historial?",
+        "clearQuestion": "Se quitan todas las traducciones de tu historial. No se puede deshacer.",
+        "delete": "Quitar del historial",
+        "open": "Abrir esta traducción",
+        "kind": "historial"
+    },
+    "settings": {
+        "title": "Ajustes del Traductor",
+        "description": "Qué motores responden aquí y a qué idioma se traduce por defecto.",
+        "engines": "Motores",
+        "browserHint": "Gratis, en el dispositivo de quien lee. Solo Chrome de escritorio.",
+        "polarHint": "Usa el modelo de Polar y cuenta para sus límites.",
+        "deeplHint": "Necesita una clave de DeepL en Integraciones.",
+        "googleHint": "Necesita una clave de Google Cloud en Integraciones.",
+        "target": "Idioma por defecto",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "saved": "Ajustes guardados",
+        "keys": "Ver claves"
+    },
+    "errors": {
+        "generic": "Algo ha fallado. Inténtalo de nuevo.",
+        "invalid": "Esa petición no es válida.",
+        "adminOnly": "Solo un administrador puede cambiar estos ajustes.",
+        "noEngine": "Ningún motor puede traducir. Añade una clave de DeepL o de Google Cloud, o configura Polar.",
+        "noEngineReader": "Aún no hay ningún motor de traducción. Los administradores se encargan de ello.",
+        "engineUnavailable": "Ese motor no puede responder ahora.",
+        "limit": "Has llegado al límite de uso de Polar por ahora.",
+        "paused": "Ese proveedor está en pausa tras un fallo y se reintenta en breve.",
+        "pausedReader": "Ese motor está en pausa por ahora. Vuelve a intentarlo más tarde.",
+        "failed": "La traducción no ha llegado. Inténtalo de nuevo.",
+        "rate": "Demasiadas traducciones en un minuto. Espera un momento.",
+        "tooLong": "Ese texto es demasiado largo para traducirlo de una vez.",
+        "detectFailed": "No se ha podido detectar el idioma.",
+        "historyFailed": "No se ha podido cargar tu historial.",
+        "deleteFailed": "No se ha podido quitar.",
+        "saveFailed": "No se han podido guardar los ajustes.",
+        "statusFailed": "No se han podido comprobar los motores. Traducir en el navegador sigue funcionando.",
+        "forbidden": "Tu rol no incluye el Traductor."
+    }
+}

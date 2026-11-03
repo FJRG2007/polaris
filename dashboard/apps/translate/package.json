@@ -1,0 +1,24 @@
+{
+    "name": "@polaris-app/translate",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Translate: text between languages, in the browser, on Polar's model or with DeepL and Google Cloud keys. An installable Polaris app.",
+    "polaris": {
+        "id": "translate",
+        "extension": "src/lib/translate-extension.ts#translateExtension"
+    },
+    "dependencies": {
+        "@polaris/app-host": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "@polaris/ui": "0.1.0",
+        "lucide-react": "0.469.0",
+        "zod": "3.25.76"
+    },
+    "peerDependencies": {
+        "next": "*",
+        "react": "^19",
+        "react-dom": "^19"
+    }
+}

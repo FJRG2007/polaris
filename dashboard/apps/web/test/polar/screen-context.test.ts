@@ -51,7 +51,8 @@ const bundles = [
     "game-servers",
     "places",
     "security-scans",
-    "status-pages"
+    "status-pages",
+    "translate"
 ]
     .flatMap((app) => routesUnder(join(WEB, "..", app, "src", "routes")))
     // Public pages of a bundle (a booking link, a status page, a lent door)

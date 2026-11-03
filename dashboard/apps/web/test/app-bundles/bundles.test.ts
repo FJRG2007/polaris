@@ -100,7 +100,8 @@ describe("app bundles", () => {
             "game-servers",
             "home",
             "security-scans",
-            "status-pages"
+            "status-pages",
+            "translate"
         ]);
     });
 

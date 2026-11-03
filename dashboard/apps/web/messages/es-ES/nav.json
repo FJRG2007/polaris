@@ -163,6 +163,9 @@
         "status-pages": {
             "description": "Páginas públicas que muestran si tus servicios funcionan"
         },
+        "translate": {
+            "description": "Traduce texto entre idiomas"
+        },
         "automations": {
             "description": "Cuando pase algo, haz algo, en todas tus apps"
         },
@@ -402,7 +405,8 @@
         "Router setup": "Router",
         "Connect": "Conectar",
         "Join a network": "Unirse a una red",
-        "Network devices": "Dispositivos de red"
+        "Network devices": "Dispositivos de red",
+        "Translate": "Traductor"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

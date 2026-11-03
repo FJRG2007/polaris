@@ -101,7 +101,8 @@
         "inbox_manage": "Responder y gestionar la bandeja",
         "users_manage": "Editar usuarios",
         "settings_manage": "Cambiar ajustes",
-        "system_manage": "Actualizar y operar el sistema"
+        "system_manage": "Actualizar y operar el sistema",
+        "translate_use": "Traducir texto"
     },
     "page": {
         "title": "Asistentes de IA",

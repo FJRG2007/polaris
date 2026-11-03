@@ -2002,6 +2002,10 @@
             "switch": "Mostrar lo que registra la gente",
             "hint": "Permite que cada persona escriba su usuario de Last.fm en Cuentas conectadas y muestra su canción junto a su nombre."
         },
+        "translation": {
+            "switch": "Usarla en Traductor",
+            "hint": "Si está apagado, Traductor deja de ofrecer este servicio y guarda la clave."
+        },
         "tailscale": {
             "switch": "Entrar con esta clave",
             "hint": "Si está apagado, el acceso remoto entra con un enlace que abres tú."
@@ -2166,6 +2170,10 @@
             "chat": {
                 "name": "Chat",
                 "hint": "A qué pueden llegar las conversaciones y las llamadas de aquí."
+            },
+            "translation": {
+                "name": "Traducción",
+                "hint": "Los servicios a los que la app Traductor puede enviar texto."
             }
         },
         "catalog": {
@@ -2462,6 +2470,28 @@
                 "links": {
                     "0": {
                         "label": "Obtener tu token"
+                    }
+                }
+            },
+            "deepl": {
+                "summary": "Traduce texto con DeepL.",
+                "description": "Permite que la app Traductor envíe texto a DeepL con tu clave. Sirven claves Free y Pro. La clave se queda en este servidor; DeepL factura el uso.",
+                "apiKeyLabel": "Clave de autenticación",
+                "apiKeyHelp": "En tu cuenta de DeepL -> Claves de API. Una clave que acaba en :fx es Free.",
+                "links": {
+                    "0": {
+                        "label": "Tu clave de API"
+                    }
+                }
+            },
+            "googleTranslate": {
+                "summary": "Traduce texto con Google Cloud Translation.",
+                "description": "Permite que la app Traductor envíe texto a Google Cloud Translation con tu clave de API. La clave se queda en este servidor; Google Cloud factura el uso.",
+                "apiKeyLabel": "Clave API",
+                "apiKeyHelp": "Activa la API Cloud Translation en el proyecto y limita la clave a ella.",
+                "links": {
+                    "0": {
+                        "label": "Crea una clave de API"
                     }
                 }
             }
@@ -2870,7 +2900,8 @@
             "crm": "CRM",
             "automations": "Automatizaciones",
             "statusPages": "Estado público",
-            "games": "Juegos"
+            "games": "Juegos",
+            "translate": "Traductor"
         },
         "permissions": {
             "drive": {
@@ -2972,6 +3003,9 @@
             "arcade": {
                 "open": "Abrir Juegos",
                 "calls": "Jugar en llamadas"
+            },
+            "translate": {
+                "use": "Traducir texto"
             }
         }
     },

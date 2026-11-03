@@ -94,6 +94,10 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
     "dns-blocker": [product("Pi-hole", "pi-hole"), product("AdGuard Home", "adguard")],
     "mail-server": [product("Microsoft 365", "microsoft")],
     crm: [product("HubSpot", "hubspot")],
+    translate: [
+        product("DeepL Translator", "deepl"),
+        product("Google Translate", "google-translate")
+    ],
     // Deploy templates in the user marketplace, by their store id.
     "template-n8n": [product("Zapier", "zapier"), product("Make", "make")],
     "template-nextcloud": [product("Google Drive", "google-drive"), product("Dropbox", "dropbox")],

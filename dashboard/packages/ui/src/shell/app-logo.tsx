@@ -268,6 +268,37 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // Translate: two speech bubbles, one answering the other.
+    translate: {
+        palette: ["#93C5FD", "#2563EB", "#1E40AF"],
+        draw: ({ base, face }) => (
+            <>
+                <path
+                    d="M4 8a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H10l-4 3.5V17.6A4 4 0 0 1 4 14z"
+                    fill={base}
+                />
+                <path
+                    d="M28 17a4 4 0 0 0-4-4h-7a4 4 0 0 0-4 4v5a4 4 0 0 0 4 4h5l4 3v-3.4a4 4 0 0 0 2-3.6z"
+                    fill={face}
+                />
+                <path
+                    d="M9 8.5h7M12.5 8.5v5"
+                    stroke={WHITE}
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    fill="none"
+                />
+                <path
+                    d="M17.5 22.5l2.5-6 2.5 6M18.4 20.5h3.2"
+                    stroke={WHITE}
+                    strokeWidth={1.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                />
+            </>
+        )
+    },
     // A trigger wired to the step it starts.
     automations: {
         palette: ["#5EEAD4", "#0D9488", "#115E59"],

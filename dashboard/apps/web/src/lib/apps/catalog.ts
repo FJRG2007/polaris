@@ -21,6 +21,7 @@ import {
     Handshake,
     Joystick,
     Activity,
+    Languages,
     ShieldCheck,
     Cloud,
     House,
@@ -368,6 +369,24 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Public pages that show whether your services are up.",
         description:
             "Publish a page that shows whether your services are up, with 90 days of uptime from HTTP, TCP, DNS and latency checks Polaris runs itself. Post incidents as they unfold and schedule maintenance ahead. Point checks at your own deployed apps or any address. Uninstalling stops the checks and keeps every page.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Text translation. Installing it runs nothing: the browser's own
+        // translator, Polar's model and the owner's DeepL or Google keys do
+        // the work, and uninstalling keeps nothing running.
+        id: "translate",
+        name: "Translate",
+        category: "Productivity",
+        icon: Languages,
+        opensAt: "/translate",
+        summary: "Translate text between languages, in the browser or with your own keys.",
+        description:
+            "Type or paste text and read it in another language as you write, with the language detected for you. Translation runs in the browser where it can, on Polar's model, or on DeepL and Google Cloud with your own keys, and the screen always says which one answered. Your recent translations are kept for you alone. Uninstalling keeps nothing running.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
