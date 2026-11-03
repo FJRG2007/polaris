@@ -11,7 +11,7 @@ import { localPermissions, type ReachStatus } from "@/lib/local-address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { Picker } from "./picker";
-import { CheckMark, CopyMark } from "./marks";
+import { CheckMark, CopyMark, EyeMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
 import { addable, AddressNote, useAddressCheck } from "./server-check";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
@@ -1301,8 +1301,9 @@ function TotpCell({
  * The whole line is the button rather than an icon at the end of it: at 360
  * pixels a row of four labelled buttons is most of the width, and the thing
  * somebody wants is almost always "give me that value". A password is shown as
- * dots - it is copied, never read off the screen - and a login with no username
- * says so rather than drawing an empty line that looks pressable and is not.
+ * dots here - reading it off the screen is `PasswordField`'s eye - and a login
+ * with no username says so rather than drawing an empty line that looks
+ * pressable and is not.
  */
 function Field({
     copyLabel,
@@ -1337,6 +1338,96 @@ function Field({
             <span className={mono ? "shown mono" : "shown"}>{shown}</span>
             {done ? <CheckMark /> : <CopyMark />}
         </button>
+    );
+}
+
+/** How long a password asked to be shown stays on screen before it is dots again. */
+const REVEAL_FOR_MS = 30_000;
+
+/**
+ * The password line, with an eye next to it for reading it instead of copying it.
+ *
+ * Somebody typing a password into a TV, a phone or another computer has nothing
+ * to paste it into, so copying alone left them with dots. The value is asked for
+ * only when the eye is pressed - through the same `copy` request the line uses,
+ * which a web page cannot send (see `FROM_PAGE`) - and goes back to dots on its
+ * own after `REVEAL_FOR_MS`, or when the popup closes, so a password is never
+ * left on a screen nobody is looking at.
+ */
+function PasswordField({
+    id,
+    done,
+    onCopy,
+    onNote
+}: {
+    id: string;
+    /** Whether the password was just copied. */
+    done: boolean;
+    onCopy: () => void;
+    /** The popup's note line: why the password could not be shown, or `null` once it was. */
+    onNote: (note: string | null) => void;
+}): React.JSX.Element {
+    const t = useWords();
+    const [value, setValue] = useState<string | null>(null);
+    const hiding = useRef<number | null>(null);
+    const mounted = useRef(true);
+    const asking = useRef(false);
+
+    const stopTimer = (): void => {
+        if (hiding.current !== null) window.clearTimeout(hiding.current);
+        hiding.current = null;
+    };
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            stopTimer();
+        };
+    }, []);
+
+    const toggle = async (): Promise<void> => {
+        if (asking.current) return;
+        stopTimer();
+        if (value !== null) {
+            setValue(null);
+            return;
+        }
+        asking.current = true;
+        const reply = await askBackground({ kind: "copy", id, field: "password" }).finally(() => {
+            asking.current = false;
+        });
+        if (!mounted.current) return;
+        if (!reply.ok || !("value" in reply)) {
+            if (!reply.ok) onNote(reply.error);
+            return;
+        }
+        onNote(null);
+        setValue(reply.value);
+        hiding.current = window.setTimeout(() => setValue(null), REVEAL_FOR_MS);
+    };
+
+    const shown = value !== null;
+    return (
+        // Shown, it wraps rather than ending in an ellipsis: a password cut short
+        // is one nobody can type in from the screen.
+        <div className={shown ? "secret revealed" : "secret"}>
+            <Field
+                copyLabel={t("popup.items.copyPassword")}
+                shown={value ?? "••••••••••"}
+                mono
+                done={done}
+                onCopy={onCopy}
+            />
+            <button
+                type="button"
+                className="icon small"
+                aria-label={shown ? t("generator.hidePassword") : t("generator.showPassword")}
+                title={shown ? t("generator.hidePassword") : t("generator.showPassword")}
+                onClick={() => void toggle()}
+            >
+                <EyeMark struck={shown} />
+            </button>
+        </div>
     );
 }
 
@@ -1850,12 +1941,11 @@ function Items({
                     done={copied === `${item.id}:username`}
                     onCopy={item.username === null ? null : () => void copy(item, "username")}
                 />
-                <Field
-                    copyLabel={t("popup.items.copyPassword")}
-                    shown="••••••••••"
-                    mono
+                <PasswordField
+                    id={item.id}
                     done={copied === `${item.id}:password`}
                     onCopy={() => void copy(item, "password")}
+                    onNote={setNote}
                 />
                 {item.totp ? (
                     <TotpCell
