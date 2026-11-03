@@ -37,6 +37,8 @@ model User {
     polarCommands     PolarCommand[]
     polarUsage        PolarUsage[]
     translateHistory  TranslateHistory[]
+    translateGlossaries TranslateGlossary[]
+    translateKeepList TranslateKeepList?
     polarToolGrants   PolarToolGrant[]
     polarConnectors   PolarConnector[]
     polarAttachments  PolarAttachment[]
@@ -16232,4 +16234,31 @@ model TranslateHistory {
     updatedAt  DateTime @updatedAt
 
     @@index([userId, createdAt])
+}
+
+// A person's glossary for one language pair: how each term is to come out.
+// Theirs alone. `entries` is [{ source, target }], bounded in code.
+model TranslateGlossary {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    name      String
+    // BCP 47 codes, as the language bar has them.
+    fromLang  String
+    toLang    String
+    // Applied to this pair unless another glossary is chosen.
+    isDefault Boolean  @default(false)
+    entries   Json     @default("[]")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([userId, fromLang, toLang])
+}
+
+// The words a person never wants translated (names, brands), in every language.
+model TranslateKeepList {
+    userId    String   @id @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    terms     Json     @default("[]")
+    updatedAt DateTime @updatedAt
 }
