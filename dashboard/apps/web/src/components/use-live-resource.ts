@@ -12,6 +12,13 @@
  * Polling pauses while the tab is hidden and catches up on return, so a
  * dashboard left open overnight is not still asking every few seconds.
  *
+ * Tabs showing the same subject share their answers (lib/tab-answers): an
+ * answer one tab is given - read, or put on screen by `replace` - reaches the
+ * others over the browser, and they put their next request back, so two windows
+ * on one screen cost the server one poll and a change made in one shows in the
+ * other at once. `cacheKey` is what they agree on, which is why it has to name
+ * everything the read depends on.
+ *
  * `useLiveRead` is the same behaviour over any promise - a server action, a
  * measurement, anything that is not a GET - so a panel of tracked figures gets
  * the instant paint whether the numbers arrive over an endpoint or an action.
@@ -20,6 +27,8 @@
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { noteRequestFailure, noteResponseStatus } from "@/lib/reachability";
 import { useShelfScope } from "@/components/shelf-scope";
+import { useSessionScope } from "@/components/session-scope";
+import { heardRecently, openTabAnswers, spreadDelay, type TabAnswers } from "@/lib/tab-answers";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { readSnapshot, writeSnapshot, type Snapshot } from "@/lib/snapshot-cache";
 
@@ -129,6 +138,15 @@ export function useLiveRead<T>({
     // Held in a ref so the fetch callback does not have to change identity every
     // time the data does, which would restart the interval on every tick.
     const latest = useRef<T | null>(data);
+    /** When the reading on screen was taken, to tell a newer answer from a
+     *  stale one another tab is still handing round. */
+    const shownAt = useRef<number>(initial?.at ?? 0);
+    /** When another tab last handed over an answer, which stands in for asking. */
+    const heardAt = useRef(0);
+    const answers = useRef<TabAnswers<T> | null>(null);
+    const accepting = useRef(enabled && !paused);
+    accepting.current = enabled && !paused;
+    const scope = useSessionScope();
 
     // Which subject the seed above belongs to. A key change means a different
     // subject entirely, so the previous device's readings must not be folded into
@@ -156,6 +174,7 @@ export function useLiveRead<T>({
         const kept = read<T>(seededFor.current);
         if (!kept || shown.current > 0) return;
         latest.current = kept.value;
+        shownAt.current = kept.at;
         setData(kept.value);
         setUpdatedAt(kept.at);
         setKept(true);
@@ -170,6 +189,8 @@ export function useLiveRead<T>({
         shown.current = started.current + 1;
         const kept = read<T>(cacheKey);
         latest.current = kept?.value ?? null;
+        shownAt.current = kept?.at ?? 0;
+        heardAt.current = 0;
         setData(kept?.value ?? null);
         setUpdatedAt(kept?.at ?? null);
         setKept(kept !== null);
@@ -180,6 +201,7 @@ export function useLiveRead<T>({
         const controller = new AbortController();
         inFlight.current.add(controller);
         const turn = (started.current += 1);
+        const askedAt = Date.now();
         const current = (): boolean => {
             if (controller.signal.aborted || turn < shown.current) return false;
             shown.current = turn;
@@ -194,11 +216,13 @@ export function useLiveRead<T>({
                 const merged =
                     latest.current === null ? value : mergeUnchanged(latest.current, value);
                 latest.current = merged;
+                shownAt.current = askedAt;
                 setData(merged);
                 setUpdatedAt(Date.now());
                 setKept(false);
                 setError(null);
                 writeSnapshot(cacheKey, merged);
+                answers.current?.post(value, askedAt);
             })
             .catch((caught: unknown) => {
                 noteRequestFailure(caught);
@@ -216,16 +240,45 @@ export function useLiveRead<T>({
 
     const replace = useCallback(
         (value: T) => {
+            const at = Date.now();
             shown.current = started.current + 1;
             latest.current = value;
+            shownAt.current = at;
             setData(value);
-            setUpdatedAt(Date.now());
+            setUpdatedAt(at);
             setKept(false);
             setError(null);
             writeSnapshot(cacheKey, value);
+            answers.current?.post(value, at);
         },
         [cacheKey]
     );
+
+    // What the other tabs on this subject were given. Taken like an answer of
+    // this tab's own - it is one, asked a moment ago by the same account - unless
+    // it is older than what is on screen, or this screen was told to hold still.
+    useEffect(() => {
+        const channel = openTabAnswers<T>(cacheKey, scope, (value, at) => {
+            if (!accepting.current || at <= shownAt.current) return;
+            heardAt.current = Date.now();
+            // Newer than any read of this tab's still in the air, which must not
+            // land over it.
+            shown.current = started.current + 1;
+            const merged = latest.current === null ? value : mergeUnchanged(latest.current, value);
+            latest.current = merged;
+            shownAt.current = at;
+            setData(merged);
+            setUpdatedAt(at);
+            setKept(false);
+            setError(null);
+            writeSnapshot(cacheKey, merged);
+        });
+        answers.current = channel;
+        return () => {
+            channel?.close();
+            if (answers.current === channel) answers.current = null;
+        };
+    }, [cacheKey, scope]);
 
     // The read a subject needs to be on screen at all: once, and again whenever
     // the subject changes. Kept apart from the poll so pausing stops the refresh
@@ -246,19 +299,28 @@ export function useLiveRead<T>({
 
     useEffect(() => {
         if (!enabled || paused || !intervalMs) return;
-        let timer: ReturnType<typeof setInterval> | null = null;
-        const start = (): void => {
-            if (timer === null) timer = setInterval(refresh, intervalMs);
-        };
+        const every = intervalMs;
+        let timer: ReturnType<typeof setTimeout> | null = null;
         const stop = (): void => {
             if (timer !== null) {
-                clearInterval(timer);
+                clearTimeout(timer);
                 timer = null;
             }
         };
+        const start = (): void => {
+            stop();
+            timer = setTimeout(tick, spreadDelay(every));
+        };
+        // Asked only when no other tab has asked lately; either way the next
+        // turn is booked.
+        function tick(): void {
+            timer = null;
+            if (!heardRecently(heardAt.current, every)) refresh();
+            start();
+        }
         const onVisibility = (): void => {
             if (document.visibilityState === "visible") {
-                refresh();
+                if (!heardRecently(heardAt.current, every)) refresh();
                 start();
             } else {
                 stop();

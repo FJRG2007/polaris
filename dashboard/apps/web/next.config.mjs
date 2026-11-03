@@ -5,6 +5,7 @@
  * source. Prisma is kept external so its engine binaries are not bundled.
  */
 
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { PortableImportMetaUrl } from "./scripts/portable-import-meta.mjs";
@@ -76,10 +77,23 @@ export const TOKEN_PATH_PREFIXES = [
  *  it to the CLI's own `CLI_PROTOCOL`. */
 export const CLI_PROTOCOL_RANGE = "1-1";
 
+/**
+ * A name for this build, different on every build, for the browser code that
+ * hands answers between tabs (`src/lib/tab-answers.ts`). A tab left open across
+ * an update still runs the previous bundle, and an answer it read is shaped the
+ * way that bundle expected; keying the channel on the build keeps it from
+ * feeding a tab that expects the new shape.
+ */
+const BUILD_SHA = (process.env.POLARIS_BUILD_SHA ?? "").trim();
+const BUILD_STAMP = BUILD_SHA
+    ? createHash("sha256").update(BUILD_SHA).digest("hex").slice(0, 16)
+    : Date.now().toString(36);
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
+    env: { NEXT_PUBLIC_POLARIS_BUILD_STAMP: BUILD_STAMP },
     // Next only compiles in a separate worker by default when there is no custom
     // `webpack` hook, and there is one below. Without the worker, the server, edge
     // and client compilations all pile up in the build's own heap, and a cold
