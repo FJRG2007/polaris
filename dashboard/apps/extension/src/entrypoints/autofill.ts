@@ -47,7 +47,7 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import { emptyProfile, PROFILE_PARTS, readForm, type PageFields } from "@/lib/fields";
-import { wholeName } from "@/lib/identity";
+import { countryForBox, wholeName } from "@/lib/identity";
 import { fieldVisible } from "@/lib/field-visible";
 import { enterSendsLogin } from "@/lib/enter-submit";
 import {
@@ -562,7 +562,19 @@ async function start(): Promise<void> {
         into(at(fields.fullName), whole);
         into(at(fields.givenName), values.firstName);
         into(at(fields.familyName), values.lastName);
-        for (const part of PROFILE_PARTS) into(at(fields.profile[part]), values[part]);
+        for (const part of PROFILE_PARTS) {
+            const box = at(fields.profile[part]);
+            into(
+                box,
+                part === "country" && box
+                    ? countryForBox(
+                          values.country,
+                          box.autocomplete,
+                          document.documentElement.lang || navigator.language
+                      )
+                    : values[part]
+            );
+        }
     };
 
     observer.observe(document.documentElement, WATCH);

@@ -1242,6 +1242,7 @@
         "web/src/app/(app)/vault/clients/page.tsx",
         "web/src/app/(app)/vault/folder-dialog.tsx",
         "web/src/app/(app)/vault/identity-fields.ts",
+        "web/src/app/(app)/vault/identity-place-fields.tsx",
         "web/src/app/(app)/vault/item-dialog.tsx",
         "web/src/app/(app)/vault/item-icon.tsx",
         "web/src/app/(app)/vault/layout.tsx",

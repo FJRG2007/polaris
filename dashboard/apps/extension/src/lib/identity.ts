@@ -13,6 +13,7 @@
  */
 
 import { onShelf, type ShelfOrganization } from "@/lib/shelf";
+import { autocompleteToken } from "@/lib/fields";
 import {
     ACCOUNT_IDENTITY,
     type ExtensionAccount,
@@ -111,4 +112,33 @@ export function accountCard(values: IdentityValues, label: string): IdentityCard
         isDefault: false,
         vault: null
     };
+}
+
+/**
+ * The country as a box wants it. The vault keeps a country as its two-letter
+ * code (`ES`): a box marked `autocomplete="country"` asks for that code, and any
+ * other asks for the name, written in the page's language. Text that is not a
+ * code the runtime can name goes in as it was stored.
+ */
+export function countryForBox(stored: string, autocomplete: string, locale: string): string {
+    const value = stored.trim();
+    const code = value.toUpperCase();
+    if (
+        !/^[A-Z]{2}$/.test(code) ||
+        code === "ZZ" ||
+        autocompleteToken(autocomplete) === "country"
+    ) {
+        return stored;
+    }
+    for (const one of [locale, "en"]) {
+        try {
+            const name = new Intl.DisplayNames([one], { type: "region", fallback: "none" }).of(
+                code
+            );
+            if (name) return name;
+        } catch {
+            // A locale this runtime cannot name countries in.
+        }
+    }
+    return stored;
 }
