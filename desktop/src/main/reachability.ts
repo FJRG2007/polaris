@@ -31,6 +31,11 @@ export function finishedLoad(title: string, wasOffline: boolean): "offline" | "r
     return wasOffline ? "recovered" : "online";
 }
 
+/** Whether a Chromium error code is a certificate this computer does not trust. */
+export function isCertificateError(code: string | null): boolean {
+    return code !== null && (code.startsWith("ERR_CERT_") || code === "ERR_SSL_PROTOCOL_ERROR" || code === "ERR_BAD_SSL_CLIENT_AUTH_CERT");
+}
+
 /** A sentence for a failed load of `host`, from Chromium's error code. */
 export function describeNetError(code: string | null, host: string): string {
     if (!code) return `Could not reach ${host}.`;
@@ -46,7 +51,7 @@ export function describeNetError(code: string | null, host: string): string {
     if (code === "ERR_CONNECTION_TIMED_OUT" || code === "ERR_TIMED_OUT" || code === "ERR_ADDRESS_UNREACHABLE") {
         return `${host} did not answer in time. It may be off, or only reachable from another network.`;
     }
-    if (code.startsWith("ERR_CERT_") || code === "ERR_SSL_PROTOCOL_ERROR" || code === "ERR_BAD_SSL_CLIENT_AUTH_CERT") {
+    if (isCertificateError(code)) {
         return `The certificate of ${host} is not trusted by this computer. Use an address of your Polaris that has a trusted certificate.`;
     }
     return `Could not reach ${host} (${code}).`;
