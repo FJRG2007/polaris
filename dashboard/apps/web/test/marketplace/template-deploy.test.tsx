@@ -39,6 +39,11 @@ const serverOptions = vi.hoisted(() => ({
     }))
 }));
 
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn() }),
     usePathname: () => "/apps/marketplace",

@@ -4,7 +4,7 @@
  * Uninstalling an app from the marketplace grid, with the real confirmation
  * dialog.
  *
- * Uninstall is in the installed row's overflow menu, offered only where the
+ * Uninstall is in the app card's overflow menu, offered only where the
  * server's own check would allow it, and the dialog's wording differs by app: Game servers warns that a world is never
  * deleted by uninstalling, Places says which containers stop. A test that
  * replaces the dialog cannot see either, which is why this one does not.
@@ -19,6 +19,11 @@ import { MessagesWrapper } from "../setup/i18n";
 
 const refresh = vi.fn();
 
+// The updates a Polaris app card shows are read by a server action.
+vi.mock("@/lib/app-bundles/actions", () => ({
+    appUpdatesAction: vi.fn(async () => []),
+    changeAppBuildAction: vi.fn(async () => ({ rows: [] }))
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
@@ -39,10 +44,9 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-/** Opens the installed row's menu and presses Uninstall in it. */
+/** Opens the app card's menu and presses Uninstall in it. */
 async function pressUninstall(name: string): Promise<void> {
-    const shelf = screen.getByRole("region", { name: "Installed" });
-    fireEvent.pointerDown(within(shelf).getByLabelText(`More for ${name}`), {
+    fireEvent.pointerDown(screen.getByLabelText(`More for ${name}`), {
         button: 0,
         ctrlKey: false,
         pointerType: "mouse"
@@ -158,8 +162,7 @@ describe("who is offered Uninstall in the grid", () => {
                 wrapper: MessagesWrapper
             }
         );
-        const shelf = screen.getByRole("region", { name: "Installed" });
-        fireEvent.pointerDown(within(shelf).getByLabelText("More for Game servers"), {
+        fireEvent.pointerDown(screen.getByLabelText("More for Game servers"), {
             button: 0,
             ctrlKey: false,
             pointerType: "mouse"

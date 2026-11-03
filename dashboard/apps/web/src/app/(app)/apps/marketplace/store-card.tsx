@@ -13,7 +13,8 @@ import Link from "next/link";
 import { AppMark } from "@/components/app-mark";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
-import { Loader2, Lock, MoreHorizontal } from "lucide-react";
+import type { AppCategory } from "@/lib/apps";
+import { Loader2, Lock, MoreHorizontal, type LucideIcon } from "lucide-react";
 import type { AppScreenshot } from "@/lib/apps/app-screenshots";
 import { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame, StorePreview } from "@polaris/ui/store-card";
 
@@ -21,6 +22,7 @@ export { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame };
 import type { PrimaryAction } from "@/lib/apps/marketplace-store";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
+    AppLogo,
     Badge,
     Button,
     DropdownMenu,
@@ -57,6 +59,64 @@ export function AppPreview({
             alt={t("card.preview", { name: app.name })}
             className={className}
             eager={eager}
+        />
+    );
+}
+
+/** A built-in app's mark: its own logo, or its icon on its own colour for one without. */
+export function BuiltInMark({ entry, size }: { entry: BuiltInListing; size: number }) {
+    const Icon = entry.icon;
+    const tint = tintFor(entry.id);
+    return (
+        <AppLogo
+            appId={entry.id}
+            size={size}
+            fallback={
+                <span
+                    className="grid shrink-0 place-items-center rounded-md"
+                    style={{
+                        width: size,
+                        height: size,
+                        backgroundColor: tint,
+                        color: initialsInk(tint)
+                    }}
+                >
+                    <Icon style={{ width: size * 0.5, height: size * 0.5 }} aria-hidden="true" />
+                </span>
+            }
+        />
+    );
+}
+
+/** A built-in app as its card draws it: the switcher entry, in the reader's words. */
+export interface BuiltInListing {
+    readonly id: string;
+    readonly name: string;
+    readonly summary: string;
+    readonly href: string;
+    readonly icon: LucideIcon;
+    readonly category: AppCategory;
+}
+
+/** A built-in app's preview: its first README capture, or the same placeholder a catalog app gets. */
+export function BuiltInPreview({
+    entry,
+    shot
+}: {
+    entry: BuiltInListing;
+    shot: AppScreenshot | null;
+}) {
+    const t = useTranslations("marketplace");
+    const tint = tintFor(entry.id);
+    return (
+        <StorePreview
+            name={entry.name}
+            summary={entry.summary}
+            mark={<BuiltInMark entry={entry} size={44} />}
+            tint={tint}
+            ink={initialsInk(tint)}
+            shot={shot}
+            alt={t("card.preview", { name: entry.name })}
         />
     );
 }
