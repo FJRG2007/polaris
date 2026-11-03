@@ -10,7 +10,8 @@
  *   window the dashboard opens on its own origin is another Polaris window
  *   under the same rules.
  * - **Local windows** show a page this app ships - the address form, the key
- *   form, a push - with the local bridge. They navigate nowhere.
+ *   form, a push - with the local bridge. They navigate nowhere. The settings
+ *   can also be a **sheet**: the same page laid over a Polaris window.
  *
  * Every window is sandboxed, isolated, without Node, and without `<webview>`.
  */
@@ -23,6 +24,7 @@ import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
 import {
     app,
     BrowserWindow,
+    WebContentsView,
     nativeTheme,
     shell,
     type BrowserWindowConstructorOptions,
@@ -268,6 +270,56 @@ export function openOverlayWindow(bounds: { readonly x: number; readonly y: numb
 }
 
 /** A window showing one of this app's own pages. */
+/** A local page laid over a window as a sheet rather than given a window of its own. */
+export interface LocalSheet {
+    focus(): void;
+    close(): void;
+    isDestroyed(): boolean;
+}
+
+/**
+ * The settings over the Polaris window they belong to: the window dims and the
+ * page sits on it, the way an app's own settings do, instead of a second window
+ * appearing beside it. Same page, same bridge and the same rules as a local
+ * window; the page is told with `?sheet` and draws itself as a card. It closes
+ * with its window, and says so through `onClosed`.
+ */
+export function openLocalSheet(parent: BrowserWindow, kind: "connect", onClosed: () => void): LocalSheet {
+    const view = new WebContentsView({ webPreferences: preferences("local.js") });
+    view.setBackgroundColor("#00000000");
+    const contents = view.webContents;
+    register(contents, kind);
+    contents.on("will-navigate", (event) => event.preventDefault());
+    contents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+    const fit = () => {
+        if (parent.isDestroyed()) return;
+        const [width = 0, height = 0] = parent.getContentSize();
+        view.setBounds({ x: 0, y: 0, width, height });
+    };
+    const RESIZES = ["resize", "maximize", "unmaximize", "enter-full-screen", "leave-full-screen"] as const;
+    let closed = false;
+    const close = () => {
+        if (closed) return;
+        closed = true;
+        for (const event of RESIZES) parent.off(event as "resize", fit);
+        if (!parent.isDestroyed()) {
+            parent.contentView.removeChildView(view);
+            parent.webContents.focus();
+        }
+        if (!contents.isDestroyed()) contents.close();
+        onClosed();
+    };
+
+    fit();
+    for (const event of RESIZES) parent.on(event as "resize", fit);
+    parent.once("closed", close);
+    parent.contentView.addChildView(view);
+    contents.once("did-finish-load", () => contents.focus());
+    void contents.loadFile(join(__dirname, "..", "renderer", `${kind}.html`), { query: { sheet: "1" } });
+    return { focus: () => contents.focus(), close, isDestroyed: () => closed };
+}
+
 export function openLocalWindow(
     kind: Exclude<WindowKind, "polaris" | "overlay">,
     options: { readonly title: string; readonly width: number; readonly height: number; readonly parent?: BrowserWindow; }

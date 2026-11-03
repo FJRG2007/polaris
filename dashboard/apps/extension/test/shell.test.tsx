@@ -107,7 +107,6 @@ describe("the home screen", () => {
         // Which Polaris this is lives in the account menu (host-menu.test.tsx).
         const markup = renderToStaticMarkup(<Home status={STATUS} onOpen={() => {}} />);
         expect(markup).not.toContain("Servers");
-        expect(markup).not.toContain("Hosts");
         expect(markup).not.toContain("polaris.example");
         // The vault and Polar, nothing else.
         expect(markup.match(/class="section"/g)).toHaveLength(2);

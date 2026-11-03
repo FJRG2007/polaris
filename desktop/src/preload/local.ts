@@ -19,7 +19,8 @@ const bridge: PolarisLocal = {
         rename: (origin, name) => ipcRenderer.invoke(CHANNELS.connectRename, { origin, name }),
         remove: (origin) => ipcRenderer.invoke(CHANNELS.connectRemove, origin),
         preferences: () => ipcRenderer.invoke(CHANNELS.connectPreferences),
-        setOpenAtLogin: (open) => ipcRenderer.invoke(CHANNELS.connectOpenAtLogin, open)
+        setOpenAtLogin: (open) => ipcRenderer.invoke(CHANNELS.connectOpenAtLogin, open),
+        close: () => ipcRenderer.invoke(CHANNELS.connectClose)
     },
     apiKey: {
         state: () => ipcRenderer.invoke(CHANNELS.keyState),

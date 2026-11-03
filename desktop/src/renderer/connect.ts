@@ -198,7 +198,10 @@ function editRow(server: ServerRow, row: HTMLLIElement): void {
     };
     field.addEventListener("keydown", (event) => {
         if (event.key === "Enter") save();
-        if (event.key === "Escape") viewRow(server, row);
+        if (event.key !== "Escape") return;
+        // The row's own Escape, not the sheet's.
+        event.preventDefault();
+        viewRow(server, row);
     });
     row.replaceChildren(field, textButton("Save", save, true), textButton("Cancel", () => viewRow(server, row)));
     field.focus();
@@ -249,6 +252,22 @@ function draw(servers: readonly ServerRow[]): void {
 async function refresh(): Promise<void> {
     const state = await window.polarisLocal.connect.state().catch(() => null);
     draw(state?.servers ?? []);
+}
+
+// Laid over the Polaris window: Escape, the cross or a press beside the card
+// puts it away.
+if (new URLSearchParams(location.search).has("sheet")) {
+    const closeSheet = () => void window.polarisLocal.connect.close().catch(() => undefined);
+    document.body.classList.add("sheet");
+    const cross = byId<HTMLButtonElement>("close-sheet");
+    cross.hidden = false;
+    cross.addEventListener("click", closeSheet);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !event.defaultPrevented && !removeDialog.open) closeSheet();
+    });
+    document.body.addEventListener("mousedown", (event) => {
+        if (event.target === document.body) closeSheet();
+    });
 }
 
 showAdd.addEventListener("click", () => showForm(true));

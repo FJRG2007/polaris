@@ -590,3 +590,47 @@ button.icon svg {
         opacity: 0.6;
     }
 }
+
+/* The settings laid over the Polaris window (`openLocalSheet`). */
+.panel {
+    position: relative;
+}
+
+.sheet {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 56px 24px 24px;
+    background: rgb(5 6 8 / 0.55);
+}
+
+.sheet .panel {
+    width: min(540px, 100%);
+    max-height: calc(100vh - 80px);
+    overflow: auto;
+    padding: 28px 28px 24px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 24px 80px rgb(0 0 0 / 0.4);
+    animation: sheet-in 160ms ease-out;
+}
+
+.sheet-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+}
+
+@keyframes sheet-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sheet .panel {
+        animation: none;
+    }
+}
