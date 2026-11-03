@@ -23,7 +23,11 @@ const NEW = new Date(NOW.getTime() - 60_000).toISOString();
 const LIVE_APP = "polaris-0a1b2c3d";
 const GONE_APP = "polaris-deadbeef";
 
-function container(project: string | null, image = "cloudflare/cloudflared:latest", createdAt = OLD) {
+function container(
+    project: string | null,
+    image = "cloudflare/cloudflared:latest",
+    createdAt = OLD
+) {
     return {
         id: `id-${project}`,
         name: `name-${project}`,
