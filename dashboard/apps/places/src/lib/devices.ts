@@ -285,8 +285,7 @@ export async function updateDevice(
     }
     const row = await prisma.$transaction(async (tx) => {
         // Labels are a place's: moved to another, it drops the old place's.
-        if (current.placeId !== edit.placeId)
-            await labels.dropForeignLabels(tx, id, edit.placeId);
+        if (current.placeId !== edit.placeId) await labels.dropForeignLabels(tx, id, edit.placeId);
         if (edit.labelIds !== undefined)
             await labels.setDeviceLabels(tx, installedAppId, id, edit.placeId, edit.labelIds);
         return tx.placeDevice.update({

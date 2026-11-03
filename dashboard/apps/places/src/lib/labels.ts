@@ -37,7 +37,10 @@ export async function listLabels(
 }
 
 async function requireLabel(installedAppId: string, id: string): Promise<LabelView> {
-    const row = await prisma.placeLabel.findFirst({ where: { id, installedAppId }, select: FIELDS });
+    const row = await prisma.placeLabel.findFirst({
+        where: { id, installedAppId },
+        select: FIELDS
+    });
     if (!row) throw new HomeError("Label not found");
     return row;
 }

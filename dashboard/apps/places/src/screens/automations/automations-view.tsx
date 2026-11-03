@@ -146,7 +146,12 @@ export function UnmovedAutomations({
     }, [placeId]);
 
     const lookup = useMemo<words.DeviceLookup>(() => {
-        return words.lookupOf(listing?.devices ?? [], listing?.rooms ?? [], [], listing?.labels ?? []);
+        return words.lookupOf(
+            listing?.devices ?? [],
+            listing?.rooms ?? [],
+            [],
+            listing?.labels ?? []
+        );
     }, [listing]);
 
     const shown = useMemo(

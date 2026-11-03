@@ -223,7 +223,9 @@ export function DeviceLabelsField({
                         onClick={() => setEditing((open) => !open)}
                     >
                         <Pencil className="size-4" />
-                        {editing ? t("deviceDialog.doneEditingLabels") : t("deviceDialog.editLabels")}
+                        {editing
+                            ? t("deviceDialog.doneEditingLabels")
+                            : t("deviceDialog.editLabels")}
                     </Button>
                     {editing &&
                         list.map((label) => (

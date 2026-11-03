@@ -126,15 +126,15 @@ export interface EditorContext {
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
     const [found, list, roomList, floorList, labelList, place, cameraList, setList] =
         await Promise.all([
-        devices.listDevices(installedAppId, placeId),
-        automations.listAutomations(installedAppId, placeId),
-        rooms.listRooms(installedAppId, placeId),
-        rooms.listFloors(installedAppId, placeId),
-        labels.listLabels(installedAppId, placeId),
-        places.getPlace(installedAppId, placeId),
-        cameras.listCameras(installedAppId, placeId),
-        cameraSets.listCameraSets(installedAppId, placeId)
-    ]);
+            devices.listDevices(installedAppId, placeId),
+            automations.listAutomations(installedAppId, placeId),
+            rooms.listRooms(installedAppId, placeId),
+            rooms.listFloors(installedAppId, placeId),
+            labels.listLabels(installedAppId, placeId),
+            places.getPlace(installedAppId, placeId),
+            cameras.listCameras(installedAppId, placeId),
+            cameraSets.listCameraSets(installedAppId, placeId)
+        ]);
     const privacyTargets = privacyGroups(cameraList, {
         places: new Map(place ? [[place.id, place.name]] : []),
         rooms: new Map(roomList.map((room) => [room.id, room.name])),

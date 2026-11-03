@@ -448,7 +448,8 @@ export function PlaceTargetField<T extends AreaBlock>({
         } = block;
         const distinct = nextAreas.filter(
             (ref, index) =>
-                nextAreas.findIndex((other) => other.kind === ref.kind && other.id === ref.id) === index
+                nextAreas.findIndex((other) => other.kind === ref.kind && other.id === ref.id) ===
+                index
         );
         if (distinct.length === 0) {
             onChange(rest as unknown as T);
@@ -467,7 +468,9 @@ export function PlaceTargetField<T extends AreaBlock>({
         write([refOf(next), ...areas.slice(1)], block.only, block.exclude);
     };
     const room = auto.LIMITS.targets - areas.length - devicesNamed.length;
-    const free = every.filter((option) => !areas.some((ref) => `${ref.kind}:${ref.id}` === option.value));
+    const free = every.filter(
+        (option) => !areas.some((ref) => `${ref.kind}:${ref.id}` === option.value)
+    );
     const only = block.only ?? [];
     const exclude = block.exclude ?? [];
     const kindsLeft = kinds.DEVICE_KINDS.filter((kind) => !only.includes(kind));
@@ -476,7 +479,9 @@ export function PlaceTargetField<T extends AreaBlock>({
             .filter((option) => !option.value.startsWith("place:"))
             .filter((option) => !exclude.some((ref) => `${ref.kind}:${ref.id}` === option.value)),
         ...place.devices
-            .filter((device) => !exclude.some((ref) => ref.kind === "device" && ref.id === device.id))
+            .filter(
+                (device) => !exclude.some((ref) => ref.kind === "device" && ref.id === device.id)
+            )
             .map((device) => ({ value: `device:${device.id}`, label: device.name }))
     ];
     const { count, excluded } = targetCount(block, place, rooms);
@@ -534,7 +539,8 @@ export function PlaceTargetField<T extends AreaBlock>({
                                     placeholder={t("automations.fields.addArea")}
                                     options={free}
                                     onValueChange={(next) =>
-                                        next && write([...areas, refOf(next)], block.only, block.exclude)
+                                        next &&
+                                        write([...areas, refOf(next)], block.only, block.exclude)
                                     }
                                 />
                             </div>
@@ -548,7 +554,9 @@ export function PlaceTargetField<T extends AreaBlock>({
                                         {only.map((kind) => (
                                             <Chip
                                                 key={kind}
-                                                label={t(`devices.kinds.${kind as kinds.DeviceKind}`)}
+                                                label={t(
+                                                    `devices.kinds.${kind as kinds.DeviceKind}`
+                                                )}
                                                 remove={t("automations.fields.removeKind")}
                                                 disabled={disabled}
                                                 onRemove={() =>
@@ -636,9 +644,12 @@ export function PlaceTargetField<T extends AreaBlock>({
                         {count === 0
                             ? t("automations.fields.targetNone")
                             : only.length === 1
-                              ? t(`automations.fields.kindCount.${only[0] as kinds.DeviceKind}`, { count })
+                              ? t(`automations.fields.kindCount.${only[0] as kinds.DeviceKind}`, {
+                                    count
+                                })
                               : t("automations.fields.targetCount", { count })}
-                        {excluded > 0 && `, ${t("automations.fields.targetExcluded", { count: excluded })}`}
+                        {excluded > 0 &&
+                            `, ${t("automations.fields.targetExcluded", { count: excluded })}`}
                     </p>
                 </div>
             )}

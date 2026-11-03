@@ -305,7 +305,9 @@ function setName(
         let name =
             only.length > 0
                 ? t("automations.say.kindsInPlace", {
-                      kinds: [...new Set(only.map((kind) => t(`devices.groups.${kind}`)))].join(", "),
+                      kinds: [...new Set(only.map((kind) => t(`devices.groups.${kind}`)))].join(
+                          ", "
+                      ),
                       place
                   })
                 : t("automations.say.inPlace", { place });

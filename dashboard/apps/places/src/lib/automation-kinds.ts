@@ -1666,7 +1666,11 @@ function single<T extends object>(block: T): T {
     // whatever the new device asks.
     const places = placeTargets(block as { targets?: { kind: string; id: string }[] });
     if (places.length > 0) return { ...rest, targets: places } as T;
-    const { only: _only, exclude: _exclude, ...bare } = rest as typeof rest & {
+    const {
+        only: _only,
+        exclude: _exclude,
+        ...bare
+    } = rest as typeof rest & {
         only?: unknown;
         exclude?: unknown;
     };

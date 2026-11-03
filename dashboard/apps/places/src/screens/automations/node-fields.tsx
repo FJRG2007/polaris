@@ -217,7 +217,9 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
 
     return (
         <RoomsProvider value={listing.rooms ?? NO_ROOMS}>
-            <fields.TargetPlaceProvider value={{ labels: listing.labels, devices: listing.devices }}>
+            <fields.TargetPlaceProvider
+                value={{ labels: listing.labels, devices: listing.devices }}
+            >
                 {body}
             </fields.TargetPlaceProvider>
         </RoomsProvider>

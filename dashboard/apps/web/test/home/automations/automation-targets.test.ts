@@ -154,14 +154,18 @@ describe("a stored block", () => {
     });
 
     it("accepts the new fields, and refuses a kind it does not know", () => {
-        const block = { ...step([{ kind: "label", id: "top" }], {
-            only: ["light"],
-            exclude: [{ kind: "room", id: "kitchen" }]
-        }), deviceId: "ceiling" };
+        const block = {
+            ...step([{ kind: "label", id: "top" }], {
+                only: ["light"],
+                exclude: [{ kind: "room", id: "kitchen" }]
+            }),
+            deviceId: "ceiling"
+        };
         expect(auto.actionSchema.safeParse(block).success).toBe(true);
         expect(auto.actionSchema.safeParse({ ...block, only: ["toaster"] }).success).toBe(false);
         expect(
-            auto.actionSchema.safeParse({ ...block, exclude: [{ kind: "place", id: "all" }] }).success
+            auto.actionSchema.safeParse({ ...block, exclude: [{ kind: "place", id: "all" }] })
+                .success
         ).toBe(false);
     });
 });
@@ -188,7 +192,9 @@ describe("an automation naming areas", () => {
             "automations.errors.placeGone"
         ]);
         expect(
-            messages(step([{ kind: "label", id: "top" }], { exclude: [{ kind: "label", id: "top" }] }))
+            messages(
+                step([{ kind: "label", id: "top" }], { exclude: [{ kind: "label", id: "top" }] })
+            )
         ).toEqual(["automations.errors.allExcluded"]);
         expect(messages(step([{ kind: "label", id: "night" }]))).toEqual([]);
     });
@@ -196,16 +202,25 @@ describe("an automation naming areas", () => {
 
 describe("how a block's set reads", () => {
     const t = placesCatalogs.translator("en-US", "places");
-    const lookup = lookupOf([], [{ id: "kitchen", name: "Kitchen", floor: "" }], [], [
-        { id: "top", name: "Ceiling" }
-    ]);
+    const lookup = lookupOf(
+        [],
+        [{ id: "kitchen", name: "Kitchen", floor: "" }],
+        [],
+        [{ id: "top", name: "Ceiling" }]
+    );
 
     it("names its kinds, its areas and what it leaves out", () => {
         const said = describeStep(
-            step([{ kind: "room", id: "kitchen" }, { kind: "label", id: "top" }], {
+            step(
+                [
+                    { kind: "room", id: "kitchen" },
+                    { kind: "label", id: "top" }
+                ],
+                {
                     only: ["light"],
                     exclude: [{ kind: "device", id: "hall" }]
-                }),
+                }
+            ),
             lookup,
             () => undefined,
             t
