@@ -140,14 +140,22 @@ async function buildNewYork() {
 
     // Building footprints and the street tree inventory, already gzip-compressed as they are kept
     const bundledData = {};
-    for (const [placeholder, name] of [["BUILDINGS_FILE", "buildings"], ["TREES_FILE", "trees"]]) {
+    for (const [placeholder, name] of [
+        ["BUILDINGS_FILE", "buildings"],
+        ["TREES_FILE", "trees"]
+    ]) {
         const bytes = readFileSync(join(source, "data", `${name}.bin.gz`));
         bundledData[placeholder] = hashed(name, "bin", bytes);
         write(bundledData[placeholder], bytes);
     }
 
     const template = readFileSync(join(source, "index.html"), "utf8");
-    for (const placeholder of ["GAME_FILE", "STYLE_FILE", "GEO_FILE", ...Object.keys(bundledData)]) {
+    for (const placeholder of [
+        "GAME_FILE",
+        "STYLE_FILE",
+        "GEO_FILE",
+        ...Object.keys(bundledData)
+    ]) {
         if (!template.includes(`./${placeholder}"`))
             throw new Error(`index.html lost ${placeholder}`);
     }
