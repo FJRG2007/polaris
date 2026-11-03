@@ -15,7 +15,7 @@
  *
  * `i18nProvider.useLocale` is the language the page is drawn in. An app ships
  * its own catalogs and formats them with it -
- * `catalogs.translator(hostUi.i18nProvider.useLocale(), "games")` - see
+ * `catalogs.translator(hostUi.i18nProvider.useLocale(), "games", hostUi.i18nProvider.useClient())` - see
  * docs/i18n.md.
  */
 
@@ -41,7 +41,7 @@ import { subscribeSharedStream } from "@/lib/shared-stream";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import { useSessionScope } from "@/components/session-scope";
 import { useDisplayFormat } from "@/components/display-format";
-import { useLocale } from "@/components/i18n/i18n-provider";
+import { useClient, useLocale } from "@/components/i18n/i18n-provider";
 import { useRuntimeLog } from "@/app/(app)/apps/installed/[id]/use-runtime-log";
 import { CONSUMPTION_METRICS, PLAYER_METRICS } from "@/components/metrics-specs";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -195,7 +195,7 @@ export const clientHost = {
     displayFormat: { useDisplayFormat },
     filePicker: { ChooseFilesDialog, FilePickerDialog, useChooseFiles },
     gameLogo: { GameLogo },
-    i18nProvider: { useLocale },
+    i18nProvider: { useClient, useLocale },
     logViewer: { LogViewer },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },

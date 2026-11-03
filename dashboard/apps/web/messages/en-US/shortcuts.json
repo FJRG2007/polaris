@@ -16,7 +16,7 @@
     "resetAllHint": "Your account's changes are cleared, and this device's too.",
     "fixedHint": "Always, cannot be changed",
     "deviceOnly": "This device only",
-    "deviceOnlyHint": "Keys you change now apply in this browser only, on top of your account's.",
+    "deviceOnlyHint": "{surface, select, app {Keys you change now apply in this app only, on top of your account's.} other {Keys you change now apply in this browser only, on top of your account's.}}",
     "onDevice": "Changed on this device",
     "moved": "Changed",
     "cancel": "Cancel",
@@ -35,7 +35,7 @@
         "reserved": "{keys} belongs to the browser or to moving between controls. Pick another.",
         "clash": "{keys} already does {action} here.",
         "tooMany": "An action can hold up to {count} keys.",
-        "deviceNotSaved": "This browser would not keep the change. It applies until you close the tab."
+        "deviceNotSaved": "{surface, select, app {This app would not keep the change. It applies until you close the window.} other {This browser would not keep the change. It applies until you close the tab.}}"
     },
     "actions": {
         "general": {

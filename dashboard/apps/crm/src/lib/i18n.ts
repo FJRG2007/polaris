@@ -11,5 +11,5 @@ export type CrmTranslator = Translator<CrmKey>;
 
 /** The translator for whoever is reading this request. */
 export async function crmT(): Promise<CrmTranslator> {
-    return crmCatalogs.translator(await host.i18nRequest.getLocale(), "crm");
+    return crmCatalogs.translator(await host.i18nRequest.getLocale(), "crm", await host.i18nRequest.getClient());
 }

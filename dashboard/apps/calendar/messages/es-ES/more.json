@@ -342,7 +342,7 @@
         "weeklyHours": "Horario semanal"
     },
     "embed": {
-        "openFull": "Abrir en otra pestaña"
+        "openFull": "{surface, select, app {Abrir en el navegador} other {Abrir en otra pestaña}}"
     },
     "freeBusy": {
         "away": "Fuera",

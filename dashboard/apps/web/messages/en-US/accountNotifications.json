@@ -68,17 +68,17 @@
         "connectedAccounts": "Connected accounts"
     },
     "browser": {
-        "title": "Browser notifications",
+        "title": "{clientKind, select, desktop {System notifications} other {Browser notifications}}",
         "standing": {
             "app": "The Polaris app draws these itself. Nothing to allow.",
-            "granted": "Polaris can tell you about these while you are on another tab.",
-            "denied": "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
-            "askable": "Let Polaris tell you about a call or a message while you are on another tab.",
-            "unsupported": "This browser cannot show them."
+            "granted": "{clientKind, select, desktop {Polaris can tell you about these while you are in another window.} other {Polaris can tell you about these while you are on another tab.}}",
+            "denied": "{clientKind, select, desktop {The system is blocking them. Allow notifications for Polaris in the system settings to turn them back on.} other {This browser is blocking them. Allow notifications for this site in its settings to turn them back on.}}",
+            "askable": "{clientKind, select, desktop {Let Polaris tell you about a call or a message while you are in another window.} other {Let Polaris tell you about a call or a message while you are on another tab.}}",
+            "unsupported": "{clientKind, select, desktop {This app cannot show them.} other {This browser cannot show them.}}"
         },
         "testBody": "This is what a notice from Polaris looks like.",
         "testSent": "Sent. If nothing appeared, the system is holding it back - check its own notification settings.",
-        "testRefused": "This browser would not draw it.",
+        "testRefused": "{clientKind, select, desktop {The system would not show it.} other {This browser would not draw it.}}",
         "allowed": "Allowed",
         "on": "On",
         "blocked": "Blocked",
@@ -91,7 +91,7 @@
             },
             "messages": {
                 "title": "Chat messages",
-                "hint": "A message in a conversation you follow, while you are on another tab."
+                "hint": "{surface, select, app {A message in a conversation you follow, while you are in another window.} other {A message in a conversation you follow, while you are on another tab.}}"
             },
             "mail": {
                 "title": "Mail",
@@ -102,8 +102,8 @@
                 "hint": "A finished build, a server that stopped, anything the bell would carry."
             }
         },
-        "outsideTab": "{kind} outside the tab",
-        "keptHere": "These are kept for this browser, not for your account - the same as the sound below. What reaches the bell, your mail and everything else is further down."
+        "outsideTab": "{surface, select, app {{kind} outside the window} other {{kind} outside the tab}}",
+        "keptHere": "{clientKind, select, desktop {These are kept for this app, not for your account - the same as the sound below. What reaches the bell, your mail and everything else is further down.} other {These are kept for this browser, not for your account - the same as the sound below. What reaches the bell, your mail and everything else is further down.}}"
     },
     "sound": {
         "title": "Sound",
@@ -116,16 +116,16 @@
         "volumeHint": "For every Polaris sound: alerts, messages and calls. Saved to your account."
     },
     "tabIcon": {
-        "title": "Tab icon",
-        "label": "What the tab icon shows when something is waiting",
+        "title": "{surface, select, app {App icon} other {Tab icon}}",
+        "label": "{surface, select, app {What the app icon shows when something is waiting} other {What the tab icon shows when something is waiting}}",
         "styles": {
             "count": {
                 "label": "Count",
-                "hint": "How many are waiting, on the tab icon."
+                "hint": "{surface, select, app {How many are waiting, on the app icon.} other {How many are waiting, on the tab icon.}}"
             },
             "dot": {
                 "label": "Dot",
-                "hint": "A dot on the tab icon, without the number."
+                "hint": "{surface, select, app {A dot on the app icon, without the number.} other {A dot on the tab icon, without the number.}}"
             },
             "none": {
                 "label": "Nothing",

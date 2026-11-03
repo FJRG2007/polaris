@@ -7,5 +7,5 @@ import type { CloudTranslator } from "../lib/i18n";
 import { cloudCatalogs } from "../../messages";
 
 export function useCloudT(): CloudTranslator {
-    return cloudCatalogs.translator(hostUi.i18nProvider.useLocale(), "cloudServers");
+    return cloudCatalogs.translator(hostUi.i18nProvider.useLocale(), "cloudServers", hostUi.i18nProvider.useClient());
 }

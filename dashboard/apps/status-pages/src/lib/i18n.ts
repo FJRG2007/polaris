@@ -11,5 +11,5 @@ export type StatusTranslator = Translator<StatusKey>;
 
 /** The translator for whoever is reading this request. */
 export async function statusT(): Promise<StatusTranslator> {
-    return statusCatalogs.translator(await host.i18nRequest.getLocale(), "statusPages");
+    return statusCatalogs.translator(await host.i18nRequest.getLocale(), "statusPages", await host.i18nRequest.getClient());
 }

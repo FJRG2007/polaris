@@ -100,6 +100,14 @@ export interface PolarisDesktop {
     defaultBrowser(): Promise<string | null>;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
+    /** Show what is waiting on the app's own icon - the taskbar button, the
+     *  Dock - the way a browser shows it on the tab's icon. */
+    setAppBadge(input: {
+        readonly label: string | null;
+        readonly dot: boolean;
+        readonly count: number;
+        readonly overlay: string | null;
+    }): Promise<boolean>;
     /** The screens and windows to share, each with a small picture, for the
      *  page's own picker. Null where the system's picker is the one to use.
      *  `thumbnails: false` answers faster, with names only. */
@@ -327,6 +335,7 @@ export const CHANNELS = {
     installTool: "desktop:install-tool",
     defaultBrowser: "desktop:default-browser",
     openServers: "desktop:open-servers",
+    appBadge: "desktop:app-badge",
     shareSources: "desktop:share-sources",
     chooseShare: "desktop:choose-share",
     drawOnShare: "desktop:draw-on-share",

@@ -206,7 +206,7 @@
         "text": "Text",
         "textPlaceholder": "Paste it here",
         "tooLong": "{count} / {max} - too long to send",
-        "seal": "Seal it in this browser",
+        "seal": "{surface, select, app {Seal it in this app} other {Seal it in this browser}}",
         "sealHint": "Polaris stores it unreadable and gives you a key to pass on separately. Without the key nobody can open it.",
         "send": "Send"
     },

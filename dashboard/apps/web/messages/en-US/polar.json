@@ -340,8 +340,8 @@
         "transcribing": "Transcribing",
         "call": "Voice mode",
         "unavailable": "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI.",
-        "micDenied": "Polar can't use your microphone. Allow it for this site in your browser, then try again.",
-        "cannotRecord": "This browser can't record audio.",
+        "micDenied": "{clientKind, select, desktop {Polar can't use your microphone. Allow it for Polaris in the system settings, then try again.} other {Polar can't use your microphone. Allow it for this site in your browser, then try again.}}",
+        "cannotRecord": "{surface, select, app {This app can't record audio.} other {This browser can't record audio.}}",
         "modelNotSaved": "Your model choice wasn't saved. Try again.",
         "errors": {
             "no_voice_provider": "Polar can't hear you without a speech-to-text key, like Groq or OpenAI.",
@@ -349,12 +349,12 @@
             "rate_limited": "Too many tries. Wait a minute.",
             "too_large": "That recording is too long.",
             "speak_failed": "Polar couldn't say this answer out loud. It's on screen.",
-            "no_speech_provider": "This browser has no voice and no key here can speak. Answers stay on screen.",
+            "no_speech_provider": "{surface, select, app {This app has no voice and no key here can speak. Answers stay on screen.} other {This browser has no voice and no key here can speak. Answers stay on screen.}}",
             "usage_limit": "You've reached the shared key's limit. Use a key of your own."
         },
         "callTitle": "Voice mode",
         "callDescription": "Speak, and Polar answers out loud. Talk over it to stop it.",
-        "browserVoice": "Speaking with your browser's voice",
+        "browserVoice": "{clientKind, select, desktop {Speaking with the system's voice} other {Speaking with your browser's voice}}",
         "phase": {
             "listening": "Listening",
             "hearing": "Hearing you",
@@ -374,7 +374,7 @@
             "microphone": "Microphone",
             "systemDefault": "System default",
             "allow": "Allow the microphone to see names",
-            "denied": "Blocked. Allow it in the browser.",
+            "denied": "{clientKind, select, desktop {Blocked. Allow it in the system settings.} other {Blocked. Allow it in the browser.}}",
             "model": "Model"
         }
     },

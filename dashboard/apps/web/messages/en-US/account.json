@@ -108,11 +108,11 @@
     },
     "spoilers": {
         "title": "Show spoilers without asking",
-        "body": "Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only."
+        "body": "{surface, select, app {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This app only.} other {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only.}}"
     },
     "deviceCache": {
         "title": "This device",
-        "body": "Polaris keeps a few things in this browser so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.",
+        "body": "{surface, select, app {Polaris keeps a few things in this app so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.} other {Polaris keeps a few things in this browser so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.}}",
         "clear": "Clear cached data",
         "clearing": "Clearing"
     },
@@ -723,7 +723,7 @@
     "devices": {
         "page": {
             "title": "Voice & Video",
-            "intro": "Which microphone and camera Polaris uses on this machine, and how you sound through them. Kept in this browser, because a headset is plugged into a machine rather than into an account."
+            "intro": "{surface, select, app {Which microphone and camera Polaris uses on this machine, and how you sound through them. Kept in this app, because a headset is plugged into a machine rather than into an account.} other {Which microphone and camera Polaris uses on this machine, and how you sound through them. Kept in this browser, because a headset is plugged into a machine rather than into an account.}}"
         },
         "stop": "Stop",
         "whichOne": "Which one",
@@ -759,7 +759,7 @@
             "pictures": "Pictures",
             "changePicture": "Change your picture",
             "ownPicture": "Use a picture of your own",
-            "pictureStays": "A picture of your own stays in this browser and is sent nowhere.",
+            "pictureStays": "{surface, select, app {A picture of your own stays in this app and is sent nowhere.} other {A picture of your own stays in this browser and is sent nowhere.}}",
             "pictureFailed": "Polaris could not use that picture.",
             "starting": "Starting. The first one on a machine downloads the model.",
             "failed": "It could not start, so nothing is applied to your camera: {problem}",
@@ -784,7 +784,7 @@
             "intro": "Leave these alone unless something is wrong. Each one is set to what Polaris did before this screen existed.",
             "autoGain": {
                 "label": "Automatic gain control",
-                "note": "Lets the browser even out how loud you are. Turn it off if your level is pumped up and down between sentences."
+                "note": "{surface, select, app {Lets the app even out how loud you are. Turn it off if your level is pumped up and down between sentences.} other {Lets the browser even out how loud you are. Turn it off if your level is pumped up and down between sentences.}}"
             },
             "betterDetection": {
                 "label": "Better voice detection",
@@ -792,7 +792,7 @@
             },
             "bypass": {
                 "label": "Send the microphone untouched",
-                "note": "Turns off the browser's echo, noise and level handling together, for an interface or a feed that has already done all three. Doing it twice is what ruins that sound."
+                "note": "{surface, select, app {Turns off the app's echo, noise and level handling together, for an interface or a feed that has already done all three. Doing it twice is what ruins that sound.} other {Turns off the browser's echo, noise and level handling together, for an interface or a feed that has already done all three. Doing it twice is what ruins that sound.}}"
             },
             "noAudio": {
                 "label": "Say when nothing is picked up",

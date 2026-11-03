@@ -112,6 +112,14 @@ export interface PolarisDesktop {
     runningPrograms?(): Promise<readonly string[]>;
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
+    /** What is waiting, on the app's icon in the taskbar or Dock. Missing on a
+     *  desktop app older than it. */
+    setAppBadge?(input: {
+        readonly label: string | null;
+        readonly dot: boolean;
+        readonly count: number;
+        readonly overlay: string | null;
+    }): Promise<boolean>;
     /** The screens and windows to share, each with a small picture, for the
      *  picker this page draws. Null where the system's own picker is the one to
      *  use (macOS). Absent from an app older than the picker, which then shows

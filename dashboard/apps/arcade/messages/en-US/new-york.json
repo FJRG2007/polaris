@@ -43,7 +43,7 @@
         "graphics": "Graphics",
         "mute": "Mute sound",
         "unmute": "Turn sound on",
-        "noAudio": "Sound is not available in this browser.",
+        "noAudio": "{surface, select, app {Sound is not available in this app.} other {Sound is not available in this browser.}}",
         "hideHud": "Hide HUD",
         "showHud": "Show HUD",
         "menu": "Menu"
@@ -207,6 +207,6 @@
         "off": "Off",
         "volume": "Volume",
         "soundOn": "Play sound",
-        "noAudio": "Sound is not available in this browser."
+        "noAudio": "{surface, select, app {Sound is not available in this app.} other {Sound is not available in this browser.}}"
     }
 }

@@ -8,7 +8,7 @@ import { DropGuard } from "@/components/drop-guard";
 import { themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
-import { getLocale, getTranslations } from "@/lib/i18n/request";
+import { getClient, getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
 import { ConnectionBanner } from "@/components/connection-banner";
@@ -192,10 +192,11 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
     const session = await resolveSession().catch(() => null);
-    const [theme, textSize, locale] = await Promise.all([
+    const [theme, textSize, locale, client] = await Promise.all([
         resolveTheme(session?.id ?? null),
         resolveTextSize(session?.id ?? null),
-        getLocale()
+        getLocale(),
+        getClient()
     ]);
 
     return (
@@ -218,6 +219,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <div aria-hidden className="app-drag-strip" />
                 <I18nProvider
                     locale={locale}
+                    client={client}
                     messages={pickMessages(locale, ["common", "components"])}
                 >
                     <LocaleSync locale={locale} signedIn={session !== null} />

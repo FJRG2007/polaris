@@ -25,7 +25,9 @@ import { useAdminWaiting } from "@/components/admin-waiting";
 import { tabWaiting } from "@/lib/waiting-counts";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { useDoNotDisturb } from "@/components/do-not-disturb";
-import { applyFavicon, currentFavicon, drawFavicon, type FaviconLink } from "@/lib/favicon";
+import { applyFavicon, currentFavicon, drawBadgeOverlay, drawFavicon, type FaviconLink } from "@/lib/favicon";
+import { useDesktopBridge } from "@/components/desktop-app";
+import { useClient } from "@/components/i18n/i18n-provider";
 import {
     DEFAULT_FAVICON_STYLE,
     faviconBadge,
@@ -53,6 +55,8 @@ export function NotificationFavicon() {
     // In do not disturb the tab's title carries no count: the icon still does,
     // quietly, but a title that changes is the tab asking to be looked at.
     const quiet = useDoNotDisturb();
+    const desktop = useDesktopBridge();
+    const client = useClient();
 
     useEffect(() => {
         const read = () => setStyle(faviconStyle());
@@ -70,6 +74,32 @@ export function NotificationFavicon() {
         const badged = drawFavicon(badge);
         if (badged) applyFavicon({ href: badged, type: "image/png" });
     }, [style, waiting]);
+
+    // The desktop app has no tab: the same choice goes on its icon in the
+    // taskbar or the Dock instead, and comes off when the page goes.
+    useEffect(() => {
+        const badge = faviconBadge(style, waiting);
+        const setAppBadge = desktop?.setAppBadge;
+        if (!setAppBadge) {
+            // Installed from the browser's menu: the browser draws the count on
+            // the installed app's icon itself, where it can.
+            if (client === "installed") installedAppBadge(badge ? (badge.kind === "dot" ? 0 : waiting) : null);
+            return;
+        }
+        void setAppBadge({
+            label: badge?.kind === "count" ? badge.label : null,
+            dot: badge?.kind === "dot",
+            count: waiting,
+            overlay: badge ? drawBadgeOverlay(badge) : null
+        }).catch(() => undefined);
+    }, [client, desktop, style, waiting]);
+
+    useEffect(
+        () => () => {
+            void desktop?.setAppBadge?.({ label: null, dot: false, count: 0, overlay: null }).catch(() => undefined);
+        },
+        [desktop]
+    );
 
     useEffect(() => {
         const badge = quiet ? null : faviconBadge(style, waiting);
@@ -97,4 +127,15 @@ export function NotificationFavicon() {
     );
 
     return null;
+}
+
+/** The Badging API of an installed web app: a number, 0 for a bare mark, or
+ *  nothing at all. Missing in browsers that do not have it. */
+function installedAppBadge(count: number | null): void {
+    const badging = navigator as Navigator & {
+        setAppBadge?: (count?: number) => Promise<void>;
+        clearAppBadge?: () => Promise<void>;
+    };
+    if (count === null) void badging.clearAppBadge?.().catch(() => undefined);
+    else void badging.setAppBadge?.(count).catch(() => undefined);
 }

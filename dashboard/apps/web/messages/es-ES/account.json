@@ -108,11 +108,11 @@
     },
     "spoilers": {
         "title": "Mostrar spoilers sin preguntar",
-        "body": "Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador."
+        "body": "{surface, select, app {Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en esta app.} other {Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador.}}"
     },
     "deviceCache": {
         "title": "Este equipo",
-        "body": "Polaris guarda algunas cosas en este navegador para que las pantallas abran más rápido: imágenes, el volumen de cada persona en una llamada, la velocidad de reproducción. Bórralas si algo parece desactualizado y recargar no lo ha arreglado. Tus otros dispositivos no se ven afectados y sigues con la sesión iniciada.",
+        "body": "{surface, select, app {Polaris guarda algunas cosas en esta app para que las pantallas abran más rápido: imágenes, el volumen de cada persona en una llamada, la velocidad de reproducción. Bórralas si algo parece desactualizado y recargar no lo ha arreglado. Tus otros dispositivos no se ven afectados y sigues con la sesión iniciada.} other {Polaris guarda algunas cosas en este navegador para que las pantallas abran más rápido: imágenes, el volumen de cada persona en una llamada, la velocidad de reproducción. Bórralas si algo parece desactualizado y recargar no lo ha arreglado. Tus otros dispositivos no se ven afectados y sigues con la sesión iniciada.}}",
         "clear": "Borrar datos en caché",
         "clearing": "Borrando"
     },
@@ -723,7 +723,7 @@
     "devices": {
         "page": {
             "title": "Voz y vídeo",
-            "intro": "Qué micrófono y qué cámara usa Polaris en este ordenador, y cómo suenas a través de ellos. Se guarda en este navegador, porque unos auriculares se conectan a un ordenador, no a una cuenta."
+            "intro": "{surface, select, app {Qué micrófono y qué cámara usa Polaris en este ordenador, y cómo suenas a través de ellos. Se guarda en esta app, porque unos auriculares se conectan a un ordenador, no a una cuenta.} other {Qué micrófono y qué cámara usa Polaris en este ordenador, y cómo suenas a través de ellos. Se guarda en este navegador, porque unos auriculares se conectan a un ordenador, no a una cuenta.}}"
         },
         "stop": "Parar",
         "whichOne": "Cuál",
@@ -759,7 +759,7 @@
             "pictures": "Imágenes",
             "changePicture": "Cambiar tu imagen",
             "ownPicture": "Usar una imagen tuya",
-            "pictureStays": "Una imagen tuya se queda en este navegador y no se envía a ningún sitio.",
+            "pictureStays": "{surface, select, app {Una imagen tuya se queda en esta app y no se envía a ningún sitio.} other {Una imagen tuya se queda en este navegador y no se envía a ningún sitio.}}",
             "pictureFailed": "Polaris no ha podido usar esa imagen.",
             "starting": "Iniciando. La primera vez en un ordenador se descarga el modelo.",
             "failed": "No pudo iniciarse, así que no se aplica nada a tu cámara: {problem}",
@@ -784,7 +784,7 @@
             "intro": "No toques esto salvo que algo vaya mal. Cada opción está como lo hacía Polaris antes de que existiera esta pantalla.",
             "autoGain": {
                 "label": "Ganancia automática",
-                "note": "Deja que el navegador iguale tu volumen. Desactívalo si tu nivel sube y baja entre frases."
+                "note": "{surface, select, app {Deja que la app iguale tu volumen. Desactívalo si tu nivel sube y baja entre frases.} other {Deja que el navegador iguale tu volumen. Desactívalo si tu nivel sube y baja entre frases.}}"
             },
             "betterDetection": {
                 "label": "Mejor detección de voz",
@@ -792,7 +792,7 @@
             },
             "bypass": {
                 "label": "Enviar el micrófono sin tocar",
-                "note": "Desactiva a la vez el tratamiento de eco, ruido y nivel del navegador, para una interfaz o una señal que ya ha hecho las tres cosas. Hacerlo dos veces es lo que estropea ese sonido."
+                "note": "{surface, select, app {Desactiva a la vez el tratamiento de eco, ruido y nivel de la app, para una interfaz o una señal que ya ha hecho las tres cosas. Hacerlo dos veces es lo que estropea ese sonido.} other {Desactiva a la vez el tratamiento de eco, ruido y nivel del navegador, para una interfaz o una señal que ya ha hecho las tres cosas. Hacerlo dos veces es lo que estropea ese sonido.}}"
             },
             "noAudio": {
                 "label": "Avisar cuando no se capta nada",

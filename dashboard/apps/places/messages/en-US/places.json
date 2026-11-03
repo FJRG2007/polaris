@@ -2747,7 +2747,7 @@
         "locating": "Finding it...",
         "denied": "Location was refused. Allow it, or type it in.",
         "failed": "Could not get the location. Try again.",
-        "unsupported": "This browser cannot share a location."
+        "unsupported": "{surface, select, app {This app cannot share a location.} other {This browser cannot share a location.}}"
     },
     "guest": {
         "until": "Works until {when}.",

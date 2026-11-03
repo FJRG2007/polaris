@@ -16,7 +16,7 @@
     "resetAllHint": "Se borran los cambios de tu cuenta y los de este dispositivo.",
     "fixedHint": "Siempre, no se puede cambiar",
     "deviceOnly": "Solo este equipo",
-    "deviceOnlyHint": "Las teclas que cambies ahora solo valen en este navegador, sobre las de tu cuenta.",
+    "deviceOnlyHint": "{surface, select, app {Las teclas que cambies ahora solo valen en esta app, sobre las de tu cuenta.} other {Las teclas que cambies ahora solo valen en este navegador, sobre las de tu cuenta.}}",
     "onDevice": "Cambiado en este equipo",
     "moved": "Cambiado",
     "cancel": "Cancelar",
@@ -35,7 +35,7 @@
         "reserved": "{keys} es del navegador o sirve para moverse entre controles. Elige otra.",
         "clash": "{keys} ya hace {action} aquí.",
         "tooMany": "Una acción puede tener hasta {count} teclas.",
-        "deviceNotSaved": "Este navegador no guardó el cambio. Vale hasta que cierres la pestaña."
+        "deviceNotSaved": "{surface, select, app {Esta app no guardó el cambio. Vale hasta que cierres la ventana.} other {Este navegador no guardó el cambio. Vale hasta que cierres la pestaña.}}"
     },
     "actions": {
         "general": {

@@ -11,9 +11,9 @@
         "error": {
             "updatedTitle": "Polaris se ha actualizado mientras esta página estaba abierta",
             "brokeTitle": "Esta página ha fallado",
-            "updatedBody": "Esta pestaña sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.",
+            "updatedBody": "{surface, select, app {Esta ventana sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.} other {Esta pestaña sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.}}",
             "againBody": "Ha vuelto a fallar igual, así que intentarlo otra vez no lo arreglará. Recarga para cargar una versión nueva, o envía lo de abajo a quien lo esté revisando.",
-            "brokeBody": "El resto de Polaris sigue funcionando. Vuelve a intentarlo; y si ha llegado una actualización bajo esta pestaña, Polaris lo indica en la esquina de la pantalla.",
+            "brokeBody": "{surface, select, app {El resto de Polaris sigue funcionando. Vuelve a intentarlo; y si ha llegado una actualización bajo esta ventana, Polaris lo indica en la esquina de la pantalla.} other {El resto de Polaris sigue funcionando. Vuelve a intentarlo; y si ha llegado una actualización bajo esta pestaña, Polaris lo indica en la esquina de la pantalla.}}",
             "reference": "Referencia: {digest}",
             "reload": "Recargar",
             "trying": "Probando",
@@ -31,7 +31,7 @@
         "globalError": {
             "updatedTitle": "Polaris se actualizó con esta página abierta",
             "brokeTitle": "Polaris no ha podido iniciar esta página",
-            "updatedBody": "Esta pestaña sigue con la versión anterior. Recarga para cargar la nueva.",
+            "updatedBody": "{surface, select, app {Esta ventana sigue con la versión anterior. Recarga para cargar la nueva.} other {Esta pestaña sigue con la versión anterior. Recarga para cargar la nueva.}}",
             "brokeBody": "Recarga para volver a intentarlo. Si sigue pasando, este es el error con el que falló.",
             "reference": "Referencia: {digest}",
             "reload": "Recargar",
@@ -94,7 +94,7 @@
             "couldNotAuthorize": "no se pudo autorizar el terminal"
         },
         "refused": "El servidor rechazó la sesión: {reason}.",
-        "untrusted": "El navegador no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.",
+        "untrusted": "{surface, select, app {La app no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.} other {El navegador no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.}}",
         "retry": "Reintentar"
     },
     "storage": {
@@ -115,7 +115,7 @@
         "askPolarSelection": "Preguntar a Polar por lo marcado",
         "copied": "Copiado al portapapeles",
         "copyFailed": "Se bloqueó la copia. Usa el atajo de copiar del teclado.",
-        "pasteFailed": "El navegador no permitió pegar. Usa el atajo de pegar del teclado.",
+        "pasteFailed": "{surface, select, app {La app no permitió pegar. Usa el atajo de pegar del teclado.} other {El navegador no permitió pegar. Usa el atajo de pegar del teclado.}}",
         "browserMenu": "Mayús+clic derecho abre el menú del navegador"
     },
     "permissionSections": {

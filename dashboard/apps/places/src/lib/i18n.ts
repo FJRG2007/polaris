@@ -11,7 +11,7 @@ export type PlacesTranslator = Translator<PlacesKey>;
 
 /** The translator for whoever is reading this request. */
 export async function placesT(): Promise<PlacesTranslator> {
-    return placesCatalogs.translator(await host.i18nRequest.getLocale(), "places");
+    return placesCatalogs.translator(await host.i18nRequest.getLocale(), "places", await host.i18nRequest.getClient());
 }
 
 /** The translator for one account, with no request around it - a notification.

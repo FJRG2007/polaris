@@ -2863,7 +2863,7 @@
             "deleteTitle": "¿Eliminar {name}?",
             "deleteBody": "Los momentos de eventos y llegadas que lo usan vuelven al sonido del juego.",
             "deleted": "{name} eliminado.",
-            "cannotPlay": "Este navegador no reproduce archivos Ogg. El juego de los jugadores sí.",
+            "cannotPlay": "{surface, select, app {Esta app no reproduce archivos Ogg. El juego de los jugadores sí.} other {Este navegador no reproduce archivos Ogg. El juego de los jugadores sí.}}",
             "addedMany": "Añadidos {count} sonidos.",
             "copied": "Copiado {id}.",
             "copyFailed": "No se pudo copiar. Selecciona el id y cópialo a mano.",
@@ -2955,7 +2955,7 @@
         },
         "encode": {
             "tooLarge": "Ese archivo es demasiado grande para leerlo.",
-            "unreadable": "Este navegador no pudo leerlo como audio. Prueba con MP3, WAV u OGG.",
+            "unreadable": "{surface, select, app {Esta app no pudo leerlo como audio. Prueba con MP3, WAV u OGG.} other {Este navegador no pudo leerlo como audio. Prueba con MP3, WAV u OGG.}}",
             "tooLong": "Demasiado largo para un sonido, incluso con la calidad más baja. Recórtalo.",
             "encoder": "El conversor no cargó. Recarga la página e inténtalo de nuevo."
         },

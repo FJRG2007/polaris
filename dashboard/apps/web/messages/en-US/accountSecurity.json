@@ -4,7 +4,7 @@
         "intro": "How you prove it is you, and how long a session stays open."
     },
     "newDevice": {
-        "unrecognized": "This browser did not say what it is, so it counts as new. Security settings stay locked from here.",
+        "unrecognized": "{surface, select, app {This app did not say what it is, so it counts as new. Security settings stay locked from here.} other {This browser did not say what it is, so it counts as new. Security settings stay locked from here.}}",
         "waiting": "This account gives a new device {grace, plural, one {# day} other {# days}} before it can change security settings. This one has {left, plural, one {# day} other {# days}} left."
     },
     "feedback": {

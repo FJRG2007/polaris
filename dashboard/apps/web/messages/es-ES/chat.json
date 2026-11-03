@@ -241,7 +241,7 @@
             },
             "standard": {
                 "label": "Estándar",
-                "help": "El tratamiento de eco y ruido del propio navegador. Suficiente para una habitación tranquila."
+                "help": "{surface, select, app {El tratamiento de eco y ruido de la propia app. Suficiente para una habitación tranquila.} other {El tratamiento de eco y ruido del propio navegador. Suficiente para una habitación tranquila.}}"
             },
             "licensed": {
                 "label": "Mejorado (con licencia)",
@@ -382,7 +382,7 @@
         "recordThisCall": "Grabar la llamada",
         "moreForThisCall": "Más de la llamada",
         "recShort": "REC",
-        "writeThisCallToA": "Guardar esta llamada en un archivo de vídeo en este navegador",
+        "writeThisCallToA": "{surface, select, app {Guardar esta llamada en un archivo de vídeo en esta app} other {Guardar esta llamada en un archivo de vídeo en este navegador}}",
         "addPeople": "Añadir gente",
         "shareALinkToThis": "Compartir un enlace",
         "whatYouAreSharingHas": "Lo que compartes ha dejado de enviar imágenes nuevas, así que todos ven la última. Si es una ventana minimizada - un juego a pantalla completa se minimiza al cambiar de ventana - vuelve a abrirla, pon el juego en ventana o comparte la pantalla entera.",
@@ -412,7 +412,7 @@
         "raiseYourHand": "Levantar la mano",
         "leaveTheCall": "Colgar",
         "recordThisCall2": "¿Grabar esta llamada?",
-        "theRecordingIsMadeIn": "La grabación se hace en este navegador, con lo que puede ver y oír, y se para si sales de la llamada o cierras la pestaña. Todos en la llamada lo saben mientras dura. Cuando la paras, eliges si va a la conversación o se queda en este equipo.",
+        "theRecordingIsMadeIn": "{surface, select, app {La grabación se hace en esta app, con lo que puede ver y oír, y se para si sales de la llamada o cierras la ventana. Todos en la llamada lo saben mientras dura. Cuando la paras, eliges si va a la conversación o se queda en este equipo.} other {La grabación se hace en este navegador, con lo que puede ver y oír, y se para si sales de la llamada o cierras la pestaña. Todos en la llamada lo saben mientras dura. Cuando la paras, eliges si va a la conversación o se queda en este equipo.}}",
         "cancel": "Cancelar",
         "startRecording": "Grabar",
         "mirrorMyPicture": "Reflejar mi imagen",
@@ -601,7 +601,7 @@
         "stopReplying": "No responder",
         "editingAMessage": "Editando un mensaje",
         "stopEditing": "Dejar de editar",
-        "polarisIsNotHearingAnything": "Polaris no oye nada. Revisa tu micrófono, o que sea el que usa tu navegador.",
+        "polarisIsNotHearingAnything": "{surface, select, app {Polaris no oye nada. Revisa tu micrófono, o que sea el que usa esta app.} other {Polaris no oye nada. Revisa tu micrófono, o que sea el que usa tu navegador.}}",
         "throwThisRecordingAway": "Descartar esta grabación",
         "throwItAway": "Descartar",
         "sendThisRecording": "Enviar esta grabación",
@@ -931,12 +931,12 @@
         "description": "Polaris graba la pantalla o ventana que elijas y pone el vídeo en tu mensaje. Hasta {time} y {size} MB.",
         "recorded": "{time}, {size} MB",
         "errors": {
-            "unsupported": "Este navegador no puede grabar vídeo. Prueba con otro navegador.",
+            "unsupported": "{surface, select, app {Esta app no puede grabar vídeo. Prueba desde un navegador.} other {Este navegador no puede grabar vídeo. Prueba con otro navegador.}}",
             "withoutCamera": "Grabando sin la cámara: no se pudo abrir.",
             "withoutMicrophone": "Grabando sin el micrófono: no se pudo abrir.",
-            "noPicture": "Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.",
-            "notStarted": "Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.",
-            "notEncoded": "Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.",
+            "noPicture": "{surface, select, app {Esta app no pudo componer la imagen. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.}}",
+            "notStarted": "{surface, select, app {Esta app no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.}}",
+            "notEncoded": "{surface, select, app {Esta app no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.}}",
             "tooLarge": "Detenida: la grabación llegó al tamaño máximo de un mensaje."
         }
     },
@@ -1333,7 +1333,7 @@
     },
     "savedDrafts": {
         "savedDrafts": "Borradores",
-        "onlyYouCanSeeThese": "Solo tú los ves, y solo en este navegador. Cada uno se guarda 30 días.",
+        "onlyYouCanSeeThese": "{surface, select, app {Solo tú los ves, y solo en esta app. Cada uno se guarda 30 días.} other {Solo tú los ves, y solo en este navegador. Cada uno se guarda 30 días.}}",
         "restore": "Recuperar",
         "delete": "Borrar",
         "one": "Un borrador guardado: {excerpt}",
@@ -1350,13 +1350,13 @@
         "sending": "Enviando",
         "sendToTheConversation": "Enviar a la conversación",
         "notRecorded": "No se grabó la llamada",
-        "notRecordedWhy": "Vuelve a intentarlo o graba desde otro navegador.",
+        "notRecordedWhy": "{surface, select, app {Vuelve a intentarlo o graba desde un navegador.} other {Vuelve a intentarlo o graba desde otro navegador.}}",
         "close": "Cerrar",
         "errors": {
-            "unsupported": "Este navegador no puede grabar vídeo.",
-            "noPicture": "Este navegador no pudo componer la imagen.",
-            "notStarted": "Este navegador no pudo empezar a grabar la llamada.",
-            "notEncoded": "Este navegador no pudo grabar la llamada.",
+            "unsupported": "{surface, select, app {Esta app no puede grabar vídeo.} other {Este navegador no puede grabar vídeo.}}",
+            "noPicture": "{surface, select, app {Esta app no pudo componer la imagen.} other {Este navegador no pudo componer la imagen.}}",
+            "notStarted": "{surface, select, app {Esta app no pudo empezar a grabar la llamada.} other {Este navegador no pudo empezar a grabar la llamada.}}",
+            "notEncoded": "{surface, select, app {Esta app no pudo grabar la llamada.} other {Este navegador no pudo grabar la llamada.}}",
             "tooLarge": "Detenida: la grabación llegó al tamaño máximo de un mensaje."
         }
     },
@@ -1933,7 +1933,7 @@
         "chooseFile": "Elegir archivo",
         "otherFile": "Elegir otro",
         "fileTooLarge": "Ese archivo pasa de 50 MB",
-        "fileUnreadable": "Este navegador no puede leer ese archivo como audio",
+        "fileUnreadable": "{surface, select, app {Esta app no puede leer ese archivo como audio} other {Este navegador no puede leer ese archivo como audio}}",
         "length": "Dura {seconds} s",
         "tooLongCut": "Dura {seconds} s. Elige qué {max} s conservar.",
         "start": "Inicio",
@@ -1949,9 +1949,9 @@
         "save": "Guardar"
     },
     "cameraProblem": {
-        "noCanvas": "Este navegador no tiene un lienzo en el que dibujar.",
-        "noVideoOut": "Este navegador no permite enviar un lienzo como vídeo.",
-        "noWebgl": "Este navegador no puede dibujar un fondo: WebGL 2 está desactivado o no es compatible.",
+        "noCanvas": "{surface, select, app {Esta app no tiene un lienzo en el que dibujar.} other {Este navegador no tiene un lienzo en el que dibujar.}}",
+        "noVideoOut": "{surface, select, app {Esta app no permite enviar un lienzo como vídeo.} other {Este navegador no permite enviar un lienzo como vídeo.}}",
+        "noWebgl": "{surface, select, app {Esta app no puede dibujar un fondo: WebGL 2 está desactivado o no es compatible.} other {Este navegador no puede dibujar un fondo: WebGL 2 está desactivado o no es compatible.}}",
         "noModel": "El modelo de fondo no está en este servidor. Una actualización lo añade.",
         "graphics": "La tarjeta gráfica no pudo crear el fondo.",
         "graphicsSaid": "La tarjeta gráfica no pudo crear el fondo: {said}",
@@ -2066,21 +2066,21 @@
         "voiceMessage": "Mensaje de voz",
         "settings": "Ajustes de dictado",
         "private": "Dictado privado",
-        "privateHelp": "Lo escribe Polaris en lugar de tu navegador.",
+        "privateHelp": "{surface, select, app {Lo escribe Polaris en lugar de esta app.} other {Lo escribe Polaris en lugar de tu navegador.}}",
         "problem": {
-            "micBlocked": "El micrófono está bloqueado. Permítelo en los ajustes del sitio del navegador y vuelve a intentarlo.",
-            "serviceBlocked": "Este navegador tiene el dictado desactivado.",
+            "micBlocked": "{clientKind, select, desktop {El micrófono está bloqueado. Permítelo para Polaris en los ajustes del sistema y vuelve a intentarlo.} other {El micrófono está bloqueado. Permítelo en los ajustes del sitio del navegador y vuelve a intentarlo.}}",
+            "serviceBlocked": "{surface, select, app {Esta app tiene el dictado desactivado.} other {Este navegador tiene el dictado desactivado.}}",
             "noSpeech": "No se ha oído nada. Toca el micrófono y habla.",
             "network": "El dictado necesita conexión. Revísala y vuelve a intentarlo.",
             "noMic": "No hay micrófono. Conecta uno o elígelo en el menú del micrófono.",
-            "language": "El dictado no está disponible en este idioma en este navegador.",
+            "language": "{surface, select, app {El dictado no está disponible en este idioma en esta app.} other {El dictado no está disponible en este idioma en este navegador.}}",
             "notSetUp": "El dictado aún no está disponible aquí. Tus administradores pueden activarlo.",
             "tooMany": "Demasiados dictados por ahora. Espera un minuto y vuelve a intentarlo.",
-            "unavailable": "Este navegador no puede dictar. Envía un mensaje de voz o pide a tus administradores que activen el dictado.",
+            "unavailable": "{surface, select, app {Esta app no puede dictar. Envía un mensaje de voz o pide a tus administradores que activen el dictado.} other {Este navegador no puede dictar. Envía un mensaje de voz o pide a tus administradores que activen el dictado.}}",
             "failed": "No se ha podido escribir. Vuelve a intentarlo."
         },
         "problemWithPrivate": {
-            "serviceBlocked": "Este navegador tiene el dictado desactivado. Prueba el dictado privado en el menú del micrófono o envía un mensaje de voz.",
+            "serviceBlocked": "{surface, select, app {Esta app tiene el dictado desactivado. Prueba el dictado privado en el menú del micrófono o envía un mensaje de voz.} other {Este navegador tiene el dictado desactivado. Prueba el dictado privado en el menú del micrófono o envía un mensaje de voz.}}",
             "network": "El dictado necesita conexión. Revísala o prueba el dictado privado en el menú del micrófono.",
             "language": "El dictado no está disponible en este idioma aquí. Prueba el dictado privado en el menú del micrófono.",
             "notSetUp": "El dictado privado aún no está disponible aquí. Desactívalo en el menú del micrófono."

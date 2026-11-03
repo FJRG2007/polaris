@@ -73,7 +73,7 @@
             "labelHint": "Pasta, Laundry",
             "full": "You have {max} timers, the most there can be. Delete one to add another.",
             "emptyTitle": "No timers set up",
-            "emptyBody": "Start one above. It keeps counting if you close the tab or switch device.",
+            "emptyBody": "{surface, select, app {Start one above. It keeps counting if you close the window or switch device.} other {Start one above. It keeps counting if you close the tab or switch device.}}",
             "untitled": "{length} timer",
             "done": "Time's up",
             "running": "Running",

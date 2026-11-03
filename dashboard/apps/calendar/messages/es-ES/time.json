@@ -73,7 +73,7 @@
             "labelHint": "Pasta, Colada",
             "full": "Tienes {max} temporizadores, el máximo. Elimina uno para añadir otro.",
             "emptyTitle": "Sin temporizadores",
-            "emptyBody": "Inicia uno arriba. Sigue contando aunque cierres la pestaña o cambies de dispositivo.",
+            "emptyBody": "{surface, select, app {Inicia uno arriba. Sigue contando aunque cierres la ventana o cambies de dispositivo.} other {Inicia uno arriba. Sigue contando aunque cierres la pestaña o cambies de dispositivo.}}",
             "untitled": "Temporizador de {length}",
             "done": "Terminado",
             "running": "En marcha",

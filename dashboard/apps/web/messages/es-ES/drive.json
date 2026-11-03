@@ -911,7 +911,7 @@
         "language": "Lenguaje",
         "whoCanOpenIt": "Quién puede abrirlo",
         "aPasswordAnExpiryAnd": "La contraseña, la caducidad y el límite de vistas se pueden poner cuando exista.",
-        "sealItInThisBrowser": "Sellarlo en este navegador",
+        "sealItInThisBrowser": "{surface, select, app {Sellarlo en esta app} other {Sellarlo en este navegador}}",
         "theKeyGoesInThe": "La clave va en el enlace y nunca llega al servidor. Polaris no puede previsualizarlo, buscarlo ni recuperarlo, y un enlace perdido es un fragmento perdido.",
         "cancel": "Cancelar",
         "saveChanges": "Guardar cambios",

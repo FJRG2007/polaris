@@ -911,7 +911,7 @@
         "language": "Language",
         "whoCanOpenIt": "Who can open it",
         "aPasswordAnExpiryAnd": "A password, an expiry and a view cap can be set once it exists.",
-        "sealItInThisBrowser": "Seal it in this browser",
+        "sealItInThisBrowser": "{surface, select, app {Seal it in this app} other {Seal it in this browser}}",
         "theKeyGoesInThe": "The key goes in the link and never reaches the server. Polaris cannot preview, search or recover it, and a lost link is a lost snippet.",
         "cancel": "Cancel",
         "saveChanges": "Save changes",

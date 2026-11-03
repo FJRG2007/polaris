@@ -20,7 +20,7 @@ import { clientIp } from "@/lib/request-context";
 import { LOCALE_COOKIE, localeFromCookie } from "./cookie";
 import type { Namespace, NamespaceTranslator } from "./types";
 import { recordDetectedLocale, storedLocale } from "./locale-service";
-import { DEFAULT_LOCALE, detectLocale, type Locale } from "@polaris/core";
+import { clientFromUserAgent, DEFAULT_LOCALE, detectLocale, type Client, type Locale } from "@polaris/core";
 
 /** How long a first request waits for the address's country before giving up on
  *  it. Only reached when the browser names no language Polaris has, and only
@@ -123,5 +123,19 @@ export async function getLocale(): Promise<Locale> {
  *     return { error: t("language.unsupported") };
  */
 export async function getTranslations<N extends Namespace>(namespace: N): Promise<NamespaceTranslator<N>> {
-    return translatorFor(await getLocale(), namespace);
+    const [locale, client] = await Promise.all([getLocale(), getClient()]);
+    return translatorFor(locale, namespace, client);
 }
+
+/**
+ * Which Polaris this request comes from - the desktop app or a browser - read
+ * from its user-agent, so the page is worded for it from the first paint (see
+ * client-surface.ts). Outside a request, a browser.
+ */
+export const getClient = cache(async (): Promise<Client> => {
+    try {
+        return clientFromUserAgent((await headers()).get("user-agent"));
+    } catch {
+        return "browser";
+    }
+});

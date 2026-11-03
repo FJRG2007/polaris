@@ -60,6 +60,7 @@ const bridge: PolarisDesktop = {
     openTvInstall: () => ipcRenderer.invoke(CHANNELS.tvOpen),
     defaultBrowser: () => ipcRenderer.invoke(CHANNELS.defaultBrowser),
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),
+    setAppBadge: (input) => ipcRenderer.invoke(CHANNELS.appBadge, input),
     shareSources: (input) => ipcRenderer.invoke(CHANNELS.shareSources, input),
     chooseShare: (input) => ipcRenderer.invoke(CHANNELS.chooseShare, input),
     drawOnShare: (stroke) => ipcRenderer.invoke(CHANNELS.drawOnShare, stroke),

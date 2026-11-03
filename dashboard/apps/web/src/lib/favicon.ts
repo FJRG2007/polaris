@@ -110,6 +110,31 @@ export function drawFavicon(badge: FaviconBadge | null, size = RENDER_SIZE): str
     return canvas.toDataURL("image/png");
 }
 
+/**
+ * The badge alone, filling a transparent square: what the desktop app lays over
+ * the corner of its taskbar button, where the app's own icon is already drawn
+ * underneath. Same red and the same figures as the tab's, so the two read as one
+ * thing. Null when there is no canvas to draw it with.
+ */
+export function drawBadgeOverlay(badge: FaviconBadge, size = 32): string | null {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    const radius = size / 2;
+    context.fillStyle = BADGE_BACKGROUND;
+    disc(context, radius, radius, radius);
+    if (badge.kind === "count") {
+        context.fillStyle = MARK_FOREGROUND;
+        context.font = `700 ${radius * (badge.label.length > 1 ? 1.1 : 1.5)}px ${BADGE_FONT}`;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(badge.label, radius, radius);
+    }
+    return canvas.toDataURL("image/png");
+}
+
 /** What the tab is showing now, so the badge can be taken back off later. */
 export function currentFavicon(): FaviconLink {
     const link = document.head.querySelector<HTMLLinkElement>("link[rel~='icon']");

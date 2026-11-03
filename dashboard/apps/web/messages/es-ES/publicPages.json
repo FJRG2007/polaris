@@ -206,7 +206,7 @@
         "text": "Texto",
         "textPlaceholder": "Pégalo aquí",
         "tooLong": "{count} / {max} - demasiado largo para enviarlo",
-        "seal": "Sellarlo en este navegador",
+        "seal": "{surface, select, app {Sellarlo en esta app} other {Sellarlo en este navegador}}",
         "sealHint": "Polaris lo guarda ilegible y te da una clave para que la pases aparte. Sin la clave nadie puede abrirlo.",
         "send": "Enviar"
     },

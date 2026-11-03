@@ -241,7 +241,7 @@
             },
             "standard": {
                 "label": "Standard",
-                "help": "The browser's own echo and noise handling. Enough for a quiet room."
+                "help": "{surface, select, app {The app's own echo and noise handling. Enough for a quiet room.} other {The browser's own echo and noise handling. Enough for a quiet room.}}"
             },
             "licensed": {
                 "label": "Enhanced (licensed)",
@@ -382,7 +382,7 @@
         "recordThisCall": "Record this call",
         "moreForThisCall": "More for this call",
         "recShort": "REC",
-        "writeThisCallToA": "Write this call to a video file in this browser",
+        "writeThisCallToA": "{surface, select, app {Write this call to a video file in this app} other {Write this call to a video file in this browser}}",
         "addPeople": "Add people",
         "shareALinkToThis": "Share a link to this call",
         "whatYouAreSharingHas": "What you are sharing has stopped sending new pictures, so everybody sees the last one. If it is a minimized window - a game in full screen minimizes when you switch away - bring it back, run the game in a window, or share your whole screen.",
@@ -412,7 +412,7 @@
         "raiseYourHand": "Raise your hand",
         "leaveTheCall": "Leave the call",
         "recordThisCall2": "Record this call?",
-        "theRecordingIsMadeIn": "The recording is made in this browser, from what it can see and hear, and it stops if you leave the call or close the tab. Everybody in the call is told while it runs. When you stop, you choose whether it goes into the conversation or stays on this machine.",
+        "theRecordingIsMadeIn": "{surface, select, app {The recording is made in this app, from what it can see and hear, and it stops if you leave the call or close the window. Everybody in the call is told while it runs. When you stop, you choose whether it goes into the conversation or stays on this machine.} other {The recording is made in this browser, from what it can see and hear, and it stops if you leave the call or close the tab. Everybody in the call is told while it runs. When you stop, you choose whether it goes into the conversation or stays on this machine.}}",
         "cancel": "Cancel",
         "startRecording": "Start recording",
         "mirrorMyPicture": "Mirror my picture",
@@ -601,7 +601,7 @@
         "stopReplying": "Stop replying",
         "editingAMessage": "Editing a message",
         "stopEditing": "Stop editing",
-        "polarisIsNotHearingAnything": "Polaris is not hearing anything. Check your microphone, or that it is the one your browser is using.",
+        "polarisIsNotHearingAnything": "{surface, select, app {Polaris is not hearing anything. Check your microphone, or that it is the one this app is using.} other {Polaris is not hearing anything. Check your microphone, or that it is the one your browser is using.}}",
         "throwThisRecordingAway": "Throw this recording away",
         "throwItAway": "Throw it away",
         "sendThisRecording": "Send this recording",
@@ -931,12 +931,12 @@
         "description": "Polaris records the screen or window you pick and puts the video in your message. Up to {time} and {size} MB.",
         "recorded": "{time}, {size} MB",
         "errors": {
-            "unsupported": "This browser cannot record video. Try another browser.",
+            "unsupported": "{surface, select, app {This app cannot record video. Try it from a browser.} other {This browser cannot record video. Try another browser.}}",
             "withoutCamera": "Recording without the camera: it could not be opened.",
             "withoutMicrophone": "Recording without the microphone: it could not be opened.",
-            "noPicture": "This browser could not put the picture together. Try again, or use another browser.",
-            "notStarted": "This browser could not start recording the screen. Try again, or use another browser.",
-            "notEncoded": "This browser could not record the screen, so nothing was saved. Try again, or use another browser.",
+            "noPicture": "{surface, select, app {This app could not put the picture together. Try again, or use a browser.} other {This browser could not put the picture together. Try again, or use another browser.}}",
+            "notStarted": "{surface, select, app {This app could not start recording the screen. Try again, or use a browser.} other {This browser could not start recording the screen. Try again, or use another browser.}}",
+            "notEncoded": "{surface, select, app {This app could not record the screen, so nothing was saved. Try again, or use a browser.} other {This browser could not record the screen, so nothing was saved. Try again, or use another browser.}}",
             "tooLarge": "Stopped: the recording reached the size a message can carry."
         }
     },
@@ -1333,7 +1333,7 @@
     },
     "savedDrafts": {
         "savedDrafts": "Saved drafts",
-        "onlyYouCanSeeThese": "Only you can see these, and only in this browser. Each one is kept for 30 days.",
+        "onlyYouCanSeeThese": "{surface, select, app {Only you can see these, and only in this app. Each one is kept for 30 days.} other {Only you can see these, and only in this browser. Each one is kept for 30 days.}}",
         "restore": "Restore",
         "delete": "Delete",
         "one": "A saved draft: {excerpt}",
@@ -1350,13 +1350,13 @@
         "sending": "Sending",
         "sendToTheConversation": "Send to the conversation",
         "notRecorded": "The call was not recorded",
-        "notRecordedWhy": "Try again, or record from another browser.",
+        "notRecordedWhy": "{surface, select, app {Try again, or record from a browser.} other {Try again, or record from another browser.}}",
         "close": "Close",
         "errors": {
-            "unsupported": "This browser cannot record video.",
-            "noPicture": "This browser could not put the picture together.",
-            "notStarted": "This browser could not start recording the call.",
-            "notEncoded": "This browser could not record the call.",
+            "unsupported": "{surface, select, app {This app cannot record video.} other {This browser cannot record video.}}",
+            "noPicture": "{surface, select, app {This app could not put the picture together.} other {This browser could not put the picture together.}}",
+            "notStarted": "{surface, select, app {This app could not start recording the call.} other {This browser could not start recording the call.}}",
+            "notEncoded": "{surface, select, app {This app could not record the call.} other {This browser could not record the call.}}",
             "tooLarge": "Stopped: the recording reached the size a message can carry."
         }
     },
@@ -1933,7 +1933,7 @@
         "chooseFile": "Choose file",
         "otherFile": "Choose another",
         "fileTooLarge": "That file is over 50 MB",
-        "fileUnreadable": "This browser cannot read that file as audio",
+        "fileUnreadable": "{surface, select, app {This app cannot read that file as audio} other {This browser cannot read that file as audio}}",
         "length": "{seconds} s long",
         "tooLongCut": "{seconds} s long. Choose which {max} s to keep.",
         "start": "Start",
@@ -1949,9 +1949,9 @@
         "save": "Save"
     },
     "cameraProblem": {
-        "noCanvas": "This browser has no canvas to draw on.",
-        "noVideoOut": "This browser would not let a canvas be sent as video.",
-        "noWebgl": "This browser cannot draw a background: WebGL 2 is turned off or not supported.",
+        "noCanvas": "{surface, select, app {This app has no canvas to draw on.} other {This browser has no canvas to draw on.}}",
+        "noVideoOut": "{surface, select, app {This app would not let a canvas be sent as video.} other {This browser would not let a canvas be sent as video.}}",
+        "noWebgl": "{surface, select, app {This app cannot draw a background: WebGL 2 is turned off or not supported.} other {This browser cannot draw a background: WebGL 2 is turned off or not supported.}}",
         "noModel": "The background model is not on this server. An update adds it.",
         "graphics": "The graphics card would not build the background.",
         "graphicsSaid": "The graphics card would not build the background: {said}",
@@ -2066,21 +2066,21 @@
         "voiceMessage": "Voice message",
         "settings": "Dictation settings",
         "private": "Private dictation",
-        "privateHelp": "Polaris writes it down instead of your browser.",
+        "privateHelp": "{surface, select, app {Polaris writes it down instead of this app.} other {Polaris writes it down instead of your browser.}}",
         "problem": {
-            "micBlocked": "The microphone is blocked. Allow it in the browser's site settings, then try again.",
-            "serviceBlocked": "This browser turned dictation off.",
+            "micBlocked": "{clientKind, select, desktop {The microphone is blocked. Allow it for Polaris in the system settings, then try again.} other {The microphone is blocked. Allow it in the browser's site settings, then try again.}}",
+            "serviceBlocked": "{surface, select, app {This app turned dictation off.} other {This browser turned dictation off.}}",
             "noSpeech": "Nothing was heard. Tap the mic and speak.",
             "network": "Dictation needs a connection. Check it and try again.",
             "noMic": "No microphone found. Plug one in or pick it in the mic menu.",
-            "language": "Dictation is not available in this language in this browser.",
+            "language": "{surface, select, app {Dictation is not available in this language in this app.} other {Dictation is not available in this language in this browser.}}",
             "notSetUp": "Dictation is not available here yet. Your administrators can turn it on.",
             "tooMany": "Too many dictations for now. Wait a minute and try again.",
-            "unavailable": "This browser cannot dictate. Send a voice message instead, or ask your administrators to turn on dictation.",
+            "unavailable": "{surface, select, app {This app cannot dictate. Send a voice message instead, or ask your administrators to turn on dictation.} other {This browser cannot dictate. Send a voice message instead, or ask your administrators to turn on dictation.}}",
             "failed": "That could not be written down. Try again."
         },
         "problemWithPrivate": {
-            "serviceBlocked": "This browser turned dictation off. Try Private dictation in the mic menu, or send a voice message.",
+            "serviceBlocked": "{surface, select, app {This app turned dictation off. Try Private dictation in the mic menu, or send a voice message.} other {This browser turned dictation off. Try Private dictation in the mic menu, or send a voice message.}}",
             "network": "Dictation needs a connection. Check it, or try Private dictation in the mic menu.",
             "language": "Dictation is not available in this language here. Try Private dictation in the mic menu.",
             "notSetUp": "Private dictation is not available here yet. Turn it off in the mic menu."

@@ -9,11 +9,14 @@
  */
 
 import { createContext, useContext, useMemo } from "react";
-import { createTranslator, DEFAULT_LOCALE, type Locale, type Namespaces } from "@polaris/core";
+import { createTranslator, DEFAULT_LOCALE, type Client, type Locale, type Namespaces } from "@polaris/core";
 
 export interface I18nState {
     readonly locale: Locale;
     readonly messages: Namespaces;
+    /** The Polaris the screen is drawn in, which every message can word itself
+     *  by. A browser when not given. */
+    readonly client?: Client;
 }
 
 export const I18nContext = createContext<I18nState | null>(null);
@@ -24,7 +27,8 @@ export function useTranslations(namespace: string) {
     return useMemo(
         () =>
             createTranslator(state?.locale ?? DEFAULT_LOCALE, state?.messages[namespace], {
-                namespace
+                namespace,
+                client: state?.client
             }),
         [state, namespace]
     );

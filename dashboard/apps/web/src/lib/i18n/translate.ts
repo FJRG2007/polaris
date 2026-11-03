@@ -12,7 +12,7 @@
 
 import { webCatalogs } from "../../../messages";
 import type { Namespace, NamespaceTranslator, WebKey } from "./types";
-import type { Locale, MessageParams, Namespaces } from "@polaris/core";
+import type { Client, Locale, MessageParams, Namespaces } from "@polaris/core";
 
 /** One message by its qualified key: `translate("es-ES", "nav.account.signOut")`. */
 export function translate(locale: Locale, key: WebKey, params?: MessageParams): string {
@@ -20,8 +20,12 @@ export function translate(locale: Locale, key: WebKey, params?: MessageParams): 
 }
 
 /** A translator over one namespace, for code that says several things. */
-export function translatorFor<N extends Namespace>(locale: Locale, namespace: N): NamespaceTranslator<N> {
-    return webCatalogs.translator(locale, namespace);
+export function translatorFor<N extends Namespace>(
+    locale: Locale,
+    namespace: N,
+    client?: Client
+): NamespaceTranslator<N> {
+    return webCatalogs.translator(locale, namespace, client);
 }
 
 /** The namespaces a screen needs, as the browser is handed them. */

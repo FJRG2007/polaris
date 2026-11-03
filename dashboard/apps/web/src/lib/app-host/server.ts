@@ -455,7 +455,8 @@ export const serverHost = {
         storedLocale: later(load.i18nLocaleService, "storedLocale")
     },
     i18nRequest: {
-        getLocale: later(load.i18nRequest, "getLocale")
+        getLocale: later(load.i18nRequest, "getLocale"),
+        getClient: later(load.i18nRequest, "getClient")
     },
     integrationService: {
         getIntegrationSecret: later(load.integrationService, "getIntegrationSecret")

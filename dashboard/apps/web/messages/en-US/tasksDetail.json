@@ -41,7 +41,7 @@
         "creating": "Creating",
         "submit": "Create task",
         "keepTitle": "Keep this draft?",
-        "keepDescription": "It stays in this browser and is offered back the next time you write a task in this list.",
+        "keepDescription": "{surface, select, app {It stays in this app and is offered back the next time you write a task in this list.} other {It stays in this browser and is offered back the next time you write a task in this list.}}",
         "discard": "Discard it",
         "keepWriting": "Keep writing",
         "saveDraft": "Save draft"
