@@ -27,7 +27,8 @@ class FakeChannel {
     postMessage(message: unknown): void {
         const copy = structuredClone(message);
         for (const peer of FakeChannel.live) {
-            if (peer !== this && !peer.closed && peer.name === this.name) peer.onmessage?.({ data: copy });
+            if (peer !== this && !peer.closed && peer.name === this.name)
+                peer.onmessage?.({ data: copy });
         }
     }
 
@@ -49,7 +50,9 @@ function tab(id: string) {
 
 /** Requests to the presence endpoint, by the ids each asked about. */
 function asked(fetchMock: ReturnType<typeof vi.fn>): string[][] {
-    return fetchMock.mock.calls.map(([, init]) => (JSON.parse(String(init.body)) as { ids: string[] }).ids);
+    return fetchMock.mock.calls.map(
+        ([, init]) => (JSON.parse(String(init.body)) as { ids: string[] }).ids
+    );
 }
 
 let visibility: DocumentVisibilityState = "visible";
@@ -72,7 +75,9 @@ afterEach(() => {
 function answering() {
     const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
         const { ids } = JSON.parse(init.body) as { ids: string[] };
-        return new Response(JSON.stringify({ people: Object.fromEntries(ids.map((id) => [id, here])) }));
+        return new Response(
+            JSON.stringify({ people: Object.fromEntries(ids.map((id) => [id, here])) })
+        );
     });
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;

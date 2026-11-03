@@ -33,7 +33,8 @@ class FakeChannel {
     postMessage(message: unknown): void {
         const copy = structuredClone(message);
         for (const peer of FakeChannel.live) {
-            if (peer !== this && !peer.closed && peer.name === this.name) peer.onmessage?.({ data: copy });
+            if (peer !== this && !peer.closed && peer.name === this.name)
+                peer.onmessage?.({ data: copy });
         }
     }
 
@@ -77,14 +78,21 @@ function controlledLoad() {
 
 function tab(
     load: () => Promise<Reading>,
-    { account = "user-1", paused = false, intervalMs }: { account?: string; paused?: boolean; intervalMs?: number } = {}
+    {
+        account = "user-1",
+        paused = false,
+        intervalMs
+    }: { account?: string; paused?: boolean; intervalMs?: number } = {}
 ) {
     const wrapper = ({ children }: { children: ReactNode }) => (
         <SessionScopeProvider userId={account}>{children}</SessionScopeProvider>
     );
-    return renderHook(() => useLiveRead<Reading>({ load, cacheKey: "servers.usage.h1", paused, intervalMs }), {
-        wrapper
-    });
+    return renderHook(
+        () => useLiveRead<Reading>({ load, cacheKey: "servers.usage.h1", paused, intervalMs }),
+        {
+            wrapper
+        }
+    );
 }
 
 beforeEach(() => {

@@ -29,7 +29,11 @@ import { openPeerChannel } from "@/lib/shared-stream";
 
 const BUILD = process.env.NEXT_PUBLIC_POLARIS_BUILD_STAMP ?? "dev";
 
-const answerSchema = z.object({ kind: z.literal("answer"), at: z.number().finite(), value: z.unknown() });
+const answerSchema = z.object({
+    kind: z.literal("answer"),
+    at: z.number().finite(),
+    value: z.unknown()
+});
 
 export interface TabAnswers<T> {
     /** Hand an answer to the other tabs. One that cannot be copied between
@@ -48,10 +52,14 @@ export function openTabAnswers<T>(
     onAnswer: (value: T, at: number) => void
 ): TabAnswers<T> | null {
     if (!scope || typeof BroadcastChannel === "undefined") return null;
-    const channel = openPeerChannel<z.infer<typeof answerSchema>>(`answers:${BUILD}:${key}`, scope, (message) => {
-        const answer = answerSchema.safeParse(message);
-        if (answer.success) onAnswer(answer.data.value as T, answer.data.at);
-    });
+    const channel = openPeerChannel<z.infer<typeof answerSchema>>(
+        `answers:${BUILD}:${key}`,
+        scope,
+        (message) => {
+            const answer = answerSchema.safeParse(message);
+            if (answer.success) onAnswer(answer.data.value as T, answer.data.at);
+        }
+    );
     return {
         post: (value, at) => {
             try {

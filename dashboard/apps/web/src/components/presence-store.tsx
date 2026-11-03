@@ -114,25 +114,28 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
-    const ask = useCallback(async (ids: readonly string[]) => {
-        if (ids.length === 0) return;
-        try {
-            const response = await fetch("/api/presence", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ ids })
-            });
-            if (!response.ok) return;
-            const body = (await response.json()) as { people?: Record<string, PresenceOf> };
-            const answered = Object.entries(body.people ?? {});
-            if (answered.length === 0) return;
-            take(answered);
-            answers.current?.post(Object.fromEntries(answered), Date.now());
-        } catch {
-            // Offline, or a request that went away with the page. The dots keep
-            // whatever they had, which is the right way to be wrong.
-        }
-    }, [take]);
+    const ask = useCallback(
+        async (ids: readonly string[]) => {
+            if (ids.length === 0) return;
+            try {
+                const response = await fetch("/api/presence", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ ids })
+                });
+                if (!response.ok) return;
+                const body = (await response.json()) as { people?: Record<string, PresenceOf> };
+                const answered = Object.entries(body.people ?? {});
+                if (answered.length === 0) return;
+                take(answered);
+                answers.current?.post(Object.fromEntries(answered), Date.now());
+            } catch {
+                // Offline, or a request that went away with the page. The dots keep
+                // whatever they had, which is the right way to be wrong.
+            }
+        },
+        [take]
+    );
 
     // Answers other tabs were given. Only the people drawn here are taken; the
     // rest would be a map of faces nobody on this tab is looking at.
@@ -173,7 +176,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     // just told about.
     useEffect(() => {
         const due = (): string[] =>
-            [...watched.current].filter((id) => !heardRecently(heard.current.get(id) ?? 0, REFRESH_MS));
+            [...watched.current].filter(
+                (id) => !heardRecently(heard.current.get(id) ?? 0, REFRESH_MS)
+            );
         // A chain of spread waits rather than an interval: two tabs opened
         // together would otherwise keep asking in the same instant, each too
         // early to have heard the other.
