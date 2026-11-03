@@ -31,7 +31,7 @@
         "turnOff": "Desactivar",
         "newDevice": {
             "title": "Este equipo aún es nuevo aquí",
-            "hint": "Usa un dispositivo desde el que ya hayas iniciado sesión, o espera. Cerrar sesión desde aquí sigue funcionando."
+            "hint": "Entra aquí con una llave de acceso, usa un dispositivo desde el que ya hayas iniciado sesión, o espera. Cerrar sesión desde aquí sigue funcionando."
         },
         "password": {
             "title": "Contraseña",
@@ -57,7 +57,7 @@
             "title": "Equipos nuevos",
             "description": "Haz que un navegador desde el que nunca has iniciado sesión espere antes de poder cambiar nada en esta página. Te da tiempo a darte cuenta si alguien entra con tu contraseña.",
             "label": "Espera antes de que un dispositivo nuevo pueda cambiar la seguridad",
-            "hint": "Un dispositivo en espera puede leer esta página y cerrar su propia sesión. No afecta a los dispositivos que ya usas, ni a aquel desde el que abriste esta cuenta."
+            "hint": "Un dispositivo en espera puede leer esta página y cerrar su propia sesión. No afecta a los dispositivos que ya usas, ni a aquel desde el que abriste esta cuenta, ni a una entrada con llave de acceso."
         },
         "limits": {
             "title": "Límites de sesión",

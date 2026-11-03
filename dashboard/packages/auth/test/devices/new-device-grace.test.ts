@@ -203,6 +203,68 @@ describe("sessionDeviceStanding", () => {
         session.findFirst.mockResolvedValue(null);
         expect((await sessionDeviceStanding("user-1", "session-1")).settled).toBe(false);
     });
+
+    /** The desktop app on the owner's own computer: Chromium, but announcing
+     *  itself as an app, so its user-agent reads as a browser never seen here. */
+    const DESKTOP = "Mozilla/5.0 (Windows NT 10.0) polaris-desktop/0.1.11 Chrome/131.0.0.0 Electron/38.0.0";
+
+    it("settles a session opened with a passkey, however new its browser reads", async () => {
+        graceOf(7);
+        register({ userAgent: CHROME, days: 400 }, { userAgent: DESKTOP, days: 0 });
+        session.findFirst.mockResolvedValue({ userAgent: DESKTOP, state: { userAgent: DESKTOP, signInMethod: "passkey" } });
+        const standing = await sessionDeviceStanding("user-1", "session-1");
+        expect(standing.settled).toBe(true);
+        expect(standing.graceDays).toBe(7);
+    });
+
+    it("still holds the same new browser when it signed in with a password", async () => {
+        graceOf(7);
+        register({ userAgent: CHROME, days: 400 }, { userAgent: DESKTOP, days: 0 });
+        session.findFirst.mockResolvedValue({ userAgent: DESKTOP, state: { userAgent: DESKTOP, signInMethod: "password" } });
+        expect((await sessionDeviceStanding("user-1", "session-1")).settled).toBe(false);
+    });
+
+    it("settles a sign-in a settled session approved", async () => {
+        graceOf(7);
+        register({ userAgent: CHROME, days: 400 }, { userAgent: DESKTOP, days: 0 });
+        session.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
+            Promise.resolve(
+                where.id === "session-new"
+                    ? { userAgent: DESKTOP, state: { userAgent: DESKTOP, signInMethod: "qr-code", authorizedBySessionId: "session-old" } }
+                    : { userAgent: CHROME, state: { userAgent: CHROME, signInMethod: "password" } }
+            )
+        );
+        expect((await sessionDeviceStanding("user-1", "session-new")).settled).toBe(true);
+    });
+
+    it("does not pass an approval down a chain of new devices", async () => {
+        graceOf(7);
+        register({ userAgent: SAFARI, days: 1 }, { userAgent: DESKTOP, days: 0 }, { userAgent: CHROME, days: 400 });
+        openedFrom(CHROME);
+        // session-a (new desktop) was let in by session-b (new Safari), which was
+        // itself let in by session-c (old Chrome). Only one hop is followed.
+        const rows: Record<string, unknown> = {
+            "session-a": { userAgent: DESKTOP, state: { userAgent: DESKTOP, signInMethod: "qr-code", authorizedBySessionId: "session-b" } },
+            "session-b": { userAgent: SAFARI, state: { userAgent: SAFARI, signInMethod: "qr-code", authorizedBySessionId: "session-c" } },
+            "session-c": { userAgent: CHROME, state: { userAgent: CHROME, signInMethod: "password" } }
+        };
+        session.findFirst.mockImplementation(({ where }: { where: { id: string } }) => Promise.resolve(rows[where.id] ?? null));
+        expect((await sessionDeviceStanding("user-1", "session-a")).settled).toBe(false);
+        expect((await sessionDeviceStanding("user-1", "session-b")).settled).toBe(true);
+    });
+
+    it("holds an approval whose approving session is gone", async () => {
+        graceOf(7);
+        register({ userAgent: CHROME, days: 400 }, { userAgent: DESKTOP, days: 0 });
+        session.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
+            Promise.resolve(
+                where.id === "session-new"
+                    ? { userAgent: DESKTOP, state: { userAgent: DESKTOP, signInMethod: "qr-code", authorizedBySessionId: "session-gone" } }
+                    : null
+            )
+        );
+        expect((await sessionDeviceStanding("user-1", "session-new")).settled).toBe(false);
+    });
 });
 
 describe("rememberAccountDevice", () => {
