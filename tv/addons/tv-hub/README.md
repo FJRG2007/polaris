@@ -182,5 +182,5 @@ player/     PlayerActivity (Media3)
 ```
 
 Testing on a TV, with demo fixtures: [docs/TESTING.md](docs/TESTING.md).
-Third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Third-party licences: [app/src/main/assets/licenses.txt](app/src/main/assets/licenses.txt).
 Maintained by [@maxhayim](https://github.com/maxhayim); issues about TV Hub go to them.
