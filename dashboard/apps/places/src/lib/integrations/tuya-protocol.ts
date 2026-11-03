@@ -109,7 +109,12 @@ export function ecbDecrypt(key: Buffer, data: Buffer): Buffer {
     }
 }
 
-function gcmSeal(key: Buffer, iv: Buffer, aad: Buffer, data: Buffer): { body: Buffer; tag: Buffer } {
+function gcmSeal(
+    key: Buffer,
+    iv: Buffer,
+    aad: Buffer,
+    data: Buffer
+): { body: Buffer; tag: Buffer } {
     const cipher = createCipheriv("aes-128-gcm", key, iv);
     cipher.setAAD(aad);
     const body = Buffer.concat([cipher.update(data), cipher.final()]);
@@ -275,7 +280,10 @@ export function parseFrame(
             code = body.readUInt32BE(0);
             body = body.subarray(4);
         }
-        return { frame: { seqno, cmd, retcode: code, payload: body }, rest: buffer.subarray(total) };
+        return {
+            frame: { seqno, cmd, retcode: code, payload: body },
+            rest: buffer.subarray(total)
+        };
     }
     throw new TuyaProtocolError("Not a Tuya frame");
 }
@@ -339,7 +347,9 @@ export function decodePayload(session: TuyaSession, frame: TuyaFrame): unknown {
     try {
         return JSON.parse(text) as unknown;
     } catch {
-        throw new TuyaProtocolError(`Device answered something that is not JSON: ${text.slice(0, 40)}`);
+        throw new TuyaProtocolError(
+            `Device answered something that is not JSON: ${text.slice(0, 40)}`
+        );
     }
 }
 
@@ -353,7 +363,10 @@ const statusSchema = z.union([
 export function dpsOf(decoded: unknown): Record<string, unknown> | null {
     const parsed = statusSchema.safeParse(decoded);
     if (!parsed.success) return null;
-    const data = parsed.data as { dps?: Record<string, unknown>; data?: { dps: Record<string, unknown> } };
+    const data = parsed.data as {
+        dps?: Record<string, unknown>;
+        data?: { dps: Record<string, unknown> };
+    };
     return data.dps ?? data.data?.dps ?? null;
 }
 
@@ -480,7 +493,10 @@ export function parseAnnouncement(datagram: Buffer): TuyaAnnouncement | null {
             const parsed = parseFrame(datagram, { retcode: "guess" });
             if (!parsed) return null;
             const body = parsed.frame.payload;
-            text = body[0] === 0x7b ? body.toString("utf8") : ecbDecrypt(TUYA_UDP_KEY, body).toString("utf8");
+            text =
+                body[0] === 0x7b
+                    ? body.toString("utf8")
+                    : ecbDecrypt(TUYA_UDP_KEY, body).toString("utf8");
         } else {
             text = ecbDecrypt(TUYA_UDP_KEY, datagram).toString("utf8");
         }
