@@ -38,6 +38,7 @@ import { ClimateControls } from "./climate-controls";
 import { LightControls } from "./light-controls";
 import { ApplianceControls } from "./appliance-controls";
 import { LitterControls } from "./litter-controls";
+import { SwitchSettings } from "./switch-settings";
 import {
     Badge,
     Button,
@@ -253,6 +254,25 @@ export function DeviceControls({
             />
         );
     }
+    if (
+        kinds.isSwitchable(device.kind) &&
+        detailed &&
+        kinds.hasSwitchSettings(device.switchSettings)
+    ) {
+        // The switch as any switch has it, with the settings this one reports
+        // beneath it.
+        return (
+            <div className={cn("flex min-w-0 flex-col gap-3", className)}>
+                <DeviceSwitch
+                    device={device}
+                    canControl={canControl}
+                    busy={busy !== null}
+                    onAct={onAct}
+                />
+                <SwitchSettings device={device} canControl={canControl} busy={busy} onAct={onAct} />
+            </div>
+        );
+    }
     if (kinds.isSwitchable(device.kind)) {
         return (
             <DeviceSwitch
@@ -466,6 +486,13 @@ export function DevicePanel({
                                         .filter(Boolean)
                                         .join(" - ")}
                                 </p>
+                                {/* Whether it answers here or only through its
+                                    maker, for a make reached both ways. */}
+                                {device.reach && (
+                                    <p className="text-xs text-foreground-subtle">
+                                        {kinds.reachText(device.reach, t)}
+                                    </p>
+                                )}
                                 {batteryLow(device) && (
                                     <p className="flex items-center gap-1.5 text-xs text-danger">
                                         <BatteryLow className="size-3.5 shrink-0" />

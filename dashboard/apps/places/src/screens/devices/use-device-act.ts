@@ -51,7 +51,8 @@ export function useDeviceAct({
                       kind: device.kind,
                       climate: device.climate ?? null,
                       air: device.air ?? null,
-                      light: device.light ?? null
+                      light: device.light ?? null,
+                      switchSettings: device.switchSettings ?? null
                   },
                   command
               )
@@ -62,9 +63,12 @@ export function useDeviceAct({
                 : null;
         const air = applied && "air" in applied ? applied.air : null;
         const light = applied && "light" in applied ? applied.light : null;
+        const switchSettings =
+            applied && "switchSettings" in applied ? applied.switchSettings : null;
         if (climate) settle({ ...device, climate });
         else if (air) settle({ ...device, air });
         else if (light) settle({ ...device, light });
+        else if (switchSettings) settle({ ...device, switchSettings });
         else if (settled) settle({ ...device, state: settled });
         const send = (where?: ReportedLocation) =>
             runAction(
@@ -82,14 +86,17 @@ export function useDeviceAct({
         if (!result || result.error) {
             // Only what this press changed is put back, and only while it is
             // still what this press made it: a later press, or a sync, wins.
-            if (climate || air || light || settled) {
+            if (climate || air || light || switchSettings || settled) {
                 update((entry) => {
                     if (entry.id !== device.id) return entry;
                     if (climate && entry.climate === climate)
                         return { ...entry, climate: device.climate };
                     if (air && entry.air === air) return { ...entry, air: device.air };
                     if (light && entry.light === light) return { ...entry, light: device.light };
-                    if (!climate && !air && !light && settled && entry.state === settled)
+                    if (switchSettings && entry.switchSettings === switchSettings)
+                        return { ...entry, switchSettings: device.switchSettings };
+                    const onlyState = !climate && !air && !light && !switchSettings;
+                    if (onlyState && settled && entry.state === settled)
                         return { ...entry, state: device.state };
                     return entry;
                 });
