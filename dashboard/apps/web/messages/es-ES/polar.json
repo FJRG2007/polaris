@@ -765,7 +765,71 @@
             "steps": "Pasos",
             "comparison": "Comparativa",
             "diagram": "Diagrama",
-            "calculator": "Calculadora"
+            "calculator": "Calculadora",
+            "translation": "Traducción",
+            "weather": "El tiempo",
+            "time": "Hora",
+            "conversion": "Conversión"
+        },
+        "translation": {
+            "detected": "Idioma detectado",
+            "listen": "Escuchar",
+            "stop": "Parar",
+            "copy": "Copiar traducción",
+            "copied": "Copiado",
+            "alternatives": "También"
+        },
+        "weather": {
+            "tool": "Tiempo consultado",
+            "asOf": "A las {time}",
+            "feelsLike": "Sensación {value}",
+            "wind": "Viento {value}",
+            "humidity": "Humedad {value}",
+            "rain": "Lluvia {value}",
+            "forecast": "Próximos días",
+            "codes": {
+                "clear": "Despejado",
+                "mainlyClear": "Casi despejado",
+                "partlyCloudy": "Algo nuboso",
+                "overcast": "Cubierto",
+                "fog": "Niebla",
+                "rimeFog": "Niebla helada",
+                "drizzleLight": "Llovizna débil",
+                "drizzleModerate": "Llovizna",
+                "drizzleDense": "Llovizna densa",
+                "freezingDrizzleLight": "Llovizna helada débil",
+                "freezingDrizzleDense": "Llovizna helada",
+                "rainSlight": "Lluvia débil",
+                "rainModerate": "Lluvia",
+                "rainHeavy": "Lluvia fuerte",
+                "freezingRainLight": "Lluvia helada débil",
+                "freezingRainHeavy": "Lluvia helada",
+                "snowSlight": "Nieve débil",
+                "snowModerate": "Nieve",
+                "snowHeavy": "Nieve fuerte",
+                "snowGrains": "Cinarra",
+                "showersSlight": "Chubascos débiles",
+                "showersModerate": "Chubascos",
+                "showersViolent": "Chubascos fuertes",
+                "snowShowersSlight": "Nevadas débiles",
+                "snowShowersHeavy": "Nevadas",
+                "thunderstorm": "Tormenta",
+                "thunderstormHailSlight": "Tormenta, granizo débil",
+                "thunderstormHeavy": "Tormenta fuerte",
+                "thunderstormHailHeavy": "Tormenta con granizo"
+            }
+        },
+        "time": {
+            "now": "Ahora",
+            "same": "Misma hora",
+            "ahead": "{value} más",
+            "behind": "{value} menos",
+            "hours": "{hours} h",
+            "hoursMinutes": "{hours} h {minutes} min"
+        },
+        "conversion": {
+            "source": "Fuente: {source}",
+            "asOf": "a {date}"
         }
     },
     "code": {

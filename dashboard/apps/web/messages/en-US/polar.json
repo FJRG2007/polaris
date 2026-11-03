@@ -765,7 +765,71 @@
             "steps": "Steps",
             "comparison": "Comparison",
             "diagram": "Diagram",
-            "calculator": "Calculator"
+            "calculator": "Calculator",
+            "translation": "Translation",
+            "weather": "Weather",
+            "time": "Time",
+            "conversion": "Conversion"
+        },
+        "translation": {
+            "detected": "Detected language",
+            "listen": "Listen",
+            "stop": "Stop",
+            "copy": "Copy translation",
+            "copied": "Copied",
+            "alternatives": "Also"
+        },
+        "weather": {
+            "tool": "Checked the weather",
+            "asOf": "As of {time}",
+            "feelsLike": "Feels like {value}",
+            "wind": "Wind {value}",
+            "humidity": "Humidity {value}",
+            "rain": "Rain {value}",
+            "forecast": "Coming days",
+            "codes": {
+                "clear": "Clear sky",
+                "mainlyClear": "Mainly clear",
+                "partlyCloudy": "Partly cloudy",
+                "overcast": "Overcast",
+                "fog": "Fog",
+                "rimeFog": "Freezing fog",
+                "drizzleLight": "Light drizzle",
+                "drizzleModerate": "Drizzle",
+                "drizzleDense": "Dense drizzle",
+                "freezingDrizzleLight": "Light freezing drizzle",
+                "freezingDrizzleDense": "Freezing drizzle",
+                "rainSlight": "Light rain",
+                "rainModerate": "Rain",
+                "rainHeavy": "Heavy rain",
+                "freezingRainLight": "Light freezing rain",
+                "freezingRainHeavy": "Freezing rain",
+                "snowSlight": "Light snow",
+                "snowModerate": "Snow",
+                "snowHeavy": "Heavy snow",
+                "snowGrains": "Snow grains",
+                "showersSlight": "Light showers",
+                "showersModerate": "Showers",
+                "showersViolent": "Heavy showers",
+                "snowShowersSlight": "Light snow showers",
+                "snowShowersHeavy": "Snow showers",
+                "thunderstorm": "Thunderstorm",
+                "thunderstormHailSlight": "Thunderstorm, light hail",
+                "thunderstormHeavy": "Heavy thunderstorm",
+                "thunderstormHailHeavy": "Thunderstorm with hail"
+            }
+        },
+        "time": {
+            "now": "Now",
+            "same": "Same time",
+            "ahead": "{value} ahead",
+            "behind": "{value} behind",
+            "hours": "{hours} h",
+            "hoursMinutes": "{hours} h {minutes} min"
+        },
+        "conversion": {
+            "source": "Source: {source}",
+            "asOf": "as of {date}"
         }
     },
     "code": {
