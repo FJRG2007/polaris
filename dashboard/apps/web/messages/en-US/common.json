@@ -126,5 +126,16 @@
         "empty": "Nothing to show.",
         "areaCount": "{count} of {total}",
         "areaAll": "All of {area}"
+    },
+    "textTranslation": {
+        "translate": "Translate",
+        "translateSelection": "Translate selection",
+        "title": "Translation",
+        "language": "Translate into",
+        "working": "Translating",
+        "failed": "Could not translate this",
+        "alreadyIn": "Already in this language",
+        "copy": "Copy translation",
+        "open": "Open in Translate"
     }
 }

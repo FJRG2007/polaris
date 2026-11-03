@@ -223,7 +223,8 @@
         "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
         "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
         "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s.",
-        "tooManyReminders": "Puedes tener hasta {max} recordatorios pendientes"
+        "tooManyReminders": "Puedes tener hasta {max} recordatorios pendientes",
+        "translationSettingInvalid": "Eso no es un ajuste de traducción"
     },
     "media": {
         "refused": {

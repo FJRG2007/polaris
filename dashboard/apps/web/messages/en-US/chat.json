@@ -223,7 +223,8 @@
         "soundboardOwner": "The owner of the space cannot be denied the soundboard",
         "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial",
         "inviteSendLimit": "Too many invites at once. Try again in {seconds} s.",
-        "tooManyReminders": "You can have up to {max} reminders waiting"
+        "tooManyReminders": "You can have up to {max} reminders waiting",
+        "translationSettingInvalid": "That is not a translation setting"
     },
     "media": {
         "refused": {

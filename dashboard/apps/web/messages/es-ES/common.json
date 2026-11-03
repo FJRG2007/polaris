@@ -126,5 +126,16 @@
         "empty": "Nada que mostrar.",
         "areaCount": "{count} de {total}",
         "areaAll": "Todos los permisos de {area}"
+    },
+    "textTranslation": {
+        "translate": "Traducir",
+        "translateSelection": "Traducir lo marcado",
+        "title": "Traducción",
+        "language": "Traducir al",
+        "working": "Traduciendo",
+        "failed": "No se pudo traducir",
+        "alreadyIn": "Ya está en este idioma",
+        "copy": "Copiar traducción",
+        "open": "Abrir en Traducir"
     }
 }
