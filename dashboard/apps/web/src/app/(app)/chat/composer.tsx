@@ -344,6 +344,12 @@ export function Composer({
     const t = useTranslations("chat");
     const tFiles = useTranslations("components");
     const [body, setBody] = useState("");
+    /** What is in the box now, for a send that resolves after an await: the
+     *  words typed while it waited are the ones that go. */
+    const latestBody = useRef(body);
+    useEffect(() => {
+        latestBody.current = body;
+    }, [body]);
     const translator = useTextTranslator();
     /** Where a message goes out, when it is translated before it goes. */
     const outgoingTo = translator && translateOutgoing && !editing ? translateOutgoing : null;
@@ -784,7 +790,13 @@ export function Composer({
                     return outcome.kind === "same" ? null : { ...asked, phase: "failed" };
                 });
                 // Already in that language: there is nothing to choose between.
-                if (outcome.kind === "same") return void submit(value, "original");
+                // What goes is what is in the box now - words typed while the
+                // answer came back are part of it, and are asked about anew
+                // when they changed what was being sent.
+                if (outcome.kind === "same") {
+                    const now = latestBody.current;
+                    return void (now === value ? submit(value, "original") : submit(now));
+                }
                 return;
             }
         }

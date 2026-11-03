@@ -296,6 +296,36 @@ describe("sending in another language", () => {
         expect(onSend).not.toHaveBeenCalled();
     });
 
+    it("sends what is in the box when it was already in that language, words typed meanwhile included", async () => {
+        let answer: (outcome: TranslationOutcome) => void = () => {};
+        const translate = vi.fn((_text: string, _to: string) =>
+            translate.mock.calls.length === 1
+                ? new Promise<TranslationOutcome>((resolve) => (answer = resolve))
+                : Promise.resolve<TranslationOutcome>({ kind: "same" })
+        );
+        translator.current = { target: "en", translate, openHref: () => "/translate" };
+        const onSend = vi.fn();
+        const user = userEvent.setup();
+        const { container } = box(onSend);
+        await user.click(await surface(container));
+        await user.keyboard("Guten Morgen");
+        await user.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
+
+        // Back in the box while the answer is on its way. A click puts the
+        // caret at the start, so the new words land in front.
+        await user.click(await surface(container));
+        await user.keyboard("Hallo ");
+        expect(container.textContent).toContain("Hallo Guten Morgen");
+        await act(async () => answer({ kind: "same" }));
+
+        await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+        expect(onSend.mock.calls[0]![0]).toBe("Hallo Guten Morgen");
+        expect(onSend.mock.calls[0]![6]).toBeUndefined();
+        // The words added while it waited were asked about too, not waved through.
+        expect(translate).toHaveBeenLastCalledWith("Hallo Guten Morgen", "de");
+    });
+
     it("is off without an app that translates", async () => {
         const onSend = vi.fn();
         const user = userEvent.setup();
