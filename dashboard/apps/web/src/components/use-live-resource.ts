@@ -215,10 +215,11 @@ export function useLiveRead<T>({
                 // panel does not re-render and nothing flickers.
                 const merged =
                     latest.current === null ? value : mergeUnchanged(latest.current, value);
+                const at = Date.now();
                 latest.current = merged;
                 shownAt.current = askedAt;
                 setData(merged);
-                setUpdatedAt(Date.now());
+                setUpdatedAt(at);
                 setKept(false);
                 setError(null);
                 writeSnapshot(cacheKey, merged);
