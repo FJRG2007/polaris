@@ -13,6 +13,7 @@
 import { useWords } from "./words";
 import { useEffect, useState } from "react";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
+import { createSameInstanceCheck } from "@/lib/same-instance";
 import { createServerCheck, type ServerVerdict } from "@/lib/server-identity";
 
 const ASK_AFTER_MS = 400;
@@ -64,6 +65,35 @@ export function useAddressCheck(typed: string): AddressCheck {
     }, [typed]);
 
     return state;
+}
+
+const sameInstance = createSameInstanceCheck();
+
+/**
+ * Which listed server the checked address is the same Polaris as, or null. Asked
+ * once the address answered as a Polaris, and also when it could not be read -
+ * an untrusted certificate on the local name of a Polaris already listed is the
+ * usual reason - so that is what the line says instead.
+ */
+export function useSameInstance(check: AddressCheck, listed: readonly string[]): string | null {
+    const [same, setSame] = useState<{ readonly origin: string; readonly as: string | null } | null>(null);
+    const asks =
+        check.kind === "polaris" || check.kind === "unreachable" || check.kind === "unconfirmed";
+    const origin = asks ? check.origin : null;
+    const key = listed.join(" ");
+    useEffect(() => {
+        if (!origin) return;
+        let current = true;
+        void sameInstance(origin, key ? key.split(" ") : [])
+            .catch(() => null)
+            .then((as) => {
+                if (current) setSame({ origin, as });
+            });
+        return () => {
+            current = false;
+        };
+    }, [origin, key]);
+    return origin && same?.origin === origin ? same.as : null;
 }
 
 /** Whether the address may be added: a Polaris, or one only the worker can confirm. */

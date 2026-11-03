@@ -316,6 +316,7 @@
         "add": "Add a host",
         "addButton": "Add",
         "already": "Already on your list as {name}.",
+        "sameInstance": "This is the same Polaris as {name}, already on your list.",
         "newName": "Name",
         "newNameHint": "Optional. Shown in the list instead of the address.",
         "removeTitle": "Remove {name}?",

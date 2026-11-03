@@ -19,7 +19,7 @@ import { useWords } from "./words";
 import { BinMark, PencilMark } from "./marks";
 import { useEffect, useRef, useState } from "react";
 import { readOrigin } from "@/lib/address";
-import { addable, AddressNote, useAddressCheck } from "./server-check";
+import { addable, AddressNote, useAddressCheck, useSameInstance } from "./server-check";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 import {
     describeServer,
@@ -272,7 +272,14 @@ function AddServer({
     // Asked live, so an address that is not a Polaris never reaches the
     // permission prompt: the button stays off and the line says why.
     const check = useAddressCheck(typed);
-    const usable = addable(check) && !already && nameProblem === null && !busy;
+    // The same Polaris under another name, proved by its signature: said in
+    // place of whatever else the check found, its certificate included.
+    const sameAs = useSameInstance(
+        check,
+        known.map((one) => one.origin)
+    );
+    const twin = sameAs === null ? undefined : known.find((one) => one.origin === sameAs);
+    const usable = addable(check) && !already && !twin && nameProblem === null && !busy;
 
     const add = async (): Promise<void> => {
         if (!usable || !origin) return;
@@ -311,6 +318,7 @@ function AddServer({
                 spellCheck={false}
                 aria-invalid={
                     Boolean(already) ||
+                    Boolean(twin) ||
                     (check.kind !== "incomplete" && check.kind !== "checking" && !addable(check))
                 }
                 onChange={(event) => setTyped(event.target.value)}
@@ -322,6 +330,10 @@ function AddServer({
             {already ? (
                 <p className="problem inline">
                     {t("servers.already", { name: describeServer(already) })}
+                </p>
+            ) : twin ? (
+                <p className="problem inline">
+                    {t("servers.sameInstance", { name: describeServer(twin) })}
                 </p>
             ) : (
                 <AddressNote check={check} />
