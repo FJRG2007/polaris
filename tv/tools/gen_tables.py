@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Writes the TV tables, the brand grid and the counts from each examples/<folder>/tv.json.
 
-    gen_tables.py [--root DIR]                 rewrite README.md, the translated READMEs that carry its brand
-                                               block, examples/README.md and tools/readme_stats.py
+    gen_tables.py [--root DIR]                 rewrite README.md, examples/README.md and tools/readme_stats.py
     gen_tables.py --check                      write nothing; exit 1 when a file is out of date
     gen_tables.py --font Fredoka.ttf           also redraw docs/stats.png and docs/card.jpg if a count moved
     gen_tables.py --adopt PATCH                write tv.json for folders that have none, from the table rows
@@ -24,12 +23,10 @@ line). One optional key: "readme_os", a README table's OS cell when it is not "o
 folders in the same order, alphabetical by "tv" (case ignored), so a brand's models sit together.
 
 The full table lives in examples/README.md between <!-- tv-table:start ... --> and <!-- tv-table:end -->.
-README.md has no table of its own: its brand grid (the TOP brands with the most lists, linked to the site's
-search, and the rest in a <details>) sits between <!-- tv-brands:start ... --> and <!-- tv-brands:end -->.
-README.nl.md, README.de.md, README.uk.md and README.tr.md carry the same brand block and the same counts in
-their own words ("N tv-modellen · B merken · L talen · ", "N TV-Modelle · B Marken · L Sprachen · ",
-and the Ukrainian and Turkish words in TRANSLATIONS below), and a README that still has tv-table markers
-gets the short table there too. Everything outside the markers is hand-written.
+README.md has no table of its own: its brand grid (the TOP brands with the most lists, and the rest in a
+<details>) sits between <!-- tv-brands:start ... --> and <!-- tv-brands:end -->. A README that still has
+tv-table markers gets the short table there too.
+Everything outside the markers is hand-written.
 The counts are the card's alt text ("N TV models · B brands · L languages · "), the "| **L languages** |"
 feature row and STATS in tools/readme_stats.py. Exit codes: 0 up to date (or written), 1 out of date
 (--check), or a count moved and --font could not draw one of the pictures (the tables are written; the
@@ -42,14 +39,12 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 KEYS = ("tv", "os", "brand", "notes")
 OPTIONAL = ("readme_os",)
 WIDTH = 120  # the brand lines under the grid wrap before this many characters
 TOP = 30  # brands in the README's grid
 COLUMNS = 6  # the grid's columns: 30 brands make 5 rows
-SEARCH = "https://cleanyour.tv/tvs?q="  # the site's TV search; a brand cell links to its results
 # The three words README.md states its counts in, in the order the card's alt text gives them.
 WORDS = ("TV models", "brands", "languages")
 README_HEADER = ["| TV | OS |", "|---|---|"]
@@ -180,7 +175,7 @@ def brand_lines(entries):
     top, rest = ranked[:TOP], ranked[TOP:]
     out = []
     if top:
-        cells = [f"[{b}]({SEARCH}{quote(b, safe='')}) · {tv[b]}" for b in top]
+        cells = [f"{b} · {tv[b]}" for b in top]
         cells += [""] * (-len(cells) % COLUMNS)
         out += ["|" + " |" * COLUMNS, "|" + "---|" * COLUMNS]
         out += ["| " + " | ".join(cells[i:i + COLUMNS]) + " |" for i in range(0, len(cells), COLUMNS)]
@@ -257,21 +252,8 @@ def stats(text, entries, root):
 
 
 OWNED = ("README.md", "examples/README.md", "tools/readme_stats.py")
-# The translated READMEs that carry the brand block too, written when the file is there - and the three
-# words each of them states its counts in, for the card's alt text ("345 TV models · 93 brands · 29
-# languages · ") and the "| **29 languages** |" row. The brand block is generated, so those numbers have
-# to move with it: README.nl.md was added to this script as it stood and said "316 tv-modellen · 89
-# merken · 28 talen" over a grid built from 345 lists in 93 brands, because counts() only knew the
-# English words. A page listed here without its words would drift the same way, so
-# tests/test_gen_tables_translated_counts.py reads them - and holds every page that carries the markers to
-# being written, which is how README.de.md came here: it copied the block by hand when the German page
-# landed, so its grid said "Xiaomi · 32" and "+49 more brands" over 97 brands while README.md said 34 and
-# +53, and no run moved it.
-TRANSLATIONS = {"README.nl.md": ("tv-modellen", "merken", "talen"),
-                "README.de.md": ("TV-Modelle", "Marken", "Sprachen"),
-                "README.uk.md": (("модель телевізорів", "моделі телевізорів", "моделей телевізорів"),
-                                 ("бренд", "бренди", "брендів"), ("мова", "мови", "мов")),
-                "README.tr.md": ("TV modeli", "marka", "dil")}
+# Other pages that carry the brand block, with the words each states its counts in. None today.
+TRANSLATIONS = {}
 
 
 def readme(text, entries, root, path, words=WORDS):

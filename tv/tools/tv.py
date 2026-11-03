@@ -102,8 +102,8 @@ except ImportError as e:
                   if os.path.isfile(p)), None)
     # Once only, marked in the environment: a venv that lacks adb_shell as well gets the message below
     # rather than another run of itself.
-    if _venv and not os.environ.get("CLEANYOURTV_TV_PY_VENV"):
-        os.environ["CLEANYOURTV_TV_PY_VENV"] = "1"
+    if _venv and not os.environ.get("POLARIS_TV_TV_PY_VENV"):
+        os.environ["POLARIS_TV_TV_PY_VENV"] = "1"
         _args = [_venv, "-I", os.path.abspath(__file__), *sys.argv[1:]]
         if os.name == "nt":
             # No exec on Windows: os.execv starts a second process, and the shell takes its prompt back.
@@ -350,7 +350,7 @@ def connect_error(e):
         return (f"{target} refused the connection: nothing listens for ADB there, so network ADB is off "
                 f"or on another port.\nIf the TV has Wireless debugging, {pair}. {reboot} A firmware that "
                 f"runs adbd on a port of its own takes TV_HOST=<tv ip>:<port>.\nNot an Android TV (Samsung, LG, "
-                f"Roku)? There's no ADB to connect to; see https://cleanyour.tv/not-android. {see}")
+                f"Roku)? There's no ADB to connect to. {see}")
     if isinstance(e, (TcpTimeoutException, AdbTimeoutError)):
         return (f"{target} took the connection, but ADB did not finish the handshake "
                 f"({type(e).__name__}: {e}).\nIf the TV shows \"Allow USB debugging?\", accept it and run "
@@ -411,7 +411,7 @@ def lost_connection(e, command, position=None):
 # screencap writes the PNG on the TV and we pull the file afterwards: adb_shell's shell() decodes
 # what comes back as text, which corrupts an image, and `exec-out screencap -p` returns a broken
 # PNG on some MediaTek sets (docs/TROUBLESHOOTING.md). /data/local/tmp is writable from shell.
-SHOT_REMOTE = "/data/local/tmp/cleanyourtv-shot.png"
+SHOT_REMOTE = "/data/local/tmp/polaris-tv-shot.png"
 PNG = b"\x89PNG\r\n\x1a\n"
 # The last 8 bytes of every PNG: the IEND chunk's type and CRC. `screencap -p` writes one, so a file
 # that starts with the signature and does not end with this is a picture the pull stopped in the middle

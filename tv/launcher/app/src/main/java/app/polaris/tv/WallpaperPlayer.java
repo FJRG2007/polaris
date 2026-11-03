@@ -188,7 +188,7 @@ final class WallpaperPlayer {
                 }
                 if (bitmap == null) {
                     files.remove(next);
-                    Log.w("TvHome.Wallpaper", "Skipping unreadable image: " + next.getName());
+                    Log.w("PolarisTv.Wallpaper", "Skipping unreadable image: " + next.getName());
                     update();
                     return;
                 }

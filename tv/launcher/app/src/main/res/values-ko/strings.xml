@@ -44,7 +44,7 @@
     <string name="vpn">VPN</string>
     <string name="vpn_off">VPN 꺼짐</string>
     <string name="home_settings">기본 홈 선택</string>
-    <string name="home_settings_help">기존 홈을 선택하면 CleanYourTV를 홈으로 쓰지 않고, CleanYourTV를 선택하면 다시 돌아옵니다. 기존 런처가 활성화되어 있고 TV에 홈 선택 기능이 있어야 합니다. 기존 런처를 비활성화했다면 먼저 복원 스크립트를 실행하세요.</string>
+    <string name="home_settings_help">기존 홈을 선택하면 Polaris TV를 홈으로 쓰지 않고, Polaris TV를 선택하면 다시 돌아옵니다. 기존 런처가 활성화되어 있고 TV에 홈 선택 기능이 있어야 합니다. 기존 런처를 비활성화했다면 먼저 복원 스크립트를 실행하세요.</string>
     <string name="launcher_settings">런처 설정</string>
     <string name="native_settings">TV 기본 설정</string>
     <string name="columns_label">한 줄당 앱 수</string>

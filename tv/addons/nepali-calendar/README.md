@@ -58,7 +58,7 @@ Unit tests cover known conversions both ways, the 2082 and 2083 new years, month
 round trip across the whole table, the table's edges, month paging across years, Devanagari digits,
 weekday and weekend handling, and that every national day exists in every year.
 
-Tested on a Hisense 50A6H4 (SmartTV 4K, songshan), Android TV 11, with the CleanYourTV launcher: the
+Tested on a Hisense 50A6H4 (SmartTV 4K, songshan), Android TV 11, with the Polaris TV launcher: the
 card, the screen, D-pad focus from every edge, month paging by button and Channel Down, Back to Home,
 and the screensaver started and left with a key.
 

@@ -179,7 +179,7 @@ class TV:
         return lines[-1] if lines else None
 
     def focused_window(self):
-        """The window that has the focus, e.g. "u0 br.eddy.tvhome/...MainActivity".
+        """The window that has the focus, e.g. "u0 app.polaris.tv/.MainActivity".
 
         The dump has several "mCurrentFocus"/"mFocusedApp" lines; only the one that names a
         window counts, and a popup (a menu left open) is a window of its own.

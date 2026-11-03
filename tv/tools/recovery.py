@@ -14,7 +14,7 @@ disabled, and reset Home and the animation scales to fixed values instead of to 
 before. Both scripts now go through this record: `disable.sh` writes it before the first command
 reaches the TV, and `restore.sh` replays it.
 
-Records live in ~/.cleanyourtv/, one per TV and list. The first one wins: a retry after a
+Records live in ~/.polaris-tv/, one per TV and list. The first one wins: a retry after a
 half-applied list must not record the broken state as the original. The TV is the address it was
 reached at, so a set that takes a new address gets a new record: save() warns when a record under
 another address still holds, as enabled, a package it just found disabled (#2139). A later run, and check.py --fix,
@@ -145,10 +145,29 @@ def list_digest(list_path):
     return hashlib.sha1(str(Path(list_path).resolve()).encode()).hexdigest()[:8]
 
 
+# Where the records live, and the folder releases before the rename kept them in.
+RECORDS_DIR = ".polaris-tv"
+OLD_RECORDS_DIR = ".cleanyourtv"
+
+
+def records_dir():
+    """~/.polaris-tv. A computer that only has the old folder gets it renamed here first, so a record
+    written before the rename is still the one a restore reads; if it cannot be moved, it is read where
+    it is."""
+    home = Path.home()
+    folder, old = home / RECORDS_DIR, home / OLD_RECORDS_DIR
+    if not folder.exists() and old.is_dir():
+        try:
+            old.rename(folder)
+        except OSError:
+            return old
+    return folder
+
+
 def record_name(list_path, tag):
     digest = list_digest(list_path)
     tag = re.sub(r"[^A-Za-z0-9.-]", "_", tag or "no-host")
-    return Path.home() / ".cleanyourtv" / f"recovery-{tag}-{digest}.json"
+    return records_dir() / f"recovery-{tag}-{digest}.json"
 
 
 def records_under_other_addresses(list_path, path):
@@ -551,7 +570,7 @@ def save(list_path, host):
             "If this is that TV on a new address (a new DHCP lease, or the Wi-Fi forget and re-join "
             "the setupwraith step asks for), undo run from here leaves those off. Run tools/restore.sh "
             "at the old address first, or move that record to "
-            f"~/.cleanyourtv/{path.name} once you are sure it is this TV.\n"
+            f"~/.polaris-tv/{path.name} once you are sure it is this TV.\n"
             "If this is a second set cleaned with the same list, nothing is wrong: both records "
             "stay.\n")
     return 0

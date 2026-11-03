@@ -8,7 +8,7 @@ TOOLS="$(cd ../../tools && pwd)"
 PY=$TOOLS/venv/bin/python
 [ -x "$PY" ] || PY=$TOOLS/venv/Scripts/python.exe
 export MSYS_NO_PATHCONV=1
-PKG=com.gathin.btconnect
+PKG=app.polaris.tv.btconnect
 # Script paths stay relative: with MSYS_NO_PATHCONV, Git Bash would hand Windows Python a /c/... path.
 tv() { "$PY" -I ../../tools/tv.py "$@"; }
 

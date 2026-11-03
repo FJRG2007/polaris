@@ -1,6 +1,6 @@
 # Bluetooth Toggle
 
-A one-press Bluetooth switch for the TV. For the [Clean Your TV](../../README.md) launcher it declares a
+A one-press Bluetooth switch for the TV. For the [Polaris TV](../../README.md) launcher it declares a
 [module card](../../docs/modules.md), so once you answer **Show card** its tile reads "Bluetooth Toggle" with a
 blue glow; on any other Android TV home it is an ordinary app.
 

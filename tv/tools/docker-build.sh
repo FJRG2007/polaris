@@ -13,8 +13,8 @@ PROJECT="${1:-launcher}"
 [ $# -gt 0 ] && shift
 TASKS=("$@")
 [ ${#TASKS[@]} -gt 0 ] || TASKS=(assembleRelease)
-IMAGE="${IMAGE:-cleanyourtv-android-build}"
-GRADLE_VOLUME="${GRADLE_VOLUME:-cleanyourtv-gradle}"
+IMAGE="${IMAGE:-polaris-tv-android-build}"
+GRADLE_VOLUME="${GRADLE_VOLUME:-polaris-tv-gradle}"
 # Where the debug signing key lives inside the container. The default is the image's own, kept in the Gradle volume;
 # KEY_DIR picks another place in it, HOST_KEY_DIR mounts a folder from this computer (your ~/.android, say).
 KEY_DIR="${KEY_DIR:-/gradle/.android}"

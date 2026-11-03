@@ -3,7 +3,7 @@
 Bluetooth headphones on the TV, made easy to keep quiet: one screen that shows where the sound goes now, your
 paired headphones with their battery, a shortcut to pairing, and a **quiet guard** that pauses and mutes the
 speakers when headphones drop, so a flat battery doesn't send a film's sound into a room where someone is
-asleep. For the [Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md):
+asleep. For the [Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md):
 once you answer **Show card** its tile reads "Headphones" with a blue glow. On any other Android TV home it is an
 ordinary app. The screen is in English and French.
 

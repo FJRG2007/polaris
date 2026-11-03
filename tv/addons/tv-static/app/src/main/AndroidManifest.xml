@@ -17,7 +17,7 @@
         android:icon="@drawable/banner"
         android:label="@string/app_name">
 
-        <!-- The settings screen: the app's own tile and, on the cleanyourtv launcher, its module card. -->
+        <!-- The settings screen: the app's own tile and, on the Polaris TV launcher, its module card. -->
         <activity
             android:name=".SettingsActivity"
             android:exported="true"

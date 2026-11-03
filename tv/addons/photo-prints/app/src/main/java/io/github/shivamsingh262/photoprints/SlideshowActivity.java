@@ -5,7 +5,7 @@ import android.os.Bundle;
 import android.view.WindowManager;
 
 /**
- * The app's tile and its module card on cleanyourtv's Home: the same scene as the screensaver, right away, until
+ * The app's tile and its module card on Polaris TV's Home: the same scene as the screensaver, right away, until
  * Back. The screen stays on while it shows.
  */
 public class SlideshowActivity extends Activity {

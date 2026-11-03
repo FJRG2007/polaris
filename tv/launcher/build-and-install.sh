@@ -109,10 +109,10 @@ HOME_QUERY='cmd package resolve-activity --brief -a android.intent.action.MAIN -
 if [ "$STOCK_LAUNCHER" = none ]; then DISABLE_STOCK="echo stock launcher left alone"
 else DISABLE_STOCK="pm disable-user --user 0 $STOCK_LAUNCHER"; fi
 APK=app/build/outputs/apk/release/app-release.apk
-"$PY" -I ../tools/b64push.py "$APK" /data/local/tmp/tvhome.apk
+"$PY" -I ../tools/b64push.py "$APK" /data/local/tmp/polaris-tv.apk
 # Install on its own: in the batch below a failed install (e.g. "not enough space" on a full /data)
 # would not stop the stock launcher from being disabled.
-OUT=$("$PY" -I ../tools/tv.py 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk')
+OUT=$("$PY" -I ../tools/tv.py 'pm install -r /data/local/tmp/polaris-tv.apk; rm -f /data/local/tmp/polaris-tv.apk')
 echo "$OUT"
 case "$OUT" in
   *Success*) ;;
@@ -178,9 +178,9 @@ rollback_home() {
   case "$BACK" in
     "$STOCK_LAUNCHER"/*) echo "$STOCK_LAUNCHER owns Home again." >&2; return 0 ;;
   esac
-  REC="${HOME:-$PWD}/cleanyourtv-handover-$(printf '%s' "$TV_HOST" | tr -c 'A-Za-z0-9._-' '_').txt"
+  REC="${HOME:-$PWD}/polaris-tv-handover-$(printf '%s' "$TV_HOST" | tr -c 'A-Za-z0-9._-' '_').txt"
   {
-    echo "# cleanyourtv: the launcher handover on $TV_HOST did not finish. From the repo root:"
+    echo "# polaris-tv: the launcher handover on $TV_HOST did not finish. From the repo root:"
     echo "TV_HOST=$TV_HOST tools/tv.py 'pm enable --user 0 $STOCK_LAUNCHER'"
     echo "TV_HOST=$TV_HOST tools/tv.py 'cmd package set-home-activity --user 0 \$(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME $STOCK_LAUNCHER | tail -n 1)'"
     echo "# then check: TV_HOST=$TV_HOST tools/tv.py '$HOME_QUERY'"

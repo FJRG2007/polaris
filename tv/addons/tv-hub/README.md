@@ -4,8 +4,8 @@ One live-TV guide for Android TV, Google TV and Fire TV: your M3U playlists and 
 a [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) server, HDHomeRun antenna tuners, and
 shortcuts to the live-TV apps you already have, in one remote-friendly interface.
 
-A CleanYourTV add-on: a normal app you can install on any launcher, with a module card so on
-CleanYourTV it can sit in the dock as **TV Hub · Live channels** once you approve it.
+A Polaris TV add-on: a normal app you can install on any launcher, with a module card so on
+Polaris TV it can sit in the dock as **TV Hub · Live channels** once you approve it.
 
 Free, MIT-licensed, no ads, no accounts, no tracking, no background services. It comes with no
 channels: it plays the sources you add. Only use playlists and services you are allowed to watch.
@@ -37,7 +37,7 @@ itself is missing from the player screenshots because the TV keeps it out of scr
 | Player | Media3: HLS and progressive streams (MPEG-TS, MP4 and the other containers Media3 reads), channel up/down, previous channel, number entry, audio and subtitle tracks, recovery and fallback |
 | Play a channel when the app opens | Off by default. On, the app opens straight into the player on the last channel watched, or the lowest channel number the first time, the way a set-top box does. Back from the player returns to the hub |
 | Merging | Channels with the same `tvg-id` in several sources show once; the player falls back between their streams. Can be turned off |
-| CleanYourTV module card | Declared per spec 1 (`res/xml/module_card.xml`) |
+| Polaris TV module card | Declared per spec 1 (`res/xml/module_card.xml`) |
 
 ### Not done, on purpose or not yet
 
@@ -113,7 +113,7 @@ the hub. Later, go to **Sources > Add a source**.
 
 `AndroidManifest.xml` puts the `app.polaris.tv.category.DOCK_CARD` filter and the
 `app.polaris.tv.card` meta-data on `MainActivity`, the same exported activity as
-`LEANBACK_LAUNCHER`, as [the spec](https://github.com/Gathin23/cleanyourtv/blob/main/docs/specs/card.md) requires:
+`LEANBACK_LAUNCHER`, as the spec requires:
 
 ```xml
 <card spec="1" label="TV Hub" caption="Live channels" accent="#4FA3E0" />
@@ -165,7 +165,7 @@ TVHUB_KEYSTORE=~/tvhub-release.jks TVHUB_KEYSTORE_PASSWORD=... TVHUB_KEY_ALIAS=t
 apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | grep SHA-256
 ```
 
-Publish that SHA-256 with every release, as CleanYourTV's module guide asks.
+Publish that SHA-256 with every release, as Polaris TV's module guide asks.
 
 ## How it is built
 

@@ -27,7 +27,7 @@
     <string name="vpn">VPN</string>
     <string name="vpn_off">VPN uit</string>
     <string name="home_settings">Standaard startscherm kiezen</string>
-    <string name="home_settings_help">Kies je oorspronkelijke startscherm om CleanYourTV niet meer als Home te gebruiken, of CleanYourTV om terug te schakelen. De oorspronkelijke launcher moet ingeschakeld zijn en je tv moet een keuzescherm voor het startscherm hebben; gebruik eerst het herstelscript als hij uitgeschakeld is.</string>
+    <string name="home_settings_help">Kies je oorspronkelijke startscherm om Polaris TV niet meer als Home te gebruiken, of Polaris TV om terug te schakelen. De oorspronkelijke launcher moet ingeschakeld zijn en je tv moet een keuzescherm voor het startscherm hebben; gebruik eerst het herstelscript als hij uitgeschakeld is.</string>
     <string name="launcher_settings">Launcher-instellingen</string>
     <string name="native_settings">Fabrikantinstellingen</string>
     <string name="columns_label">Apps per rij</string>

@@ -25,7 +25,7 @@ if (Test-Path $Folder) { $Folder = (Resolve-Path $Folder).Path }
 Set-Location (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'tools')
 $py = 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
-$pkg = 'com.gathin.photodream'
+$pkg = 'app.polaris.tv.photodream'
 $dream = "$pkg/.PhotoDream"
 $dir = "/sdcard/Android/data/$pkg/files/pictures"
 $uri = "content://$pkg.files/pictures"

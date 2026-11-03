@@ -5,7 +5,7 @@ only, and the other AirPlay receivers on the network. It looks the way an iPhone
 announcements (`_airplay._tcp` for video and mirroring, `_raop._tcp` for audio) for six seconds while the screen
 is open. It is for TVs that run an AirPlay receiver such as
 [AirPlay Server](https://github.com/jqssun/android-airplay-server) (open source); it is not made by or affiliated
-with Apple or that project. For the [Clean Your TV](../../README.md) launcher it declares a
+with Apple or that project. For the [Polaris TV](../../README.md) launcher it declares a
 [module card](../../docs/modules.md): once you answer **Show card** its tile reads "AirPlay Status" with a light
 blue glow. On any other Android TV home it is an ordinary app.
 

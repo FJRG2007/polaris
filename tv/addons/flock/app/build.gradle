@@ -7,11 +7,11 @@ dependencies {
 }
 
 android {
-    namespace 'io.github.cleanyourtv.flock'
+    namespace 'app.polaris.tv.flock'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'io.github.cleanyourtv.flock'
+        applicationId 'app.polaris.tv.flock'
         minSdk 26
         targetSdk 34
         versionCode 1

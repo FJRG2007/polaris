@@ -12,7 +12,7 @@ PY="$TOOLS/venv/bin/python"
 [ -x "$PY" ] || PY="$TOOLS/venv/Scripts/python.exe"
 [ -x "$PY" ] || { echo "run: python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt" >&2; exit 1; }
 export MSYS_NO_PATHCONV=1
-PKG=com.gathin.photodream
+PKG=app.polaris.tv.photodream
 tv() { "$PY" -I "$TOOLS/tv.py" "$@"; }
 
 if [ "${1:-}" = --uninstall ]; then

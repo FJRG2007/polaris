@@ -20,13 +20,13 @@ tools\docker-build.ps1 -Project launcher -Tasks testReleaseUnitTest,lintRelease,
 ```
 
 The first run builds the image from `tools/docker/Dockerfile` (a few minutes, about 1.5 GB) and Gradle downloads its
-distribution into the `cleanyourtv-gradle` volume; later builds reuse both. On Linux and macOS the container runs as
+distribution into the `polaris-tv-gradle` volume; later builds reuse both. On Linux and macOS the container runs as
 your user, so the build output is not owned by root.
 
 | Variable | Default | What it changes |
 |---|---|---|
-| `IMAGE` | `cleanyourtv-android-build` | The image name |
-| `GRADLE_VOLUME` | `cleanyourtv-gradle` | The Docker volume that keeps Gradle's caches and the signing key |
+| `IMAGE` | `polaris-tv-android-build` | The image name |
+| `GRADLE_VOLUME` | `polaris-tv-gradle` | The Docker volume that keeps Gradle's caches and the signing key |
 | `KEY_DIR` | `/gradle/.android` | Where the debug signing key is kept inside the container |
 | `HOST_KEY_DIR` | (none) | A folder on this computer to take the key from instead, such as `~/.android` |
 
@@ -36,13 +36,13 @@ The Linux AAPT2 that the Android Gradle plugin downloads is built for x86-64 onl
 the image as `linux/amd64` whatever the computer is; Docker Desktop runs it under Rosetta (turn on "Use Rosetta for
 x86_64/amd64 emulation" in its settings) or QEMU, and Colima needs
 `colima start --vm-type vz --vz-rosetta`. On an M-series Mac the first build took about 7 minutes and
-later ones well under a minute ([#2941](https://github.com/Gathin23/cleanyourtv/issues/2941)). Before this, an
+later ones well under a minute (an owner report). Before this, an
 arm64 image stopped at `:app:mergeReleaseResources` with `AAPT2 aapt2-8.5.2-11315950-linux Daemon #0: Daemon
 startup failed` or `rosetta error: failed to open elf at /lib64/ld-linux-x86-64.so.2`. If an older copy of the
 script left that arm64 image behind, remove it once so the next run builds the right one:
 
 ```bash
-docker image rm cleanyourtv-android-build
+docker image rm polaris-tv-android-build
 ```
 
 A native build works on these computers too: Homebrew's `openjdk@17` and an Android SDK with platform 34 and

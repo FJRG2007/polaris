@@ -3,7 +3,7 @@
 Your network's ad blocker on the TV: today's queries, how many were blocked and the share, from
 [Pi-hole](https://pi-hole.net) (version 6, or version 5) or [AdGuard Home](https://adguard.com/adguard-home/overview.html),
 and one OK to pause blocking for five minutes when a site or app won't work. A community add-on, not made by or
-affiliated with either project. For the [Clean Your TV](../../README.md) launcher it declares a
+affiliated with either project. For the [Polaris TV](../../README.md) launcher it declares a
 [module card](../../docs/modules.md): once you answer **Show card** its tile reads "Ad Blocking" with a red glow.
 On any other Android TV home it is an ordinary app.
 

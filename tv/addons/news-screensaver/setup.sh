@@ -26,7 +26,7 @@ PY=venv/bin/python
 [ -x "$PY" ] || PY=venv/Scripts/python.exe
 [ -x "$PY" ] || { echo "run: python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt" >&2; exit 1; }
 export MSYS_NO_PATHCONV=1
-PKG=com.gathin.newsdream
+PKG=app.polaris.tv.newsdream
 DREAM=$PKG/.NewsDream
 URI=content://$PKG.files
 TMP=/data/local/tmp/cyt-news

@@ -12,7 +12,7 @@ PY="$TOOLS/venv/bin/python"
 [ -x "$PY" ] || PY="$TOOLS/venv/Scripts/python.exe"
 [ -x "$PY" ] || { echo "run: python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt" >&2; exit 1; }
 export MSYS_NO_PATHCONV=1
-PKG=com.gathin.haunted
+PKG=app.polaris.tv.haunted
 DREAM=$PKG/.HauntedDream
 # The screensaver the TV had before the first run, so --uninstall can put it back.
 BEFORE=/data/local/tmp/cyt-haunted-before

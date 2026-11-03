@@ -1,11 +1,10 @@
 # Weather
 
 The weather for one city, full screen on the TV: now (temperature, feels-like, conditions), the US air quality
-index as a coloured pill, and the next three days. For the [Clean Your TV](../../README.md) launcher it declares a
+index as a coloured pill, and the next three days. For the [Polaris TV](../../README.md) launcher it declares a
 [module card](../../docs/modules.md), so once you answer **Show card** its tile reads "Weather" with a
 sky-blue glow; on any other Android TV home it is an ordinary app.
 
-![The weather page](https://raw.githubusercontent.com/Sumyabazar1/cleanyourtv/pr-assets/addon-weather/addon-3-weather.png)
 
 - **The city** is chosen once: type its name with the remote's keyboard (or voice), pick it from the matches,
   and it is kept. **Change city** at the bottom chooses another.
@@ -39,7 +38,7 @@ Saved choices override these defaults. With no saved choices the page is as abov
 | `temperature_unit` | `c` | `f` shows degrees Fahrenheit for the temperature now, feels-like and the days' highs and lows, converted from the reading before rounding. |
 | `show_both_units` | `false` | The temperature now in the other unit too, at the start of the "Feels like" line ("22°C · Feels like 70°"). |
 
-![A week, with humidity and wind](https://raw.githubusercontent.com/majnioui/cleanyourtv-contrib/pr-assets/addon-weather-week/weather-options.png)
+![A week, with humidity and wind](https://raw.githubusercontent.com/majnioui/polaris-tv-contrib/pr-assets/addon-weather-week/weather-options.png)
 
 ## Permissions
 

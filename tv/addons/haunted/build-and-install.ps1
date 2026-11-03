@@ -15,7 +15,7 @@ $here = $PSScriptRoot
 $tools = Join-Path (Split-Path (Split-Path $here -Parent) -Parent) 'tools'
 $py = Join-Path $tools 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
-$pkg = 'com.gathin.haunted'
+$pkg = 'app.polaris.tv.haunted'
 $dream = "$pkg/.HauntedDream"
 $before = '/data/local/tmp/cyt-haunted-before'
 function Tv([string]$cmd) { & $py -I (Join-Path $tools 'tv.py') $cmd; if ($LASTEXITCODE) { throw "tv.py failed: $cmd" } }

@@ -23,7 +23,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- Clean Your TV module card (docs/specs/card.md): the tile reads "Game Day" once the owner says Show. -->
+            <!-- Polaris TV module card (docs/specs/card.md): the tile reads "Game Day" once the owner says Show. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="app.polaris.tv.category.DOCK_CARD" />
@@ -35,7 +35,7 @@
             android:windowSoftInputMode="adjustNothing" />
         <activity android:name=".SecondsActivity" android:exported="false" android:screenOrientation="landscape" />
 
-        <!-- Clean Your TV launcher, game_day (docs/modules.md): where Home reads each team's next game. -->
+        <!-- Polaris TV launcher, game_day (docs/modules.md): where Home reads each team's next game. -->
         <meta-data android:name="app.polaris.tv.games" android:value="io.github.justinnewman.gameday.games" />
 
         <!-- Read-only and holding no links: what Home shows anyway. -->

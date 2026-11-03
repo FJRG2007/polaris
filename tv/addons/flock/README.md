@@ -44,7 +44,7 @@ Requires JDK 17 and Android SDK 34, like the other add-ons in this repository. F
 cd addons/flock
 ./gradlew --no-daemon testReleaseUnitTest assembleRelease
 adb install -r app/build/outputs/apk/release/app-release.apk
-adb shell am start -n io.github.cleanyourtv.flock/.FlockActivity
+adb shell am start -n app.polaris.tv.flock/.FlockActivity
 ```
 
 The app can also be opened from its module card. The launcher asks whether to show the card the first

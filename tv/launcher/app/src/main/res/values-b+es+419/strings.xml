@@ -46,7 +46,7 @@
     <string name="vpn">VPN</string>
     <string name="vpn_off">VPN apagada</string>
     <string name="home_settings">Elegir pantalla de inicio predeterminada</string>
-    <string name="home_settings_help">Elige la pantalla de inicio original para dejar de usar CleanYourTV, o elige CleanYourTV para volver a usarlo. El launcher original debe estar activado y el televisor debe ofrecer un selector de inicio; si estaba desactivado, ejecuta primero el script de restauración.</string>
+    <string name="home_settings_help">Elige la pantalla de inicio original para dejar de usar Polaris TV, o elige Polaris TV para volver a usarlo. El launcher original debe estar activado y el televisor debe ofrecer un selector de inicio; si estaba desactivado, ejecuta primero el script de restauración.</string>
     <string name="launcher_settings">Configuración del launcher</string>
     <string name="native_settings">Configuración del fabricante</string>
     <string name="columns_label">Aplicaciones por fila</string>

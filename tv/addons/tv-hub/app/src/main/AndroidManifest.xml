@@ -58,7 +58,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- CleanYourTV module card, spec 1 (docs/specs/card.md): same activity as LEANBACK_LAUNCHER. -->
+            <!-- Polaris TV module card, spec 1 (docs/specs/card.md): same activity as LEANBACK_LAUNCHER. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="app.polaris.tv.category.DOCK_CARD" />

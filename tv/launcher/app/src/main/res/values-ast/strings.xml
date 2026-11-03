@@ -28,7 +28,7 @@
     <string name="dream_name">Reló</string>
     <string name="vpn_off">VPN apagada</string>
     <string name="home_settings">Escoyer pantalla d\'aniciu predeterminá</string>
-    <string name="home_settings_help">Escueyi la to pantalla d\'aniciu orixinal pa dexar d\'usar CleanYourTV como pantalla d\'aniciu, o CleanYourTV pa volver a él. El llanzador orixinal tien que tar activáu y el televisor tien qu\'ufiertar un seleutor de pantalles d\'aniciu; si taba desactiváu, usa enantes el script de restauración.</string>
+    <string name="home_settings_help">Escueyi la to pantalla d\'aniciu orixinal pa dexar d\'usar Polaris TV como pantalla d\'aniciu, o Polaris TV pa volver a él. El llanzador orixinal tien que tar activáu y el televisor tien qu\'ufiertar un seleutor de pantalles d\'aniciu; si taba desactiváu, usa enantes el script de restauración.</string>
     <string name="launcher_settings">Axustes del llanzador</string>
     <string name="native_settings">Axustes del fabricante</string>
     <string name="columns_label">Aplicaciones por filera</string>

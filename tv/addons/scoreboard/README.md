@@ -2,7 +2,7 @@
 
 An app usage leaderboard for Android TV that tracks launch counts and foreground watch time for streaming and media apps (YouTube, Netflix, Disney+, Prime Video, Max, Plex, Peacock, Paramount+, Spotify, Twitch, Tubi, Pluto TV, etc.).
 
-For the [Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md), so once you answer **Show card** its tile reads "Scoreboard" with an amber glow; on any other Android TV home it functions as a standalone Leanback application.
+For the [Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md), so once you answer **Show card** its tile reads "Scoreboard" with an amber glow; on any other Android TV home it functions as a standalone Leanback application.
 
 ## Features
 - **Strict Streaming Filter:** Excludes background system services, settings, and package installers to focus purely on entertainment and streaming media.

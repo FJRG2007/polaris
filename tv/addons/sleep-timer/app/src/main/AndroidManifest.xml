@@ -34,7 +34,7 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-        <!-- The timer picker: the app's own tile and, on the cleanyourtv launcher, its module card. -->
+        <!-- The timer picker: the app's own tile and, on the Polaris TV launcher, its module card. -->
         <activity
             android:name=".TimerActivity"
             android:exported="true"

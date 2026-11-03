@@ -38,7 +38,7 @@ final class LibraryApps {
     private static Set<String> read(AtomicFile file) {
         try { return readStrict(file); }
         catch (IOException | RuntimeException e) {
-            Log.w("TvHome.Library", "Could not read shortcuts", e);
+            Log.w("PolarisTv.Library", "Could not read shortcuts", e);
             return Collections.emptySet();
         }
     }
@@ -65,7 +65,7 @@ final class LibraryApps {
             removed = readStrict(store(context, true));
         } catch (IOException | RuntimeException e) {
             // Never replace unreadable owner choices with an empty list on the next edit.
-            Log.w("TvHome.Library", "Keeping unreadable shortcut choices unchanged", e);
+            Log.w("PolarisTv.Library", "Keeping unreadable shortcut choices unchanged", e);
             return false;
         }
         if (onHome) {
@@ -89,7 +89,7 @@ final class LibraryApps {
             return true;
         } catch (IOException | RuntimeException e) {
             if (output != null) file.failWrite(output);
-            Log.w("TvHome.Library", "Could not save shortcut choice", e);
+            Log.w("PolarisTv.Library", "Could not save shortcut choice", e);
             return false;
         }
     }

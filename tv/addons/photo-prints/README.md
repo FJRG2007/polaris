@@ -5,7 +5,7 @@ rounded corners and the month and year it was taken. Every 15 seconds they slide
 another and three new ones are dealt in from the right, each at a slight tilt. A line along the bottom shows the
 time and the date, and moves a little at each sweep so it does not burn in.
 
-On cleanyourtv's Home it is also a module card, **Photo Prints**: press OK on it to start the same slideshow at
+On Polaris TV's Home it is also a module card, **Photo Prints**: press OK on it to start the same slideshow at
 once, and Back to leave.
 
 - Package: `io.github.shivamsingh262.photoprints`

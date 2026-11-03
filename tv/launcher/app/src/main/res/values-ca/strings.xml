@@ -68,7 +68,7 @@
     <string name="greeting_with_name">%1$s, %2$s</string>
     <string name="vpn_off">VPN desactivada</string>
     <string name="home_settings">Tria la pantalla d\'inici</string>
-    <string name="home_settings_help">Tria la teva pantalla d\'inici original per deixar d\'utilitzar CleanYourTV com a inici, o CleanYourTV per tornar-hi. El llançador original ha d\'estar activat i el televisor ha de tenir un selector de pantalla d\'inici; si l\'havies desactivat, fes servir abans l\'script de restauració.</string>
+    <string name="home_settings_help">Tria la teva pantalla d\'inici original per deixar d\'utilitzar Polaris TV com a inici, o Polaris TV per tornar-hi. El llançador original ha d\'estar activat i el televisor ha de tenir un selector de pantalla d\'inici; si l\'havies desactivat, fes servir abans l\'script de restauració.</string>
     <string name="rows_below_dock_label">Files sota el dock</string>
     <string name="wallpaper_label">Fons de pantalla</string>
     <string name="wallpaper_state">Fons de pantalla: %1$s</string>

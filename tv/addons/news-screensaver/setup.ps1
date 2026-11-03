@@ -30,7 +30,7 @@ if ($Feeds) {
 Set-Location (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'tools')
 $py = 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
-$pkg = 'com.gathin.newsdream'
+$pkg = 'app.polaris.tv.newsdream'
 $dream = "$pkg/.NewsDream"
 $uri = "content://$pkg.files"
 $tmp = '/data/local/tmp/cyt-news'

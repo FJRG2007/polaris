@@ -1,7 +1,7 @@
 # Game Day
 
 Your teams' next games on Home, counted down, from calendars you already have. For the
-[Clean Your TV](../../README.md) launcher it declares a [module card](../../docs/modules.md) ("Game Day", where
+[Polaris TV](../../README.md) launcher it declares a [module card](../../docs/modules.md) ("Game Day", where
 OK opens its settings) and, with the launcher's `game_day` key, hands Home each team's next game: the panel under
 the clock shows "Minnesota Wild at Dallas Stars" and "Puck drop in 2h 18m", then "Live now" while it is on, and
 rotates between your teams every 30 seconds. On any other Android TV home it is an ordinary app with its settings.
