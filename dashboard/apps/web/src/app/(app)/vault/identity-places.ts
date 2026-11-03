@@ -61,7 +61,8 @@ export function countryLabel(code: string, locale: string): string {
 export function countryCodeOf(text: string, locales: readonly string[]): string | null {
     const raw = text.trim();
     if (raw === "") return null;
-    if (/^[a-z]{2}$/i.test(raw) && COUNTRY_CODES.includes(raw.toUpperCase())) return raw.toUpperCase();
+    if (/^[a-z]{2}$/i.test(raw) && COUNTRY_CODES.includes(raw.toUpperCase()))
+        return raw.toUpperCase();
     const wanted = normalizePlace(raw);
     const alias = ALIASES[wanted];
     if (alias) return alias;

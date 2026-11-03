@@ -235,12 +235,16 @@ function Tv({ ctx }: { ctx: SceneContext }) {
                 >
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.6cqw" }}>
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "1.6cqw", letterSpacing: "0.2em", opacity: 0.6 }}>
+                            <div
+                                style={{ fontSize: "1.6cqw", letterSpacing: "0.2em", opacity: 0.6 }}
+                            >
                                 {ctx.say("GOOD EVENING", "BUENAS TARDES")}
                             </div>
                             <div style={{ fontSize: "6.5cqw", fontWeight: 300, lineHeight: 1.1 }}>
                                 {ctx.say("8:30", "20:30")}
-                                <span style={{ fontSize: "2cqw", marginLeft: "0.6cqw", opacity: 0.7 }}>
+                                <span
+                                    style={{ fontSize: "2cqw", marginLeft: "0.6cqw", opacity: 0.7 }}
+                                >
                                     {ctx.say("PM", "")}
                                 </span>
                             </div>
@@ -282,7 +286,14 @@ function Tv({ ctx }: { ctx: SceneContext }) {
                     </div>
                 </div>
             </div>
-            <i style={{ width: 70, height: 10, background: tone.edge, borderRadius: "0 0 6px 6px" }} />
+            <i
+                style={{
+                    width: 70,
+                    height: 10,
+                    background: tone.edge,
+                    borderRadius: "0 0 6px 6px"
+                }}
+            />
         </div>
     );
 }
