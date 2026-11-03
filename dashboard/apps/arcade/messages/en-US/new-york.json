@@ -28,7 +28,7 @@
         "failure": {
             "graphics": {
                 "title": "Graphics could not start",
-                "text": "The graphics could not start here. Turn on hardware acceleration, then reload."
+                "text": "Turn on hardware acceleration in the browser, then reload."
             },
             "error": {
                 "title": "New York could not start",
@@ -128,9 +128,7 @@
         "actions": "Hold to perform an action",
         "jump": "Jump",
         "ascend": "Ascend",
-        "descend": "Descend",
-        "boost": "Boost",
-        "sprint": "Sprint"
+        "descend": "Descend"
     },
     "map": {
         "label": "Street map",
@@ -160,29 +158,25 @@
         "person": {
             "move": "Walk",
             "turn": "Turn",
-            "boost": "Sprint",
             "up": "Jump",
             "orbit": "Look around"
         },
         "car": {
             "move": "Drive / Reverse",
             "turn": "Steer",
-            "boost": "Boost",
             "horn": "Horn",
             "orbit": "Look around"
         },
         "cyclist": {
             "move": "Pedal / Brake",
             "turn": "Turn",
-            "boost": "Sprint",
             "orbit": "Look around"
         },
         "helicopter": {
             "move": "Pitch",
             "turn": "Yaw",
             "up": "Ascend",
-            "down": "Descend",
-            "boost": "Boost"
+            "down": "Descend"
         },
         "drag": "Drag",
         "general": "Everywhere",
@@ -201,7 +195,6 @@
         "padThrottle": "Throttle and brake",
         "padLift": "Up and down",
         "padJump": "Jump",
-        "padBoost": "Boost",
         "padCamera": "Switch camera",
         "padModes": "Change mode",
         "padZoom": "Zoom",

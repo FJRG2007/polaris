@@ -229,8 +229,8 @@ body::after {
   overflow: hidden;
 }
 
-/* Filled through every start-up stage by js/main.js, as compositor transitions that keep moving while a stage blocks
-   the main thread. Until that script runs, it fills the share of fetching the code and data (STAGE_MS.data) */
+/* Filled through every start-up stage by engine/loading-screen.js (STAGES), as compositor transitions that keep moving
+   while a stage blocks the main thread */
 .loader-fill {
   position: absolute;
   inset: 0;
@@ -1782,6 +1782,7 @@ body.touch-enabled .pop-item { min-height: 44px; }
 }
 
 .loader-reload-btn {
+  min-height: 44px;
   margin-top: 6px;
   padding: 8px 20px;
   font-family: inherit;

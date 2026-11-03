@@ -339,7 +339,6 @@ async function initApp() {
           [[t('controls.rightStick')], t('controls.padLook')],
           ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : mode === 'helicopter' ? [[['RT', 'LT'], t('controls.padLift')]] : []),
           ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
-          [['X'], t('controls.padBoost')],
           [['Y'], t('controls.padCamera')],
           [['LB', 'RB'], t('controls.padModes')],
           [['↑', '↓'], t('controls.padZoom')],
@@ -349,7 +348,7 @@ async function initApp() {
       }
     ];
   }
-  // Boosted top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s): full scale of the speed meter
+  // Top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s): full scale of the speed meter
   const topSpeedMph = { person: 18, car: 81, cyclist: 43, helicopter: 116 };
 
   function renderControlHints(mode) {

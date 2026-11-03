@@ -28,7 +28,7 @@
         "failure": {
             "graphics": {
                 "title": "Sin gráficos",
-                "text": "Los gráficos no pudieron arrancar aquí. Activa la aceleración por hardware y recarga."
+                "text": "Activa la aceleración por hardware en el navegador y recarga."
             },
             "error": {
                 "title": "Nueva York no pudo iniciarse",
@@ -128,9 +128,7 @@
         "actions": "Mantén pulsado para actuar",
         "jump": "Saltar",
         "ascend": "Subir",
-        "descend": "Bajar",
-        "boost": "Turbo",
-        "sprint": "Correr"
+        "descend": "Bajar"
     },
     "map": {
         "label": "Callejero",
@@ -160,29 +158,25 @@
         "person": {
             "move": "Andar",
             "turn": "Girar",
-            "boost": "Correr",
             "up": "Saltar",
             "orbit": "Mirar"
         },
         "car": {
             "move": "Avanzar / Atrás",
             "turn": "Girar",
-            "boost": "Turbo",
             "horn": "Claxon",
             "orbit": "Mirar"
         },
         "cyclist": {
             "move": "Pedalear / Frenar",
             "turn": "Girar",
-            "boost": "Correr",
             "orbit": "Mirar"
         },
         "helicopter": {
             "move": "Cabeceo",
             "turn": "Rotar",
             "up": "Subir",
-            "down": "Bajar",
-            "boost": "Turbo"
+            "down": "Bajar"
         },
         "drag": "Ratón",
         "general": "Siempre",
@@ -201,7 +195,6 @@
         "padThrottle": "Acelerar y frenar",
         "padLift": "Subir y bajar",
         "padJump": "Saltar",
-        "padBoost": "Turbo",
         "padCamera": "Cambiar cámara",
         "padModes": "Cambiar modo",
         "padZoom": "Zoom",
