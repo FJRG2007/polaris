@@ -71,10 +71,10 @@
         "saved": "Ajustes guardados",
         "keys": "Ver claves",
         "retry": "Reintentar",
-        "limit": "Límite de longitud",
+        "limit": "Longitud máxima",
         "limitOn": "Limitar la longitud de una traducción",
         "limitHint": "Desactivado por defecto: se traduce cualquier longitud. Actívalo para limitar una traducción.",
-        "limitChars": "Máximo de caracteres",
+        "limitChars": "Caracteres máximos",
         "limitInvalid": "Escribe un número entero de {min} a {max}."
     },
     "errors": {
@@ -119,7 +119,7 @@
         "imagesReader": "Leer imágenes aún no está configurado. Se encargan los administradores.",
         "audioManager": "Transcribir necesita un modelo de Polar que transcriba voz.",
         "audioReader": "Transcribir aún no está configurado. Se encargan los administradores.",
-        "setUp": "Configurar los modelos de Polar"
+        "setUp": "Configurar modelos de Polar"
     },
     "image": {
         "drop": "Suelta, pega o elige una imagen",
@@ -130,18 +130,18 @@
         "side": "Al lado",
         "view": "Cómo mostrarla",
         "original": "Texto original",
-        "copyOriginal": "Copiar el texto original",
+        "copyOriginal": "Copiar texto original",
         "clear": "Quitar la imagen",
         "alt": "La imagen que se traduce",
         "none": "No se encontró texto en esta imagen."
     },
     "camera": {
         "start": "Abrir la cámara",
-        "stop": "Cerrar la cámara",
+        "stop": "Cerrar cámara",
         "video": "Traducir un vídeo",
         "hint": "Apunta la cámara a un texto. La traducción se actualiza cada pocos segundos.",
         "denied": "No se pudo abrir la cámara. Permítela en el navegador y vuelve a intentarlo.",
-        "unsupported": "Este navegador no puede abrir una cámara.",
+        "unsupported": "{surface, select, app {Esta aplicación no puede abrir una cámara.} other {Este navegador no puede abrir una cámara.}}",
         "pause": "Pausar",
         "resume": "Seguir",
         "waiting": "Buscando texto...",
@@ -155,7 +155,7 @@
         "stop": "Parar",
         "listening": "Escuchando...",
         "micDenied": "No se pudo abrir el micrófono. Permítelo en el navegador y vuelve a intentarlo.",
-        "micUnsupported": "Este navegador no puede usar un micrófono.",
+        "micUnsupported": "{surface, select, app {Esta aplicación no puede usar un micrófono.} other {Este navegador no puede usar un micrófono.}}",
         "empty": "Elige una grabación o habla, y la traducción aparece aquí.",
         "clear": "Borrar la conversación",
         "listen": "Escuchar",
@@ -170,7 +170,7 @@
         "download": "Descargar la traducción",
         "pdfNote": "Un PDF vuelve como texto, página a página. No conserva su diseño.",
         "another": "Traducir otro",
-        "preview": "Vista previa",
+        "preview": "Extracto",
         "cancel": "Cancelar"
     }
 }

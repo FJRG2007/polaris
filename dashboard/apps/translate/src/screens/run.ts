@@ -48,7 +48,7 @@ export async function runTranslation(
     if (options.charLimit !== null && total > options.charLimit) {
         throw new Error(options.overLimit(options.charLimit));
     }
-    let lastError: string | null = null;
+    let lastError: ServerEngineError | null = null;
     for (const id of options.order) {
         const engine = options.engines.get(id);
         if (!engine) continue;
@@ -62,8 +62,52 @@ export async function runTranslation(
         } catch (caught) {
             if (signal?.aborted) throw caught;
             // Only the server words its refusals for the reader.
-            lastError = caught instanceof ServerEngineError ? caught.message : lastError;
+            lastError = caught instanceof ServerEngineError ? caught : lastError;
         }
     }
-    throw new Error(lastError ?? options.fallback);
+    throw lastError ?? new Error(options.fallback);
+}
+
+/** Translations already made for one way of translating, by the text they translate. */
+export interface PieceCache {
+    owner: Translate | null;
+    pieces: Map<string, string>;
+}
+
+/** The most pieces a cache keeps before it starts over. */
+const CACHE_MAX = 2000;
+
+/**
+ * `text` translated through `translate`, sending only the paragraphs `cache`
+ * has not translated yet, so an edit to a long text pays for the paragraph it
+ * touched and not for the rest. `answer` is null when nothing had to be sent.
+ */
+export async function translateReusing(
+    text: string,
+    cache: PieceCache,
+    translate: Translate,
+    signal?: AbortSignal
+): Promise<{ text: string; answer: RunAnswer | null }> {
+    if (cache.owner !== translate || cache.pieces.size > CACHE_MAX) {
+        cache.owner = translate;
+        cache.pieces = new Map();
+    }
+    const parts = text.split(/(\n\s*\n)/);
+    const missing = [
+        ...new Set(
+            parts.filter((part, index) => index % 2 === 0 && part.trim() && !cache.pieces.has(part))
+        )
+    ];
+    let answer: RunAnswer | null = null;
+    if (missing.length > 0) {
+        answer = await translate(missing, signal);
+        if (answer.texts.length !== missing.length) throw new Error("answer count");
+        missing.forEach((part, index) => cache.pieces.set(part, answer!.texts[index]!));
+    }
+    return {
+        text: parts
+            .map((part, index) => (index % 2 === 1 || !part.trim() ? part : cache.pieces.get(part)!))
+            .join(""),
+        answer
+    };
 }

@@ -7,6 +7,7 @@
  */
 
 import type { Translate } from "./run";
+import { ServerEngineError } from "./server-engine";
 import { useTranslateT } from "./i18n";
 import { FileText, FileUp } from "lucide-react";
 import { Button, cn } from "@polaris/ui";
@@ -16,8 +17,47 @@ import { DocumentError, openDocument, translatedName, type DocumentFormat } from
 
 /** Paragraphs sent at once: small enough for the progress to move. */
 const BATCH = 40;
+/** Times one batch waits out the rate limit before the document gives up. */
+const RATE_RETRIES = 3;
+/** The wait when the server did not say how long. */
+const RATE_WAIT_SECONDS = 60;
 /** How much of the translation the preview shows. */
 const PREVIEW_CHARS = 3000;
+
+/** Resolves after `seconds`, or rejects as soon as `signal` aborts. */
+function wait(seconds: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const timer = window.setTimeout(resolve, seconds * 1000);
+        signal.addEventListener(
+            "abort",
+            () => {
+                window.clearTimeout(timer);
+                reject(signal.reason);
+            },
+            { once: true }
+        );
+    });
+}
+
+/**
+ * One batch through `translate`, waiting out the per-person rate limit and
+ * trying again, so a long document never loses what it already translated.
+ */
+async function translateBatch(
+    translate: Translate,
+    texts: string[],
+    signal: AbortSignal
+): Promise<string[]> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return (await translate(texts, signal)).texts;
+        } catch (caught) {
+            const limited = caught instanceof ServerEngineError && caught.code === "rate";
+            if (!limited || attempt >= RATE_RETRIES || signal.aborted) throw caught;
+            await wait(caught.retryAfter ?? RATE_WAIT_SECONDS, signal);
+        }
+    }
+}
 
 type Phase =
     | { kind: "idle" }
@@ -65,9 +105,13 @@ export function DocumentMode({
             const out: string[] = [];
             setPhase({ kind: "translating", done: 0, total: job.segments.length });
             for (let at = 0; at < job.segments.length; at += BATCH) {
-                const answer = await translate(job.segments.slice(at, at + BATCH), controller.signal);
+                const texts = await translateBatch(
+                    translate,
+                    job.segments.slice(at, at + BATCH),
+                    controller.signal
+                );
                 if (controller.signal.aborted) return;
-                out.push(...answer.texts);
+                out.push(...texts);
                 setPhase({ kind: "translating", done: out.length, total: job.segments.length });
             }
             const blob = await job.build(out);

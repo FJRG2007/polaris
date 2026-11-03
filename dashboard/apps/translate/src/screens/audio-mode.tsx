@@ -131,7 +131,7 @@ export function AudioMode({
     };
 
     const transcribe = async (file: Blob, seconds: number | null): Promise<string> => {
-        const durationMs = Math.round((seconds ?? 0) * 1000);
+        const durationMs = Math.min(AUDIO_MAX_SECONDS * 1000, Math.round((seconds ?? 0) * 1000));
         const answer = await postFile<{ text: string }>(
             `/api/translate/transcribe?durationMs=${durationMs}`,
             file,

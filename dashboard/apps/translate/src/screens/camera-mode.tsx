@@ -3,8 +3,10 @@
 /**
  * The camera, translated as it looks: a frame every few seconds is read and
  * its lines translated over the picture, where they are. A video file plays
- * through the same loop. Lines already translated are kept, so a still scene
- * sends nothing new; a frame waits until the last one is done.
+ * once through the same loop. A frame that looks like the last one read, or
+ * one taken while the tab is hidden, is not read again, and lines already
+ * translated are kept, so a still scene sends nothing new; a frame waits
+ * until the last one is done.
  */
 
 import type { Translate } from "./run";
@@ -19,6 +21,39 @@ const LOCAL_EVERY_MS = 2000;
 const SERVER_EVERY_MS = 5000;
 /** The longest side a frame is sent at. */
 const FRAME_MAX = 1280;
+
+/** The side of the small grey thumbnail two frames are compared by. */
+const PRINT_SIDE = 16;
+/** How far, out of 255, one spot of the thumbnail moves before it counts as changed. */
+const SPOT_CHANGE = 12;
+/** How many changed spots make a new frame: a little noise is not a new scene. */
+const SPOTS_CHANGED = 3;
+
+/** A tiny greyscale thumbnail of `video`, to tell whether the scene changed. */
+function printOf(video: HTMLVideoElement): Uint8Array | null {
+    const canvas = document.createElement("canvas");
+    canvas.width = PRINT_SIDE;
+    canvas.height = PRINT_SIDE;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return null;
+    context.drawImage(video, 0, 0, PRINT_SIDE, PRINT_SIDE);
+    const { data } = context.getImageData(0, 0, PRINT_SIDE, PRINT_SIDE);
+    const grey = new Uint8Array(PRINT_SIDE * PRINT_SIDE);
+    for (let at = 0; at < grey.length; at++) {
+        grey[at] = (data[at * 4]! * 3 + data[at * 4 + 1]! * 6 + data[at * 4 + 2]!) / 10;
+    }
+    return grey;
+}
+
+/** Whether two thumbnails differ enough to read the frame again. */
+export function changed(before: Uint8Array | null, now: Uint8Array | null): boolean {
+    if (!before || !now || before.length !== now.length) return true;
+    let spots = 0;
+    for (let at = 0; at < now.length; at++) {
+        if (Math.abs(now[at]! - before[at]!) > SPOT_CHANGE && ++spots >= SPOTS_CHANGED) return true;
+    }
+    return false;
+}
 
 /** One frame of `video` as a JPEG, no larger than `FRAME_MAX` on its longest side. */
 async function frameOf(video: HTMLVideoElement): Promise<Blob | null> {
@@ -46,6 +81,7 @@ export function CameraMode({
     const fileUrl = useRef<string | null>(null);
     const busy = useRef(false);
     const known = useRef(new Map<string, string>());
+    const lastPrint = useRef<Uint8Array | null>(null);
     const [running, setRunning] = useState(false);
     const [paused, setPaused] = useState(false);
     const [lines, setLines] = useState<ImageLine[]>([]);
@@ -63,6 +99,7 @@ export function CameraMode({
     // A new language or engine: what was translated before no longer holds.
     useEffect(() => {
         known.current = new Map();
+        lastPrint.current = null;
         setTranslated(null);
     }, [translate]);
 
@@ -77,6 +114,7 @@ export function CameraMode({
             element.srcObject = null;
             element.removeAttribute("src");
         }
+        lastPrint.current = null;
         setRunning(false);
         setPaused(false);
         setLines([]);
@@ -121,6 +159,10 @@ export function CameraMode({
     const tick = useCallback(async () => {
         const element = video.current;
         if (!element || busy.current || element.readyState < 2 || !element.videoWidth) return;
+        if (document.hidden) return;
+        const print = printOf(element);
+        if (!changed(lastPrint.current, print)) return;
+        lastPrint.current = print;
         busy.current = true;
         try {
             const frame = await frameOf(element);
@@ -219,7 +261,6 @@ export function CameraMode({
                     ref={video}
                     muted
                     playsInline
-                    loop
                     className={running ? "block max-h-[70vh] max-w-full rounded-lg border border-border bg-black" : "hidden"}
                 />
                 {running ? <TextOverlay lines={lines} translated={translated} height={height} /> : null}

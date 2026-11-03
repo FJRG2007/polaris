@@ -195,7 +195,9 @@ describe("no length limit unless one is set", () => {
         mocks.settings = JSON.stringify({ charLimit: 100 });
         const response = await POST(post({ texts: ["a".repeat(101)], to: "en" }));
         expect(response.status).toBe(413);
-        expect(await response.json()).toMatchObject({ error: "overLimit" });
+        const answer = (await response.json()) as { error: string; message: string };
+        expect(answer.error).toBe("overLimit");
+        expect(answer.message).toContain("100");
         expect(mocks.serverTranslate).not.toHaveBeenCalled();
     });
 

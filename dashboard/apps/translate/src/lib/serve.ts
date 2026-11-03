@@ -91,7 +91,8 @@ export function failureOf(caught: unknown): ServeFailure {
 }
 
 export type Served<T> =
-    ({ ok: true; engine: ServerEngineId } & T) | { ok: false; failure: ServeFailure };
+    | ({ ok: true; engine: ServerEngineId } & T)
+    | { ok: false; failure: ServeFailure; limit?: number };
 
 export async function translateOnServer(
     userId: string,
@@ -103,7 +104,7 @@ export async function translateOnServer(
     ]);
     const total = input.texts.reduce((sum, text) => sum + text.length, 0);
     if (settings.charLimit !== null && total > settings.charLimit) {
-        return { ok: false, failure: "overLimit" };
+        return { ok: false, failure: "overLimit", limit: settings.charLimit };
     }
     const engine = pickServerEngine(available, settings, input.engine);
     if (!engine) return { ok: false, failure: input.engine ? "unavailable" : "noEngine" };

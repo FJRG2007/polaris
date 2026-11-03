@@ -39,7 +39,8 @@ import { ImageMode } from "./image-mode";
 import { CameraMode } from "./camera-mode";
 import { DocumentMode } from "./document-mode";
 import type { Reads } from "./reads";
-import { runTranslation, type Translate } from "./run";
+import { PIECE_MAX } from "../model/chunk";
+import { runTranslation, translateReusing, type PieceCache, type Translate } from "./run";
 import { useLanguageOptions } from "./language-options";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
@@ -221,6 +222,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     // Translate on a pause in typing; a newer request cancels the older one.
     const latest = useRef(0);
     const loaded = useRef<Loaded | null>(null);
+    const pieces = useRef<PieceCache>({ owner: null, pieces: new Map() });
     useEffect(() => {
         const text = source;
         if (isLoaded(loaded.current, { source: text, from, to: targetLanguage, chosen })) {
@@ -248,11 +250,20 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         const timer = window.setTimeout(async () => {
             setPending(true);
             try {
-                const answer = await translate([text], controller.signal);
+                // A long text sends only the paragraphs an edit changed.
+                const { text: translated, answer } =
+                    text.length > PIECE_MAX
+                        ? await translateReusing(text, pieces.current, translate, controller.signal)
+                        : await translate([text], controller.signal).then((made) => ({
+                              text: made.texts[0] ?? "",
+                              answer: made
+                          }));
                 if (ticket !== latest.current) return;
-                setTarget(answer.texts[0] ?? "");
-                setAnsweredBy(answer.engine);
-                setDetected(from === AUTO ? normalizeDetected(answer.detected) : null);
+                setTarget(translated);
+                if (answer) {
+                    setAnsweredBy(answer.engine);
+                    setDetected(from === AUTO ? normalizeDetected(answer.detected) : null);
+                }
                 setError(null);
             } catch (caught) {
                 if (controller.signal.aborted || ticket !== latest.current) return;

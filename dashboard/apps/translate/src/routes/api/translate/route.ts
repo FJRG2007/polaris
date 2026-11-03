@@ -13,7 +13,6 @@
 import { caller, body } from "../../../lib/route";
 import { translateInput } from "../../../model/schemas";
 import { mediaStatus } from "../../../lib/media";
-import { loadSettings } from "../../../lib/settings";
 import { failureResponse, serverStatus, translateOnServer } from "../../../lib/serve";
 
 export async function GET(): Promise<Response> {
@@ -36,9 +35,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = await body(request, translateInput);
     if (input instanceof Response) return input;
     const served = await translateOnServer(user.id, input);
-    if (!served.ok) {
-        const limit = served.failure === "overLimit" ? (await loadSettings()).charLimit : null;
-        return failureResponse(served.failure, user.isAdmin, { limit: limit ?? 0 });
-    }
+    if (!served.ok) return failureResponse(served.failure, user.isAdmin, { limit: served.limit ?? 0 });
     return Response.json({ texts: served.texts, engine: served.engine, detected: served.detected });
 }
