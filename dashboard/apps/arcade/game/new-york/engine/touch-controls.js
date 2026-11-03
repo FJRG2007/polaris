@@ -101,7 +101,6 @@ class TouchControls {
     if (!this.root) return;
     this.mode = mode;
     const labels = {
-      boost: t(mode === 'person' || mode === 'cyclist' ? 'touch.sprint' : 'touch.boost'),
       up: t(mode === 'helicopter' ? 'touch.ascend' : 'touch.jump'),
       down: t('touch.descend')
     };

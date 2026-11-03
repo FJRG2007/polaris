@@ -10,10 +10,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const models = vi.hoisted(() => ({ build: vi.fn() }));
 
-vi.mock("../../../arcade/game/new-york/engine/actor-models.js", () => ({
+vi.mock("../../../arcade/game/new-york/engine/cars.js", () => ({
     BODY_SPECS: { sedan: {} },
     buildCarGeometry: models.build,
-    createLoftedCarMaterial: vi.fn(),
+    createLoftedCarMaterial: vi.fn()
+}));
+
+vi.mock("../../../arcade/game/new-york/engine/helicopter.js", () => ({
     buildHelicopterBodyGeometry: models.build,
     buildHelicopterMainRotorGeometry: vi.fn(),
     buildHelicopterTailRotorGeometry: vi.fn(),

@@ -27,7 +27,7 @@ import {
   select,
   uniform
 } from 'three/tsl';
-import { cityUniforms } from './tsl-materials.js';
+import { cityUniforms, filteredPulse } from './tsl-materials.js';
 import {
   MANHATTAN_COASTLINE,
   NJ_SHORELINE_POLYGON,
@@ -53,22 +53,9 @@ import {
 } from './city-config.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-// js/boroughs.js
-// The rest of New York City around the simulated Manhattan grid, at true 1:1 scale on the real geography (1 unit = 1 m,
-// x = Manhattan-grid east, z = grid south, origin at 5th Ave & 42nd St), built to read as real places from the street,
-// the waterfront, the helicopter and the Empire State observatory while staying cheap at 60 FPS:
-// - Land masses from the real shorelines (New Jersey, Brooklyn, Queens, Upper Manhattan, the Bronx, Staten Island and the
-//   horizon fillers beyond the city line; Randall's, Roosevelt, Governors, Liberty, Ellis & Mill Rock islands) with
-//   granite bulkheads
-// - The Palisades cliffs (Fort Lee -> Weehawken) fading into Jersey City Heights and Bayonne as a heightfield ridge that
-//   follows the real New Jersey shore
-// - A procedural "city carpet" ground shader: per-neighbourhood street grids (a baked zone map), sidewalks, roofs,
-//   backyard trees, parks, cemeteries, rail/port yards and marsh from a land-use map, sodium street-light grids at night
-// - ~100k instanced borough buildings (one cheap window-grid shader, lit windows at night) on the same grids, plus the
-//   real skyline clusters (Jersey City, Long Island City, Downtown Brooklyn, Williamsburg, Fort Lee)
-// - Harbor islands (Roosevelt Island + tram, Governors Island forts & hills, Randall's fields, Statue of Liberty,
-//   Ellis Island) and the four East River bridges with their distinct structures and necklace lights
-// - The George Washington and Verrazzano-Narrows bridges as distant skyline landmarks
+// Surrounding land, buildings, harbor islands and bridges, with detailed skyline landmarks.
+// World frame: 1 unit = 1 m, x = Manhattan-grid east, z = grid south; origin at 5th Ave & 42nd St.
+// Distant neighborhoods share instanced buildings and procedural ground materials.
 
 // =====================================================================================================================
 // 0. REAL PLACES
@@ -836,17 +823,6 @@ const valueNoise = Fn(([p]) => {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 });
 
-// Box-filtered periodic pulse (fraction of a footprint `w` around `x` where fract() lies in [a, b]): settles to the mean
-// coverage once a period shrinks below a pixel, so grids never shimmer at distance
-const boxPulse = Fn(([x, a, b, w]) => {
-  const p = float(x).toVar();
-  const lo = float(a).toVar();
-  const hi = float(b).toVar();
-  const hw = max(float(w), 0.0001).mul(0.5).toVar();
-  const integral = (t) => floor(t).mul(hi.sub(lo)).add(clamp(fract(t), lo, hi).sub(lo));
-  return integral(p.add(hw)).sub(integral(p.sub(hw))).div(hw.mul(2.0));
-});
-
 // 0 by day, ~0.75 at blue hour, 1 at night
 const nightFactorNode = () => smoothstep(0.7, 1.45, cityUniforms.uInteriorGlow);
 
@@ -876,9 +852,9 @@ function createLandMaterial() {
   const hv = zp1.w.mul(0.5).div(zp1.y);
   const swU = float(2.2).div(zp1.x);
   const swV = float(2.2).div(zp1.y);
-  const inBlock = boxPulse(gu, hu, float(1.0).sub(hu), fwU).mul(boxPulse(gv, hv, float(1.0).sub(hv), fwV)).toVar();
-  const inLots = boxPulse(gu, hu.add(swU), float(1.0).sub(hu).sub(swU), fwU)
-    .mul(boxPulse(gv, hv.add(swV), float(1.0).sub(hv).sub(swV), fwV)).toVar();
+  const inBlock = filteredPulse(gu, hu, float(1.0).sub(hu), fwU).mul(filteredPulse(gv, hv, float(1.0).sub(hv), fwV)).toVar();
+  const inLots = filteredPulse(gu, hu.add(swU), float(1.0).sub(hu).sub(swU), fwU)
+    .mul(filteredPulse(gv, hv.add(swV), float(1.0).sub(hv).sub(swV), fwV)).toVar();
 
   // Lots ~8 m wide along the block, two rows of roofs with a band of backyard trees between them
   const lotsU = max(floor(zp1.x.div(8.5)), 1.0);
@@ -899,7 +875,7 @@ function createLandMaterial() {
   const roofMean = srgb(0.43, 0.41, 0.39);
   const roofCol = mix(roofMean, roofVar, lotDetail);
 
-  const yardBand = boxPulse(fract(gv), 0.36, 0.64, fwV);
+  const yardBand = filteredPulse(fract(gv), 0.36, 0.64, fwV);
   const treeNoise = valueNoise(wp.xz.mul(0.11)).toVar();
   const cTree = mix(srgb(0.19, 0.26, 0.13), srgb(0.30, 0.37, 0.19), treeNoise);
   const yardAmount = clamp(yardBand.mul(0.85).add(lu.b.mul(0.35)).mul(smoothstep(0.25, 0.65, treeNoise.add(lu.b.mul(0.3)))), 0.0, 1.0);
@@ -913,8 +889,8 @@ function createLandMaterial() {
   // settles to an average canopy cover once single trees shrink below a pixel
   const reachU = min(float(3.2).div(zp1.x), hu.mul(0.9));
   const reachV = min(float(3.2).div(zp1.y), hv.mul(0.9));
-  const curbZone = boxPulse(gu, hu.sub(reachU), float(1.0).sub(hu).add(reachU), fwU)
-    .mul(boxPulse(gv, hv.sub(reachV), float(1.0).sub(hv).add(reachV), fwV));
+  const curbZone = filteredPulse(gu, hu.sub(reachU), float(1.0).sub(hu).add(reachU), fwU)
+    .mul(filteredPulse(gv, hv.sub(reachV), float(1.0).sub(hv).add(reachV), fwV));
   const treeBand = max(curbZone.sub(inLots), 0.0);
   const crowns = smoothstep(0.42, 0.62, valueNoise(wp.xz.mul(0.16).add(vec2(zp0.z, zp0.w).mul(0.01))));
   const canopyFar = smoothstep(1.2, 4.0, max(fwU.mul(zp1.x), fwV.mul(zp1.y)));
@@ -949,7 +925,7 @@ function createLandMaterial() {
   const colFw = fwidth(colCoord);
   const colDetail = float(1.0).sub(smoothstep(0.3, 1.0, colFw));
   const colHash = hash12(vec2(colId, floor(wp.y.div(13.0).add(hash12(vec2(colId, 7.0)).mul(3.0)))));
-  const joint = float(1.0).sub(boxPulse(fract(colCoord), 0.07, 0.93, colFw)).mul(colDetail);
+  const joint = float(1.0).sub(filteredPulse(fract(colCoord), 0.07, 0.93, colFw)).mul(colDetail);
   const rockN = valueNoise(vec2(wp.x.add(wp.z).mul(0.12), wp.y.mul(0.05)));
   const rust = smoothstep(0.55, 0.85, valueNoise(wp.xz.mul(0.03).add(wp.y.mul(0.02)))).mul(0.6);
   const rockBase = mix(mix(srgb(0.25, 0.235, 0.22), srgb(0.40, 0.37, 0.33), rockN), srgb(0.42, 0.31, 0.23), rust);
@@ -1006,8 +982,8 @@ function createBoroughBuildingMaterial() {
   const gv = y.div(floorH).toVar();
   const fwU = fwidth(gu).toVar();
   const fwV = fwidth(gv).toVar();
-  const winMask = boxPulse(gu, float(0.5).sub(winW.mul(0.5)), float(0.5).add(winW.mul(0.5)), fwU)
-    .mul(boxPulse(gv, float(0.42).sub(winH.mul(0.5)), float(0.42).add(winH.mul(0.5)), fwV))
+  const winMask = filteredPulse(gu, float(0.5).sub(winW.mul(0.5)), float(0.5).add(winW.mul(0.5)), fwU)
+    .mul(filteredPulse(gv, float(0.42).sub(winH.mul(0.5)), float(0.42).add(winH.mul(0.5)), fwV))
     .mul(float(1.0).sub(isRoof))
     .mul(step(1.0, gv))
     .mul(float(1.0).sub(step(info.y.sub(1.2), y)))
@@ -1024,8 +1000,8 @@ function createBoroughBuildingMaterial() {
   const wallCol = mix(wallBase.mul(mix(float(0.86), float(1.07), grime)), wallBase.mul(mix(float(0.62), float(1.3), step(0.55, bHash))), parapet);
   const storefront = float(1.0).sub(step(4.2, y)).mul(float(1.0).sub(isRoof));
   // Window frames & sills (white / cream trim on masonry, dark mullions on glass & warehouses, aluminium on modern)
-  const frameMask = boxPulse(gu, float(0.45).sub(winW.mul(0.5)), float(0.55).add(winW.mul(0.5)), fwU)
-    .mul(boxPulse(gv, float(0.36).sub(winH.mul(0.5)), float(0.45).add(winH.mul(0.5)), fwV))
+  const frameMask = filteredPulse(gu, float(0.45).sub(winW.mul(0.5)), float(0.55).add(winW.mul(0.5)), fwU)
+    .mul(filteredPulse(gv, float(0.36).sub(winH.mul(0.5)), float(0.45).add(winH.mul(0.5)), fwV))
     .mul(float(1.0).sub(isRoof))
     .mul(step(1.0, gv))
     .mul(float(1.0).sub(step(info.y.sub(1.2), y)));
@@ -1068,7 +1044,7 @@ function createBulkheadMaterial() {
   const mat = new THREE.MeshStandardNodeMaterial({ roughness: 0.86, metalness: 0.0 });
   const wp = positionWorld;
   const courseV = wp.y.div(0.85).toVar();
-  const course = boxPulse(courseV, 0.0, 0.92, fwidth(courseV));
+  const course = filteredPulse(courseV, 0.0, 0.92, fwidth(courseV));
   const n = valueNoise(vec2(wp.x.add(wp.z).mul(0.09), wp.y.mul(0.6)));
   const stone = mix(srgb(0.42, 0.41, 0.39), srgb(0.55, 0.53, 0.50), n).mul(mix(float(0.8), float(1.0), course));
   const wet = float(1.0).sub(smoothstep(-1.95, -1.0, wp.y));
@@ -1960,7 +1936,7 @@ function createLandmarkMaterial(rgb, { roughness = 0.8, metalness = 0.0, flood =
     const row = floor(cv);
     const along = select(abs(normalWorld.x).greaterThan(abs(normalWorld.z)), positionWorld.z, positionWorld.x);
     const cu = along.div(uCourses.mul(2.3)).add(row.mul(0.5)).toVar();
-    const joint = boxPulse(cv, 0.0, 0.92, fwidth(cv)).mul(boxPulse(cu, 0.0, 0.965, fwidth(cu)));
+    const joint = filteredPulse(cv, 0.0, 0.92, fwidth(cv)).mul(filteredPulse(cu, 0.0, 0.965, fwidth(cu)));
     col = col.mul(mix(float(0.7), float(1.0), joint)).mul(hash12(vec2(floor(cu), row)).mul(0.16).add(0.92));
   }
   mat.colorNode = col;

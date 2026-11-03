@@ -6,15 +6,13 @@
 import * as THREE from 'three/webgpu';
 import { onPlayers } from './embed.js';
 import { colorFor, cssColor } from './player-markers.js';
+import { BODY_SPECS, buildCarGeometry, createLoftedCarMaterial } from './cars.js';
 import {
-  BODY_SPECS,
-  buildCarGeometry,
-  createLoftedCarMaterial,
   buildHelicopterBodyGeometry,
   buildHelicopterMainRotorGeometry,
   buildHelicopterTailRotorGeometry,
   createLoftedHelicopterMaterial
-} from './actor-models.js';
+} from './helicopter.js';
 
 // How far above where a player is their name is drawn.
 const LABEL_HEIGHT = { person: 2.2, cyclist: 2.6, car: 2.2, helicopter: 3.6 };
@@ -170,6 +168,7 @@ export function createRemotePlayers(scene) {
         const turn = marker.heading - marker.root.rotation.y;
         marker.root.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * ease;
         for (const rotor of marker.model?.rotors ?? []) rotor.mesh.rotation[rotor.axis] += rotor.speed * dt;
+        marker.root.updateMatrixWorld(); // the scene does not update world matrices on its own (main.js)
         projected.copy(marker.root.position);
         projected.y += LABEL_HEIGHT[marker.mode] ?? LABEL_HEIGHT.car;
         projected.project(camera);

@@ -158,15 +158,18 @@ function ratchetBuffer(context) {
   const random = randomSequence(0x7061776c);
   const teeth = 120; // Reference: sixty pawl contacts per second.
   for (let tooth = 0; tooth < teeth; tooth++) {
-    let index = Math.round((tooth + (random() - 0.5) * 0.06) / teeth * length);
+    let index = Math.round((tooth + (random() - 0.5) * 0.18) / teeth * length);
     index = (index + length) % length;
-    const strength = (tooth % 3 ? 0.78 : 1) * (0.92 + random() * 0.16);
-    for (let i = 0; i < rate * 0.004; i++) {
+    const strength = 0.65 + random() * 0.35;
+    const decay = 0.00035 + random() * 0.0002;
+    let previous = 0;
+    for (let i = 0; i < rate * 0.0024; i++) {
       const t = i / rate;
-      // Let the hub filter provide the resonance: faster clicks should not become a high-pitched whine.
-      const impact = Math.exp(-t / 0.00025) - 0.25 * Math.exp(-t / 0.001);
-      const click = impact + (random() * 2 - 1) * Math.exp(-t / 0.0007) * 0.7;
-      data[index] += click * strength * (1 - Math.exp(-t / 0.00008));
+      const noise = random() * 2 - 1;
+      // Each pawl makes a dry, slightly different impact rather than a repeating pressure pulse.
+      const click = noise - previous * 0.8;
+      previous = noise;
+      data[index] += click * strength * (1 - Math.exp(-t / 0.00004)) * Math.exp(-t / decay);
       if (++index === length) index = 0;
     }
   }
@@ -184,14 +187,15 @@ function chainBuffer(context) {
     const phase = tooth / teeth * Math.PI * 2;
     const effort = 0.72 - Math.cos(phase * 2) * 0.18 + Math.sin(phase) * 0.06;
     const strength = effort * (tooth % 2 ? 0.88 : 1) * (0.92 + random() * 0.16);
-    let index = Math.round(tooth / teeth * data.length);
+    let index = Math.round((tooth + (random() - 0.5) * 0.1) / teeth * data.length);
+    index = (index + data.length) % data.length;
     let previous = 0;
-    for (let i = 0; i < rate * 0.012; i++) {
+    for (let i = 0; i < rate * 0.003; i++) {
       const t = i / rate;
       const noise = random() * 2 - 1;
       const friction = noise - previous * 0.65;
       previous = noise;
-      data[index] += friction * strength * (1 - Math.exp(-t / 0.0003)) * Math.exp(-t / 0.0024);
+      data[index] += friction * strength * (1 - Math.exp(-t / 0.00006)) * Math.exp(-t / 0.00045);
       if (++index === data.length) index = 0;
     }
   }
@@ -232,18 +236,7 @@ export function createSynthResources(context) {
       samples[i] = previous;
     }
   }
-  let mean = 0;
-  for (let i = 0; i < samples.length; i++) mean += samples[i];
-  mean /= samples.length;
-  let peak = 0;
-  let energy = 0;
-  for (let i = 0; i < samples.length; i++) {
-    samples[i] -= mean;
-    peak = Math.max(peak, Math.abs(samples[i]));
-    energy += samples[i] * samples[i];
-  }
-  const scale = Math.min(0.95 / peak, 0.30 / Math.sqrt(energy / samples.length));
-  for (let i = 0; i < samples.length; i++) samples[i] *= scale;
+  normalizeLoop(noise, 0.30, 0.95);
 
   const impulse = context.createBuffer(2, Math.round(sampleRate * 0.7), sampleRate);
   const reflections = [0.017, 0.034, 0.061, 0.097, 0.153, 0.231];
@@ -291,14 +284,16 @@ export function createSynthResources(context) {
 
 // Keep only meaningful target changes. Replacing future events bounds the scheduling horizon; setTargetAtTime
 // starts from the value reached by the preceding ramp, including when an update interrupts that ramp.
+// Bring a future target forward even if its value is unchanged (for example, when a shift is interrupted).
 function smoothParameter(parameter, timeConstant = 0.07, epsilon = 0.0001, snapInitial = false) {
-  let target = NaN;
-  return (value, now) => {
-    if (Math.abs(value - target) < epsilon) return;
+  let target = NaN, scheduledTime = -Infinity;
+  return (value, now, smoothing = timeConstant) => {
+    if (Math.abs(value - target) < epsilon && now >= scheduledTime) return;
     parameter.cancelScheduledValues(now);
     if (snapInitial && Number.isNaN(target)) parameter.setValueAtTime(value, now);
-    else parameter.setTargetAtTime(value, now, timeConstant);
+    else parameter.setTargetAtTime(value, now, smoothing);
     target = value;
+    scheduledTime = now;
   };
 }
 
@@ -369,8 +364,8 @@ export function createMotorVoice(context, resources, kind, output) {
     const mechanismGain = gain();
     mechanism.connect(mechanismFilter).connect(mechanismGain).connect(mix);
     const road = loop();
-    const roadHighpass = filter('highpass', 260, 0.5);
-    const roadLowpass = filter('lowpass', 3200, 0.5);
+    const roadHighpass = filter('highpass', 120, 0.5);
+    const roadLowpass = filter('lowpass', 1400, 0.5);
     const roadGain = gain();
     road.connect(roadHighpass).connect(roadLowpass).connect(roadGain).connect(mix);
     const exhaustRate = smoothParameter(exhaust.playbackRate, 0.035, 0.0005, true);
@@ -391,6 +386,7 @@ export function createMotorVoice(context, resources, kind, output) {
       previousTime = now;
       throttle = first ? load : throttle + (load - throttle) * (1 - Math.exp(-dt / (load > throttle ? 0.14 : 0.32)));
       const shiftRPM = (bus ? 1700 : 2700) + throttle * (bus ? 950 : 2900);
+      let upshift = false;
       if (speed < 0.6) {
         // A fresh launch starts in first immediately, even after a hard stop from top gear.
         gear = 0;
@@ -405,17 +401,18 @@ export function createMotorVoice(context, resources, kind, output) {
           && (wheelRPM < (bus ? 1000 : 1600) || (throttle > 0.65 && wheelRPM < shiftRPM * 0.55))) gear--;
         if (gear !== oldGear) {
           gearLock = now + 0.65;
-          if (gear > oldGear) shiftUntil = now + 0.14;
+          upshift = gear > oldGear;
+          if (upshift) shiftUntil = now + 0.16;
         }
       }
       // Wheel-coupled RPM, with torque-converter slip at low speed. Coasting retains engine braking rather than
       // dropping straight to idle; hysteresis and a minimum gear dwell prevent hunting around a shift boundary.
       const slip = throttle * (bus ? 600 : 1500) * Math.max(0.12, 1 - speed / 16);
       const targetRPM = clamp(Math.max(idle, speed * ratios[gear]) + slip, idle, bus ? 2900 : 6200);
-      rpm = first ? targetRPM : rpm + (targetRPM - rpm) * (1 - Math.exp(-dt / (targetRPM > rpm ? 0.12 : 0.075)));
+      // The playback-rate ramps provide the short RPM fall on an upshift; do not soften it twice.
+      rpm = first || upshift ? targetRPM : rpm + (targetRPM - rpm) * (1 - Math.exp(-dt / (targetRPM > rpm ? 0.12 : 0.075)));
       const pitch = (0.97 + variation * 0.06) * doppler;
       const effort = Math.min(1, throttle + speed * 0.005);
-      const torque = now < shiftUntil ? 0.52 : 1;
       const rolling = Math.min(1.35, speed / 28);
       exhaustRate(rpm / sound.referenceRPM * pitch, now);
       highExhaustRate(rpm / sound.referenceRPM * pitch * bankRatio, now);
@@ -426,13 +423,26 @@ export function createMotorVoice(context, resources, kind, output) {
       lowBankLevel(Math.cos(blend * Math.PI / 2), now);
       highBankLevel(Math.sin(blend * Math.PI / 2), now);
       mechanicalRate(rpm / sound.referenceRPM * pitch, now);
-      exhaustCutoff((bus ? 480 : 650) + effort * (bus ? 1400 : 1800) + rpm * 0.24, now);
-      exhaustLevel(((bus ? 0.16 : suv ? 0.13 : 0.11) + effort * (bus ? 0.22 : 0.26)) * torque, now);
+      const cutoff = (bus ? 480 : 650) + rpm * 0.24;
+      const exhaustIdle = bus ? 0.16 : suv ? 0.13 : 0.11;
+      const mechanicalIdle = bus ? 0.10 : 0.03;
+      if (upshift) {
+        const unloaded = Math.min(effort, 0.06);
+        exhaustCutoff(cutoff + unloaded * (bus ? 1400 : 1800), now, 0.012);
+        exhaustLevel(exhaustIdle + unloaded * (bus ? 0.22 : 0.26), now, 0.012);
+        mechanicalLevel(mechanicalIdle + unloaded * (bus ? 0.15 : 0.085), now, 0.012);
+      }
+      // Schedule unloading and recovery on the audio clock. Updates during the shift can revise
+      // the recovery target without cancelling the cut, even though controls run at only 10 Hz.
+      const loadTime = Math.max(now, shiftUntil);
+      const recovery = now < shiftUntil ? 0.045 : undefined;
+      exhaustCutoff(cutoff + effort * (bus ? 1400 : 1800), loadTime, recovery);
+      exhaustLevel(exhaustIdle + effort * (bus ? 0.22 : 0.26), loadTime, recovery);
       mechanicalFrequency(((bus ? 1050 : 1250) + rpm * 0.12) * doppler, now);
-      mechanicalLevel(((bus ? 0.10 : 0.03) + effort * (bus ? 0.15 : 0.085)) * torque, now);
-      // Tire contact is broadband and becomes the dominant sound of a car passing at speed off-throttle.
-      roadLevel(Math.pow(rolling, 1.25) * (bus ? 0.44 : 0.36) * (1 - throttle * 0.5), now);
-      roadFrequency((2200 + Math.min(1, rolling) * 2400) * doppler, now);
+      mechanicalLevel(mechanicalIdle + effort * (bus ? 0.15 : 0.085), loadTime, recovery);
+      // Keep tire noise low and soft; its level follows road speed, not throttle release.
+      roadLevel(Math.pow(rolling, 1.25) * (bus ? 0.16 : 0.10), now);
+      roadFrequency((900 + Math.min(1, rolling) * 1000) * doppler, now);
       noiseRate(doppler * (0.96 + variation * 0.08), now);
     };
   } else if (kind === 'helicopter') {
@@ -482,16 +492,16 @@ export function createMotorVoice(context, resources, kind, output) {
     };
   } else if (kind === 'cyclist') {
     const road = loop();
-    const tireHighpass = filter('highpass', 110, 0.6);
-    const tireFilter = filter('lowpass', 1400, 0.65);
+    const tireHighpass = filter('highpass', 80, 0.6);
+    const tireFilter = filter('lowpass', 650, 0.65);
     const tireGain = gain();
     road.connect(tireHighpass).connect(tireFilter).connect(tireGain).connect(mix);
     const ratchet = loop(resources.ratchet);
-    const ratchetFilter = filter('bandpass', 2600, 1);
+    const ratchetFilter = filter('bandpass', 3500, 0.5);
     const ratchetGain = gain();
     ratchet.connect(ratchetFilter).connect(ratchetGain).connect(mix);
     const chain = loop(resources.chain);
-    const chainFilter = filter('bandpass', 1900, 0.65);
+    const chainFilter = filter('bandpass', 2800, 0.5);
     const chainGain = gain();
     chain.connect(chainFilter).connect(chainGain).connect(mix);
     const tireLevel = smoothParameter(tireGain.gain, 0.15);
@@ -507,16 +517,16 @@ export function createMotorVoice(context, resources, kind, output) {
       const movement = Math.min(1.25, speed / 12);
       const rolling = Math.min(1, speed / 2);
       const pedaling = load > 0 ? 1 : 0;
-      tireLevel(Math.pow(movement, 1.35) * 0.16, now);
-      tireFrequency((900 + Math.min(1, movement) * 2100) * doppler, now);
+      tireLevel(Math.pow(movement, 1.35) * 0.015, now);
+      tireFrequency((250 + Math.min(1, movement) * 400) * doppler, now);
       // Even light pedaling engages the freewheel. Coasting clicks stand out above the quieter loaded chain.
-      ratchetLevel(rolling * (1 - pedaling) * 0.38, now);
-      ratchetRate(Math.max(0.01, speed * 24 / (2 * Math.PI * 0.35 * 60)) * doppler, now);
-      ratchetFrequency(2600 * (0.97 + variation * 0.06) * doppler, now);
-      chainLevel(rolling * pedaling * (0.02 + Math.sqrt(load) * 0.04), now);
+      ratchetLevel(rolling * (1 - pedaling) * 0.26, now);
+      ratchetRate(Math.max(0.01, speed * 18 / (2 * Math.PI * 0.35 * 60)) * doppler, now);
+      ratchetFrequency(3500 * (0.97 + variation * 0.06) * doppler, now);
+      chainLevel(rolling * pedaling * (0.012 + Math.sqrt(load) * 0.025), now);
       // Match the controller's 35 cm wheels and 3.2 wheel revolutions per crank revolution.
       chainRate(Math.max(0.01, speed / (2 * Math.PI * 0.35 * 3.2)) * doppler, now);
-      chainFrequency((1700 + load * 600) * doppler, now);
+      chainFrequency((2500 + load * 600) * doppler, now);
       noiseRate((0.9 + Math.min(1, movement) * 0.2) * doppler, now);
     };
   } else {

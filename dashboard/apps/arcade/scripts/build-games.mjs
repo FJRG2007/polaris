@@ -11,7 +11,8 @@
  *     version pinned in package.json - the build stops on any other),
  *   - its stylesheet, with the dashboard's own IBM Plex Sans in place of web fonts,
  *   - the city data, gzip-compressed (the page decompresses it itself, so it
- *     arrives small whatever sits in front of the dashboard).
+ *     arrives small whatever sits in front of the dashboard), and the building
+ *     footprints and street trees, kept gzip-compressed as they are stored.
  *
  * Nothing on the page may reach another server: the build fails on any http(s)
  * address in what it writes, except the XML namespaces SVG and the DOM name,
@@ -137,15 +138,25 @@ async function buildNewYork() {
     const geo = hashed("geo", "bin", geoBytes);
     write(geo, geoBytes);
 
+    // Building footprints and the street tree inventory, already gzip-compressed as they are kept
+    const bundledData = {};
+    for (const [placeholder, name] of [["BUILDINGS_FILE", "buildings"], ["TREES_FILE", "trees"]]) {
+        const bytes = readFileSync(join(source, "data", `${name}.bin.gz`));
+        bundledData[placeholder] = hashed(name, "bin", bytes);
+        write(bundledData[placeholder], bytes);
+    }
+
     const template = readFileSync(join(source, "index.html"), "utf8");
-    for (const placeholder of ["GAME_FILE", "STYLE_FILE", "GEO_FILE"]) {
+    for (const placeholder of ["GAME_FILE", "STYLE_FILE", "GEO_FILE", ...Object.keys(bundledData)]) {
         if (!template.includes(`./${placeholder}"`))
             throw new Error(`index.html lost ${placeholder}`);
     }
     const page = template
         .replace('./GAME_FILE"', `./${game}"`)
         .replace('./STYLE_FILE"', `./${style}"`)
-        .replace('./GEO_FILE"', `./${geo}" data-bytes="${geoBytes.length}"`);
+        .replace('./GEO_FILE"', `./${geo}" data-bytes="${geoBytes.length}"`)
+        .replace('./BUILDINGS_FILE"', `./${bundledData.BUILDINGS_FILE}"`)
+        .replace('./TREES_FILE"', `./${bundledData.TREES_FILE}"`);
     write("index.html", page);
 
     for (const [name, bytes] of files) {

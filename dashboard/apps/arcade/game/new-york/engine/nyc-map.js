@@ -30,14 +30,9 @@ import {
   isTypingInField
 } from './city-config.js';
 
-// js/nyc-map.js
-// GTA 6-Style Live Radar Minimap + Full-Screen Interactive New York City Cartographic Atlas.
-// Synchronized 1:1 with the 3D world (1 unit = 1 m; x = Manhattan-grid east, z = grid south, so both maps are drawn
-// "grid north up", the way Manhattan's street map is read, 29° east of true north). They draw the very geography the
-// city is built from (GEO, from NYC Open Data & OpenStreetMap): Manhattan's bulkhead line and piers, every
-// curb island (block) with the building footprints standing on it, the parks, Central Park's meadows, water bodies &
-// drives, the shore highways, the real street centrelines (labelled along their course), the surrounding boroughs and
-// New Jersey, the harbour islands and the bridges.
+// Minimap and full-screen map drawn from the same geography and building footprints as the 3D city.
+// World frame: 1 unit = 1 m, x = Manhattan-grid east, z = grid south. Both maps face grid north,
+// about 29 degrees east of true north.
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 const MIN_ZOOM = 0.015; // full map, pixels per metre: the whole harbour, Staten Island to the Bronx
@@ -136,15 +131,14 @@ function boundsOf(pts) {
   return b;
 }
 
-// Appends a closed ring, always wound the same way as Path2D.rect (so overlapping rings of one path union under the
-// nonzero fill rule instead of cancelling out)
-function addRing(path, pts) {
+// Match Path2D.rect winding so overlapping outlines unite; reverse courtyard holes.
+function addRing(path, pts, hole = false) {
   if (!pts || pts.length < 3) return;
   const { n, X, Z } = accessor(pts);
   if (n < 3) return;
   let a = 0;
   for (let i = 0, j = n - 1; i < n; j = i++) a += X(j) * Z(i) - X(i) * Z(j);
-  if (a >= 0) {
+  if ((a >= 0) !== hole) {
     path.moveTo(X(0), Z(0));
     for (let i = 1; i < n; i++) path.lineTo(X(i), Z(i));
   } else {
@@ -188,16 +182,15 @@ class TiledLayer {
     return t.path;
   }
 
-  ring(pts) {
-    if (pts && pts.length > 2) addRing(this.pathFor(boundsOf(pts)), pts);
+  ring(pts, holes = []) {
+    if (!pts || pts.length < 3) return;
+    const path = this.pathFor(boundsOf(pts));
+    addRing(path, pts);
+    for (const hole of holes) addRing(path, hole, true);
   }
 
   line(pts) {
     if (pts && pts.length > 1) addLine(this.pathFor(boundsOf(pts)), pts);
-  }
-
-  rect(x0, z0, x1, z1) {
-    this.pathFor({ minX: x0, maxX: x1, minZ: z0, maxZ: z1 }).rect(x0, z0, x1 - x0, z1 - z0);
   }
 
   /** Calls fn(path) for every tile overlapping the view */
@@ -289,8 +282,7 @@ function footprintLayers(all) {
   for (const blk of all) {
     for (const f of blk.footprints || []) {
       const layer = tones[f.h > 95 ? 2 : f.h > 45 ? 1 : 0];
-      if (f.pts) layer.ring(f.pts); // turned to follow a non-grid street
-      else layer.rect(f.x0, f.z0, f.x1, f.z1);
+      layer.ring(f.pts, f.holes);
     }
   }
   FOOTPRINTS = { src: all, n: all.length, tones, version: FOOTPRINTS ? FOOTPRINTS.version + 1 : 1 };
@@ -445,11 +437,10 @@ function drawWaypoint(ctx, x, y, r) {
 const overlaps = (boxes, b) => boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
 
 class NYCMapSystem {
-  constructor({ controllerManager, cameraSystem, trafficSystem, remotePlayers, allBlocks = [], onTeleport, onToggle }) {
+  constructor({ controllerManager, cameraSystem, remotePlayers, allBlocks = [], onTeleport, onToggle }) {
     this.controllerManager = controllerManager;
     this.remotePlayers = remotePlayers;
     this.cameraSystem = cameraSystem;
-    this.trafficSystem = trafficSystem;
     this.allBlocks = allBlocks;
     this.onTeleport = onTeleport;
     this.onToggle = onToggle;
@@ -496,11 +487,10 @@ class NYCMapSystem {
     this.panStart = { x: 0, y: 0, cx: 0, cz: 0 };
     this.dragMoved = false;
 
-    this.hoverWorld = null;
     this.searchHighlight = '';
     this.searchPath = null;
     this.textWidths = new Map();
-    // Default GTA 6-style active GPS waypoint (Times Square / Broadway)
+    // Start with a waypoint at Times Square / Broadway.
     const ts = NYC_LANDMARKS.find((l) => l.id === 'timessquare') || { x: 0, z: 0 };
     this.waypoint = { x: ts.x, z: ts.z, name: 'Times Square & 42nd St' };
 
@@ -612,7 +602,6 @@ class NYCMapSystem {
 
         if (mx >= 0 && mx <= rect.width && my >= 0 && my <= rect.height) {
           const wPos = this.screenToWorld(mx, my, rect.width, rect.height);
-          this.hoverWorld = wPos;
           if (this.elHoverInfo) {
             this.elHoverInfo.textContent = t('map.hover', { place: getLocationLabel(wPos.x, wPos.z) });
           }
@@ -975,7 +964,7 @@ class NYCMapSystem {
   }
 
   // =========================================================================
-  // 1. GTA 6-STYLE LIVE RADAR MINIMAP (BOTTOM-LEFT HUD)
+  // 1. LIVE MINIMAP (BOTTOM-LEFT HUD)
   // =========================================================================
   renderMinimap() {
     if (!this.miniCtx || !this.miniCanvas) return;
@@ -1049,19 +1038,6 @@ class NYCMapSystem {
     v.screen(ctx);
     const toX = (wx) => v.toX(wx);
     const toY = (wz) => v.toY(wz);
-
-    // Live moving traffic blips on radar
-    if (this.trafficSystem && this.trafficSystem.cars) {
-      ctx.fillStyle = 'rgba(226, 232, 240, 0.34)';
-      for (let i = 0; i < this.trafficSystem.cars.length; i += 2) {
-        const car = this.trafficSystem.cars[i];
-        const cx = toX(car.x);
-        const cy = toY(car.z);
-        if (Math.abs(cx) < w * 0.5 && Math.abs(cy) < h * 0.5) {
-          ctx.fillRect(cx - 1, cy - 1, 2, 2);
-        }
-      }
-    }
 
     // GPS route to the active waypoint
     if (this.waypoint) {

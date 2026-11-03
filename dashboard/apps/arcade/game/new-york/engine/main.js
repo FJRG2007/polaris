@@ -4,7 +4,7 @@ import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, vec4, smoothstep } from 'three/tsl';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { createPostProcessing } from './post-processing.js';
-import { ClusteredSpotLighting } from './clustered-lights.js';
+import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { drawOnlyCompiled } from './async-pipelines.js';
 import { PRESETS, learnAutoQuality, readQualitySetting, resolveQuality, saveQualitySetting } from './quality.js';
 import { getLocationLabel, isTypingInField, ROADS, NYC_LANDMARKS, TELEPORT_LOCATIONS } from './city-config.js';
@@ -43,17 +43,22 @@ async function initApp() {
   // The city data is in (nyc-geodata.js holds every module that needs it until it is): the build starts
   enterStage('build');
 
-  // 1. Initialize Three.js WebGPURenderer with 32-bit float reversedDepthBuffer
+
+  // 1. Initialize Three.js WebGPURenderer with 32-bit float reversedDepthBuffer.
+  // Firefox WebGL2 incurs a heavy renderbufferStorageMultisample + blitFramebuffer stall
+  // on multisampled floating-point MRT post-processing render targets, so disable MSAA on Firefox.
+  const isFirefox = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
   const renderer = new THREE.WebGPURenderer({
-    antialias: true,
+    antialias: !isFirefox,
     powerPreference: 'high-performance',
     reversedDepthBuffer: true
   });
   renderer.setPixelRatio(1.0);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  // Point and spot lights alike are clustered (clustered-lights.js): no lit shader unrolls the city's light pools
-  renderer.lighting = new ClusteredSpotLighting(256, 32, 28, 48);
+  // Point and spot lights alike are clustered (three.js r187 bins spot cones too): no lit shader unrolls the city's
+  // light pools, headlights and street lamps included
+  renderer.lighting = new ClusteredLighting(256, 32, 28, 48);
   container.appendChild(renderer.domElement);
 
   // Start-up phase timings (logged once as "[init] ...") to keep load-time regressions traceable
@@ -92,7 +97,7 @@ async function initApp() {
   console.log(`[init] quality ${quality} (${qualitySetting}), ${renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL2'}`);
   await stepDone('renderer');
 
-  // 2. Build Scene & Physical Atmospheric Sky / PMREM IBL / 4096x4096 Shadow Lighting
+  // 2. Scene, atmosphere and lighting
   const scene = new THREE.Scene();
   const lightingSystem = new LightingSystem(scene, renderer);
   lightingSystem.sunLight.castShadow = preset.shadows;
@@ -105,11 +110,11 @@ async function initApp() {
   await stepDone('boroughs');
   const { colliders: landmarkColliders } = buildLandmarks(scene);
   await stepDone('landmarks');
-  const cityBlocks = buildCityBlocks(scene);
+  const cityBlocks = buildCityBlocks(scene, landmarkColliders);
   await stepDone('blocks');
   const allColliders = [...landmarkColliders, ...cityBlocks.colliders, ...boroughs.colliders, ...(cityGrid.colliders || [])];
 
-  const streetDetails = buildStreetDetails(scene);
+  const streetDetails = buildStreetDetails(scene, allColliders);
   await stepDone('streetDetails');
   // Buildings turned along non-grid streets have oriented colliders whose world bounds reach past their lots: they stay
   // inside the property line anyway, so the road network (lanes & sidewalks) doesn't need them.
@@ -121,7 +126,7 @@ async function initApp() {
   ]);
   await stepDone('traffic');
   const highwayTraffic = createHighwayTraffic(scene, cityGrid.highwayLanes);
-  buildRoadPaint(scene, trafficSystem.network);
+  buildRoadPaint(scene, trafficSystem.network, cityGrid.roadPaint);
   await stepDone('roadPaint');
 
   // 4. Initialize Third-Person Controllers (Person, Car, Cyclist, Helicopter) & Multi-Camera System
@@ -179,22 +184,24 @@ async function initApp() {
 
   // Island-wide static geometry: chunk & distance-cull the small props, shadow stand-ins for the big casters
   // (scene-culling.js)
-  const cullingRoots = ['ManhattanCityGrid', 'ManhattanCityBlocks', 'ManhattanStreetDetails', 'ManhattanLandmarks', 'Boroughs']
+  const cullingRoots = ['ManhattanCityGrid', 'ManhattanCityBlocks', 'ManhattanStreetDetails', 'ManhattanLandmarks', 'Boroughs', 'RoadMarkings']
     .map((name) => scene.getObjectByName(name))
     .filter(Boolean);
   setupSceneCulling(scene, cullingRoots, lightingSystem.sunLight.shadow);
   await stepDone('culling');
 
-  // On WebGPU, small InstancedMeshes (<= 1000 instances) keep their matrices in uniform buffers that three.js
-  // re-uploads on every draw of every pass (~2.5 MB/frame with the shadow cascades, stalling the GPU queue).
-  // Storage attributes only upload when needed; WebGL2 needs ordinary instanced attributes for correct transforms.
-  if (renderer.backend.isWebGPUBackend) {
-    scene.traverse((object) => {
-      if (object.isInstancedMesh) {
-        object.instanceMatrix = new THREE.StorageInstancedBufferAttribute(object.instanceMatrix.array, 16);
-      }
-    });
-  }
+  // Initialize static world matrices once, including the chunks and shadow proxies created above.
+  // Crowd, tree and building-detail animation changes instance/pose buffers, not Object3D transforms.
+  const dynamicRoots = [
+    trafficSystem.group,
+    highwayTraffic.group,
+    scene.getObjectByName('StoreClusteredLights'),
+    scene.getObjectByName('StreetClusteredLights'),
+    ...Object.values(controllerManager.entities).map((entity) => entity.mesh),
+    controllerManager.entities.cyclist.helmet
+  ];
+  scene.updateMatrixWorld(true);
+  scene.matrixWorldAutoUpdate = false;
 
   // 5. TSL RenderPipeline with Half-Res Screen Space Reflections (SSRNode), Bloom & Filmic Toning
   //    Fade out distant and matte surfaces so SSR spends its rays on visible glossy reflections.
@@ -280,10 +287,10 @@ async function initApp() {
 
   // Keyboard guide for each mode: [keys, action] (the action is a key of controls.<mode>; 'Drag' is the mouse)
   const controlHints = {
-    person: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Shift'], 'boost'], [['Space'], 'up'], [['Drag'], 'orbit']],
-    car: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Shift'], 'boost'], [['B'], 'horn'], [['Drag'], 'orbit']],
-    cyclist: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Shift'], 'boost'], [['Drag'], 'orbit']],
-    helicopter: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space', 'E'], 'up'], [['Q', 'C'], 'down'], [['Shift'], 'boost']]
+    person: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space'], 'up'], [['Drag'], 'orbit']],
+    car: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['B'], 'horn'], [['Drag'], 'orbit']],
+    cyclist: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Drag'], 'orbit']],
+    helicopter: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space', 'E'], 'up'], [['Q', 'C'], 'down']]
   };
   const keyName = (key) => (key === 'Drag' ? t('controls.drag') : key);
   const modeHints = (mode) => (controlHints[mode] || []).map(([keys, action]) => [keys.map(keyName), t(`controls.${mode}.${action}`)]);
@@ -750,7 +757,7 @@ async function initApp() {
 
   function simulate(dt, now) {
     elapsed += dt;
-    controllerManager.update(dt, elapsed);
+    controllerManager.update(dt, elapsed, cameraSystem.initialized ? cameraSystem.currentPos : null);
     cameraSystem.update(dt, elapsed);
     streetDetails.signalClock.value = elapsed;
     trafficSystem.update(
@@ -774,6 +781,8 @@ async function initApp() {
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     updateSceneCulling(cameraSystem.camera.position);
+    // Traffic collisions can move the player after controller updates; finalize moving hierarchies here.
+    for (const root of dynamicRoots) root.updateMatrixWorld();
     remotePlayers.update(dt, cameraSystem.camera);
   }
 
@@ -837,7 +846,6 @@ async function initApp() {
 
       if (elSpeed) elSpeed.textContent = String(mph);
       if (elSpeedMeter) elSpeedMeter.style.transform = `scaleX(${Math.min(1, mph / (topSpeedMph[mode] || 80))})`;
-      document.body.classList.toggle('is-boosting', controllerManager.keys.boost && mph > 0);
       if (elAltitude) elAltitude.textContent = formatNumber(altFt);
       // The street corner of the player on the follow cameras, of the camera itself on the scenic ones
       const where = cameraSystem.getActivePreset().category === 'follow' ? activeEnt.position : cameraSystem.currentPos;
