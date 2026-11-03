@@ -422,6 +422,13 @@ control what goes on your TV. That needs the JDK and Android SDK named there. No
 The most useful contribution is your TV's debloat list: a folder in [`examples/`](examples/) with its
 `debloat.txt` and a `tv.json`, described at the top of [`tools/gen_tables.py`](tools/gen_tables.py).
 
+Each kind of change has its own steps: [a TV list](docs/workflows/tv-list.md),
+[a theme](docs/workflows/theme.md), [an add-on](docs/workflows/addon.md),
+[a launcher switch](docs/workflows/launcher-switch.md), [a translation](docs/workflows/translation.md),
+[docs and troubleshooting notes](docs/workflows/docs-notes.md) and
+[a performance check](docs/workflows/perf-ab.md). [`docs/DOS-AND-DONTS.md`](docs/DOS-AND-DONTS.md) lists
+the reasons a change most often comes back.
+
 ## Legal
 
 - Polaris TV is an independent open-source project. It is not affiliated with, endorsed by or sponsored

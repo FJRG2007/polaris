@@ -6,7 +6,7 @@ GMUI 6 firmware. 4 GB RAM (`dumpsys meminfo` reports 3,714,636 kB total), 106 pa
 from the factory.
 
 **How much testing is behind it:** one session on 2026-10-31 with four reboots, not the several days
-[CONTRIBUTING](../../CONTRIBUTING.md) asks for. Every package was applied in five batches with a
+CONTRIBUTING asks for. Every package was applied in five batches with a
 screenshot between them; the launcher, HDMI 1/2, Settings, Wi-Fi and the app library were checked after
 the reboot.
 

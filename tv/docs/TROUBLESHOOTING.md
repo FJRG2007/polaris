@@ -69,7 +69,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   first; the bullet below is for a set whose firmware opens no port at all.
 - **Port 5555 stays closed and there is no Wireless debugging entry either**, so the pair-once recipe
   above has nothing to pair with: a Philips 58PUS8505/62 The One, Android TV 12,
-  `STT2.230526.001` reported USB debugging on, no
+  `STT2.230526.001` (#1489) reported USB debugging on, no
   Wireless debugging screen, `adb connect <tv ip>:5555` refused, and a USB cable to the computer that got
   no connection either. Two routes are left, and the firmware has to offer one of them. The first is the
   port-scan bullet further down this section: some firmware runs `adbd` on a port of its own, so scan and
@@ -1588,7 +1588,7 @@ VH2 and do nothing from an app: Android's system-audio setting, volume nudges, a
 service. What does work is an app that keeps Network debugging on and connects to the TV's own ADB on
 `127.0.0.1:5555` with its own key, which the TV asks to allow once, and runs only that one command when
 an app opens or media starts while no `TYPE_HDMI_ARC`/`TYPE_HDMI_EARC` output is listed. The
-[Sony BRAVIA Launcher](https://github.com/udeshvirk/sony-bravia-launcher) in [`SHOWCASE.md`](../SHOWCASE.md)
+[Sony BRAVIA Launcher](https://github.com/udeshvirk/sony-bravia-launcher) in `SHOWCASE.md`
 does this (`SoundbarWaker.java`). It is a trade-off: Network debugging stays on and the port is open on
 the home network, which the PROMPT's last step closes on purpose; on a set with `ro.adb.secure=0` an open port is a shell for anyone on the network, so only consider it where the TV asks to allow each new key. On Sony, an app can instead open the
 Home Theatre Control panel (`com.sony.dtv.HomeTheatreControl`) for about half a second, which also

@@ -521,5 +521,5 @@ Notes for models that have no tested list yet live in [`docs/devices/`](../docs/
 
 - [SkyworthDigital HP4416-TVplus / TVPLUS BOX](../docs/devices/skyworth-hp4416-tvplus.md) (`HP44H`, Android TV 14, `UKG3.260404.001.C02.00.085_20260723`): factory Home behavior and owner-requested TR369 package isolation, reboot and playback checks, and independent TR069/logging services that remain active; short report, no tested debloat list.
 
-To add your TV, see [CONTRIBUTING.md](../CONTRIBUTING.md). The quickest way to get a list is to
-run the prompt in [PROMPT.md](../PROMPT.md) and copy the packages your assistant disabled.
+To add your TV, see CONTRIBUTING.md. The quickest way to get a list is to
+run the prompt in PROMPT.md and copy the packages your assistant disabled.

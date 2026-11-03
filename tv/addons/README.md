@@ -129,7 +129,7 @@ TV_HOST=<tv ip> tools/venv/bin/python -I tools/manage.py install weather
   before this rule; a screenshot for one of them is welcome.
 - **The author maintains it.** Issues about an add-on are assigned to its author. An add-on that
   breaks on current Android TV versions, or goes unmaintained, may be removed. Its history stays in
-  git, and you can keep it going in a fork listed in [`SHOWCASE.md`](../SHOWCASE.md).
+  git, and you can keep it going in a fork listed in `SHOWCASE.md`.
 
 ## Adding one
 

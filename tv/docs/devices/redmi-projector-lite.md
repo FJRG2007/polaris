@@ -23,7 +23,7 @@ and unauthenticated, which matters before anyone starts the procedure on this pr
 ```
 
 `ro.adb.secure=0`: any device on the network gets a shell on port 5555 with no authorisation prompt. The closing
-step in [PROMPT.md](../../PROMPT.md) cannot pass here, and `tools/adb-closed.py <tv ip>` keeps reporting the port open:
+step in PROMPT.md cannot pass here, and `tools/adb-closed.py <tv ip>` keeps reporting the port open:
 
 | Tried | Result |
 |---|---|
@@ -65,7 +65,7 @@ same menu SHIPPING INIT and BOARD INIT reset the set. This is a remote key seque
 - `ro.desktop.appwhitelist=com.cvte.tv.media,com.hisilicon.miracast,com.cvte.tv.pictorial` did not filter the HOME
   candidates: a third-party launcher was listed by `cmd package query-activities` for `category.HOME` normally.
 - The reporter found that Home landed on the replacement only after `com.mitv.tvhome.pub` was disabled, and that
-  this survived a reboot. This is a CVTE board, so [AGENTS.md](../../AGENTS.md) keeps the stock launcher enabled
+  this survived a reboot. This is a CVTE board, so AGENTS.md keeps the stock launcher enabled
   unless an `examples/` folder for this exact board disables it, and asks for one reboot with Home and ADB
   confirmed before anything else (#741). There is no such folder yet, so treat this as one owner's result.
 - On the Sankey set the Home key and boot send `MAIN` + `HOME` + `COMMON_HOME`

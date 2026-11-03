@@ -56,7 +56,7 @@ these packages was launched: opening one is the trap documented in the Durabrand
 | `mediatek.factorymenu.ui` | `/system_ext/app/HFactory` | `installed=false, enabled=3` |
 | `com.haier.tv.hmagicboard` | `/product/app/HMagicBoard` | `installed=true, enabled=1` |
 
-- `com.cvte.tv.hkcfac` is already named by [`PROMPT.md`](../../PROMPT.md) and by the Durabrand
+- `com.cvte.tv.hkcfac` is already named by `PROMPT.md` and by the Durabrand
   note; on this unit it is not installed for user 0.
 - `mediatek.factorymenu.ui` is already named by `PROMPT.md`; on this unit it is not installed for
   user 0 either.

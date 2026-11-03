@@ -2,7 +2,7 @@
 
 One owner-operated TV, tested on 31 October 2026. These are same-day observations,
 not a several-day debloat list or a compatibility claim for every Kodak TV.
-See [CONTRIBUTING](../../CONTRIBUTING.md) before promoting this report to a list.
+See CONTRIBUTING before promoting this report to a list.
 
 ## Identify the firmware
 

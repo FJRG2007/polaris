@@ -1,7 +1,7 @@
 # Do's and don'ts
 
 These are the reasons pull requests most often came back for changes or were closed. They come from the
-maintainer's reviews, and each line links an example. None of this replaces [CONTRIBUTING.md](../CONTRIBUTING.md):
+maintainer's reviews, and each line links an example. None of this replaces CONTRIBUTING.md:
 it is the short list of mistakes to skip. When in doubt, ask in an issue before you build. "Thanks for asking
 first" is a common reply.
 
@@ -10,7 +10,7 @@ first" is a common reply.
 | Do | Don't |
 |---|---|
 | Put a widget or tile that can be its own app in `addons/`, as a module card (#704, #1086, #1226) | Build it into `launcher/`, which stays small, offline and under a size budget for 1 GB TVs (#173, #309) |
-| Put a whole launcher, a restyle, a port or a big feature in your own repo, plus one row in [SHOWCASE.md](../SHOWCASE.md) (#773, #1229) | Send a 2,000-line PR to the core and hope it fits (#1109, #1138) |
+| Put a whole launcher, a restyle, a port or a big feature in your own repo, plus one row in SHOWCASE.md (#773, #1229) | Send a 2,000-line PR to the core and hope it fits (#1109, #1138) |
 | Search open and merged PRs first, and build on what's there (#972, #1279) | Add a second key, map or add-on for something main already does: two would fight (#864, #1173, #1288, #271) |
 | Send one idea per PR, and split the rest out (#326, #488, #1235) | Mix a TV list, a launcher change and a theme in one PR (#268, #325) |
 
@@ -114,4 +114,4 @@ first" is a common reply.
   `.gitignore` churn (#640, #1148).
 - **Write code comments in English** (#402).
 - **Don't edit generated tables or counts** in the README; they come from each folder's `tv.json`
-  ([CONTRIBUTING](../CONTRIBUTING.md#1-add-your-tv-model)).
+  (CONTRIBUTING).

@@ -44,7 +44,7 @@ Check `dumpsys wifi | grep -o 'cname=[^ ]*'` before disabling it. If it owns the
 3. Only then proceed with the last batch. Otherwise disabling setupwraith takes Wi-Fi and ADB
    down together. `tools/disable.sh` checks this too.
 
-Follow the repository's [TV procedure](../../PROMPT.md), keeping its backup and Home guards.
+Follow the repository's TV procedure, keeping its backup and Home guards.
 Install the replacement launcher and verify it before the stock-Home batch; never disable the
 stock launcher without a working replacement. On this firmware `set-home-activity` can print
 "Success" while `launcherx` still owns Home. After the guarded handover, set Home again and

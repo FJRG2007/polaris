@@ -9,7 +9,7 @@ These are single-session observations, not a tested debloat list or a change to
 Polaris TV's launcher. The external [dumbtv project](https://github.com/humblemuzzu/dumbtv)
 was used at commit `14c74e1728360bb42dd8fa749416101fd545f4b2`, with dumbtv Home
 **1.3** (`tv.dumbtv.home`, version code 4). Its settings and helper below belong
-to that project, not `app.polaris.tv`. Follow [PROMPT.md](../../PROMPT.md)
+to that project, not `app.polaris.tv`. Follow PROMPT.md
 for backups, protected packages, physical remote checks and closing ADB.
 
 ## Scope and preserving updates
