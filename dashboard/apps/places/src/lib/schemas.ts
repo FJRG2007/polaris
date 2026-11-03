@@ -247,6 +247,7 @@ export const cameraInputSchema = cameraFieldsSchema
             context.addIssue({
                 code: "custom",
                 path: ["password"],
+                // i18n-ignore: shown through placesRefusalText (refusals.matterCodeInvalid)
                 message: "That pairing code is not one a Matter camera gives"
             });
     })

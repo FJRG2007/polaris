@@ -459,7 +459,7 @@
         "enabled": "Encendida",
         "enabledHint": "Apagada significa que Polaris no se conecta a ella en absoluto.",
         "addCamera": "Añadir cámara",
-        "matterCode": "Código de vinculación",
+        "matterCode": "Código Matter",
         "matterCodeHint": "En la app de la cámara, compártela con otra app (Matter). Escribe el código de 11 cifras que muestra.",
         "matterAdded": "Añadida. Para vincularla de nuevo, quita la cámara y añádela con un código nuevo.",
         "matterCodeFormat": "Escribe el código de 11 cifras, o el que empieza por MT:",
