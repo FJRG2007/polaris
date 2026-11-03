@@ -5,7 +5,8 @@
 
 import { useState } from "react";
 import * as ui from "@polaris/ui";
-import { Field } from "./router-field";
+import { Field, VlanField } from "./router-field";
+import { vlanError, vlanTakenBy, type PortLink } from "@/lib/router/assist";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     modeOf,
@@ -19,14 +20,27 @@ import {
 
 export function LineDialog({
     wan,
+    position,
+    isNew,
+    ports,
+    links,
     onClose,
     onSave
 }: {
     wan: RouterWan;
+    /** Its place in the failover order, from 0. */
+    position: number;
+    isNew: boolean;
+    ports: readonly string[];
+    /** Every line and network of the draft, to name a port clash as it happens. */
+    links: readonly PortLink[];
     onClose: () => void;
     onSave: (wan: RouterWan) => void;
 }) {
     const t = useTranslations("router");
+    const [port, setPort] = useState(wan.interface);
+    const [vlan, setVlan] = useState(wan.vlan);
+    const self = { kind: "line" as const, key: String(position) };
     const [mode, setMode] = useState<WanMode>(modeOf(wan));
     const [address, setAddress] = useState(wan.address ?? "");
     const [gateway, setGateway] = useState(wan.gateway ?? "");
@@ -38,12 +52,12 @@ export function LineDialog({
     const fixedBad = fixed.address !== "" && fixed.gateway !== "" && !staticLineFits(fixed);
     const candidate: RouterWan =
         mode === "dhcp"
-            ? { interface: wan.interface, vlan: wan.vlan }
+            ? { interface: port, vlan }
             : mode === "static"
-              ? { interface: wan.interface, vlan: wan.vlan, mode, ...fixed }
+              ? { interface: port, vlan, mode, ...fixed }
               : {
-                    interface: wan.interface,
-                    vlan: wan.vlan,
+                    interface: port,
+                    vlan,
                     mode,
                     id: wan.id ?? newLanId(),
                     username,
@@ -54,17 +68,38 @@ export function LineDialog({
         mode === "dhcp" ||
         (mode === "static" && staticLineFits(fixed)) ||
         (mode === "pppoe" && username.trim() !== "" && (password !== "" || hasPassword));
-    const valid = parsed.success && complete;
+    const clash = vlanTakenBy(links, self, port, vlan) !== null;
+    const valid = parsed.success && complete && vlanError(vlan) === null && !clash;
 
     return (
         <ui.Dialog open onOpenChange={(open) => !open && onClose()}>
             <ui.DialogContent>
                 <ui.DialogHeader>
-                    <ui.DialogTitle>{t("editLine")}</ui.DialogTitle>
+                    <ui.DialogTitle>
+                        {isNew ? t("addLineTitle") : t("lineTitle", { n: position + 1 })}
+                    </ui.DialogTitle>
                     <ui.DialogDescription>{t("lineBody")}</ui.DialogDescription>
                 </ui.DialogHeader>
                 <div className="flex min-w-0 flex-col gap-3">
-                    <Field id="line-mode" label={t("lineMode")}>
+                    <Field id="line-port" label={`${t("port")} *`} hint={t("linePortHint")}>
+                        <ui.Select
+                            id="line-port"
+                            aria-label={t("port")}
+                            value={port}
+                            onValueChange={setPort}
+                            options={ports.map((one) => ({ value: one, label: one }))}
+                        />
+                    </Field>
+                    <VlanField
+                        id="line-vlan"
+                        port={port}
+                        value={vlan}
+                        links={links}
+                        self={self}
+                        hint={t("lineVlanHint")}
+                        onChange={setVlan}
+                    />
+                    <Field id="line-mode" label={t("lineMode")} hint={t("lineModeHint")}>
                         <ui.Select
                             id="line-mode"
                             aria-label={t("lineMode")}
@@ -78,7 +113,11 @@ export function LineDialog({
                     </Field>
                     {mode === "static" ? (
                         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field id="line-address" label={`${t("lineAddress")} *`}>
+                            <Field
+                                id="line-address"
+                                label={`${t("lineAddress")} *`}
+                                hint={t("lineAddressHint")}
+                            >
                                 <ui.Input
                                     id="line-address"
                                     className="font-mono"
@@ -87,7 +126,11 @@ export function LineDialog({
                                     onChange={(event) => setAddress(event.target.value)}
                                 />
                             </Field>
-                            <Field id="line-gateway" label={`${t("lineGateway")} *`}>
+                            <Field
+                                id="line-gateway"
+                                label={`${t("lineGateway")} *`}
+                                hint={t("lineGatewayHint")}
+                            >
                                 <ui.Input
                                     id="line-gateway"
                                     className="font-mono"
@@ -105,7 +148,11 @@ export function LineDialog({
                     ) : null}
                     {mode === "pppoe" ? (
                         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field id="line-user" label={`${t("lineUser")} *`}>
+                            <Field
+                                id="line-user"
+                                label={`${t("lineUser")} *`}
+                                hint={t("lineUserHint")}
+                            >
                                 <ui.Input
                                     id="line-user"
                                     autoComplete="off"
