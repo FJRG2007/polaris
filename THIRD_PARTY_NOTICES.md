@@ -1,3 +1,7 @@
+# Third-party notices
+
+Polaris TV (tv/) includes code under the following licence:
+
 MIT License
 
 Copyright (c) 2026 Gathin
@@ -19,9 +23,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The Outfit typeface in launcher/app/src/main/res/font/outfit.ttf is copyright
-The Outfit Project Authors and licensed under the SIL Open Font License 1.1,
-see launcher/FONT-LICENSE-OFL.txt.
