@@ -57,6 +57,7 @@ import { runAction } from "@/lib/run-action";
 import { parseConnectionUrl } from "@/lib/data/connection-url";
 import * as schema from "@/lib/data/connection-schema";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ServerPicker } from "@/components/server-picker";
 import { DbEngineSelect } from "@/components/db-engine-select";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DataConnectionView, ManagedOption } from "@/lib/data/connections";
@@ -472,10 +473,6 @@ export function ConnectionDialog({
         );
     };
 
-    const serverOptions = servers.map((server) => ({
-        value: server.id,
-        label: `${server.name} - ${server.address}`
-    }));
 
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -709,12 +706,11 @@ export function ConnectionDialog({
                                                         : undefined
                                                 }
                                             >
-                                                <Select
-                                                    value={serverId}
-                                                    onValueChange={setServerId}
+                                                <ServerPicker
+                                                    value={serverId || null}
+                                                    onValueChange={(id) => setServerId(id)}
                                                     aria-label={t("dialog.tunnelServer")}
                                                     placeholder={t("dialog.pickOne")}
-                                                    options={serverOptions}
                                                 />
                                             </Field>
                                         )
@@ -888,17 +884,16 @@ export function ConnectionDialog({
                                                     }
                                                     hint={t("dialog.jumpHint")}
                                                 >
-                                                    <Select
-                                                        value={jumpId}
-                                                        onValueChange={setJumpId}
+                                                    <ServerPicker
+                                                        value={jumpId === JUMP_UNPICKED ? null : jumpId}
+                                                        onValueChange={(id) => setJumpId(id)}
                                                         aria-label={t("dialog.jumpServer")}
                                                         placeholder={t("dialog.pickOne")}
-                                                        options={[
+                                                        fixed={[
                                                             {
                                                                 value: NO_JUMP,
                                                                 label: t("dialog.straight")
-                                                            },
-                                                            ...serverOptions
+                                                            }
                                                         ]}
                                                     />
                                                 </Field>

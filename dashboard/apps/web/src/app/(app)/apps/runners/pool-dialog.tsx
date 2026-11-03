@@ -20,6 +20,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { ServerPicker } from "@/components/server-picker";
 import { ChevronRight, Plus } from "lucide-react";
 import { RunsOnSnippet } from "./runs-on-snippet";
 import { useCallback, useEffect, useState } from "react";
@@ -42,6 +43,7 @@ import {
 import {
     createRunnerPoolSchema,
     DEFAULT_RUNNER_LABELS,
+    LOCAL_SERVER_ID,
     MAX_RUNNER_CONCURRENCY,
     normalizeRunnerLabels,
     type RunnerExhaustedAction,
@@ -50,12 +52,14 @@ import {
 } from "@polaris/core";
 import * as polls from "./runners-polls";
 
-export interface ServerOption {
+/** The box Polaris runs on: its own server row when it was enrolled, `local`
+ *  when Polaris reaches it only through its container engine - so it runs
+ *  contained jobs or none. Every other server is read by the picker. */
+export interface LocalServer {
     id: string;
     name: string;
-    /** The box Polaris runs on, which it reaches through its container engine
-     *  rather than a login - so it runs contained jobs or none. */
-    local: boolean;
+    /** No other server to choose. */
+    alone: boolean;
 }
 
 /** A limit field is empty when there is no limit of that kind, which is not the
@@ -65,7 +69,7 @@ function optional(value: string): number | null {
     return trimmed === "" ? null : Number(trimmed);
 }
 
-export function PoolDialog({ servers }: { servers: ServerOption[] }) {
+export function PoolDialog({ local }: { local: LocalServer }) {
     const t = useTranslations("runners");
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -91,7 +95,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    const server = servers.find((entry) => entry.id === serverId) ?? null;
+    const server = serverId ? { local: serverId === local.id } : null;
     // Normalized the way the schema will, so the summary and the runs-on line show
     // what the pool will actually register with rather than what was typed.
     const poolLabels = normalizeRunnerLabels(labels.split(","));
@@ -187,7 +191,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         setName("");
         // One server and nothing to choose: pick it, so the machine is probed while
         // the rest of the form is still being filled in.
-        setServerId(servers.length === 1 ? (servers[0]?.id ?? "") : "");
+        setServerId(local.alone ? local.id : "");
         setScope(EMPTY_SCOPE);
         setScopeCount(0);
         setLabels(DEFAULT_RUNNER_LABELS.join(", "));
@@ -272,16 +276,14 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                         label={t("dialog.runsOn")}
                         error={probeError ? runnerText(t, probeError) : null}
                     >
-                        <Select
-                            value={serverId}
-                            onValueChange={setServerId}
+                        <ServerPicker
+                            value={serverId || null}
+                            onValueChange={(id) => setServerId(id)}
                             placeholder={t("dialog.pickServer")}
-                            options={servers.map((entry) => ({
-                                value: entry.id,
-                                label: entry.local
-                                    ? t("dialog.thisMachine", { name: entry.name })
-                                    : entry.name
-                            }))}
+                            fixed={[
+                                { value: local.id, label: t("dialog.thisMachine", { name: local.name }) }
+                            ]}
+                            filter={local.id === LOCAL_SERVER_ID ? undefined : { exclude: [local.id] }}
                         />
                         <MachineNote
                             probing={probing}

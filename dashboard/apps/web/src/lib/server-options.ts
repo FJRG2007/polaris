@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
+import type { LocalMachineIdentity } from "@/lib/local-machine";
 import type { ServerFilter, ServerOption } from "@/lib/server-options-schema";
 
 export interface ServerOptionsPage {
@@ -107,4 +108,49 @@ export async function readServerOptions(
         })),
         next: rows.length > request.limit && last ? encodeServerCursor(last.name, last.id) : null
     };
+}
+
+/** Enough of the server that is this machine for a screen to name it. */
+export interface LocalHostRow {
+    readonly id: string;
+    readonly name: string;
+    readonly address: string;
+    readonly dockerId: string | null;
+}
+
+/**
+ * The owner's server that is the machine Polaris runs on, or null.
+ *
+ * The same three signals as `isLocalMachine` - the enrollment's host id, the
+ * container engine's id, an address this machine answers on - asked of the
+ * database in one bounded read, so naming the local box never loads every
+ * server. Prefers the enrollment when more than one row matches, as
+ * `isLocalMachine` cannot be wrong about that one.
+ */
+export async function findLocalHost(
+    ownerId: string,
+    identity: LocalMachineIdentity
+): Promise<LocalHostRow | null> {
+    const or: Prisma.HostWhereInput[] = [];
+    if (identity.hostId) or.push({ id: identity.hostId });
+    if (identity.dockerId) or.push({ dockerId: identity.dockerId });
+    const addresses = [...identity.addresses];
+    if (addresses.length) or.push({ address: { in: addresses, mode: "insensitive" } });
+    if (!or.length) return null;
+    const rows = await prisma.host.findMany({
+        where: { ownerId, OR: or },
+        select: { id: true, name: true, address: true, dockerId: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: 3
+    });
+    return rows.find((row) => row.id === identity.hostId) ?? rows[0] ?? null;
+}
+
+/** Whether the owner has any server besides `exceptId` - one bounded read. */
+export async function hasOtherServer(ownerId: string, exceptId: string | null): Promise<boolean> {
+    const row = await prisma.host.findFirst({
+        where: exceptId ? { ownerId, id: { not: exceptId } } : { ownerId },
+        select: { id: true }
+    });
+    return row !== null;
 }

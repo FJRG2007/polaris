@@ -14,7 +14,7 @@ vi.mock("@/lib/deploy-project-access", () => ({
 }));
 
 const { listServerOptionsAction } = await import("@/app/(app)/server-options-actions");
-const { encodeServerCursor } = await import("@/lib/server-options");
+const { encodeServerCursor, findLocalHost } = await import("@/lib/server-options");
 const { SERVER_OPTIONS_MAX_PAGE, SERVER_OPTIONS_PAGE } = await import("@/lib/server-options-schema");
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -142,5 +142,42 @@ describe("listServerOptionsAction", () => {
         findMany.mockResolvedValue([host(5)]);
         await listServerOptionsAction({ ids: [host(5).id] });
         expect(lastQuery().where.AND).toContainEqual({ id: { in: [host(5).id] } });
+    });
+});
+
+describe("findLocalHost", () => {
+    const identity = (hostId: string | null, dockerId: string | null, addresses: string[]) => ({
+        hostId,
+        dockerId,
+        addresses: new Set(addresses)
+    });
+
+    it("asks once, bounded, for any of the three signals, inside the owner's servers", async () => {
+        findMany.mockResolvedValue([]);
+        await findLocalHost(ME, identity("h1", "d1", ["127.0.0.1", "192.168.1.5"]));
+        expect(findMany).toHaveBeenCalledTimes(1);
+        const query = findMany.mock.calls[0]![0] as { where: unknown; take: number };
+        expect(query.take).toBeLessThanOrEqual(3);
+        expect(query.where).toEqual({
+            ownerId: ME,
+            OR: [
+                { id: "h1" },
+                { dockerId: "d1" },
+                { address: { in: ["127.0.0.1", "192.168.1.5"], mode: "insensitive" } }
+            ]
+        });
+    });
+
+    it("prefers the enrollment's own row when several match", async () => {
+        findMany.mockResolvedValue([
+            { id: "a", name: "a", address: "127.0.0.1", dockerId: null },
+            { id: "h1", name: "z", address: "x", dockerId: null }
+        ]);
+        expect((await findLocalHost(ME, identity("h1", null, ["127.0.0.1"])))?.id).toBe("h1");
+    });
+
+    it("reads nothing when there is no signal at all", async () => {
+        expect(await findLocalHost(ME, identity(null, null, []))).toBeNull();
+        expect(findMany).not.toHaveBeenCalled();
     });
 });

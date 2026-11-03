@@ -24,7 +24,7 @@ import { PoolDialog } from "./pool-dialog";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RunsOnSnippet } from "./runs-on-snippet";
-import type { ServerOption } from "./pool-dialog";
+import type { LocalServer } from "./pool-dialog";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { Box, FolderOpen, Github, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import type { RunnerJobView, RunnerPoolView, RunnerTargetView } from "@/lib/runners/runner-service";
@@ -37,11 +37,11 @@ type Words = NamespaceTranslator<"runners">;
 
 export function RunnersView({
     pools,
-    servers,
+    local,
     accessNotice
 }: {
     pools: RunnerPoolView[];
-    servers: ServerOption[];
+    local: LocalServer;
     /** What the GitHub connection is missing, streamed in after the page paints. */
     accessNotice: React.ReactNode;
 }) {
@@ -129,7 +129,7 @@ export function RunnersView({
                             <RefreshCw className="size-4" />
                         </Button>
                     ) : null}
-                    <PoolDialog servers={servers} />
+                    <PoolDialog local={local} />
                 </div>
             </div>
 

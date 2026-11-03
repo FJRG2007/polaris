@@ -23,6 +23,33 @@ const FIXTURE_PUBLIC_LINE =
 const NODE_0 = { id: "22222222-2222-4222-8222-222222222222", name: "node-0", address: "10.0.0.2" };
 let tunnelServers: (typeof NODE_0)[] = [NODE_0];
 
+// A menu has no height in jsdom, so the virtualized list draws every row.
+vi.mock("@tanstack/react-virtual", () => ({
+    useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: () => number }) => ({
+        getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+                index,
+                key: index,
+                start: index * estimateSize()
+            })),
+        getTotalSize: () => count * estimateSize()
+    })
+}));
+
+// The pickers read their servers a page at a time from this action.
+vi.mock("@/app/(app)/server-options-actions", () => ({
+    listServerOptionsAction: async () => ({
+        items: tunnelServers.map((server) => ({
+            ...server,
+            os: null,
+            environment: "vps",
+            root: true,
+            online: true
+        })),
+        next: null
+    })
+}));
+
 vi.mock("@/app/(app)/apps/databases/actions", () => ({
     // The real key reader, so this exercises the same parsing and passphrase
     // handling the server action wraps - only its rate limiting and
@@ -144,14 +171,14 @@ describe("the connection form", () => {
         open();
         await userEvent.click(screen.getByRole("switch", { name: "Reach it over SSH" }));
         expect(
-            await screen.findByRole("combobox", { name: "Server to tunnel through" })
+            await screen.findByRole("button", { name: "Server to tunnel through" })
         ).toBeTruthy();
 
         await userEvent.click(screen.getByRole("radio", { name: "Another login" }));
         expect(screen.getByPlaceholderText("ssh.example.com")).toBeTruthy();
         expect(screen.getByPlaceholderText("root")).toBeTruthy();
         expect(screen.getByRole("radio", { name: "Private key" })).toBeTruthy();
-        expect(screen.getByRole("combobox", { name: "Server to jump through" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Server to jump through" })).toBeTruthy();
     });
 
     it("says what is wrong with an address as it is typed, and refuses to save it", async () => {
@@ -172,8 +199,8 @@ describe("the connection form", () => {
         expect(await screen.findByText("Pick the server to tunnel through.")).toBeTruthy();
         expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(true);
 
-        await userEvent.click(screen.getByRole("combobox", { name: "Server to tunnel through" }));
-        await userEvent.click(await screen.findByRole("option", { name: /node-0/ }));
+        await userEvent.click(screen.getByRole("button", { name: "Server to tunnel through" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: /node-0/ }));
 
         expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(false);
     });
@@ -196,8 +223,8 @@ describe("the connection form", () => {
         expect(save.hasAttribute("disabled")).toBe(true);
         expect(screen.getByText(/was removed from Servers/)).toBeTruthy();
 
-        await userEvent.click(screen.getByRole("combobox", { name: "Server to jump through" }));
-        await userEvent.click(await screen.findByRole("option", { name: "Straight to it" }));
+        await userEvent.click(screen.getByRole("button", { name: "Server to jump through" }));
+        await userEvent.click(await screen.findByRole("menuitem", { name: "Straight to it" }));
 
         expect(save.hasAttribute("disabled")).toBe(false);
     });
