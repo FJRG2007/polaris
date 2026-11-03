@@ -7,12 +7,13 @@
  * only needs the form does not pull in the whole canvas.
  */
 
+import { ServerPicker } from "@/components/server-picker";
 import * as deployActions from "./actions";
 import { ChevronRight, Loader2 } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Input } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
     dbEngineLabel,
     SERVICE_TEMPLATES,
@@ -20,37 +21,25 @@ import {
     type ServiceTemplate
 } from "@polaris/core";
 import { Field } from "./form-field";
-import * as polls from "./deploy-polls";
 
-export interface ServerOption {
-    id: string;
-    name: string;
+/** Where the servers a new service can deploy to are read from. */
+export interface DeployServers {
+    readonly environmentId: string;
 }
 
 /**
- * The servers a new service can deploy to (local host + connected SSH hosts),
- * with the first one selected by default - so a single-server setup needs no
- * choice and multi-server setups get an explicit picker.
+ * The server a new service deploys to: the machine Polaris runs on unless
+ * another is picked. The servers themselves are read by the picker a page at a
+ * time, scoped to the environment being deployed into - the project owner's
+ * machines rather than those of whoever happens to be filling the form in.
  */
 export function useDeployServers(environmentId: string): {
-    servers: ServerOption[];
+    servers: DeployServers;
     serverId: string;
     setServerId: (id: string) => void;
 } {
-    const [servers, setServers] = useState<ServerOption[]>([]);
     const [serverId, setServerId] = useState("local");
-    useEffect(() => {
-        // Scoped to the environment being deployed into, so the list is the
-        // project owner's machines rather than the machines of whoever happens to
-        // be filling the form in.
-        void polls
-            .deployServers(environmentId)
-            .then((list) => {
-                setServers(list);
-                if (list[0]) setServerId(list[0].id);
-            })
-            .catch(() => undefined);
-    }, [environmentId]);
+    const servers = useMemo(() => ({ environmentId }), [environmentId]);
     return { servers, serverId, setServerId };
 }
 
@@ -59,18 +48,18 @@ export function ServerField({
     value,
     onChange
 }: {
-    servers: ServerOption[];
+    servers: DeployServers;
     value: string;
     onChange: (id: string) => void;
 }) {
     const t = useTranslations("deploy");
-    if (servers.length === 0) return null;
     return (
         <Field label={t("view.server")} hint={t("view.serverHint")}>
-            <Select
+            <ServerPicker
                 value={value}
-                onValueChange={onChange}
-                options={servers.map((server) => ({ value: server.id, label: server.name }))}
+                onValueChange={(id) => onChange(id)}
+                environmentId={servers.environmentId}
+                includeLocal
                 aria-label={t("view.server")}
             />
         </Field>
