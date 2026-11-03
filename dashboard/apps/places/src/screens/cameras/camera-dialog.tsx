@@ -690,7 +690,11 @@ export function CameraDialog({
                                 <Field
                                     label={t("dialog.matterCode")}
                                     required={!matterAdded}
-                                    hint={matterAdded ? t("dialog.matterAdded") : t("dialog.matterCodeHint")}
+                                    hint={
+                                        matterAdded
+                                            ? t("dialog.matterAdded")
+                                            : t("dialog.matterCodeHint")
+                                    }
                                     error={
                                         codeIssue === "format"
                                             ? t("dialog.matterCodeFormat")
@@ -706,30 +710,34 @@ export function CameraDialog({
                                         spellCheck={false}
                                         disabled={matterAdded}
                                         placeholder="3497-0112-332"
-                                        aria-invalid={codeIssue === "format" || codeIssue === "check"}
+                                        aria-invalid={
+                                            codeIssue === "format" || codeIssue === "check"
+                                        }
                                     />
                                 </Field>
                             ) : (
-                            <Field
-                                label={usesRtsp ? t("dialog.password") : t("dialog.tapoPassword")}
-                                required={!usesRtsp && !inheritsPassword}
-                                hint={
-                                    camera?.hasPassword
-                                        ? t("dialog.passwordStored")
-                                        : inheritsPassword
-                                          ? t("dialog.passwordInherited")
-                                          : usesRtsp
-                                            ? undefined
-                                            : // The question everybody asks at this
-                                              // field, answered at it: the camera
-                                              // checks the password by itself and
-                                              // never asks who is presenting it,
-                                              // so there is no address to give and
-                                              // its absence is not a missing step.
-                                              t("dialog.passwordTapo")
-                                }
-                            >
-                                {/* enigma:allow-no-breach-check - nothing is being
+                                <Field
+                                    label={
+                                        usesRtsp ? t("dialog.password") : t("dialog.tapoPassword")
+                                    }
+                                    required={!usesRtsp && !inheritsPassword}
+                                    hint={
+                                        camera?.hasPassword
+                                            ? t("dialog.passwordStored")
+                                            : inheritsPassword
+                                              ? t("dialog.passwordInherited")
+                                              : usesRtsp
+                                                ? undefined
+                                                : // The question everybody asks at this
+                                                  // field, answered at it: the camera
+                                                  // checks the password by itself and
+                                                  // never asks who is presenting it,
+                                                  // so there is no address to give and
+                                                  // its absence is not a missing step.
+                                                  t("dialog.passwordTapo")
+                                    }
+                                >
+                                    {/* enigma:allow-no-breach-check - nothing is being
                                     chosen here. This is the password the camera
                                     already has, set in its own app or on its own
                                     web page; refusing it for being weak would
@@ -738,39 +746,41 @@ export function CameraDialog({
                                     enigma:allow-identity-password - and it
                                     belongs to a device, so there is no account
                                     identity for it to resemble. */}
-                                <Input
-                                    type="password"
-                                    value={form.password}
-                                    onChange={(event) => set("password", event.target.value)}
-                                    autoComplete="off"
-                                    placeholder={camera?.hasPassword ? t("dialog.unchanged") : ""}
-                                />
-                            </Field>
+                                    <Input
+                                        type="password"
+                                        value={form.password}
+                                        onChange={(event) => set("password", event.target.value)}
+                                        autoComplete="off"
+                                        placeholder={
+                                            camera?.hasPassword ? t("dialog.unchanged") : ""
+                                        }
+                                    />
+                                </Field>
                             )}
                         </div>
                         {matter ? null : (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                onClick={test}
-                                disabled={testing || incomplete}
-                            >
-                                {testing ? (
-                                    <Loader2 className="size-4 shrink-0 animate-spin" />
-                                ) : (
-                                    <Sparkles className="size-4 shrink-0" />
-                                )}
-                                {t("dialog.ask")}
-                            </Button>
-                            {tested ? (
-                                <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
-                                    <CircleCheck className="size-3.5 shrink-0 text-success" />
-                                    {tested}
-                                </span>
-                            ) : null}
-                        </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={test}
+                                    disabled={testing || incomplete}
+                                >
+                                    {testing ? (
+                                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="size-4 shrink-0" />
+                                    )}
+                                    {t("dialog.ask")}
+                                </Button>
+                                {tested ? (
+                                    <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
+                                        <CircleCheck className="size-3.5 shrink-0 text-success" />
+                                        {tested}
+                                    </span>
+                                ) : null}
+                            </div>
                         )}
                         {usesRtsp ? (
                             <div className="grid gap-3 sm:grid-cols-2">

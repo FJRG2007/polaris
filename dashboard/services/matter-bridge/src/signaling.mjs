@@ -131,7 +131,10 @@ export function relayMessagesFor(frame, key) {
 export function cameraEndpoint(attributes) {
     const endpoints = Object.keys(attributes ?? {})
         .map((path) => path.split("/").map(Number))
-        .filter(([endpoint, cluster]) => cluster === WEBRTC_PROVIDER_CLUSTER && Number.isInteger(endpoint))
+        .filter(
+            ([endpoint, cluster]) =>
+                cluster === WEBRTC_PROVIDER_CLUSTER && Number.isInteger(endpoint)
+        )
         .map(([endpoint]) => endpoint);
     return endpoints.length > 0 ? Math.min(...endpoints) : null;
 }
@@ -156,7 +159,13 @@ export function canTalk(capabilities) {
  * @param {unknown} reason
  */
 export function commissionRefusal(reason) {
-    const known = ["not-discovered", "passcode-mismatch", "invalid-payload", "attestation-rejected", "timeout"];
+    const known = [
+        "not-discovered",
+        "passcode-mismatch",
+        "invalid-payload",
+        "attestation-rejected",
+        "timeout"
+    ];
     return typeof reason === "string" && known.includes(reason) ? reason : "failed";
 }
 

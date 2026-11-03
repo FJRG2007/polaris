@@ -6,7 +6,11 @@ import { talkCodecFor } from "@polaris-app/places/src/lib/talk";
 import { talkSupport } from "@polaris-app/places/src/lib/vendors";
 import { parseCameraInput } from "@polaris-app/places/src/lib/schemas";
 import { DEFAULT_DETECTION } from "@polaris-app/places/src/lib/detection";
-import { cameraModel, searchModels, vendorForModel } from "@polaris-app/places/src/lib/camera-models";
+import {
+    cameraModel,
+    searchModels,
+    vendorForModel
+} from "@polaris-app/places/src/lib/camera-models";
 import { commissionSentence } from "@polaris-app/places/src/lib/matter-bridge";
 import { placesRefusalText } from "@polaris-app/places/src/lib/refusal-text";
 import { placesCatalogs } from "@polaris-app/places/messages";
@@ -89,11 +93,16 @@ describe("Matter bridge signalling", () => {
         ).toEqual({ type: "offer", sdp: "v=0\r\n" });
         expect(
             signaling.parseRelayMessage(
-                JSON.stringify({ type: "webrtc/candidate", value: "candidate:1 1 udp 1 10.0.0.2 5000 typ host" })
+                JSON.stringify({
+                    type: "webrtc/candidate",
+                    value: "candidate:1 1 udp 1 10.0.0.2 5000 typ host"
+                })
             )
         ).toEqual({ type: "candidate", candidate: "candidate:1 1 udp 1 10.0.0.2 5000 typ host" });
         expect(signaling.parseRelayMessage("not json")).toBeNull();
-        expect(signaling.parseRelayMessage(JSON.stringify({ type: "webrtc/offer", value: "x" }))).toBeNull();
+        expect(
+            signaling.parseRelayMessage(JSON.stringify({ type: "webrtc/offer", value: "x" }))
+        ).toBeNull();
     });
 
     it("starts a live view with talkback only when the camera can play it", () => {
@@ -109,7 +118,9 @@ describe("Matter bridge signalling", () => {
     });
 
     it("files the relay's candidates under the offer's first media section", () => {
-        const mid = signaling.firstMid("v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:v0\r\nm=audio\r\na=mid:a1\r\n");
+        const mid = signaling.firstMid(
+            "v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:v0\r\nm=audio\r\na=mid:a1\r\n"
+        );
         expect(mid).toBe("v0");
         expect(signaling.candidateArgs(target, "k", "candidate:x", mid).ice_candidates).toEqual([
             { candidate: "candidate:x", sdpMid: "v0", sdpMLineIndex: 0 }
@@ -127,16 +138,24 @@ describe("Matter bridge signalling", () => {
         expect(
             signaling.relayMessagesFor(
                 callback("ice_candidates", {
-                    ice_candidates: [{ candidate: "candidate:a", sdpMid: "0", sdpMLineIndex: 0 }, { candidate: "" }]
+                    ice_candidates: [
+                        { candidate: "candidate:a", sdpMid: "0", sdpMLineIndex: 0 },
+                        { candidate: "" }
+                    ]
                 }),
                 "k"
             )
         ).toEqual({ send: [{ type: "webrtc/candidate", value: "candidate:a" }] });
         expect(signaling.relayMessagesFor(callback("end", { reason: 1 }), "k")).toBe("end");
         expect(
-            signaling.relayMessagesFor({ event: "camera_session_ended", data: { client_session_key: "k" } }, "k")
+            signaling.relayMessagesFor(
+                { event: "camera_session_ended", data: { client_session_key: "k" } },
+                "k"
+            )
         ).toBe("end");
-        expect(signaling.relayMessagesFor(callback("answer", { sdp: "v=0" }, "other"), "k")).toBeNull();
+        expect(
+            signaling.relayMessagesFor(callback("answer", { sdp: "v=0" }, "other"), "k")
+        ).toBeNull();
     });
 
     it("finds the camera endpoint by its WebRTC provider cluster", () => {
@@ -145,16 +164,44 @@ describe("Matter bridge signalling", () => {
     });
 
     it("says a camera can talk only with a speaker and half or full duplex", () => {
-        expect(signaling.canTalk({ features: ["Video", "Speaker"], audio: { two_way_talk_support: "FullDuplex" } })).toBe(true);
-        expect(signaling.canTalk({ features: ["Video", "Speaker"], audio: { two_way_talk_support: "HalfDuplex" } })).toBe(true);
-        expect(signaling.canTalk({ features: ["Video"], audio: { two_way_talk_support: "FullDuplex" } })).toBe(false);
-        expect(signaling.canTalk({ features: ["Speaker"], audio: { two_way_talk_support: "NotSupported" } })).toBe(false);
+        expect(
+            signaling.canTalk({
+                features: ["Video", "Speaker"],
+                audio: { two_way_talk_support: "FullDuplex" }
+            })
+        ).toBe(true);
+        expect(
+            signaling.canTalk({
+                features: ["Video", "Speaker"],
+                audio: { two_way_talk_support: "HalfDuplex" }
+            })
+        ).toBe(true);
+        expect(
+            signaling.canTalk({
+                features: ["Video"],
+                audio: { two_way_talk_support: "FullDuplex" }
+            })
+        ).toBe(false);
+        expect(
+            signaling.canTalk({
+                features: ["Speaker"],
+                audio: { two_way_talk_support: "NotSupported" }
+            })
+        ).toBe(false);
         expect(signaling.canTalk({ features: ["Speaker"] })).toBe(false);
     });
 
     it("names the camera a path is for, and nothing else", () => {
-        expect(signaling.cameraPath("/cameras/12/1/webrtc")).toEqual({ nodeId: 12, endpointId: 1, rest: "/webrtc" });
-        expect(signaling.cameraPath("/cameras/12/1")).toEqual({ nodeId: 12, endpointId: 1, rest: "" });
+        expect(signaling.cameraPath("/cameras/12/1/webrtc")).toEqual({
+            nodeId: 12,
+            endpointId: 1,
+            rest: "/webrtc"
+        });
+        expect(signaling.cameraPath("/cameras/12/1")).toEqual({
+            nodeId: 12,
+            endpointId: 1,
+            rest: ""
+        });
         expect(signaling.cameraPath("/cameras/../1")).toBeNull();
         expect(signaling.commissionRefusal("passcode-mismatch")).toBe("passcode-mismatch");
         expect(signaling.commissionRefusal("weird")).toBe("failed");
@@ -163,11 +210,19 @@ describe("Matter bridge signalling", () => {
 
 describe("talking through any camera with a way back", () => {
     it("reads the speaker codec off the relay connection, A-law first", () => {
-        expect(backchannelCodec(["video, recvonly, H264", "audio, recvonly, AAC/16000", "audio, sendonly, PCMU/8000, PCMA/8000"])).toBe("pcma");
+        expect(
+            backchannelCodec([
+                "video, recvonly, H264",
+                "audio, recvonly, AAC/16000",
+                "audio, sendonly, PCMU/8000, PCMA/8000"
+            ])
+        ).toBe("pcma");
         expect(backchannelCodec(["audio, sendonly, PCMU/8000"])).toBe("pcmu");
         expect(backchannelCodec(["audio, sendonly, OPUS/48000/2"])).toBe("opus");
         expect(backchannelCodec(["audio, sendonly, MPEG4-GENERIC/16000"])).toBe("aac");
-        expect(backchannelCodec(["video, recvonly, H264", "audio, recvonly, PCMA/8000"])).toBeNull();
+        expect(
+            backchannelCodec(["video, recvonly, H264", "audio, recvonly, PCMA/8000"])
+        ).toBeNull();
         expect(backchannelCodec([])).toBeNull();
     });
 
@@ -211,7 +266,9 @@ describe("adding a Matter camera", () => {
 
     it("stores the code as the bridge reads it and refuses one with a wrong digit", () => {
         expect(parseCameraInput(payload("3497-0112-332")).password).toBe("34970112332");
-        expect(() => parseCameraInput(payload("3497-0112-333"))).toThrow(/not one a Matter camera gives/);
+        expect(() => parseCameraInput(payload("3497-0112-333"))).toThrow(
+            /not one a Matter camera gives/
+        );
         // An edit of a camera already added sends no code at all.
         expect(parseCameraInput(payload()).password).toBeUndefined();
         expect(parseCameraInput(payload()).detector).not.toBe("camera");
@@ -219,7 +276,15 @@ describe("adding a Matter camera", () => {
 
     it("says every refusal of the bridge in Spanish", () => {
         const t = placesCatalogs.translator("es-ES", "places");
-        const reasons = ["invalid-payload", "passcode-mismatch", "not-discovered", "timeout", "attestation-rejected", "not-a-camera", "other"];
+        const reasons = [
+            "invalid-payload",
+            "passcode-mismatch",
+            "not-discovered",
+            "timeout",
+            "attestation-rejected",
+            "not-a-camera",
+            "other"
+        ];
         for (const reason of reasons) {
             const english = commissionSentence(reason);
             expect(placesRefusalText(t, english)).not.toBe(english);

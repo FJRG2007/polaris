@@ -219,7 +219,8 @@ export async function publishCamera(
  *  machine. Refused until the camera has been added to that bridge. */
 async function matterSource(camera: CameraTarget): Promise<string> {
     const path = mainPathOf(camera);
-    if (!path.startsWith("/cameras/")) throw new HomeError("This Matter camera has not been added yet");
+    if (!path.startsWith("/cameras/"))
+        throw new HomeError("This Matter camera has not been added yet");
     const bridge = await matterBridge(relayServerFor(camera.reachVia));
     if (!bridge) throw new HomeError("The Matter bridge is still starting");
     return relaySourceFor(bridge, path);
@@ -850,10 +851,14 @@ export async function playTalk(
     cameraId: string,
     codec: TalkCodec = "pcma"
 ): Promise<boolean> {
-    const response = await relayFetch(endpoint, `/api/streams?${talkPlayQuery(cameraId, true, codec)}`, {
-        method: "POST",
-        timeoutMs: 8000
-    }).catch(() => null);
+    const response = await relayFetch(
+        endpoint,
+        `/api/streams?${talkPlayQuery(cameraId, true, codec)}`,
+        {
+            method: "POST",
+            timeoutMs: 8000
+        }
+    ).catch(() => null);
     return response?.ok === true;
 }
 

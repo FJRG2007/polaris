@@ -69,11 +69,23 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Type the pairing code the camera's app shared", "refusals.matterCodeMissing"],
     ["This Matter camera has not been added yet", "refusals.matterNotAdded"],
     ["That pairing code is not one a Matter camera gives", "refusals.matterCodeInvalid"],
-    ["The camera refused that pairing code. Share it again from the camera's app", "refusals.matterCodeRefused"],
-    ["The camera did not answer. Share it again from its app and add it within a few minutes", "refusals.matterNoAnswer"],
+    [
+        "The camera refused that pairing code. Share it again from the camera's app",
+        "refusals.matterCodeRefused"
+    ],
+    [
+        "The camera did not answer. Share it again from its app and add it within a few minutes",
+        "refusals.matterNoAnswer"
+    ],
     ["The camera could not prove it is a certified Matter device", "refusals.matterNotCertified"],
-    ["That pairing code belongs to a Matter device that is not a camera", "refusals.matterNotCamera"],
-    ["The camera could not be added. Share it again from its app and try once more", "refusals.matterAddFailed"],
+    [
+        "That pairing code belongs to a Matter device that is not a camera",
+        "refusals.matterNotCamera"
+    ],
+    [
+        "The camera could not be added. Share it again from its app and try once more",
+        "refusals.matterAddFailed"
+    ],
     ["The camera relay is not answering", "refusals.relayNotAnswering"],
     ["The camera relay would not take a voice", "refusals.relayNoVoice"],
     [

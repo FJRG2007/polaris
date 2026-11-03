@@ -173,7 +173,10 @@ async function commission(body) {
         return { status: 400, body: { error: "invalid-payload" } };
     const parsed = await command("parse_onboarding_payload", { code });
     if (parsed.error_code !== undefined)
-        return { status: 400, body: { error: commissionRefusal(parsed.reason ?? "invalid-payload") } };
+        return {
+            status: 400,
+            body: { error: commissionRefusal(parsed.reason ?? "invalid-payload") }
+        };
     const payload = parsed.result?.type === "qr" ? parsed.result.payloads?.[0] : parsed.result;
     const pin = payload?.setup_pin_code;
     if (typeof pin !== "number") return { status: 400, body: { error: "invalid-payload" } };
@@ -242,7 +245,11 @@ const sockets = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 http.on("upgrade", (request, socket, head) => {
     const url = new URL(request.url ?? "/", "http://bridge");
     const target = cameraPath(url.pathname);
-    if (!target || target.rest !== "/webrtc" || !sameSecret(url.searchParams.get("token"), PASSWORD)) {
+    if (
+        !target ||
+        target.rest !== "/webrtc" ||
+        !sameSecret(url.searchParams.get("token"), PASSWORD)
+    ) {
         socket.destroy();
         return;
     }

@@ -251,9 +251,9 @@ export const cameraInputSchema = cameraFieldsSchema
             });
     })
     .transform((value) => ({
-    ...value,
-    detector: settledDetector(value.vendor, value.detector)
-}));
+        ...value,
+        detector: settledDetector(value.vendor, value.detector)
+    }));
 
 /** The few fields the reachability check needs, taken off the same object so the
  *  address and the account are judged by the rules that will store them. */
