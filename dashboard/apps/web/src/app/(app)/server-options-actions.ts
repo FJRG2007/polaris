@@ -21,7 +21,10 @@ import { readServerOptions, type ServerOptionsPage } from "@/lib/server-options"
  *  `deploy.read`, runners and the rest of the server tools under `system.manage`,
  *  an agent session's machine under `agents.manage` and a mail server's under
  *  `mailserver.manage`, as starting either is. */
-async function mayPickServers(user: SessionUser, purpose: ServerPurpose | undefined): Promise<boolean> {
+async function mayPickServers(
+    user: SessionUser,
+    purpose: ServerPurpose | undefined
+): Promise<boolean> {
     if (purpose === "agentSession") return sessionCan(user, "agents.manage");
     if (purpose === "mailServer") return sessionCan(user, "mailserver.manage");
     return (await sessionCan(user, "deploy.read")) || sessionCan(user, "system.manage");
@@ -47,7 +50,10 @@ export async function listServerOptionsAction(
     if (!environmentId && !(await mayPickServers(user, parsed.data.purpose)))
         return { error: t("asyncSelect.failed") };
     const request = parsed.data.purpose
-        ? { ...parsed.data, filter: { ...parsed.data.filter, ...PURPOSE_FILTER[parsed.data.purpose] } }
+        ? {
+              ...parsed.data,
+              filter: { ...parsed.data.filter, ...PURPOSE_FILTER[parsed.data.purpose] }
+          }
         : parsed.data;
     try {
         const ownerId = environmentId

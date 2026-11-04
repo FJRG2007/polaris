@@ -23,4 +23,3 @@ export const dnsPlan = (input: Parameters<typeof actions.planDnsAction>[0], sign
         { input: JSON.stringify(input) },
         signal
     );
-

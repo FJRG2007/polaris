@@ -1011,7 +1011,9 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
                             value={serverId}
                             onValueChange={setServerId}
                             selectedLabel={
-                                serverId === LOCAL_SERVER_OPTION ? t("wizard.thisServer") : undefined
+                                serverId === LOCAL_SERVER_OPTION
+                                    ? t("wizard.thisServer")
+                                    : undefined
                             }
                             includeLocal
                             placeholder={t("wizard.chooseServer")}

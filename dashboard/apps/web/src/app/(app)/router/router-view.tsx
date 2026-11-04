@@ -175,7 +175,9 @@ export function RouterSection() {
                             className="w-64 max-w-full"
                             aria-label={t("machine")}
                             value={chosen || null}
-                            selectedLabel={chosen === start.first?.id ? start.first.name : undefined}
+                            selectedLabel={
+                                chosen === start.first?.id ? start.first.name : undefined
+                            }
                             placeholder={t("pickMachine")}
                             filter={ROOT_ONLY}
                             onValueChange={setHostId}

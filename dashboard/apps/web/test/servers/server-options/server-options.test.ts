@@ -154,7 +154,10 @@ describe("listServerOptionsAction", () => {
         findMany.mockResolvedValue([host(1)]);
         sessionCan.mockImplementation(async (_user, permission) => permission === "agents.manage");
         const result = await listServerOptionsAction({ purpose: "agentSession" });
-        expect(result).toEqual({ items: [expect.objectContaining({ id: host(1).id })], next: null });
+        expect(result).toEqual({
+            items: [expect.objectContaining({ id: host(1).id })],
+            next: null
+        });
         expect(sessionCan.mock.calls.map(([, permission]) => permission)).toEqual([
             "agents.manage"
         ]);
@@ -171,7 +174,9 @@ describe("listServerOptionsAction", () => {
 
     it("reads a mail server's machines under the mail grant, this machine first", async () => {
         findMany.mockResolvedValue([host(2)]);
-        sessionCan.mockImplementation(async (_user, permission) => permission === "mailserver.manage");
+        sessionCan.mockImplementation(
+            async (_user, permission) => permission === "mailserver.manage"
+        );
         const result = await listServerOptionsAction({ purpose: "mailServer", includeLocal: true });
         expect(sessionCan.mock.calls.map(([, permission]) => permission)).toEqual([
             "mailserver.manage"

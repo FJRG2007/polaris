@@ -241,7 +241,6 @@ function SetupDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-
     // Suggest the name from the domain the way almost everybody names it.
     const suggested =
         domain.trim() && !hostname.trim() ? `mail.${domain.trim().toLowerCase()}` : "";
