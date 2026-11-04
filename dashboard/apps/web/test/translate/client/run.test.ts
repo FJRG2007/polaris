@@ -40,6 +40,30 @@ describe("translateReusing", () => {
         expect(translate).toHaveBeenCalledTimes(2);
     });
 
+    it("marks a glossary used anywhere in the text, sent now or kept from before", async () => {
+        const translate: Translate = vi.fn(async (texts: string[]) => ({
+            texts,
+            detected: "en",
+            engine: "deepl" as const,
+            glossary: texts.map((text) => (text.includes("term") ? "Mine" : null))
+        }));
+        const cache: PieceCache = { owner: null, pieces: new Map() };
+        const first = await translateReusing("a term
+
+plain", cache, translate);
+        expect(first.glossary).toBe("Mine");
+
+        const edited = await translateReusing("a term
+
+plain!", cache, translate);
+        expect(translate).toHaveBeenLastCalledWith(["plain!"], undefined);
+        expect(edited.glossary).toBe("Mine");
+
+        const kept = await translateReusing("plain", cache, translate);
+        expect(kept.answer).toBeNull();
+        expect(kept.glossary).toBeNull();
+    });
+
     it("starts over for another way of translating", async () => {
         const cache: PieceCache = { owner: null, pieces: new Map() };
         await translateReusing("one", cache, upper());

@@ -119,7 +119,7 @@ export function VirtualKeyboard({
     // A click keeps the field focused; Tab and Enter still reach every key.
     const keepFocus = (event: { preventDefault: () => void }) => event.preventDefault();
     const keyClass =
-        "flex h-10 min-w-0 flex-1 items-center justify-center rounded-md border border-border bg-surface px-0.5 text-base text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted sm:h-11";
+        "flex h-11 min-w-0 flex-1 items-center justify-center rounded-md border border-border bg-surface px-0.5 text-base text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted";
 
     return (
         <Popover.Root

@@ -47,6 +47,17 @@ describe("protect and restore", () => {
         expect(answer.glossaryUsed).toBe(true);
     });
 
+    it("says which of the texts a term was found in", async () => {
+        const answer = await withTerms(
+            ["The dashboard.", "Nothing here.", "Dashboard"],
+            terms([["dashboard", "panel"]]),
+            echo
+        );
+        expect(answer.usedIn).toEqual([true, false, true]);
+        const none = await withTerms(["The dashboard."], null, echo);
+        expect(none.usedIn).toEqual([false]);
+    });
+
     it("keeps a never-translate word exactly as it was written", async () => {
         const answer = await withTerms(
             ["Open Polaris and polaris.", "POLARIS"],

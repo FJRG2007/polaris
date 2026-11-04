@@ -11,7 +11,8 @@
 import type { Shelf } from "./glossaries";
 import { hostUi } from "@polaris/app-host/client";
 import { languageName } from "../model/languages";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLanguageOptions } from "./language-options";
 import type { Glossary, GlossarySummary } from "../lib/glossary";
 import { BookA, Download, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
@@ -55,6 +56,9 @@ import {
 } from "@polaris/ui";
 
 const { useChooseFiles } = hostUi.filePicker;
+
+/** A term row's height before it is measured: an input and the gap under it. */
+const ROW_HEIGHT = 40;
 
 /** What a CSV chooser offers. */
 const CSV_ACCEPT = ".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values";
@@ -431,6 +435,8 @@ function GlossaryEditor({
     const languages = useLanguageOptions(locale);
     const [chooseFiles, chooser] = useChooseFiles();
     const [value, setValue] = useState<Draft>(draft);
+    const latest = useRef(value);
+    latest.current = value;
     const [filter, setFilter] = useState("");
     const [pending, setPending] = useState(false);
 
@@ -455,6 +461,21 @@ function GlossaryEditor({
             );
     }, [value.entries, filter]);
 
+    const scroller = useRef<HTMLDivElement | null>(null);
+    const rowWindow = useVirtualizer({
+        count: shownRows.length,
+        getScrollElement: () => scroller.current,
+        estimateSize: () => ROW_HEIGHT,
+        overscan: 8
+    });
+    // A term just added is scrolled into view, since rows out of sight are not drawn.
+    const revealLast = useRef(false);
+    useEffect(() => {
+        if (!revealLast.current || shownRows.length === 0) return;
+        revealLast.current = false;
+        rowWindow.scrollToIndex(shownRows.length - 1, { align: "end" });
+    }, [shownRows.length, rowWindow]);
+
     const setEntry = (index: number, side: keyof GlossaryEntry, text: string) =>
         setValue((current) => ({
             ...current,
@@ -475,18 +496,23 @@ function GlossaryEditor({
                 toast.show({ title: t("glossary.errors.importEmpty") });
                 return;
             }
-            setValue((current) => {
-                const kept = current.entries.filter((e) => e.source.trim() || e.target.trim());
-                const known = new Set(entries.map((e) => e.source.toLocaleLowerCase()));
-                const merged = [
-                    ...kept.filter((e) => !known.has(normalizeTerm(e.source).toLocaleLowerCase())),
-                    ...entries
-                ].slice(0, ENTRIES_MAX);
-                return { ...current, entries: merged };
-            });
+            const kept = latest.current.entries.filter((e) => e.source.trim() || e.target.trim());
+            const known = new Set(entries.map((e) => e.source.toLocaleLowerCase()));
+            const others = kept.filter(
+                (e) => !known.has(normalizeTerm(e.source).toLocaleLowerCase())
+            );
+            const added = entries.slice(0, Math.max(0, ENTRIES_MAX - others.length));
+            const overflow = entries.length - added.length;
+            setValue((current) => ({ ...current, entries: [...others, ...added] }));
+            const notes = [
+                skipped > 0 ? t("glossary.importSkipped", { count: skipped }) : null,
+                overflow > 0
+                    ? t("glossary.importOverflow", { count: overflow, max: ENTRIES_MAX })
+                    : null
+            ].filter(Boolean);
             toast.show({
-                title: t("glossary.imported", { count: entries.length }),
-                body: skipped > 0 ? t("glossary.importSkipped", { count: skipped }) : undefined
+                title: t("glossary.imported", { count: added.length }),
+                body: notes.length > 0 ? notes.join(" ") : undefined
             });
         });
     };
@@ -589,52 +615,70 @@ function GlossaryEditor({
                             onChange={(event) => setFilter(event.target.value)}
                         />
                     ) : null}
-                    <ul className="flex max-h-80 min-w-0 flex-col gap-2 overflow-y-auto">
-                        {shownRows.map(({ entry, index }) => (
-                            <li key={index} className="flex min-w-0 items-center gap-2">
-                                <Input
-                                    className="min-w-0 flex-1"
-                                    value={entry.source}
-                                    maxLength={200}
-                                    aria-label={t("glossary.source")}
-                                    placeholder={t("glossary.source")}
-                                    aria-invalid={
-                                        (halfRow(entry) && !entry.source.trim()) || undefined
-                                    }
-                                    onChange={(event) =>
-                                        setEntry(index, "source", event.target.value)
-                                    }
-                                />
-                                <Input
-                                    className="min-w-0 flex-1"
-                                    value={entry.target}
-                                    maxLength={200}
-                                    aria-label={t("glossary.target")}
-                                    placeholder={t("glossary.target")}
-                                    aria-invalid={
-                                        (halfRow(entry) && !entry.target.trim()) || undefined
-                                    }
-                                    onChange={(event) =>
-                                        setEntry(index, "target", event.target.value)
-                                    }
-                                />
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={t("glossary.removeTerm")}
-                                    title={t("glossary.removeTerm")}
-                                    onClick={() =>
-                                        setValue({
-                                            ...value,
-                                            entries: value.entries.filter((_, at) => at !== index)
-                                        })
-                                    }
-                                >
-                                    <X className="size-4 shrink-0" aria-hidden />
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
+                    <div ref={scroller} className="max-h-80 min-w-0 overflow-y-auto">
+                        <ul
+                            className="relative min-w-0"
+                            style={{ height: rowWindow.getTotalSize() }}
+                        >
+                            {rowWindow.getVirtualItems().map((row) => {
+                                const { entry, index } = shownRows[row.index]!;
+                                return (
+                                    <li
+                                        key={index}
+                                        data-index={row.index}
+                                        ref={rowWindow.measureElement}
+                                        className="absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 pb-2"
+                                        style={{ transform: `translateY(${row.start}px)` }}
+                                    >
+                                        <Input
+                                            className="min-w-0 flex-1"
+                                            value={entry.source}
+                                            maxLength={200}
+                                            aria-label={t("glossary.source")}
+                                            placeholder={t("glossary.source")}
+                                            aria-invalid={
+                                                (halfRow(entry) && !entry.source.trim()) ||
+                                                undefined
+                                            }
+                                            onChange={(event) =>
+                                                setEntry(index, "source", event.target.value)
+                                            }
+                                        />
+                                        <Input
+                                            className="min-w-0 flex-1"
+                                            value={entry.target}
+                                            maxLength={200}
+                                            aria-label={t("glossary.target")}
+                                            placeholder={t("glossary.target")}
+                                            aria-invalid={
+                                                (halfRow(entry) && !entry.target.trim()) ||
+                                                undefined
+                                            }
+                                            onChange={(event) =>
+                                                setEntry(index, "target", event.target.value)
+                                            }
+                                        />
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={t("glossary.removeTerm")}
+                                            title={t("glossary.removeTerm")}
+                                            onClick={() =>
+                                                setValue({
+                                                    ...value,
+                                                    entries: value.entries.filter(
+                                                        (_, at) => at !== index
+                                                    )
+                                                })
+                                            }
+                                        >
+                                            <X className="size-4 shrink-0" aria-hidden />
+                                        </Button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
                     <Button
                         variant="ghost"
                         size="sm"
@@ -642,6 +686,7 @@ function GlossaryEditor({
                         disabled={value.entries.length >= ENTRIES_MAX}
                         onClick={() => {
                             setFilter("");
+                            revealLast.current = true;
                             setValue({
                                 ...value,
                                 entries: [...value.entries, { source: "", target: "" }]

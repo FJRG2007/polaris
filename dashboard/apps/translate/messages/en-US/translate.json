@@ -252,6 +252,7 @@
         "import": "Import CSV",
         "imported": "{count, plural, one {# term imported} other {# terms imported}}",
         "importSkipped": "{count, plural, one {# row was skipped: it was blank or too long.} other {# rows were skipped: they were blank or too long.}}",
+        "importOverflow": "{count, plural, one {# term did not fit: a glossary holds {max} terms.} other {# terms did not fit: a glossary holds {max} terms.}}",
         "filter": "Find a term",
         "source": "Term",
         "target": "Translated as",

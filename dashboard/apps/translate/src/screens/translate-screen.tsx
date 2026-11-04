@@ -302,13 +302,16 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     signal
                 )
             );
-            const used = answer.glossaryUsed
-                ? applied.name
-                    ? t("glossary.used", { name: applied.name })
-                    : t("glossary.keepUsed")
-                : null;
-            if (!signal?.aborted) setTermsUsed(used);
-            return { texts: answer.texts, detected: answer.detected, engine: answer.engine };
+            const mark = applied.name
+                ? t("glossary.used", { name: applied.name })
+                : t("glossary.keepUsed");
+            if (!signal?.aborted) setTermsUsed(answer.glossaryUsed ? mark : null);
+            return {
+                texts: answer.texts,
+                detected: answer.detected,
+                engine: answer.engine,
+                glossary: answer.usedIn.map((used) => (used ? mark : null))
+            };
         },
         [engineId, usable, chosen, engines, from, targetLanguage, charLimit, termsFor, t]
     );
@@ -346,15 +349,17 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             setPending(true);
             try {
                 // A long text sends only the paragraphs an edit changed.
-                const { text: translated, answer } =
+                const { text: translated, answer, glossary } =
                     text.length > PIECE_MAX
                         ? await translateReusing(text, pieces.current, translate, controller.signal)
                         : await translate([text], controller.signal).then((made) => ({
                               text: made.texts[0] ?? "",
-                              answer: made
+                              answer: made,
+                              glossary: made.glossary?.[0] ?? null
                           }));
                 if (ticket !== latest.current) return;
                 setTarget(translated);
+                setTermsUsed(glossary);
                 if (answer) {
                     setAnsweredBy(answer.engine);
                     setDetected(from === AUTO ? normalizeDetected(answer.detected) : null);

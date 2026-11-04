@@ -185,17 +185,26 @@ export function restore(texts: readonly string[], shielded: Protected): string[]
 
 /**
  * `translate` run on `texts` with `terms` applied: protected on the way in,
- * restored on the way out. `used` says whether a term was found.
+ * restored on the way out. `glossaryUsed` says whether a term was found, and
+ * `usedIn` in which of `texts`.
  */
 export async function withTerms<T extends { texts: string[] }>(
     texts: readonly string[],
     terms: Terms | null | undefined,
     translate: (texts: string[]) => Promise<T>
-): Promise<T & { glossaryUsed: boolean }> {
-    if (!hasTerms(terms)) return { ...(await translate([...texts])), glossaryUsed: false };
+): Promise<T & { glossaryUsed: boolean; usedIn: boolean[] }> {
+    if (!hasTerms(terms)) {
+        const answer = await translate([...texts]);
+        return { ...answer, glossaryUsed: false, usedIn: texts.map(() => false) };
+    }
     const shielded = protect(texts, terms);
     const answer = await translate(shielded.texts);
-    return { ...answer, texts: restore(answer.texts, shielded), glossaryUsed: shielded.used };
+    return {
+        ...answer,
+        texts: restore(answer.texts, shielded),
+        glossaryUsed: shielded.used,
+        usedIn: shielded.texts.map((text, index) => text !== texts[index])
+    };
 }
 
 /** One CSV field, quoted when it has to be (RFC 4180). */

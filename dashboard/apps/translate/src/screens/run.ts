@@ -15,6 +15,8 @@ export interface RunAnswer {
     texts: string[];
     detected: string | null;
     engine: EngineId;
+    /** For each text, the glossary mark its translation applied, or null. */
+    glossary?: (string | null)[];
 }
 
 /** Translates `texts` for a mode; throws an Error carrying the sentence to show. */
@@ -71,7 +73,7 @@ export async function runTranslation(
 /** Translations already made for one way of translating, by the text they translate. */
 export interface PieceCache {
     owner: Translate | null;
-    pieces: Map<string, string>;
+    pieces: Map<string, { text: string; glossary: string | null }>;
 }
 
 /** The most pieces a cache keeps before it starts over. */
@@ -80,14 +82,15 @@ const CACHE_MAX = 2000;
 /**
  * `text` translated through `translate`, sending only the paragraphs `cache`
  * has not translated yet, so an edit to a long text pays for the paragraph it
- * touched and not for the rest. `answer` is null when nothing had to be sent.
+ * touched and not for the rest. `answer` is null when nothing had to be sent;
+ * `glossary` is the mark of the first paragraph that applied one, sent or kept.
  */
 export async function translateReusing(
     text: string,
     cache: PieceCache,
     translate: Translate,
     signal?: AbortSignal
-): Promise<{ text: string; answer: RunAnswer | null }> {
+): Promise<{ text: string; answer: RunAnswer | null; glossary: string | null }> {
     if (cache.owner !== translate || cache.pieces.size > CACHE_MAX) {
         cache.owner = translate;
         cache.pieces = new Map();
@@ -102,14 +105,19 @@ export async function translateReusing(
     if (missing.length > 0) {
         answer = await translate(missing, signal);
         if (answer.texts.length !== missing.length) throw new Error("answer count");
-        missing.forEach((part, index) => cache.pieces.set(part, answer!.texts[index]!));
+        missing.forEach((part, index) =>
+            cache.pieces.set(part, {
+                text: answer!.texts[index]!,
+                glossary: answer!.glossary?.[index] ?? null
+            })
+        );
     }
+    const shown = parts.map((part, index) =>
+        index % 2 === 1 || !part.trim() ? null : cache.pieces.get(part)!
+    );
     return {
-        text: parts
-            .map((part, index) =>
-                index % 2 === 1 || !part.trim() ? part : cache.pieces.get(part)!
-            )
-            .join(""),
-        answer
+        text: parts.map((part, index) => shown[index]?.text ?? part).join(""),
+        answer,
+        glossary: shown.find((piece) => piece?.glossary)?.glossary ?? null
     };
 }
