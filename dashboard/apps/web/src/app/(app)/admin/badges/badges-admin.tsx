@@ -59,7 +59,6 @@ export function BadgesAdmin() {
 
     useEffect(() => {
         void reload();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const remove = async (badge: BadgeDefinitionView) => {
@@ -327,7 +326,6 @@ function HoldersDialog({
             if (answer.error !== undefined) toast.show({ title: answer.error });
             else setHolders(answer.holders);
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [badge.id]);
 
     const grant = async (person: { id: string; name: string }) => {
