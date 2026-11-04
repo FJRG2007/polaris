@@ -44,6 +44,12 @@
         "addGoogle": "Clave de Google",
         "polar": "Activar Polar"
     },
+    "temporary": {
+        "on": "Modo temporal",
+        "off": "Desactivar modo temporal",
+        "notice": "Modo temporal activo: nada de lo que traduces queda en tu historial.",
+        "stop": "Desactivar"
+    },
     "history": {
         "title": "Historial",
         "empty": "Tus traducciones aparecen aquí.",
@@ -129,8 +135,9 @@
         "choose": "Elegir una imagen",
         "hint": "Capturas y fotos, hasta 8 MB.",
         "reading": "Leyendo el texto...",
-        "overlay": "Sobre la imagen",
-        "side": "Al lado",
+        "translated": "Traducida",
+        "originalPicture": "Original",
+        "altTranslated": "La imagen con su texto traducido",
         "view": "Cómo mostrarla",
         "original": "Texto original",
         "copyOriginal": "Copiar texto original",
@@ -188,7 +195,9 @@
         "unsupported": "Ese archivo no se puede traducir aquí",
         "dictate": "Dictar",
         "dictateStop": "Dejar de dictar",
-        "dictateUnavailable": "El dictado no está disponible aquí"
+        "dictateUnavailable": "El dictado no está disponible aquí",
+        "keyboard": "Mostrar el teclado",
+        "keyboardClose": "Ocultar el teclado"
     },
     "website": {
         "address": "Dirección del sitio",
@@ -207,5 +216,74 @@
         "openOriginal": "Abrir original",
         "fetching": "Obteniendo la página",
         "hint": "Escribe la dirección de una página para leerla en otro idioma."
+    },
+    "glossary": {
+        "open": "Glosarios",
+        "title": "Glosarios",
+        "description": "Elige cómo se traducen los términos en cada par de idiomas y qué palabras no se traducen nunca.",
+        "used": "Glosario: {name}",
+        "keepUsed": "Lista de no traducir aplicada",
+        "listTitle": "Glosarios",
+        "new": "Nuevo glosario",
+        "newTitle": "Nuevo glosario",
+        "editTitle": "Editar glosario",
+        "emptyTitle": "Aún no hay glosarios",
+        "emptyHint": "Un glosario fija cómo sale un término, como el nombre de un producto o una frase de tu equipo.",
+        "retry": "Reintentar",
+        "default": "Principal",
+        "pair": "{from} a {to}",
+        "count": "{count, plural, one {# término} other {# términos}}",
+        "edit": "Editar glosario",
+        "export": "Exportar como CSV",
+        "delete": "Eliminar glosario",
+        "kind": "glosario",
+        "deleteTitle": "¿Eliminar este glosario?",
+        "deleteQuestion": "{name} y sus términos se eliminan para siempre.",
+        "keepTitle": "No traducir nunca",
+        "keepHint": "Nombres y marcas que se dejan tal cual en todos los idiomas. Uno por línea.",
+        "keepPlaceholder": "Polaris",
+        "keepCount": "{count} de {max}",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "name": "Nombre",
+        "makeDefault": "Usar por defecto en este par de idiomas",
+        "terms": "Términos",
+        "termsCount": "{count} de {max}",
+        "import": "Importar CSV",
+        "imported": "{count, plural, one {# término importado} other {# términos importados}}",
+        "importSkipped": "{count, plural, one {Se omitió # fila: estaba vacía o era muy larga.} other {Se omitieron # filas: estaban vacías o eran muy largas.}}",
+        "importOverflow": "{count, plural, one {# término no cabía: un glosario admite {max} términos.} other {# términos no cabían: un glosario admite {max} términos.}}",
+        "filter": "Buscar término",
+        "source": "Término",
+        "target": "Se traduce como",
+        "removeTerm": "Quitar término",
+        "addTerm": "Añadir",
+        "errors": {
+            "loadFailed": "No se pudieron cargar tus glosarios.",
+            "saveFailed": "No se pudo guardar el glosario.",
+            "deleteFailed": "No se pudo eliminar el glosario.",
+            "missing": "Ese glosario ya no existe.",
+            "limit": "Tienes el máximo de glosarios. Elimina uno para añadir otro.",
+            "samePair": "Elige dos idiomas distintos.",
+            "importEmpty": "Ese archivo no tiene términos. Cada línea necesita un término y su traducción, separados por coma.",
+            "keepInvalid": "Cada palabra con menos de 200 caracteres, y no más de {max}."
+        }
+    },
+    "keyboard": {
+        "shift": "Mayús",
+        "alt": "Símbolos",
+        "backspace": "Borrar",
+        "space": "Espacio",
+        "layout": "Tipo de teclado",
+        "layouts": {
+            "latin": "Latino con tildes",
+            "cyrillic": "Cirílico",
+            "greek": "Griego",
+            "arabic": "Árabe",
+            "hebrew": "Hebreo",
+            "devanagari": "Devanagari (hindi)",
+            "kana": "Kana japonés",
+            "hangul": "Coreano"
+        }
     }
 }

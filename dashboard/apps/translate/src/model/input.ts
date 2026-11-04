@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { LANGUAGE_CODES, type LanguageCode } from "./languages";
 
 /** Where an input is translated. */
 export type InputKind = "image" | "document" | "audio" | "video";
@@ -141,4 +142,55 @@ export function websiteOf(text: string): string | null {
     }
     const parsed = websiteUrl.safeParse(trimmed);
     return parsed.success ? parsed.data : null;
+}
+
+/** The most text a link may hand the box (`/translate?text=...`). */
+export const LINKED_TEXT_MAX = 5000;
+
+const linked = z.object({
+    text: z
+        .string()
+        .transform((text) => text.trim().slice(0, LINKED_TEXT_MAX))
+        .optional()
+        .catch(undefined),
+    to: z
+        .string()
+        .transform((code) => code.trim())
+        .pipe(z.enum(LANGUAGE_CODES))
+        .optional()
+        .catch(undefined)
+});
+
+/**
+ * What a link into Translate asks for: `?text=` fills the box and `?to=` picks
+ * the language (another screen's "Open in Translate"). A part that is not
+ * valid is left out, not refused: the screen still opens.
+ */
+export function linkedRequest(search: string): { text?: string; to?: LanguageCode } {
+    const params = new URLSearchParams(search);
+    const answer = linked.parse({
+        text: params.get("text") ?? undefined,
+        to: params.get("to") ?? undefined
+    });
+    return {
+        ...(answer.text ? { text: answer.text } : {}),
+        ...(answer.to ? { to: answer.to } : {})
+    };
+}
+
+/** How the text box is dictated into, or null when it cannot be here. */
+export type DictationWay = "server" | "browser" | null;
+
+/**
+ * The server transcribes when it can and the browser can record; otherwise
+ * the browser's own speech recognition; otherwise there is no dictation and
+ * the button says so.
+ */
+export function dictationWay(can: {
+    record: boolean;
+    serverTranscribes: boolean;
+    browserRecognizes: boolean;
+}): DictationWay {
+    if (can.record && can.serverTranscribes) return "server";
+    return can.browserRecognizes ? "browser" : null;
 }

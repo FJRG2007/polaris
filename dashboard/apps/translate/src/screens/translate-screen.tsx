@@ -27,6 +27,8 @@ import {
     Globe,
     Languages,
     MessagesSquare,
+    Ghost,
+    BookA,
     Mic,
     Paperclip,
     Settings2,
@@ -46,7 +48,10 @@ import {
     Select,
     Skeleton,
     Textarea,
+    VirtualKeyboard,
     cn,
+    layoutForLanguage,
+    type KeyboardLayoutId,
     useToast,
     type SearchableSelectOption
 } from "@polaris/ui";
@@ -58,10 +63,20 @@ import { CameraMode } from "./camera-mode";
 import { DocumentMode } from "./document-mode";
 import { WebsiteMode } from "./website-mode";
 import { hostUi } from "@polaris/app-host/client";
-import { INPUT_ACCEPT, pastedFile, routeFile, websiteOf, type InputKind } from "../model/input";
+import {
+    INPUT_ACCEPT,
+    dictationWay,
+    linkedRequest,
+    pastedFile,
+    routeFile,
+    websiteOf,
+    type InputKind
+} from "../model/input";
 import type { Reads } from "./reads";
 import { PIECE_MAX } from "../model/chunk";
 import { runTranslation, translateReusing, type PieceCache, type Translate } from "./run";
+import { useGlossaries } from "./glossaries";
+import { withTerms } from "../model/glossary";
 import { useLanguageOptions } from "./language-options";
 import type { HistoryEntry } from "../lib/history";
 import { pickEngine, usableEngines, type TranslateEngine } from "../model/engines";
@@ -154,6 +169,17 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [target, setTarget] = useState("");
     const [answeredBy, setAnsweredBy] = useState<EngineId | null>(null);
     const [detected, setDetected] = useState<string | null>(null);
+    // The language detection last named, for choosing a glossary before it names one again.
+    const lastDetected = useRef<string | null>(null);
+    useEffect(() => {
+        if (detected) lastDetected.current = detected;
+    }, [detected]);
+    const { termsFor } = useGlossaries();
+    // What the last translation applied: a glossary's name, the keep list, or nothing.
+    const [termsUsed, setTermsUsed] = useState<string | null>(null);
+    const sourceField = useRef<HTMLTextAreaElement | null>(null);
+    // The on-screen keyboard follows the source language until another layout is picked.
+    const [layoutPicked, setLayoutPicked] = useState<KeyboardLayoutId | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [download, setDownload] = useState<number | null>(null);
@@ -164,6 +190,17 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     const [nativeDictation, setNativeDictation] = useState(false);
     const stopDictation = useRef<(() => void) | null>(null);
     const dictationStarting = useRef(false);
+
+    // While on, nothing translated is kept in the history. It stays on until it
+    // is turned off, as Polar's temporary chats do.
+    const [temporary, setTemporary] = useState(false);
+
+    // A link into Translate ("Open in Translate"): `?text=` fills the box, `?to=` the language.
+    useEffect(() => {
+        const asked = linkedRequest(window.location.search);
+        if (asked.text) setSource(asked.text);
+        if (asked.to) setTo(asked.to);
+    }, []);
 
     const [history, setHistory] = useState<HistoryEntry[] | null>(() =>
         readCache<HistoryEntry[]>("history")
@@ -239,25 +276,44 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
 
     // Every mode translates through this: the chosen engine, or each usable
     // one in the administrator's order until one answers.
+    // The pair's default glossary and the never-translate list go with it.
     const translate = useCallback<Translate>(
-        (texts, signal, pair) => {
-            if (!engineId) return Promise.reject(new Error(t("errors.noEngineReader")));
+        async (texts, signal, pair) => {
+            if (!engineId) throw new Error(t("errors.noEngineReader"));
             const order = [engineId, ...usable.filter((id) => id !== engineId && chosen === null)];
-            return runTranslation(
-                texts,
-                {
-                    engines,
-                    order,
-                    from: pair ? pair.from : from === AUTO ? null : from,
-                    to: pair ? pair.to : targetLanguage,
-                    charLimit,
-                    fallback: t("errors.failed"),
-                    overLimit: (limit) => t("errors.overLimit", { limit })
-                },
-                signal
+            const fromLang = pair ? pair.from : from === AUTO ? null : from;
+            const toLang = pair ? pair.to : targetLanguage;
+            const applied = await termsFor(
+                fromLang ?? (pair ? null : lastDetected.current),
+                toLang
             );
+            const answer = await withTerms(texts, applied.terms, (shielded) =>
+                runTranslation(
+                    shielded,
+                    {
+                        engines,
+                        order,
+                        from: fromLang,
+                        to: toLang,
+                        charLimit,
+                        fallback: t("errors.failed"),
+                        overLimit: (limit) => t("errors.overLimit", { limit })
+                    },
+                    signal
+                )
+            );
+            const mark = applied.name
+                ? t("glossary.used", { name: applied.name })
+                : t("glossary.keepUsed");
+            if (!signal?.aborted) setTermsUsed(answer.glossaryUsed ? mark : null);
+            return {
+                texts: answer.texts,
+                detected: answer.detected,
+                engine: answer.engine,
+                glossary: answer.usedIn.map((used) => (used ? mark : null))
+            };
         },
-        [engineId, usable, chosen, engines, from, targetLanguage, charLimit, t]
+        [engineId, usable, chosen, engines, from, targetLanguage, charLimit, termsFor, t]
     );
 
     // Translate on a pause in typing; a newer request cancels the older one.
@@ -274,6 +330,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         }
         loaded.current = null;
         if (!text.trim() || !engineId) {
+            setTermsUsed(null);
             setTarget("");
             setPending(false);
             setError(null);
@@ -292,15 +349,20 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             setPending(true);
             try {
                 // A long text sends only the paragraphs an edit changed.
-                const { text: translated, answer } =
-                    text.length > PIECE_MAX
-                        ? await translateReusing(text, pieces.current, translate, controller.signal)
-                        : await translate([text], controller.signal).then((made) => ({
-                              text: made.texts[0] ?? "",
-                              answer: made
-                          }));
+                const {
+                    text: translated,
+                    answer,
+                    glossary
+                } = text.length > PIECE_MAX
+                    ? await translateReusing(text, pieces.current, translate, controller.signal)
+                    : await translate([text], controller.signal).then((made) => ({
+                          text: made.texts[0] ?? "",
+                          answer: made,
+                          glossary: made.glossary?.[0] ?? null
+                      }));
                 if (ticket !== latest.current) return;
                 setTarget(translated);
+                setTermsUsed(glossary);
                 if (answer) {
                     setAnsweredBy(answer.engine);
                     setDetected(from === AUTO ? normalizeDetected(answer.detected) : null);
@@ -322,6 +384,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     // Keep a translation once it has stayed on screen for a moment.
     useEffect(() => {
         const sourceLanguage = from === AUTO ? detected : from;
+        if (temporary) return;
         if (!answeredBy || !target.trim() || !source.trim() || !sourceLanguage || pending) return;
         if (isLoaded(loaded.current, { source, from, to: targetLanguage, chosen })) return;
         const timer = window.setTimeout(() => {
@@ -342,7 +405,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             });
         }, REMEMBER_MS);
         return () => window.clearTimeout(timer);
-    }, [answeredBy, target, source, from, detected, targetLanguage, pending, chosen]);
+    }, [answeredBy, target, source, from, detected, targetLanguage, pending, chosen, temporary]);
 
     const detect = async () => {
         if (!source.trim() || !engineId) return;
@@ -364,6 +427,30 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
     };
 
     const swapFrom = from === AUTO ? detected : from;
+
+    useEffect(() => setLayoutPicked(null), [from]);
+    const keyboardLabels = useMemo(
+        () => ({
+            open: t("input.keyboard"),
+            close: t("input.keyboardClose"),
+            shift: t("keyboard.shift"),
+            alt: t("keyboard.alt"),
+            backspace: t("keyboard.backspace"),
+            space: t("keyboard.space"),
+            layout: t("keyboard.layout"),
+            layouts: {
+                latin: t("keyboard.layouts.latin"),
+                cyrillic: t("keyboard.layouts.cyrillic"),
+                greek: t("keyboard.layouts.greek"),
+                arabic: t("keyboard.layouts.arabic"),
+                hebrew: t("keyboard.layouts.hebrew"),
+                devanagari: t("keyboard.layouts.devanagari"),
+                kana: t("keyboard.layouts.kana"),
+                hangul: t("keyboard.layouts.hangul")
+            }
+        }),
+        [t]
+    );
     const swap = () => {
         if (!swapFrom) return;
         const nextFrom = targetLanguage as SourceLanguage;
@@ -484,8 +571,13 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
         if (!text) return;
         setSource((now) => (now && !/\s$/.test(now) ? `${now} ${text}` : now + text));
     };
-    const serverDictation = canRecord && (status?.reads?.audio ?? false);
-    const canDictate = serverDictation || nativeDictation;
+    const dictation = dictationWay({
+        record: canRecord,
+        serverTranscribes: status?.reads?.audio ?? false,
+        browserRecognizes: nativeDictation
+    });
+    const serverDictation = dictation === "server";
+    const canDictate = dictation !== null;
     const dictate = async () => {
         if (dictating) return stopDictation.current?.();
         if (dictationStarting.current) return;
@@ -586,16 +678,46 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 title={t("title")}
                 description={t("description")}
                 actions={
-                    manager ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant={temporary ? "secondary" : "ghost"}
+                            size="icon"
+                            aria-pressed={temporary}
+                            aria-label={temporary ? t("temporary.off") : t("temporary.on")}
+                            title={temporary ? t("temporary.off") : t("temporary.on")}
+                            onClick={() => setTemporary(!temporary)}
+                        >
+                            <Ghost className="size-4 shrink-0" aria-hidden />
+                        </Button>
                         <Button asChild variant="outline" size="sm">
-                            <Link href="/admin/apps/translate/settings">
-                                <Settings2 className="size-4 shrink-0" aria-hidden />
-                                {t("actions.settings")}
+                            <Link href="/translate/glossaries">
+                                <BookA className="size-4 shrink-0" aria-hidden />
+                                {t("glossary.open")}
                             </Link>
                         </Button>
-                    ) : null
+                        {manager ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href="/admin/apps/translate/settings">
+                                    <Settings2 className="size-4 shrink-0" aria-hidden />
+                                    {t("actions.settings")}
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </div>
                 }
             />
+            {temporary ? (
+                <div
+                    role="status"
+                    className="mb-3 flex min-w-0 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+                >
+                    <Ghost className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 flex-1">{t("temporary.notice")}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setTemporary(false)}>
+                        {t("temporary.stop")}
+                    </Button>
+                </div>
+            ) : null}
 
             {nothing ? (
                 <EmptyState
@@ -683,6 +805,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                             </span>
                         ) : null}
                     </span>
+                    {termsUsed ? <GlossaryMark label={termsUsed} /> : null}
                     <Button variant="ghost" size="sm" onClick={() => setInput({ kind: "text" })}>
                         <X className="size-4 shrink-0" aria-hidden />
                         {t("input.backToText")}
@@ -694,6 +817,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     translate={translate}
                     reads={reads}
                     manager={manager}
+                    to={targetLanguage}
                     file={input.file}
                 />
             ) : input.kind === "camera" || input.kind === "video" ? (
@@ -720,12 +844,19 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                     file={input.kind === "audio" ? input.file : null}
                 />
             ) : input.kind === "website" ? (
-                <WebsiteMode
-                    translate={translate}
-                    charLimit={charLimit}
-                    url={input.url}
-                    onClose={() => setInput({ kind: "text" })}
-                />
+                <>
+                    {termsUsed ? (
+                        <p className="mb-2 flex min-w-0">
+                            <GlossaryMark label={termsUsed} />
+                        </p>
+                    ) : null}
+                    <WebsiteMode
+                        translate={translate}
+                        charLimit={charLimit}
+                        url={input.url}
+                        onClose={() => setInput({ kind: "text" })}
+                    />
+                </>
             ) : null}
             <div
                 className={cn(
@@ -758,6 +889,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 ) : null}
                 <section className="flex min-w-0 flex-col rounded-lg border border-border bg-card">
                     <Textarea
+                        ref={sourceField}
                         aria-label={t("pane.source")}
                         placeholder={t("pane.placeholder")}
                         value={source}
@@ -787,6 +919,14 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                         >
                             <Paperclip className="size-4 shrink-0" aria-hidden />
                         </Button>
+                        <VirtualKeyboard
+                            target={sourceField}
+                            layout={
+                                layoutPicked ?? layoutForLanguage(from === AUTO ? detected : from)
+                            }
+                            onLayoutChange={setLayoutPicked}
+                            labels={keyboardLabels}
+                        />
                         <Button
                             variant={dictating ? "secondary" : "ghost"}
                             size="icon"
@@ -895,7 +1035,10 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                             ) : download !== null && download < 1 ? (
                                 t("engine.downloading", { percent: Math.round(download * 100) })
                             ) : answeredBy && target ? (
-                                t("engine.answeredBy", { engine: t(ENGINE_KEY[answeredBy]) })
+                                <>
+                                    {t("engine.answeredBy", { engine: t(ENGINE_KEY[answeredBy]) })}
+                                    {termsUsed ? <GlossaryMark label={termsUsed} /> : null}
+                                </>
                             ) : null}
                         </span>
                         {canSpeak ? (
@@ -996,5 +1139,18 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                 onConfirm={() => void clearAll()}
             />
         </div>
+    );
+}
+
+/** Says a glossary or the never-translate list shaped the translation. */
+function GlossaryMark({ label }: { label: string }) {
+    return (
+        <span
+            className="ml-2 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+            title={label}
+        >
+            <BookA className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{label}</span>
+        </span>
     );
 }

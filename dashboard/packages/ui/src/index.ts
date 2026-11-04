@@ -89,6 +89,12 @@ export {
     type ConfirmDeleteDialogProps
 } from "./components/confirm-delete-dialog";
 export { Switch } from "./components/switch";
+export {
+    VirtualKeyboard,
+    type VirtualKeyboardLabels,
+    type VirtualKeyboardProps
+} from "./components/virtual-keyboard";
+export { KEYBOARD_LAYOUTS, layoutForLanguage, type KeyboardLayoutId } from "./lib/keyboard-layouts";
 export { ColorPicker, SUGGESTED_COLORS } from "./components/color-picker";
 export {
     ToastProvider,

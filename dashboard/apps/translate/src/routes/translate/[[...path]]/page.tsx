@@ -4,6 +4,9 @@
  * for the engines and the history in the browser, so the panes are on screen
  * before any request has left.
  *
+ * `/translate/glossaries` is the reader's own glossaries and never-translate
+ * list, for anybody who may translate.
+ *
  * `/translate/settings` is the app's administrator settings - the page
  * Management > Polaris apps > Translate > Settings opens - and is there only
  * for an administrator.
@@ -16,6 +19,7 @@ import { PageHeader } from "@polaris/ui";
 import { notFound } from "next/navigation";
 import { translateT } from "../../../lib/i18n";
 import { SettingsPanel } from "../../../screens/settings-panel";
+import { GlossaryManager } from "../../../screens/glossary-manager";
 import { TranslateScreen } from "../../../screens/translate-screen";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +35,9 @@ export default async function TranslatePage({
     ]);
     if (raw === undefined || (Array.isArray(raw) && raw.length === 0))
         return <TranslateScreen manager={user.isAdmin} />;
-    if (!Array.isArray(raw) || raw.length !== 1 || raw[0] !== "settings" || !user.isAdmin)
-        notFound();
+    if (!Array.isArray(raw) || raw.length !== 1) notFound();
+    const glossaries = raw[0] === "glossaries";
+    if (!glossaries && (raw[0] !== "settings" || !user.isAdmin)) notFound();
     const t = await translateT();
     return (
         <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-4">
@@ -43,8 +48,23 @@ export default async function TranslatePage({
                 <ArrowLeft className="size-4 shrink-0" aria-hidden />
                 {t("title")}
             </Link>
-            <PageHeader title={t("settings.title")} description={t("settings.description")} />
-            <SettingsPanel />
+            {glossaries ? (
+                <>
+                    <PageHeader
+                        title={t("glossary.title")}
+                        description={t("glossary.description")}
+                    />
+                    <GlossaryManager />
+                </>
+            ) : (
+                <>
+                    <PageHeader
+                        title={t("settings.title")}
+                        description={t("settings.description")}
+                    />
+                    <SettingsPanel />
+                </>
+            )}
         </div>
     );
 }

@@ -6,6 +6,9 @@
 import { describe, expect, it } from "vitest";
 import {
     INPUT_ACCEPT,
+    LINKED_TEXT_MAX,
+    dictationWay,
+    linkedRequest,
     normalizeWebsite,
     pastedFile,
     routeFile,
@@ -140,5 +143,55 @@ describe("websiteOf", () => {
         expect(websiteOf("e.g.")).toBeNull();
         expect(websiteOf("javascript:alert(1)")).toBeNull();
         expect(websiteOf("")).toBeNull();
+    });
+});
+
+describe("linkedRequest", () => {
+    it("fills the box and the language from a link", () => {
+        expect(linkedRequest("?text=%20Hola%20mundo%20&to=en")).toEqual({
+            text: "Hola mundo",
+            to: "en"
+        });
+    });
+
+    it("leaves out what is not valid and keeps the rest", () => {
+        expect(linkedRequest("?text=Hi&to=xx")).toEqual({ text: "Hi" });
+        expect(linkedRequest("?to=de")).toEqual({ to: "de" });
+        expect(linkedRequest("?text=%20%20")).toEqual({});
+        expect(linkedRequest("")).toEqual({});
+    });
+
+    it("caps a long text", () => {
+        const answer = linkedRequest(`?text=${"a".repeat(LINKED_TEXT_MAX + 50)}`);
+        expect(answer.text).toHaveLength(LINKED_TEXT_MAX);
+    });
+});
+
+describe("dictationWay", () => {
+    it("lets the server transcribe when it can and the browser records", () => {
+        expect(
+            dictationWay({ record: true, serverTranscribes: true, browserRecognizes: true })
+        ).toBe("server");
+        expect(
+            dictationWay({ record: true, serverTranscribes: true, browserRecognizes: false })
+        ).toBe("server");
+    });
+
+    it("falls back to the browser's recognition", () => {
+        expect(
+            dictationWay({ record: false, serverTranscribes: true, browserRecognizes: true })
+        ).toBe("browser");
+        expect(
+            dictationWay({ record: true, serverTranscribes: false, browserRecognizes: true })
+        ).toBe("browser");
+    });
+
+    it("has none when neither can", () => {
+        expect(
+            dictationWay({ record: true, serverTranscribes: false, browserRecognizes: false })
+        ).toBeNull();
+        expect(
+            dictationWay({ record: false, serverTranscribes: true, browserRecognizes: false })
+        ).toBeNull();
     });
 });

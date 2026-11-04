@@ -87,3 +87,11 @@ export function languageName(code: string, locale: string): string {
         return code;
     }
 }
+
+/** Scripts written right to left, by the language's primary subtag. */
+const RIGHT_TO_LEFT: ReadonlySet<string> = new Set(["ar", "he", "fa", "ur", "yi", "ps", "dv"]);
+
+/** Whether `code` (any BCP 47 tag) is written right to left. */
+export function isRightToLeft(code: string | null | undefined): boolean {
+    return RIGHT_TO_LEFT.has((code ?? "").split("-")[0]!.toLowerCase());
+}
