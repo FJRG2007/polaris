@@ -17,6 +17,7 @@ import "server-only";
 import { z } from "zod";
 import * as core from "@polaris/core";
 import { prisma, Prisma } from "@polaris/db";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { assertOwnPrivacyLists, maySee, ruleAllows, type PrivacyViewer } from "@/lib/privacy-service";
 
 /** A refusal whose sentence may be shown to the person who caused it. */
@@ -133,22 +134,12 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
             orderBy: { grantedAt: "asc" },
             take: core.MOST_BADGE_PREFERENCES
         }),
-        prisma.badgeUnlock.findMany({
-            where: { userId },
-            select: { badge: true, level: true, unlockedAt: true }
-        })
+        unlocksOf(userId)
     ]);
     if (!user) return [];
 
-    const reached = new Map(unlocks.map((row) => [`${row.badge}#${row.level}`, row.unlockedAt]));
-    const missing: { userId: string; badge: string; level: number; unlockedAt: Date }[] = [];
-    const dateOf = (badge: string, level: number): Date => {
-        const known = reached.get(`${badge}#${level}`);
-        if (known) return known;
-        missing.push({ userId, badge, level, unlockedAt: now });
-        reached.set(`${badge}#${level}`, now);
-        return now;
-    };
+    const reached = await recordUnlocks(userId, user.isAdmin, values, unlocks, now);
+    const dateOf = (badge: string, level: number): Date => reached.get(`${badge}#${level}`) ?? now;
 
     const staff = user.isAdmin ? dateOf(core.STAFF_BADGE, 1) : null;
     const ladders = core.BADGE_LADDER_IDS.map((id) => {
@@ -163,10 +154,6 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
         }));
         return { id, key, ladder, progress, levels };
     });
-
-    if (missing.length > 0) {
-        await prisma.badgeUnlock.createMany({ data: missing, skipDuplicates: true });
-    }
 
     const rarity = await rarities(
         ladders.map((entry) => ({ key: entry.key, level: Math.max(1, entry.progress.level) })),
@@ -236,6 +223,81 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
     views.push(...ladders.filter((entry) => entry.progress.level > 0).map(ladderView));
     views.push(...ladders.filter((entry) => entry.progress.level === 0).map(ladderView));
     return views;
+}
+
+type UnlockRow = { badge: string; level: number; unlockedAt: Date };
+
+function unlocksOf(userId: string): Promise<UnlockRow[]> {
+    return prisma.badgeUnlock.findMany({
+        where: { userId },
+        select: { badge: true, level: true, unlockedAt: true }
+    });
+}
+
+/**
+ * Write the day of every level this person has reached and that is not
+ * recorded yet, and answer every recorded day by `badge#level`. A level is
+ * written once and never moved or removed.
+ */
+async function recordUnlocks(
+    userId: string,
+    isAdmin: boolean,
+    values: BadgeValues,
+    known: readonly UnlockRow[],
+    now: Date
+): Promise<Map<string, Date>> {
+    const reached = new Map(known.map((row) => [`${row.badge}#${row.level}`, row.unlockedAt]));
+    const due: { badge: string; level: number }[] = isAdmin ? [{ badge: core.STAFF_BADGE, level: 1 }] : [];
+    for (const id of core.BADGE_LADDER_IDS) {
+        const { level } = core.ladderProgress(core.BADGE_LADDERS[id].thresholds, values[id]);
+        for (let at = 1; at <= level; at++) due.push({ badge: core.ladderKey(id), level: at });
+    }
+    const missing = due.filter((row) => !reached.has(`${row.badge}#${row.level}`));
+    if (missing.length > 0) {
+        await prisma.badgeUnlock.createMany({
+            data: missing.map((row) => ({ userId, ...row, unlockedAt: now })),
+            skipDuplicates: true
+        });
+        for (const row of missing) reached.set(`${row.badge}#${row.level}`, now);
+    }
+    return reached;
+}
+
+/** People one sweep pass reaches, a batch at a time. */
+const SWEEP_BATCH = 200;
+const SWEEP_BATCHES = 5;
+const SWEEP_CURSOR = "badges.unlockSweepCursor";
+
+/**
+ * Record the levels everybody has reached, not only the people whose profile
+ * somebody opened - rarity is counted from these rows, so it has to see the
+ * whole instance. A pass walks people in id order from where the last one
+ * stopped, a bounded number of batches, and starts over once it reaches the
+ * end. Re-running it is harmless: a level already written is left alone.
+ */
+export async function sweepBadgeUnlocks(now = new Date()): Promise<{ people: number }> {
+    let cursor = await getSetting(SWEEP_CURSOR);
+    let people = 0;
+    for (let batch = 0; batch < SWEEP_BATCHES; batch++) {
+        const users = await prisma.user.findMany({
+            where: cursor ? { id: { gt: cursor } } : {},
+            orderBy: { id: "asc" },
+            take: SWEEP_BATCH,
+            select: { id: true, isAdmin: true }
+        });
+        for (const user of users) {
+            // One person whose activity cannot be read is not a reason to stop
+            // at them on every pass: they are tried again next time round.
+            await Promise.all([activityValues(user.id, now), unlocksOf(user.id)])
+                .then(([values, known]) => recordUnlocks(user.id, user.isAdmin, values, known, now))
+                .catch((error) => console.error("polaris: could not record badge levels:", error));
+        }
+        people += users.length;
+        cursor = users.length === SWEEP_BATCH ? users[users.length - 1]!.id : null;
+        if (!cursor) break;
+    }
+    await setSetting(SWEEP_CURSOR, cursor);
+    return { people };
 }
 
 /** Holders over people, for every badge in view: three grouped reads, whatever the count. */

@@ -59,6 +59,7 @@ import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { pruneMoveHistory, sweepLeftCopies, sweepStorageMoves } from "@/lib/storage-moves/service";
 import { sweepAppStorage } from "@/lib/storage-moves/app-storage";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
+import { sweepBadgeUnlocks } from "@/lib/badges/badge-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
 import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
@@ -946,6 +947,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // runner finds nothing left.
         leaseMs: null,
         run: expireTransfers
+    },
+    {
+        key: "badge-unlocks",
+        // Every ten minutes. It records the badge levels people reached so rarity
+        // counts the whole instance; a level noticed late only moves its day.
+        everyMs: Number(process.env.POLARIS_BADGE_SWEEP_MS) || 10 * MINUTE,
+        // Leased: the pass continues from a shared cursor, and two runners would
+        // walk the same people twice.
+        leaseMs: 15 * MINUTE,
+        run: () => sweepBadgeUnlocks()
     },
     {
         key: "suspensions",
