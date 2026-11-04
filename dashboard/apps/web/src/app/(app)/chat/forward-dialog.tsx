@@ -273,13 +273,13 @@ export function ForwardDialog({
         setBusy(false);
         dropReview();
         const named = refused.map(
-            (id) => targets.find((target) => target.id === id)?.name ?? "a conversation"
+            (id) => targets.find((target) => target.id === id)?.name ?? t("forward.aConversation")
         );
         if (refused.length === going.length) {
             setError(
                 refused.length === 1
-                    ? `It could not be sent to ${named[0]}.`
-                    : "It could not be sent to any of those."
+                    ? t("forward.notSentTo", { name: named[0] })
+                    : t("forward.notSentToAny")
             );
             return;
         }
@@ -289,7 +289,7 @@ export function ForwardDialog({
             // not, and saying "failed" would send it twice to everybody else.
             // So the ones that went are dropped from the choice and only the
             // ones that did not are left selected, ready to try again.
-            setError(`Sent, except to ${named.join(", ")}.`);
+            setError(t("forward.sentExceptTo", { names: named.join(", ") }));
             setChosen(refused);
             return;
         }
@@ -353,7 +353,7 @@ export function ForwardDialog({
                                                     chosen.includes(target.id)
                                             ) && (
                                                 <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[0.6875rem] text-primary">
-                                                    chosen
+                                                    {t("forward.chosen")}
                                                 </span>
                                             )}
                                             <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
@@ -406,7 +406,7 @@ export function ForwardDialog({
                                             </span>
                                             {chosen.includes(target.id) && (
                                                 <span className="shrink-0 text-[0.6875rem] text-primary">
-                                                    chosen
+                                                    {t("forward.chosen")}
                                                 </span>
                                             )}
                                         </PersonRow>

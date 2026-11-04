@@ -1299,7 +1299,12 @@
         "translatingNote": "Traduciendo tu nota...",
         "noteReview": "Tu nota, traducida",
         "noteGoesTo": "Para {names}",
-        "noteFailedFor": "Sin traducir para {names}. Va tal cual."
+        "noteFailedFor": "Sin traducir para {names}. Va tal cual.",
+        "aConversation": "una conversación",
+        "notSentTo": "No se pudo enviar a {name}.",
+        "notSentToAny": "No se pudo enviar a ninguno.",
+        "sentExceptTo": "Enviado, salvo a {names}.",
+        "chosen": "elegido"
     },
     "voiceNote": {
         "pause": "Pausar",

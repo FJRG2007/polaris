@@ -1299,7 +1299,12 @@
         "translatingNote": "Translating your note...",
         "noteReview": "Your note, translated",
         "noteGoesTo": "To {names}",
-        "noteFailedFor": "Not translated for {names}. It goes as written."
+        "noteFailedFor": "Not translated for {names}. It goes as written.",
+        "aConversation": "a conversation",
+        "notSentTo": "It could not be sent to {name}.",
+        "notSentToAny": "It could not be sent to any of those.",
+        "sentExceptTo": "Sent, except to {names}.",
+        "chosen": "chosen"
     },
     "voiceNote": {
         "pause": "Pause",
