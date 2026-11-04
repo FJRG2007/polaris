@@ -24,9 +24,3 @@ export const dnsPlan = (input: Parameters<typeof actions.planDnsAction>[0], sign
         signal
     );
 
-export const placements = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof actions.listPlacementsAction>>(
-        "/api/mail-server/placements",
-        {},
-        signal
-    );

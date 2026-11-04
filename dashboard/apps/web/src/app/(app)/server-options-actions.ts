@@ -19,16 +19,19 @@ import { readServerOptions, type ServerOptionsPage } from "@/lib/server-options"
 
 /** The screens that pick among one's own servers: databases read under
  *  `deploy.read`, runners and the rest of the server tools under `system.manage`,
- *  and an agent session's machine under `agents.manage`, as starting one is. */
+ *  an agent session's machine under `agents.manage` and a mail server's under
+ *  `mailserver.manage`, as starting either is. */
 async function mayPickServers(user: SessionUser, purpose: ServerPurpose | undefined): Promise<boolean> {
     if (purpose === "agentSession") return sessionCan(user, "agents.manage");
+    if (purpose === "mailServer") return sessionCan(user, "mailserver.manage");
     return (await sessionCan(user, "deploy.read")) || sessionCan(user, "system.manage");
 }
 
 /** What each purpose accepts, applied whatever the picker asked for. */
 const PURPOSE_FILTER: Record<ServerPurpose, ServerFilter> = {
     // A session starts only on a server that is enrolled and switched on.
-    agentSession: { active: true }
+    agentSession: { active: true },
+    mailServer: {}
 };
 
 export async function listServerOptionsAction(

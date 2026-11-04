@@ -321,8 +321,7 @@ vi.mock("@/app/(app)/admin/inbox/inbox-polls", () => {
 
 vi.mock("@/app/(app)/mail-server/mail-server-polls", () => ({
     serverDetail: forward(() => import("@/app/(app)/mail-server/actions"), "serverDetailAction", 1),
-    dnsPlan: forward(() => import("@/app/(app)/mail-server/actions"), "planDnsAction", 1),
-    placements: forward(() => import("@/app/(app)/mail-server/actions"), "listPlacementsAction", 0)
+    dnsPlan: forward(() => import("@/app/(app)/mail-server/actions"), "planDnsAction", 1)
 }));
 
 vi.mock("@/app/(app)/automations/automations-polls", () => ({

@@ -32,7 +32,7 @@ export const serverFilterSchema = z
 export type ServerFilter = z.infer<typeof serverFilterSchema>;
 
 /** Features that pick a server under their own grant rather than the server tools'. */
-export const serverPurposeSchema = z.enum(["agentSession"]);
+export const serverPurposeSchema = z.enum(["agentSession", "mailServer"]);
 export type ServerPurpose = z.infer<typeof serverPurposeSchema>;
 
 /** The machine Polaris runs on, offered under this id where a screen deploys to it

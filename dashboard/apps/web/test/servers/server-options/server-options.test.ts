@@ -169,6 +169,19 @@ describe("listServerOptionsAction", () => {
         expect(findMany).not.toHaveBeenCalled();
     });
 
+    it("reads a mail server's machines under the mail grant, this machine first", async () => {
+        findMany.mockResolvedValue([host(2)]);
+        sessionCan.mockImplementation(async (_user, permission) => permission === "mailserver.manage");
+        const result = await listServerOptionsAction({ purpose: "mailServer", includeLocal: true });
+        expect(sessionCan.mock.calls.map(([, permission]) => permission)).toEqual([
+            "mailserver.manage"
+        ]);
+        expect("items" in result && result.items.map((item) => item.id)).toEqual([
+            "local",
+            host(2).id
+        ]);
+    });
+
     it("keeps the purpose's narrowing even when the picker asks for a wider list", async () => {
         findMany.mockResolvedValue([]);
         await listServerOptionsAction({ purpose: "agentSession", filter: { active: false } });
