@@ -1295,7 +1295,11 @@
         "saySomethingAboutIt": "Di algo sobre él",
         "cancel": "Cancelar",
         "forward": "Reenviar",
-        "forwardTo": "Reenviar a {count}"
+        "forwardTo": "Reenviar a {count}",
+        "translatingNote": "Traduciendo tu nota...",
+        "noteReview": "Tu nota, traducida",
+        "noteGoesTo": "Para {names}",
+        "noteFailedFor": "Sin traducir para {names}. Va tal cual."
     },
     "voiceNote": {
         "pause": "Pausar",

@@ -26,17 +26,33 @@
  * is the kind of thing people stop bothering with.
  */
 
+import type { ChatSentTranslation } from "@polaris/core";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { forwardAction } from "./actions";
+import { sentRecord } from "./outgoing-translation";
 import { runAction } from "@/lib/run-action";
-import { useEffect, useMemo, useState } from "react";
+import { plainText } from "@/components/rich-text/excerpt";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { TranslationOutcome } from "@/lib/text-translation/queue";
+import { useTextTranslator } from "@/components/text-translation/provider";
+import { languageLabel } from "@/components/text-translation/language-select";
+import { translateMarkdown } from "@/components/rich-text/translate-markdown";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { listedTargets, type Target } from "./forward-targets";
 import { PersonName, PersonRow } from "@/components/person-name";
-import { ChevronLeft, ChevronRight, Forward, Hash, Loader2, Server, Volume2 } from "lucide-react";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Forward,
+    Hash,
+    Languages,
+    Loader2,
+    Server,
+    Volume2
+} from "lucide-react";
 import {
     Button,
     Dialog,
@@ -54,6 +70,39 @@ const TARGET_FIELDS: readonly SearchField<Target>[] = [
     { text: (target) => target.place }
 ];
 
+/**
+ * The note translated for the destinations that send in another language,
+ * one answer per language rather than per destination - four rooms that all
+ * go out in German ask once. Only ever on screen for the note and the choice
+ * it was asked for: changing either drops it.
+ */
+type NoteReview = {
+    readonly note: string;
+    readonly outcomes: ReadonlyMap<string, TranslationOutcome>;
+};
+
+/** What one destination is sent: its translation and the record of it, or
+ *  the note as written and no record. */
+function noteFor(
+    note: string,
+    to: string | null,
+    review: NoteReview | null
+): { note: string; translation?: ChatSentTranslation } {
+    const outcome = review && to ? review.outcomes.get(to) : undefined;
+    if (!review || !to || outcome?.kind !== "translated") return { note };
+    const translation = sentRecord(
+        {
+            source: review.note,
+            to,
+            phase: "ready",
+            text: outcome.text,
+            detected: outcome.detected
+        },
+        review.note
+    );
+    return translation ? { note: outcome.text, translation } : { note };
+}
+
 export function ForwardDialog({
     message,
     onOpenChange,
@@ -66,6 +115,8 @@ export function ForwardDialog({
     onSent: () => void;
 }) {
     const t = useTranslations("chat");
+    const locale = useLocale();
+    const translator = useTextTranslator();
     const { channels, spaces } = useChat();
     const [chosen, setChosen] = useState<readonly string[]>([]);
     /** The server being looked inside, or null at the top level. */
@@ -74,6 +125,19 @@ export function ForwardDialog({
     const [query, setQuery] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [translating, setTranslating] = useState(false);
+    const [review, setReview] = useState<NoteReview | null>(null);
+    /** Which translation is the current one; an answer for a note or a choice
+     *  since changed is dropped rather than shown. */
+    const asked = useRef(0);
+
+    /** Anything changed under a translation makes it a translation of
+     *  something else. */
+    const dropReview = () => {
+        asked.current += 1;
+        setReview(null);
+        setTranslating(false);
+    };
 
     /**
      * Nothing carried from the last time this was open.
@@ -94,6 +158,9 @@ export function ForwardDialog({
         setQuery("");
         setInside(null);
         setError("");
+        asked.current += 1;
+        setReview(null);
+        setTranslating(false);
     }, [message?.id]);
 
     const open = useMemo(() => channels.filter((channel) => !channel.archived), [channels]);
@@ -134,15 +201,60 @@ export function ForwardDialog({
 
     const openServers = !searching && !inside && spaces.length > 0;
 
-    const pick = (id: string) =>
+    const pick = (id: string) => {
+        dropReview();
         setChosen((current) =>
             current.includes(id) ? current.filter((one) => one !== id) : [...current, id]
         );
+    };
 
     /** Where it is actually going. */
     const going = chosen;
 
+    /** The language a destination sends this person's words out in, or null
+     *  where they go as written. Read tolerantly: a list cached before the
+     *  setting existed has no `translation` on its rows. */
+    const languageOf = (id: string): string | null =>
+        open.find((channel) => channel.id === id)?.translation?.outgoing ?? null;
+
+    /**
+     * Forward pressed. The note follows each destination's outgoing language
+     * the way the composer does: translated once per language, shown, and only
+     * then sent - nothing goes out translated without having been on screen.
+     * A destination already in that language, or one whose translation failed,
+     * gets the note as written and no record.
+     */
     const send = async () => {
+        if (!message || going.length === 0) return;
+        const text = note.trim();
+        const wanted =
+            translator && text
+                ? [...new Set(going.map(languageOf))].filter((to): to is string => to !== null)
+                : [];
+        if (!translator || wanted.length === 0) return deliver(null);
+        const ticket = ++asked.current;
+        setTranslating(true);
+        setError("");
+        const answers = await Promise.all(
+            wanted.map(async (to) => {
+                const outcome: TranslationOutcome = await translateMarkdown(text, (words) =>
+                    translator.translate(words, to)
+                ).catch(() => ({ kind: "failed", message: null }));
+                return [to, outcome] as const;
+            })
+        );
+        if (ticket !== asked.current) return;
+        setTranslating(false);
+        const outcomes = new Map(answers);
+        // Every one already in its language: there is nothing to choose.
+        if ([...outcomes.values()].every((outcome) => outcome.kind === "same"))
+            return deliver(null);
+        setReview({ note: text, outcomes });
+    };
+
+    /** Sends to every destination: each its translation when `translations`
+     *  holds one for its language, the note as written otherwise. */
+    const deliver = async (translations: NoteReview | null) => {
         if (!message || going.length === 0) return;
         setBusy(true);
         setError("");
@@ -151,13 +263,15 @@ export function ForwardDialog({
         // down and the person is told which one it was.
         const refused: string[] = [];
         for (const id of going) {
+            const words = noteFor(note, languageOf(id), translations);
             const result = await runAction(
-                () => forwardAction({ messageId: message.id, channelId: id, note }),
+                () => forwardAction({ messageId: message.id, channelId: id, ...words }),
                 () => undefined
             );
             if (!result || result.error) refused.push(id);
         }
         setBusy(false);
+        dropReview();
         const named = refused.map(
             (id) => targets.find((target) => target.id === id)?.name ?? "a conversation"
         );
@@ -306,8 +420,39 @@ export function ForwardDialog({
                         value={note}
                         placeholder={t("forward.saySomethingAboutItOptional")}
                         aria-label={t("forward.saySomethingAboutIt")}
-                        onChange={(event) => setNote(event.target.value)}
+                        onChange={(event) => {
+                            dropReview();
+                            setNote(event.target.value);
+                        }}
                     />
+
+                    {translating && (
+                        <p
+                            aria-live="polite"
+                            className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <Languages className="size-3.5 shrink-0" aria-hidden />
+                            <span className="min-w-0 truncate">{t("forward.translatingNote")}</span>
+                        </p>
+                    )}
+
+                    {review && (
+                        <NoteReviewPanel
+                            review={review}
+                            busy={busy}
+                            namesFor={(to) =>
+                                going
+                                    .filter((id) => languageOf(id) === to)
+                                    .map((id) => targets.find((target) => target.id === id)?.name)
+                                    .filter((name): name is string => Boolean(name))
+                                    .join(", ")
+                            }
+                            locale={locale}
+                            onKeepEditing={dropReview}
+                            onSendAsWritten={() => void deliver(null)}
+                            onSendTranslation={() => void deliver(review)}
+                        />
+                    )}
 
                     {error && (
                         <p role="alert" className="text-sm text-danger">
@@ -322,10 +467,10 @@ export function ForwardDialog({
                     </Button>
                     <Button
                         size="sm"
-                        disabled={busy || going.length === 0}
+                        disabled={busy || translating || review !== null || going.length === 0}
                         onClick={() => void send()}
                     >
-                        {busy ? (
+                        {busy || translating ? (
                             <Loader2 className="size-4 animate-spin" />
                         ) : (
                             <Forward className="size-4" />
@@ -337,6 +482,92 @@ export function ForwardDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * The note in each language it is about to go out in, before anything leaves.
+ * A language whose translation failed says so and that it goes as written; a
+ * language it was already in is not shown, since nothing changes there.
+ */
+function NoteReviewPanel({
+    review,
+    busy,
+    namesFor,
+    locale,
+    onKeepEditing,
+    onSendAsWritten,
+    onSendTranslation
+}: {
+    review: NoteReview;
+    busy: boolean;
+    namesFor: (to: string) => string;
+    locale: string;
+    onKeepEditing: () => void;
+    onSendAsWritten: () => void;
+    onSendTranslation: () => void;
+}) {
+    const t = useTranslations("chat");
+    const shown = [...review.outcomes].filter(([, outcome]) => outcome.kind !== "same");
+    const anyTranslated = shown.some(([, outcome]) => outcome.kind === "translated");
+    return (
+        <div
+            role="region"
+            aria-label={t("forward.noteReview")}
+            aria-live="polite"
+            className="flex flex-col gap-2 rounded-md border border-border bg-card px-3 py-2"
+        >
+            {shown.map(([to, outcome]) => {
+                const language = languageLabel(to, locale);
+                const names = namesFor(to);
+                return (
+                    <div key={to} className="flex min-w-0 flex-col gap-1">
+                        <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                            <Languages className="size-3.5 shrink-0" aria-hidden />
+                            <span className="min-w-0 truncate" title={names}>
+                                {outcome.kind === "translated"
+                                    ? t("translation.previewTitle", { language })
+                                    : t("forward.noteFailedFor", { names })}
+                            </span>
+                        </p>
+                        {outcome.kind === "translated" && (
+                            <>
+                                <p
+                                    className="truncate text-[0.6875rem] text-foreground-subtle"
+                                    title={names}
+                                >
+                                    {t("forward.noteGoesTo", { names })}
+                                </p>
+                                <p
+                                    data-testid="forward-note-translation"
+                                    className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-sm"
+                                >
+                                    {plainText(outcome.text)}
+                                </p>
+                            </>
+                        )}
+                    </div>
+                );
+            })}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button variant="ghost" size="xs" onClick={onKeepEditing}>
+                    {t("translation.keepEditing")}
+                </Button>
+                <Button
+                    variant={anyTranslated ? "outline" : "primary"}
+                    size="xs"
+                    disabled={busy}
+                    onClick={onSendAsWritten}
+                >
+                    {t("translation.sendAsWritten")}
+                </Button>
+                {anyTranslated && (
+                    <Button size="xs" disabled={busy} onClick={onSendTranslation} autoFocus>
+                        {t("translation.sendTranslation")}
+                    </Button>
+                )}
+            </div>
+        </div>
     );
 }
 
