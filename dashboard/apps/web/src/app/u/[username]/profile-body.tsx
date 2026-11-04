@@ -11,6 +11,7 @@ import { ProfileCard } from "./profile-card";
 import type { SessionUser } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
 import { NothingToShow } from "@/components/nothing-to-show";
+import { badgesFor } from "@/lib/badges/badge-service";
 import { publicProfile, profilesArePublic } from "@/lib/profile-service";
 
 export async function ProfileBody({
@@ -30,12 +31,16 @@ export async function ProfileBody({
         return <NothingToShow closed={closed} subject="profile" />;
     }
 
+    // The server decides which badges this viewer may see; the card only draws them.
+    const badges = await badgesFor(profile.id, viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null);
+
     return (
-        <Messages namespaces={["publicPages"]}>
+        <Messages namespaces={["publicPages", "badges"]}>
             <ProfileCard
                 profile={profile}
                 own={viewer?.id === profile.id}
                 signedIn={viewer !== null}
+                badges={badges}
             />
         </Messages>
     );
