@@ -9,7 +9,6 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requirePermission } from "@/lib/session";
-import { listHosts } from "@/lib/host-service";
 import { listConnections } from "@/lib/storage-service";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp, listInstalledApps, type InstalledAppView } from "@/lib/apps/install-service";
@@ -25,26 +24,9 @@ import { validationMessage } from "@/components/i18n/validation-message";
 const MARKETPLACE_PATH = "/apps/marketplace";
 const POLARIS_APPS_PATH = "/admin/apps";
 
-export interface InstallTarget {
-    id: string;
-    name: string;
-    kind: "local" | "host";
-}
-
 export interface StorageConnectionOption {
     id: string;
     name: string;
-}
-
-/** Servers an app can be installed on: the local host plus connected SSH hosts. */
-export async function listInstallTargetsAction(): Promise<InstallTarget[]> {
-    const user = await requirePermission("deploy.manage");
-    const [hosts, t] = await Promise.all([listHosts(user.id), getTranslations("marketplace")]);
-    return [
-        // Named in the reader's language, the way the storage choice beside it is.
-        { id: "local", name: t("wizard.thisServer"), kind: "local" },
-        ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
-    ];
 }
 
 /** NAS/storage connections a volume can be backed by. */

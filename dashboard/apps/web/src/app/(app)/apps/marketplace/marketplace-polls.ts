@@ -11,13 +11,6 @@ import type * as deployActionsModule from "@/app/(app)/apps/deploy/actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 
-export const installTargets = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof marketplaceActionsModule.listInstallTargetsAction>>(
-        "/api/marketplace/install-targets",
-        {},
-        signal
-    );
-
 export const storageConnections = (signal?: AbortSignal) =>
     readPoll<Answer<typeof marketplaceActionsModule.listStorageConnectionsAction>>(
         "/api/marketplace/storage-connections",

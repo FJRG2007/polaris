@@ -147,8 +147,6 @@ const actions = vi.hoisted(() => {
         "getWafRuleAction",
         "redeployStrategyAction",
         "planDnsAction",
-        "listPlacementsAction",
-        "listInstallTargetsAction",
         "listStorageConnectionsAction",
         "listTemplateTargetsAction",
         "probeRunnerHostAction",
@@ -452,7 +450,6 @@ vi.mock("@/app/(app)/apps/installed/[id]/actions", () => ({
     redeployStrategyAction: actions.redeployStrategyAction
 }));
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
-    listInstallTargetsAction: actions.listInstallTargetsAction,
     listStorageConnectionsAction: actions.listStorageConnectionsAction
 }));
 vi.mock("@/app/(app)/apps/runners/actions", () => ({
@@ -643,7 +640,6 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/apps/installed/redeploy-strategy": () =>
         import("@/app/api/apps/installed/redeploy-strategy/route"),
     "/api/mail-server/dns-plan": () => import("@/app/api/mail-server/dns-plan/route"),
-    "/api/marketplace/install-targets": () => import("@/app/api/marketplace/install-targets/route"),
     "/api/marketplace/storage-connections": () =>
         import("@/app/api/marketplace/storage-connections/route"),
     "/api/marketplace/template-targets": () =>
@@ -2323,18 +2319,6 @@ const CASES: Case[] = [
             ).dnsPlan({ kind: "sample" }),
         action: "planDnsAction",
         args: [{ kind: "sample" }]
-    },
-    {
-        name: "the machines an app can be installed on",
-        path: "/api/marketplace/install-targets",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/apps/marketplace/marketplace-polls")>(
-                    "@/app/(app)/apps/marketplace/marketplace-polls"
-                )
-            ).installTargets(),
-        action: "listInstallTargetsAction",
-        args: []
     },
     {
         name: "the storage an app's volumes can live on",

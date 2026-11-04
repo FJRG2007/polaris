@@ -28,7 +28,6 @@ vi.mock("@/app/(app)/apps/deploy/actions", () => ({
 }));
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     installAppAction: vi.fn(),
-    listInstallTargetsAction: vi.fn(async () => []),
     listStorageConnectionsAction: vi.fn(async () => [])
 }));
 vi.mock("@/app/(app)/apps/installed/[id]/actions", () => ({

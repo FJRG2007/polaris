@@ -671,11 +671,6 @@ vi.mock("@/app/(app)/apps/installed/[id]/installed-polls", () => ({
 }));
 
 vi.mock("@/app/(app)/apps/marketplace/marketplace-polls", () => ({
-    installTargets: forward(
-        () => import("@/app/(app)/apps/marketplace/actions"),
-        "listInstallTargetsAction",
-        0
-    ),
     storageConnections: forward(
         () => import("@/app/(app)/apps/marketplace/actions"),
         "listStorageConnectionsAction",
