@@ -3,7 +3,8 @@
  * a reading turns into a status chip. Client-safe - types only from the service.
  */
 
-import type { LanDetails } from "@polaris/core";
+import { LOCAL_SERVER_ID, type LanDetails } from "@polaris/core";
+import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import type { UpsReading } from "@/lib/ups/ups-reading";
 import type { UsbDiscovery, UpsReadResult, UpsView } from "@/lib/ups/ups-service";
 import type {
@@ -39,9 +40,10 @@ export interface UpsDetailAnswer {
 }
 
 /** A machine a UPS can be reached through or protect, by its metric subject id. */
-export interface UpsMachine {
-    id: string;
-    name: string;
+/** The server a UPS's machine subject names, as a server picker knows it -
+ *  the inverse of `hostSubject`. */
+export function serverOfMachine(subject: string): string {
+    return subject === LOCAL_HOST_SUBJECT ? LOCAL_SERVER_ID : subject;
 }
 
 export type UpsStatusKey =

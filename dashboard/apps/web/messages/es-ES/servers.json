@@ -908,7 +908,6 @@
             "belowCharge": "Bajo carga (%)",
             "belowRuntime": "Bajo autonomía (min)",
             "machines": "Máquinas",
-            "noMachines": "Aún no hay máquinas que proteger.",
             "save": "Guardar",
             "saved": "Guardado",
             "incomplete": "Elige al menos una máquina y un umbral.",

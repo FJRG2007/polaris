@@ -908,7 +908,6 @@
             "belowCharge": "Below charge (%)",
             "belowRuntime": "Below runtime (min)",
             "machines": "Machines",
-            "noMachines": "There are no machines to protect yet.",
             "save": "Save",
             "saved": "Saved",
             "incomplete": "Pick at least one machine and one threshold.",

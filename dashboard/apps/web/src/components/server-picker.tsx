@@ -11,10 +11,37 @@
  */
 
 import * as ui from "@polaris/ui";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { listServerOptionsAction } from "@/app/(app)/server-options-actions";
 import type { ServerFilter, ServerOption, ServerPurpose } from "@/lib/server-options-schema";
+
+/**
+ * The names of the servers a screen shows by id, read back for those ids only -
+ * how a row names its server without the screen holding the whole list. An id
+ * the reader may not use, or that is gone, has no name here.
+ */
+export function useServerNames(
+    ids: readonly string[],
+    includeLocal = false
+): Readonly<Record<string, string>> {
+    const key = [...new Set(ids)].sort().slice(0, 50).join(",");
+    const [names, setNames] = useState<Record<string, string>>({});
+    useEffect(() => {
+        if (!key) return;
+        let cancelled = false;
+        void listServerOptionsAction({ ids: key.split(","), includeLocal, limit: 50 }).then(
+            (page) => {
+                if (cancelled || "error" in page) return;
+                setNames(Object.fromEntries(page.items.map((one) => [one.id, one.name])));
+            }
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [key, includeLocal]);
+    return names;
+}
 
 /** The cache every server picker's pages live under. */
 export const SERVER_OPTIONS_CACHE = "servers:";

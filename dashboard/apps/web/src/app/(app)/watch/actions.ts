@@ -14,26 +14,45 @@ import {
     createAlarm,
     deleteAlarm,
     listAlarms,
-    listAlarmTargets,
     listRecentAlarmEvents,
     setAlarmEnabled,
     type AlarmEventView,
-    type AlarmTargets,
     type AlarmView
 } from "@/lib/watch-service";
+import { z } from "zod";
+import { pageFields } from "@/lib/deploy-target-options-schema";
+import type { OptionsPage } from "@/lib/deploy-target-options";
+import { alarmTargetOptions, type AlarmTargetOption } from "@/lib/watch/alarm-target-options";
 
 export async function watchStateAction(): Promise<{
     alarms: AlarmView[];
     events: AlarmEventView[];
-    targets: AlarmTargets;
 }> {
     const user = await requirePermission("deploy.read");
-    const [alarms, events, targets] = await Promise.all([
+    const [alarms, events] = await Promise.all([
         listAlarms(user.id),
-        listRecentAlarmEvents(user.id),
-        listAlarmTargets(user.id)
+        listRecentAlarmEvents(user.id)
     ]);
-    return { alarms, events, targets };
+    return { alarms, events };
+}
+
+const targetOptionsSchema = z
+    .object({ ...pageFields, kind: z.enum(["application", "host", "domain"]) })
+    .strict();
+
+/** A page of what the caller may put an alarm on - the scope `createAlarm` checks. */
+export async function alarmTargetOptionsAction(
+    input: unknown
+): Promise<OptionsPage<AlarmTargetOption> | { error: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = targetOptionsSchema.safeParse(input);
+    if (!parsed.success) return { items: [], next: null };
+    try {
+        return await alarmTargetOptions(user.id, parsed.data.kind, parsed.data);
+    } catch (caught) {
+        console.error("polaris: the alarm targets could not be read:", caught);
+        return { error: (await getTranslations("watch"))("alarms.targetsFailed") };
+    }
 }
 
 export async function createAlarmAction(

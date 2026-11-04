@@ -5261,6 +5261,7 @@ model Application {
     @@index([targetId])
     @@index([storageMode])
     @@index([binnedAt])
+    @@index([name, id])
 
     wireguardTunnels WireguardTunnel[]
     ciWait           DeployCiWait?
@@ -15572,6 +15573,7 @@ model Ups {
     actions                 UpsAction[]
 
     @@index([placeId])
+    @@index([name, id])
 }
 
 // Something a UPS did: a status flag that rose, a test, a lost link, a

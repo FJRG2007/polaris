@@ -10,15 +10,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { alarmInputSchema } from "@/lib/watch/watch-schema";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { alarmStateWord, metricWord, thresholdWords, watchText } from "@/lib/watch/words";
 import { Activity, Bell, BellOff, Loader2, Plus, Share2, Trash2 } from "lucide-react";
 import { ShareDialog } from "@/components/access/share-dialog";
-import type { AlarmEventView, AlarmTargets, AlarmView } from "@/lib/watch-service";
-import { createAlarmAction, deleteAlarmAction, setAlarmEnabledAction } from "./actions";
+import type { AlarmEventView, AlarmView } from "@/lib/watch-service";
+import type { AlarmTargetOption } from "@/lib/watch/alarm-target-options";
+import { PagedPicker } from "@/components/paged-picker";
+import {
+    alarmTargetOptionsAction,
+    createAlarmAction,
+    deleteAlarmAction,
+    setAlarmEnabledAction
+} from "./actions";
 import {
     ALARM_TARGET_TYPES,
     alarmUnit,
@@ -53,12 +60,10 @@ function stateTone(state: string): string | undefined {
 export function WatchView({
     initialAlarms,
     initialEvents,
-    targets,
     routes
 }: {
     initialAlarms: AlarmView[];
     initialEvents: AlarmEventView[];
-    targets: AlarmTargets;
     /** Where a firing alarm is currently sent, by the account's rules. */
     routes: string[];
 }) {
@@ -67,14 +72,6 @@ export function WatchView({
     const t = useTranslations("watch");
     const [creating, setCreating] = useState(false);
     const [sharing, setSharing] = useState<AlarmView | null>(null);
-
-    const targetName = useMemo(() => {
-        const map = new Map<string, string>();
-        for (const app of targets.apps) map.set(app.id, app.name);
-        for (const host of targets.hosts) map.set(host.id, host.name);
-        for (const domain of targets.domains) map.set(domain.id, domain.hostname);
-        return map;
-    }, [targets]);
 
     function describe(alarm: AlarmView): string {
         if (alarmUnit(alarm.metric, alarm.targetType)) {
@@ -137,7 +134,6 @@ export function WatchView({
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {t("alarms.line", {
                                                     target:
-                                                        targetName.get(alarm.targetId) ??
                                                         alarm.targetLabel ??
                                                         t("alarms.unknownTarget"),
                                                     summary: describe(alarm)
@@ -260,7 +256,6 @@ export function WatchView({
 
             {creating && (
                 <CreateAlarmDialog
-                    targets={targets}
                     onClose={() => setCreating(false)}
                     onCreated={() => {
                         setCreating(false);
@@ -272,40 +267,29 @@ export function WatchView({
     );
 }
 
-function CreateAlarmDialog({
-    targets,
-    onClose,
-    onCreated
-}: {
-    targets: AlarmTargets;
-    onClose: () => void;
-    onCreated: () => void;
-}) {
+function CreateAlarmDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
     const t = useTranslations("watch");
     const tcommon = useTranslations("common");
     const [pending, startTransition] = useTransition();
     const [name, setName] = useState("");
     const [targetType, setTargetType] = useState<AlarmTargetType>("application");
     const [targetId, setTargetId] = useState("");
+    const [chosen, setChosen] = useState<AlarmTargetOption | null>(null);
     const [metric, setMetric] = useState<AlarmMetric>("cpu");
     const [operator, setOperator] = useState<"gt" | "lt">("gt");
     const [threshold, setThreshold] = useState("80");
     const [forPeriods, setForPeriods] = useState("2");
     const [error, setError] = useState<string | null>(null);
 
-    const options =
-        targetType === "application"
-            ? targets.apps.map((a) => ({ value: a.id, label: a.name }))
-            : targetType === "host"
-              ? targets.hosts.map((h) => ({ value: h.id, label: h.name }))
-              : targets.domains.map((d) => ({ value: d.id, label: d.hostname }));
-    const chosenHost =
-        targetType === "host" ? targets.hosts.find((host) => host.id === targetId) : undefined;
+    const chosenHost = targetType === "host" ? chosen : null;
     const metricOptions = metricsFor(targetType)
         // A server reached over SSH has no disk reading to judge.
         .filter(
             (entry) =>
-                entry !== "disk" || targetType !== "host" || !chosenHost || chosenHost.measuresDisk
+                entry !== "disk" ||
+                targetType !== "host" ||
+                !chosenHost ||
+                chosenHost.measuresDisk !== false
         )
         .map((entry) => ({ value: entry, label: metricWord(t, entry) }));
     const unit = alarmUnit(metric, targetType);
@@ -366,6 +350,7 @@ function CreateAlarmDialog({
                                 const next = value as AlarmTargetType;
                                 setTargetType(next);
                                 setTargetId("");
+                                setChosen(null);
                                 chooseMetric(metricsFor(next)[0] ?? "cpu", next);
                             }}
                             options={ALARM_TARGET_TYPES.map((type) => ({
@@ -376,20 +361,26 @@ function CreateAlarmDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t(`labels.target.${targetType}`)}</span>
-                        <Select
-                            value={targetId}
-                            onValueChange={(value) => {
+                        <PagedPicker
+                            read={alarmTargetOptionsAction}
+                            scope={{ kind: targetType }}
+                            cache="watch:alarm-targets"
+                            value={targetId || null}
+                            onValueChange={(value, item) => {
                                 setTargetId(value);
+                                setChosen(item);
                                 // A disk alarm cannot stay on a server that has no disk reading.
-                                const host =
-                                    targetType === "host"
-                                        ? targets.hosts.find((entry) => entry.id === value)
-                                        : undefined;
-                                if (metric === "disk" && host && !host.measuresDisk)
+                                if (
+                                    metric === "disk" &&
+                                    targetType === "host" &&
+                                    item?.measuresDisk === false
+                                )
                                     chooseMetric("cpu");
                             }}
                             placeholder={t("alarms.chooseOne")}
-                            options={options}
+                            searchPlaceholder={t("alarms.targetSearch")}
+                            emptyText={t("alarms.targetsNone")}
+                            aria-label={t(`labels.target.${targetType}`)}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">

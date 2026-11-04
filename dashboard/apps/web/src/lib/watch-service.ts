@@ -28,8 +28,7 @@ export interface AlarmView {
     carriedToId: string | null;
     /** Somebody else's alarm, shared with this reader to watch and nothing more. */
     shared?: boolean;
-    /** What a shared alarm watches, by name: the reader's own targets do not
-     *  hold it. */
+    /** What the alarm watches, by name; null when it is gone. */
     targetLabel?: string | null;
 }
 
@@ -128,14 +127,18 @@ export async function listAlarms(ownerId: string): Promise<AlarmView[]> {
         grantedSubjects(ownerId, "watch.alarm")
     ]);
     const lent = [...granted.keys()];
-    if (lent.length === 0) return rows.map(toView);
-    const shared = await prisma.alarm.findMany({
-        where: { id: { in: lent }, ownerId: { not: ownerId } },
-        orderBy: { createdAt: "desc" }
-    });
-    const labels = await targetLabels(shared);
+    const shared =
+        lent.length === 0
+            ? []
+            : await prisma.alarm.findMany({
+                  where: { id: { in: lent }, ownerId: { not: ownerId } },
+                  orderBy: { createdAt: "desc" }
+              });
+    // Only the targets of the alarms shown are named - never the whole list of
+    // everything that could be watched.
+    const labels = await targetLabels([...rows, ...shared]);
     return [
-        ...rows.map(toView),
+        ...rows.map((row) => ({ ...toView(row), targetLabel: labels.get(row.targetId) ?? null })),
         ...shared.map((row) => ({
             ...toView(row),
             shared: true,
@@ -150,7 +153,10 @@ async function targetLabels(
 ): Promise<Map<string, string>> {
     const ids = (type: string) =>
         rows.filter((row) => row.targetType === type).map((row) => row.targetId);
-    const [hosts, apps, domains] = await Promise.all([
+    const local = rows.some(
+        (row) => row.targetType === "host" && row.targetId === LOCAL_HOST_SUBJECT
+    );
+    const [hosts, apps, domains, localName] = await Promise.all([
         prisma.host.findMany({
             where: { id: { in: ids("host") } },
             select: { id: true, name: true }
@@ -162,9 +168,11 @@ async function targetLabels(
         prisma.domain.findMany({
             where: { id: { in: ids("domain") } },
             select: { id: true, hostname: true }
-        })
+        }),
+        local ? getLocalServerName().catch(() => null) : null
     ]);
     return new Map([
+        ...(local ? [[LOCAL_HOST_SUBJECT, localName ?? LOCAL_SERVER_FALLBACK_NAME] as const] : []),
         ...hosts.map((one) => [one.id, one.name] as const),
         ...apps.map((one) => [one.id, one.name] as const),
         ...domains.map((one) => [one.id, one.hostname] as const)

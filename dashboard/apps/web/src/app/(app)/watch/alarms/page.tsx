@@ -15,16 +15,15 @@ import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { ruleFor } from "@/lib/notifications/preferences";
 import { listDestinations } from "@/lib/notifications/destinations";
-import { listAlarms, listAlarmTargets, listRecentAlarmEvents } from "@/lib/watch-service";
+import { listAlarms, listRecentAlarmEvents } from "@/lib/watch-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function WatchPage() {
     const user = await requirePermission("deploy.read");
-    const [alarms, events, targets, rule, destinations, t] = await Promise.all([
+    const [alarms, events, rule, destinations, t] = await Promise.all([
         listAlarms(user.id),
         listRecentAlarmEvents(user.id),
-        listAlarmTargets(user.id),
         ruleFor(user.id, "watch.alarm"),
         listDestinations(user.id),
         getTranslations("watch")
@@ -38,5 +37,5 @@ export default async function WatchPage() {
         ...destinations.filter((entry) => rule.destinations.includes(entry.id)).map((entry) => entry.name)
     ];
 
-    return <WatchView initialAlarms={alarms} initialEvents={events} targets={targets} routes={routes} />;
+    return <WatchView initialAlarms={alarms} initialEvents={events} routes={routes} />;
 }

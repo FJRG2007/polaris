@@ -21,7 +21,9 @@ import {
     SegmentedControl,
     Select
 } from "@polaris/ui";
-import type { UpsMachine } from "./ups-words";
+import { serverOfMachine } from "./ups-words";
+import { hostSubject } from "@/lib/metrics-shared";
+import { ServerPicker, useServerNames } from "@/components/server-picker";
 import * as upsReading from "@/lib/ups/ups-reading";
 import type { UpsView, UsbOffer } from "@/lib/ups/ups-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -126,7 +128,6 @@ export function UpsConnectionDialog({
     open,
     onOpenChange,
     editing,
-    machines,
     offers,
     onSaved
 }: {
@@ -134,7 +135,6 @@ export function UpsConnectionDialog({
     onOpenChange: (open: boolean) => void;
     /** The UPS being changed; null adds a new one. */
     editing: UpsView | null;
-    machines: readonly UpsMachine[];
     offers: readonly UsbOffer[];
     onSaved: (id: string) => void;
 }) {
@@ -174,8 +174,11 @@ export function UpsConnectionDialog({
         return key ? t(`ups.errors.${key}`) : null;
     };
 
-    const machineOptions = machines.map((machine) => ({ value: machine.id, label: machine.name }));
-    const machineName = (id: string) => machines.find((machine) => machine.id === id)?.name ?? id;
+    const names = useServerNames(
+        offers.map((offer) => serverOfMachine(offer.machineId)),
+        true
+    );
+    const machineName = (id: string) => names[serverOfMachine(id)] ?? id;
     const offerOptions = offers.map((offer) => ({
         value: `${offer.machineId}/${offer.deviceId}`,
         label: `${offer.name} (${machineName(offer.machineId)})`
@@ -286,12 +289,12 @@ export function UpsConnectionDialog({
                     {values.connection === "snmp" ? (
                         <label className="flex min-w-0 flex-col gap-1 text-sm">
                             <span>{t("ups.form.machine")} *</span>
-                            <Select
+                            <ServerPicker
                                 aria-label={t("ups.form.machine")}
                                 placeholder={t("ups.form.pickMachine")}
-                                value={values.machineId}
-                                options={machineOptions}
-                                onValueChange={(value) => set("machineId", value)}
+                                includeLocal
+                                value={values.machineId ? serverOfMachine(values.machineId) : null}
+                                onValueChange={(value) => set("machineId", hostSubject(value))}
                             />
                         </label>
                     ) : null}

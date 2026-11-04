@@ -20,17 +20,12 @@ import { UpsConnectionDialog } from "./ups-connection-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, EmptyState, LanDetails, PageHeader, Skeleton } from "@polaris/ui";
-import { minutesLeft, rounded, upsStatus, type UpsListAnswer, type UpsMachine } from "./ups-words";
+import { useServerNames } from "@/components/server-picker";
+import { minutesLeft, rounded, serverOfMachine, upsStatus, type UpsListAnswer } from "./ups-words";
 
 const POLL_MS = 10_000;
 
-export function UpsListView({
-    machines,
-    places
-}: {
-    machines: UpsMachine[];
-    places: { id: string; name: string }[];
-}) {
+export function UpsListView({ places }: { places: { id: string; name: string }[] }) {
     const t = useTranslations("servers");
     const router = useRouter();
     const [adding, setAdding] = useState(false);
@@ -44,8 +39,11 @@ export function UpsListView({
     });
     const data = live.data;
     const offers: UsbOffer[] = data?.usb.offers ?? [];
-    const machineName = (id: string | null) =>
-        machines.find((machine) => machine.id === id)?.name ?? "";
+    const names = useServerNames(
+        offers.map((offer) => serverOfMachine(offer.machineId)),
+        true
+    );
+    const machineName = (id: string | null) => (id ? (names[serverOfMachine(id)] ?? "") : "");
 
     const placeName = (id: string | null) => places.find((place) => place.id === id)?.name ?? "";
 
@@ -304,7 +302,6 @@ export function UpsListView({
                         open
                         onOpenChange={setAdding}
                         editing={null}
-                        machines={machines}
                         offers={offers}
                         onSaved={(id) => router.push(`/places/ups/${id}`)}
                     />
