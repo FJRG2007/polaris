@@ -156,3 +156,13 @@ export async function hasOtherServer(ownerId: string, exceptId: string | null): 
     });
     return row !== null;
 }
+
+/** Whether the owner has a server a picker under `filter` would offer - one bounded
+ *  read, which is all a screen needs to choose between the picker and its empty state. */
+export async function hasServerOption(ownerId: string, filter: ServerFilter = {}): Promise<boolean> {
+    const row = await prisma.host.findFirst({
+        where: serverOptionsWhere(ownerId, "", filter),
+        select: { id: true }
+    });
+    return row !== null;
+}

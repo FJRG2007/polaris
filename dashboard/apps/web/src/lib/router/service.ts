@@ -21,8 +21,6 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { openText, sealText } from "@/lib/tls/managed-certificates";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";
 
-/** The most machines offered: the picker searches within these. */
-const MACHINE_CHOICES = 1000;
 /** How long Polaris keeps trying to come back, inside the machine's own timer. */
 const CONFIRM_MS = 100_000;
 const CONFIRM_POLL_MS = 3_000;
@@ -167,20 +165,20 @@ async function probe(connection: HostConnection): Promise<RouterReading> {
     return readProbe(await runScript(connection, plans.PROBE_SCRIPT));
 }
 
-/** The machines that could be a router, for the picker. */
-export async function routerMachines(ownerId: string): Promise<RouterMachine[]> {
-    const hosts = await prisma.host.findMany({
-        where: { ownerId },
-        select: { id: true, name: true, address: true, username: true, sudo: true },
-        orderBy: { name: "asc" },
-        take: MACHINE_CHOICES
-    });
-    return hosts.map(({ id, name, address, username, sudo }) => ({
-        id,
-        name,
-        address,
-        root: sudo || username === "root"
-    }));
+/** Whether there is any machine at all, and the first one that could be a router -
+ *  what the screen opens on. Two bounded reads; the picker pages the rest. */
+export async function routerStart(
+    ownerId: string
+): Promise<{ hasMachines: boolean; first: RouterMachine | null }> {
+    const [any, first] = await Promise.all([
+        prisma.host.findFirst({ where: { ownerId }, select: { id: true } }),
+        prisma.host.findFirst({
+            where: { ownerId, OR: [{ sudo: true }, { username: "root" }] },
+            select: { id: true, name: true, address: true },
+            orderBy: [{ name: "asc" }, { id: "asc" }]
+        })
+    ]);
+    return { hasMachines: any !== null, first: first ? { ...first, root: true } : null };
 }
 
 /** One machine's plan and how it stands now. A machine that does not answer still

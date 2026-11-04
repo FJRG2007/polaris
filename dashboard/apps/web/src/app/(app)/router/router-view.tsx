@@ -19,6 +19,7 @@ import { dhcpRange } from "@/lib/vpn/networks";
 import { ForwardDialog } from "./forward-dialog";
 import { useVpnRead } from "../vpn/use-vpn-read";
 import { HelpNote, whoIs } from "./router-field";
+import { ServerPicker } from "@/components/server-picker";
 import type { RouterView } from "@/lib/router/service";
 import type { RouterReading } from "@/lib/router/read";
 import { useDisplayFormat } from "@/components/display-format";
@@ -130,13 +131,15 @@ const PROBLEMS = [
 
 type Translate = ReturnType<typeof useTranslations>;
 
+/** Making a machine a router needs root on it. */
+const ROOT_ONLY = { root: true } as const;
+
 export function RouterSection() {
     const t = useTranslations("router");
     const list = useVpnRead("router:machines", actions.listMachinesAction, t("errors.generic"));
-    const machines = list.data?.machines ?? null;
+    const start = list.data ?? null;
     const [hostId, setHostId] = useState("");
-    const usable = machines?.filter(({ root }) => root) ?? [];
-    const chosen = hostId || usable[0]?.id || "";
+    const chosen = hostId || start?.first?.id || "";
 
     return (
         <div className="flex flex-col gap-4">
@@ -152,9 +155,9 @@ export function RouterSection() {
                 </HelpNote>
             </div>
             {list.error ? <p className="text-sm text-danger">{list.error}</p> : null}
-            {machines === null ? (
+            {start === null ? (
                 <ui.Skeleton className="h-8 w-64 max-w-full" />
-            ) : machines.length === 0 ? (
+            ) : !start.hasMachines ? (
                 <ui.EmptyState
                     title={t("noMachines")}
                     description={t("noMachinesBody")}
@@ -168,20 +171,17 @@ export function RouterSection() {
                 <>
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <span className="text-sm font-medium">{t("machine")}</span>
-                        <ui.Select
+                        <ServerPicker
                             className="w-64 max-w-full"
                             aria-label={t("machine")}
-                            value={chosen}
+                            value={chosen || null}
+                            selectedLabel={chosen === start.first?.id ? start.first.name : undefined}
                             placeholder={t("pickMachine")}
+                            filter={ROOT_ONLY}
                             onValueChange={setHostId}
-                            options={machines.map(({ id, name, root }) => ({
-                                value: id,
-                                label: name,
-                                disabled: !root
-                            }))}
                         />
                     </div>
-                    {usable.length === 0 ? (
+                    {start.first === null ? (
                         <p className="text-sm text-muted-foreground">{t("noRoot")}</p>
                     ) : null}
                     {chosen ? (

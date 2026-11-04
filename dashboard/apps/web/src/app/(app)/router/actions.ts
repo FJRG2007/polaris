@@ -29,7 +29,10 @@ async function failed(error: unknown): Promise<{ error: string }> {
 }
 
 export interface MachinesAnswer {
-    readonly machines: service.RouterMachine[];
+    /** Whether there is any server at all. */
+    readonly hasMachines: boolean;
+    /** The first server Polaris holds root on - what the screen opens on. */
+    readonly first: service.RouterMachine | null;
     /** Subnets of the VPN's private networks, offered when adding a network. */
     readonly privateNetworks: { name: string; cidr: string; routerAddress: string }[];
 }
@@ -37,12 +40,12 @@ export interface MachinesAnswer {
 export async function listMachinesAction(): Promise<Result<MachinesAnswer>> {
     const user = await requireAdmin();
     try {
-        const [machines, networks] = await Promise.all([
-            service.routerMachines(user.id),
+        const [start, networks] = await Promise.all([
+            service.routerStart(user.id),
             storedNetworks().catch(() => [])
         ]);
         return {
-            machines,
+            ...start,
             privateNetworks: networks.map(({ name, cidr, routerAddress }) => ({
                 name,
                 cidr,
