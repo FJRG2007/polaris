@@ -693,16 +693,25 @@ describe("the screen's view", () => {
             switchedAt: new Date(NOW - 60_000),
             checks: JSON.stringify({ checkedAt: new Date().toISOString() })
         });
-        const fresh = await service.cutoverPanel("domain-1", null);
+        const fresh = await service.cutoverPanel("domain-1");
         expect(state.probes).toBe(0);
         expect(fresh.cutover?.phase).toBe("propagating");
 
         state.rows.get("c1")!.checks = JSON.stringify({
             checkedAt: new Date(NOW - 60_000).toISOString()
         });
-        const checked = await service.cutoverPanel("domain-1", null);
+        const checked = await service.cutoverPanel("domain-1");
         expect(state.probes).toBe(1);
         expect(checked.cutover?.phase).toBe("done");
-        expect(checked.targets.map((target) => target.id)).toEqual(["app-old", "app-new"]);
+    });
+
+    it("offers the services it may move to a page at a time", async () => {
+        const page = await service.cutoverTargets("domain-1", null, {
+            query: "",
+            cursor: null,
+            limit: 1
+        });
+        expect(page.items.map((target) => target.id)).toEqual(["app-old"]);
+        expect(page.next).not.toBeNull();
     });
 });

@@ -9,6 +9,7 @@
 
 import * as ui from "@polaris/ui";
 import { useCallback } from "react";
+import { usePaged } from "@/components/paged-picker";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     listDeployTargetOptionsAction,
@@ -19,31 +20,6 @@ import type {
     DeployTargetScope,
     ServiceOption
 } from "@/lib/deploy-target-options-schema";
-
-type Reader<T> = (
-    input: Record<string, unknown>
-) => Promise<{ items: T[]; next: string | null } | { error: string }>;
-
-/** A page loader and an id resolver over one action, keyed by what is asked. */
-function usePaged<T>(read: Reader<T>, scope: Record<string, unknown>) {
-    const key = JSON.stringify(scope);
-    const load = useCallback<ui.AsyncLoad<T>>(
-        async ({ query, cursor }) => {
-            const result = await read({ ...JSON.parse(key), query, cursor });
-            if ("error" in result) throw new Error(result.error);
-            return result;
-        },
-        [key, read]
-    );
-    const resolve = useCallback(
-        async (id: string) => {
-            const result = await read({ ...JSON.parse(key), ids: [id] });
-            return "error" in result ? null : (result.items[0] ?? null);
-        },
-        [key, read]
-    );
-    return { load, resolve, key };
-}
 
 interface PickerProps<T> {
     value: string | null;
@@ -60,17 +36,21 @@ interface PickerProps<T> {
 /** One deploy server; this machine is labelled with `localLabel` when given. */
 export function DeployTargetPicker({
     scope,
+    projectId,
     localLabel,
     placeholder,
     ...rest
 }: PickerProps<DeployTargetOption> & {
     scope: DeployTargetScope;
+    /** The project whose owner's servers scope `project` reads. */
+    projectId?: string;
     localLabel?: (name: string) => string;
 }) {
     const t = useTranslations("components");
-    const { load, resolve, key } = usePaged<DeployTargetOption>(listDeployTargetOptionsAction, {
-        scope
-    });
+    const { load, resolve, key } = usePaged<DeployTargetOption>(
+        listDeployTargetOptionsAction,
+        projectId ? { scope, projectId } : { scope }
+    );
     const label = useCallback(
         (target: DeployTargetOption) =>
             target.local && localLabel ? localLabel(target.name) : target.name,

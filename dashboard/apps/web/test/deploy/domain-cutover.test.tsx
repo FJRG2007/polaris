@@ -16,12 +16,16 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 const DOMAIN = "0192f1e2-7b5c-7d3e-8f00-00000000000d";
 const TARGET = "0192f1e2-7b5c-7d3e-8f00-0000000000a2";
 const HOST = "shop.example.com";
+const TARGETS = vi.hoisted(() => [
+    { id: "0192f1e2-7b5c-7d3e-8f00-0000000000a2", name: "shop-v2", environment: "production" }
+]);
 
 const actions = vi.hoisted(() => ({
     cutoverPanelAction: vi.fn(async (_domainId: string): Promise<CutoverReply> => ({})),
     startCutoverAction: vi.fn(async (_input: unknown): Promise<CutoverReply> => ({})),
     switchCutoverAction: vi.fn(async (_domainId: string): Promise<CutoverReply> => ({})),
-    rollbackCutoverAction: vi.fn(async (_domainId: string): Promise<CutoverReply> => ({}))
+    rollbackCutoverAction: vi.fn(async (_domainId: string): Promise<CutoverReply> => ({})),
+    cutoverTargetOptionsAction: vi.fn(async (_input: unknown) => ({ items: TARGETS, next: null }))
 }));
 
 vi.mock("@/app/(app)/apps/deploy/dns-cutover-actions", () => actions);
@@ -30,8 +34,6 @@ afterEach(() => {
     cleanup();
     vi.clearAllMocks();
 });
-
-const TARGETS = [{ id: TARGET, name: "shop-v2", environment: "production" }];
 
 function view(overrides: Partial<CutoverView> = {}): CutoverView {
     return {
@@ -71,7 +73,7 @@ function view(overrides: Partial<CutoverView> = {}): CutoverView {
 let opened = 0;
 
 async function open(cutover: CutoverView | null, canManage = true) {
-    actions.cutoverPanelAction.mockResolvedValue({ panel: { cutover, targets: TARGETS } });
+    actions.cutoverPanelAction.mockResolvedValue({ panel: { cutover } });
     const domainId = `${DOMAIN.slice(0, -2)}${String(opened++).padStart(2, "0")}`;
     render(
         <DomainCutoverButton
@@ -115,7 +117,7 @@ describe("moving a domain to another service", () => {
         const dialog = await screen.findByRole("dialog");
         expect(within(dialog).getByText(`Move ${HOST}`)).toBeTruthy();
         expect(dialog.querySelector("[aria-busy='true']")).not.toBeNull();
-        answer({ panel: { cutover: null, targets: TARGETS } });
+        answer({ panel: { cutover: null } });
         await waitFor(() => expect(within(dialog).getByText("Check and start")).toBeTruthy());
         expect(dialog.querySelector("[aria-busy='true']")).toBeNull();
     });
@@ -124,7 +126,7 @@ describe("moving a domain to another service", () => {
         await open(null);
         const dialog = await screen.findByRole("dialog");
         await waitFor(() =>
-            expect(within(dialog).getByRole("combobox", { name: "Move to" })).toBeTruthy()
+            expect(within(dialog).getByRole("button", { name: "Move to" })).toBeTruthy()
         );
         expect(
             within(dialog).getByRole("button", { name: "Check and start" }).hasAttribute("disabled")
