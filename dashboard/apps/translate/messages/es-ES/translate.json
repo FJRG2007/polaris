@@ -1,6 +1,6 @@
 {
     "title": "Traductor",
-    "description": "Traduce texto, imágenes, documentos y voz a otro idioma.",
+    "description": "Traduce textos, imágenes, documentos, voz y páginas web a otro idioma.",
     "pane": {
         "source": "Texto que traducir",
         "target": "Traducción",
@@ -112,7 +112,10 @@
         "image": "Imágenes",
         "document": "Documentos",
         "audio": "Audio",
-        "camera": "Cámara"
+        "camera": "Cámara",
+        "video": "Vídeo",
+        "conversation": "Conversación",
+        "website": "Sitio web"
     },
     "reads": {
         "imagesManager": "Leer imágenes necesita un modelo de Polar que lea imágenes.",
@@ -172,5 +175,37 @@
         "another": "Traducir otro",
         "preview": "Extracto",
         "cancel": "Cancelar"
+    },
+    "input": {
+        "attach": "Adjuntar archivo",
+        "attachTitle": "Traducir un archivo",
+        "camera": "Traducir con la cámara",
+        "conversation": "Iniciar conversación",
+        "website": "Traducir un sitio web",
+        "translateSite": "Traducir este sitio web",
+        "drop": "Suelta el archivo para traducirlo",
+        "backToText": "Volver al texto",
+        "unsupported": "Ese archivo no se puede traducir aquí",
+        "dictate": "Dictar",
+        "dictateStop": "Dejar de dictar",
+        "dictateUnavailable": "El dictado no está disponible aquí"
+    },
+    "website": {
+        "address": "Dirección del sitio",
+        "placeholder": "ejemplo.com/pagina",
+        "translate": "Traducir",
+        "close": "Cerrar el sitio web",
+        "invalid": "Escribe una dirección web que empiece por http o https.",
+        "unreachable": "No se pudo acceder a esa página.",
+        "notPage": "Esa dirección no es una página web.",
+        "tooLarge": "Esa página es demasiado grande para traducirla.",
+        "empty": "Esa página no tiene texto que traducir.",
+        "view": "Ver",
+        "translation": "Traducción",
+        "original": "Original",
+        "progress": "Traduciendo {done} de {total}",
+        "openOriginal": "Abrir original",
+        "fetching": "Obteniendo la página",
+        "hint": "Escribe la dirección de una página para leerla en otro idioma."
     }
 }

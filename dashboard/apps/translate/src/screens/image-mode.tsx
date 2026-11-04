@@ -29,11 +29,14 @@ type View = "overlay" | "side";
 export function ImageMode({
     translate,
     reads,
-    manager
+    manager,
+    file
 }: {
     translate: Translate;
     reads: Reads;
     manager: boolean;
+    /** A file handed over by the box (dropped, pasted or chosen), opened on arrival. */
+    file?: File | null;
 }) {
     const t = useTranslateT();
     const [chooseFiles, chooser] = useChooseFiles();
@@ -99,21 +102,11 @@ export function ImageMode({
         return () => controller.abort();
     }, [lines, translate]);
 
-    // A picture pasted anywhere on the page while this mode is open.
+    // The box hands a picture over; a newer one replaces it.
     useEffect(() => {
-        const paste = (event: ClipboardEvent) => {
-            const item = [...(event.clipboardData?.items ?? [])].find((entry) =>
-                entry.type.startsWith("image/")
-            );
-            const file = item?.getAsFile();
-            if (!file) return;
-            event.preventDefault();
-            void open(file);
-        };
-        window.addEventListener("paste", paste);
-        return () => window.removeEventListener("paste", paste);
+        if (file) void open(file);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- open reads the latest state itself
-    }, [reads.images]);
+    }, [file]);
 
     useEffect(() => {
         const element = picture.current;

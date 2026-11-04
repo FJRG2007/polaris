@@ -71,11 +71,14 @@ type Phase =
 export function DocumentMode({
     translate,
     charLimit,
-    to
+    to,
+    file
 }: {
     translate: Translate;
     charLimit: number | null;
     to: string;
+    /** A file handed over by the box (dropped, pasted or chosen), opened on arrival. */
+    file?: File | null;
 }) {
     const t = useTranslateT();
     const [chooseFiles, chooser] = useChooseFiles();
@@ -139,6 +142,11 @@ export function DocumentMode({
             );
         }
     };
+
+    useEffect(() => {
+        if (file) void open(file);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per file handed over
+    }, [file]);
 
     const cancel = () => {
         running.current?.abort();

@@ -1,6 +1,6 @@
 {
     "title": "Translate",
-    "description": "Translate text, pictures, documents and speech into another language.",
+    "description": "Translate text, pictures, documents, speech and web pages into another language.",
     "pane": {
         "source": "Text to translate",
         "target": "Translation",
@@ -112,7 +112,10 @@
         "image": "Images",
         "document": "Documents",
         "audio": "Audio",
-        "camera": "Camera"
+        "camera": "Camera",
+        "video": "Video",
+        "conversation": "Conversation",
+        "website": "Website"
     },
     "reads": {
         "imagesManager": "Reading pictures needs a Polar model that can read images.",
@@ -172,5 +175,37 @@
         "another": "Translate another",
         "preview": "Preview",
         "cancel": "Cancel"
+    },
+    "input": {
+        "attach": "Attach a file",
+        "attachTitle": "Translate a file",
+        "camera": "Translate with the camera",
+        "conversation": "Have a conversation",
+        "website": "Translate a website",
+        "translateSite": "Translate this website",
+        "drop": "Drop the file to translate it",
+        "backToText": "Back to text",
+        "unsupported": "That file cannot be translated here",
+        "dictate": "Dictate",
+        "dictateStop": "Stop dictating",
+        "dictateUnavailable": "Dictation is not available here"
+    },
+    "website": {
+        "address": "Website address",
+        "placeholder": "example.com/page",
+        "translate": "Translate",
+        "close": "Close the website",
+        "invalid": "Type a web address that starts with http or https.",
+        "unreachable": "That page could not be reached.",
+        "notPage": "That address is not a web page.",
+        "tooLarge": "That page is too large to translate.",
+        "empty": "That page has no text to translate.",
+        "view": "Show",
+        "translation": "Translation",
+        "original": "Original",
+        "progress": "Translating {done} of {total}",
+        "openOriginal": "Open original",
+        "fetching": "Fetching the page",
+        "hint": "Type the address of a page to read it in another language."
     }
 }

@@ -15,6 +15,8 @@ const DASHBOARD = resolve(__dirname, "../../../..");
 const ALLOWED: Record<string, string> = {
     "apps/web/src/components/file-picker/file-picker-dialog.tsx":
         "the picker itself: its 'this computer' tab is the browser's chooser",
+    "apps/web/src/components/file-picker/camera-capture.tsx":
+        "the picker's own camera and gallery buttons (capture), which only the browser opens",
     "apps/web/src/app/(app)/drive/files-view.tsx":
         "Drive's own upload: the files are going into Drive, not coming out of it",
     "apps/web/src/app/r/[token]/upload-form.tsx":

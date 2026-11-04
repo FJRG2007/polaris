@@ -78,11 +78,14 @@ async function frameOf(video: HTMLVideoElement): Promise<Blob | null> {
 export function CameraMode({
     translate,
     reads,
-    manager
+    manager,
+    file
 }: {
     translate: Translate;
     reads: Reads;
     manager: boolean;
+    /** A video handed over by the box, played and read on arrival. */
+    file?: File | null;
 }) {
     const t = useTranslateT();
     const video = useRef<HTMLVideoElement>(null);
@@ -153,8 +156,9 @@ export function CameraMode({
 
     const startFile = async (file: File) => {
         setError(null);
+        const element = video.current;
+        if (!element) return;
         release();
-        const element = video.current!;
         fileUrl.current = URL.createObjectURL(file);
         element.src = fileUrl.current;
         try {
@@ -165,6 +169,11 @@ export function CameraMode({
             setError(t("camera.videoFailed"));
         }
     };
+
+    useEffect(() => {
+        if (file) void startFile(file);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per file handed over
+    }, [file]);
 
     const tick = useCallback(async () => {
         const element = video.current;

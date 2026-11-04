@@ -287,7 +287,10 @@ describe("the services the dashboard offers apps", () => {
         const careless: string[] = [];
         for (const file of appFiles()) {
             const text = readFileSync(file, "utf8");
-            for (const match of text.matchAll(new RegExp(`(\\w*\\s*)\\b${name}\\(`, "g"))) {
+            // A call through its namespace (`await host.safeFetch.safeUrl(`) is
+            // awaited as much as a destructured one, so the receiver is skipped.
+            const call = new RegExp(`(\\w*\\s*)\\b(?:\\w+\\.)*${name}\\(`, "g");
+            for (const match of text.matchAll(call)) {
                 if (!/^(await|void)\s+$/.test(match[1] ?? ""))
                     careless.push(`${file}: ${match[0]}`);
                 // What it used to be could not fail, so a call nobody waits for

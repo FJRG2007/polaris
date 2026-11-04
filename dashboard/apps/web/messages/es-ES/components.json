@@ -411,6 +411,7 @@
             "mine": "Mis archivos",
             "shared": "Compartido conmigo",
             "upload": "Subir",
+            "camera": "Cámara",
             "url": "Por dirección"
         },
         "kinds": {
@@ -439,7 +440,17 @@
         "noneChosen": "Nada elegido",
         "attach": "Adjuntar",
         "fetching": "Cargando archivo",
-        "fetchFailed": "No se pudo obtener ese archivo."
+        "fetchFailed": "No se pudo obtener ese archivo.",
+        "camera": {
+            "photo": "Hacer una foto",
+            "video": "Grabar un vídeo",
+            "stop": "Parar la grabación",
+            "gallery": "Elegir de la galería",
+            "preview": "Vista de la cámara",
+            "starting": "Iniciando la cámara",
+            "denied": "La cámara está bloqueada. Permítela en el navegador para usarla aquí.",
+            "failed": "No se pudo capturar. Vuelve a intentarlo."
+        }
     },
     "transfers": {
         "label": "Transferencias",
