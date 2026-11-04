@@ -10,7 +10,7 @@
  */
 
 import { createContext, useContext } from "react";
-import { PersonNameTag } from "@/components/profile-name-extras";
+import { PersonNameTag } from "@/components/name-tags/person-name-tag";
 
 /** Somebody pressed, and the thing they were pressed on - which is where a card
  *  about them opens beside. */
@@ -43,19 +43,19 @@ export function PersonMention({ id, label, className }: { id: string; label: str
         );
     return (
         <>
-        <button
-            type="button"
-            onClick={(event) => {
-                // A mention inside a message sits inside that message's own
-                // press targets; this press is about the person.
-                event.stopPropagation();
-                press({ id, name: label.replace(/^@/, "") }, event.currentTarget);
-            }}
-            className={`${className} cursor-pointer hover:bg-primary/25`}
-        >
-            {label}
-        </button>
-        <PersonNameTag id={id} />
+            <button
+                type="button"
+                onClick={(event) => {
+                    // A mention inside a message sits inside that message's own
+                    // press targets; this press is about the person.
+                    event.stopPropagation();
+                    press({ id, name: label.replace(/^@/, "") }, event.currentTarget);
+                }}
+                className={`${className} cursor-pointer hover:bg-primary/25`}
+            >
+                {label}
+            </button>
+            <PersonNameTag id={id} />
         </>
     );
 }

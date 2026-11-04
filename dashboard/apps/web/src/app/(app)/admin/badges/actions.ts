@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
 import { getTranslations } from "@/lib/i18n/request";
 import * as badges from "@/lib/badges/badge-service";
+import * as nameTags from "@/lib/name-tags/name-tag-service";
 
 type Answer<T = object> = (T & { error?: undefined }) | { error: string };
 
@@ -30,6 +31,18 @@ async function guard<T extends object>(
             console.warn("polaris: badge action refused:", caught.message);
             return { error: (await getTranslations("badges"))("admin.failed") };
         }
+        throw caught;
+    }
+}
+
+/** The instance's own name tag, which only administrators set. */
+export async function setInstanceNameTagAction(input: unknown): Promise<{ error?: string }> {
+    const actor = await scope();
+    try {
+        await nameTags.setInstanceTag(actor, input);
+        return {};
+    } catch (caught) {
+        if (caught instanceof nameTags.NameTagError) return { error: caught.code };
         throw caught;
     }
 }

@@ -5,7 +5,7 @@
  * and their visible badges, so every profile surface shows the same thing in
  * the same order.
  *
- * `PersonNameTag` is the part every drawn name carries - `PersonName` renders it
+ * `PersonNameTag` (components/name-tags) is the part every drawn name carries - `PersonName` renders it
  * right after the name, so chat, member lists, mentions, task assignees and
  * comments all get it from here. It asks for the tag in a batch with every other
  * name on screen.
@@ -20,15 +20,7 @@ import { Button } from "@polaris/ui";
 import type { BadgesForViewer } from "@/lib/badges/badge-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BadgesDialog, BadgeStrip } from "@/components/badges/badges-dialog";
-import { useNameTag } from "@/components/name-tags/name-tag-store";
 import { NameTagButton } from "@/components/name-tags/name-tag-chip";
-
-/** The tag a person wears, as this viewer may see it - nothing otherwise. */
-export function PersonNameTag({ id }: { id: string | null | undefined }) {
-    const tag = useNameTag(id);
-    if (!id || !tag) return null;
-    return <NameTagButton tag={tag} personId={id} />;
-}
 
 export function ProfileNameExtras({
     badges,

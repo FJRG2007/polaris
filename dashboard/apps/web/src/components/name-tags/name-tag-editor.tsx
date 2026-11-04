@@ -111,7 +111,10 @@ export function NameTagEditor({
         setDone(true);
     };
 
-    const emblems: string[] = allowAvatar && image ? [...core.NAME_TAG_EMBLEMS, core.NAME_TAG_AVATAR] : [...core.NAME_TAG_EMBLEMS];
+    const emblems: string[] =
+        allowAvatar && image
+            ? [...core.NAME_TAG_EMBLEMS, core.NAME_TAG_AVATAR]
+            : [...core.NAME_TAG_EMBLEMS];
     const preview: core.NameTagView = {
         text: normalized.text || "TAG",
         emblem: value.emblem,
@@ -130,7 +133,9 @@ export function NameTagEditor({
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <p className="text-sm font-medium">{t("nameTags.editor.enabled")}</p>
-                        <p className="text-muted-foreground text-xs">{t("nameTags.editor.enabledHint")}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("nameTags.editor.enabledHint")}
+                        </p>
                     </div>
                     <Switch
                         checked={value.enabled}
@@ -152,13 +157,22 @@ export function NameTagEditor({
                         aria-invalid={textIssue !== null}
                         required
                     />
-                    <span className={cn("text-xs", textIssue ? "text-danger-ink" : "text-muted-foreground")}>
-                        {textIssue ? t(`nameTags.errors.${nameTagErrorKey(textIssue)}`) : t("nameTags.editor.textHint")}
+                    <span
+                        className={cn(
+                            "text-xs",
+                            textIssue ? "text-danger-ink" : "text-muted-foreground"
+                        )}
+                    >
+                        {textIssue
+                            ? t(`nameTags.errors.${nameTagErrorKey(textIssue)}`)
+                            : t("nameTags.editor.textHint")}
                     </span>
                 </label>
 
                 <fieldset className="flex flex-col gap-1">
-                    <legend className="mb-1 text-sm font-medium">{t("nameTags.editor.emblem")}</legend>
+                    <legend className="mb-1 text-sm font-medium">
+                        {t("nameTags.editor.emblem")}
+                    </legend>
                     <div role="radiogroup" className="flex flex-wrap gap-1.5">
                         {emblems.map((emblem) => {
                             const label =
@@ -176,10 +190,16 @@ export function NameTagEditor({
                                     onClick={() => change({ emblem })}
                                     className={cn(
                                         "border-border hover:border-border-strong flex size-8 items-center justify-center rounded-md border",
-                                        value.emblem === emblem && "border-primary ring-primary ring-1"
+                                        value.emblem === emblem &&
+                                            "border-primary ring-primary ring-1"
                                     )}
                                 >
-                                    <NameTagEmblemMark emblem={emblem} color={value.color} image={image} className="size-4" />
+                                    <NameTagEmblemMark
+                                        emblem={emblem}
+                                        color={value.color}
+                                        image={image}
+                                        className="size-4"
+                                    />
                                 </button>
                             );
                         })}
@@ -187,7 +207,9 @@ export function NameTagEditor({
                 </fieldset>
 
                 <fieldset className="flex flex-col gap-1">
-                    <legend className="mb-1 text-sm font-medium">{t("nameTags.editor.color")}</legend>
+                    <legend className="mb-1 text-sm font-medium">
+                        {t("nameTags.editor.color")}
+                    </legend>
                     <div role="radiogroup" className="flex flex-wrap gap-1.5">
                         {core.NAME_TAG_COLORS.map((color) => (
                             <button
@@ -201,7 +223,9 @@ export function NameTagEditor({
                                 className="border-border flex size-7 items-center justify-center rounded-full border"
                                 style={{ background: NAME_TAG_HEX[color] }}
                             >
-                                {value.color === color && <Check className="size-3.5 shrink-0 text-white" />}
+                                {value.color === color && (
+                                    <Check className="size-3.5 shrink-0 text-white" />
+                                )}
                             </button>
                         ))}
                     </div>
@@ -213,7 +237,11 @@ export function NameTagEditor({
                         <NameTagLabel tag={preview} />
                     </span>
                     <div className="flex items-center gap-2">
-                        {done && <span className="text-muted-foreground text-xs">{t("nameTags.editor.saved")}</span>}
+                        {done && (
+                            <span className="text-muted-foreground text-xs">
+                                {t("nameTags.editor.saved")}
+                            </span>
+                        )}
                         <Button
                             size="sm"
                             onClick={save}
@@ -225,7 +253,10 @@ export function NameTagEditor({
                     </div>
                 </div>
                 {serverError && (
-                    <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                    <p
+                        role="alert"
+                        className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                    >
                         {t(`nameTags.errors.${serverError as ErrorKey}`)}
                     </p>
                 )}

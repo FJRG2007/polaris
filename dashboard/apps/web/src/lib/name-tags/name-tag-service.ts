@@ -61,7 +61,12 @@ function orgSettings(row: {
     tagColor: string;
 }): NameTagSettings {
     return parsedStored(
-        { enabled: row.tagEnabled, text: row.tagText ?? "", emblem: row.tagEmblem, color: row.tagColor },
+        {
+            enabled: row.tagEnabled,
+            text: row.tagText ?? "",
+            emblem: row.tagEmblem,
+            color: row.tagColor
+        },
         true
     );
 }
@@ -86,13 +91,20 @@ export async function setInstanceTag(actor: OrgActor, input: unknown): Promise<v
 }
 
 export async function tagOfOrg(orgId: string): Promise<NameTagSettings> {
-    const row = await prisma.organization.findUnique({ where: { id: orgId }, select: ORG_TAG_SELECT });
+    const row = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: ORG_TAG_SELECT
+    });
     return row ? orgSettings(row) : OFF;
 }
 
 /** An organization's tag, by somebody who runs it. Reserved words stay the
  *  instance administrators' own. */
-export async function saveOrganizationTag(actor: OrgActor, orgId: string, input: unknown): Promise<void> {
+export async function saveOrganizationTag(
+    actor: OrgActor,
+    orgId: string,
+    input: unknown
+): Promise<void> {
     await requireOrgPermission(actor, orgId, "settings.manage");
     const parsed = core
         .nameTagDefinitionSchema({
@@ -144,11 +156,16 @@ export async function myNameTags(userId: string): Promise<MyNameTags> {
                   take: 200
               });
     const options: NameTagOption[] = [];
-    if (instance.enabled) options.push({ orgId: null, name: INSTANCE_NAME, tag: viewOf(instance, null, null) });
+    if (instance.enabled)
+        options.push({ orgId: null, name: INSTANCE_NAME, tag: viewOf(instance, null, null) });
     for (const org of orgs) {
         const settings = orgSettings(org);
         if (settings.enabled)
-            options.push({ orgId: org.id, name: org.name, tag: viewOf(settings, org.id, org.image) });
+            options.push({
+                orgId: org.id,
+                name: org.name,
+                tag: viewOf(settings, org.id, org.image)
+            });
     }
     const chosen: core.NameTagChoice =
         choice === null
@@ -182,12 +199,19 @@ export async function setNameTagChoice(userId: string, input: unknown): Promise<
     });
 }
 
-function viewOf(settings: NameTagSettings, orgId: string | null, image: string | null): core.NameTagView {
+function viewOf(
+    settings: NameTagSettings,
+    orgId: string | null,
+    image: string | null
+): core.NameTagView {
     const avatar = settings.emblem === core.NAME_TAG_AVATAR;
     return {
         text: settings.text,
         // An avatar that is not there falls back to the first drawn emblem.
-        emblem: avatar && (orgId === null || image === null) ? core.NAME_TAG_EMBLEMS[0] : settings.emblem,
+        emblem:
+            avatar && (orgId === null || image === null)
+                ? core.NAME_TAG_EMBLEMS[0]
+                : settings.emblem,
         color: settings.color,
         orgId,
         image: avatar && orgId !== null && image !== null ? orgAvatarUrl(orgId) : null
@@ -237,7 +261,8 @@ export async function nameTagsFor(
         }
         const org = row.org;
         if (!org) continue;
-        const member = org.ownerId === row.userId || org.members.some((m) => m.userId === row.userId);
+        const member =
+            org.ownerId === row.userId || org.members.some((m) => m.userId === row.userId);
         if (!member) continue;
         const settings = orgSettings(org);
         if (!settings.enabled) continue;
@@ -287,7 +312,8 @@ export async function nameTagCard(
                 where: { orgId: org.id, userId: viewer.id, restricted: false }
             })) > 0);
     const memberCount = viewerIn
-        ? (await prisma.organizationMember.count({ where: { orgId: org.id, restricted: false } })) + 1
+        ? (await prisma.organizationMember.count({ where: { orgId: org.id, restricted: false } })) +
+          1
         : null;
     return {
         tag,

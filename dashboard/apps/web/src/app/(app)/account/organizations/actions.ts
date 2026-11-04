@@ -27,6 +27,7 @@ import * as invitations from "@/lib/orgs/invitation-service";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { orgValidationMessage } from "./org-validation";
+import { NameTagError, saveOrganizationTag } from "@/lib/name-tags/name-tag-service";
 
 const ORGS_PATH = "/account/organizations";
 
@@ -150,6 +151,26 @@ export async function setOrgChatAction(
         return {};
     } catch (caught) {
         return failure(caught, "errors.saveThat");
+    }
+}
+
+/** The organization's name tag. Refusals come back as a code the screen words. */
+export async function setOrgNameTagAction(
+    orgId: string,
+    input: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await saveOrganizationTag(caller, orgId, input);
+        await record(caller.id, orgId, "org.nameTag");
+        refresh();
+        revalidatePath("/u", "layout");
+        return {};
+    } catch (caught) {
+        if (caught instanceof NameTagError) return { error: caught.code };
+        if (caught instanceof orgs.OrgError) return { error: "forbidden" };
+        console.error(caught);
+        return { error: "invalid" };
     }
 }
 

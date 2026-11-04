@@ -171,12 +171,7 @@ export function ProfileCard({
                             </span>
                         ) : null}
                     </h1>
-                    <ProfileNameExtras
-                        badges={badges}
-                        own={own}
-                        personId={profile.id}
-                        tag={tag}
-                    />
+                    <ProfileNameExtras badges={badges} own={own} personId={profile.id} tag={tag} />
                     {profile.fullName && profile.fullName !== profile.name ? (
                         <p className="text-muted-foreground text-sm">{profile.fullName}</p>
                     ) : null}

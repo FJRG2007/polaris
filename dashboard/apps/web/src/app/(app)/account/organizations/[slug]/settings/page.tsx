@@ -23,6 +23,8 @@ import { canDeleteOrg, listOrgMembers, orgDeletionImpact } from "@/lib/orgs/org-
 import { effectiveOrgSuccessor } from "@/lib/successor-service";
 import { orgChatOffered } from "@/lib/chat/isolation";
 import { prisma } from "@polaris/db";
+import { orgAvatarUrl } from "@/lib/avatar-url";
+import { tagOfOrg } from "@/lib/name-tags/name-tag-service";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +45,7 @@ export default async function OrganizationSettingsPage({
     if (!canManage && !canDelete) notFound();
 
     // Each half's inputs are only fetched for somebody who will be shown it.
-    const [members, impact, successor, chatOffered, chat] = await Promise.all([
+    const [members, impact, successor, chatOffered, chat, nameTag] = await Promise.all([
         access.isOwner
             ? listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
             : Promise.resolve([]),
@@ -57,13 +59,14 @@ export default async function OrganizationSettingsPage({
         orgChatOffered(),
         prisma.organization.findUnique({
             where: { id: org.id },
-            select: { chatIsolated: true }
-        })
+            select: { chatIsolated: true, image: true }
+        }),
+        canManage ? tagOfOrg(org.id) : Promise.resolve(null)
     ]);
 
     // The photo card is the account screens' own, and reads their namespace.
     return (
-        <Messages namespaces={["account"]}>
+        <Messages namespaces={["account", "badges"]}>
         <SettingsView
             org={org}
             isOwner={access.isOwner}
@@ -76,6 +79,8 @@ export default async function OrganizationSettingsPage({
             impact={impact}
             chatIsolated={chat?.chatIsolated === true}
             chatOffered={chatOffered}
+            nameTag={nameTag}
+            orgImage={chat?.image ? orgAvatarUrl(org.id) : null}
         />
         </Messages>
     );

@@ -107,7 +107,7 @@
         "mine": {
             "title": "Your tag",
             "intro": "Shown after your name, to the same people who see your badges.",
-            "none": "No tag",
+            "none": "Wear none",
             "empty": "None of your organizations has a tag yet.",
             "loadFailed": "Your tags could not be loaded.",
             "retry": "Try again"
@@ -115,7 +115,7 @@
         "editor": {
             "enabled": "Members can wear it",
             "enabledHint": "Turning it off removes it from everybody at once.",
-            "text": "Tag",
+            "text": "Tag text",
             "textHint": "Up to 4 letters or numbers, shown in capitals.",
             "emblem": "Emblem",
             "color": "Color",

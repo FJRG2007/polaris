@@ -12,7 +12,14 @@ import * as core from "@polaris/core";
 import { nameTagCardAction } from "@/app/(app)/name-tag-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NameTagCard } from "@/lib/name-tags/name-tag-service";
-import { cn, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 /** Each color, readable on light and dark surfaces alike. */
 export const NAME_TAG_HEX: Record<core.NameTagColor, string> = {
@@ -52,7 +59,11 @@ export function NameTagEmblemMark({
     if (emblem === core.NAME_TAG_AVATAR && image) {
         return (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={image} alt="" className={cn("size-3 shrink-0 rounded-[3px] object-cover", className)} />
+            <img
+                src={image}
+                alt=""
+                className={cn("size-3 shrink-0 rounded-[3px] object-cover", className)}
+            />
         );
     }
     const path = EMBLEM_PATHS[emblem as core.NameTagEmblem] ?? EMBLEM_PATHS.spark;
@@ -118,7 +129,10 @@ export function NameTagButton({ tag, personId }: { tag: core.NameTagView; person
             </span>
             {card !== null && (
                 <Dialog open onOpenChange={(next) => !next && setCard(null)}>
-                    <DialogContent className="max-w-xs" onClick={(event) => event.stopPropagation()}>
+                    <DialogContent
+                        className="max-w-xs"
+                        onClick={(event) => event.stopPropagation()}
+                    >
                         {card === "loading" ? (
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">
@@ -146,7 +160,11 @@ function NameTagCardBody({ card }: { card: NameTagCard }) {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={card.image} alt="" className="size-full object-cover" />
                     ) : (
-                        <NameTagEmblemMark emblem={card.tag.emblem} color={card.tag.color} className="size-6" />
+                        <NameTagEmblemMark
+                            emblem={card.tag.emblem}
+                            color={card.tag.color}
+                            className="size-6"
+                        />
                     )}
                 </span>
                 <div className="min-w-0">

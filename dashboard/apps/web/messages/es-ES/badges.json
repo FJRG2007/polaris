@@ -98,27 +98,27 @@
             "intro": "Una etiqueta corta que los miembros muestran tras su nombre."
         },
         "instance": {
-            "title": "Etiqueta de la instancia",
+            "title": "Etiqueta global",
             "intro": "Una etiqueta que cualquiera puede llevar. Admite palabras reservadas."
         },
         "mine": {
             "title": "Tu etiqueta",
             "intro": "Se muestra tras tu nombre a quien ve tus insignias.",
-            "none": "Sin etiqueta",
+            "none": "Ninguna",
             "empty": "Ninguna de tus organizaciones tiene etiqueta.",
             "loadFailed": "No se han podido cargar tus etiquetas.",
             "retry": "Reintentar"
         },
         "editor": {
-            "enabled": "Los miembros pueden llevarla",
+            "enabled": "Pueden llevarla",
             "enabledHint": "Al desactivarla se quita a todos a la vez.",
-            "text": "Etiqueta",
+            "text": "Texto",
             "textHint": "Hasta 4 letras o números, en mayúsculas.",
             "emblem": "Emblema",
             "color": "Color",
             "avatar": "Foto",
-            "preview": "Vista previa",
-            "save": "Guardar etiqueta",
+            "preview": "Muestra",
+            "save": "Guardar",
             "saved": "Etiqueta guardada."
         },
         "emblems": {
@@ -136,7 +136,7 @@
             "red": "Rojo",
             "amber": "Ámbar",
             "green": "Verde",
-            "teal": "Turquesa",
+            "teal": "Cian",
             "blue": "Azul",
             "violet": "Violeta",
             "pink": "Rosa"

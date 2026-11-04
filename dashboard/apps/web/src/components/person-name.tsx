@@ -27,7 +27,7 @@ import { nameLookOf, nameplateOf, type Nameplate } from "@polaris/core";
 import { nameStyleClass, nameLookCss, nameplateCss } from "@/lib/profile-style-css";
 import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
 import { useContactName, useProfileName, useProfileStyle } from "@/components/profile-style-store";
-import { PersonNameTag } from "@/components/profile-name-extras";
+import { PersonNameTag } from "@/components/name-tags/person-name-tag";
 
 /**
  * The places a person is a row of data rather than a person.
