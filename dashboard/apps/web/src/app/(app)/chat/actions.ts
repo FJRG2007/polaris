@@ -1364,6 +1364,15 @@ export async function setChannelNotifyAction(
     return result;
 }
 
+/** This reader's live translation of one conversation - see
+ *  `chat.setChannelTranslation`. */
+export async function setChannelTranslationAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.setChannelTranslation(me, input));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
 /** The same answer for a whole space, which every channel in it follows unless
  *  it was given one of its own. */
 export async function setSpaceNotifyAction(

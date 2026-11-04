@@ -42,6 +42,15 @@ import { holdReload } from "@/lib/reload-safety";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { translateMarkdown } from "@/components/rich-text/translate-markdown";
+import { useTextTranslator } from "@/components/text-translation/provider";
+import {
+    OutgoingLanguageNote,
+    OutgoingTranslationStrip,
+    fitsLength,
+    sentRecord,
+    type OutgoingPreview
+} from "./outgoing-translation";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { dropDraft, keepDraft, readDraft, type SavedDraft } from "./drafts";
@@ -139,7 +148,8 @@ export function Composer({
     onSaveEdit,
     onCancelEdit,
     emoji = null,
-    divided = true
+    divided = true,
+    translateOutgoing = null
 }: {
     /**
      * The conversation this box belongs to, or null where it is not one.
@@ -260,8 +270,19 @@ export function Composer({
         fromDrive?: readonly KeptPick[],
         /** Told how far the files have got, for the line under the message
          *  while it is on its way. */
-        report?: (progress: SendProgress) => void
+        report?: (progress: SendProgress) => void,
+        /** Set when `body` is a translation of what was typed - see
+         *  `translateOutgoing`. */
+        translation?: core.ChatSentTranslation
     ) => void | Promise<SendOutcome>;
+    /**
+     * The language what is written goes out in, or null to send it as written:
+     * this reader's live translation of the conversation, handed in by the
+     * chat callers and left off by a task's comment box. Each message is
+     * translated when Send is pressed and shown in full before it goes; an
+     * edit is never translated.
+     */
+    translateOutgoing?: string | null;
     /**
      * The same message, at an hour that has not happened yet.
      *
@@ -324,6 +345,16 @@ export function Composer({
     const t = useTranslations("chat");
     const tFiles = useTranslations("components");
     const [body, setBody] = useState("");
+    /** What is in the box now, for a send that resolves after an await: the
+     *  words typed while it waited are the ones that go. */
+    const latestBody = useRef(body);
+    useEffect(() => {
+        latestBody.current = body;
+    }, [body]);
+    const translator = useTextTranslator();
+    /** Where a message goes out, when it is translated before it goes. */
+    const outgoingTo = translator && translateOutgoing && !editing ? translateOutgoing : null;
+    const [preview, setPreview] = useState<OutgoingPreview | null>(null);
     const [files, setFiles] = useState<readonly File[]>([]);
     /** Picks that are staying where they are. Held apart from `files` because
      *  there are no bytes to hold: what is sent is where to find them. */
@@ -686,7 +717,8 @@ export function Composer({
                 one.hidden,
                 one.kept,
                 (progress) =>
-                    settle((was) => (was.phase === "sending" ? { ...was, progress } : was))
+                    settle((was) => (was.phase === "sending" ? { ...was, progress } : was)),
+                one.translation
             );
         } catch {
             outcome = { error: t("composer.outgoing.notSent") };
@@ -711,13 +743,66 @@ export function Composer({
         }
     };
 
-    const submit = async (value: string) => {
+    /**
+     * Send what is in the box.
+     *
+     * With the messages going out in another language, the first press asks
+     * for the translation and shows it - nothing leaves until the writer has
+     * seen the words the room will read and chosen them, or chosen to send
+     * what they wrote. `choice` is that choice; Enter on a translation that
+     * is already shown is the same as pressing its button.
+     */
+    const submit = async (value: string, choice?: "translated" | "original") => {
         const text = isBlankMarkdown(value) ? "" : value.trim();
         // A message that is only a file is a message. Making somebody type
         // "here" before they can send a screenshot is a tax on the common case.
         if (disabled || tooLong || (!text && files.length === 0 && kept.length === 0)) return;
         // An edit that puts back the words already there changes nothing.
         if (editing && !isDirty(editing.body, text)) return onCancelEdit?.();
+        let translation: core.ChatSentTranslation | undefined;
+        let words = text;
+        if (outgoingTo && translator && text && choice !== "original") {
+            const shown =
+                preview !== null && preview.source === text && preview.to === outgoingTo
+                    ? preview
+                    : null;
+            if (shown?.phase === "working") return;
+            if (shown?.phase === "ready") {
+                if (!fitsLength(shown.text, rules.maxMessageLength)) return;
+                translation = sentRecord(shown, text) ?? undefined;
+                if (translation) words = shown.text;
+            } else {
+                // A translation that failed is not asked again by Enter: the
+                // strip is offering to send what was written.
+                if (shown?.phase === "failed") return;
+                const asked: OutgoingPreview = { source: text, to: outgoingTo, phase: "working" };
+                setPreview(asked);
+                const outcome = await translateMarkdown(text, (words) =>
+                    translator.translate(words, outgoingTo)
+                );
+                setPreview((now) => {
+                    if (now !== asked) return now;
+                    if (outcome.kind === "translated")
+                        return {
+                            ...asked,
+                            phase: "ready",
+                            text: outcome.text,
+                            detected: outcome.detected
+                        };
+                    return outcome.kind === "same" ? null : { ...asked, phase: "failed" };
+                });
+                // Already in that language: there is nothing to choose between.
+                // What goes is what is in the box now - words typed while the
+                // answer came back are part of it, and are asked about anew
+                // when they changed what was being sent.
+                if (outcome.kind === "same") {
+                    const now = latestBody.current;
+                    return void (now === value ? submit(value, "original") : submit(now));
+                }
+                return;
+            }
+        }
+        setPreview(null);
         // Sending is the end of what was being said, and words still on their
         // way would land in the box it just emptied.
         dictation.cancel();
@@ -742,12 +827,13 @@ export function Composer({
             await deliver({
                 id: newOutgoingId(),
                 scope,
-                body: text,
+                body: words,
                 files: sending,
                 kept: staying,
-                hidden
+                hidden,
+                translation
             });
-        } else await onSend(text, sending, undefined, hidden, staying);
+        } else await onSend(words, sending, undefined, hidden, staying, undefined, translation);
     };
 
     /**
@@ -1059,6 +1145,23 @@ export function Composer({
                 <p role="alert" className="mb-2 text-xs text-danger">
                     {refused || voice.error}
                 </p>
+            )}
+
+            {/* Shown only while it is a translation of what is in the box: a
+                word changed after Send was pressed is a different message. */}
+            {outgoingTo &&
+            preview &&
+            preview.to === outgoingTo &&
+            preview.source === (isBlankMarkdown(body) ? "" : body.trim()) ? (
+                <OutgoingTranslationStrip
+                    preview={preview}
+                    maxLength={rules.maxMessageLength}
+                    onSendTranslation={() => void submit(body, "translated")}
+                    onSendOriginal={() => void submit(body, "original")}
+                    onCancel={() => setPreview(null)}
+                />
+            ) : (
+                outgoingTo && <OutgoingLanguageNote to={outgoingTo} />
             )}
 
             <OutgoingList

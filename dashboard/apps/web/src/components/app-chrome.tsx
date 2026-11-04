@@ -60,7 +60,7 @@ import { SessionScopeProvider } from "@/components/session-scope";
 import { ShelfScopeProvider } from "@/components/shelf-scope";
 import { NotificationBell } from "@/components/notification-bell";
 import { DesktopUpdateButton } from "@/components/desktop-update-button";
-import { headerSlots } from "@/lib/app-extensions/registry";
+import { headerSlots, textTranslator } from "@/lib/app-extensions/registry";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { openShelfFor, resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
@@ -217,6 +217,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     // What the apps this person reaches draw beside the bell - Calendar's
     // running timers. Read from the extensions in memory: no query.
     const appHeader = headerSlots(apps.ids);
+    // Translate, where the reader has it: the selection menu and Chat offer it
+    // through this. Null, and none of their Translate entries are drawn.
+    const translator = textTranslator(apps.ids);
 
     const frame = (
         <CapabilityProvider capabilities={capabilities}>
@@ -249,7 +252,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                         <AppUnreadDriftProvider>
                                             <NotificationsProvider initial={notifications}>
                                                 <ToastProvider>
-                                                    <SelectionMenu>
+                                                    <SelectionMenu translator={translator}>
                                                         {/* The favorites, shared by the app menu
                                         and the Overview's rail so a star in one moves
                                         the other. Inside the toasts, which is how a

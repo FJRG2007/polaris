@@ -12,7 +12,7 @@
  */
 
 import { inviteCards, type ChatInviteCard } from "./invite-cards";
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
@@ -77,6 +77,16 @@ export interface ChatMessageView {
     readonly replyCount: number;
     readonly lastReplyAt: string | null;
     readonly edited: boolean;
+    /**
+     * Sent through live translation: the language it was typed in and the one
+     * it went out in. `original` - the words as typed - only on the author's
+     * own copy; everybody else is told it was translated, never what was typed.
+     */
+    readonly translated?: {
+        readonly from: string | null;
+        readonly to: string;
+        readonly original?: string;
+    };
     readonly deleted: boolean;
     readonly reactions: readonly ChatReactionView[];
     readonly attachments: readonly ChatAttachmentView[];
@@ -527,6 +537,7 @@ export async function send(
                 parentId: input.parentId ?? null,
                 replyToId: quoted,
                 forwarded: quoted !== null && (quote?.forwarded ?? false),
+                ...(input.translation ? { translation: input.translation } : {}),
                 ...(attachments.length
                     ? {
                           attachments: {
@@ -829,7 +840,8 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
         }
         await tx.chatMessage.update({
             where: { id: input.messageId },
-            data: { body: input.body, editedAt }
+            // Edited words are no longer a translation of what was typed.
+            data: { body: input.body, editedAt, translation: Prisma.DbNull }
         });
     });
     publishChatChange({
@@ -1086,6 +1098,7 @@ export async function remove(
                 data: {
                     deletedAt: new Date(),
                     body: "",
+                    translation: Prisma.DbNull,
                     pinnedAt: null,
                     pinnedById: null,
                     pinExpiresAt: null
@@ -1560,10 +1573,17 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
 
     // The note as written, empty included: a space was here to get past the
     // blank-body rule, and it left a message whose text was one space.
-    return send(actor, { channelId: input.channelId, body: input.note, parentId: null }, [], {
-        messageId: input.messageId,
-        forwarded: true
-    });
+    // A note sent translated carries its record like any other message would.
+    const translation = input.note && input.translation ? { translation: input.translation } : {};
+    return send(
+        actor,
+        { channelId: input.channelId, body: input.note, parentId: null, ...translation },
+        [],
+        {
+            messageId: input.messageId,
+            forwarded: true
+        }
+    );
 }
 
 /**
@@ -1674,7 +1694,8 @@ export const MESSAGE_SELECT = {
     deletedAt: true,
     createdAt: true,
     webhookId: true,
-    authorLabel: true
+    authorLabel: true,
+    translation: true
 } as const;
 
 interface Row {
@@ -1695,6 +1716,26 @@ interface Row {
      *  read that selected its own columns (search) still decorates. */
     webhookId?: string | null;
     authorLabel?: string | null;
+    /** `{ from, to, original }` when it was sent translated - see
+     *  `core.readSentTranslation`. Optional for the same reason as above. */
+    translation?: unknown;
+}
+
+/** The translation note on a message, as one reader may see it. */
+export function translatedView(
+    row: Pick<Row, "authorId" | "deletedAt" | "translation">,
+    viewerId: string
+): { translated?: NonNullable<ChatMessageView["translated"]> } {
+    if (row.deletedAt) return {};
+    const record = core.readSentTranslation(row.translation);
+    if (!record) return {};
+    return {
+        translated: {
+            from: record.from,
+            to: record.to,
+            ...(row.authorId === viewerId ? { original: record.original } : {})
+        }
+    };
 }
 
 /**
@@ -1975,6 +2016,7 @@ export async function decorateMessages(
             lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
             edited: row.editedAt !== null,
             deleted: row.deletedAt !== null,
+            ...translatedView(row, actor.id),
             reactions: [...(onMessage.get(row.id) ?? new Map())]
                 .map(([, tally]) => ({ emoji: tally.emoji, count: tally.count, mine: tally.mine }))
                 // Most-reacted first, then by emoji so the order is stable between

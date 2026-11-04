@@ -157,7 +157,7 @@ vi.mock("@polaris/db", () => {
         user: { findMany: async () => [] },
         $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(client)
     };
-    return { prisma: client };
+    return { prisma: client, Prisma: { DbNull: null } };
 });
 
 const actor = { id: "ada" };

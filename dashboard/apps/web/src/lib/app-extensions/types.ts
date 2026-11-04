@@ -321,6 +321,13 @@ export interface AppExtension {
      */
     readonly headerSlot?: () => AppSlot | null;
 
+    /**
+     * Text translation it offers the rest of Polaris: the selection menu, a
+     * chat message's menu and live chat translation call it. Plain data, so it
+     * crosses to the browser as it is.
+     */
+    readonly textTranslation?: () => TextTranslationOffer;
+
     /** The panel an installed-app page draws for one of its installs. */
     readonly installedPanelSlot?: (install: ExtensionInstall) => Promise<AppSlot | null>;
     /**
@@ -408,6 +415,20 @@ export interface AppExtension {
      * They are the servers' decisions, not Polaris's, and are drawn apart.
      */
     readonly gameSanctions?: (userId: string) => Promise<readonly GameSanction[]>;
+}
+
+/**
+ * Where an app translates text, as core's screens reach it - over HTTP, never
+ * by importing the app.
+ *
+ * `endpoint` answers GET with `{ engines[], defaultTarget, charLimit }` and
+ * POST `{ texts[], from, to }` with `{ texts[], detected }`; `page` is where
+ * the app's own screen opens.
+ */
+export interface TextTranslationOffer {
+    readonly appId: string;
+    readonly endpoint: string;
+    readonly page: string;
 }
 
 /** A tool an app offers over MCP, its input type already erased by

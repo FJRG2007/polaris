@@ -9769,6 +9769,10 @@ model ChatChannelMember {
     // time rather than a flag, so several pinned conversations keep the order
     // they were pinned in instead of an arbitrary one.
     pinnedAt          DateTime?
+    // This person's live translation here, `{ incoming, outgoing }` - see
+    // `chatTranslationPrefsSchema`. Theirs alone: each reader sees the room in
+    // their own language. Null is off, and so is anything that does not parse.
+    translation       Json?
     createdAt         DateTime  @default(now())
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -9846,6 +9850,11 @@ model ChatMessage {
     // `authorId` outlives an account.
     webhookId    String?   @db.Uuid
     authorLabel  String?
+    // Sent through live translation: `{ from, to, original }` - the language
+    // it was typed in, the one it went out in, and the words as typed, which
+    // only the author is shown. Null for everything else; cleared on an edit,
+    // since the edited words are no longer a translation of the original.
+    translation  Json?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)

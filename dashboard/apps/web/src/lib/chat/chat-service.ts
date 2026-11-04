@@ -92,6 +92,9 @@ export interface ChatChannelView {
      *  chosen otherwise. Separate from the mute below it, and it leaves the
      *  unread count alone: it decides what interrupts, not what is counted. */
     readonly notifyLevel: core.ChatChannelNotifyLevel;
+    /** This reader's live translation here - theirs alone, and off until they
+     *  turn it on. */
+    readonly translation: core.ChatTranslationPrefs;
     /** Whether this reader keeps it at the top of their list. Theirs alone -
      *  pinning a conversation says nothing to the other people in it. */
     readonly pinned: boolean;
@@ -747,6 +750,7 @@ export async function listChannels(
                 mutedUntil: true,
                 notifyLevel: true,
                 pinnedAt: true,
+                translation: true,
                 role: true,
                 timeoutUntil: true
             }
@@ -901,6 +905,7 @@ export async function listChannels(
             muted: membership ? core.muteInForce(membership) : false,
             mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
             notifyLevel: channelNotifyOf(membership?.notifyLevel),
+            translation: core.readChatTranslation(membership?.translation),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
             mayAdminister,
             mayChangePrivacy: Boolean(channel.spaceId && administered.has(channel.spaceId)),
@@ -1741,6 +1746,26 @@ export async function setChannelNotify(
         where: { channelId_userId: { channelId, userId: actor.id } },
         update: { notifyLevel },
         create: { channelId, userId: actor.id, notifyLevel }
+    });
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
+/**
+ * This reader's live translation of one conversation: whether what the others
+ * write is shown in their language, and which language what they write goes
+ * out in. Upserted like the mute, for the same reason, and told only to the
+ * reader's own tabs - nobody else's screen changes.
+ */
+export async function setChannelTranslation(actor: ChatActor, input: unknown): Promise<void> {
+    const parsed = core.chatTranslationSettingSchema.safeParse(input);
+    if (!parsed.success) throw new ChatAccessError({ key: "errors.translationSettingInvalid" });
+    const { channelId, incoming, outgoing } = parsed.data;
+    await requireChannel(actor, channelId);
+    const translation = { incoming, outgoing };
+    await prisma.chatChannelMember.upsert({
+        where: { channelId_userId: { channelId, userId: actor.id } },
+        update: { translation },
+        create: { channelId, userId: actor.id, translation }
     });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
 }

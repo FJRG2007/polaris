@@ -17,6 +17,7 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
+import type { ChatSentTranslation } from "@polaris/core";
 import { holdReload } from "@/lib/reload-safety";
 import type { RecordedSound } from "./voice-recorder";
 import { Paperclip, RotateCcw, X } from "lucide-react";
@@ -48,6 +49,8 @@ export interface Outgoing {
     readonly sounds?: readonly RecordedSound[];
     /** Which of them arrive covered, by position - see `Composer`. */
     readonly hidden: readonly number[];
+    /** Set when `body` is a translation of what was typed. */
+    readonly translation?: ChatSentTranslation;
     readonly phase: "sending" | "failed";
     readonly error?: string;
     readonly progress?: SendProgress;

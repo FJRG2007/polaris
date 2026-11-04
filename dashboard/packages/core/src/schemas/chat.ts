@@ -415,6 +415,66 @@ export const chatDirectOpenSchema = z.object({
 
 export type ChatDirectOpenInput = z.infer<typeof chatDirectOpenSchema>;
 
+/**
+ * A language as the translation surfaces name it: a BCP 47 tag of a language
+ * and at most a script or region (`de`, `pt-BR`, `zh-Hans`).
+ */
+export const chatLanguageCode = z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,4})?$/);
+
+/**
+ * One reader's live translation of one conversation. Two independent choices:
+ * what the others write, shown in the reader's own language, and what the
+ * reader writes, sent in `outgoing` (null: sent as written).
+ */
+export const chatTranslationPrefsSchema = z
+    .object({
+        incoming: z.boolean(),
+        outgoing: chatLanguageCode.nullable()
+    })
+    .strict();
+
+export type ChatTranslationPrefs = z.infer<typeof chatTranslationPrefsSchema>;
+
+export const NO_CHAT_TRANSLATION: ChatTranslationPrefs = { incoming: false, outgoing: null };
+
+/**
+ * A stored preference read back whole. The column is JSON and older than any
+ * screen reading it, so anything that does not parse is "off" rather than an
+ * error.
+ */
+export function readChatTranslation(raw: unknown): ChatTranslationPrefs {
+    const parsed = chatTranslationPrefsSchema.safeParse(raw);
+    return parsed.success ? parsed.data : NO_CHAT_TRANSLATION;
+}
+
+export const chatTranslationSettingSchema = chatTranslationPrefsSchema.extend({
+    channelId: z.string().uuid()
+});
+
+/**
+ * What a message sent through live translation records: the language it was
+ * written in (null when it was not detected), the one it went out in, and the
+ * words as typed, which only their author is ever shown.
+ */
+export const chatSentTranslationSchema = z
+    .object({
+        from: chatLanguageCode.nullable(),
+        to: chatLanguageCode,
+        original: chatMessageBody
+    })
+    .strict();
+
+export type ChatSentTranslation = z.infer<typeof chatSentTranslationSchema>;
+
+/** A stored record read back whole, or null when there is none to show. */
+export function readSentTranslation(raw: unknown): ChatSentTranslation | null {
+    const parsed = chatSentTranslationSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+}
+
 export const chatSendSchema = z.object({
     channelId: z.string().uuid(),
     body: chatMessageBody,
@@ -423,7 +483,9 @@ export const chatSendSchema = z.object({
     /** The message this one answers, shown quoted above it and left in the
      *  channel. The ordinary way to answer something; a thread is the
      *  alternative for when a side conversation would bury the room. */
-    replyToId: z.string().uuid().nullable().optional()
+    replyToId: z.string().uuid().nullable().optional(),
+    /** Set when live translation rewrote what was typed before it was sent. */
+    translation: chatSentTranslationSchema.optional()
 });
 
 export type ChatSendInput = z.infer<typeof chatSendSchema>;
@@ -523,7 +585,9 @@ export const chatForwardSchema = z.object({
     /** Where it goes. Proved against the reader like any other write. */
     channelId: z.string().uuid(),
     /** A line of their own on top of it, which is what a forward usually is. */
-    note: z.string().trim().max(MAX_CHAT_MESSAGE).default("")
+    note: z.string().trim().max(MAX_CHAT_MESSAGE).default(""),
+    /** The note went out in another language: what was typed, and in which. */
+    translation: chatSentTranslationSchema.optional()
 });
 
 export type ChatForwardInput = z.infer<typeof chatForwardSchema>;

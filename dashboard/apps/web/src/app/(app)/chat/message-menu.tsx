@@ -34,6 +34,7 @@ import { useAppUrl } from "@/components/app-url";
 import { imageItems } from "@/components/image-actions";
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { plainText } from "@/components/rich-text/excerpt";
+import { useTranslateToggle } from "./translated-body";
 import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import type { DeleteMessage } from "./delete-message";
@@ -47,6 +48,7 @@ import {
     CornerUpLeft,
     Forward,
     Info,
+    Languages,
     Link2,
     Mail,
     MessageCircleReply,
@@ -237,6 +239,8 @@ export function MessageMenu({
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
     const readingThis = useReadingMessage() === message.id;
+    /** Only where the reader has an app that translates, and only for words. */
+    const translation = useTranslateToggle(message);
 
     /** Set the reminder, and say back when it is for. */
     const remind = async (dueAt: Date): Promise<boolean> => {
@@ -532,6 +536,16 @@ export function MessageMenu({
                             <Copy className="size-3.5" />
                             {t("messageMenu.copyText")}
                             <ShortcutHint id="chat.copy" />
+                        </ContextMenuItem>
+                    )}
+                    {/* On this reader's screen only: the message as sent is
+                        untouched, and the original is one press away. */}
+                    {translation && (
+                        <ContextMenuItem onSelect={translation.run}>
+                            <Languages className="size-3.5" />
+                            {translation.showing
+                                ? t("translation.showOriginal")
+                                : t("translation.translate")}
                         </ContextMenuItem>
                     )}
                     {actions.onPin && !message.deleted && message.kind !== "system" && (

@@ -95,6 +95,13 @@ export {
     type VirtualKeyboardProps
 } from "./components/virtual-keyboard";
 export { KEYBOARD_LAYOUTS, layoutForLanguage, type KeyboardLayoutId } from "./lib/keyboard-layouts";
+export {
+    Popover,
+    PopoverClose,
+    PopoverAnchor,
+    PopoverContent,
+    PopoverTrigger
+} from "./components/popover";
 export { ColorPicker, SUGGESTED_COLORS } from "./components/color-picker";
 export {
     ToastProvider,

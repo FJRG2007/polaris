@@ -223,7 +223,8 @@
         "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
         "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
         "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s.",
-        "tooManyReminders": "Puedes tener hasta {max} recordatorios pendientes"
+        "tooManyReminders": "Puedes tener hasta {max} recordatorios pendientes",
+        "translationSettingInvalid": "Eso no es un ajuste de traducción"
     },
     "media": {
         "refused": {
@@ -1294,7 +1295,17 @@
         "saySomethingAboutIt": "Di algo sobre él",
         "cancel": "Cancelar",
         "forward": "Reenviar",
-        "forwardTo": "Reenviar a {count}"
+        "forwardTo": "Reenviar a {count}",
+        "translatingNote": "Traduciendo tu nota...",
+        "noteReview": "Tu nota, traducida",
+        "noteGoesTo": "Para {names}",
+        "noteFailedFor": "Sin traducir para {names}. Va tal cual.",
+        "noteTooLongFor": "La traducción es demasiado larga para {names}. Va tal cual.",
+        "aConversation": "una conversación",
+        "notSentTo": "No se pudo enviar a {name}.",
+        "notSentToAny": "No se pudo enviar a ninguno.",
+        "sentExceptTo": "Enviado, salvo a {names}.",
+        "chosen": "elegido"
     },
     "voiceNote": {
         "pause": "Pausar",
@@ -2118,5 +2129,37 @@
         "decline": "Rechazar",
         "canDraw": "Pueden dibujar en tu pantalla: {names}",
         "stopAll": "Quitar lápices"
+    },
+    "translation": {
+        "translate": "Traducir",
+        "showOriginal": "Ver original",
+        "showTranslation": "Ver traducción",
+        "translated": "Traducido",
+        "translatedFrom": "Traducido del {language}",
+        "working": "Traduciendo...",
+        "failed": "No se pudo traducir",
+        "alreadyIn": "Ya está en tu idioma",
+        "sentIn": "Enviado en {language}",
+        "showTyped": "Ver lo que escribiste",
+        "hideTyped": "Ocultar lo escrito",
+        "settings": "Traducción en vivo",
+        "settingsIntro": "Solo lo ves tú. Los mensajes no cambian para nadie más.",
+        "incoming": "Traducir lo que escriben",
+        "incomingHint": "En {language} al aparecer en pantalla.",
+        "outgoing": "Enviar mis mensajes en otro idioma",
+        "outgoingHint": "Revisas la traducción antes de enviarla.",
+        "outgoingLanguage": "Enviar en",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "saving": "Guardando...",
+        "unavailable": "La traducción en vivo necesita Traducir.",
+        "outgoingOn": "Tus mensajes salen en {language}",
+        "previewTitle": "Esto es lo que se envía, en {language}",
+        "previewWorking": "Traduciendo al {language}...",
+        "previewFailed": "No se pudo traducir. Puedes enviarlo tal cual.",
+        "previewTooLong": "La traducción supera el límite de {count} caracteres. Puedes enviarlo tal cual.",
+        "sendTranslation": "Enviar traducción",
+        "sendAsWritten": "Enviar tal cual",
+        "keepEditing": "Seguir editando"
     }
 }
