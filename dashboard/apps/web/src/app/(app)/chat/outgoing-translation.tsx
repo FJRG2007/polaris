@@ -97,7 +97,7 @@ export function OutgoingTranslationStrip({
             {preview.phase === "ready" && (
                 <p
                     data-testid="outgoing-translation"
-                    className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-sm"
+                    className="max-h-40 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words text-sm"
                 >
                     {/* The Markdown that goes, read as the room reads it rather
                         than with its asterisks and brackets showing. */}

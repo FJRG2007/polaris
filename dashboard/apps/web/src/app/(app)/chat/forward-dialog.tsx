@@ -563,7 +563,7 @@ function NoteReviewPanel({
                                 </p>
                                 <p
                                     data-testid="forward-note-translation"
-                                    className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-sm"
+                                    className="max-h-32 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words text-sm"
                                 >
                                     {plainText(outcome.text)}
                                 </p>
