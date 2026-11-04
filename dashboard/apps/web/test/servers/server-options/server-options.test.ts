@@ -150,6 +150,31 @@ describe("listServerOptionsAction", () => {
         ]);
     });
 
+    it("reads an agent session's servers under the agents grant, enrolled ones only", async () => {
+        findMany.mockResolvedValue([host(1)]);
+        sessionCan.mockImplementation(async (_user, permission) => permission === "agents.manage");
+        const result = await listServerOptionsAction({ purpose: "agentSession" });
+        expect(result).toEqual({ items: [expect.objectContaining({ id: host(1).id })], next: null });
+        expect(sessionCan.mock.calls.map(([, permission]) => permission)).toEqual([
+            "agents.manage"
+        ]);
+        expect(lastQuery().where.AND).toContainEqual({ status: "active" });
+        expect(lastQuery().where.AND[0]).toEqual({ ownerId: ME });
+    });
+
+    it("lists nothing for an agent session without the agents grant", async () => {
+        sessionCan.mockImplementation(async (_user, permission) => permission !== "agents.manage");
+        const result = await listServerOptionsAction({ purpose: "agentSession" });
+        expect(result).toEqual({ error: "asyncSelect.failed" });
+        expect(findMany).not.toHaveBeenCalled();
+    });
+
+    it("keeps the purpose's narrowing even when the picker asks for a wider list", async () => {
+        findMany.mockResolvedValue([]);
+        await listServerOptionsAction({ purpose: "agentSession", filter: { active: false } });
+        expect(lastQuery().where.AND).toContainEqual({ status: "active" });
+    });
+
     it("treats a hand-made cursor as the top rather than an error", async () => {
         findMany.mockResolvedValue([]);
         await listServerOptionsAction({ cursor: "not-a-cursor" });

@@ -63,7 +63,6 @@ vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     sessionChoicesAction: async () => ({
         agents: [],
         repos: [],
-        hosts: [],
         sharedWorkspace: false
     }),
     startSessionAction: async () => ({ id: "started" }),

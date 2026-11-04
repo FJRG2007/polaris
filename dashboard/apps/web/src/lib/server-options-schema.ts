@@ -16,6 +16,8 @@ export const serverFilterSchema = z
     .object({
         /** Only servers whose Polaris login may act as root. */
         root: z.boolean().optional(),
+        /** Only servers that are enrolled and not switched off, answering or not. */
+        active: z.boolean().optional(),
         /** Only servers answering now. */
         online: z.boolean().optional(),
         /** Only servers with a container engine Polaris has reached. */
@@ -28,6 +30,10 @@ export const serverFilterSchema = z
     .strict();
 
 export type ServerFilter = z.infer<typeof serverFilterSchema>;
+
+/** Features that pick a server under their own grant rather than the server tools'. */
+export const serverPurposeSchema = z.enum(["agentSession"]);
+export type ServerPurpose = z.infer<typeof serverPurposeSchema>;
 
 /** The machine Polaris runs on, offered under this id where a screen deploys to it
  *  without it being enrolled. */
@@ -53,7 +59,10 @@ export const serverOptionsRequestSchema = z
         includeLocal: z.boolean().optional(),
         /** The servers of the project this environment belongs to, rather than the
          *  caller's own: what a service in it may be deployed to. */
-        environmentId: z.string().uuid().optional()
+        environmentId: z.string().uuid().optional(),
+        /** What the choice is for, when that is not a server tool: the list is then
+         *  read under that feature's grant and narrowed to what it accepts. */
+        purpose: serverPurposeSchema.optional()
     })
     .strict();
 

@@ -26,6 +26,7 @@ import {
     SignInNotice
 } from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
+import { ServerPicker } from "@/components/server-picker";
 import { startSessionAction, stopSessionAction } from "./actions";
 import type { GithubInstallGap } from "@/lib/github-app-reach";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
@@ -79,7 +80,6 @@ const ORDER: Record<core.AgentSessionState, number> = {
 interface Choices {
     agents: AgentOption[];
     repos: { id: string; name: string }[];
-    hosts: { id: string; name: string }[];
     /** Whether this deployment offers a machine everybody shares. */
     sharedWorkspace: boolean;
 }
@@ -417,14 +417,12 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             <span className="text-xs text-muted-foreground">
                                 {t("sessions.form.whichServer")}
                             </span>
-                            <Select
-                                value={hostId}
+                            <ServerPicker
+                                value={hostId || null}
                                 onValueChange={setHostId}
-                                options={(choices?.hosts ?? []).map((host) => ({
-                                    value: host.id,
-                                    label: host.name
-                                }))}
+                                purpose="agentSession"
                                 placeholder={t("sessions.form.pickServer")}
+                                aria-label={t("sessions.form.whichServer")}
                             />
                         </label>
                     ) : null}

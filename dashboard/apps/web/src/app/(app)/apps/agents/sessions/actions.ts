@@ -55,29 +55,22 @@ const SESSIONS_PATH = "/apps/agents/sessions";
 export async function sessionChoicesAction(): Promise<{
     agents: AgentOption[];
     repos: { id: string; name: string }[];
-    hosts: { id: string; name: string }[];
     /** Whether this deployment offers a machine everybody shares. */
     sharedWorkspace: boolean;
 }> {
     const user = await requirePermission("agents.manage");
-    const [repos, hosts, sharedWorkspace] = await Promise.all([
+    const [repos, sharedWorkspace] = await Promise.all([
         prisma.agentRepo.findMany({
             where: { ownerId: user.id, enabled: true },
             select: { id: true, repoFullName: true },
             orderBy: { repoFullName: "asc" }
-        }),
-        prisma.host.findMany({
-            where: { ownerId: user.id, status: "active" },
-            select: { id: true, name: true },
-            orderBy: { name: "asc" }
         }),
         sharedWorkspaceAllowed()
     ]);
     return {
         sharedWorkspace,
         agents: await agentOptionsFor(user.id),
-        repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
-        hosts
+        repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName }))
     };
 }
 

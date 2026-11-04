@@ -14,7 +14,7 @@ import * as ui from "@polaris/ui";
 import { useCallback } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { listServerOptionsAction } from "@/app/(app)/server-options-actions";
-import type { ServerFilter, ServerOption } from "@/lib/server-options-schema";
+import type { ServerFilter, ServerOption, ServerPurpose } from "@/lib/server-options-schema";
 
 /** The cache every server picker's pages live under. */
 export const SERVER_OPTIONS_CACHE = "servers:";
@@ -26,6 +26,8 @@ interface ServerScope {
     includeLocal?: boolean;
     /** A project environment's servers - its owner's - rather than the caller's. */
     environmentId?: string;
+    /** A feature that picks under its own grant, such as an agent session. */
+    purpose?: ServerPurpose;
 }
 
 async function readPage(
@@ -53,9 +55,9 @@ interface CommonProps extends ServerScope {
     "aria-label"?: string;
 }
 
-function useServerLoad({ filter, includeLocal, environmentId }: ServerScope) {
+function useServerLoad({ filter, includeLocal, environmentId, purpose }: ServerScope) {
     // The key is the scope: a new object with the same filters is the same list.
-    const key = JSON.stringify({ filter: filter ?? {}, includeLocal, environmentId });
+    const key = JSON.stringify({ filter: filter ?? {}, includeLocal, environmentId, purpose });
     const load = useCallback<ui.AsyncLoad<ServerOption>>(
         ({ query, cursor }) => readPage(query, cursor, JSON.parse(key) as ServerScope),
         [key]
@@ -82,6 +84,7 @@ export function ServerPicker({
     filter,
     includeLocal,
     environmentId,
+    purpose,
     placeholder,
     ...rest
 }: CommonProps & {
@@ -92,7 +95,12 @@ export function ServerPicker({
     selectedLabel?: string;
 }) {
     const t = useTranslations("components");
-    const { load, resolve, cacheKey } = useServerLoad({ filter, includeLocal, environmentId });
+    const { load, resolve, cacheKey } = useServerLoad({
+        filter,
+        includeLocal,
+        environmentId,
+        purpose
+    });
     return (
         <ui.AsyncSelect<ServerOption>
             {...rest}
@@ -119,6 +127,7 @@ export function ServerMultiPicker({
     filter,
     includeLocal,
     environmentId,
+    purpose,
     placeholder,
     ...rest
 }: CommonProps & {
@@ -127,7 +136,12 @@ export function ServerMultiPicker({
     selectedLabels?: Readonly<Record<string, string>>;
 }) {
     const t = useTranslations("components");
-    const { load, resolve, cacheKey } = useServerLoad({ filter, includeLocal, environmentId });
+    const { load, resolve, cacheKey } = useServerLoad({
+        filter,
+        includeLocal,
+        environmentId,
+        purpose
+    });
     return (
         <ui.AsyncMultiSelect<ServerOption>
             {...rest}
