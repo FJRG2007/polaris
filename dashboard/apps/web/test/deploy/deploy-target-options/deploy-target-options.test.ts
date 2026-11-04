@@ -14,6 +14,10 @@ vi.mock("@/lib/session", () => ({
     requireAdmin: () => requireAdmin(),
     requirePermission: (permission: string) => requirePermission(permission)
 }));
+const projectAccess = vi.fn();
+vi.mock("@/lib/deploy-project-access", () => ({
+    requireProjectAccess: (...args: unknown[]) => projectAccess(...args)
+}));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 
 const { listDeployTargetOptionsAction, listServiceOptionsAction } =
@@ -65,6 +69,29 @@ describe("listDeployTargetOptionsAction", () => {
             kind: { not: "local" },
             owner: { isAdmin: true }
         });
+    });
+
+    it("lists a project owner's servers under read access to the project", async () => {
+        targets.mockResolvedValue([]);
+        projectAccess.mockResolvedValue({ ownerId: ADMIN });
+        const project = "55555555-5555-4555-8555-555555555555";
+        await listDeployTargetOptionsAction({ scope: "project", projectId: project });
+        expect(requirePermission).toHaveBeenCalledWith("deploy.read");
+        expect(projectAccess).toHaveBeenCalledWith(project, ME, "project.read");
+        expect(last(targets).where.AND[0]).toEqual({ ownerId: ADMIN });
+    });
+
+    it("refuses the project scope without a project, and a project the caller cannot read", async () => {
+        expect(await listDeployTargetOptionsAction({ scope: "project" })).toEqual({
+            error: "asyncSelect.failed"
+        });
+        projectAccess.mockRejectedValue(new Error("Project not found"));
+        const refused = await listDeployTargetOptionsAction({
+            scope: "project",
+            projectId: "55555555-5555-4555-8555-555555555555"
+        });
+        expect(refused).toEqual({ error: "asyncSelect.failed" });
+        expect(targets).not.toHaveBeenCalled();
     });
 
     it("searches in the database and pages by name and id, one row past the page", async () => {

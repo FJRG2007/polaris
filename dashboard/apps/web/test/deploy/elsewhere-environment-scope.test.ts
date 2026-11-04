@@ -49,7 +49,10 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit: async () => undefined }));
 vi.mock("@/lib/connections/store", () => ({ listConnections: async () => [] }));
-vi.mock("@/lib/deploy-target-service", () => ({ listDeployTargets: async () => [] }));
+vi.mock("@/lib/deploy-target-service", () => ({
+    firstDeployTarget: async () => null,
+    targetLabel: (target: { name: string }) => target.name
+}));
 vi.mock("@/lib/deploy/migrate", () => ({
     moveOut: (...args: unknown[]) => moveOut(...(args as [])),
     moveHome: (...args: unknown[]) => moveHome(...(args as [])),
