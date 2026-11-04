@@ -42,10 +42,12 @@ function dm(id: string, name: string, outgoing: string | null) {
     };
 }
 
+const limit = { current: 4000 };
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         channels: [dm("c1", "Grace", "de"), dm("c2", "Ada", "de"), dm("c3", "Alan", null)],
-        spaces: []
+        spaces: [],
+        rulesFor: () => ({ maxMessageLength: limit.current })
     })
 }));
 
@@ -96,6 +98,7 @@ async function forwardNote(names: readonly RegExp[], note: string) {
 beforeEach(() => {
     forwardAction.mockClear();
     translator.current = null;
+    limit.current = 4000;
 });
 afterEach(cleanup);
 
@@ -174,6 +177,28 @@ describe("a forward's note sent where messages go out in another language", () =
         expect(await screen.findByText(/Not translated for Grace/)).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Send translation" })).toBeNull();
         expect(forwardAction).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole("button", { name: "Send as written" }));
+        await waitFor(() => expect(forwardAction).toHaveBeenCalledTimes(1));
+        expect(forwardAction).toHaveBeenCalledWith({
+            messageId: "m1",
+            channelId: "c1",
+            note: "look at this"
+        });
+    });
+
+    it("says a translation over the limit and sends the note as written", async () => {
+        limit.current = 14;
+        setTranslator(async (text) => ({
+            kind: "translated",
+            text: `DE DE DE ${text}`,
+            detected: "en"
+        }));
+        const { user } = await forwardNote([/Grace$/], "look at this");
+
+        expect(await screen.findByText(/too long for Grace/)).toBeTruthy();
+        expect(screen.queryByTestId("forward-note-translation")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Send translation" })).toBeNull();
 
         await user.click(screen.getByRole("button", { name: "Send as written" }));
         await waitFor(() => expect(forwardAction).toHaveBeenCalledTimes(1));

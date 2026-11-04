@@ -1098,6 +1098,7 @@ export async function remove(
                 data: {
                     deletedAt: new Date(),
                     body: "",
+                    translation: Prisma.DbNull,
                     pinnedAt: null,
                     pinnedById: null,
                     pinExpiresAt: null
@@ -1720,20 +1721,6 @@ interface Row {
     translation?: unknown;
 }
 
-/**
- * Fill in the two things a message row does not carry: who wrote it and what is
- * on it.
- *
- * Exported because search builds the same views from rows it selected itself,
- * and a second copy of this would be a second place for a message to be drawn
- * without its reactions.
- *
- * Both in one query for the whole page rather than per message. Author names are
- * looked up rather than joined - `authorId` is deliberately not a foreign key,
- * so a join would drop every message written by somebody who has since deleted
- * their account, which is the opposite of what a record of a conversation is
- * for.
- */
 /** The translation note on a message, as one reader may see it. */
 export function translatedView(
     row: Pick<Row, "authorId" | "deletedAt" | "translation">,
@@ -1751,6 +1738,20 @@ export function translatedView(
     };
 }
 
+/**
+ * Fill in the two things a message row does not carry: who wrote it and what is
+ * on it.
+ *
+ * Exported because search builds the same views from rows it selected itself,
+ * and a second copy of this would be a second place for a message to be drawn
+ * without its reactions.
+ *
+ * Both in one query for the whole page rather than per message. Author names are
+ * looked up rather than joined - `authorId` is deliberately not a foreign key,
+ * so a join would drop every message written by somebody who has since deleted
+ * their account, which is the opposite of what a record of a conversation is
+ * for.
+ */
 export async function decorateMessages(
     actor: ChatActor,
     rows: readonly Row[]

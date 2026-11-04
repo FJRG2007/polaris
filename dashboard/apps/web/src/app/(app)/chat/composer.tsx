@@ -47,6 +47,7 @@ import { useTextTranslator } from "@/components/text-translation/provider";
 import {
     OutgoingLanguageNote,
     OutgoingTranslationStrip,
+    fitsLength,
     sentRecord,
     type OutgoingPreview
 } from "./outgoing-translation";
@@ -767,6 +768,7 @@ export function Composer({
                     : null;
             if (shown?.phase === "working") return;
             if (shown?.phase === "ready") {
+                if (!fitsLength(shown.text, rules.maxMessageLength)) return;
                 translation = sentRecord(shown, text) ?? undefined;
                 if (translation) words = shown.text;
             } else {
@@ -1153,6 +1155,7 @@ export function Composer({
             preview.source === (isBlankMarkdown(body) ? "" : body.trim()) ? (
                 <OutgoingTranslationStrip
                     preview={preview}
+                    maxLength={rules.maxMessageLength}
                     onSendTranslation={() => void submit(body, "translated")}
                     onSendOriginal={() => void submit(body, "original")}
                     onCancel={() => setPreview(null)}

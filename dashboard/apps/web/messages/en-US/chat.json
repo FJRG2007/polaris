@@ -1300,6 +1300,7 @@
         "noteReview": "Your note, translated",
         "noteGoesTo": "To {names}",
         "noteFailedFor": "Not translated for {names}. It goes as written.",
+        "noteTooLongFor": "The translation is too long for {names}. It goes as written.",
         "aConversation": "a conversation",
         "notSentTo": "It could not be sent to {name}.",
         "notSentToAny": "It could not be sent to any of those.",
@@ -2156,6 +2157,7 @@
         "previewTitle": "This is what goes out, in {language}",
         "previewWorking": "Translating into {language}...",
         "previewFailed": "Could not translate. You can send it as written.",
+        "previewTooLong": "The translation is over the {count}-character limit. You can send it as written.",
         "sendTranslation": "Send translation",
         "sendAsWritten": "Send as written",
         "keepEditing": "Keep editing"

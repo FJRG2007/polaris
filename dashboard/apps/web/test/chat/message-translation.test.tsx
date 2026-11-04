@@ -225,11 +225,14 @@ async function surface(container: HTMLElement): Promise<HTMLElement> {
 }
 
 describe("sending in another language", () => {
-    function box(onSend: React.ComponentProps<typeof Composer>["onSend"]) {
+    function box(
+        onSend: React.ComponentProps<typeof Composer>["onSend"],
+        rules = DEFAULT_CHAT_RULES
+    ) {
         return render(
             <Composer
                 channelId="c1"
-                rules={DEFAULT_CHAT_RULES}
+                rules={rules}
                 disabled={false}
                 placeholder="Message"
                 onSend={onSend}
@@ -294,6 +297,34 @@ describe("sending in another language", () => {
             await screen.findByText("Could not translate. You can send it as written.")
         ).toBeDefined();
         expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it("offers only what was written when the translation runs past the limit", async () => {
+        fakeTranslator(() => ({
+            kind: "translated",
+            text: "Guten Morgen, ihr alle",
+            detected: "en"
+        }));
+        const onSend = vi.fn();
+        const user = userEvent.setup();
+        const { container } = box(onSend, { ...DEFAULT_CHAT_RULES, maxMessageLength: 15 });
+        await user.click(await surface(container));
+        await user.keyboard("Good morning");
+        await user.click(screen.getByRole("button", { name: "Send" }));
+
+        expect(
+            await screen.findByText(
+                "The translation is over the 15-character limit. You can send it as written."
+            )
+        ).toBeDefined();
+        expect(screen.queryByRole("button", { name: "Send translation" })).toBeNull();
+        await user.keyboard("{Enter}");
+        expect(onSend).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole("button", { name: "Send as written" }));
+        await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+        expect(onSend.mock.calls[0]![0]).toBe("Good morning");
+        expect(onSend.mock.calls[0]![6]).toBeUndefined();
     });
 
     it("sends what is in the box when it was already in that language, words typed meanwhile included", async () => {

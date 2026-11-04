@@ -42,6 +42,12 @@ export function sentRecord(
     return parsed.success ? parsed.data : null;
 }
 
+/** Whether a translation fits in a message of at most `max` characters,
+ *  counted in code points the way the server counts them. */
+export function fitsLength(text: string, max: number): boolean {
+    return [...text.trim()].length <= max;
+}
+
 /** The line that says, before anything is typed, where messages go out. */
 export function OutgoingLanguageNote({ to }: { to: string }) {
     const t = useTranslations("chat");
@@ -58,11 +64,13 @@ export function OutgoingLanguageNote({ to }: { to: string }) {
 
 export function OutgoingTranslationStrip({
     preview,
+    maxLength,
     onSendTranslation,
     onSendOriginal,
     onCancel
 }: {
     preview: OutgoingPreview;
+    maxLength: number;
     onSendTranslation: () => void;
     onSendOriginal: () => void;
     onCancel: () => void;
@@ -70,6 +78,7 @@ export function OutgoingTranslationStrip({
     const t = useTranslations("chat");
     const locale = useLocale();
     const language = languageLabel(preview.to, locale);
+    const sendable = preview.phase === "ready" && fitsLength(preview.text, maxLength);
     return (
         <div
             role="region"
@@ -98,19 +107,24 @@ export function OutgoingTranslationStrip({
             {preview.phase === "failed" && (
                 <p className="text-xs text-danger">{t("translation.previewFailed")}</p>
             )}
+            {preview.phase === "ready" && !sendable && (
+                <p className="text-xs text-danger">
+                    {t("translation.previewTooLong", { count: maxLength })}
+                </p>
+            )}
             <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button variant="ghost" size="xs" onClick={onCancel}>
                     {t("translation.keepEditing")}
                 </Button>
                 <Button
-                    variant={preview.phase === "ready" ? "outline" : "primary"}
+                    variant={sendable ? "outline" : "primary"}
                     size="xs"
                     disabled={preview.phase === "working"}
                     onClick={onSendOriginal}
                 >
                     {t("translation.sendAsWritten")}
                 </Button>
-                {preview.phase === "ready" && (
+                {sendable && (
                     <Button size="xs" onClick={onSendTranslation} autoFocus>
                         {t("translation.sendTranslation")}
                     </Button>

@@ -1300,6 +1300,7 @@
         "noteReview": "Tu nota, traducida",
         "noteGoesTo": "Para {names}",
         "noteFailedFor": "Sin traducir para {names}. Va tal cual.",
+        "noteTooLongFor": "La traducción es demasiado larga para {names}. Va tal cual.",
         "aConversation": "una conversación",
         "notSentTo": "No se pudo enviar a {name}.",
         "notSentToAny": "No se pudo enviar a ninguno.",
@@ -2156,6 +2157,7 @@
         "previewTitle": "Esto es lo que se envía, en {language}",
         "previewWorking": "Traduciendo al {language}...",
         "previewFailed": "No se pudo traducir. Puedes enviarlo tal cual.",
+        "previewTooLong": "La traducción supera el límite de {count} caracteres. Puedes enviarlo tal cual.",
         "sendTranslation": "Enviar traducción",
         "sendAsWritten": "Enviar tal cual",
         "keepEditing": "Seguir editando"
