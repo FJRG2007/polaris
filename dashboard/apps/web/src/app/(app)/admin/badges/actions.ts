@@ -63,16 +63,19 @@ export async function deleteBadgeDefinitionAction(id: unknown): Promise<Answer> 
 }
 
 export async function badgeHoldersAction(
-    id: unknown
-): Promise<Answer<{ holders: badges.BadgeHolder[] }>> {
-    return guard(await scope(), async (actor) => ({ holders: await badges.holdersOf(actor, id) }));
+    id: unknown,
+    options?: unknown
+): Promise<Answer<badges.BadgeHoldersPage>> {
+    return guard(await scope(), (actor) => badges.holdersOf(actor, id, options));
 }
 
-export async function grantBadgeAction(id: unknown, userId: unknown): Promise<Answer> {
-    return guard(await scope(), async (actor) => {
-        await badges.grantBadge(actor, id, userId);
-        return {};
-    });
+export async function grantBadgeAction(
+    id: unknown,
+    userId: unknown
+): Promise<Answer<{ created: boolean }>> {
+    return guard(await scope(), async (actor) => ({
+        created: await badges.grantBadge(actor, id, userId)
+    }));
 }
 
 export async function revokeBadgeAction(id: unknown, userId: unknown): Promise<Answer> {

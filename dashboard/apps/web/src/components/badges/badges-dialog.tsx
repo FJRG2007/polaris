@@ -83,7 +83,7 @@ export function BadgeStrip({
                             onClick={() => setOpen(badge)}
                             aria-label={t("openBadge", { name: badgeName(t, badge) })}
                             title={badgeName(t, badge)}
-                            className="flex rounded-md p-0.5 hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="flex rounded-md p-0.5 hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:p-2.5"
                         >
                             <BadgeIcon
                                 icon={badge.icon}

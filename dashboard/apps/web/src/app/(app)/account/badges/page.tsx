@@ -10,14 +10,14 @@ import { getTranslations } from "@/lib/i18n/request";
 export const dynamic = "force-dynamic";
 
 export default async function BadgesPage() {
-    const [, t] = await Promise.all([requireUser(), getTranslations("badges")]);
+    const [user, t] = await Promise.all([requireUser(), getTranslations("badges")]);
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
             </div>
-            <BadgesSettings />
+            <BadgesSettings userId={user.id} />
         </div>
     );
 }

@@ -57,7 +57,7 @@
         "audience": "Who sees {name}",
         "followAccount": "As set in Privacy",
         "people": "Choose people",
-        "privacyLink": "Who sees your badges at all is set in <link>Privacy</link>.",
+        "privacyLink": "Your <link>Privacy</link> setting decides who sees any of your badges. A badge here can only narrow it.",
         "saved": "Saved",
         "failed": "Your badges could not be saved. Try again."
     },
@@ -81,6 +81,9 @@
         "empty": "No custom badges yet.",
         "noHolders": "Nobody has this badge yet.",
         "failed": "That did not work. Try again.",
+        "searchHolders": "Search people with it",
+        "noMatch": "Nobody with this badge matches.",
+        "more": "Show more",
         "icons": {
             "star": "Star",
             "heart": "Heart",

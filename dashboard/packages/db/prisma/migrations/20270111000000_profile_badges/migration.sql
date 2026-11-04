@@ -51,19 +51,13 @@ CREATE TABLE IF NOT EXISTS "BadgePreference" (
 CREATE UNIQUE INDEX IF NOT EXISTS "BadgeGrant_badgeId_userId_key" ON "BadgeGrant"("badgeId", "userId");
 CREATE INDEX IF NOT EXISTS "BadgeGrant_userId_idx" ON "BadgeGrant"("userId");
 CREATE INDEX IF NOT EXISTS "BadgeUnlock_badge_level_idx" ON "BadgeUnlock"("badge", "level");
--- The message count reads by author; call time already has its index.
-CREATE INDEX IF NOT EXISTS "ChatMessage_authorId_idx" ON "ChatMessage"("authorId");
 
 -- AddForeignKey
-DO $$ BEGIN
-    ALTER TABLE "BadgeGrant" ADD CONSTRAINT "BadgeGrant_badgeId_fkey" FOREIGN KEY ("badgeId") REFERENCES "BadgeDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-    ALTER TABLE "BadgeGrant" ADD CONSTRAINT "BadgeGrant_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-    ALTER TABLE "BadgeUnlock" ADD CONSTRAINT "BadgeUnlock_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-    ALTER TABLE "BadgePreference" ADD CONSTRAINT "BadgePreference_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "BadgeGrant" DROP CONSTRAINT IF EXISTS "BadgeGrant_badgeId_fkey";
+ALTER TABLE "BadgeGrant" ADD CONSTRAINT "BadgeGrant_badgeId_fkey" FOREIGN KEY ("badgeId") REFERENCES "BadgeDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BadgeGrant" DROP CONSTRAINT IF EXISTS "BadgeGrant_userId_fkey";
+ALTER TABLE "BadgeGrant" ADD CONSTRAINT "BadgeGrant_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BadgeUnlock" DROP CONSTRAINT IF EXISTS "BadgeUnlock_userId_fkey";
+ALTER TABLE "BadgeUnlock" ADD CONSTRAINT "BadgeUnlock_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BadgePreference" DROP CONSTRAINT IF EXISTS "BadgePreference_userId_fkey";
+ALTER TABLE "BadgePreference" ADD CONSTRAINT "BadgePreference_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

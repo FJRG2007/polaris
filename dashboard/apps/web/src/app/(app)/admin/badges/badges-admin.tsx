@@ -8,7 +8,7 @@
 
 import * as core from "@polaris/core";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PeoplePicker } from "@/components/people-picker";
 import { BadgeIcon } from "@/components/badges/badge-icon";
 import { Pencil, Plus, Trash2, Users, X } from "lucide-react";
@@ -320,13 +320,52 @@ function HoldersDialog({
     const t = useTranslations("badges");
     const toast = useToast();
     const [holders, setHolders] = useState<BadgeHolder[] | null>(null);
+    const [next, setNext] = useState<string | null>(null);
+    const [query, setQuery] = useState("");
+    const [loadingMore, setLoadingMore] = useState(false);
+    // Only the answer to the newest search is kept; a slower older one is dropped.
+    const asked = useRef(0);
 
     useEffect(() => {
-        void badgeHoldersAction(badge.id).then((answer) => {
-            if (answer.error !== undefined) toast.show({ title: answer.error });
-            else setHolders(answer.holders);
+        const ticket = ++asked.current;
+        setHolders(null);
+        const timer = setTimeout(
+            () =>
+                void badgeHoldersAction(badge.id, { query }).then((answer) => {
+                    if (ticket !== asked.current) return;
+                    if (answer.error !== undefined) {
+                        toast.show({ title: answer.error });
+                        setHolders([]);
+                        return;
+                    }
+                    setHolders(answer.holders);
+                    setNext(answer.next);
+                }),
+            query ? 250 : 0
+        );
+        return () => clearTimeout(timer);
+    }, [badge.id, query]);
+
+    const loadMore = async () => {
+        if (!next || loadingMore) return;
+        const ticket = asked.current;
+        setLoadingMore(true);
+        const answer = await badgeHoldersAction(badge.id, { query, cursor: next });
+        setLoadingMore(false);
+        if (ticket !== asked.current) return;
+        if (answer.error !== undefined) {
+            toast.show({ title: answer.error });
+            return;
+        }
+        setHolders((current) => {
+            const known = new Set((current ?? []).map((holder) => holder.id));
+            return [
+                ...(current ?? []),
+                ...answer.holders.filter((holder) => !known.has(holder.id))
+            ];
         });
-    }, [badge.id]);
+        setNext(answer.next);
+    };
 
     const grant = async (person: { id: string; name: string }) => {
         if (holders?.some((holder) => holder.id === person.id)) return;
@@ -346,6 +385,8 @@ function HoldersDialog({
             setHolders(before);
             onChanged(-1);
             toast.show({ title: answer.error });
+        } else if (!answer.created) {
+            onChanged(-1);
         }
     };
 
@@ -376,9 +417,19 @@ function HoldersDialog({
                         for (const person of picked) void grant(person);
                     }}
                 />
+                <Input
+                    type="search"
+                    value={query}
+                    maxLength={100}
+                    placeholder={t("admin.searchHolders")}
+                    aria-label={t("admin.searchHolders")}
+                    onChange={(event) => setQuery(event.target.value)}
+                />
                 {holders === null && <Skeleton className="h-10 w-full" />}
                 {holders?.length === 0 && (
-                    <p className="text-sm text-muted-foreground">{t("admin.noHolders")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {query.trim() ? t("admin.noMatch") : t("admin.noHolders")}
+                    </p>
                 )}
                 {holders && holders.length > 0 && (
                     <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto">
@@ -417,6 +468,19 @@ function HoldersDialog({
                                 </Button>
                             </li>
                         ))}
+                        {next && (
+                            <li className="py-2">
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="w-full"
+                                    disabled={loadingMore}
+                                    onClick={() => void loadMore()}
+                                >
+                                    {t("admin.more")}
+                                </Button>
+                            </li>
+                        )}
                     </ul>
                 )}
             </DialogContent>

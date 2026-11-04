@@ -8,6 +8,9 @@
  * and never moved, so the date survives the activity behind it (a deleted
  * message does not take a level back).
  *
+ * Rarity is counted over the whole instance by the scheduled sweep and kept as
+ * one setting, so drawing a badge never counts the table behind it.
+ *
  * Every read of somebody else's badges goes through `badgesFor`, which applies
  * the account's `badges` privacy rule, each badge's own rule, and hiding.
  */
@@ -132,8 +135,11 @@ export interface BadgeArrangement {
  * Owned badges first, then the ladders not started yet.
  */
 export async function evaluateBadges(userId: string, now = new Date()): Promise<BadgeView[]> {
-    const [user, values, grants, unlocks] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
+    const [user, values, grants, unlocks, rarity] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: userId },
+            select: { isAdmin: true, createdAt: true }
+        }),
         activityValues(userId, now),
         prisma.badgeGrant.findMany({
             where: { userId },
@@ -144,11 +150,12 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
             orderBy: { grantedAt: "asc" },
             take: core.MOST_BADGE_PREFERENCES
         }),
-        unlocksOf(userId)
+        unlocksOf(userId),
+        storedRarity()
     ]);
     if (!user) return [];
 
-    const reached = await recordUnlocks(userId, user.isAdmin, values, unlocks, now);
+    const reached = await recordUnlocks(userId, user, values, unlocks, now);
     const dateOf = (badge: string, level: number): Date => reached.get(`${badge}#${level}`) ?? now;
 
     const staff = user.isAdmin ? dateOf(core.STAFF_BADGE, 1) : null;
@@ -164,11 +171,6 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
         }));
         return { id, key, ladder, progress, levels };
     });
-
-    const rarity = await rarities(
-        ladders.map((entry) => ({ key: entry.key, level: Math.max(1, entry.progress.level) })),
-        grants.map((grant) => grant.badge.id)
-    );
 
     const views: BadgeView[] = [];
     if (staff) {
@@ -203,7 +205,7 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
             top: 1,
             levelName: null,
             unlockedAt: grant.grantedAt.toISOString(),
-            rarity: rarity.custom.get(grant.badge.id) ?? 0,
+            rarity: rarity.custom[grant.badge.id] ?? 0,
             unit: null,
             progress: null,
             levels: []
@@ -221,7 +223,7 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
         top: entry.progress.top,
         levelName: core.levelName(entry.progress.level),
         unlockedAt: entry.levels[entry.progress.level - 1]?.unlockedAt ?? null,
-        rarity: rarity.ladder.get(`${entry.key}#${Math.max(1, entry.progress.level)}`) ?? 0,
+        rarity: rarity.ladder[`${entry.key}#${Math.max(1, entry.progress.level)}`] ?? 0,
         unit: entry.ladder.unit,
         progress: {
             value: entry.progress.value,
@@ -247,45 +249,59 @@ function unlocksOf(userId: string): Promise<UnlockRow[]> {
 /**
  * Write the day of every level this person has reached and that is not
  * recorded yet, and answer every recorded day by `badge#level`. A level is
- * written once and never moved or removed.
+ * written once and never moved or removed. A tenure level carries the day it
+ * was really reached, which the account's age says exactly; every other level
+ * is dated when it is first noticed.
  */
 async function recordUnlocks(
     userId: string,
-    isAdmin: boolean,
+    user: { isAdmin: boolean; createdAt: Date },
     values: BadgeValues,
     known: readonly UnlockRow[],
     now: Date
 ): Promise<Map<string, Date>> {
     const reached = new Map(known.map((row) => [`${row.badge}#${row.level}`, row.unlockedAt]));
-    const due: { badge: string; level: number }[] = isAdmin
-        ? [{ badge: core.STAFF_BADGE, level: 1 }]
+    const due: UnlockRow[] = user.isAdmin
+        ? [{ badge: core.STAFF_BADGE, level: 1, unlockedAt: now }]
         : [];
     for (const id of core.BADGE_LADDER_IDS) {
-        const { level } = core.ladderProgress(core.BADGE_LADDERS[id].thresholds, values[id]);
-        for (let at = 1; at <= level; at++) due.push({ badge: core.ladderKey(id), level: at });
+        const { thresholds } = core.BADGE_LADDERS[id];
+        const { level } = core.ladderProgress(thresholds, values[id]);
+        for (let at = 1; at <= level; at++) {
+            const unlockedAt =
+                id === "tenure" ? tenureDay(user.createdAt, thresholds[at - 1]!, now) : now;
+            due.push({ badge: core.ladderKey(id), level: at, unlockedAt });
+        }
     }
     const missing = due.filter((row) => !reached.has(`${row.badge}#${row.level}`));
     if (missing.length > 0) {
         await prisma.badgeUnlock.createMany({
-            data: missing.map((row) => ({ userId, ...row, unlockedAt: now })),
+            data: missing.map((row) => ({ userId, ...row })),
             skipDuplicates: true
         });
-        for (const row of missing) reached.set(`${row.badge}#${row.level}`, now);
+        for (const row of missing) reached.set(`${row.badge}#${row.level}`, row.unlockedAt);
     }
     return reached;
+}
+
+/** The day an account made at `createdAt` turned `days` old, never later than now. */
+function tenureDay(createdAt: Date, days: number, now: Date): Date {
+    return new Date(Math.min(now.getTime(), createdAt.getTime() + days * DAY_MS));
 }
 
 /** People one sweep pass reaches, a batch at a time. */
 const SWEEP_BATCH = 200;
 const SWEEP_BATCHES = 5;
 const SWEEP_CURSOR = "badges.unlockSweepCursor";
+const RARITY_KEY = "badges.rarity";
 
 /**
  * Record the levels everybody has reached, not only the people whose profile
  * somebody opened - rarity is counted from these rows, so it has to see the
  * whole instance. A pass walks people in id order from where the last one
  * stopped, a bounded number of batches, and starts over once it reaches the
- * end. Re-running it is harmless: a level already written is left alone.
+ * end, then counts rarity from what is recorded and keeps it for every screen
+ * to read. Re-running it is harmless: a level already written is left alone.
  */
 export async function sweepBadgeUnlocks(now = new Date()): Promise<{ people: number }> {
     let cursor = await getSetting(SWEEP_CURSOR);
@@ -295,13 +311,13 @@ export async function sweepBadgeUnlocks(now = new Date()): Promise<{ people: num
             where: cursor ? { id: { gt: cursor } } : {},
             orderBy: { id: "asc" },
             take: SWEEP_BATCH,
-            select: { id: true, isAdmin: true }
+            select: { id: true, isAdmin: true, createdAt: true }
         });
         for (const user of users) {
             // One person whose activity cannot be read is not a reason to stop
             // at them on every pass: they are tried again next time round.
             await Promise.all([activityValues(user.id, now), unlocksOf(user.id)])
-                .then(([values, known]) => recordUnlocks(user.id, user.isAdmin, values, known, now))
+                .then(([values, known]) => recordUnlocks(user.id, user, values, known, now))
                 .catch((error) => console.error("polaris: could not record badge levels:", error));
         }
         people += users.length;
@@ -309,42 +325,55 @@ export async function sweepBadgeUnlocks(now = new Date()): Promise<{ people: num
         if (!cursor) break;
     }
     await setSetting(SWEEP_CURSOR, cursor);
+    await setSetting(RARITY_KEY, JSON.stringify(await countRarity()));
     return { people };
 }
 
-/** Holders over people, for every badge in view: three grouped reads, whatever the count. */
-async function rarities(
-    ladders: readonly { key: string; level: number }[],
-    customIds: readonly string[]
-): Promise<{ staff: number; ladder: Map<string, number>; custom: Map<string, number> }> {
+const percentSchema = z.number().finite().min(0).max(100);
+const raritySchema = z.object({
+    staff: percentSchema,
+    ladder: z.record(z.string(), percentSchema),
+    custom: z.record(z.string(), percentSchema)
+});
+type Rarity = z.infer<typeof raritySchema>;
+const NO_RARITY: Rarity = { staff: 0, ladder: {}, custom: {} };
+
+/** Holders over people for every badge on the instance: four grouped reads, whatever the count. */
+async function countRarity(): Promise<Rarity> {
     const [people, admins, levels, grants] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { isAdmin: true } }),
         prisma.badgeUnlock.groupBy({
             by: ["badge", "level"],
-            where: { badge: { in: ladders.map((entry) => entry.key) } },
+            where: { badge: { in: core.BADGE_LADDER_IDS.map((id) => core.ladderKey(id)) } },
             _count: { _all: true }
         }),
-        customIds.length > 0
-            ? prisma.badgeGrant.groupBy({
-                  by: ["badgeId"],
-                  where: { badgeId: { in: [...customIds] } },
-                  _count: { _all: true }
-              })
-            : Promise.resolve([] as { badgeId: string; _count: { _all: number } }[])
+        prisma.badgeGrant.groupBy({ by: ["badgeId"], _count: { _all: true } })
     ]);
     return {
         staff: core.rarityPercent(admins, people),
-        ladder: new Map(
+        ladder: Object.fromEntries(
             levels.map((row) => [
                 `${row.badge}#${row.level}`,
                 core.rarityPercent(row._count._all, people)
             ])
         ),
-        custom: new Map(
+        custom: Object.fromEntries(
             grants.map((row) => [row.badgeId, core.rarityPercent(row._count._all, people)])
         )
     };
+}
+
+/** What the last sweep counted; before the first one, nobody holds anything. */
+async function storedRarity(): Promise<Rarity> {
+    const raw = await getSetting(RARITY_KEY);
+    if (!raw) return NO_RARITY;
+    try {
+        const parsed = raritySchema.safeParse(JSON.parse(raw));
+        return parsed.success ? parsed.data : NO_RARITY;
+    } catch {
+        return NO_RARITY;
+    }
 }
 
 /** How this person arranged their badges, in their order. */
@@ -548,7 +577,12 @@ export async function deleteDefinition(actor: BadgeActor, id: unknown): Promise<
     ]);
 }
 
-export async function grantBadge(actor: BadgeActor, id: unknown, userId: unknown): Promise<void> {
+/** Give a badge; answers whether the person did not hold it already. */
+export async function grantBadge(
+    actor: BadgeActor,
+    id: unknown,
+    userId: unknown
+): Promise<boolean> {
     assertAdmin(actor);
     const badgeId = uuid(id);
     const holder = uuid(userId);
@@ -558,11 +592,11 @@ export async function grantBadge(actor: BadgeActor, id: unknown, userId: unknown
     ]);
     if (!badge) throw new BadgeError("That badge no longer exists");
     if (!person) throw new BadgeError("That person no longer exists");
-    await prisma.badgeGrant.upsert({
-        where: { badgeId_userId: { badgeId, userId: holder } },
-        create: { badgeId, userId: holder, grantedById: actor.id },
-        update: {}
+    const { count } = await prisma.badgeGrant.createMany({
+        data: [{ badgeId, userId: holder, grantedById: actor.id }],
+        skipDuplicates: true
     });
+    return count > 0;
 }
 
 export async function revokeBadge(actor: BadgeActor, id: unknown, userId: unknown): Promise<void> {
@@ -584,17 +618,64 @@ export interface BadgeHolder {
     grantedAt: string;
 }
 
+export interface BadgeHoldersPage {
+    holders: BadgeHolder[];
+    /** Where the next page starts, or null when this one is the last. */
+    next: string | null;
+}
+
 const HOLDERS_PAGE = 50;
 
-export async function holdersOf(actor: BadgeActor, id: unknown): Promise<BadgeHolder[]> {
+const holdersQuerySchema = z.object({
+    query: z
+        .string()
+        .transform((value) => value.trim())
+        .pipe(z.string().max(100))
+        .default(""),
+    cursor: z.string().uuid().nullable().default(null)
+});
+
+/**
+ * One page of the people holding a badge, newest first, narrowed to a name or
+ * username when a search is given. Each page starts after the grant the last
+ * one ended on.
+ */
+export async function holdersOf(
+    actor: BadgeActor,
+    id: unknown,
+    options: unknown = {}
+): Promise<BadgeHoldersPage> {
     assertAdmin(actor);
+    const badgeId = uuid(id);
+    const parsed = holdersQuerySchema.safeParse(options ?? {});
+    if (!parsed.success) throw new BadgeError("That search is not valid");
+    const { query, cursor } = parsed.data;
+    const named = query
+        ? {
+              user: {
+                  OR: [
+                      { name: { contains: query, mode: "insensitive" as const } },
+                      { username: { contains: query, mode: "insensitive" as const } }
+                  ]
+              }
+          }
+        : {};
     const rows = await prisma.badgeGrant.findMany({
-        where: { badgeId: uuid(id) },
-        orderBy: { grantedAt: "desc" },
-        take: HOLDERS_PAGE,
-        select: { grantedAt: true, user: { select: { id: true, name: true, username: true } } }
+        where: { badgeId, ...named },
+        orderBy: [{ grantedAt: "desc" }, { id: "desc" }],
+        take: HOLDERS_PAGE + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: {
+            id: true,
+            grantedAt: true,
+            user: { select: { id: true, name: true, username: true } }
+        }
     });
-    return rows.map((row) => ({ ...row.user, grantedAt: row.grantedAt.toISOString() }));
+    const page = rows.slice(0, HOLDERS_PAGE);
+    return {
+        holders: page.map((row) => ({ ...row.user, grantedAt: row.grantedAt.toISOString() })),
+        next: rows.length > HOLDERS_PAGE ? page[page.length - 1]!.id : null
+    };
 }
 
 function uuid(value: unknown): string {

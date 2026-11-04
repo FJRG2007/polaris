@@ -10582,7 +10582,7 @@ model UserPrivacy {
     // that audience and never widens it.
     activity     String   @default("everyone")
     // Who sees the badges on the profile, and the progress behind them. A badge
-    // may narrow or widen this for itself on its BadgePreference row.
+    // may narrow this for itself on its BadgePreference row, never widen it.
     badges       String   @default("everyone")
     updatedAt    DateTime @updatedAt
 
@@ -16323,8 +16323,8 @@ model BadgeUnlock {
 }
 
 // How one person shows one badge: its place in the row, whether it is hidden,
-// and who may see it when that differs from the account's badges setting.
-// `audience` null follows the account setting.
+// and who among the people the account's badges setting lets through may see
+// it. `audience` null follows the account setting.
 model BadgePreference {
     userId   String   @db.Uuid
     badge    String

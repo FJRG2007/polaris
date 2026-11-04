@@ -39,11 +39,13 @@ interface Pref {
 let people: Person[] = [];
 let unlocks: Unlock[] = [];
 let prefs: Pref[] = [];
-let grants: { badgeId: string; userId: string; grantedAt: Date }[] = [];
+let grants: { id: string; badgeId: string; userId: string; grantedAt: Date }[] = [];
 let settings = new Map<string, string>();
 /** Whether the account-wide `badges` rule lets the viewer through. */
 let accountRuleAllows = true;
 const upsertGrant = vi.fn();
+
+const grantId = (index: number) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
 
 const definitions = [{ id: BADGE, name: "Helper", description: "", icon: "star" }];
 
@@ -72,22 +74,46 @@ vi.mock("@polaris/db", () => ({
         gamePlayerLink: { findMany: async () => [] },
         $queryRaw: async () => [{ seconds: 0 }],
         badgeGrant: {
-            findMany: async ({ where }: { where: { userId: string } }) =>
-                grants
-                    .filter((g) => g.userId === where.userId)
+            findMany: async (args: {
+                where: { userId?: string; badgeId?: string };
+                take?: number;
+                cursor?: { id: string };
+            }) => {
+                if (args.where.badgeId) {
+                    const ordered = grants
+                        .filter((g) => g.badgeId === args.where.badgeId)
+                        .sort((a, b) => b.id.localeCompare(a.id));
+                    const start = args.cursor
+                        ? ordered.findIndex((g) => g.id === args.cursor!.id) + 1
+                        : 0;
+                    return ordered.slice(start, start + (args.take ?? ordered.length)).map((g) => ({
+                        id: g.id,
+                        grantedAt: g.grantedAt,
+                        user: { id: g.userId, name: g.userId, username: null }
+                    }));
+                }
+                return grants
+                    .filter((g) => g.userId === args.where.userId)
                     .map((g) => ({
                         grantedAt: g.grantedAt,
                         badge: definitions.find((d) => d.id === g.badgeId)!
-                    })),
-            groupBy: async ({ where }: { where: { badgeId: { in: string[] } } }) =>
-                where.badgeId.in.map((badgeId) => ({
+                    }));
+            },
+            groupBy: async () =>
+                [...new Set(grants.map((g) => g.badgeId))].map((badgeId) => ({
                     badgeId,
                     _count: { _all: grants.filter((g) => g.badgeId === badgeId).length }
                 })),
-            upsert: async (args: { create: { badgeId: string; userId: string } }) => {
-                upsertGrant(args);
-                grants.push({ ...args.create, grantedAt: new Date() });
-                return {};
+            createMany: async ({ data }: { data: { badgeId: string; userId: string }[] }) => {
+                upsertGrant(data);
+                let count = 0;
+                for (const row of data) {
+                    if (grants.some((g) => g.badgeId === row.badgeId && g.userId === row.userId))
+                        continue;
+                    grants.push({ id: grantId(grants.length), ...row, grantedAt: new Date() });
+                    count += 1;
+                }
+                return { count };
             },
             deleteMany: async ({ where }: { where: { badgeId: string; userId: string } }) => {
                 grants = grants.filter(
@@ -263,6 +289,39 @@ describe("custom badges are handed out by administrators only", () => {
         ).not.toContain(`custom:${BADGE}`);
     });
 
+    it("counts a grant once, however often it is given", async () => {
+        const admin = { id: ADMIN, isAdmin: true };
+        expect(await service.grantBadge(admin, BADGE, ALICE)).toBe(true);
+        expect(await service.grantBadge(admin, BADGE, ALICE)).toBe(false);
+        expect(grants).toHaveLength(1);
+    });
+
+    it("pages through every holder, past the first page", async () => {
+        const admin = { id: ADMIN, isAdmin: true };
+        for (let index = 0; index < 120; index++) {
+            grants.push({
+                id: grantId(index),
+                badgeId: BADGE,
+                userId: grantId(1000 + index),
+                grantedAt: new Date()
+            });
+        }
+        const seen = new Set<string>();
+        let cursor: string | null = null;
+        let pages = 0;
+        do {
+            const page = await service.holdersOf(admin, BADGE, { cursor });
+            for (const holder of page.holders) seen.add(holder.id);
+            cursor = page.next;
+            pages += 1;
+        } while (cursor && pages < 10);
+        expect(seen.size).toBe(120);
+        expect(pages).toBe(3);
+        await expect(
+            service.holdersOf(admin, BADGE, { cursor: "not-an-id" })
+        ).rejects.toBeInstanceOf(service.BadgeError);
+    });
+
     it("refuses an id that is not one", async () => {
         await expect(
             service.grantBadge({ id: ADMIN, isAdmin: true }, "nope", ALICE)
@@ -272,7 +331,7 @@ describe("custom badges are handed out by administrators only", () => {
 
 describe("the owner's arrangement", () => {
     it("keeps the order and hiding as saved, and drops badges left out", async () => {
-        grants.push({ badgeId: BADGE, userId: ALICE, grantedAt: new Date() });
+        grants.push({ id: grantId(0), badgeId: BADGE, userId: ALICE, grantedAt: new Date() });
         await service.saveArrangement(ALICE, [
             { badge: "ladder:messages", hidden: false },
             { badge: `custom:${BADGE}`, hidden: true }
@@ -342,6 +401,30 @@ describe("rarity", () => {
         const admin = await service.evaluateBadges(ADMIN);
         expect(admin[0]).toMatchObject({ key: "staff", owned: true, rarity: 25 });
         expect(keys(await service.evaluateBadges(CAROL))).not.toContain("staff");
+    });
+
+    it("is read from what the sweep stored, never counted while a profile draws", async () => {
+        await service.evaluateBadges(ALICE);
+        const before = (await service.evaluateBadges(BOB)).find(
+            (badge) => badge.key === "ladder:messages"
+        )!;
+        expect(before.rarity).toBe(0);
+        await service.sweepBadgeUnlocks();
+        expect(JSON.parse(settings.get("badges.rarity")!)).toMatchObject({ staff: 25 });
+    });
+
+    it("dates a tenure level by the account's age, not by when it was noticed", async () => {
+        const made = new Date("2024-01-01T00:00:00Z");
+        people = [{ ...person(ALICE, 0), createdAt: made }];
+        const now = new Date("2026-06-01T00:00:00Z");
+        const tenure = (await service.evaluateBadges(ALICE, now)).find(
+            (badge) => badge.key === "ladder:tenure"
+        )!;
+        expect(tenure.levels[0]!.unlockedAt).toBe(new Date("2024-01-08T00:00:00Z").toISOString());
+        expect(tenure.levels[1]!.unlockedAt).toBe(new Date("2024-01-31T00:00:00Z").toISOString());
+        expect(
+            unlocks.find((row) => row.badge === "ladder:tenure" && row.level === 1)!.unlockedAt
+        ).toEqual(new Date("2024-01-08T00:00:00Z"));
     });
 
     it("never moves the day a level was first reached", async () => {

@@ -54,7 +54,7 @@
         "audience": "Quién ve {name}",
         "followAccount": "Como en Privacidad",
         "people": "Elegir gente",
-        "privacyLink": "Quién ve tus insignias se elige en <link>Privacidad</link>.",
+        "privacyLink": "Tu ajuste de <link>Privacidad</link> decide quién ve tus insignias. Aquí cada una solo puede restringirlo.",
         "saved": "Guardado",
         "failed": "No se pudieron guardar. Inténtalo otra vez."
     },
@@ -78,6 +78,9 @@
         "empty": "Aún no hay insignias propias.",
         "noHolders": "Nadie tiene esta insignia aún.",
         "failed": "No ha funcionado. Inténtalo otra vez.",
+        "searchHolders": "Buscar quién la tiene",
+        "noMatch": "Nadie con esta insignia coincide.",
+        "more": "Ver más",
         "icons": {
             "star": "Astro",
             "heart": "Corazón",

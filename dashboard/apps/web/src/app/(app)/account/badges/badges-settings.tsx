@@ -36,7 +36,7 @@ import {
 
 /** The Select value for "follow the account's badges setting". */
 const FOLLOW = "follow";
-const CACHE_KEY = "polaris.badges.mine";
+const cacheKey = (userId: string) => `polaris.badges.mine:${userId}`;
 
 interface Row {
     badge: BadgeView;
@@ -71,24 +71,24 @@ function arrangementOf(rows: readonly Row[]): BadgeArrangement[] {
     }));
 }
 
-function readCache(): MyBadges | null {
+function readCache(userId: string): MyBadges | null {
     try {
-        const raw = sessionStorage.getItem(CACHE_KEY);
+        const raw = sessionStorage.getItem(cacheKey(userId));
         return raw ? (JSON.parse(raw) as MyBadges) : null;
     } catch {
         return null;
     }
 }
 
-function writeCache(data: MyBadges): void {
+function writeCache(userId: string, data: MyBadges): void {
     try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        sessionStorage.setItem(cacheKey(userId), JSON.stringify(data));
     } catch {
         // A browser that keeps nothing still shows the screen; it only loads again.
     }
 }
 
-export function BadgesSettings() {
+export function BadgesSettings({ userId }: { userId: string }) {
     const t = useTranslations("badges");
     const tp = useTranslations("accountPrivacy");
     const toast = useToast();
@@ -102,7 +102,7 @@ export function BadgesSettings() {
     const saved = useRef<Row[]>([]);
 
     useEffect(() => {
-        const cached = readCache();
+        const cached = readCache(userId);
         const take = (next: MyBadges) => {
             setData(next);
             setRows(rowsOf(next));
@@ -112,11 +112,11 @@ export function BadgesSettings() {
         if (cached) take(cached);
         loadMyBadgesAction()
             .then((next) => {
-                writeCache(next);
+                writeCache(userId, next);
                 take(next);
             })
             .catch(() => setFailed(true));
-    }, []);
+    }, [userId]);
 
     const commit = (next: Row[]) => {
         if (JSON.stringify(arrangementOf(next)) === JSON.stringify(arrangementOf(rows))) return;
@@ -126,7 +126,7 @@ export function BadgesSettings() {
             .then((answer) => {
                 if (answer.error) throw new Error(answer.error);
                 saved.current = next;
-                if (data) writeCache({ ...data, arrangement: arrangementOf(next) });
+                if (data) writeCache(userId, { ...data, arrangement: arrangementOf(next) });
             })
             .catch(() => {
                 setRows(before);
