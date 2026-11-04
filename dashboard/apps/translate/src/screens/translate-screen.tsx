@@ -349,14 +349,17 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
             setPending(true);
             try {
                 // A long text sends only the paragraphs an edit changed.
-                const { text: translated, answer, glossary } =
-                    text.length > PIECE_MAX
-                        ? await translateReusing(text, pieces.current, translate, controller.signal)
-                        : await translate([text], controller.signal).then((made) => ({
-                              text: made.texts[0] ?? "",
-                              answer: made,
-                              glossary: made.glossary?.[0] ?? null
-                          }));
+                const {
+                    text: translated,
+                    answer,
+                    glossary
+                } = text.length > PIECE_MAX
+                    ? await translateReusing(text, pieces.current, translate, controller.signal)
+                    : await translate([text], controller.signal).then((made) => ({
+                          text: made.texts[0] ?? "",
+                          answer: made,
+                          glossary: made.glossary?.[0] ?? null
+                      }));
                 if (ticket !== latest.current) return;
                 setTarget(translated);
                 setTermsUsed(glossary);

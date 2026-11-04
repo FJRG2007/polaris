@@ -68,8 +68,13 @@ describe("protect and restore", () => {
     });
 
     it("matches in any case and carries the capital over", () => {
-        const shielded = protect(["Server down. the server is up. SERVER!"], terms([["server", "servidor"]]));
-        expect(restore(shielded.texts, shielded)).toEqual(["Servidor down. the servidor is up. SERVIDOR!"]);
+        const shielded = protect(
+            ["Server down. the server is up. SERVER!"],
+            terms([["server", "servidor"]])
+        );
+        expect(restore(shielded.texts, shielded)).toEqual([
+            "Servidor down. the servidor is up. SERVIDOR!"
+        ]);
     });
 
     it("matches whole words only, next to punctuation", () => {
@@ -77,14 +82,19 @@ describe("protect and restore", () => {
             ["cat, (cat) cat. «cat» concat cats cat's"],
             terms([["cat", "gato"]])
         );
-        expect(restore(shielded.texts, shielded)).toEqual(["gato, (gato) gato. «gato» concat cats gato's"]);
+        expect(restore(shielded.texts, shielded)).toEqual([
+            "gato, (gato) gato. «gato» concat cats gato's"
+        ]);
     });
 
     it("prefers the longest term", () => {
-        const shielded = protect(["New York City and New York"], terms([
-            ["New York", "Nueva York"],
-            ["New York City", "Ciudad de Nueva York"]
-        ]));
+        const shielded = protect(
+            ["New York City and New York"],
+            terms([
+                ["New York", "Nueva York"],
+                ["New York City", "Ciudad de Nueva York"]
+            ])
+        );
         expect(restore(shielded.texts, shielded)).toEqual(["Ciudad de Nueva York and Nueva York"]);
     });
 
@@ -143,9 +153,14 @@ describe("input", () => {
 
     it("refuses a blank term, the same language twice, and too many entries", () => {
         const base = { name: "G", from: "en", to: "es", isDefault: false };
-        expect(glossaryInput.safeParse({ ...base, entries: [{ source: " ", target: "x" }] }).success).toBe(false);
+        expect(
+            glossaryInput.safeParse({ ...base, entries: [{ source: " ", target: "x" }] }).success
+        ).toBe(false);
         expect(glossaryInput.safeParse({ ...base, to: "en", entries: [] }).success).toBe(false);
-        const many = Array.from({ length: ENTRIES_MAX + 1 }, (_, i) => ({ source: `t${i}`, target: "x" }));
+        const many = Array.from({ length: ENTRIES_MAX + 1 }, (_, i) => ({
+            source: `t${i}`,
+            target: "x"
+        }));
         expect(glossaryInput.safeParse({ ...base, entries: many }).success).toBe(false);
         expect(keepInput.parse([" Polaris ", "polaris", "Enigma"])).toEqual(["polaris", "Enigma"]);
     });

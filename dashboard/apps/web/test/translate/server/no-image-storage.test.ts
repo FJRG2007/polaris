@@ -30,8 +30,21 @@ describe("translating a picture keeps no picture", () => {
 
     it("writes nothing where a picture or a recording is received", () => {
         const sources = [
-            ...files(join(dashboard, "apps", "translate", "src", "routes", "api", "translate", "image")),
-            ...files(join(dashboard, "apps", "translate", "src", "routes", "api", "translate", "transcribe")),
+            ...files(
+                join(dashboard, "apps", "translate", "src", "routes", "api", "translate", "image")
+            ),
+            ...files(
+                join(
+                    dashboard,
+                    "apps",
+                    "translate",
+                    "src",
+                    "routes",
+                    "api",
+                    "translate",
+                    "transcribe"
+                )
+            ),
             join(dashboard, "apps", "translate", "src", "lib", "media.ts"),
             join(dashboard, "apps", "web", "src", "lib", "translate", "server-media.ts"),
             join(dashboard, "apps", "web", "src", "app", "api", "attachments", "fetch", "route.ts")

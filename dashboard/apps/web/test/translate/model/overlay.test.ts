@@ -82,7 +82,8 @@ describe("fitText", () => {
         const fitted = fitText(text, 100, 40, measure, { min: 6, max: 30 });
         expect(fitted.size).toBeLessThan(30);
         expect(fitted.lines.length * fitted.size * LINE_HEIGHT).toBeLessThanOrEqual(40);
-        for (const line of fitted.lines) expect(measure(line, fitted.size)).toBeLessThanOrEqual(100);
+        for (const line of fitted.lines)
+            expect(measure(line, fitted.size)).toBeLessThanOrEqual(100);
         expect(fitted.lines.join(" ")).toBe(text);
     });
 

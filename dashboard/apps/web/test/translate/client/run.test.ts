@@ -48,14 +48,10 @@ describe("translateReusing", () => {
             glossary: texts.map((text) => (text.includes("term") ? "Mine" : null))
         }));
         const cache: PieceCache = { owner: null, pieces: new Map() };
-        const first = await translateReusing("a term
-
-plain", cache, translate);
+        const first = await translateReusing("a term\n\nplain", cache, translate);
         expect(first.glossary).toBe("Mine");
 
-        const edited = await translateReusing("a term
-
-plain!", cache, translate);
+        const edited = await translateReusing("a term\n\nplain!", cache, translate);
         expect(translate).toHaveBeenLastCalledWith(["plain!"], undefined);
         expect(edited.glossary).toBe("Mine");
 
@@ -91,6 +87,10 @@ describe("runTranslation", () => {
             fallback: "Failed",
             overLimit: () => "Over"
         });
-        await expect(failed).rejects.toMatchObject({ code: "rate", retryAfter: 60, message: "Too many" });
+        await expect(failed).rejects.toMatchObject({
+            code: "rate",
+            retryAfter: 60,
+            message: "Too many"
+        });
     });
 });

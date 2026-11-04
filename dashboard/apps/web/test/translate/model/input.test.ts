@@ -148,7 +148,10 @@ describe("websiteOf", () => {
 
 describe("linkedRequest", () => {
     it("fills the box and the language from a link", () => {
-        expect(linkedRequest("?text=%20Hola%20mundo%20&to=en")).toEqual({ text: "Hola mundo", to: "en" });
+        expect(linkedRequest("?text=%20Hola%20mundo%20&to=en")).toEqual({
+            text: "Hola mundo",
+            to: "en"
+        });
     });
 
     it("leaves out what is not valid and keeps the rest", () => {
@@ -166,17 +169,29 @@ describe("linkedRequest", () => {
 
 describe("dictationWay", () => {
     it("lets the server transcribe when it can and the browser records", () => {
-        expect(dictationWay({ record: true, serverTranscribes: true, browserRecognizes: true })).toBe("server");
-        expect(dictationWay({ record: true, serverTranscribes: true, browserRecognizes: false })).toBe("server");
+        expect(
+            dictationWay({ record: true, serverTranscribes: true, browserRecognizes: true })
+        ).toBe("server");
+        expect(
+            dictationWay({ record: true, serverTranscribes: true, browserRecognizes: false })
+        ).toBe("server");
     });
 
     it("falls back to the browser's recognition", () => {
-        expect(dictationWay({ record: false, serverTranscribes: true, browserRecognizes: true })).toBe("browser");
-        expect(dictationWay({ record: true, serverTranscribes: false, browserRecognizes: true })).toBe("browser");
+        expect(
+            dictationWay({ record: false, serverTranscribes: true, browserRecognizes: true })
+        ).toBe("browser");
+        expect(
+            dictationWay({ record: true, serverTranscribes: false, browserRecognizes: true })
+        ).toBe("browser");
     });
 
     it("has none when neither can", () => {
-        expect(dictationWay({ record: true, serverTranscribes: false, browserRecognizes: false })).toBeNull();
-        expect(dictationWay({ record: false, serverTranscribes: true, browserRecognizes: false })).toBeNull();
+        expect(
+            dictationWay({ record: true, serverTranscribes: false, browserRecognizes: false })
+        ).toBeNull();
+        expect(
+            dictationWay({ record: false, serverTranscribes: true, browserRecognizes: false })
+        ).toBeNull();
     });
 });
