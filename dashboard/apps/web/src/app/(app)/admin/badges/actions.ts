@@ -12,12 +12,18 @@ import * as badges from "@/lib/badges/badge-service";
 
 type Answer<T = object> = (T & { error?: undefined }) | { error: string };
 
+/** The administrator acting; every action below starts here. */
+async function scope(): Promise<badges.BadgeActor> {
+    const user = await requireAdmin();
+    return { id: user.id, isAdmin: user.isAdmin };
+}
+
 async function guard<T extends object>(
+    actor: badges.BadgeActor,
     run: (actor: badges.BadgeActor) => Promise<T>
 ): Promise<Answer<T>> {
-    const user = await requireAdmin();
     try {
-        return await run({ id: user.id, isAdmin: user.isAdmin });
+        return await run(actor);
     } catch (caught) {
         if (caught instanceof badges.BadgeError) {
             // The service's sentences are English; the screen says the localized one.
@@ -31,22 +37,26 @@ async function guard<T extends object>(
 export async function listBadgeDefinitionsAction(): Promise<
     Answer<{ definitions: badges.BadgeDefinitionView[] }>
 > {
-    return guard(async (actor) => ({ definitions: await badges.listDefinitions(actor) }));
+    return guard(await scope(), async (actor) => ({
+        definitions: await badges.listDefinitions(actor)
+    }));
 }
 
 export async function createBadgeDefinitionAction(input: unknown): Promise<Answer<{ id: string }>> {
-    return guard(async (actor) => ({ id: await badges.createDefinition(actor, input) }));
+    return guard(await scope(), async (actor) => ({
+        id: await badges.createDefinition(actor, input)
+    }));
 }
 
 export async function updateBadgeDefinitionAction(id: unknown, input: unknown): Promise<Answer> {
-    return guard(async (actor) => {
+    return guard(await scope(), async (actor) => {
         await badges.updateDefinition(actor, id, input);
         return {};
     });
 }
 
 export async function deleteBadgeDefinitionAction(id: unknown): Promise<Answer> {
-    return guard(async (actor) => {
+    return guard(await scope(), async (actor) => {
         await badges.deleteDefinition(actor, id);
         return {};
     });
@@ -55,18 +65,18 @@ export async function deleteBadgeDefinitionAction(id: unknown): Promise<Answer> 
 export async function badgeHoldersAction(
     id: unknown
 ): Promise<Answer<{ holders: badges.BadgeHolder[] }>> {
-    return guard(async (actor) => ({ holders: await badges.holdersOf(actor, id) }));
+    return guard(await scope(), async (actor) => ({ holders: await badges.holdersOf(actor, id) }));
 }
 
 export async function grantBadgeAction(id: unknown, userId: unknown): Promise<Answer> {
-    return guard(async (actor) => {
+    return guard(await scope(), async (actor) => {
         await badges.grantBadge(actor, id, userId);
         return {};
     });
 }
 
 export async function revokeBadgeAction(id: unknown, userId: unknown): Promise<Answer> {
-    return guard(async (actor) => {
+    return guard(await scope(), async (actor) => {
         await badges.revokeBadge(actor, id, userId);
         return {};
     });
