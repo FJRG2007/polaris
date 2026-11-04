@@ -22,6 +22,9 @@ import {
 const listNetworksAction = vi.fn();
 const createNetworkAction = vi.fn();
 const removeNetworkAction = vi.fn();
+vi.mock("@/app/(app)/deploy-target-options-actions", () => ({
+    listDeployTargetOptionsAction: async () => ({ items: [], next: null })
+}));
 vi.mock("@/app/(app)/vpn/networks/actions", () => ({
     listNetworksAction,
     createNetworkAction,
@@ -70,7 +73,7 @@ describe("VpnNetworksSection", () => {
     });
 
     it("shows an administrator the state, the router and its values", async () => {
-        listNetworksAction.mockResolvedValue({ networks: [NETWORK], servers: [] });
+        listNetworksAction.mockResolvedValue({ networks: [NETWORK], firstServer: null });
         render(<VpnNetworksSection isAdmin />);
         expect(await screen.findByText("Fixture home")).toBeTruthy();
         expect(screen.getByText("Connected")).toBeTruthy();
@@ -82,7 +85,7 @@ describe("VpnNetworksSection", () => {
         const shared = { ...NETWORK, access: "everyone" as const, setup: null };
         listNetworksAction.mockResolvedValue({
             networks: [shared],
-            servers: []
+            firstServer: null
         });
         render(<VpnNetworksSection isAdmin={false} />);
         expect(await screen.findByText("Fixture home")).toBeTruthy();
@@ -93,7 +96,7 @@ describe("VpnNetworksSection", () => {
     it("refuses a subnet another network uses before anything is sent", async () => {
         listNetworksAction.mockResolvedValue({
             networks: [NETWORK],
-            servers: [{ id: "target-1", name: "fixture-server" }]
+            firstServer: { id: "target-1", name: "fixture-server" }
         });
         render(<VpnNetworksSection isAdmin />);
         fireEvent.click((await screen.findAllByText("New network"))[0] as HTMLElement);
@@ -108,7 +111,7 @@ describe("VpnNetworksSection", () => {
     it("says what is wrong with a subnet as it is typed, and sends what is typed", async () => {
         listNetworksAction.mockResolvedValue({
             networks: [],
-            servers: [{ id: "target-1", name: "fixture-server" }]
+            firstServer: { id: "target-1", name: "fixture-server" }
         });
         createNetworkAction.mockResolvedValue({});
         render(<VpnNetworksSection isAdmin />);
@@ -143,7 +146,7 @@ describe("VpnNetworksSection", () => {
     });
 
     it("says what the limited edition lacks instead of offering a network", async () => {
-        listNetworksAction.mockResolvedValue({ networks: [], servers: [], limited: true });
+        listNetworksAction.mockResolvedValue({ networks: [], firstServer: null, limited: true });
         render(<VpnNetworksSection isAdmin />);
         expect(await screen.findByText(/need the full edition/)).toBeTruthy();
         expect(screen.queryByText("New network")).toBeNull();
@@ -153,7 +156,7 @@ describe("VpnNetworksSection", () => {
         const setup = { ...NETWORK.setup, dhcp: { first: "10.77.2.100", last: "10.77.2.249" } };
         listNetworksAction.mockResolvedValue({
             networks: [{ ...NETWORK, cidr: "10.77.2.0/23", setup }],
-            servers: []
+            firstServer: null
         });
         render(<VpnNetworksSection isAdmin />);
         expect(await screen.findByText("10.77.2.100 - 10.77.2.249")).toBeTruthy();
@@ -162,7 +165,7 @@ describe("VpnNetworksSection", () => {
     it("closes the dialog on a network that was saved, and keeps the notice", async () => {
         listNetworksAction.mockResolvedValue({
             networks: [],
-            servers: [{ id: "target-1", name: "fixture-server" }]
+            firstServer: { id: "target-1", name: "fixture-server" }
         });
         createNetworkAction.mockResolvedValue({ notice: "Fixture notice" });
         render(<VpnNetworksSection isAdmin />);
@@ -177,7 +180,7 @@ describe("VpnNetworksSection", () => {
     it("forgets a failed create on cancel and reopens clean from the empty state", async () => {
         listNetworksAction.mockResolvedValue({
             networks: [],
-            servers: [{ id: "target-1", name: "fixture-server" }]
+            firstServer: { id: "target-1", name: "fixture-server" }
         });
         createNetworkAction.mockResolvedValue({ error: "Fixture failure" });
         render(<VpnNetworksSection isAdmin />);
@@ -197,7 +200,7 @@ describe("VpnNetworksSection", () => {
     });
 
     it("forgets a failed removal on cancel", async () => {
-        listNetworksAction.mockResolvedValue({ networks: [NETWORK], servers: [] });
+        listNetworksAction.mockResolvedValue({ networks: [NETWORK], firstServer: null });
         removeNetworkAction.mockResolvedValue({ error: "Fixture failure" });
         render(<VpnNetworksSection isAdmin />);
         await screen.findByText("Fixture home");

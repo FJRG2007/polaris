@@ -30,8 +30,9 @@ const idSchema = z.object({ id: z.string().uuid() });
 
 export interface NetworksAnswer {
     readonly networks: service.NetworkView[];
-    /** Where a gateway can run; empty for anybody but an administrator. */
-    readonly servers: service.NetworkServer[];
+    /** The first server a gateway can run on - what the dialog opens on; null when
+     *  there is none, and for anybody but an administrator. */
+    readonly firstServer: service.NetworkServer | null;
     /** This edition cannot run a gateway, so no network can be created here. */
     readonly limited: boolean;
 }
@@ -40,11 +41,11 @@ export interface NetworksAnswer {
 export async function listNetworksAction(): Promise<Result<NetworksAnswer>> {
     const user = await requireUser();
     try {
-        const [networks, servers] = await Promise.all([
+        const [networks, firstServer] = await Promise.all([
             service.listNetworks({ id: user.id, isAdmin: user.isAdmin }),
-            user.isAdmin ? service.networkServers(user.id) : Promise.resolve([])
+            user.isAdmin ? service.firstNetworkServer(user.id) : Promise.resolve(null)
         ]);
-        return { networks, servers, limited: !service.canRunGateways() };
+        return { networks, firstServer, limited: !service.canRunGateways() };
     } catch (error) {
         return failed(error);
     }

@@ -14,6 +14,7 @@ import type { NetworksAnswer } from "./actions";
 import { CodeView } from "@/components/json-view";
 import type { NetworkView } from "@/lib/vpn/network-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { DeployTargetPicker } from "@/components/deploy-target-picker";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Loader2, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import {
@@ -184,7 +185,7 @@ export function VpnNetworksSection({ isAdmin }: { isAdmin: boolean }) {
                 <CreateDialog
                     t={t}
                     taken={networks?.map(({ cidr }) => cidr) ?? []}
-                    servers={read.data?.servers ?? []}
+                    firstServer={read.data?.firstServer ?? null}
                     busy={pending}
                     error={error}
                     onClose={cancelDialog}
@@ -522,7 +523,7 @@ function InternetField({
 function CreateDialog({
     t,
     taken,
-    servers,
+    firstServer,
     busy,
     error,
     onClose,
@@ -530,7 +531,7 @@ function CreateDialog({
 }: {
     t: Translate;
     taken: readonly string[];
-    servers: NetworksAnswer["servers"];
+    firstServer: NetworksAnswer["firstServer"];
     busy: boolean;
     error: string | null;
     onClose: () => void;
@@ -541,7 +542,7 @@ function CreateDialog({
     const [cidr, setCidr] = useState(suggested);
     const [routerAddress, setRouterAddress] = useState(firstHost(suggested));
     const [routerTouched, setRouterTouched] = useState(false);
-    const [targetId, setTargetId] = useState(servers[0]?.id ?? "");
+    const [targetId, setTargetId] = useState(firstServer?.id ?? "");
     const [ssid, setSsid] = useState("");
     const [access, setAccess] = useState<"admins" | "everyone">("admins");
     const [internet, setInternet] = useState(false);
@@ -627,17 +628,18 @@ function CreateDialog({
                     <Field
                         id="network-server"
                         label={`${t("networks.server")} *`}
-                        error={servers.length === 0 ? t("networks.noServers") : null}
+                        error={firstServer === null ? t("networks.noServers") : null}
                     >
-                        <ui.Select
-                            value={targetId}
+                        <DeployTargetPicker
+                            scope="mine"
+                            value={targetId || null}
+                            selectedLabel={
+                                targetId === firstServer?.id ? firstServer.name : undefined
+                            }
                             onValueChange={setTargetId}
                             placeholder={t("networks.pickServer")}
-                            disabled={servers.length === 0}
-                            options={servers.map((server) => ({
-                                value: server.id,
-                                label: server.name
-                            }))}
+                            disabled={firstServer === null}
+                            aria-label={t("networks.server")}
                         />
                     </Field>
                     <Field
