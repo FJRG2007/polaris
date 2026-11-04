@@ -211,6 +211,7 @@ export * from "./schemas/chat.js";
 export * from "./schemas/chat-rules.js";
 export * from "./schemas/privacy.js";
 export * from "./badges.js";
+export * from "./name-tags.js";
 export * from "./schemas/activity.js";
 export * from "./schemas/retention.js";
 export * from "./schemas/billing.js";
