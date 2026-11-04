@@ -129,9 +129,16 @@ describe("protect and restore", () => {
 
     it("sends the text untouched when nothing applies", async () => {
         const answer = await withTerms(["Hello"], { entries: [], keep: [] }, echo);
-        expect(answer).toEqual({ texts: ["Hello"], glossaryUsed: false });
+        expect(answer).toEqual({ texts: ["Hello"], glossaryUsed: false, usedIn: [false] });
         const none = await withTerms(["Hello"], terms([["bye", "adiós"]]), echo);
         expect(none.glossaryUsed).toBe(false);
+        expect(none.usedIn).toEqual([false]);
+    });
+
+    it("says which texts a term applied to", async () => {
+        const answer = await withTerms(["Hello", "bye now"], terms([["bye", "adiós"]]), echo);
+        expect(answer.glossaryUsed).toBe(true);
+        expect(answer.usedIn).toEqual([false, true]);
     });
 });
 
