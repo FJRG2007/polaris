@@ -16,7 +16,12 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { prisma, Prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { assertOwnPrivacyLists, maySee, ruleAllows, type PrivacyViewer } from "@/lib/privacy-service";
+import {
+    assertOwnPrivacyLists,
+    maySee,
+    ruleAllows,
+    type PrivacyViewer
+} from "@/lib/privacy-service";
 
 /** A refusal whose sentence may be shown to the person who caused it. */
 export class BadgeError extends Error {}
@@ -32,10 +37,17 @@ export async function activityValues(userId: string, now = new Date()): Promise<
     const [user, messages, callSeconds, tasks, arcade, serverSeconds] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } }),
         prisma.chatMessage.count({
-            where: { authorId: userId, deletedAt: null, webhookId: null, kind: { notIn: ["system", "call"] } }
+            where: {
+                authorId: userId,
+                deletedAt: null,
+                webhookId: null,
+                kind: { notIn: ["system", "call"] }
+            }
         }),
         callTime(userId),
-        prisma.task.count({ where: { completedAt: { not: null }, assignees: { some: { userId } } } }),
+        prisma.task.count({
+            where: { completedAt: { not: null }, assignees: { some: { userId } } }
+        }),
         prisma.arcadeSessionPlayer.count({ where: { userId } }),
         serverTime(userId)
     ]);
@@ -245,7 +257,9 @@ async function recordUnlocks(
     now: Date
 ): Promise<Map<string, Date>> {
     const reached = new Map(known.map((row) => [`${row.badge}#${row.level}`, row.unlockedAt]));
-    const due: { badge: string; level: number }[] = isAdmin ? [{ badge: core.STAFF_BADGE, level: 1 }] : [];
+    const due: { badge: string; level: number }[] = isAdmin
+        ? [{ badge: core.STAFF_BADGE, level: 1 }]
+        : [];
     for (const id of core.BADGE_LADDER_IDS) {
         const { level } = core.ladderProgress(core.BADGE_LADDERS[id].thresholds, values[id]);
         for (let at = 1; at <= level; at++) due.push({ badge: core.ladderKey(id), level: at });
@@ -322,9 +336,14 @@ async function rarities(
     return {
         staff: core.rarityPercent(admins, people),
         ladder: new Map(
-            levels.map((row) => [`${row.badge}#${row.level}`, core.rarityPercent(row._count._all, people)])
+            levels.map((row) => [
+                `${row.badge}#${row.level}`,
+                core.rarityPercent(row._count._all, people)
+            ])
         ),
-        custom: new Map(grants.map((row) => [row.badgeId, core.rarityPercent(row._count._all, people)]))
+        custom: new Map(
+            grants.map((row) => [row.badgeId, core.rarityPercent(row._count._all, people)])
+        )
     };
 }
 
@@ -366,13 +385,19 @@ export interface BadgesForViewer {
  * never sees a hidden one - not even an administrator, since hiding is a choice
  * about the profile rather than a secret.
  */
-export async function badgesFor(subjectId: string, viewer: PrivacyViewer | null): Promise<BadgesForViewer> {
+export async function badgesFor(
+    subjectId: string,
+    viewer: PrivacyViewer | null
+): Promise<BadgesForViewer> {
     const asking: PrivacyViewer = viewer ?? { id: "", isAdmin: false };
     const own = asking.id === subjectId;
     if (!own && !(await maySee(subjectId, "badges", asking))) {
         return { shown: [], available: [], arrangement: null };
     }
-    const [views, arrangement] = await Promise.all([evaluateBadges(subjectId), arrangementOf(subjectId)]);
+    const [views, arrangement] = await Promise.all([
+        evaluateBadges(subjectId),
+        arrangementOf(subjectId)
+    ]);
     const byKey = new Map(arrangement.map((row) => [row.badge, row]));
     const positions = new Map(arrangement.map((row, index) => [row.badge, index]));
     const owned = core.orderBadges(
@@ -403,7 +428,8 @@ export async function badgesFor(subjectId: string, viewer: PrivacyViewer | null)
  */
 export async function saveArrangement(userId: string, input: unknown): Promise<void> {
     const parsed = core.badgePreferencesSchema.safeParse(input);
-    if (!parsed.success) throw new BadgeError(parsed.error.issues[0]?.message ?? "Those badges could not be saved");
+    if (!parsed.success)
+        throw new BadgeError(parsed.error.issues[0]?.message ?? "Those badges could not be saved");
     const rows = parsed.data.map((row) => {
         const needsList = row.audience !== null && core.audienceNeedsList(row.audience);
         return {
@@ -461,20 +487,29 @@ export async function listDefinitions(actor: BadgeActor): Promise<BadgeDefinitio
     const rows = await prisma.badgeDefinition.findMany({
         orderBy: { createdAt: "asc" },
         take: MOST_DEFINITIONS,
-        select: { id: true, name: true, description: true, icon: true, _count: { select: { grants: true } } }
+        select: {
+            id: true,
+            name: true,
+            description: true,
+            icon: true,
+            _count: { select: { grants: true } }
+        }
     });
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
         description: row.description,
-        icon: (core.BADGE_ICONS as readonly string[]).includes(row.icon) ? (row.icon as core.BadgeIcon) : "star",
+        icon: (core.BADGE_ICONS as readonly string[]).includes(row.icon)
+            ? (row.icon as core.BadgeIcon)
+            : "star",
         holders: row._count.grants
     }));
 }
 
 function definitionInput(input: unknown): core.BadgeDefinitionInput {
     const parsed = core.badgeDefinitionSchema.safeParse(input);
-    if (!parsed.success) throw new BadgeError(parsed.error.issues[0]?.message ?? "That badge is not valid");
+    if (!parsed.success)
+        throw new BadgeError(parsed.error.issues[0]?.message ?? "That badge is not valid");
     return parsed.data;
 }
 
@@ -482,12 +517,20 @@ export async function createDefinition(actor: BadgeActor, input: unknown): Promi
     assertAdmin(actor);
     const data = definitionInput(input);
     const count = await prisma.badgeDefinition.count();
-    if (count >= MOST_DEFINITIONS) throw new BadgeError("This instance already has as many badges as it can hold");
-    const row = await prisma.badgeDefinition.create({ data: { ...data, createdById: actor.id }, select: { id: true } });
+    if (count >= MOST_DEFINITIONS)
+        throw new BadgeError("This instance already has as many badges as it can hold");
+    const row = await prisma.badgeDefinition.create({
+        data: { ...data, createdById: actor.id },
+        select: { id: true }
+    });
     return row.id;
 }
 
-export async function updateDefinition(actor: BadgeActor, id: unknown, input: unknown): Promise<void> {
+export async function updateDefinition(
+    actor: BadgeActor,
+    id: unknown,
+    input: unknown
+): Promise<void> {
     assertAdmin(actor);
     const badgeId = uuid(id);
     const data = definitionInput(input);
@@ -528,7 +571,9 @@ export async function revokeBadge(actor: BadgeActor, id: unknown, userId: unknow
     const holder = uuid(userId);
     await prisma.$transaction([
         prisma.badgeGrant.deleteMany({ where: { badgeId, userId: holder } }),
-        prisma.badgePreference.deleteMany({ where: { userId: holder, badge: core.customKey(badgeId) } })
+        prisma.badgePreference.deleteMany({
+            where: { userId: holder, badge: core.customKey(badgeId) }
+        })
     ]);
 }
 

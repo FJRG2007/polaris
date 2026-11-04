@@ -196,7 +196,10 @@ export function BadgesSettings() {
                                         locked={row.hidden}
                                         className="size-9 shrink-0"
                                     />
-                                    <span className="min-w-0 flex-1 truncate text-[0.8125rem]" title={name}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-[0.8125rem]"
+                                        title={name}
+                                    >
                                         {name}
                                     </span>
                                     <Select
@@ -212,25 +215,46 @@ export function BadgesSettings() {
                                             }))
                                         ]}
                                         onValueChange={(value) => {
-                                            const audience = value === FOLLOW ? null : (value as core.PrivacyAudience);
+                                            const audience =
+                                                value === FOLLOW
+                                                    ? null
+                                                    : (value as core.PrivacyAudience);
                                             update(row.badge.key, { audience });
-                                            if (audience && core.audienceNeedsList(audience)) setEditing(row.badge.key);
+                                            if (audience && core.audienceNeedsList(audience))
+                                                setEditing(row.badge.key);
                                         }}
                                     />
-                                    {row.audience && core.audienceNeedsList(row.audience) && !row.hidden && (
-                                        <Button size="sm" variant="secondary" onClick={() => setEditing(row.badge.key)}>
-                                            {t("settings.people")}
-                                        </Button>
-                                    )}
+                                    {row.audience &&
+                                        core.audienceNeedsList(row.audience) &&
+                                        !row.hidden && (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => setEditing(row.badge.key)}
+                                            >
+                                                {t("settings.people")}
+                                            </Button>
+                                        )}
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={t(row.hidden ? "settings.show" : "settings.hide", { name })}
-                                        title={t(row.hidden ? "settings.show" : "settings.hide", { name })}
+                                        aria-label={t(
+                                            row.hidden ? "settings.show" : "settings.hide",
+                                            { name }
+                                        )}
+                                        title={t(row.hidden ? "settings.show" : "settings.hide", {
+                                            name
+                                        })}
                                         aria-pressed={row.hidden}
-                                        onClick={() => update(row.badge.key, { hidden: !row.hidden })}
+                                        onClick={() =>
+                                            update(row.badge.key, { hidden: !row.hidden })
+                                        }
                                     >
-                                        {row.hidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                        {row.hidden ? (
+                                            <EyeOff className="size-4" />
+                                        ) : (
+                                            <Eye className="size-4" />
+                                        )}
                                     </Button>
                                     <Button
                                         size="icon"
@@ -269,7 +293,9 @@ export function BadgesSettings() {
                     named={named}
                     onNamed={(person) =>
                         setNamed((current) =>
-                            current.some((entry) => entry.id === person.id) ? current : [...current, person]
+                            current.some((entry) => entry.id === person.id)
+                                ? current
+                                : [...current, person]
                         )
                     }
                     onChange={(rule) =>
@@ -291,7 +317,9 @@ export function BadgesSettings() {
                         </DialogHeader>
                         <BadgeDetail
                             badge={details}
-                            hidden={rows.find((row) => row.badge.key === details.key)?.hidden ?? false}
+                            hidden={
+                                rows.find((row) => row.badge.key === details.key)?.hidden ?? false
+                            }
                         />
                     </DialogContent>
                 </Dialog>

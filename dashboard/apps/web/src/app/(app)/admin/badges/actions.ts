@@ -12,7 +12,9 @@ import * as badges from "@/lib/badges/badge-service";
 
 type Answer<T = object> = (T & { error?: undefined }) | { error: string };
 
-async function guard<T extends object>(run: (actor: badges.BadgeActor) => Promise<T>): Promise<Answer<T>> {
+async function guard<T extends object>(
+    run: (actor: badges.BadgeActor) => Promise<T>
+): Promise<Answer<T>> {
     const user = await requireAdmin();
     try {
         return await run({ id: user.id, isAdmin: user.isAdmin });
@@ -26,7 +28,9 @@ async function guard<T extends object>(run: (actor: badges.BadgeActor) => Promis
     }
 }
 
-export async function listBadgeDefinitionsAction(): Promise<Answer<{ definitions: badges.BadgeDefinitionView[] }>> {
+export async function listBadgeDefinitionsAction(): Promise<
+    Answer<{ definitions: badges.BadgeDefinitionView[] }>
+> {
     return guard(async (actor) => ({ definitions: await badges.listDefinitions(actor) }));
 }
 
@@ -48,7 +52,9 @@ export async function deleteBadgeDefinitionAction(id: unknown): Promise<Answer> 
     });
 }
 
-export async function badgeHoldersAction(id: unknown): Promise<Answer<{ holders: badges.BadgeHolder[] }>> {
+export async function badgeHoldersAction(
+    id: unknown
+): Promise<Answer<{ holders: badges.BadgeHolder[] }>> {
     return guard(async (actor) => ({ holders: await badges.holdersOf(actor, id) }));
 }
 
@@ -67,7 +73,9 @@ export async function revokeBadgeAction(id: unknown, userId: unknown): Promise<A
 }
 
 /** Anybody on the instance may be given a badge, so the search is not narrowed. */
-export async function searchBadgePeopleAction(query: string): Promise<{ results?: { id: string; name: string }[] }> {
+export async function searchBadgePeopleAction(
+    query: string
+): Promise<{ results?: { id: string; name: string }[] }> {
     const user = await requireAdmin();
     const found = await findPeople(user, String(query ?? ""), { reachableOnly: false });
     return { results: found.people };

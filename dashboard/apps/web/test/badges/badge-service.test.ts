@@ -51,9 +51,12 @@ vi.mock("@polaris/db", () => ({
     Prisma: { sql: () => ({}), join: () => ({}) },
     prisma: {
         user: {
-            findUnique: async ({ where }: { where: { id: string } }) => people.find((p) => p.id === where.id) ?? null,
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                people.find((p) => p.id === where.id) ?? null,
             count: async (args?: { where?: { isAdmin?: boolean } }) =>
-                people.filter((p) => args?.where?.isAdmin === undefined || p.isAdmin === args.where.isAdmin).length,
+                people.filter(
+                    (p) => args?.where?.isAdmin === undefined || p.isAdmin === args.where.isAdmin
+                ).length,
             findMany: async ({ where, take }: { where: { id?: { gt: string } }; take: number }) =>
                 [...people]
                     .sort((a, b) => a.id.localeCompare(b.id))
@@ -72,7 +75,10 @@ vi.mock("@polaris/db", () => ({
             findMany: async ({ where }: { where: { userId: string } }) =>
                 grants
                     .filter((g) => g.userId === where.userId)
-                    .map((g) => ({ grantedAt: g.grantedAt, badge: definitions.find((d) => d.id === g.badgeId)! })),
+                    .map((g) => ({
+                        grantedAt: g.grantedAt,
+                        badge: definitions.find((d) => d.id === g.badgeId)!
+                    })),
             groupBy: async ({ where }: { where: { badgeId: { in: string[] } } }) =>
                 where.badgeId.in.map((badgeId) => ({
                     badgeId,
@@ -84,19 +90,26 @@ vi.mock("@polaris/db", () => ({
                 return {};
             },
             deleteMany: async ({ where }: { where: { badgeId: string; userId: string } }) => {
-                grants = grants.filter((g) => !(g.badgeId === where.badgeId && g.userId === where.userId));
+                grants = grants.filter(
+                    (g) => !(g.badgeId === where.badgeId && g.userId === where.userId)
+                );
                 return { count: 1 };
             }
         },
         badgeDefinition: {
-            findUnique: async ({ where }: { where: { id: string } }) => definitions.find((d) => d.id === where.id) ?? null
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                definitions.find((d) => d.id === where.id) ?? null
         },
         badgeUnlock: {
-            findMany: async ({ where }: { where: { userId: string } }) => unlocks.filter((u) => u.userId === where.userId),
+            findMany: async ({ where }: { where: { userId: string } }) =>
+                unlocks.filter((u) => u.userId === where.userId),
             createMany: async ({ data }: { data: Unlock[] }) => {
                 for (const row of data) {
                     const known = unlocks.some(
-                        (u) => u.userId === row.userId && u.badge === row.badge && u.level === row.level
+                        (u) =>
+                            u.userId === row.userId &&
+                            u.badge === row.badge &&
+                            u.level === row.level
                     );
                     if (!known) unlocks.push(row);
                 }
@@ -110,13 +123,23 @@ vi.mock("@polaris/db", () => ({
                     entry.n += 1;
                     counts.set(key, entry);
                 }
-                return [...counts.values()].map((e) => ({ badge: e.badge, level: e.level, _count: { _all: e.n } }));
+                return [...counts.values()].map((e) => ({
+                    badge: e.badge,
+                    level: e.level,
+                    _count: { _all: e.n }
+                }));
             }
         },
         badgePreference: {
             findMany: async ({ where }: { where: { userId: string } }) =>
-                prefs.filter((p) => p.userId === where.userId).sort((a, b) => a.position - b.position),
-            deleteMany: async ({ where }: { where: { userId?: string; badge: string | { notIn: string[] } } }) => {
+                prefs
+                    .filter((p) => p.userId === where.userId)
+                    .sort((a, b) => a.position - b.position),
+            deleteMany: async ({
+                where
+            }: {
+                where: { userId?: string; badge: string | { notIn: string[] } };
+            }) => {
                 prefs = prefs.filter((p) => {
                     if (where.userId && p.userId !== where.userId) return true;
                     if (typeof where.badge === "string") return p.badge !== where.badge;
@@ -125,7 +148,9 @@ vi.mock("@polaris/db", () => ({
                 return { count: 0 };
             },
             upsert: async ({ create }: { create: Pref }) => {
-                prefs = prefs.filter((p) => !(p.userId === create.userId && p.badge === create.badge));
+                prefs = prefs.filter(
+                    (p) => !(p.userId === create.userId && p.badge === create.badge)
+                );
                 prefs.push(create);
                 return {};
             }
@@ -136,7 +161,8 @@ vi.mock("@polaris/db", () => ({
 
 vi.mock("@/lib/privacy-service", () => ({
     maySee: async () => accountRuleAllows,
-    ruleAllows: async (_viewer: unknown, _subject: string, rule: { audience: string }) => rule.audience === "everyone",
+    ruleAllows: async (_viewer: unknown, _subject: string, rule: { audience: string }) =>
+        rule.audience === "everyone",
     assertOwnPrivacyLists: async (_userId: string, ids: string[]) => {
         if (ids.length > 0) throw new Error("That list is not yours");
     }
@@ -210,29 +236,37 @@ describe("who sees somebody's badges", () => {
 describe("custom badges are handed out by administrators only", () => {
     it("refuses a grant or a revoke from anybody else, before touching anything", async () => {
         const member = { id: BOB, isAdmin: false };
-        await expect(service.grantBadge(member, BADGE, ALICE)).rejects.toBeInstanceOf(service.BadgeError);
-        await expect(service.revokeBadge(member, BADGE, ALICE)).rejects.toBeInstanceOf(service.BadgeError);
-        await expect(service.createDefinition(member, { name: "Mine" })).rejects.toBeInstanceOf(service.BadgeError);
-        await expect(service.deleteDefinition(member, BADGE)).rejects.toBeInstanceOf(service.BadgeError);
+        await expect(service.grantBadge(member, BADGE, ALICE)).rejects.toBeInstanceOf(
+            service.BadgeError
+        );
+        await expect(service.revokeBadge(member, BADGE, ALICE)).rejects.toBeInstanceOf(
+            service.BadgeError
+        );
+        await expect(service.createDefinition(member, { name: "Mine" })).rejects.toBeInstanceOf(
+            service.BadgeError
+        );
+        await expect(service.deleteDefinition(member, BADGE)).rejects.toBeInstanceOf(
+            service.BadgeError
+        );
         expect(upsertGrant).not.toHaveBeenCalled();
     });
 
     it("lets an administrator give one and take it back", async () => {
         const admin = { id: ADMIN, isAdmin: true };
         await service.grantBadge(admin, BADGE, ALICE);
-        expect(keys((await service.badgesFor(ALICE, { id: ALICE, isAdmin: false })).shown)).toContain(
-            `custom:${BADGE}`
-        );
+        expect(
+            keys((await service.badgesFor(ALICE, { id: ALICE, isAdmin: false })).shown)
+        ).toContain(`custom:${BADGE}`);
         await service.revokeBadge(admin, BADGE, ALICE);
-        expect(keys((await service.badgesFor(ALICE, { id: ALICE, isAdmin: false })).shown)).not.toContain(
-            `custom:${BADGE}`
-        );
+        expect(
+            keys((await service.badgesFor(ALICE, { id: ALICE, isAdmin: false })).shown)
+        ).not.toContain(`custom:${BADGE}`);
     });
 
     it("refuses an id that is not one", async () => {
-        await expect(service.grantBadge({ id: ADMIN, isAdmin: true }, "nope", ALICE)).rejects.toBeInstanceOf(
-            service.BadgeError
-        );
+        await expect(
+            service.grantBadge({ id: ADMIN, isAdmin: true }, "nope", ALICE)
+        ).rejects.toBeInstanceOf(service.BadgeError);
     });
 });
 
@@ -243,7 +277,10 @@ describe("the owner's arrangement", () => {
             { badge: "ladder:messages", hidden: false },
             { badge: `custom:${BADGE}`, hidden: true }
         ]);
-        await service.saveArrangement(ALICE, [{ badge: `custom:${BADGE}`, hidden: true }, { badge: "ladder:messages" }]);
+        await service.saveArrangement(ALICE, [
+            { badge: `custom:${BADGE}`, hidden: true },
+            { badge: "ladder:messages" }
+        ]);
         const saved = await service.arrangementOf(ALICE);
         expect(saved.map((row) => [row.badge, row.hidden])).toEqual([
             [`custom:${BADGE}`, true],
@@ -253,19 +290,28 @@ describe("the owner's arrangement", () => {
         expect(keys(own.shown)).toEqual([`custom:${BADGE}`, "ladder:messages"]);
 
         await service.saveArrangement(ALICE, [{ badge: "ladder:messages" }]);
-        expect((await service.arrangementOf(ALICE)).map((row) => row.badge)).toEqual(["ladder:messages"]);
+        expect((await service.arrangementOf(ALICE)).map((row) => row.badge)).toEqual([
+            "ladder:messages"
+        ]);
     });
 
     it("refuses a badge named twice, an unknown badge, and a list that is not theirs", async () => {
         await expect(
-            service.saveArrangement(ALICE, [{ badge: "ladder:messages" }, { badge: "ladder:messages" }])
+            service.saveArrangement(ALICE, [
+                { badge: "ladder:messages" },
+                { badge: "ladder:messages" }
+            ])
         ).rejects.toBeInstanceOf(service.BadgeError);
-        await expect(service.saveArrangement(ALICE, [{ badge: "ladder:nope" }])).rejects.toBeInstanceOf(
-            service.BadgeError
-        );
+        await expect(
+            service.saveArrangement(ALICE, [{ badge: "ladder:nope" }])
+        ).rejects.toBeInstanceOf(service.BadgeError);
         await expect(
             service.saveArrangement(ALICE, [
-                { badge: "ladder:messages", audience: "only", listId: "00000000-0000-4000-8000-0000000000aa" }
+                {
+                    badge: "ladder:messages",
+                    audience: "only",
+                    listId: "00000000-0000-4000-8000-0000000000aa"
+                }
             ])
         ).rejects.toThrow("not yours");
         expect(prefs).toEqual([]);
@@ -285,7 +331,9 @@ describe("rarity", () => {
         const messages = alice.find((badge) => badge.key === "ladder:messages")!;
         expect(messages.level).toBe(2);
         expect(messages.rarity).toBe(25);
-        const bob = (await service.evaluateBadges(BOB)).find((badge) => badge.key === "ladder:messages")!;
+        const bob = (await service.evaluateBadges(BOB)).find(
+            (badge) => badge.key === "ladder:messages"
+        )!;
         expect(bob.rarity).toBe(50);
     });
 
@@ -300,7 +348,9 @@ describe("rarity", () => {
         const first = new Date("2026-01-01T00:00:00Z");
         await service.sweepBadgeUnlocks(first);
         await service.sweepBadgeUnlocks(new Date("2026-06-01T00:00:00Z"));
-        const messages = (await service.evaluateBadges(ALICE)).find((badge) => badge.key === "ladder:messages")!;
+        const messages = (await service.evaluateBadges(ALICE)).find(
+            (badge) => badge.key === "ladder:messages"
+        )!;
         expect(messages.unlockedAt).toBe(first.toISOString());
     });
 });

@@ -9,7 +9,12 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { listsFor, namePeople, type PrivacyListView } from "@/lib/privacy-service";
-import { BadgeError, badgesFor, saveArrangement, type BadgesForViewer } from "@/lib/badges/badge-service";
+import {
+    BadgeError,
+    badgesFor,
+    saveArrangement,
+    type BadgesForViewer
+} from "@/lib/badges/badge-service";
 
 export interface MyBadges extends BadgesForViewer {
     lists: PrivacyListView[];
@@ -31,7 +36,8 @@ export async function saveBadgeArrangementAction(input: unknown): Promise<{ erro
     try {
         await saveArrangement(user.id, input);
     } catch (caught) {
-        if (caught instanceof BadgeError) return { error: (await getTranslations("badges"))("settings.failed") };
+        if (caught instanceof BadgeError)
+            return { error: (await getTranslations("badges"))("settings.failed") };
         throw caught;
     }
     revalidatePath("/u", "layout");

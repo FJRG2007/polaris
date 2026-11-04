@@ -76,8 +76,9 @@ export function BadgesAdmin() {
     const changeHolders = (id: string, delta: number) =>
         setDefinitions(
             (current) =>
-                current?.map((entry) => (entry.id === id ? { ...entry, holders: entry.holders + delta } : entry)) ??
-                null
+                current?.map((entry) =>
+                    entry.id === id ? { ...entry, holders: entry.holders + delta } : entry
+                ) ?? null
         );
 
     return (
@@ -105,9 +106,17 @@ export function BadgesAdmin() {
                     <ul className="flex flex-col divide-y divide-border">
                         {definitions.map((badge) => (
                             <li key={badge.id} className="flex min-w-0 items-center gap-3 p-3">
-                                <BadgeIcon icon={badge.icon} kind="custom" level={1} className="size-9 shrink-0" />
+                                <BadgeIcon
+                                    icon={badge.icon}
+                                    kind="custom"
+                                    level={1}
+                                    className="size-9 shrink-0"
+                                />
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[0.8125rem]" title={badge.name}>
+                                    <span
+                                        className="block truncate text-[0.8125rem]"
+                                        title={badge.name}
+                                    >
                                         {badge.name}
                                     </span>
                                     <span className="block truncate text-[0.6875rem] text-foreground-subtle">
@@ -163,7 +172,9 @@ export function BadgesAdmin() {
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>{t("admin.removeTitle")}</DialogTitle>
-                            <DialogDescription>{t("admin.removeBody", { name: removing.name })}</DialogDescription>
+                            <DialogDescription>
+                                {t("admin.removeBody", { name: removing.name })}
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="flex justify-end gap-2">
                             <Button variant="secondary" onClick={() => setRemoving(null)}>
@@ -199,11 +210,15 @@ function BadgeEditor({
 }) {
     const t = useTranslations("badges");
     const toast = useToast();
-    const initial: Draft = badge ? { name: badge.name, description: badge.description, icon: badge.icon } : EMPTY;
+    const initial: Draft = badge
+        ? { name: badge.name, description: badge.description, icon: badge.icon }
+        : EMPTY;
     const [draft, setDraft] = useState<Draft>(initial);
     const [saving, setSaving] = useState(false);
     const parsed = core.badgeDefinitionSchema.safeParse(draft);
-    const dirty = JSON.stringify(core.badgeDefinitionSchema.safeParse(initial).data) !== JSON.stringify(parsed.data);
+    const dirty =
+        JSON.stringify(core.badgeDefinitionSchema.safeParse(initial).data) !==
+        JSON.stringify(parsed.data);
     const ready = parsed.success && (badge === null || dirty) && !saving;
 
     const save = async () => {
@@ -221,7 +236,9 @@ function BadgeEditor({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{badge ? t("admin.edit", { name: badge.name }) : t("admin.create")}</DialogTitle>
+                    <DialogTitle>
+                        {badge ? t("admin.edit", { name: badge.name }) : t("admin.create")}
+                    </DialogTitle>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-3"
@@ -244,7 +261,9 @@ function BadgeEditor({
                             value={draft.description}
                             maxLength={160}
                             rows={2}
-                            onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                            onChange={(event) =>
+                                setDraft({ ...draft, description: event.target.value })
+                            }
                         />
                     </label>
                     <fieldset className="flex flex-col gap-1 text-[0.8125rem]">
@@ -261,10 +280,17 @@ function BadgeEditor({
                                     onClick={() => setDraft({ ...draft, icon })}
                                     className={cn(
                                         "rounded-md p-1 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        draft.icon === icon ? "bg-primary/10 ring-2 ring-primary" : "hover:bg-muted"
+                                        draft.icon === icon
+                                            ? "bg-primary/10 ring-2 ring-primary"
+                                            : "hover:bg-muted"
                                     )}
                                 >
-                                    <BadgeIcon icon={icon} kind="custom" level={1} className="size-8" />
+                                    <BadgeIcon
+                                        icon={icon}
+                                        kind="custom"
+                                        level={1}
+                                        className="size-8"
+                                    />
                                 </button>
                             ))}
                         </div>
@@ -308,7 +334,12 @@ function HoldersDialog({
         if (holders?.some((holder) => holder.id === person.id)) return;
         const before = holders;
         setHolders((current) => [
-            { id: person.id, name: person.name, username: null, grantedAt: new Date().toISOString() },
+            {
+                id: person.id,
+                name: person.name,
+                username: null,
+                grantedAt: new Date().toISOString()
+            },
             ...(current ?? [])
         ]);
         onChanged(1);
@@ -348,7 +379,9 @@ function HoldersDialog({
                     }}
                 />
                 {holders === null && <Skeleton className="h-10 w-full" />}
-                {holders?.length === 0 && <p className="text-sm text-muted-foreground">{t("admin.noHolders")}</p>}
+                {holders?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">{t("admin.noHolders")}</p>
+                )}
                 {holders && holders.length > 0 && (
                     <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto">
                         {holders.map((holder) => (
@@ -362,15 +395,24 @@ function HoldersDialog({
                                         {holder.name}
                                     </Link>
                                 ) : (
-                                    <span className="min-w-0 flex-1 truncate text-[0.8125rem]" title={holder.name}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-[0.8125rem]"
+                                        title={holder.name}
+                                    >
                                         {holder.name}
                                     </span>
                                 )}
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    aria-label={t("admin.revoke", { name: badge.name, person: holder.name })}
-                                    title={t("admin.revoke", { name: badge.name, person: holder.name })}
+                                    aria-label={t("admin.revoke", {
+                                        name: badge.name,
+                                        person: holder.name
+                                    })}
+                                    title={t("admin.revoke", {
+                                        name: badge.name,
+                                        person: holder.name
+                                    })}
                                     onClick={() => void revoke(holder)}
                                 >
                                     <X className="size-4" />

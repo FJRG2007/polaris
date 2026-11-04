@@ -48,7 +48,11 @@ const GLYPHS: Record<string, string> = {
     gem: "M8 6h8l3 4-7 9-7-9zM5 10h14M10 6l-1 4 3 9 3-9-1-4"
 };
 
-export function badgeColors(kind: string, level: number, locked: boolean): readonly [string, string] {
+export function badgeColors(
+    kind: string,
+    level: number,
+    locked: boolean
+): readonly [string, string] {
     if (locked) return LOCKED_COLORS;
     if (kind === "staff") return STAFF_COLORS;
     if (kind === "custom") return CUSTOM_COLORS;

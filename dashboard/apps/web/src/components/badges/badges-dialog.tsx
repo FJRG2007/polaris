@@ -15,17 +15,35 @@ import type { BadgeView } from "@/lib/badges/badge-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { cn, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 type T = NamespaceTranslator<"badges">;
 
-const CATEGORIES = ["staff", "custom", "tenure", "messages", "calls", "tasks", "arcade", "servers"] as const;
+const CATEGORIES = [
+    "staff",
+    "custom",
+    "tenure",
+    "messages",
+    "calls",
+    "tasks",
+    "arcade",
+    "servers"
+] as const;
 const UNITS = ["days", "messages", "minutes", "tasks", "games", "hours"] as const;
 
 type Category = (typeof CATEGORIES)[number];
 
 function categoryOf(badge: BadgeView): Category {
-    return (CATEGORIES as readonly string[]).includes(badge.category) ? (badge.category as Category) : "custom";
+    return (CATEGORIES as readonly string[]).includes(badge.category)
+        ? (badge.category as Category)
+        : "custom";
 }
 
 /** The badge's own name: a custom badge's words, or its category and level. */
@@ -42,13 +60,22 @@ export function amountOf(t: T, unit: string | null, count: number): string {
 }
 
 /** A row of badge icons; each one opens its detail. */
-export function BadgeStrip({ badges, className }: { badges: readonly BadgeView[]; className?: string }) {
+export function BadgeStrip({
+    badges,
+    className
+}: {
+    badges: readonly BadgeView[];
+    className?: string;
+}) {
     const t = useTranslations("badges");
     const [open, setOpen] = useState<BadgeView | null>(null);
     if (badges.length === 0) return null;
     return (
         <>
-            <ul className={cn("flex flex-wrap items-center gap-1", className)} aria-label={t("title")}>
+            <ul
+                className={cn("flex flex-wrap items-center gap-1", className)}
+                aria-label={t("title")}
+            >
                 {badges.map((badge) => (
                     <li key={badge.key}>
                         <button
@@ -58,7 +85,12 @@ export function BadgeStrip({ badges, className }: { badges: readonly BadgeView[]
                             title={badgeName(t, badge)}
                             className="flex rounded-md p-0.5 hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <BadgeIcon icon={badge.icon} kind={badge.kind} level={badge.level} className="size-6" />
+                            <BadgeIcon
+                                icon={badge.icon}
+                                kind={badge.kind}
+                                level={badge.level}
+                                className="size-6"
+                            />
                         </button>
                     </li>
                 ))}
@@ -68,7 +100,9 @@ export function BadgeStrip({ badges, className }: { badges: readonly BadgeView[]
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>{badgeName(t, open)}</DialogTitle>
-                            <DialogDescription>{t(`categories.${categoryOf(open)}.name`)}</DialogDescription>
+                            <DialogDescription>
+                                {t(`categories.${categoryOf(open)}.name`)}
+                            </DialogDescription>
                         </DialogHeader>
                         <BadgeDetail badge={open} />
                     </DialogContent>
@@ -84,7 +118,9 @@ export function BadgeDetail({ badge, hidden = false }: { badge: BadgeView; hidde
     const format = useDisplayFormat();
     const category = categoryOf(badge);
     const description =
-        badge.kind === "custom" && badge.description ? badge.description : t(`categories.${category}.description`);
+        badge.kind === "custom" && badge.description
+            ? badge.description
+            : t(`categories.${category}.description`);
     return (
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -150,7 +186,10 @@ export function BadgeDetail({ badge, hidden = false }: { badge: BadgeView; hidde
                     </h3>
                     <ol className="flex flex-col divide-y divide-border rounded-md border border-border">
                         {badge.levels.map((level) => (
-                            <li key={level.level} className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+                            <li
+                                key={level.level}
+                                className="flex min-w-0 items-center gap-2 px-2 py-1.5"
+                            >
                                 <BadgeIcon
                                     icon={badge.icon}
                                     kind={badge.kind}
@@ -158,7 +197,9 @@ export function BadgeDetail({ badge, hidden = false }: { badge: BadgeView; hidde
                                     locked={level.unlockedAt === null}
                                     className="size-5"
                                 />
-                                <span className="min-w-0 flex-1 truncate text-xs">{t(`levels.${level.name}`)}</span>
+                                <span className="min-w-0 flex-1 truncate text-xs">
+                                    {t(`levels.${level.name}`)}
+                                </span>
                                 <span className="shrink-0 text-xs text-muted-foreground">
                                     {amountOf(t, badge.unit, level.threshold)}
                                 </span>
@@ -167,7 +208,10 @@ export function BadgeDetail({ badge, hidden = false }: { badge: BadgeView; hidde
                                         {format.date(new Date(level.unlockedAt))}
                                     </span>
                                 ) : (
-                                    <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("locked")} />
+                                    <Lock
+                                        className="size-3.5 shrink-0 text-muted-foreground"
+                                        aria-label={t("locked")}
+                                    />
                                 )}
                             </li>
                         ))}
@@ -232,7 +276,9 @@ export function BadgesDialog({
                             {shown.length === 0 ? (
                                 <p className="text-xs text-muted-foreground">{t("noneOwned")}</p>
                             ) : (
-                                <ul className="grid grid-cols-3 gap-1 sm:grid-cols-4">{shown.map(tile)}</ul>
+                                <ul className="grid grid-cols-3 gap-1 sm:grid-cols-4">
+                                    {shown.map(tile)}
+                                </ul>
                             )}
                         </section>
                         <section className="flex flex-col gap-1">
@@ -242,7 +288,9 @@ export function BadgesDialog({
                             {available.length === 0 ? (
                                 <p className="text-xs text-muted-foreground">{t("allOwned")}</p>
                             ) : (
-                                <ul className="grid grid-cols-3 gap-1 sm:grid-cols-4">{available.map(tile)}</ul>
+                                <ul className="grid grid-cols-3 gap-1 sm:grid-cols-4">
+                                    {available.map(tile)}
+                                </ul>
                             )}
                         </section>
                     </div>

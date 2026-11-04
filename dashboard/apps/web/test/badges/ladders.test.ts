@@ -9,9 +9,24 @@ describe("badge ladders", () => {
     });
 
     it("reports progress between the current level and the next", () => {
-        expect(core.ladderProgress([10, 20], 15)).toEqual({ value: 15, level: 1, top: 2, next: 20, fraction: 0.5 });
-        expect(core.ladderProgress([10, 20], 25)).toMatchObject({ level: 2, next: null, fraction: 1 });
-        expect(core.ladderProgress([10, 20], -3)).toMatchObject({ value: 0, level: 0, next: 10, fraction: 0 });
+        expect(core.ladderProgress([10, 20], 15)).toEqual({
+            value: 15,
+            level: 1,
+            top: 2,
+            next: 20,
+            fraction: 0.5
+        });
+        expect(core.ladderProgress([10, 20], 25)).toMatchObject({
+            level: 2,
+            next: null,
+            fraction: 1
+        });
+        expect(core.ladderProgress([10, 20], -3)).toMatchObject({
+            value: 0,
+            level: 0,
+            next: 10,
+            fraction: 0
+        });
         expect(core.ladderProgress([10, 20], Number.NaN)).toMatchObject({ value: 0 });
     });
 
@@ -45,7 +60,13 @@ describe("badge arrangement", () => {
     const badges = [{ key: "a" }, { key: "b" }, { key: "c" }, { key: "d" }];
 
     it("puts arranged badges first in their order and new ones after", () => {
-        const order = core.orderBadges(badges, new Map([["c", 0], ["a", 1]]));
+        const order = core.orderBadges(
+            badges,
+            new Map([
+                ["c", 0],
+                ["a", 1]
+            ])
+        );
         expect(order.map((badge) => badge.key)).toEqual(["c", "a", "b", "d"]);
     });
 
@@ -56,9 +77,20 @@ describe("badge arrangement", () => {
     });
 
     it("refuses a badge listed twice or an unknown key", () => {
-        expect(core.badgePreferencesSchema.safeParse([{ badge: "staff" }, { badge: "staff" }]).success).toBe(false);
+        expect(
+            core.badgePreferencesSchema.safeParse([{ badge: "staff" }, { badge: "staff" }]).success
+        ).toBe(false);
         expect(core.badgePreferencesSchema.safeParse([{ badge: "bogus" }]).success).toBe(false);
-        const ok = core.badgePreferencesSchema.safeParse([{ badge: "staff", hidden: true }, { badge: "ladder:tasks" }]);
-        expect(ok.success && ok.data[1]).toEqual({ badge: "ladder:tasks", hidden: false, audience: null, listId: null, people: [] });
+        const ok = core.badgePreferencesSchema.safeParse([
+            { badge: "staff", hidden: true },
+            { badge: "ladder:tasks" }
+        ]);
+        expect(ok.success && ok.data[1]).toEqual({
+            badge: "ladder:tasks",
+            hidden: false,
+            audience: null,
+            listId: null,
+            people: []
+        });
     });
 });

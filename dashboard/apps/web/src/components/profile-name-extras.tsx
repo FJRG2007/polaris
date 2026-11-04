@@ -19,7 +19,9 @@ export function ProfileNameExtras({ badges, own }: { badges: BadgesForViewer; ow
     const t = useTranslations("badges");
     const [open, setOpen] = useState(false);
     const hidden = (badges.arrangement ?? []).filter((row) => row.hidden).map((row) => row.badge);
-    const visible = own ? badges.shown.filter((badge) => !hidden.includes(badge.key)) : badges.shown;
+    const visible = own
+        ? badges.shown.filter((badge) => !hidden.includes(badge.key))
+        : badges.shown;
     if (!own && visible.length === 0) return null;
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-2">

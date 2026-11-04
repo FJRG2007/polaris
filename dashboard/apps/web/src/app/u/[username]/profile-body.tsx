@@ -32,7 +32,10 @@ export async function ProfileBody({
     }
 
     // The server decides which badges this viewer may see; the card only draws them.
-    const badges = await badgesFor(profile.id, viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null);
+    const badges = await badgesFor(
+        profile.id,
+        viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null
+    );
 
     return (
         <Messages namespaces={["publicPages", "badges"]}>

@@ -18,7 +18,10 @@
     "hiddenNote": "Hidden from your profile",
     "categories": {
         "staff": { "name": "Staff", "description": "Runs this Polaris instance." },
-        "custom": { "name": "Custom", "description": "Given by an administrator of this instance." },
+        "custom": {
+            "name": "Custom",
+            "description": "Given by an administrator of this instance."
+        },
         "tenure": { "name": "Veteran", "description": "Days since the account was made." },
         "messages": { "name": "Voice", "description": "Messages written in chat." },
         "calls": { "name": "On air", "description": "Minutes spent in calls and meetings." },

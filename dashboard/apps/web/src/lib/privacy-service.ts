@@ -845,7 +845,10 @@ async function realPeople(ids: readonly string[]): Promise<string[]> {
 }
 
 /** `assertOwnLists` for a rule kept outside the privacy settings themselves. */
-export async function assertOwnPrivacyLists(userId: string, listIds: readonly string[]): Promise<void> {
+export async function assertOwnPrivacyLists(
+    userId: string,
+    listIds: readonly string[]
+): Promise<void> {
     await assertOwnLists(userId, listIds);
 }
 
@@ -879,7 +882,10 @@ export async function ruleAllows(
         needsFriends ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
         core.audienceNeedsReach(audience) && audience !== "friendsOfFriends"
             ? reachBetween(viewer.id, [subjectId])
-            : Promise.resolve({ subjectFollows: new Set<string>(), viewerFollows: new Set<string>() }),
+            : Promise.resolve({
+                  subjectFollows: new Set<string>(),
+                  viewerFollows: new Set<string>()
+              }),
         audience === "friendsOfFriends"
             ? sharingAFriend(viewer.id, [subjectId])
             : Promise.resolve(new Set<string>()),

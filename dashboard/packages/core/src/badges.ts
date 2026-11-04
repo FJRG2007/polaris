@@ -52,7 +52,16 @@ export type BadgeLadderId = keyof typeof BADGE_LADDERS;
 export const BADGE_LADDER_IDS = Object.keys(BADGE_LADDERS) as BadgeLadderId[];
 
 /** The drawn icons a custom badge may use. */
-export const BADGE_ICONS = ["star", "heart", "shield", "flag", "bolt", "crown", "leaf", "gem"] as const;
+export const BADGE_ICONS = [
+    "star",
+    "heart",
+    "shield",
+    "flag",
+    "bolt",
+    "crown",
+    "leaf",
+    "gem"
+] as const;
 
 export type BadgeIcon = (typeof BADGE_ICONS)[number];
 
@@ -74,7 +83,11 @@ export function customKey(id: string): string {
 /** What a stored key names, or null for one this version does not know. */
 export function parseBadgeKey(
     key: string
-): { kind: "staff" } | { kind: "ladder"; id: BadgeLadderId } | { kind: "custom"; id: string } | null {
+):
+    | { kind: "staff" }
+    | { kind: "ladder"; id: BadgeLadderId }
+    | { kind: "custom"; id: string }
+    | null {
     if (key === STAFF_BADGE) return { kind: "staff" };
     if (key.startsWith(LADDER_PREFIX)) {
         const id = key.slice(LADDER_PREFIX.length);
