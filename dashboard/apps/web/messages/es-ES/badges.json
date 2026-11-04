@@ -60,7 +60,7 @@
     },
     "admin": {
         "intro": "Crea insignias para esta instancia y dáselas a gente. Staff sigue al rol de administrador.",
-        "create": "Nueva insignia",
+        "create": "Crear",
         "edit": "Editar {name}",
         "name": "Nombre",
         "description": "Descripción",
@@ -79,7 +79,7 @@
         "noHolders": "Nadie tiene esta insignia aún.",
         "failed": "No ha funcionado. Inténtalo otra vez.",
         "icons": {
-            "star": "Estrella",
+            "star": "Astro",
             "heart": "Corazón",
             "shield": "Escudo",
             "flag": "Bandera",

@@ -12,8 +12,6 @@
  * the account's `badges` privacy rule, each badge's own rule, and hiding.
  */
 
-import "server-only";
-
 import { z } from "zod";
 import * as core from "@polaris/core";
 import { prisma, Prisma } from "@polaris/db";
