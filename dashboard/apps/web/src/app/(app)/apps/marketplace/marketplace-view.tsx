@@ -936,7 +936,7 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
             .then((loadedConnections) => {
                 if (active) setConnections(loadedConnections);
             })
-            .catch(() => active && setError(t("errors.servers")));
+            .catch(() => active && setError(t("errors.storage")));
         return () => {
             active = false;
         };

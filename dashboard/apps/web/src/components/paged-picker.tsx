@@ -80,27 +80,3 @@ export function PagedPicker<T extends { id: string; name: string }>({
         />
     );
 }
-
-export function PagedMultiPicker<T extends { id: string; name: string }>({
-    read,
-    scope,
-    cache,
-    itemLabel,
-    ...rest
-}: PagedProps<T> & {
-    values: readonly string[];
-    onValuesChange: (ids: string[]) => void;
-    selectedLabels?: Readonly<Record<string, string>>;
-}) {
-    const { load, resolve, key } = usePaged<T>(read, scope);
-    return (
-        <ui.AsyncMultiSelect<T>
-            {...rest}
-            load={load}
-            resolve={resolve}
-            cacheKey={`${cache}:${key}`}
-            itemValue={idOf}
-            itemLabel={itemLabel ?? nameOf}
-        />
-    );
-}

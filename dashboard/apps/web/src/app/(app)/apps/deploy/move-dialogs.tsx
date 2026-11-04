@@ -486,6 +486,7 @@ export function MoveHomeDialog({
     const t = useTranslations("deploy");
     const [plan, setPlan] = useState<MoveHomePlan | null>(null);
     const [firstTarget, setFirstTarget] = useState<{ id: string; name: string } | null>();
+    const [machine, setMachine] = useState<string>();
     const [environment, setEnvironment] = useState(
         service.environmentId || environments[0]?.id || ""
     );
@@ -526,6 +527,7 @@ export function MoveHomeDialog({
             }
             const first = result.firstTarget ?? null;
             setFirstTarget(first);
+            setMachine(result.machine);
             setTarget(first?.id ?? "");
         })();
         return () => {
@@ -669,6 +671,7 @@ export function MoveHomeDialog({
                                                 : undefined
                                         }
                                         onValueChange={setTarget}
+                                        localLabel={(name) => machine ?? name}
                                         disabled={firstTarget === undefined}
                                         aria-label={t("move.home.server")}
                                     />

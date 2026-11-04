@@ -22,7 +22,7 @@
     },
     "errors": {
         "install": "No se pudo instalar la app",
-        "servers": "No se cargaron tus servidores",
+        "storage": "No se cargaron tus conexiones de almacenamiento",
         "checkForm": "Revisa el formulario y reinténtalo",
         "invalid": "Instalación no válida",
         "chooseNas": "Elige una conexión NAS para este volumen"

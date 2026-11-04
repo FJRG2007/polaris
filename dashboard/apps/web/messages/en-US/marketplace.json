@@ -22,7 +22,7 @@
     },
     "errors": {
         "install": "Could not install the app",
-        "servers": "Could not load your servers",
+        "storage": "Could not load your storage connections",
         "checkForm": "Check the form and try again",
         "invalid": "Invalid install request",
         "chooseNas": "Choose a NAS connection for this volume"

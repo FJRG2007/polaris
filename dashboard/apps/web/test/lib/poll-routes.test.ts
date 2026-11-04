@@ -254,8 +254,7 @@ vi.mock("@/app/(app)/admin/inbox/actions", () => ({
 }));
 vi.mock("@/app/(app)/mail-server/actions", () => ({
     serverDetailAction: actions.serverDetailAction,
-    planDnsAction: actions.planDnsAction,
-    listPlacementsAction: actions.listPlacementsAction
+    planDnsAction: actions.planDnsAction
 }));
 vi.mock("@/app/(app)/automations/actions", () => ({
     getRunAction: actions.getRunAction,

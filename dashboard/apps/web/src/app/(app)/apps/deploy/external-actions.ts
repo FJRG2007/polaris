@@ -363,6 +363,7 @@ export async function moveHomePlanAction(
 ): Promise<{
     plan?: migrate.MoveHomePlan;
     firstTarget?: { id: string; name: string } | null;
+    machine?: string;
     canCopyVariables?: boolean;
     error?: string;
 }> {
@@ -379,7 +380,8 @@ export async function moveHomePlanAction(
         return {
             plan: accessCan(access, COPY_OUT) ? plan : { ...plan, variableKeys: [] },
             canCopyVariables: accessCan(access, COPY_HOME),
-            firstTarget: first ? { id: first.id, name: targetLabel(first, machine) } : null
+            firstTarget: first ? { id: first.id, name: targetLabel(first, machine) } : null,
+            machine
         };
     } catch (caught) {
         return { error: await refusal(caught) };
