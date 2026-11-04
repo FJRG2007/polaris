@@ -2660,6 +2660,10 @@
                 "title": "Display defaults",
                 "description": "The units, dates and number formats new accounts start on."
             },
+            "badges": {
+                "title": "Badges",
+                "description": "Badges of your own to give people, beside the ones they earn."
+            },
             "agents": {
                 "title": "Agent defaults",
                 "description": "Where coding agents may run, and what they may open on their own."
