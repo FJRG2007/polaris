@@ -12,6 +12,7 @@ import type { SessionUser } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
 import { NothingToShow } from "@/components/nothing-to-show";
 import { badgesFor } from "@/lib/badges/badge-service";
+import { nameTagsFor } from "@/lib/name-tags/name-tag-service";
 import { publicProfile, profilesArePublic } from "@/lib/profile-service";
 
 export async function ProfileBody({
@@ -32,10 +33,11 @@ export async function ProfileBody({
     }
 
     // The server decides which badges this viewer may see; the card only draws them.
-    const badges = await badgesFor(
-        profile.id,
-        viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null
-    );
+    const asking = viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null;
+    const [badges, tags] = await Promise.all([
+        badgesFor(profile.id, asking),
+        nameTagsFor(asking, [profile.id])
+    ]);
 
     return (
         <Messages namespaces={["publicPages", "badges"]}>
@@ -44,6 +46,7 @@ export async function ProfileBody({
                 own={viewer?.id === profile.id}
                 signedIn={viewer !== null}
                 badges={badges}
+                tag={tags.get(profile.id) ?? null}
             />
         </Messages>
     );

@@ -45,6 +45,9 @@ export const NAME_TAG_COLORS = [
 ] as const;
 export type NameTagColor = (typeof NAME_TAG_COLORS)[number];
 
+/** What this instance is called, whose short forms are reserved. */
+export const NAME_TAG_INSTANCE_NAME = "Polaris";
+
 export const NAME_TAG_MAX = 4;
 
 /**

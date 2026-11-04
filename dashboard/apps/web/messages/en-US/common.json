@@ -137,5 +137,13 @@
         "alreadyIn": "Already in this language",
         "copy": "Copy translation",
         "open": "Open in Translate"
+    },
+    "nameTag": {
+        "open": "{tag} tag",
+        "loading": "Loading...",
+        "members": "{count, plural, one {# member} other {# members}}",
+        "orgHint": "Members of this organization can wear its tag.",
+        "instanceHint": "The tag of this Polaris itself.",
+        "view": "View organization"
     }
 }

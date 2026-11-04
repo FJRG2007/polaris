@@ -10,6 +10,7 @@
  */
 
 import { createContext, useContext } from "react";
+import { PersonNameTag } from "@/components/profile-name-extras";
 
 /** Somebody pressed, and the thing they were pressed on - which is where a card
  *  about them opens beside. */
@@ -31,8 +32,17 @@ export function usePersonPress(): PersonPress | null {
  */
 export function PersonMention({ id, label, className }: { id: string; label: string; className: string }) {
     const press = usePersonPress();
-    if (!press || !id) return <span className={className}>{label}</span>;
+    if (!id) return <span className={className}>{label}</span>;
+    // The tag sits outside the chip, as it does after every other drawn name.
+    if (!press)
+        return (
+            <>
+                <span className={className}>{label}</span>
+                <PersonNameTag id={id} />
+            </>
+        );
     return (
+        <>
         <button
             type="button"
             onClick={(event) => {
@@ -45,5 +55,7 @@ export function PersonMention({ id, label, className }: { id: string; label: str
         >
             {label}
         </button>
+        <PersonNameTag id={id} />
+        </>
     );
 }

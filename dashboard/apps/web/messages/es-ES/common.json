@@ -137,5 +137,13 @@
         "alreadyIn": "Ya está en este idioma",
         "copy": "Copiar traducción",
         "open": "Abrir en Traducir"
+    },
+    "nameTag": {
+        "open": "Etiqueta {tag}",
+        "loading": "Cargando...",
+        "members": "{count, plural, one {# miembro} other {# miembros}}",
+        "orgHint": "Los miembros de esta organización llevan su etiqueta.",
+        "instanceHint": "La etiqueta de este mismo Polaris.",
+        "view": "Ver organización"
     }
 }

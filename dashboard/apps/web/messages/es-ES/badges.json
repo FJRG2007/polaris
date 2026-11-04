@@ -91,5 +91,65 @@
             "leaf": "Hoja",
             "gem": "Gema"
         }
+    },
+    "nameTags": {
+        "org": {
+            "title": "Etiqueta",
+            "intro": "Una etiqueta corta que los miembros muestran tras su nombre."
+        },
+        "instance": {
+            "title": "Etiqueta de la instancia",
+            "intro": "Una etiqueta que cualquiera puede llevar. Admite palabras reservadas."
+        },
+        "mine": {
+            "title": "Tu etiqueta",
+            "intro": "Se muestra tras tu nombre a quien ve tus insignias.",
+            "none": "Sin etiqueta",
+            "empty": "Ninguna de tus organizaciones tiene etiqueta.",
+            "loadFailed": "No se han podido cargar tus etiquetas.",
+            "retry": "Reintentar"
+        },
+        "editor": {
+            "enabled": "Los miembros pueden llevarla",
+            "enabledHint": "Al desactivarla se quita a todos a la vez.",
+            "text": "Etiqueta",
+            "textHint": "Hasta 4 letras o números, en mayúsculas.",
+            "emblem": "Emblema",
+            "color": "Color",
+            "avatar": "Foto",
+            "preview": "Vista previa",
+            "save": "Guardar etiqueta",
+            "saved": "Etiqueta guardada."
+        },
+        "emblems": {
+            "spark": "Chispa",
+            "shield": "Escudo",
+            "bolt": "Rayo",
+            "leaf": "Hoja",
+            "flame": "Llama",
+            "gem": "Gema",
+            "wave": "Ola",
+            "orbit": "Órbita"
+        },
+        "colors": {
+            "slate": "Pizarra",
+            "red": "Rojo",
+            "amber": "Ámbar",
+            "green": "Verde",
+            "teal": "Turquesa",
+            "blue": "Azul",
+            "violet": "Violeta",
+            "pink": "Rosa"
+        },
+        "errors": {
+            "required": "Escribe una etiqueta.",
+            "tooLong": "Usa 4 caracteres como mucho.",
+            "characters": "Usa solo letras y números.",
+            "reserved": "Esa etiqueta es del personal de la instancia.",
+            "emblem": "Elige un emblema.",
+            "invalid": "No se ha podido guardar la etiqueta.",
+            "forbidden": "Solo los administradores pueden hacerlo.",
+            "unavailable": "Ahora no puedes llevar esa etiqueta."
+        }
     }
 }
