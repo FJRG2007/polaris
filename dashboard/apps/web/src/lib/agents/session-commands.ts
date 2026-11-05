@@ -281,6 +281,18 @@ const PREPARE_WORKTREE = [
     '  git clone --depth 50 -c http.extraHeader="$GIT_AUTH_HEADER" "https://github.com/$GITHUB_REPOSITORY.git" "$POLARIS_WORKDIR"',
     "fi",
     'cd "$POLARIS_WORKDIR"',
+    // `clone -c` writes the header into the new repository's own config, so the
+    // clone token would otherwise sit in .git/config for the agent to read.
+    "git config --unset-all http.extraHeader || true",
+    // From here on git asks Polaris for a token scoped to this repository each
+    // time it needs one, rather than the agent holding one. See
+    // `gitCredentialScript`.
+    'if [ -n "$POLARIS_GIT_CREDENTIAL" ]; then',
+    '  printf %s "$POLARIS_GIT_CREDENTIAL" | base64 -d > "$POLARIS_STATE_DIR/git-credential.sh"',
+    '  chmod 0700 "$POLARIS_STATE_DIR/git-credential.sh"',
+    '  git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""',
+    '  git config credential.username x-access-token',
+    "fi",
     'git checkout -b "$POLARIS_BRANCH"',
     "POLARIS_WORKDIR_NEW=yes",
     "fi",
@@ -597,7 +609,7 @@ const START_AGENT = [
     "  rm -f /tmp/polaris-first-run.sh",
     "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no

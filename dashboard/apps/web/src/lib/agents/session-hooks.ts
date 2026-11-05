@@ -120,6 +120,31 @@ export function hookScript(ingestUrl: string, token: string): string {
     ].join("\n");
 }
 
+/**
+ * The git credential helper a session's checkout is given.
+ *
+ * The agent never holds a GitHub token of its own. When its git needs one - a
+ * fetch, a push of its branch - git runs this, and this asks Polaris for a fresh
+ * token with the session's own reporting token. Polaris mints it for the one
+ * repository the session works in, with permission to read and write its
+ * contents and nothing else, so a token an agent is talked into printing is
+ * worth an hour on one repository rather than every repository of the
+ * installation. Only `get` is answered: git's `store` and `erase` have nothing
+ * to keep here.
+ */
+export function gitCredentialScript(url: string, token: string): string {
+    return [
+        "#!/bin/sh",
+        "# Written by Polaris. Hands git a short-lived token for this session's repository.",
+        '[ "$1" = "get" ] || exit 0',
+        "cat >/dev/null",
+        `curl -sS -f -m 15 -X POST ${shellQuote(url)} \\`,
+        `  -H ${shellQuote(`Authorization: Bearer ${token}`)} 2>/dev/null`,
+        "exit 0",
+        ""
+    ].join("\n");
+}
+
 /** Single-quote for a POSIX shell. Everything is safe inside single quotes except
  *  a single quote, which is closed, escaped and reopened. */
 export function shellQuote(value: string): string {

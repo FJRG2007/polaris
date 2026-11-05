@@ -13,6 +13,7 @@
  */
 
 import { createHmac, createSign, timingSafeEqual } from "node:crypto";
+import * as scoping from "@/lib/github-installation-scope";
 import {
     getIntegrationSecret,
     getIntegrationState,
@@ -146,11 +147,16 @@ async function getAppSecrets(): Promise<AppSecrets | null> {
 async function installationToken(
     installationId: number,
     appId: string,
-    pem: string
+    pem: string,
+    scope?: scoping.InstallationScope
 ): Promise<string> {
+    const scoped = scoping.installationTokenBody(scope);
     const res = await fetch(`${API}/app/installations/${installationId}/access_tokens`, {
         method: "POST",
-        headers: apiHeaders(appJwt(appId, pem)),
+        headers: scoped
+            ? { ...apiHeaders(appJwt(appId, pem)), "Content-Type": "application/json" }
+            : apiHeaders(appJwt(appId, pem)),
+        ...(scoped ? { body: scoped } : {}),
         cache: "no-store"
     });
     if (!res.ok) throw new Error(`GitHub returned ${res.status} minting an installation token`);
@@ -1203,7 +1209,13 @@ export async function githubApiToken(owner?: string): Promise<string | null> {
  * set of repositories, which a personal token connected to the same row is not -
  * so work with nobody watching uses this and never the token.
  */
-export async function githubAppInstallationToken(owner?: string): Promise<string | null> {
+export async function githubAppInstallationToken(
+    owner?: string,
+    /** Narrow the token to these repositories and permissions. A scoped request
+     *  also never falls back to another account's installation: an owner the App
+     *  is not installed on gets null. */
+    scope?: scoping.InstallationScope
+): Promise<string | null> {
     const state = await getIntegrationState(PROVIDER);
     if (!state?.hasSecret || state.config.method !== "app") return null;
     const secrets = await getAppSecrets();
@@ -1211,11 +1223,12 @@ export async function githubAppInstallationToken(owner?: string): Promise<string
     const installs = Array.isArray(state.config.installations)
         ? (state.config.installations as Installation[])
         : [];
-    const inst =
-        (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) ||
-        installs[0];
+    const inst = scope
+        ? scoping.installationFor(installs, owner ?? "")
+        : (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) ||
+          installs[0];
     if (!inst) return null;
-    return installationToken(inst.id, secrets.appId, secrets.pem);
+    return installationToken(inst.id, secrets.appId, secrets.pem, scope);
 }
 
 async function apiToken(owner?: string): Promise<string | null> {

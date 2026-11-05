@@ -441,6 +441,16 @@ export async function sessionForToken(
     return { id: record.id, state, taskId: record.taskId };
 }
 
+/** The repository a session works in, as `owner/name`, or null for a workspace
+ *  or a session that no longer exists. */
+export async function sessionRepository(sessionId: string): Promise<string | null> {
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { repo: { select: { repoFullName: true } } }
+    });
+    return record?.repo?.repoFullName ?? null;
+}
+
 /** Whose work a session is doing: the account that owns the repository it runs
  *  in, or - for a workspace, which has no repository to resolve through - the
  *  person who started it. What the tools it is given act as, so a session can

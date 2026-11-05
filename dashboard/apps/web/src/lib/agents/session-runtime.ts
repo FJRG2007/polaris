@@ -30,7 +30,14 @@ import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
 import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
-import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
+import * as scoping from "@/lib/github-installation-scope";
+import {
+    claudeHookSettings,
+    gitCredentialScript,
+    hookScript,
+    mcpConfig,
+    shellQuote
+} from "./session-hooks";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import {
@@ -118,7 +125,8 @@ interface Bootstrap {
     readonly hookSettings: string;
     readonly mcpConfig: string;
     readonly cloneHeader: string;
-    readonly githubToken: string;
+    /** The credential helper script, or empty for a workspace. */
+    readonly gitCredential: string;
     /** What signs the agent in, narrowed to the variables its own tool reads.
      *  Empty on a machine where the tool is already signed in, and empty for a
      *  tool Polaris holds no sourced credential for. */
@@ -215,19 +223,12 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     // A workspace checks nothing out, so it needs no installation and asks for
     // no token. Refusing to start one because an organization has not connected
     // GitHub would be refusing over a repository nobody named.
-    const owner = session.repoFullName.split("/")[0] ?? "";
-    const githubToken = session.repoFullName
-        ? ((await githubAppInstallationToken(owner)) ?? "")
-        : "";
-    if (session.repoFullName && !githubToken) {
-        throw new SessionRefusal(
-            `Polaris has no GitHub App installation for ${owner}, so it cannot check the repository out. Connect it again under Agents settings.`
-        );
-    }
+    const githubToken = session.repoFullName ? await cloneToken(session.repoFullName) : "";
 
     const base = (await appBaseUrl()).replace(/\/+$/, "");
     const ingest = `${base}/api/agents/sessions/${session.id}/events`;
     const mcp = `${base}/api/mcp`;
+    const credential = `${base}/api/agents/sessions/${session.id}/git-credential`;
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session, enigma.enabled);
     const chosen = session.accountId
@@ -284,7 +285,9 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
         cloneHeader: githubToken ? (cloneAuthHeader(githubToken) ?? "") : "",
-        githubToken,
+        // Not a token: a script that asks for one. The agent's environment holds
+        // no GitHub credential at all.
+        gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
         // and a session that quietly used the first is a session doing the work
@@ -307,6 +310,35 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         runAs: session.place === "host" ? "" : commands.CONTAINER_USER,
         home: session.place === "host" ? "" : commands.AGENT_HOME
     };
+}
+
+/**
+ * The token the boot script clones with: one repository, read only, minted from
+ * the installation on that repository's own owner.
+ *
+ * Refused rather than guessed. An owner the App is not installed on used to get
+ * the FIRST installation's token - somebody else's account - and a repository
+ * the installation does not reach is GitHub refusing the scope, which is worth
+ * saying in words the reader can act on.
+ */
+async function cloneToken(repoFullName: string): Promise<string> {
+    const scoped = scoping.repositoryScope(repoFullName, scoping.CLONE_PERMISSIONS);
+    if (!scoped) throw new SessionRefusal(`Polaris cannot read ${repoFullName} as a GitHub repository name.`);
+    let token: string | null;
+    try {
+        token = await githubAppInstallationToken(scoped.owner, scoped.scope);
+    } catch (error) {
+        console.error(`[agent-session] scoped token for ${repoFullName}:`, error);
+        throw new SessionRefusal(
+            `The GitHub App installed on ${scoped.owner} does not reach ${repoFullName}. Add the repository to the installation on GitHub, then start the session again.`
+        );
+    }
+    if (!token) {
+        throw new SessionRefusal(
+            `Polaris has no GitHub App installation for ${scoped.owner}, so it cannot check the repository out. Install the App on ${scoped.owner} under Agents settings.`
+        );
+    }
+    return token;
 }
 
 /**
@@ -334,7 +366,6 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
     return guardEnv({
         GITHUB_REPOSITORY: boot.repoFullName,
         GIT_AUTH_HEADER: boot.cloneHeader,
-        GH_TOKEN: boot.githubToken,
         POLARIS_WORKDIR: boot.workdir,
         POLARIS_STATE_DIR: boot.stateDir,
         POLARIS_AGENT_CONFIG: boot.agentConfig,
@@ -368,6 +399,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
+        POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
         ...boot.autonomyEnv,
         ...boot.credentials
     });

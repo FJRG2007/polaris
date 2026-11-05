@@ -26,13 +26,12 @@ import {
 /**
  * Variables every session is handed whether or not anybody linked anything.
  *
- * The GitHub App installation token that checked the repository out is exported
- * for the agent's own git and GitHub tools, so a tool that signs in with it is
- * signed in already. Kept as a set here as well as in `agent-signins.ts` for
- * different reasons: there it decides what is worth asking for, here it decides
- * what counts as present.
+ * None. A session used to export its GitHub installation token as `GH_TOKEN`,
+ * which made a tool that signs in with it look signed in; the agent now holds no
+ * GitHub token at all (its git asks Polaris through a credential helper), so a
+ * tool that needs one needs it linked.
  */
-const ALWAYS_PRESENT = ["GH_TOKEN", "GITHUB_TOKEN"];
+const ALWAYS_PRESENT: string[] = [];
 
 /** Every credential variable this person's sessions would actually be given. */
 export async function credentialsHeldBy(userId: string | null): Promise<Set<string>> {
