@@ -57,7 +57,6 @@ export function NameTagEmblemMark({
 }) {
     if (emblem === core.NAME_TAG_AVATAR && image) {
         return (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
                 src={image}
                 alt=""
@@ -160,7 +159,6 @@ function NameTagCardBody({ card }: { card: NameTagCard }) {
             <div className="flex min-w-0 items-center gap-3">
                 <span className="bg-muted border-border flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
                     {card.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={card.image} alt="" className="size-full object-cover" />
                     ) : (
                         <NameTagEmblemMark
