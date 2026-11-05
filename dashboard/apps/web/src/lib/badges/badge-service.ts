@@ -12,12 +12,15 @@
  * one setting, so drawing a badge never counts the table behind it.
  *
  * Every read of somebody else's badges goes through `badgesFor`, which applies
- * the account's `badges` privacy rule, each badge's own rule, and hiding.
+ * the account's `badges` privacy rule, each badge's own rule, and hiding. Only
+ * the owner's own read counts activity and records levels; anybody else reads
+ * what is already recorded, so opening a profile never counts or writes.
  */
 
 import { z } from "zod";
 import * as core from "@polaris/core";
 import { prisma, Prisma } from "@polaris/db";
+import { recordAudit } from "@/lib/audit-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     assertOwnPrivacyLists,
@@ -135,12 +138,62 @@ export interface BadgeArrangement {
  * Owned badges first, then the ladders not started yet.
  */
 export async function evaluateBadges(userId: string, now = new Date()): Promise<BadgeView[]> {
-    const [user, values, grants, unlocks, rarity] = await Promise.all([
+    const [basis, values] = await Promise.all([badgeBasis(userId), activityValues(userId, now)]);
+    if (!basis.user) return [];
+    const reached = await recordUnlocks(userId, basis.user, values, basis.unlocks, now);
+    return badgeViews(basis.user, basis, reached, now, (id) => {
+        const progress = core.ladderProgress(core.BADGE_LADDERS[id].thresholds, values[id]);
+        return { level: progress.level, progress };
+    });
+}
+
+/**
+ * What one person holds as recorded so far, for anybody but its owner: the
+ * levels already written by the sweep or by the owner's own screens, without
+ * counting their activity or writing anything. Tenure needs no counting, so it
+ * is read from the account's age; how far anybody is towards a next level is
+ * left to its owner.
+ */
+export async function recordedBadges(userId: string, now = new Date()): Promise<BadgeView[]> {
+    const basis = await badgeBasis(userId);
+    const user = basis.user;
+    if (!user) return [];
+    const reached = new Map(
+        basis.unlocks.map((row) => [`${row.badge}#${row.level}`, row.unlockedAt])
+    );
+    return badgeViews(user, basis, reached, now, (id) => {
+        const { thresholds } = core.BADGE_LADDERS[id];
+        if (id === "tenure") {
+            const days = Math.floor((now.getTime() - user.createdAt.getTime()) / DAY_MS);
+            return { level: core.ladderProgress(thresholds, days).level, progress: null };
+        }
+        const key = core.ladderKey(id);
+        const recorded = basis.unlocks
+            .filter((row) => row.badge === key)
+            .reduce((most, row) => Math.max(most, row.level), 0);
+        return { level: Math.min(recorded, thresholds.length), progress: null };
+    });
+}
+
+type BasisUser = { isAdmin: boolean; createdAt: Date };
+type GrantRow = {
+    grantedAt: Date;
+    badge: { id: string; name: string; description: string; icon: string };
+};
+interface BadgeBasis {
+    user: BasisUser | null;
+    grants: GrantRow[];
+    unlocks: UnlockRow[];
+    rarity: Rarity;
+}
+type LadderState = { level: number; progress: core.LadderProgress | null };
+
+function badgeBasis(userId: string): Promise<BadgeBasis> {
+    return Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             select: { isAdmin: true, createdAt: true }
         }),
-        activityValues(userId, now),
         prisma.badgeGrant.findMany({
             where: { userId },
             select: {
@@ -152,24 +205,38 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
         }),
         unlocksOf(userId),
         storedRarity()
-    ]);
-    if (!user) return [];
+    ]).then(([user, grants, unlocks, rarity]) => ({ user, grants, unlocks, rarity }));
+}
 
-    const reached = await recordUnlocks(userId, user, values, unlocks, now);
-    const dateOf = (badge: string, level: number): Date => reached.get(`${badge}#${level}`) ?? now;
+function badgeViews(
+    user: BasisUser,
+    { grants, rarity }: BadgeBasis,
+    reached: ReadonlyMap<string, Date>,
+    now: Date,
+    stateOf: (id: core.BadgeLadderId) => LadderState
+): BadgeView[] {
+    const dateOf = (badge: string, level: number, fallback = now): Date =>
+        reached.get(`${badge}#${level}`) ?? fallback;
 
     const staff = user.isAdmin ? dateOf(core.STAFF_BADGE, 1) : null;
     const ladders = core.BADGE_LADDER_IDS.map((id) => {
         const ladder = core.BADGE_LADDERS[id];
-        const progress = core.ladderProgress(ladder.thresholds, values[id]);
+        const state = stateOf(id);
         const key = core.ladderKey(id);
         const levels = ladder.thresholds.map((threshold, index) => ({
             level: index + 1,
             name: core.BADGE_LEVELS[index]!,
             threshold,
-            unlockedAt: index < progress.level ? dateOf(key, index + 1).toISOString() : null
+            unlockedAt:
+                index < state.level
+                    ? dateOf(
+                          key,
+                          index + 1,
+                          id === "tenure" ? tenureDay(user.createdAt, threshold, now) : now
+                      ).toISOString()
+                    : null
         }));
-        return { id, key, ladder, progress, levels };
+        return { id, key, ladder, state, levels };
     });
 
     const views: BadgeView[] = [];
@@ -218,22 +285,22 @@ export async function evaluateBadges(userId: string, now = new Date()): Promise<
         icon: entry.id,
         name: null,
         description: null,
-        owned: entry.progress.level > 0,
-        level: entry.progress.level,
-        top: entry.progress.top,
-        levelName: core.levelName(entry.progress.level),
-        unlockedAt: entry.levels[entry.progress.level - 1]?.unlockedAt ?? null,
-        rarity: rarity.ladder[`${entry.key}#${Math.max(1, entry.progress.level)}`] ?? 0,
+        owned: entry.state.level > 0,
+        level: entry.state.level,
+        top: entry.ladder.thresholds.length,
+        levelName: core.levelName(entry.state.level),
+        unlockedAt: entry.levels[entry.state.level - 1]?.unlockedAt ?? null,
+        rarity: rarity.ladder[`${entry.key}#${Math.max(1, entry.state.level)}`] ?? 0,
         unit: entry.ladder.unit,
-        progress: {
-            value: entry.progress.value,
-            next: entry.progress.next,
-            fraction: entry.progress.fraction
+        progress: entry.state.progress && {
+            value: entry.state.progress.value,
+            next: entry.state.progress.next,
+            fraction: entry.state.progress.fraction
         },
         levels: entry.levels
     });
-    views.push(...ladders.filter((entry) => entry.progress.level > 0).map(ladderView));
-    views.push(...ladders.filter((entry) => entry.progress.level === 0).map(ladderView));
+    views.push(...ladders.filter((entry) => entry.state.level > 0).map(ladderView));
+    views.push(...ladders.filter((entry) => entry.state.level === 0).map(ladderView));
     return views;
 }
 
@@ -424,7 +491,7 @@ export async function badgesFor(
         return { shown: [], available: [], arrangement: null };
     }
     const [views, arrangement] = await Promise.all([
-        evaluateBadges(subjectId),
+        own ? evaluateBadges(subjectId) : recordedBadges(subjectId),
         arrangementOf(subjectId)
     ]);
     const byKey = new Map(arrangement.map((row) => [row.badge, row]));
@@ -552,6 +619,13 @@ export async function createDefinition(actor: BadgeActor, input: unknown): Promi
         data: { ...data, createdById: actor.id },
         select: { id: true }
     });
+    await recordAudit({
+        actorId: actor.id,
+        action: "badge.create",
+        targetType: "badge",
+        targetId: row.id,
+        metadata: { name: data.name }
+    });
     return row.id;
 }
 
@@ -565,16 +639,31 @@ export async function updateDefinition(
     const data = definitionInput(input);
     const { count } = await prisma.badgeDefinition.updateMany({ where: { id: badgeId }, data });
     if (count === 0) throw new BadgeError("That badge no longer exists");
+    await recordAudit({
+        actorId: actor.id,
+        action: "badge.update",
+        targetType: "badge",
+        targetId: badgeId,
+        metadata: { name: data.name }
+    });
 }
 
 /** Deleting a badge takes it from everybody who had it, and from their arrangements. */
 export async function deleteDefinition(actor: BadgeActor, id: unknown): Promise<void> {
     assertAdmin(actor);
     const badgeId = uuid(id);
-    await prisma.$transaction([
+    const [, removed] = await prisma.$transaction([
         prisma.badgePreference.deleteMany({ where: { badge: core.customKey(badgeId) } }),
         prisma.badgeDefinition.deleteMany({ where: { id: badgeId } })
     ]);
+    if (removed.count > 0) {
+        await recordAudit({
+            actorId: actor.id,
+            action: "badge.delete",
+            targetType: "badge",
+            targetId: badgeId
+        });
+    }
 }
 
 /** Give a badge; answers whether the person did not hold it already. */
@@ -596,6 +685,15 @@ export async function grantBadge(
         data: [{ badgeId, userId: holder, grantedById: actor.id }],
         skipDuplicates: true
     });
+    if (count > 0) {
+        await recordAudit({
+            actorId: actor.id,
+            action: "badge.grant",
+            targetType: "user",
+            targetId: holder,
+            metadata: { badgeId }
+        });
+    }
     return count > 0;
 }
 
@@ -603,12 +701,21 @@ export async function revokeBadge(actor: BadgeActor, id: unknown, userId: unknow
     assertAdmin(actor);
     const badgeId = uuid(id);
     const holder = uuid(userId);
-    await prisma.$transaction([
+    const [revoked] = await prisma.$transaction([
         prisma.badgeGrant.deleteMany({ where: { badgeId, userId: holder } }),
         prisma.badgePreference.deleteMany({
             where: { userId: holder, badge: core.customKey(badgeId) }
         })
     ]);
+    if (revoked.count > 0) {
+        await recordAudit({
+            actorId: actor.id,
+            action: "badge.revoke",
+            targetType: "user",
+            targetId: holder,
+            metadata: { badgeId }
+        });
+    }
 }
 
 export interface BadgeHolder {

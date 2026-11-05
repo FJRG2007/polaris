@@ -44,6 +44,7 @@ let settings = new Map<string, string>();
 /** Whether the account-wide `badges` rule lets the viewer through. */
 let accountRuleAllows = true;
 const upsertGrant = vi.fn();
+const audited = vi.fn();
 
 const grantId = (index: number) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
 
@@ -194,6 +195,10 @@ vi.mock("@/lib/privacy-service", () => ({
     }
 }));
 
+vi.mock("@/lib/audit-service", () => ({
+    recordAudit: async (event: unknown) => audited(event)
+}));
+
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (key: string) => settings.get(key) ?? null,
     setSetting: async (key: string, value: string | null) => {
@@ -219,6 +224,7 @@ beforeEach(() => {
     settings = new Map();
     accountRuleAllows = true;
     upsertGrant.mockClear();
+    audited.mockClear();
 });
 
 const keys = (badges: readonly { key: string }[]) => badges.map((badge) => badge.key);
@@ -233,10 +239,20 @@ describe("who sees somebody's badges", () => {
     });
 
     it("lets an allowed viewer see earned badges, but never what is left or the arrangement", async () => {
+        await service.sweepBadgeUnlocks();
         const seen = await service.badgesFor(ALICE, { id: BOB, isAdmin: false });
         expect(keys(seen.shown)).toEqual(["ladder:messages"]);
         expect(seen.available).toEqual([]);
         expect(seen.arrangement).toBeNull();
+        expect(seen.shown[0]).toMatchObject({ level: 2, progress: null });
+    });
+
+    it("reads only what is recorded for anybody but the owner, and writes nothing", async () => {
+        const seen = await service.badgesFor(ALICE, { id: BOB, isAdmin: false });
+        expect(seen.shown).toEqual([]);
+        expect(unlocks).toEqual([]);
+        await service.badgesFor(ALICE, { id: ALICE, isAdmin: false });
+        expect(keys((await service.badgesFor(ALICE, null)).shown)).toEqual(["ladder:messages"]);
     });
 
     it("keeps a hidden badge for its owner alone, administrators included", async () => {
@@ -250,6 +266,7 @@ describe("who sees somebody's badges", () => {
     });
 
     it("applies a badge's own audience on top of the account's", async () => {
+        await service.sweepBadgeUnlocks();
         await service.saveArrangement(ALICE, [{ badge: "ladder:messages", audience: "nobody" }]);
         expect((await service.badgesFor(ALICE, { id: BOB, isAdmin: false })).shown).toEqual([]);
         await service.saveArrangement(ALICE, [{ badge: "ladder:messages", audience: "everyone" }]);
@@ -287,6 +304,10 @@ describe("custom badges are handed out by administrators only", () => {
         expect(
             keys((await service.badgesFor(ALICE, { id: ALICE, isAdmin: false })).shown)
         ).not.toContain(`custom:${BADGE}`);
+        expect(audited.mock.calls.map(([event]) => event)).toEqual([
+            expect.objectContaining({ actorId: ADMIN, action: "badge.grant", targetId: ALICE }),
+            expect.objectContaining({ actorId: ADMIN, action: "badge.revoke", targetId: ALICE })
+        ]);
     });
 
     it("counts a grant once, however often it is given", async () => {

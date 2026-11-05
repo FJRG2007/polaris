@@ -100,6 +100,8 @@ export function BadgesSettings({ userId }: { userId: string }) {
     const [details, setDetails] = useState<BadgeView | null>(null);
     // The last list the server accepted, which a failed save goes back to.
     const saved = useRef<Row[]>([]);
+    const latest = useRef(0);
+    const queue = useRef<Promise<void>>(Promise.resolve());
 
     useEffect(() => {
         const cached = readCache(userId);
@@ -120,18 +122,21 @@ export function BadgesSettings({ userId }: { userId: string }) {
 
     const commit = (next: Row[]) => {
         if (JSON.stringify(arrangementOf(next)) === JSON.stringify(arrangementOf(rows))) return;
-        const before = saved.current;
+        const turn = ++latest.current;
         setRows(next);
-        void saveBadgeArrangementAction(arrangementOf(next))
-            .then((answer) => {
-                if (answer.error) throw new Error(answer.error);
-                saved.current = next;
-                if (data) writeCache(userId, { ...data, arrangement: arrangementOf(next) });
-            })
-            .catch(() => {
-                setRows(before);
-                toast.show({ title: t("settings.failed") });
-            });
+        queue.current = queue.current.then(() =>
+            saveBadgeArrangementAction(arrangementOf(next))
+                .then((answer) => {
+                    if (answer.error) throw new Error(answer.error);
+                    saved.current = next;
+                    if (data) writeCache(userId, { ...data, arrangement: arrangementOf(next) });
+                })
+                .catch(() => {
+                    if (turn !== latest.current) return;
+                    setRows(saved.current);
+                    toast.show({ title: t("settings.failed") });
+                })
+        );
     };
 
     const update = (key: string, change: Partial<Row>) =>
