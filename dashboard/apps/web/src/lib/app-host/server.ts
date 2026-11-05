@@ -144,6 +144,7 @@ const load = {
     envVarService: once(() => import("@/lib/env-var-service")),
     footageStorage: once(() => import("@/lib/footage-storage")),
     hostService: once(() => import("@/lib/host-service")),
+    serverOptions: once(() => import("@/lib/server-options")),
     neighbours: once(() => import("@/lib/storage-whereabouts/neighbours")),
     i18nLocaleService: once(() => import("@/lib/i18n/locale-service")),
     i18nRequest: once(() => import("@/lib/i18n/request")),
@@ -445,6 +446,11 @@ export const serverHost = {
     hostService: {
         getHostConnection: later(load.hostService, "getHostConnection"),
         listHosts: later(load.hostService, "listHosts")
+    },
+    // An owner's servers a page at a time, searched on the server: what an app
+    // picker reads instead of every server the owner has.
+    serverOptions: {
+        readServerOptions: later(load.serverOptions, "readServerOptions")
     },
     // The host's neighbour table (IP -> hardware address), for an app that is
     // given a device by its MAC and has to find the address it was lent. Empty

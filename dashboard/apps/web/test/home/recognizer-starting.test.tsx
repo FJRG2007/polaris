@@ -41,7 +41,6 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
     detectionDefaultsAction: async () => ({
         defaults: { sensitivity: 50, settleSeconds: 2, minGapSeconds: 30 }
     }),
-    listServersAction: async () => ({ servers: [{ id: "local", label: "this server" }] }),
     installRecognizerAction: async () => ({}),
     setFaceRecognitionAction: async () => ({}),
     setFaceEnabledAction: async () => ({}),

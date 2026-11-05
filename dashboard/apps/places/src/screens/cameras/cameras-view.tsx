@@ -154,7 +154,6 @@ export function CamerasView({
     const [recheck, setRecheck] = useState(0);
     /** Whether a camera is open in the viewer, which asks for its own stream. */
     const [watchingOne, setWatchingOne] = useState(false);
-    const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
     const [defaults, setDefaults] = useState<{
         sensitivity: number;
@@ -280,13 +279,11 @@ export function CamerasView({
             };
         }
         void Promise.all([
-            actions.listServersAction(),
             actions.listStorageOptionsAction(),
             actions.detectionDefaultsAction()
         ]).then(
-            ([machines, disks, tuning]) => {
+            ([disks, tuning]) => {
                 if (cancelled) return;
-                setServers(machines.servers ?? []);
                 setStorage(disks.options ?? []);
                 setDefaults(tuning.defaults ?? null);
                 setExtras(true);
@@ -825,7 +822,6 @@ export function CamerasView({
                         (row) => row.hasPassword && usesAccountPassword(row.vendor)
                     )}
                     placeId={editing?.placeId || cameras?.[0]?.placeId || ""}
-                    servers={servers}
                     storage={storage}
                     defaults={defaults}
                     onClose={() => {
@@ -839,7 +835,6 @@ export function CamerasView({
             {ready && discovering ? (
                 <DiscoverDialog
                     known={new Set(loaded.map((camera) => camera.address))}
-                    servers={servers.filter((server) => server.id !== "local")}
                     onClose={() => setDiscovering(false)}
                     onPick={(found: DiscoveredCamera) => {
                         setDiscovering(false);

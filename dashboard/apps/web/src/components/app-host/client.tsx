@@ -144,6 +144,12 @@ const ServerMultiPicker = dynamic(
     { ssr: false }
 );
 
+/** A picker over any list an app's own action answers a page at a time. */
+const PagedPicker = dynamic(
+    () => import("@/components/paged-picker").then((module) => module.PagedPicker),
+    { ssr: false }
+) as typeof import("@/components/paged-picker").PagedPicker;
+
 const dropServerOptions = () =>
     import("@/components/server-picker").then((module) => module.dropServerOptions());
 
@@ -252,6 +258,7 @@ export const clientHost = {
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },
     notificationSound: { soundGain },
+    pagedPicker: { PagedPicker },
     qrCode: { QRCodeSVG },
     metricsHistory: { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS },
     relativeTime: { RelativeTime, relativeTime },

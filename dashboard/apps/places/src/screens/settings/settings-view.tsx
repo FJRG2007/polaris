@@ -23,9 +23,10 @@ import Link from "next/link";
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { CircleAlert, CircleCheck, Loader2, ScanFace } from "lucide-react";
-import { Button, Input, isDirty, Select, Skeleton, Switch } from "@polaris/ui";
+import { Button, Input, isDirty, Skeleton, Switch } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
+import { MachinePicker } from "../machine-picker";
 import type { PlacesTranslator } from "../../lib/i18n";
 
 const { runAction } = hostUi.runAction;
@@ -87,7 +88,6 @@ export function HomeSettingsView({
     const [key, setKey] = useState("");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [server, setServer] = useState("local");
     const [installing, setInstalling] = useState(false);
     /** True once it has been given long enough to start and has not. */
@@ -98,10 +98,9 @@ export function HomeSettingsView({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [result, tuning, machines] = await Promise.all([
+            const [result, tuning] = await Promise.all([
                 actions.homeSettingsAction(),
-                actions.detectionDefaultsAction(),
-                actions.listServersAction()
+                actions.detectionDefaultsAction()
             ]);
             if (cancelled) return;
             if (result.error) setError(result.error);
@@ -121,7 +120,6 @@ export function HomeSettingsView({
             setManual(Boolean(value.faceApiUrl));
             setDefaults(tuning.defaults ?? null);
             setStoredDefaults(tuning.defaults ?? null);
-            setServers(machines.servers ?? []);
         })();
         return () => {
             cancelled = true;
@@ -481,13 +479,10 @@ export function HomeSettingsView({
                                     <span className="text-[0.75rem] font-medium text-muted-foreground">
                                         {t("settings.runOn")}
                                     </span>
-                                    <Select
+                                    <MachinePicker
                                         value={server}
                                         onValueChange={setServer}
-                                        options={servers.map((machine) => ({
-                                            value: machine.id,
-                                            label: machine.label
-                                        }))}
+                                        includeLocal
                                     />
                                 </label>
                                 <Button onClick={install} disabled={installing}>

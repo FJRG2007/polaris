@@ -1228,6 +1228,11 @@
             }
         }
     },
+    "machinePicker": {
+        "placeholder": "Elige una máquina",
+        "search": "Buscar máquinas",
+        "empty": "Ninguna máquina coincide"
+    },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
         "thisServer": "Este servidor",
