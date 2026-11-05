@@ -60,7 +60,9 @@ describe("the dehumidifier kind", () => {
             air: { ...AIR, humidity: { ...AIR.humidity, target: 45 } }
         });
         // An air conditioner's command is not a dehumidifier's.
-        expect(kinds.commandFor("dehumidifier", { action: "set-temperature", target: 22 })).toBeNull();
+        expect(
+            kinds.commandFor("dehumidifier", { action: "set-temperature", target: 22 })
+        ).toBeNull();
     });
 
     it("keeps the tank flag when stored, and drops a document that is not one", () => {
