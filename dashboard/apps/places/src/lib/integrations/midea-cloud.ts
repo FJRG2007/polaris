@@ -181,7 +181,7 @@ export function setMideaPause(next?: (ms: number) => Promise<void>): void {
     pause = next ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 }
 
-/** A signed-in MSmartHome session. Kept only for the length of one sync. */
+/** A signed-in MSmartHome session. Kept in memory until MSmartHome ends it. */
 export interface MideaSession {
     readonly apiUrl: string;
     readonly account: string;

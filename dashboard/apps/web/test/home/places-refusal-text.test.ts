@@ -26,7 +26,8 @@ const LIB = fileURLToPath(new URL("../../../places/src/lib/", import.meta.url));
 
 /** `new HomeError("A sentence")` and its siblings, the sentence possibly on the
  *  next line. */
-const BUILT = /new (?:HomeError|DriverError|NukiError|TuyaError|BrokerError)\(\s*"([^"\\]+)"/g;
+const BUILT =
+    /new (?:HomeError|DriverError|NukiError|TuyaError|BrokerError|MideaCloudError)\(\s*"([^"\\]+)"/g;
 
 async function files(dir: string): Promise<string[]> {
     const found: string[] = [];
@@ -166,6 +167,38 @@ describe("a refusal from Places", () => {
         ).toBe(
             "Philips no ha enviado un código a esa dirección. Comprueba que es la que usas en la app Air+. Philips dijo: Invalid parameter value (400006)."
         );
+    });
+
+    it("reads a dehumidifier's refusals in Spanish, with what they carry", () => {
+        const cases: [string, string][] = [
+            ["Type at most 20 addresses", "Escribe 20 direcciones como mucho"],
+            [
+                "The dehumidifier did not answer at 192.168.1.40. Check it is switched on and on the same network as Polaris.",
+                "El deshumectador no respondió en 192.168.1.40."
+            ],
+            [
+                "Bedroom shows as offline in the MSmartHome app. Check it is plugged in and on Wi-Fi.",
+                "Bedroom aparece sin conexión"
+            ],
+            [
+                "Bedroom did not answer the scan on this network. Type its IP address in the connection: your router's list of devices shows it.",
+                "Bedroom no respondió a la búsqueda"
+            ],
+            [
+                "The dehumidifier at 192.168.1.40 refused the key MSmartHome gave for it. Remove it from the MSmartHome app, add it again, and sync.",
+                "El deshumectador de 192.168.1.40 rechazó la clave"
+            ],
+            ["A dehumidifier takes 35 to 85% humidity.", "del 35 al 85 %"],
+            [
+                "MSmartHome answered with error 1234 (busy).",
+                "MSmartHome respondió con el error 1234 (busy)."
+            ],
+            ["MSmartHome answered with error 1234.", "MSmartHome respondió con el error 1234."]
+        ];
+        for (const [english, spanish] of cases) {
+            expect(placesRefusalText(en, english)).toBe(english);
+            expect(placesRefusalText(es, english)).toContain(spanish);
+        }
     });
 
     it("passes a camera's own words through", () => {

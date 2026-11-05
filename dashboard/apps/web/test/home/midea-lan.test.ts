@@ -233,6 +233,46 @@ describe("the Midea / Comfee driver", () => {
         expect(received[1]![12]).toBe(4);
     });
 
+    it("signs in once and reads the units on the network after that", async () => {
+        await driver.mideaLanDriver.list(CREDENTIALS);
+        await driver.mideaLanDriver.list(CREDENTIALS);
+        await driver.mideaLanDriver.act(
+            CREDENTIALS,
+            { externalId: ID, kind: "dehumidifier" },
+            "turn-off"
+        );
+        await driver.mideaLanDriver.list(CREDENTIALS);
+        expect(fetched.filter((alias) => alias === "/mj/user/login")).toHaveLength(1);
+        expect(fetched.filter((alias) => alias === "/v1/appliance/user/list/get")).toHaveLength(1);
+        expect(fetched.filter((alias) => alias === "/v1/iot/secure/getToken")).toHaveLength(2);
+        expect(scans).toHaveLength(1);
+    });
+
+    it("signs in again once when MSmartHome ends the session", async () => {
+        await driver.mideaLanDriver.list(CREDENTIALS);
+        vi.useFakeTimers({ now: Date.now() + 11 * 60_000, toFake: ["Date"] });
+        try {
+            let ended = true;
+            const listed = answers["/v1/appliance/user/list/get"];
+            answers["/v1/appliance/user/list/get"] = { code: 3106, msg: "expired" };
+            cloud.setMideaFetcher(async (input) => {
+                const alias = decodeURI(new URL(String(input)).searchParams.get("alias") ?? "");
+                fetched.push(alias);
+                if (alias === "/mj/user/login") {
+                    ended = false;
+                    answers["/v1/appliance/user/list/get"] = listed;
+                }
+                return new Response(JSON.stringify(answers[alias] ?? { code: 1 }));
+            });
+            const [unit] = await driver.mideaLanDriver.list(CREDENTIALS);
+            expect(ended).toBe(false);
+            expect(unit).toMatchObject({ online: true });
+            expect(fetched.filter((alias) => alias === "/mj/user/login")).toHaveLength(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("refuses a mode the unit does not have", async () => {
         await expect(
             driver.mideaLanDriver.act(
@@ -286,8 +326,10 @@ describe("what the driver says when it cannot", () => {
 
     it("says where a unit did not answer", async () => {
         reachable = false;
-        const [unit] = await driver.mideaLanDriver.list(CREDENTIALS);
-        expect(unit).toMatchObject({ online: false });
+        await expect(driver.mideaLanDriver.list(CREDENTIALS)).rejects.toMatchObject({
+            kind: "unreachable",
+            message: `The dehumidifier did not answer at ${ADDRESS}. Check it is switched on and on the same network as Polaris.`
+        });
         await expect(
             driver.mideaLanDriver.act(
                 CREDENTIALS,
@@ -298,6 +340,25 @@ describe("what the driver says when it cannot", () => {
             kind: "unreachable",
             message: `The dehumidifier did not answer at ${ADDRESS}. Check it is switched on and on the same network as Polaris.`
         });
+    });
+
+    it("says on a sync that a unit the scan missed should have its address typed, and waits before scanning again", async () => {
+        driver.setMideaTransport({
+            connect: async () => fakeLink(),
+            scan: async (targets) => {
+                scans.push([...targets]);
+                return [];
+            }
+        });
+        for (let sync = 0; sync < 3; sync++) {
+            await expect(driver.mideaLanDriver.list(CREDENTIALS)).rejects.toMatchObject({
+                kind: "unreachable",
+                message: expect.stringContaining("Bedroom did not answer the scan")
+            });
+        }
+        expect(scans).toHaveLength(1);
+        await driver.mideaLanDriver.list({ ...CREDENTIALS, hosts: ADDRESS }).catch(() => undefined);
+        expect(scans).toHaveLength(2);
     });
 
     it("says a unit the scan missed should have its address typed", async () => {

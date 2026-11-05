@@ -16,6 +16,7 @@
  */
 
 import * as kinds from "../device-kinds";
+import { createHash } from "node:crypto";
 import { createSocket } from "node:dgram";
 import { HomeError } from "../home-error";
 import { createConnection } from "node:net";
@@ -37,6 +38,10 @@ const SOCKET_TIMEOUT_MS = 8000;
 /** No answer from a unit is anywhere near this. */
 const MAX_BUFFER = 64 * 1024;
 const MAX_TYPED_ADDRESSES = 20;
+/** How long an account's appliance list is trusted before MSmartHome is asked again. */
+const LIST_TTL_MS = 10 * 60_000;
+/** How long a unit the scan missed waits before a sync scans for it again. */
+const SCAN_AGAIN_MS = 5 * 60_000;
 
 // --- the two ways out, replaceable in tests ----------------------------------------
 
@@ -156,11 +161,20 @@ export function setMideaTransport(next?: MideaTransport): void {
  *  process: both are found again by the next sync when they are lost. */
 const workingKeys = new Map<string, cloud.MideaKey>();
 const addresses = new Map<string, string>();
+/** When a scan last missed a unit, per appliance id and addresses typed. */
+const missedAt = new Map<string, number>();
+/** One MSmartHome session per account, kept until MSmartHome ends it. */
+const sessions = new Map<string, Promise<cloud.MideaSession>>();
+/** Each account's appliances as last listed. */
+const listings = new Map<string, { at: number; value: Promise<cloud.MideaAppliance[]> }>();
 
 /** Forget what was learned; for tests. */
 export function forgetMideaUnits(): void {
     workingKeys.clear();
     addresses.clear();
+    missedAt.clear();
+    sessions.clear();
+    listings.clear();
 }
 
 let messageId = 0;
@@ -171,12 +185,20 @@ function nextMessageId(): number {
 
 // --- credentials and errors ---------------------------------------------------------
 
-function accountOf(credentials: Credentials): { email: string; password: string } {
+interface MideaAccount {
+    readonly email: string;
+    readonly password: string;
+    /** Which account this is, for the in-memory holds: never the credential. */
+    readonly key: string;
+}
+
+function accountOf(credentials: Credentials): MideaAccount {
     const email = credentials.email?.trim().toLowerCase() ?? "";
     const password = credentials.password ?? "";
     if (!email || !password)
         throw new HomeError("That connection is missing its email or password");
-    return { email, password };
+    const key = createHash("sha256").update(`${email}\n${password}`).digest("hex");
+    return { email, password, key };
 }
 
 /** The addresses typed, one per dehumidifier, each checked as any address is. */
@@ -210,31 +232,82 @@ async function speaking<T>(call: () => Promise<T>): Promise<T> {
 
 interface Dehumidifier {
     readonly appliance: cloud.MideaAppliance;
-    readonly session: cloud.MideaSession;
+    readonly account: MideaAccount;
 }
 
-async function dehumidifiers(credentials: Credentials): Promise<Dehumidifier[]> {
-    const { email, password } = accountOf(credentials);
-    return speaking(async () => {
-        const session = await cloud.signIn(email, password);
-        const all = await cloud.listAppliances(session);
-        return all
-            .filter((appliance) => appliance.type === protocol.A1)
-            .map((appliance) => ({ appliance, session }));
+/** Hold `entry` under `key` until `value` fails. */
+function holding<V>(map: Map<string, V>, key: string, entry: V, value: Promise<unknown>): void {
+    map.set(key, entry);
+    value.catch(() => {
+        if (map.get(key) === entry) map.delete(key);
     });
+}
+
+function sessionOf(account: MideaAccount): Promise<cloud.MideaSession> {
+    const held = sessions.get(account.key);
+    if (held) return held;
+    const fresh = cloud.signIn(account.email, account.password);
+    holding(sessions, account.key, fresh, fresh);
+    return fresh;
+}
+
+/** A cloud call on the account's session; a kept session MSmartHome has ended
+ *  is signed in again once. */
+async function onSession<T>(
+    account: MideaAccount,
+    call: (session: cloud.MideaSession) => Promise<T>
+): Promise<T> {
+    const held = sessions.get(account.key);
+    const session = await sessionOf(account);
+    try {
+        return await call(session);
+    } catch (caught) {
+        const ended = caught instanceof cloud.MideaCloudError && caught.reason === "password";
+        if (!held || !ended) throw caught;
+        if (sessions.get(account.key) === held) sessions.delete(account.key);
+        return call(await sessionOf(account));
+    }
+}
+
+function appliancesOf(account: MideaAccount, fresh: boolean): Promise<cloud.MideaAppliance[]> {
+    const held = listings.get(account.key);
+    if (!fresh && held && Date.now() - held.at < LIST_TTL_MS) return held.value;
+    const value = onSession(account, cloud.listAppliances);
+    holding(listings, account.key, { at: Date.now(), value }, value);
+    return value;
+}
+
+async function dehumidifiers(credentials: Credentials, fresh = false): Promise<Dehumidifier[]> {
+    const account = accountOf(credentials);
+    return speaking(async () =>
+        (await appliancesOf(account, fresh))
+            .filter((appliance) => appliance.type === protocol.A1)
+            .map((appliance) => ({ appliance, account }))
+    );
 }
 
 async function keysFor(unit: Dehumidifier): Promise<cloud.MideaKey[]> {
     const known = workingKeys.get(unit.appliance.id);
     if (known) return [known];
-    return speaking(() => cloud.applianceKeys(unit.session, unit.appliance.id));
+    return speaking(() =>
+        onSession(unit.account, (session) => cloud.applianceKeys(session, unit.appliance.id))
+    );
 }
 
 // --- where the units are ------------------------------------------------------------
 
-/** Scan for the units, at the addresses typed and on this network, and keep
- *  where each answered. */
-async function locateUnits(credentials: Credentials): Promise<void> {
+const missKey = (credentials: Credentials, applianceId: string) =>
+    `${applianceId}\n${credentials.hosts ?? ""}`;
+
+/** Whether a scan missed this unit too recently to scan for it again yet. */
+function missedLately(credentials: Credentials, applianceId: string): boolean {
+    const at = missedAt.get(missKey(credentials, applianceId));
+    return at !== undefined && Date.now() - at < SCAN_AGAIN_MS;
+}
+
+/** Scan for the units, at the addresses typed and on this network, keep
+ *  where each answered, and note which of `wanted` did not. */
+async function locateUnits(credentials: Credentials, wanted: readonly string[]): Promise<void> {
     const typed = await typedAddresses(credentials);
     const targets = [...new Set([BROADCAST, ...typed, ...(await subnetTargets())])];
     const replies = await transport.scan(targets, SCAN_WINDOW_MS);
@@ -242,6 +315,10 @@ async function locateUnits(credentials: Credentials): Promise<void> {
         if (forbiddenAddress(reply.address)) continue;
         const id = protocol.discoveredId(reply.data);
         if (id !== null) addresses.set(id.toString(), reply.address);
+    }
+    for (const id of wanted) {
+        if (addresses.has(id)) missedAt.delete(missKey(credentials, id));
+        else missedAt.set(missKey(credentials, id), Date.now());
     }
 }
 
@@ -477,7 +554,7 @@ export const mideaLanDriver: DeviceDriver = {
      *  address typed is one a unit can be at. */
     async verify(credentials) {
         await typedAddresses(credentials);
-        const units = await dehumidifiers(credentials);
+        const units = await dehumidifiers(credentials, true);
         if (units.length === 0) {
             throw new DriverError(
                 "That MSmartHome account has no dehumidifier. Add it in the MSmartHome app first, then connect again.",
@@ -488,8 +565,12 @@ export const mideaLanDriver: DeviceDriver = {
 
     async list(credentials) {
         const units = await dehumidifiers(credentials);
-        if (units.some((unit) => unit.appliance.online && !addresses.has(unit.appliance.id)))
-            await locateUnits(credentials);
+        const unfound = units
+            .filter((unit) => unit.appliance.online && !addresses.has(unit.appliance.id))
+            .map((unit) => unit.appliance.id);
+        if (unfound.some((id) => !missedLately(credentials, id)))
+            await locateUnits(credentials, unfound);
+        const failures: DriverError[] = [];
         const read = async (unit: Dehumidifier) => {
             if (!unit.appliance.online) return null;
             try {
@@ -500,16 +581,25 @@ export const mideaLanDriver: DeviceDriver = {
                 if (!(caught instanceof DriverError)) throw caught;
                 // Gone from where it was: scanned for again on the next sync.
                 if (caught.kind === "unreachable") addresses.delete(unit.appliance.id);
+                failures.push(caught);
                 return null;
             }
         };
         const statuses = await Promise.all(units.map(read));
+        // Nothing read at all: the account says why, rather than every unit
+        // only showing as offline.
+        const first = failures[0];
+        if (first && statuses.every((status) => status === null)) throw first;
         return units.map((unit, index) => mideaSnapshot(unit.appliance, statuses[index] ?? null));
     },
 
     async act(credentials, device, action, command) {
-        const units = await dehumidifiers(credentials);
-        const unit = units.find((entry) => entry.appliance.id === device.externalId);
+        const find = async (fresh: boolean) =>
+            (await dehumidifiers(credentials, fresh)).find(
+                (entry) => entry.appliance.id === device.externalId
+            );
+        let unit = await find(false);
+        if (!unit?.appliance.online) unit = await find(true);
         if (!unit)
             throw new DriverError(
                 "That dehumidifier is no longer on the MSmartHome account.",
@@ -524,7 +614,8 @@ export const mideaLanDriver: DeviceDriver = {
                     address
                 );
             });
-        if (!addresses.has(unit.appliance.id)) await locateUnits(credentials);
+        const wanted = [unit.appliance.id];
+        if (!addresses.has(unit.appliance.id)) await locateUnits(credentials, wanted);
         try {
             await send();
         } catch (caught) {
@@ -533,7 +624,7 @@ export const mideaLanDriver: DeviceDriver = {
             if (!(caught instanceof DriverError) || caught.kind !== "unreachable") throw caught;
             const before = addresses.get(unit.appliance.id);
             addresses.delete(unit.appliance.id);
-            await locateUnits(credentials);
+            await locateUnits(credentials, wanted);
             const after = addresses.get(unit.appliance.id);
             if (!after || after === before) throw caught;
             await send();
