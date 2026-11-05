@@ -432,16 +432,51 @@ export async function deleteMaintenance(id: string) {
     await prisma.statusMaintenance.deleteMany({ where: { id } });
 }
 
-/** Polaris's own deployed addresses, for a check to point at without typing. */
-export async function deployedTargets(): Promise<{ label: string; url: string }[]> {
+/** One deployed address as the check form's picker shows it: the id is the URL. */
+export interface DeployedTarget {
+    id: string;
+    name: string;
+}
+
+/**
+ * Polaris's own deployed addresses, for a check to point at without typing - a
+ * page at a time, searched by hostname or app name in the database and continued
+ * on the hostname (unique), so the form never holds every domain there is.
+ */
+export async function deployedTargets(request: {
+    query: string;
+    cursor: string | null;
+    limit: number;
+}): Promise<{ items: DeployedTarget[]; next: string | null }> {
     const domains = await prisma.domain.findMany({
-        where: { enabled: true, NOT: { kind: "release" } },
+        where: {
+            enabled: true,
+            NOT: { kind: "release" },
+            ...(request.query
+                ? {
+                      OR: [
+                          { hostname: { contains: request.query, mode: "insensitive" as const } },
+                          {
+                              application: {
+                                  name: { contains: request.query, mode: "insensitive" as const }
+                              }
+                          }
+                      ]
+                  }
+                : {}),
+            ...(request.cursor ? { hostname: { gt: request.cursor } } : {})
+        },
         orderBy: { hostname: "asc" },
-        take: 200,
+        // One past the page: the extra row is how the end is known without counting.
+        take: request.limit + 1,
         select: { hostname: true, https: true, application: { select: { name: true } } }
     });
-    return domains.map((domain) => ({
-        label: `${domain.application.name} (${domain.hostname})`,
-        url: `${domain.https ? "https" : "http"}://${domain.hostname}/`
-    }));
+    const page = domains.slice(0, request.limit);
+    return {
+        items: page.map((domain) => ({
+            id: `${domain.https ? "https" : "http"}://${domain.hostname}/`,
+            name: `${domain.application.name} (${domain.hostname})`
+        })),
+        next: domains.length > request.limit ? (page[page.length - 1]?.hostname ?? null) : null
+    };
 }

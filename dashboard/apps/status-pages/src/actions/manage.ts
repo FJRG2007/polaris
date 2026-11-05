@@ -193,8 +193,20 @@ export async function checkCustomDomainAction(
     return outcome(async () => ({ status: await manage.checkCustomDomain(parsed.data.id) }));
 }
 
-export async function deployedTargetsAction(): Promise<
-    Outcome<{ targets: { label: string; url: string }[] }>
-> {
-    return outcome(async () => ({ targets: await manage.deployedTargets() }));
+const deployedTargetsInput = z
+    .object({
+        query: z.string().trim().max(120).default(""),
+        cursor: z.string().max(253).nullable().default(null),
+        limit: z.number().int().min(1).max(50).default(50)
+    })
+    .strict();
+
+/** A page of Polaris's own deployed addresses, in the shape a paged picker reads. */
+export async function deployedTargetsAction(
+    input: unknown
+): Promise<{ items: manage.DeployedTarget[]; next: string | null } | { error: string }> {
+    const parsed = deployedTargetsInput.safeParse(input ?? {});
+    if (!parsed.success) return { error: "invalid" };
+    const answer = await outcome(async () => manage.deployedTargets(parsed.data));
+    return answer.ok ? { items: answer.items, next: answer.next } : { error: answer.error };
 }
