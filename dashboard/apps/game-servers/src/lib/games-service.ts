@@ -50,6 +50,7 @@ import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
 const { listHosts } = host.hostService;
+const { readServerOptions } = host.serverOptions;
 const { getHostLanIp } = host.hostAddress;
 const { hostPortForApp } = host.deployService;
 const { getLocalEnvironment } = host.networkService;
@@ -221,6 +222,69 @@ function presentIds(values: readonly (string | null)[]): string[] {
 
 /** The game servers this person runs, plus any they were given access to, and
  *  everything Polaris already knows about them, newest first. */
+/** Where the next page of game servers starts: the last name and id handed out. */
+function encodeNameCursor(name: string, id: string): string {
+    return Buffer.from(JSON.stringify([name, id])).toString("base64url");
+}
+
+function decodeNameCursor(raw: string | null): { name: string; id: string } | null {
+    if (!raw) return null;
+    try {
+        const [name, id] = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown[];
+        return typeof name === "string" && typeof id === "string" ? { name, id } : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The game servers somebody may pick, a page at a time: their own and the ones
+ * they were given, searched by name in the database and ordered by name, so a
+ * picker never holds more than the pages scrolled through.
+ */
+export async function gameServerOptionsPage(
+    ownerId: string,
+    alsoIds: readonly string[],
+    request: { query: string; cursor: string | null; limit: number; ids?: readonly string[] }
+): Promise<{ items: { id: string; name: string }[]; next: string | null }> {
+    const mine = { ownerId, status: { not: "removed" } };
+    const after = decodeNameCursor(request.cursor);
+    const rows = await prisma.installedApp.findMany({
+        where: {
+            AND: [
+                alsoIds.length > 0
+                    ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] }
+                    : mine,
+                { catalogId: { in: gameServerCatalogIds() } },
+                ...(request.ids ? [{ id: { in: [...request.ids] } }] : []),
+                ...(request.query
+                    ? [{ name: { contains: request.query, mode: "insensitive" as const } }]
+                    : []),
+                ...(after
+                    ? [
+                          {
+                              OR: [
+                                  { name: { gt: after.name } },
+                                  { name: after.name, id: { gt: after.id } }
+                              ]
+                          }
+                      ]
+                    : [])
+            ]
+        },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        // One past the page: the extra row is how the end is known without counting.
+        take: request.limit + 1
+    });
+    const page = rows.slice(0, request.limit);
+    const last = page[page.length - 1];
+    return {
+        items: page,
+        next: rows.length > request.limit && last ? encodeNameCursor(last.name, last.id) : null
+    };
+}
+
 export async function listGameServerFacts(
     ownerId: string,
     alsoIds: readonly string[] = [],
@@ -596,35 +660,102 @@ export function withNamesOnly(presence: ServerPresence): GameServerLive {
 export async function listGameMachines(ownerId: string, probe = true): Promise<GameMachine[]> {
     const hosts = await listHosts(ownerId);
     const committed = await committedMemoryByTarget(ownerId);
-    const local: GameMachine = {
+    const remote = await Promise.all(
+        hosts.map(async (host) => ({
+            id: host.id,
+            name: host.name,
+            ...machineFigures(
+                probe
+                    ? await getServerMetrics(host.id, ownerId).catch(() => null)
+                    : ((await peekServerMetrics(host.id))?.metrics ?? null)
+            ),
+            committedMb: committed.get(host.id) ?? 0
+        }))
+    );
+    return [localGameMachine(committed), ...remote];
+}
+
+/** The machine Polaris runs on. The web runs in a container that shares the
+ *  host's memory accounting, so these are the machine's figures unless it was
+ *  given a limit of its own. */
+function localGameMachine(committed: ReadonlyMap<string, number>): GameMachine {
+    return {
         id: "local",
         name: gameMessage("games", "lib.localMachine"),
-        // The web runs in a container that shares the host's memory accounting, so
-        // these are the machine's figures unless it was given a limit of its own.
         memoryTotalBytes: totalmem(),
         memoryFreeBytes: freemem(),
         committedMb: committed.get("local") ?? 0
     };
+}
+
+/** Whatever the machine has free, from a reading taken one way or the other. */
+function machineFigures(
+    metrics: { memoryTotalBytes: number | null; memoryUsedBytes: number | null } | null
+): Pick<GameMachine, "memoryTotalBytes" | "memoryFreeBytes"> {
+    const total = metrics?.memoryTotalBytes ?? null;
+    const used = metrics?.memoryUsedBytes ?? null;
+    return { memoryTotalBytes: total, memoryFreeBytes: total !== null && used !== null ? total - used : null };
+}
+
+/** The largest page of machines the create dialog is handed. */
+export const GAME_MACHINE_PAGE = 50;
+
+/**
+ * The machines a game server can run on, a page at a time: the owner's servers
+ * searched by name on the server, with the machine Polaris runs on first on the
+ * first page while the search matches it. Unmeasured - each carries the last
+ * reading taken recently enough to show - so a page costs one query, never an
+ * SSH session per machine.
+ */
+export async function gameMachinePage(
+    ownerId: string,
+    request: { query: string; cursor: string | null; ids?: readonly string[] }
+): Promise<{ items: GameMachine[]; next: string | null }> {
+    const ids = request.ids?.filter((id) => id !== "local");
+    const page =
+        ids && ids.length === 0
+            ? { items: [], next: null }
+            : await readServerOptions(ownerId, {
+                  query: request.query,
+                  cursor: request.cursor,
+                  limit: GAME_MACHINE_PAGE,
+                  ids,
+                  filter: {}
+              });
+    const committed = await committedMemoryByTarget(ownerId);
     const remote = await Promise.all(
-        hosts.map(async (host) => {
-            const metrics = probe
-                ? await getServerMetrics(host.id, ownerId).catch(() => null)
-                : ((await peekServerMetrics(host.id))?.metrics ?? null);
-            return {
-                id: host.id,
-                name: host.name,
-                memoryTotalBytes: metrics?.memoryTotalBytes ?? null,
-                memoryFreeBytes:
-                    metrics?.memoryTotalBytes !== null &&
-                    metrics?.memoryTotalBytes !== undefined &&
-                    metrics.memoryUsedBytes !== null
-                        ? metrics.memoryTotalBytes - metrics.memoryUsedBytes
-                        : null,
-                committedMb: committed.get(host.id) ?? 0
-            };
-        })
+        page.items.map(async (server) => ({
+            id: server.id,
+            name: server.name,
+            ...machineFigures((await peekServerMetrics(server.id))?.metrics ?? null),
+            committedMb: committed.get(server.id) ?? 0
+        }))
     );
-    return [local, ...remote];
+    const local = localGameMachine(committed);
+    const wantsLocal =
+        request.cursor === null &&
+        (request.ids
+            ? request.ids.includes("local")
+            : local.name.toLowerCase().includes(request.query.toLowerCase()));
+    return { items: wantsLocal ? [local, ...remote] : remote, next: page.next };
+}
+
+/**
+ * One machine, measured: what the create dialog shows under the machine
+ * chosen. Only that machine is asked, so an unreachable one elsewhere costs
+ * nothing. Null for a machine that is not the owner's.
+ */
+export async function measuredGameMachine(
+    ownerId: string,
+    machineId: string
+): Promise<GameMachine | null> {
+    const committed = await committedMemoryByTarget(ownerId);
+    if (machineId === "local") return localGameMachine(committed);
+    const [found] = (await gameMachinePage(ownerId, { query: "", cursor: null, ids: [machineId] }))
+        .items;
+    if (!found) return null;
+    const metrics = await getServerMetrics(found.id, ownerId).catch(() => null);
+    return { ...found, ...machineFigures(metrics) };
 }
 
 /** Megabytes of heap this owner's game servers have been given, per machine. */
