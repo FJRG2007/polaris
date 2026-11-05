@@ -14,6 +14,8 @@ import type { ChatGameLinkView } from "./game-links";
 import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
+import { receiptsAmong } from "@/lib/privacy-service";
+import { lastMessages, withReceipt, type ChatLastMessage } from "@/lib/chat/last-messages";
 import { nicknamesFor } from "@/lib/contact-names";
 import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
 import { discardChannelFiles } from "./attachments";
@@ -83,6 +85,8 @@ export interface ChatChannelView {
     readonly private: boolean;
     readonly archived: boolean;
     readonly lastMessageAt: string | null;
+    /** The newest message, for a direct message or a group. Null in a space. */
+    readonly last: ChatLastMessage | null;
     /** How many messages this reader has not seen. Zero for a channel they have
      *  never opened and nothing has happened in. */
     readonly unread: number;
@@ -835,7 +839,7 @@ export async function listChannels(
 
     // Four reads that depend on nothing but the rows above, asked together
     // rather than one after another.
-    const [unread, called, shut, linked] = await Promise.all([
+    const [unread, called, shut, linked, last] = await Promise.all([
         unreadCounts(actor, channels, mine),
         // What this reader calls people, over what those people are called. A
         // direct message is named after who is in it, so a nickname has to
@@ -862,8 +866,30 @@ export async function listChannels(
                     channels.filter((channel) => channel.kind !== "dm").map((channel) => channel.id)
                 )
             )
-            .catch(() => new Map<string, ChatGameLinkView[]>())
+            .catch(() => new Map<string, ChatGameLinkView[]>()),
+        // What each conversation last said, for the detailed list rows. Rooms in
+        // a space are never drawn that way, so they are not asked about. A read
+        // that fails costs the previews, not the list.
+        lastMessages(
+            channels.filter((channel) => !channel.spaceId).map((channel) => channel.id)
+        ).catch(() => new Map<string, ChatLastMessage>())
     ]);
+
+    // The ticks under the reader's own last message, only where the
+    // conversation itself would draw them: a one-to-one whose two sides both
+    // allow read receipts. Asked about every such conversation in one go.
+    const ticked = new Map<string, string>();
+    for (const channel of channels) {
+        if (channel.kind !== "dm" || last.get(channel.id)?.authorId !== actor.id) continue;
+        const other = channel.members.find((member) => member.userId !== actor.id);
+        if (other) ticked.set(channel.id, other.userId);
+    }
+    const allowed = await receiptsAmong({ id: actor.id, isAdmin: false }, [
+        ...ticked.values()
+    ]).catch(() => new Set<string>());
+    const receipts = new Set(
+        [...ticked].filter(([, userId]) => allowed.has(userId)).map(([channelId]) => channelId)
+    );
 
     return channels.map((channel) => {
         const others = channel.members
@@ -900,6 +926,7 @@ export async function listChannels(
             archived: channel.archived,
             lastMessageAt: channel.lastMessageAt?.toISOString() ?? null,
             unread: unread.get(channel.id) ?? 0,
+            last: withReceipt(last.get(channel.id) ?? null, receipts.has(channel.id)),
             // Worked out rather than read: a mute with an end that has passed is
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,

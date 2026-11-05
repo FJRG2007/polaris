@@ -2177,5 +2177,22 @@
         "notYours": "No puedes cambiar el icono del grupo",
         "tooBig": "Ese GIF es demasiado grande",
         "notAnImage": "Eso no es una imagen"
+    },
+    "listView": {
+        "label": "Vista de lista",
+        "auto": "Automática por ancho",
+        "compact": "Compacta",
+        "detailed": "Detallada",
+        "yesterday": "Ayer",
+        "you": "Tú",
+        "from": "{sender}: {text}",
+        "deleted": "Mensaje eliminado",
+        "call": "Llamada",
+        "poll": "Encuesta",
+        "attachment": "Adjunto",
+        "read": "Leído",
+        "delivered": "Entregado",
+        "sent": "Enviado",
+        "muted": "Silenciado"
     }
 }

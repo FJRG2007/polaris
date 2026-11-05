@@ -674,6 +674,38 @@ export async function receiptsBetween(viewer: PrivacyViewer, otherId: string): P
     return theirs && mine;
 }
 
+/**
+ * `receiptsBetween` for many people at once: which of them the viewer and they
+ * may exchange ticks with. For a list of conversations, where asking one at a
+ * time is a round trip per row.
+ *
+ * Their side is one batched check. The viewer's side is one setting, so
+ * "everyone" and "nobody" settle every row from a single read; only an audience
+ * that depends on who is asking falls back to asking about each candidate left.
+ */
+export async function receiptsAmong(
+    viewer: PrivacyViewer,
+    otherIds: readonly string[]
+): Promise<Set<string>> {
+    const wanted = [...new Set(otherIds)];
+    if (viewer.isAdmin) return new Set(wanted);
+    const [theirs, row] = await Promise.all([
+        allowedBy(viewer, "readReceipts", wanted),
+        prisma.userPrivacy.findUnique({
+            where: { userId: viewer.id },
+            select: { readReceipts: true }
+        })
+    ]);
+    const candidates = wanted.filter((id) => theirs.has(id));
+    const audience = core.storedAudience("readReceipts", row?.readReceipts ?? null);
+    if (audience === "nobody") return new Set();
+    if (audience === "everyone") return new Set(candidates);
+    const mine = await Promise.all(
+        candidates.map((id) => maySee(viewer.id, "readReceipts", { id, isAdmin: false }))
+    );
+    return new Set(candidates.filter((_, index) => mine[index]));
+}
+
 // ---------------------------------------------------------------------------
 // The lists a rule names
 // ---------------------------------------------------------------------------

@@ -35,7 +35,7 @@ import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
  * conversation beside it starts being the narrow column instead, on the smallest
  * screen this list is drawn on at all.
  */
-const LIST_PANE = { min: 208, max: 480, fallback: 256 };
+const LIST_PANE = { min: 208, max: 560, fallback: 256 };
 
 /**
  * Whether this address is a conversation, which on a phone takes the whole
