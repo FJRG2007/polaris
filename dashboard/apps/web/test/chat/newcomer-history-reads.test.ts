@@ -123,7 +123,11 @@ vi.mock("@polaris/db", () => ({
                 return {};
             }
         },
-        chatChannelMember: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
+        chatChannelMember: {
+            findUnique: async () => null,
+            findMany: async () => [],
+            updateMany: async () => ({ count: 0 })
+        },
         user: { findMany: async () => [] }
     }
 }));

@@ -61,9 +61,15 @@ import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
 import * as move from "./channel-move";
 import { joinMenuGroups } from "./menu-groups";
+import { onShelf, type LockShelf } from "./lock-shelf";
+import * as lockActions from "./lock-actions";
+import { ChatLockProvider, LockCodeDialog, LockShelfEntries, useChatLock } from "./lock-dialogs";
 import {
     Ban,
     BellOff,
+    Eye,
+    EyeOff,
+    LockOpen,
     LayoutList,
     CheckCheck,
     ArrowDownToLine,
@@ -234,6 +240,14 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
 }
 
 export function ChatSidebar() {
+    return (
+        <ChatLockProvider>
+            <ChatSidebarList />
+        </ChatLockProvider>
+    );
+}
+
+function ChatSidebarList() {
     const {
         channels,
         spaces,
@@ -253,6 +267,9 @@ export function ChatSidebar() {
     const meetings = here.startsWith("/chat/meetings");
 
     const [folded, setFolded] = useState<readonly string[]>([]);
+    // Every chat, or one of the "Locked chats" / "Hidden chats" shelves.
+    const [shelf, setShelf] = useState<LockShelf>("all");
+    const { hideLocked } = useChatLock().state;
     const [listView, chooseListView] = useChatListView();
     const directList = useRef<HTMLDivElement>(null);
     const [listWidth, setListWidth] = useState(0);
@@ -320,27 +337,46 @@ export function ChatSidebar() {
     const directs = useMemo(
         () =>
             channels
-                .filter((channel) => channel.spaceId === null)
+                // On a shelf, every conversation of that kind wherever it lives.
+                .filter(
+                    (channel) =>
+                        (shelf !== "all" || channel.spaceId === null) &&
+                        onShelf(channel, shelf, hideLocked)
+                )
                 .sort(
                     (left, right) =>
                         Number(right.pinned) - Number(left.pinned) ||
                         (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
                 ),
+        [channels, shelf, hideLocked]
+    );
+    const hiddenCount = useMemo(
+        () => channels.filter((channel) => channel.hidden).length,
+        [channels]
+    );
+    const lockedCount = useMemo(
+        () => channels.filter((channel) => channel.locked).length,
         [channels]
     );
 
     const inSpace = useMemo(() => {
         if (!activeSpaceId) return [];
         const listed = channels.filter(
-            (channel) => channel.spaceId === activeSpaceId && !channel.archived
+            (channel) =>
+                channel.spaceId === activeSpaceId &&
+                !channel.archived &&
+                onShelf(channel, "all", hideLocked)
         );
         return pendingOrder ? move.withChannelOrder(listed, pendingOrder.order) : listed;
-    }, [channels, activeSpaceId, pendingOrder]);
+    }, [channels, activeSpaceId, pendingOrder, hideLocked]);
 
     useEffect(() => {
         if (!pendingOrder?.stored || !activeSpaceId) return;
         const listed = channels.filter(
-            (channel) => channel.spaceId === activeSpaceId && !channel.archived
+            (channel) =>
+                channel.spaceId === activeSpaceId &&
+                !channel.archived &&
+                onShelf(channel, "all", hideLocked)
         );
         if (move.reflectsChannelOrder(listed, pendingOrder.order)) {
             setPendingOrder(null);
@@ -352,7 +388,7 @@ export function ChatSidebar() {
             PENDING_ORDER_SETTLE_MS
         );
         return () => clearTimeout(timer);
-    }, [channels, activeSpaceId, pendingOrder]);
+    }, [channels, activeSpaceId, pendingOrder, hideLocked]);
 
     const voiceIds = useMemo(
         () => inSpace.filter((channel) => channel.kind === "voice").map((channel) => channel.id),
@@ -580,6 +616,13 @@ export function ChatSidebar() {
                     <span>{t("sidebar.savedMessages")}</span>
                 </Link>
 
+                <LockShelfEntries
+                    shelf={shelf}
+                    onShelf={setShelf}
+                    hiddenCount={hiddenCount}
+                    lockedCount={lockedCount}
+                />
+
                 {/* In every rail for the same reason, and drawn for everybody:
                     creating a meeting takes a grant, being invited to one does
                     not, and somebody who has been invited needs the list far
@@ -613,9 +656,15 @@ export function ChatSidebar() {
                     loadFailed ? null : (
                         <SidebarSkeleton />
                     )
-                ) : space === null ? (
+                ) : space === null || shelf !== "all" ? (
                     <Section
-                        label={t("sidebar.directMessages")}
+                        label={
+                            shelf === "locked"
+                                ? t("lock.lockedChats")
+                                : shelf === "hidden"
+                                  ? t("lock.hiddenChats")
+                                  : t("sidebar.directMessages")
+                        }
                         folded={folded.includes("dm")}
                         onToggle={() => toggle("dm")}
                         action={<ListViewMenu view={listView} onChoose={chooseListView} />}
@@ -623,7 +672,11 @@ export function ChatSidebar() {
                         <div ref={directList} className="flex flex-col gap-px">
                             {directs.length === 0 ? (
                                 <p className="px-2 py-1 text-xs text-foreground-subtle">
-                                    {t("sidebar.nobodyYet")}
+                                    {shelf === "locked"
+                                        ? t("lock.noneLocked")
+                                        : shelf === "hidden"
+                                          ? t("lock.noneHidden")
+                                          : t("sidebar.nobodyYet")}
                                 </p>
                             ) : (
                                 directs.map((channel) => (
@@ -1439,6 +1492,12 @@ function Row({
                     )}
                     {/* Said quietly, and only because a row that sits above a newer
                         conversation with nothing to explain it reads as a bug. */}
+                    {channel?.locked && (
+                        <Lock
+                            className="size-3 shrink-0 text-foreground-subtle"
+                            aria-label={t("lock.locked")}
+                        />
+                    )}
                     {channel?.pinned && (
                         <Pin
                             className="size-3 shrink-0 text-foreground-subtle"
@@ -1639,6 +1698,9 @@ function DetailedLine({
                 <span className="min-w-0 flex-1 truncate" title={line || undefined}>
                     {line}
                 </span>
+                {channel.locked && (
+                    <Lock className="size-3 shrink-0" aria-label={t("lock.locked")} />
+                )}
                 {channel.pinned && (
                     <Pin className="size-3 shrink-0" aria-label={t("sidebar.pinned")} />
                 )}
@@ -1713,9 +1775,45 @@ function RowMenu({
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { blocked, friends, refresh, spaces } = useChat();
+    const { blocked, friends, refresh, spaces, patchChannel } = useChat();
     const t = useTranslations("chat");
     const toast = useToast();
+    const chatLock = useChatLock();
+    const [unlocking, setUnlocking] = useState(false);
+    /** Drawn at once, put back on a refusal - which is answered with its reason. */
+    async function flag(
+        patch: { locked?: boolean; hidden?: boolean },
+        call: () => Promise<{ error?: string }>
+    ): Promise<string | undefined> {
+        const before = { locked: channel.locked, hidden: channel.hidden };
+        patchChannel(channel.id, patch);
+        let failure = "";
+        const result = await runAction(call, (message) => {
+            failure = message;
+        });
+        if (!result || result.error) {
+            patchChannel(channel.id, before);
+            return result?.error || failure || t("lock.failed");
+        }
+        refresh();
+        return undefined;
+    }
+    async function lockThis(): Promise<void> {
+        if (!chatLock.state.hasCode) {
+            chatLock.openSettings();
+            return;
+        }
+        const refused = await flag({ locked: true }, () =>
+            lockActions.setChannelLockedAction({ channelId: channel.id, on: true })
+        );
+        if (refused) toast.show({ title: refused });
+    }
+    async function hideThis(hidden: boolean): Promise<void> {
+        const refused = await flag({ hidden }, () =>
+            lockActions.setChannelHiddenAction({ channelId: channel.id, on: hidden })
+        );
+        if (refused) toast.show({ title: refused });
+    }
     const [removeFriend, removeFriendDialog] = useRemoveFriend((message) =>
         toast.show({ title: message })
     );
@@ -1849,6 +1947,26 @@ function RowMenu({
                                         <Pin className="size-3.5" />
                                     )}
                                     {channel.pinned ? t("sidebar.unpin") : t("sidebar.pinToTheTop")}
+                                </ContextMenuItem>,
+                                <ContextMenuItem
+                                    onSelect={() =>
+                                        channel.locked ? setUnlocking(true) : void lockThis()
+                                    }
+                                >
+                                    {channel.locked ? (
+                                        <LockOpen className="size-3.5" />
+                                    ) : (
+                                        <Lock className="size-3.5" />
+                                    )}
+                                    {channel.locked ? t("lock.unlockChat") : t("lock.lock")}
+                                </ContextMenuItem>,
+                                <ContextMenuItem onSelect={() => void hideThis(!channel.hidden)}>
+                                    {channel.hidden ? (
+                                        <Eye className="size-3.5" />
+                                    ) : (
+                                        <EyeOff className="size-3.5" />
+                                    )}
+                                    {channel.hidden ? t("lock.unhide") : t("lock.hide")}
                                 </ContextMenuItem>,
                                 <ContextMenuItem
                                     onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
@@ -2000,6 +2118,20 @@ function RowMenu({
             {/* Outside the menu, which closes on the item that opens this: a dialog
             mounted inside one is unmounted the moment it is asked for. */}
             {removeFriendDialog}
+            <LockCodeDialog
+                open={unlocking}
+                onOpenChange={setUnlocking}
+                title={t("lock.removeLockAsk")}
+                submit={(code) =>
+                    flag({ locked: false }, () =>
+                        lockActions.setChannelLockedAction({
+                            channelId: channel.id,
+                            on: false,
+                            code
+                        })
+                    )
+                }
+            />
             {renamingGroup ? (
                 <EditGroupDialog
                     channel={channel}

@@ -258,16 +258,28 @@ export function MessageToasts() {
             announced.current.set(message.channelId, message.messageId);
 
             const t = words.current;
-            const who = message.inChannel
-                ? t("messageToasts.inChannel", {
-                      author: message.authorName,
-                      channel: message.conversation
-                  })
-                : message.authorName;
-            const replyTo = message.inChannel
-                ? t("messageToasts.messageChannel", { channel: message.conversation })
-                : t("messageToasts.replyTo", { author: message.authorName });
-            if (alert.toast) {
+            // Behind the reader's chat lock: the server sent nothing to show,
+            // so the note says only that something arrived.
+            const who = message.locked
+                ? t("messageToasts.locked")
+                : message.inChannel
+                  ? t("messageToasts.inChannel", {
+                        author: message.authorName,
+                        channel: message.conversation
+                    })
+                  : message.authorName;
+            const replyTo = message.locked
+                ? who
+                : message.inChannel
+                  ? t("messageToasts.messageChannel", { channel: message.conversation })
+                  : t("messageToasts.replyTo", { author: message.authorName });
+            if (alert.toast && message.locked) {
+                raise.current({
+                    key: `${TAG}${message.channelId}`,
+                    title: who,
+                    onPress: () => go.current(`/chat/c/${message.channelId}`)
+                });
+            } else if (alert.toast) {
                 const group = groups.current.get(message.channelId) ?? { lines: [], count: 0 };
                 if (!group.lines.some((line) => line.id === message.messageId)) {
                     group.lines = [

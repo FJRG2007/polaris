@@ -93,6 +93,8 @@ import { Button, EmptyState, ResizeHandle, Skeleton, cn, useToast } from "@polar
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
+import { LockedGate } from "./lock-dialogs";
+import { forgetUnlockProof, unlockProofFor } from "./lock-session";
 import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
 import { usePolarContext } from "@/components/polar/polar-panel";
@@ -576,6 +578,10 @@ export function ChannelView({
         setTimeout(() => catchUpAgain.current(), 0);
     }, []);
 
+    /** The conversation is behind the reader's chat lock and this tab has not
+     *  been given the code for it. */
+    const [needsCode, setNeedsCode] = useState(false);
+
     /** The window, written in one place so the fetches below can do their
      *  arithmetic on what is actually on screen without waiting for a render. */
     const show = useCallback((next: readonly ChatMessageView[]) => {
@@ -586,8 +592,21 @@ export function ChannelView({
     /** Back to the live end of the conversation: the newest page and nothing
      *  else. What opening a channel does. */
     const load = useCallback(async () => {
-        const result = await actions.readChannelAction(channelId);
+        const result = await actions.readChannelAction(
+            channelId,
+            undefined,
+            unlockProofFor(channelId)
+        );
         if (result.channel) setDescribed(result.channel);
+        // Behind the reader's chat lock, and this tab holds no good proof for
+        // it: the gate asks for the code instead of showing a refusal.
+        if (result.error && result.channel?.locked) {
+            forgetUnlockProof(channelId);
+            setNeedsCode(true);
+            show([]);
+            return;
+        }
+        setNeedsCode(false);
         if (result.error) {
             setError(result.error);
             show([]);
@@ -652,7 +671,11 @@ export function ChannelView({
         fetching.current = true;
         setLoadingOlder(true);
 
-        const result = await actions.readChannelAction(channelId, cursor);
+        const result = await actions.readChannelAction(
+            channelId,
+            cursor,
+            unlockProofFor(channelId)
+        );
         setLoadingOlder(false);
         release();
         if (!result.page) return false;
@@ -690,7 +713,7 @@ export function ChannelView({
         if (!cursor || fetching.current) return;
         fetching.current = true;
 
-        const result = await actions.readSinceAction(channelId, cursor);
+        const result = await actions.readSinceAction(channelId, cursor, unlockProofFor(channelId));
         release();
         if (!result.page) return;
 
@@ -737,7 +760,7 @@ export function ChannelView({
         }
 
         fetching.current = true;
-        const result = await actions.readSinceAction(channelId, newest);
+        const result = await actions.readSinceAction(channelId, newest, unlockProofFor(channelId));
         release();
         const known = new Set(held.current.map((message) => message.id));
         const arrived = (result.page?.messages ?? []).filter((message) => !known.has(message.id));
@@ -2359,7 +2382,18 @@ export function ChannelView({
         channel.contentMode === "age" &&
         !channel.ageConfirmed &&
         ageConfirmedHere !== channelId;
-    const shownConversation = gated ? (
+    const shownConversation = needsCode ? (
+        <LockedGate
+            key={channelId}
+            channelId={channelId}
+            onUnlocked={() => {
+                setNeedsCode(false);
+                setError("");
+                void load();
+                void pins.reload();
+            }}
+        />
+    ) : gated ? (
         <AgeGate
             channelId={channelId}
             channelName={channel.name}

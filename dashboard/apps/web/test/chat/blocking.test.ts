@@ -143,8 +143,15 @@ vi.mock("@polaris/db", () => {
         chatSpaceMember: { findUnique: async () => null, findMany: async () => [] },
         chatChannelMember: {
             findUnique: async () => ({ role: "member" }),
-            findMany: async ({ where }: { where: { userId?: { not?: string } } }) =>
+            updateMany: async () => ({ count: 0 }),
+            findMany: async ({
+                where
+            }: {
+                where: { userId?: { not?: string }; locked?: boolean };
+            }) =>
                 membership
+                    // Nobody here has locked the conversation.
+                    .filter(() => where.locked !== true)
                     .filter((row) => row.userId !== where.userId?.not)
                     .map((row) => ({
                         ...row,
