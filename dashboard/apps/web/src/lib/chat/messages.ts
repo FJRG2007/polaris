@@ -323,7 +323,8 @@ export async function readChannel(
  */
 export async function readThread(
     actor: ChatActor,
-    messageId: string
+    messageId: string,
+    proof?: string | null
 ): Promise<readonly ChatMessageView[]> {
     const root = await prisma.chatMessage.findUnique({
         where: { id: messageId },
@@ -332,6 +333,7 @@ export async function readThread(
     if (!root) return [];
     await requireChannel(actor, root.channelId);
     await requireAgeCleared(actor, root.channelId);
+    await requireUnlocked(actor, root.channelId, proof);
     const floor = await history.readableSince(actor, root.channelId);
 
     // A reply passed in place of the root opens the thread it is in, which is

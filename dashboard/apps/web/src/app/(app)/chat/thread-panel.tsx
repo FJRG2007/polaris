@@ -16,6 +16,7 @@ import { useComposerEmoji, type SpaceEmojiScope } from "./space-emoji";
 import { X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
+import { unlockProofFor } from "./lock-session";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { useChat } from "./chat-context";
@@ -92,7 +93,7 @@ export function ThreadPanel({
     const [inserting, setInserting] = useState<{ token: number; text: string } | null>(null);
 
     const load = useCallback(async () => {
-        const result = await actions.readThreadAction(root.id);
+        const result = await actions.readThreadAction(root.id, unlockProofFor(root.channelId));
         if (result.error) {
             setError(result.error);
             setMessages([]);

@@ -628,6 +628,23 @@ export function ChannelView({
         void load();
     }, [load]);
 
+    // Locked while it is open - from the row's menu here, or in another tab and
+    // brought in by the list - and this tab was never handed the code for it:
+    // the gate goes over it at once rather than at the next reload, and what was
+    // on screen, a thread or a search included, goes with it. A lock taken off
+    // while the gate is up opens it again.
+    const lockedNow = channel ? channel.locked : null;
+    useEffect(() => {
+        if (lockedNow === true && !needsCode && !unlockProofFor(channelId)) {
+            setNeedsCode(true);
+            setThread(null);
+            setSearching(false);
+            show([]);
+        } else if (lockedNow === false && needsCode) {
+            void load();
+        }
+    }, [lockedNow, needsCode, channelId, load, show]);
+
     // After the messages, on purpose. A browser runs server actions one at a
     // time, in the order they were asked for, so whichever of these two
     // effects is declared first is the one the other waits behind - and the
@@ -837,15 +854,18 @@ export function ChannelView({
      *
      * Answers whether it opened one.
      */
-    const openThreadOf = useCallback(async (messageId: string): Promise<boolean> => {
-        const result = await actions.readThreadAction(messageId);
-        const root = threadRootFor(result.messages ?? [], messageId);
-        if (!root) return false;
-        setThread(root);
-        setThreadHighlight(messageId);
-        setTimeout(() => setThreadHighlight(null), HIGHLIGHT_MS);
-        return true;
-    }, []);
+    const openThreadOf = useCallback(
+        async (messageId: string): Promise<boolean> => {
+            const result = await actions.readThreadAction(messageId, unlockProofFor(channelId));
+            const root = threadRootFor(result.messages ?? [], messageId);
+            if (!root) return false;
+            setThread(root);
+            setThreadHighlight(messageId);
+            setTimeout(() => setThreadHighlight(null), HIGHLIGHT_MS);
+            return true;
+        },
+        [channelId]
+    );
 
     /**
      * Scroll to a message, fetching backwards until it is there.
@@ -2515,7 +2535,13 @@ export function ChannelView({
                     membersOpen={members.open && !thread && !searching}
                 />
 
-                <PinnedBar pins={pins.pins} onJump={jumpHere} onShowAll={() => setPinsOpen(true)} />
+                {!needsCode && (
+                    <PinnedBar
+                        pins={pins.pins}
+                        onJump={jumpHere}
+                        onShowAll={() => setPinsOpen(true)}
+                    />
+                )}
 
                 {/* A voice channel is a room AND a record: the one place a
                     group is most likely to want to drop a link used to be the

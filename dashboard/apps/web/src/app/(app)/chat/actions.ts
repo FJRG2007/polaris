@@ -172,10 +172,15 @@ export async function rereadAction(
 }
 
 export async function readThreadAction(
-    messageId: string
+    messageId: string,
+    /** The unlock proof for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.readThread(me, messageId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.readThread(me, messageId, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { messages: result.value };
 }
 
@@ -676,13 +681,18 @@ export async function unpinAction(messageId: unknown): Promise<{ error?: string 
 
 /** Every pin in a conversation, newest first, for the bar and the list. */
 export async function pinsAction(
-    channelId: unknown
+    channelId: unknown,
+    /** The unlock proof for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<{ pins?: readonly pins.ChatPinView[]; error?: string }> {
     const me = await actor();
     const parsed = z.string().uuid().safeParse(channelId);
     if (!parsed.success)
         return { error: (await getTranslations("chat"))("errors.notInConversation") };
-    const result = await guard(() => pins.pinsIn(me, parsed.data));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        pins.pinsIn(me, parsed.data, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { pins: result.value };
 }
 
