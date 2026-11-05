@@ -40,7 +40,13 @@ function useSecurityT(): SecurityTranslator {
     );
 }
 
-type Servers = Extract<Awaited<ReturnType<typeof actions.serversAction>>, { ok: true }>["data"];
+type Servers = Extract<
+    Awaited<ReturnType<typeof actions.serversAction>>,
+    { ok: true }
+>["data"]["items"];
+type Server = Servers[number];
+
+const { PagedPicker } = hostUi.pagedPicker;
 type Overview = Extract<Awaited<ReturnType<typeof actions.overviewAction>>, { ok: true }>["data"];
 type Scan = Overview["scans"][number];
 type Finding = Extract<
@@ -103,6 +109,11 @@ export function pickServer(
     return servers?.[0]?.id ?? null;
 }
 
+/** A server as the picker names it: the one Polaris runs on says so. */
+function serverLabel(server: Server, t: SecurityTranslator): string {
+    return server.local ? `${server.name} (${t("thisServer")})` : server.name;
+}
+
 export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
     const t = useSecurityT();
     const [servers, setServers] = useState<Servers | null>(() => cacheRead("security:servers"));
@@ -119,16 +130,30 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
         [t]
     );
 
+    // Never the whole list: the server chosen (or linked), read back by id, and
+    // the first one, for when nothing is chosen or the chosen one is gone. The
+    // picker reads the rest a page at a time.
     const loadServers = useCallback(async () => {
-        const result = await actions.serversAction();
-        if (!result.ok) return setServersFailed(true);
+        const [chosen, first] = await Promise.all([
+            serverId ? actions.serversAction({ ids: [serverId] }) : null,
+            actions.serversAction({ limit: 1 })
+        ]);
+        if (!first.ok || (chosen && !chosen.ok)) return setServersFailed(true);
         setServersFailed(false);
-        setServers(result.data);
-        cacheWrite("security:servers", result.data);
+        const known = [...(chosen?.ok ? chosen.data.items : []), ...first.data.items];
+        const unique = known.filter((s, index) => known.findIndex((o) => o.id === s.id) === index);
+        setServers(unique);
+        cacheWrite("security:servers", unique);
+        // A dependency would read again on every pick; the pick hands its row over.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     useEffect(() => {
         void loadServers();
     }, [loadServers]);
+    const choose = useCallback((id: string, row: Server | null) => {
+        setServerId(id);
+        if (row) setServers((known) => [row, ...(known ?? []).filter((s) => s.id !== row.id)]);
+    }, []);
 
     const current = pickServer(servers, serverId);
     // A linked or chosen server that is no longer listed: say so, once.
@@ -196,15 +221,19 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
                 {servers && servers.length > 0 ? (
                     <div className="flex min-w-0 items-center gap-2 text-sm">
                         <span className="shrink-0">{t("server")}</span>
-                        <Select
+                        <PagedPicker<Server>
                             className="h-8 min-w-0 max-w-[16rem]"
-                            value={current ?? ""}
-                            onValueChange={setServerId}
+                            read={actions.serverOptionsAction}
+                            scope={{}}
+                            cache="security:server-options"
+                            value={current}
+                            onValueChange={choose}
+                            selectedLabel={server ? serverLabel(server, t) : undefined}
+                            itemLabel={(s) => serverLabel(s, t)}
                             aria-label={t("server")}
-                            options={servers.map((s) => ({
-                                value: s.id,
-                                label: s.local ? `${s.name} (${t("thisServer")})` : s.name
-                            }))}
+                            placeholder={t("server")}
+                            searchPlaceholder={t("serverSearch")}
+                            emptyText={t("serverEmpty")}
                         />
                     </div>
                 ) : null}

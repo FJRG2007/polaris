@@ -1274,6 +1274,11 @@
             }
         }
     },
+    "machinePicker": {
+        "placeholder": "Choose a machine",
+        "search": "Search machines",
+        "empty": "No machine matches"
+    },
     "actions": {
         "defaultStorage": "Wherever this Polaris keeps footage ({name})",
         "thisServer": "This server",

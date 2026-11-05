@@ -17,6 +17,7 @@ import { prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
 import { inFlightDeployments } from "./deploy-service";
 import { isLocalMachine, localMachineIdentity } from "./local-machine";
+import { decodeServerCursor, encodeServerCursor } from "./server-options";
 import { LOCAL_SERVER_ID, localServerName } from "./local-server";
 import { serverSlug } from "./watch/server-route";
 import { LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
@@ -194,12 +195,120 @@ export async function getWatchServers(ownerId: string): Promise<WatchCard[]> {
     return buildServers(ownerId, await firingByTarget(ownerId));
 }
 
+const HOST_SELECT = {
+    id: true,
+    name: true,
+    address: true,
+    username: true,
+    dockerId: true
+} as const;
+
+/** A page of the cards a list draws, and where the next one starts. */
+export interface CardPage {
+    readonly cards: WatchCard[];
+    readonly next: string | null;
+}
+
+/**
+ * A page of the owner's registered servers in (name, id) order, the machine
+ * Polaris runs on taken out of it. The first page also says which registered
+ * server that machine is - read on its own, so no page has to hold them all.
+ */
+async function watchHostPage(ownerId: string, cursor: string | null, limit: number) {
+    const after = decodeServerCursor(cursor);
+    const identity = await localMachineIdentity();
+    const addresses = [...identity.addresses];
+    const [rows, candidates] = await Promise.all([
+        prisma.host.findMany({
+            where: {
+                ownerId,
+                ...(after
+                    ? {
+                          OR: [
+                              { name: { gt: after.name } },
+                              { name: after.name, id: { gt: after.id } }
+                          ]
+                      }
+                    : {})
+            },
+            select: HOST_SELECT,
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            // One past the page: the extra row is how the end is known without counting.
+            take: limit + 1
+        }),
+        after
+            ? []
+            : prisma.host.findMany({
+                  where: {
+                      ownerId,
+                      OR: [
+                          ...(identity.hostId ? [{ id: identity.hostId }] : []),
+                          ...(identity.dockerId ? [{ dockerId: identity.dockerId }] : []),
+                          ...(addresses.length > 0
+                              ? [{ address: { in: addresses, mode: "insensitive" as const } }]
+                              : [])
+                      ]
+                  },
+                  select: HOST_SELECT,
+                  orderBy: { createdAt: "asc" },
+                  take: 5
+              })
+    ]);
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+        first: !after,
+        local: candidates.find((host) => isLocalMachine(host, identity)) ?? null,
+        remote: page.filter((host) => !isLocalMachine(host, identity)),
+        next: rows.length > limit && last ? encodeServerCursor(last.name, last.id) : null
+    };
+}
+
+/** One page of server cards: the machine Polaris runs on first, then the
+ *  registered servers by name. Each card links by id: whether a name is unique
+ *  is not something one page can tell, and an address must not change with the
+ *  page that drew it. */
+export async function getWatchServerPage(
+    ownerId: string,
+    cursor: string | null,
+    limit: number
+): Promise<CardPage> {
+    const [hosts, alarms] = await Promise.all([
+        watchHostPage(ownerId, cursor, limit),
+        firingByTarget(ownerId)
+    ]);
+    const cards = await serverCards(hosts, alarms, { byId: true });
+    return { cards: hosts.first ? cards : cards.slice(1), next: hosts.next };
+}
+
+/** One page of container cards, a page of machines at a time: each machine
+ *  listed costs a round trip to its engine, so the page is counted in machines. */
+export async function getWatchContainerPage(
+    ownerId: string,
+    cursor: string | null,
+    limit: number
+): Promise<CardPage> {
+    const hosts = await watchHostPage(ownerId, cursor, limit);
+    return { cards: await containerCards(ownerId, hosts), next: hosts.next };
+}
+
 async function buildServers(ownerId: string, alarms: Map<string, number>): Promise<WatchCard[]> {
+    return serverCards(await watchHosts(ownerId), alarms);
+}
+
+async function serverCards(
+    hosts: Pick<Awaited<ReturnType<typeof watchHosts>>, "local" | "remote">,
+    alarms: Map<string, number>,
+    /** Link every card by its id rather than its name - for a list that is a page. */
+    { byId = false }: { byId?: boolean } = {}
+): Promise<WatchCard[]> {
     const now = Date.now();
-    const { local, remote } = await watchHosts(ownerId);
+    const { local, remote } = hosts;
     const name = await localServerName(local?.name);
     const machine = { id: local?.id ?? LOCAL_SERVER_ID, name };
     const servers = [machine, ...remote];
+    const address = (server: { id: string; name: string }) =>
+        byId ? server.id : serverSlug(servers, server, LOCAL_SERVER_ID);
 
     const ids = [LOCAL_HOST_SUBJECT, ...remote.map((host) => host.id)];
     const series = await sparklines("host", ids, now);
@@ -216,7 +325,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
             alarms: local ? (alarms.get(local.id) ?? 0) : 0,
             // Addressed as the machine, not as the reserved subject its samples
             // are filed under.
-            href: `/watch/server/${serverSlug(servers, machine, LOCAL_SERVER_ID)}`
+            href: `/watch/server/${address(machine)}`
         },
         ...remote.map((host) => ({
             id: host.id,
@@ -225,7 +334,7 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
             detail: `${host.username}@${host.address}`,
             ...readingsFor(series.get(host.id), now),
             alarms: alarms.get(host.id) ?? 0,
-            href: `/watch/server/${serverSlug(servers, host, LOCAL_SERVER_ID)}`
+            href: `/watch/server/${address(host)}`
         }))
     ];
 }
@@ -321,16 +430,27 @@ export async function getWatchOverview(ownerId: string): Promise<WatchOverview> 
  * screen does.
  */
 export async function getWatchContainers(ownerId: string): Promise<WatchCard[]> {
-    const { local, remote } = await watchHosts(ownerId);
+    return containerCards(ownerId, { ...(await watchHosts(ownerId)), first: true });
+}
+
+async function containerCards(
+    ownerId: string,
+    hosts: Pick<Awaited<ReturnType<typeof watchHostPage>>, "local" | "remote" | "first">
+): Promise<WatchCard[]> {
+    const { local, remote } = hosts;
     const sources: ContainerSource[] = [
         // A server that is the local machine is reached through the daemon, not
-        // over SSH to itself, so its containers are listed once.
-        {
-            id: LOCAL_HOST_SUBJECT,
-            connectionId: LOCAL_DOCKER_CONNECTION_ID,
-            label: await localServerName(local?.name),
-            open: async () => localDockerDriver()
-        },
+        // over SSH to itself, so its containers are listed once - on the first page.
+        ...(hosts.first
+            ? [
+                  {
+                      id: LOCAL_HOST_SUBJECT,
+                      connectionId: LOCAL_DOCKER_CONNECTION_ID,
+                      label: await localServerName(local?.name),
+                      open: async () => localDockerDriver()
+                  }
+              ]
+            : []),
         ...remote.map((host) => ({
             id: host.id,
             connectionId: `${HOST_DOCKER_PREFIX}${host.id}`,

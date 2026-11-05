@@ -64,7 +64,7 @@ import {
     listAgentDefaults,
     policyForNewRepo,
     saveAgentDefaults,
-    scopeOf,
+    repoScopes,
     type AgentDefaultsView
 } from "@/lib/agents/agent-defaults-service";
 import {
@@ -516,16 +516,10 @@ export async function listAgentDefaultsAction(): Promise<{
     owners: string[];
 }> {
     const user = await requirePermission("agents.manage");
-    const [tiers, repos] = await Promise.all([
-        listAgentDefaults(user.id),
-        prisma.agentRepo.findMany({ where: { ownerId: user.id }, select: { repoFullName: true } })
-    ]);
     // The accounts worth offering a tier for are the ones this person actually
     // has repositories in; anything else would be a list of every organization
     // on GitHub.
-    const owners = [...new Set(repos.map((repo) => scopeOf(repo.repoFullName)))]
-        .filter(Boolean)
-        .sort();
+    const [tiers, owners] = await Promise.all([listAgentDefaults(user.id), repoScopes(user.id)]);
     return { tiers, owners };
 }
 

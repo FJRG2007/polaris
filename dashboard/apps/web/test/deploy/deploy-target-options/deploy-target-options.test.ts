@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const targets = vi.fn();
 const apps = vi.fn();
+const projects = vi.fn();
+const environments = vi.fn();
 vi.mock("@polaris/db", () => ({
     prisma: {
         deployTarget: { findMany: (...args: unknown[]) => targets(...args) },
-        application: { findMany: (...args: unknown[]) => apps(...args) }
+        application: { findMany: (...args: unknown[]) => apps(...args) },
+        project: { findMany: (...args: unknown[]) => projects(...args) },
+        environment: { findMany: (...args: unknown[]) => environments(...args) }
     }
 }));
 const requireAdmin = vi.fn(async () => ({ id: ADMIN }));
@@ -18,6 +22,8 @@ const projectAccess = vi.fn();
 vi.mock("@/lib/deploy-project-access", () => ({
     requireProjectAccess: (...args: unknown[]) => projectAccess(...args)
 }));
+vi.mock("@/lib/deploy-service", () => ({ scopedProjectWhere: async () => ({ OR: [] }) }));
+vi.unmock("@/app/(app)/deploy-target-options-actions");
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 
 const { listDeployTargetOptionsAction, listServiceOptionsAction } =
@@ -141,5 +147,34 @@ describe("listServiceOptionsAction", () => {
             error: "asyncSelect.failed"
         });
         expect(apps).not.toHaveBeenCalled();
+    });
+});
+
+describe("template project and environment options", () => {
+    it("pages the projects on the open shelf with the environment each lands in", async () => {
+        const { templateProjectOptionsAction } =
+            await import("@/app/(app)/deploy-target-options-actions");
+        projects.mockResolvedValue([
+            { id: id(1), name: "a", environments: [{ id: id(11) }, { id: id(12) }] },
+            { id: id(2), name: "b", environments: [] }
+        ]);
+        const page = await templateProjectOptionsAction({ limit: 1 });
+        expect(requirePermission).toHaveBeenCalledWith("deploy.manage");
+        expect(last(projects).where.AND[0]).toEqual({ OR: [] });
+        expect(last(projects).take).toBe(2);
+        expect(page).toEqual({
+            items: [{ id: id(1), name: "a", environmentId: id(11), manyEnvironments: true }],
+            next: encodeServerCursor("a", id(1))
+        });
+    });
+
+    it("reads one project's environments only through that same shelf", async () => {
+        const { templateEnvironmentOptionsAction } =
+            await import("@/app/(app)/deploy-target-options-actions");
+        environments.mockResolvedValue([{ id: id(11), name: "prod" }]);
+        const page = await templateEnvironmentOptionsAction({ projectId: id(1) });
+        expect(last(environments).where.AND[0]).toEqual({ projectId: id(1), project: { OR: [] } });
+        expect(page).toEqual({ items: [{ id: id(11), name: "prod" }], next: null });
+        expect(await templateEnvironmentOptionsAction({})).toEqual({ error: "asyncSelect.failed" });
     });
 });

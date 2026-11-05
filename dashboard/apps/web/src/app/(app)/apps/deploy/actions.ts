@@ -354,19 +354,6 @@ export async function deleteEnvironmentAction(input: {
     }
 }
 
-export interface TemplateTarget {
-    id: string;
-    name: string;
-    environments: { id: string; name: string; isDefault: boolean }[];
-}
-
-/** The projects, with their environments, a template from the marketplace can go
- *  into: the shelf that is open, as the projects page lists it. */
-export async function listTemplateTargetsAction(): Promise<TemplateTarget[]> {
-    const user = await requirePermission("deploy.manage");
-    return deployService.listProjectTargets(user.id, await scopeOrgIdFor(user.id));
-}
-
 export async function createApplicationAction(input: {
     environmentId: string;
     name: string;

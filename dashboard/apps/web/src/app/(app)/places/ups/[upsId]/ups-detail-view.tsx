@@ -16,7 +16,6 @@ import { ArrowLeft, Pencil, Share2, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
-    Checkbox,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -63,10 +62,12 @@ import {
 import {
     minutesLeft,
     rounded,
+    serverOfMachine,
     upsStatus,
-    type UpsDetailAnswer,
-    type UpsMachine
+    type UpsDetailAnswer
 } from "../ups-words";
+import { hostSubject } from "@/lib/metrics-shared";
+import { ServerMultiPicker } from "@/components/server-picker";
 
 const POLL_MS = 10_000;
 const RANGES = { h6: 6, h24: 24, d7: 168, d30: 720 } as const;
@@ -85,13 +86,11 @@ type Tab = (typeof TABS)[number];
 
 export function UpsDetailView({
     initial,
-    machines,
     canOfferNetwork,
     places,
     standing = { manage: true, control: true }
 }: {
     initial: UpsView;
-    machines: UpsMachine[];
     canOfferNetwork: boolean;
     places: { id: string; name: string }[];
     /** What the reader may do: an administrator runs it, a visitor was lent it
@@ -279,11 +278,7 @@ export function UpsDetailView({
                             <h2 id="ups-shutdown" className="text-sm font-medium">
                                 {t("ups.regions.shutdown")}
                             </h2>
-                            <UpsShutdown
-                                ups={initial}
-                                machines={machines}
-                                sentAt={ups.shutdownSentAt}
-                            />
+                            <UpsShutdown ups={initial} sentAt={ups.shutdownSentAt} />
                         </section>
                     ) : null}
                 </div>
@@ -334,7 +329,6 @@ export function UpsDetailView({
                     open
                     onOpenChange={setEditing}
                     editing={ups}
-                    machines={machines}
                     offers={[]}
                     onSaved={() => {
                         live.refresh();
@@ -636,15 +630,7 @@ function UpsControls({ id, reading }: { id: string; reading: upsReading.UpsReadi
     );
 }
 
-function UpsShutdown({
-    ups,
-    machines,
-    sentAt
-}: {
-    ups: UpsView;
-    machines: UpsMachine[];
-    sentAt: string | null;
-}) {
+function UpsShutdown({ ups, sentAt }: { ups: UpsView; sentAt: string | null }) {
     const t = useTranslations("servers");
     const [saved, setSaved] = useState(ups.shutdown);
     const [draft, setDraft] = useState(ups.shutdown);
@@ -681,14 +667,9 @@ function UpsShutdown({
         setDone(true);
     }
 
-    function toggleMachine(id: string, on: boolean) {
+    function chooseMachines(serverIds: string[]) {
         setDone(false);
-        setDraft((current) => ({
-            ...current,
-            protectedMachineIds: on
-                ? [...current.protectedMachineIds, id]
-                : current.protectedMachineIds.filter((one) => one !== id)
-        }));
+        setDraft((current) => ({ ...current, protectedMachineIds: serverIds.map(hostSubject) }));
     }
 
     const errorText = (() => {
@@ -743,23 +724,13 @@ function UpsShutdown({
             </div>
             <fieldset className="flex flex-col gap-1.5">
                 <legend className="mb-1 text-sm">{t("ups.shutdown.machines")}</legend>
-                {machines.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("ups.shutdown.noMachines")}</p>
-                ) : (
-                    machines.map((machine) => (
-                        <label key={machine.id} className="flex min-w-0 items-center gap-2 text-sm">
-                            <Checkbox
-                                checked={draft.protectedMachineIds.includes(machine.id)}
-                                onChange={(event) =>
-                                    toggleMachine(machine.id, event.target.checked)
-                                }
-                            />
-                            <span className="truncate" title={machine.name}>
-                                {machine.name}
-                            </span>
-                        </label>
-                    ))
-                )}
+                <ServerMultiPicker
+                    className="max-w-md"
+                    includeLocal
+                    aria-label={t("ups.shutdown.machines")}
+                    values={draft.protectedMachineIds.map(serverOfMachine)}
+                    onValuesChange={chooseMachines}
+                />
             </fieldset>
             {errorText ? (
                 <p role="alert" className="text-sm text-danger-ink">

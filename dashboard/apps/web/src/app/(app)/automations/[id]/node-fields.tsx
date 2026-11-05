@@ -25,11 +25,12 @@ import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useEffect, useState } from "react";
-import { rotateHookAction } from "../actions";
+import { rotateHookAction, thresholdSubjectsAction } from "../actions";
+import { PagedPicker } from "@/components/paged-picker";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
 import { CodeEditor } from "@/components/json-view";
-import { ThresholdFields } from "./threshold-fields";
+import { ThresholdFields, useSubjectProbe } from "./threshold-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
@@ -980,41 +981,25 @@ function CodeFields({ config, set }: { config: Config; set: (change: Config) => 
  */
 function RedeployFields({ config, set }: { config: Config; set: (change: Config) => void }) {
     const t = useTranslations("automations");
-    const [services, setServices] = useState<readonly { id: string; name: string }[] | null>(null);
-    const [error, setError] = useState("");
-    useEffect(() => {
-        let cancelled = false;
-        void polls.thresholdChoices().then((answer) => {
-            if (cancelled) return;
-            if (answer.ok)
-                setServices(answer.kinds.find((kind) => kind.kind === "app")?.subjects ?? []);
-            else setError(answer.error);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, []);
     const chosenId = typeof config.applicationId === "string" ? config.applicationId : "";
-    const missing =
-        services !== null && chosenId !== "" && !services.some((entry) => entry.id === chosenId);
+    const probe = useSubjectProbe("app", chosenId);
+    const missing = probe.gone;
     return (
         <div className="space-y-3">
             <Field label={`${t("fields.service")} *`}>
-                <Select
-                    value={chosenId}
+                <PagedPicker
+                    read={thresholdSubjectsAction}
+                    scope={{ kind: "app" }}
+                    cache="automations:threshold-subjects"
+                    value={missing || !chosenId ? null : chosenId}
                     onValueChange={(applicationId) => set({ applicationId })}
-                    options={(services ?? []).map((entry) => ({
-                        value: entry.id,
-                        label: entry.name
-                    }))}
-                    placeholder={t(
-                        services === null ? "fields.serviceLoading" : "fields.servicePick"
-                    )}
+                    placeholder={t("fields.servicePick")}
+                    searchPlaceholder={t("fields.serviceSearch")}
+                    emptyText={t("fields.serviceNone")}
                     aria-label={t("fields.service")}
                 />
             </Field>
-            {error && <p className="text-xs text-danger-ink">{error}</p>}
-            {services !== null && services.length === 0 && (
+            {probe.none && (
                 <p className="text-xs text-muted-foreground">
                     {t("fields.serviceNone")}{" "}
                     <Link className="underline" href="/apps/deploy">

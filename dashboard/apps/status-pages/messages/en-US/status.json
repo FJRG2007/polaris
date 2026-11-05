@@ -126,6 +126,8 @@
         "deployed": "Deployed app",
         "deployedHint": "Fills in the address of one of your apps.",
         "deployedPlaceholder": "Pick an app",
+        "deployedSearch": "Search apps or addresses",
+        "deployedEmpty": "No app matches",
         "url": "URL",
         "urlHint": "Redirects are not followed.",
         "host": "Host",

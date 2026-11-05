@@ -38,6 +38,12 @@ import {
     type WafAnomalySettings
 } from "@/lib/waf-anomaly-service";
 import { getTranslations } from "@/lib/i18n/request";
+import type { OptionsPage } from "@/lib/deploy-target-options";
+import { readFirewallScopeOptions } from "@/lib/firewall-scope-options";
+import {
+    firewallScopeOptionsRequestSchema,
+    type FirewallScopeOption
+} from "@/lib/firewall-scope-options-schema";
 import { findAccountsAsAdmin, findPeople, SHORTEST_SEARCH } from "@/lib/people-search";
 import { like } from "@/lib/rich-text/mention-service";
 import { discoverableBy } from "@/lib/privacy-service";
@@ -952,5 +958,22 @@ export async function closeDirectAccessAction(
         };
     } catch (caught) {
         return { error: await failure(caught, "errors.save") };
+    }
+}
+
+/** A page of what a scope kind can name, for the scope-target picker - read with
+ *  the visibility the page applies, behind the page's own gate. */
+export async function firewallScopeOptionsAction(
+    input: unknown
+): Promise<OptionsPage<FirewallScopeOption> | { error: string }> {
+    const user = await requirePermission("deploy.manage");
+    const t = await getTranslations("components");
+    const parsed = firewallScopeOptionsRequestSchema.safeParse(input);
+    if (!parsed.success) return { error: t("asyncSelect.failed") };
+    try {
+        return await readFirewallScopeOptions(user.id, parsed.data.kind, parsed.data);
+    } catch (error) {
+        console.error("[firewall-scope-options] read failed", error);
+        return { error: t("asyncSelect.failed") };
     }
 }

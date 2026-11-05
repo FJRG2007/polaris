@@ -1,9 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { homePathForUser, requireUser } from "@/lib/session";
-import { hostSubject } from "@/lib/metrics-shared";
 import * as upsService from "@/lib/ups/ups-service";
 import { upsStanding, visitorView } from "@/lib/ups/ups-access";
-import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
 import { UpsDetailView } from "./ups-detail-view";
 
 export const dynamic = "force-dynamic";
@@ -23,18 +21,16 @@ export default async function UpsDetailPage({ params }: { params: Promise<{ upsI
         return (
             <UpsDetailView
                 initial={visitorView(upsService.toView(row))}
-                machines={[]}
                 canOfferNetwork={false}
                 places={[]}
                 standing={{ manage: false, control: standing.control }}
             />
         );
     }
-    const [rows, places] = await Promise.all([listServerRows(user.id), upsService.placeChoices()]);
+    const places = await upsService.placeChoices();
     return (
         <UpsDetailView
             initial={upsService.toView(row)}
-            machines={rows.map((one) => ({ id: hostSubject(one.id), name: one.name }))}
             canOfferNetwork={upsService.canOfferNetwork(row)}
             places={places}
         />

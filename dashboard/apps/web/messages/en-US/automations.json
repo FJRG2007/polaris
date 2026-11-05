@@ -217,7 +217,7 @@
         "webhookManage": "Manage webhooks",
         "service": "Service",
         "servicePick": "Pick a service",
-        "serviceLoading": "Loading services...",
+        "serviceSearch": "Search services",
         "serviceNone": "No services of yours yet.",
         "serviceOpenDeploy": "Open Deploy",
         "serviceGone": "That service is gone or out of reach."
@@ -856,6 +856,7 @@
         "pick": "Choose one",
         "subjectPick": "Choose what to watch.",
         "subjectNone": "There is nothing of this kind you can watch yet.",
+        "subjectSearch": "Search",
         "subjectGone": "The one chosen is gone or no longer yours. Choose another.",
         "invalidSource": "Choose a reading of this kind.",
         "comparison": "Fires when it is",

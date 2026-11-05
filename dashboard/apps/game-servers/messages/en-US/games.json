@@ -145,7 +145,10 @@
         "javaDetail": "PC players",
         "bedrockDetail": "Phones, consoles, Windows app",
         "bothDetail": "A Java world Bedrock can join, through Geyser",
-        "machineMemory": "{name} - {free} of {total} GB free"
+        "machineMemory": "{name} - {free} of {total} GB free",
+        "machinePlaceholder": "Choose a machine",
+        "machineSearch": "Search machines",
+        "machineEmpty": "No machine matches"
     },
     "errors": {
         "couldNotReadYourGame": "Could not read your game servers",
@@ -1406,6 +1409,8 @@
     "automation": {
         "server": "Server",
         "serverPick": "Choose a server",
+        "serverSearch": "Search servers",
+        "serverEmpty": "No server matches",
         "serverLoading": "Loading servers...",
         "serverNone": "No servers you can manage here.",
         "serverGone": "That server is gone or you lost access to it.",

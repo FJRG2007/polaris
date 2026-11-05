@@ -97,7 +97,7 @@ import { guard } from "../lib/action-guard";
 import { connectionWords } from "../lib/device-connections";
 
 const { requireUser } = host.session;
-const { listHosts } = host.hostService;
+const { readServerOptions } = host.serverOptions;
 const { recordAudit } = host.auditService;
 const { storageTargetOptions } = host.storageTarget;
 
@@ -396,21 +396,70 @@ export async function listStorageOptionsAction(): Promise<{
     return result.error ? { error: result.error } : { options: result.value };
 }
 
-/** The machines a camera can be reached from, or have its detection run on. */
-export async function listServersAction(): Promise<{
-    servers?: { id: string; label: string }[];
-    error?: string;
-}> {
+/** One machine as a picker shows it. */
+export interface MachineOption {
+    id: string;
+    name: string;
+    address: string;
+}
+
+const machineOptionsInput = zod
+    .object({
+        query: zod.string().trim().max(120).default(""),
+        cursor: zod.string().max(2048).nullable().default(null),
+        /** Read these back by id - how a picker names what is chosen. */
+        ids: zod
+            .array(zod.union([zod.string().uuid(), zod.literal(LOCAL_MACHINE)]))
+            .min(1)
+            .max(50)
+            .optional(),
+        /** Offer the machine Polaris runs on first. */
+        includeLocal: zod.boolean().default(false)
+    })
+    .strict();
+
+const MACHINE_PAGE = 50;
+
+/**
+ * The machines a camera can be reached from, or have its detection run on, a
+ * page at a time: the house owner's servers searched on the server, with the
+ * machine Polaris runs on first where the screen offers it.
+ */
+export async function machineOptionsAction(
+    input: unknown
+): Promise<{ items: MachineOption[]; next: string | null } | { error: string }> {
     const { install } = await requireHome("home.read");
     const t = await placesT();
+    const parsed = machineOptionsInput.safeParse(input);
+    if (!parsed.success) return { error: t("refusals.failed") };
+    const request = parsed.data;
     const result = await guard(async () => {
-        const hosts = await listHosts(install.ownerId);
-        return [
-            { id: LOCAL_MACHINE, label: t("actions.thisMachine") },
-            ...hosts.map((host) => ({ id: host.id, label: host.name }))
-        ];
+        const ids = request.ids?.filter((id) => id !== LOCAL_MACHINE);
+        const page =
+            ids && ids.length === 0
+                ? { items: [], next: null }
+                : await readServerOptions(install.ownerId, {
+                      query: request.query,
+                      cursor: request.cursor,
+                      limit: MACHINE_PAGE,
+                      ids,
+                      filter: {}
+                  });
+        const items: MachineOption[] = page.items.map((server) => ({
+            id: server.id,
+            name: server.name,
+            address: server.address
+        }));
+        const local = { id: LOCAL_MACHINE, name: t("actions.thisMachine"), address: "" };
+        const wantsLocal =
+            request.includeLocal &&
+            request.cursor === null &&
+            (request.ids
+                ? request.ids.includes(LOCAL_MACHINE)
+                : local.name.toLowerCase().includes(request.query.toLowerCase()));
+        return { items: wantsLocal ? [local, ...items] : items, next: page.next };
     });
-    return result.error ? { error: result.error } : { servers: result.value };
+    return result.value ?? { error: result.error ?? t("refusals.failed") };
 }
 
 /**

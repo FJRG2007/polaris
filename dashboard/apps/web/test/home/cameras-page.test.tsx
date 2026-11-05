@@ -37,7 +37,6 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
     liveCamerasAction: async () => ({ live: [] }),
     listCameraSetsAction: async () => ({ sets: [] }),
     listRoomsAction: async () => ({ rooms: [] }),
-    listServersAction: async () => ({ servers: [] }),
     listStorageOptionsAction: async () => ({ options: [] }),
     detectionDefaultsAction: async () => ({
         defaults: { sensitivity: 50, settleSeconds: 2, minGapSeconds: 30 }

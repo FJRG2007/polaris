@@ -9,6 +9,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import * as hostOptions from "./connections";
+import type { DockerConnectionSummary } from "./types";
 import { recordAudit } from "@/lib/audit-service";
 import { withDockerDriver } from "@/lib/container-service";
 import { createDockerConnectionSchema, createDockerDriver } from "@polaris/docker";
@@ -181,4 +183,15 @@ export async function removeContainerAction(
     });
     revalidatePath(CONTAINERS_PATH);
     return {};
+}
+
+/** A page of the Docker hosts this person can reach, for the host switcher. */
+export async function connectionOptionsAction(
+    input: unknown
+): Promise<{ items: DockerConnectionSummary[]; next: string | null } | { error: string }> {
+    const user = await requirePermission("deploy.read");
+    const parsed = hostOptions.connectionOptionsInput.safeParse(input ?? {});
+    if (!parsed.success) return { error: "invalid" };
+    const ctx = await hostOptions.connectionContext(user);
+    return hostOptions.connectionOptionsPage(user, ctx, parsed.data);
 }

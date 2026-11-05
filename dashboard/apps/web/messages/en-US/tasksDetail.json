@@ -7,6 +7,8 @@
         "noRepos": "An agent works in a repository the Agents app already reaches, and none is connected yet.",
         "repository": "Repository",
         "pickRepository": "Pick a repository",
+        "repoSearch": "Search repositories",
+        "repoEmpty": "No repository matches",
         "agent": "Agent",
         "prompt": "What it is being asked",
         "start": "Start"

@@ -148,7 +148,6 @@ const actions = vi.hoisted(() => {
         "redeployStrategyAction",
         "planDnsAction",
         "listStorageConnectionsAction",
-        "listTemplateTargetsAction",
         "probeRunnerHostAction",
         "runnerPrincipalsAction",
         "previewScopeAction",
@@ -209,8 +208,7 @@ vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     namedTunnelStatusAction: actions.namedTunnelStatusAction,
     domainHealthAction: actions.domainHealthAction,
     cloudflareAccountStatusAction: actions.cloudflareAccountStatusAction,
-    listNasConnectionsAction: actions.listNasConnectionsAction,
-    listTemplateTargetsAction: actions.listTemplateTargetsAction
+    listNasConnectionsAction: actions.listNasConnectionsAction
 }));
 vi.mock("@/app/(app)/apps/deploy/project-actions", () => ({
     listPromotionsAction: actions.listPromotionsAction,
@@ -641,8 +639,6 @@ const ROUTES: Record<string, () => Promise<{ GET?: Handler; POST?: Handler }>> =
     "/api/mail-server/dns-plan": () => import("@/app/api/mail-server/dns-plan/route"),
     "/api/marketplace/storage-connections": () =>
         import("@/app/api/marketplace/storage-connections/route"),
-    "/api/marketplace/template-targets": () =>
-        import("@/app/api/marketplace/template-targets/route"),
     "/api/runners/probe": () => import("@/app/api/runners/probe/route"),
     "/api/runners/principals": () => import("@/app/api/runners/principals/route"),
     "/api/runners/scope-preview": () => import("@/app/api/runners/scope-preview/route"),
@@ -2329,18 +2325,6 @@ const CASES: Case[] = [
                 )
             ).storageConnections(),
         action: "listStorageConnectionsAction",
-        args: []
-    },
-    {
-        name: "the projects a template can be deployed into",
-        path: "/api/marketplace/template-targets",
-        ask: async () =>
-            (
-                await actual<typeof import("@/app/(app)/apps/marketplace/marketplace-polls")>(
-                    "@/app/(app)/apps/marketplace/marketplace-polls"
-                )
-            ).templateTargets(),
-        action: "listTemplateTargetsAction",
         args: []
     },
     {

@@ -2182,6 +2182,7 @@ model DockerConnection {
     owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
     @@index([ownerId])
+    @@index([ownerId, name, id])
 }
 
 // A global server registered once (SSH) and consumed by multiple apps: Docker
@@ -4179,6 +4180,7 @@ model InstalledApp {
     updatedAt       DateTime @updatedAt
 
     @@index([ownerId])
+    @@index([ownerId, name, id])
     @@index([catalogId])
     @@index([targetId])
     @@index([applicationId])
@@ -4863,6 +4865,7 @@ model DeployTarget {
     @@unique([ownerId, name])
     @@index([ownerId])
     @@index([hostId])
+    @@index([name, id])
 }
 
 model Project {
@@ -4908,6 +4911,7 @@ model Project {
     @@index([ownerId])
     @@index([orgId])
     @@index([binnedAt])
+    @@index([name, id])
 }
 
 // Access to a project, held by somebody other than the owner. The owner is never
@@ -5088,6 +5092,7 @@ model Environment {
 
     @@unique([projectId, slug])
     @@index([projectId])
+    @@index([name, id])
 }
 
 // One promotion of an environment into another: each service in the target
@@ -5262,6 +5267,7 @@ model Application {
     @@index([targetId])
     @@index([storageMode])
     @@index([binnedAt])
+    @@index([name, id])
 
     wireguardTunnels WireguardTunnel[]
     ciWait           DeployCiWait?
@@ -15581,6 +15587,7 @@ model Ups {
     actions                 UpsAction[]
 
     @@index([placeId])
+    @@index([name, id])
 }
 
 // Something a UPS did: a status flag that rose, a test, a lost link, a

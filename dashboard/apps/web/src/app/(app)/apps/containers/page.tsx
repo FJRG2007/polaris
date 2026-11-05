@@ -26,18 +26,16 @@ export default async function ContainersPage({
 }) {
     const user = await requirePermission("deploy.read");
     const params = await searchParams;
-    const hosts = await containerHosts(user);
+    const hosts = await containerHosts(user, pick(params.c));
     const selected = selectConnection(hosts, pick(params.c));
     const t = await getTranslations("containers");
 
     return (
         <>
-            <PageHeader
-                title={t("overview.containers")}
-                description={t("page.description")}
-            />
+            <PageHeader title={t("overview.containers")} description={t("page.description")} />
             <ContainersView
                 connections={hosts.connections}
+                more={hosts.more}
                 connectionId={selected?.id ?? null}
                 sshEnabled={loadEnv().POLARIS_SSH_ENABLED}
                 canManage={hosts.canManage}

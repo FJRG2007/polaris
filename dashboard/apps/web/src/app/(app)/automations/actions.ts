@@ -21,6 +21,8 @@ import * as appEvents from "@/lib/automations/app-events";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
+import { pageFields } from "@/lib/deploy-target-options-schema";
+import type { OptionsPage } from "@/lib/deploy-target-options";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import type {
     MessagingChannelChoice,
@@ -713,33 +715,54 @@ export async function chatWebhooksAction(): Promise<
     }
 }
 
-/** What a threshold trigger can watch, for its picker: each kind's subjects and readings. */
+/** What a threshold trigger can watch, for its picker: each kind and its readings.
+ *  The subjects come a page at a time from `thresholdSubjectsAction`. */
 export interface ThresholdKindChoice {
     readonly kind: string;
-    readonly subjects: readonly { readonly id: string; readonly name: string }[];
     readonly sources: readonly { readonly id: string; readonly unit: string }[];
 }
 
-/**
- * The servers, services and UPS this account may watch. The same check runs
- * again on every evaluation against whoever the automation runs as.
- */
+/** The kinds of thing a threshold trigger can watch, and what each reads. */
 export async function thresholdChoicesAction(): Promise<
     Result<{ kinds: readonly ThresholdKindChoice[] }>
 > {
     try {
-        const who = await actor();
+        await actor();
         const { thresholdKinds } = await import("@/lib/automations/threshold-sources");
-        const kinds = await Promise.all(
-            thresholdKinds().map(async (kind) => ({
-                kind: kind.kind,
-                subjects: await kind.subjects(who).catch(() => []),
-                sources: kind.sources.map(({ id, unit }) => ({ id, unit }))
-            }))
-        );
+        const kinds = thresholdKinds().map((kind) => ({
+            kind: kind.kind,
+            sources: kind.sources.map(({ id, unit }) => ({ id, unit }))
+        }));
         return { ok: true, kinds };
     } catch (caught) {
         return failure(caught);
+    }
+}
+
+const subjectsRequestSchema = z
+    .object({ ...pageFields, kind: z.string().trim().min(1).max(40) })
+    .strict();
+
+/**
+ * A page of the servers, services or UPS this account may watch under a kind.
+ * The same check runs again on every evaluation against whoever the
+ * automation runs as.
+ */
+export async function thresholdSubjectsAction(
+    input: unknown
+): Promise<OptionsPage<{ id: string; name: string }> | { error: string }> {
+    try {
+        const who = await actor();
+        const parsed = subjectsRequestSchema.safeParse(input);
+        const { thresholdKinds } = await import("@/lib/automations/threshold-sources");
+        const kind = parsed.success
+            ? thresholdKinds().find((entry) => entry.kind === parsed.data.kind)
+            : undefined;
+        if (!parsed.success || !kind) return { items: [], next: null };
+        const page = await kind.subjects(who, parsed.data);
+        return { ...page, items: page.items.map(({ id, name }) => ({ id, name })) };
+    } catch (caught) {
+        return { error: (await failure(caught)).error };
     }
 }
 

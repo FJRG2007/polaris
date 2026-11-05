@@ -38,10 +38,12 @@ import { createGameServerSchema, isModIdList } from "../lib/games-schema";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { formatMemory } from "../lib/minecraft/blueprints";
 import type { ServerTemplateView } from "../lib/game-templates";
+import type { GameMachine } from "../lib/games-service";
 import {
     createGameServerAction,
     expectedMemoryAction,
-    gameMachinesAction,
+    gameMachineAction,
+    gameMachineOptionsAction,
     gameSetupAction,
     listServerTemplatesAction,
     type GameSetup
@@ -70,6 +72,7 @@ import { hostUi } from "@polaris/app-host/client";
 import { MapDownloadNotice, useMapDownload } from "./map-download";
 
 const { CopyButton } = hostUi.copyButton;
+const { PagedPicker } = hostUi.pagedPicker;
 
 /** A password the operator did not have to invent, from the browser's own
  *  randomness rather than a round trip - it is a field they may still overwrite. */
@@ -161,23 +164,20 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         };
     }, []);
 
-    // What each machine has free, which costs a round trip to every one of them.
-    // Asked for beside the setup rather than inside it, so the form is on screen
-    // and answerable while the figures are still coming back; they land on the
-    // machine already chosen without disturbing the choice. A failure leaves the
-    // list exactly as it was, which is the list with no figures on it.
+    // What the chosen machine has free, measured - only that one, since asking
+    // costs a round trip to it. The form stays answerable while it comes back,
+    // and a failure leaves the choice with no figure under it.
+    const [machine, setMachine] = useState<GameMachine | null>(null);
     useEffect(() => {
         let active = true;
-        void gameMachinesAction()
-            .then(
-                (machines) =>
-                    active && setSetup((current) => (current ? { ...current, machines } : current))
-            )
+        setMachine(null);
+        void gameMachineAction(serverId)
+            .then((measured) => active && setMachine(measured))
             .catch(() => undefined);
         return () => {
             active = false;
         };
-    }, []);
+    }, [serverId]);
 
     const offered = useMemo(
         () => GAMES.filter((entry) => setup?.games.includes(entry.id) ?? false),
@@ -224,7 +224,6 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             : game === "fivem"
               ? formatMemory(expectedFivemMemoryMb(concurrentPlayers))
               : minecraftMemory;
-    const machine = setup?.machines.find((entry) => entry.id === serverId) ?? null;
 
     // Crossplay is a Java server Bedrock can also join, so it cannot survive a
     // switch to a Bedrock one.
@@ -732,18 +731,17 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("create.runsOn")}</span>
-                        {setup === null ? (
-                            <Skeleton className="h-9 w-full" />
-                        ) : (
-                            <Select
-                                value={serverId}
-                                onValueChange={setServerId}
-                                options={setup.machines.map((entry) => ({
-                                    value: entry.id,
-                                    label: machineLabel(t, entry)
-                                }))}
-                            />
-                        )}
+                        <PagedPicker<GameMachine>
+                            read={gameMachineOptionsAction}
+                            scope={{}}
+                            cache="games:machines"
+                            value={serverId}
+                            onValueChange={(id) => setServerId(id)}
+                            itemLabel={(entry) => machineLabel(t, entry)}
+                            placeholder={t("create.machinePlaceholder")}
+                            searchPlaceholder={t("create.machineSearch")}
+                            emptyText={t("create.machineEmpty")}
+                        />
                         {machine && (
                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Users className="size-3" />

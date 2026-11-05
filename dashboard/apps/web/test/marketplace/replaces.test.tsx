@@ -24,7 +24,6 @@ vi.mock("@/lib/app-bundles/actions", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
-    listTemplateTargetsAction: vi.fn(async () => []),
     createApplicationAction: vi.fn()
 }));
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({

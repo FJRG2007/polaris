@@ -55,7 +55,8 @@ import {
     CodeBranchChip,
     CodeRepoBar,
     CodeSessionBar,
-    NO_REPO
+    NO_REPO,
+    readRepo
 } from "@/components/polar/polar-code-context";
 import type {
     PolarCodeAccess,
@@ -278,6 +279,11 @@ function useCodeChoices(canStart: boolean) {
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [repoId, setRepoId] = useState("");
+    // The pick as of now, for a refresh that lands after it changed.
+    const picked = useRef(repoId);
+    useEffect(() => {
+        picked.current = repoId;
+    }, [repoId]);
     const [agentKey, setAgentKey] = useState("");
 
     const load = useCallback(() => {
@@ -288,11 +294,17 @@ function useCodeChoices(canStart: boolean) {
                 setError(null);
                 setChoices(loaded);
                 // A pick that is gone (a repository disconnected meanwhile) falls back.
-                setRepoId((current) =>
-                    current === NO_REPO || loaded.repos.some((repo) => repo.id === current)
-                        ? current
-                        : (loaded.repos[0]?.id ?? NO_REPO)
-                );
+                // One past the first page is asked about by id rather than taken
+                // for gone because the page does not hold it.
+                const fallback = loaded.repos[0]?.id ?? NO_REPO;
+                const current = picked.current;
+                if (current === "") setRepoId(fallback);
+                else if (current !== NO_REPO && !loaded.repos.some((repo) => repo.id === current))
+                    void readRepo(current)
+                        .then((found) => {
+                            if (!found) setRepoId((now) => (now === current ? fallback : now));
+                        })
+                        .catch(() => undefined);
                 const ready =
                     loaded.agents.find((agent) => agent.readiness !== "missing") ??
                     loaded.agents[0];

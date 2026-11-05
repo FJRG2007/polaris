@@ -8,11 +8,14 @@
  */
 
 import { prisma, type Prisma } from "@polaris/db";
+import { scopedProjectWhere } from "@/lib/deploy-service";
 import { decodeServerCursor, encodeServerCursor } from "@/lib/server-options";
 import type {
     DeployTargetOption,
     DeployTargetScope,
-    ServiceOption
+    ServiceOption,
+    TemplateEnvironmentOption,
+    TemplateProjectOption
 } from "@/lib/deploy-target-options-schema";
 
 export interface OptionsPage<T> {
@@ -123,4 +126,67 @@ export async function readServiceOptions(
         project: row.environment.project.name,
         targetId: row.targetId
     }));
+}
+
+/** The projects on the open shelf a template can go into - what
+ *  `listTemplateTargetsAction` used to read whole - with the environment each
+ *  lands in unless another is picked. */
+export async function readTemplateProjectOptions(
+    userId: string,
+    orgId: string | null,
+    request: PageRequest
+): Promise<OptionsPage<TemplateProjectOption>> {
+    const and: Prisma.ProjectWhereInput[] = [
+        (await scopedProjectWhere(userId, orgId)) as Prisma.ProjectWhereInput
+    ];
+    if (request.ids) and.push({ id: { in: [...request.ids] } });
+    if (request.query) and.push({ name: { contains: request.query, mode: "insensitive" } });
+    and.push(...afterCursor(request.cursor));
+    const rows = await prisma.project.findMany({
+        where: { AND: and },
+        select: {
+            id: true,
+            name: true,
+            environments: {
+                select: { id: true },
+                orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+                // The default, and whether there is a second to choose.
+                take: 2
+            }
+        },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: request.limit + 1
+    });
+    return pageOf(rows, request.limit, (row) => ({
+        id: row.id,
+        name: row.name,
+        environmentId: row.environments[0]?.id ?? null,
+        manyEnvironments: row.environments.length > 1
+    }));
+}
+
+/** The environments of one of those projects - nothing for a project the caller
+ *  could not have picked. */
+export async function readTemplateEnvironmentOptions(
+    userId: string,
+    orgId: string | null,
+    projectId: string,
+    request: PageRequest
+): Promise<OptionsPage<TemplateEnvironmentOption>> {
+    const and: Prisma.EnvironmentWhereInput[] = [
+        {
+            projectId,
+            project: (await scopedProjectWhere(userId, orgId)) as Prisma.ProjectWhereInput
+        }
+    ];
+    if (request.ids) and.push({ id: { in: [...request.ids] } });
+    if (request.query) and.push({ name: { contains: request.query, mode: "insensitive" } });
+    and.push(...afterCursor(request.cursor));
+    const rows = await prisma.environment.findMany({
+        where: { AND: and },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: request.limit + 1
+    });
+    return pageOf(rows, request.limit, (row) => row);
 }

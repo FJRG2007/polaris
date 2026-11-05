@@ -30,6 +30,7 @@ import {
     vendorNote
 } from "../../lib/vendors";
 import { usePlacesT } from "../use-places-t";
+import { MachinePicker } from "../machine-picker";
 import {
     MATTER_VENDOR,
     leavesMatterBridge,
@@ -82,11 +83,6 @@ import {
 import { hostUi } from "@polaris/app-host/client";
 
 const { runAction } = hostUi.runAction;
-
-interface Server {
-    id: string;
-    label: string;
-}
 
 /** What the form holds. Strings for anything typed, so a half-typed port is a
  *  half-typed port rather than NaN. */
@@ -179,7 +175,6 @@ export function CameraDialog({
     prefill = null,
     sharedPassword = false,
     placeId = "",
-    servers,
     storage,
     defaults,
     onClose,
@@ -195,7 +190,6 @@ export function CameraDialog({
     sharedPassword?: boolean;
     /** The place it is (or will be) at, whose rooms it can be put in. */
     placeId?: string;
-    servers: Server[];
     /** The disks footage can be pointed at, the instance default first. */
     storage: { id: string; label: string }[];
     /** What a new camera starts out believing about movement. */
@@ -803,18 +797,12 @@ export function CameraDialog({
                     </Section>
 
                     <Section title={t("dialog.sections.reach")} hint={t("dialog.reachHint")}>
-                        <Select
-                            value={form.reachVia}
-                            onValueChange={(value) => set("reachVia", value)}
-                            options={[
-                                { value: "direct", label: t("dialog.direct") },
-                                ...servers
-                                    .filter((server) => server.id !== "local")
-                                    .map((server) => ({
-                                        value: `server:${server.id}`,
-                                        label: server.label
-                                    }))
-                            ]}
+                        <MachinePicker
+                            value={reachedVia ?? "direct"}
+                            onValueChange={(id) =>
+                                set("reachVia", id === "direct" ? "direct" : `server:${id}`)
+                            }
+                            fixed={[{ value: "direct", label: t("dialog.direct") }]}
                         />
                     </Section>
 
@@ -875,24 +863,19 @@ export function CameraDialog({
                                 // not reach the camera over, to look at it here,
                                 // would be the slowest possible way to do it.
                                 <Field label={t("dialog.runsOn")} hint={t("dialog.runsOnHint")}>
-                                    <Input
-                                        value={
-                                            servers.find((server) => server.id === reachedVia)
-                                                ?.label ?? reachedVia
-                                        }
-                                        readOnly
+                                    <MachinePicker
+                                        value={reachedVia}
+                                        onValueChange={() => undefined}
+                                        disabled
                                         className="w-64"
                                     />
                                 </Field>
                             ) : (
                                 <Field label={t("dialog.runsOn")}>
-                                    <Select
+                                    <MachinePicker
                                         value={form.detectorTargetId}
-                                        onValueChange={(value) => set("detectorTargetId", value)}
-                                        options={servers.map((server) => ({
-                                            value: server.id,
-                                            label: server.label
-                                        }))}
+                                        onValueChange={(id) => set("detectorTargetId", id)}
+                                        includeLocal
                                     />
                                 </Field>
                             )

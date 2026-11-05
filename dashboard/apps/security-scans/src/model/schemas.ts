@@ -33,6 +33,16 @@ const id = z.string().uuid();
 
 export const targetInput = z.object({ targetId: id });
 
+export const serverOptionsInput = z
+    .object({
+        query: z.string().trim().max(120).default(""),
+        cursor: z.string().max(2048).nullable().default(null),
+        limit: z.number().int().min(1).max(50).default(50),
+        /** Read these back by id - how the page names, or misses, a chosen server. */
+        ids: z.array(id).min(1).max(50).optional()
+    })
+    .strict();
+
 export const malwareInput = z.object({
     targetId: id,
     volumes: z

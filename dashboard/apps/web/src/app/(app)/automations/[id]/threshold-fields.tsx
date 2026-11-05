@@ -11,7 +11,8 @@ import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Input, Select, Switch, type SelectOption } from "@polaris/ui";
-import { type ThresholdKindChoice } from "../actions";
+import { thresholdSubjectsAction, type ThresholdKindChoice } from "../actions";
+import { PagedPicker } from "@/components/paged-picker";
 import {
     numberFromInput,
     sourceKey,
@@ -21,6 +22,42 @@ import {
 import * as polls from "../automations-polls";
 
 type Config = Record<string, any>;
+
+/**
+ * Whether a kind has any subject this account may watch, and whether the one
+ * already chosen is still among them - one id lookup and one single-row page,
+ * so the whole list is never read to answer either.
+ */
+export function useSubjectProbe(
+    kind: string,
+    subjectId: string
+): { none: boolean | null; gone: boolean } {
+    const [none, setNone] = useState<boolean | null>(null);
+    const [gone, setGone] = useState(false);
+    useEffect(() => {
+        let cancelled = false;
+        setNone(null);
+        if (!kind) return;
+        void thresholdSubjectsAction({ kind, limit: 1 }).then((page) => {
+            if (!cancelled && !("error" in page)) setNone(page.items.length === 0);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [kind]);
+    useEffect(() => {
+        let cancelled = false;
+        setGone(false);
+        if (!kind || !subjectId) return;
+        void thresholdSubjectsAction({ kind, ids: [subjectId] }).then((page) => {
+            if (!cancelled && !("error" in page)) setGone(page.items.length === 0);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [kind, subjectId]);
+    return { none, gone };
+}
 
 /** What a source reads as, in the reader's words; one nothing names yet reads as its id. */
 export function useSourceLabel(): (source: string) => string {
@@ -89,8 +126,8 @@ export function ThresholdFields({
     const kind = kinds?.find((entry) => entry.kind === kindId) ?? null;
     const states = thresholdFieldStates(config);
     const subjectId = typeof config.subjectId === "string" ? config.subjectId : "";
-    const subjectGone =
-        kind !== null && subjectId !== "" && !kind.subjects.some((one) => one.id === subjectId);
+    const probe = useSubjectProbe(kind ? kindId : "", subjectId);
+    const subjectGone = kind !== null && probe.gone;
     const unit = kind?.sources.find((entry) => entry.id === source)?.unit ?? "";
     const streak = typeof config.streak === "number" ? config.streak : 3;
 
@@ -99,10 +136,6 @@ export function ThresholdFields({
         label: t.has(`threshold.kinds.${entry.kind}`)
             ? t(`threshold.kinds.${entry.kind}` as "threshold.kinds.host")
             : entry.kind
-    }));
-    const subjectOptions: SelectOption[] = (kind?.subjects ?? []).map((one) => ({
-        value: one.id,
-        label: one.name
     }));
     const sourceOptions: SelectOption[] = (kind?.sources ?? []).map((one) => ({
         value: one.id,
@@ -140,17 +173,21 @@ export function ThresholdFields({
                     state={states.subjectId}
                     invalid={t("threshold.subjectPick")}
                 >
-                    <Select
-                        value={subjectGone ? "" : subjectId}
+                    <PagedPicker
+                        read={thresholdSubjectsAction}
+                        scope={{ kind: kindId }}
+                        cache="automations:threshold-subjects"
+                        value={subjectGone || !subjectId ? null : subjectId}
                         placeholder={t(kinds === null ? "threshold.loading" : "threshold.pick")}
-                        options={subjectOptions}
+                        searchPlaceholder={t("threshold.subjectSearch")}
+                        emptyText={t("threshold.subjectNone")}
                         disabled={!kind}
                         onValueChange={(next) => set({ subjectId: next })}
                         aria-label={t("threshold.subject")}
                     />
                 </Labeled>
             </div>
-            {kind && kind.subjects.length === 0 ? (
+            {kind && probe.none ? (
                 <p className="text-xs text-muted-foreground">{t("threshold.subjectNone")}</p>
             ) : null}
             {subjectGone ? (

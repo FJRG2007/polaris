@@ -68,6 +68,24 @@ export function scopeOf(repoFullName: string): string {
     return (repoFullName.split("/")[0] ?? "").toLowerCase();
 }
 
+/** The most accounts a tier picker offers. */
+const SCOPE_LIMIT = 500;
+
+/**
+ * The accounts a person has repositories in, as `scopeOf` names them -
+ * worked out in the database, so the screen reads the distinct accounts
+ * rather than every repository to find them.
+ */
+export async function repoScopes(ownerId: string): Promise<string[]> {
+    const rows = await prisma.$queryRaw<{ scope: string }[]>`
+        SELECT DISTINCT lower(split_part("repoFullName", '/', 1)) AS scope
+        FROM "AgentRepo"
+        WHERE "ownerId" = ${ownerId}::uuid
+        ORDER BY scope
+        LIMIT ${SCOPE_LIMIT}`;
+    return rows.map((row) => row.scope).filter(Boolean);
+}
+
 const SELECT = {
     scope: true,
     execution: true,

@@ -46,7 +46,10 @@ import {
     saveMaintenanceAction,
     savePageAction
 } from "../actions/manage";
-import type { CheckView } from "../lib/manage";
+import type { CheckView, DeployedTarget } from "../lib/manage";
+import { hostUi } from "@polaris/app-host/client";
+
+const { PagedPicker } = hostUi.pagedPicker;
 
 type Values = Record<string, unknown>;
 
@@ -441,14 +444,16 @@ export function CheckDialog({
 }) {
     const t = useStatusT();
     const [values, setValues] = useState(() => checkValues(check));
-    const [targets, setTargets] = useState<{ label: string; url: string }[] | null>(null);
+    /** Whether Polaris has any deployed address to offer - a one-row read; the
+     *  picker reads the addresses themselves a page at a time. */
+    const [hasTargets, setHasTargets] = useState(false);
     useEffect(() => {
         if (!open) return;
         setValues(checkValues(check));
         let live = true;
-        deployedTargetsAction()
+        deployedTargetsAction({ limit: 1 })
             .then((answer) => {
-                if (live && answer.ok) setTargets(answer.targets);
+                if (live && "items" in answer) setHasTargets(answer.items.length > 0);
             })
             .catch(() => undefined);
         return () => {
@@ -486,18 +491,19 @@ export function CheckDialog({
                             />
                         )}
                     </Field>
-                    {values.kind === "http" && targets && targets.length > 0 ? (
+                    {values.kind === "http" && hasTargets ? (
                         <Field label={t("check.deployed")} hint={t("check.deployedHint")}>
                             {(id) => (
-                                <Select
+                                <PagedPicker<DeployedTarget>
                                     id={id}
-                                    value=""
-                                    placeholder={t("check.deployedPlaceholder")}
+                                    read={deployedTargetsAction}
+                                    scope={{}}
+                                    cache="status:deployed-targets"
+                                    value={null}
                                     onValueChange={(url) => set({ target: url })}
-                                    options={targets.map((target) => ({
-                                        value: target.url,
-                                        label: target.label
-                                    }))}
+                                    placeholder={t("check.deployedPlaceholder")}
+                                    searchPlaceholder={t("check.deployedSearch")}
+                                    emptyText={t("check.deployedEmpty")}
                                 />
                             )}
                         </Field>

@@ -6,6 +6,8 @@
     "loadFailed": "Could not load this server. Try again in a moment.",
     "tryAgain": "Try again",
     "thisServer": "This server",
+    "serverSearch": "Search servers",
+    "serverEmpty": "No server matches",
     "tabs": {
         "malware": "Malware",
         "files": "File changes",

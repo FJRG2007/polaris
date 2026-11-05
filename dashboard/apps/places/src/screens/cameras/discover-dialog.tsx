@@ -25,25 +25,24 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input,
-    Select
+    Input
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
+import { MachinePicker } from "../machine-picker";
+
+/** Looking from here rather than from one of the machines. */
+const DIRECT = "direct";
 
 const { runAction } = hostUi.runAction;
 
 export function DiscoverDialog({
     known,
-    servers,
     onClose,
     onPick
 }: {
     /** Addresses the house already has, so the list can say so. */
     known: Set<string>;
-    /** The machines that can be asked to look, for a network Polaris cannot see
-     *  itself. */
-    servers: { id: string; label: string }[];
     onClose: () => void;
     onPick: (found: DiscoveredCamera) => void;
 }) {
@@ -75,9 +74,7 @@ export function DiscoverDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("cameras.discover")}</DialogTitle>
-                    <DialogDescription>
-                        {t("discover.intro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("discover.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
@@ -101,27 +98,21 @@ export function DiscoverDialog({
                             {t("discover.look")}
                         </Button>
                     </div>
-                    {servers.length > 0 ? (
-                        <label className="flex flex-col gap-1.5">
-                            <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                {t("discover.from")}
-                            </span>
-                            <Select
-                                value={from}
-                                onValueChange={setFrom}
-                                options={[
-                                    { value: "", label: t("dialog.direct") },
-                                    ...servers.map((server) => ({
-                                        value: server.id,
-                                        label: server.label
-                                    }))
-                                ]}
-                            />
-                            <span className="text-[0.6875rem] text-foreground-subtle">
-                                {t("discover.fromHint")}
-                            </span>
-                        </label>
-                    ) : null}
+                    {/* The machines that can be asked to look, for a network
+                        Polaris cannot see itself. */}
+                    <label className="flex flex-col gap-1.5">
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
+                            {t("discover.from")}
+                        </span>
+                        <MachinePicker
+                            value={from || DIRECT}
+                            onValueChange={(id) => setFrom(id === DIRECT ? "" : id)}
+                            fixed={[{ value: DIRECT, label: t("dialog.direct") }]}
+                        />
+                        <span className="text-[0.6875rem] text-foreground-subtle">
+                            {t("discover.fromHint")}
+                        </span>
+                    </label>
                 </div>
 
                 {error ? <p className="mt-3 text-[0.75rem] text-danger">{error}</p> : null}

@@ -11,7 +11,9 @@
 
 import { prisma } from "@polaris/db";
 import { localMachineIdentity } from "@/lib/local-machine";
-import { assertOwnsTarget, listAlarmTargets } from "@/lib/watch-service";
+import { assertOwnsTarget } from "@/lib/watch-service";
+import type { OptionsPage, PageRequest } from "@/lib/deploy-target-options";
+import { alarmTargetOptions, upsOptions } from "@/lib/watch/alarm-target-options";
 import {
     hostSubject,
     latestMetricValue,
@@ -36,8 +38,9 @@ export interface ThresholdSource {
 
 export interface ThresholdKind {
     readonly kind: string;
-    /** The subjects this account may watch, for the picker. */
-    subjects(actor: RunActor): Promise<ThresholdSubject[]>;
+    /** A page of the subjects this account may watch, for the picker - searched,
+     *  continued from a cursor, or read back by id. */
+    subjects(actor: RunActor, request: PageRequest): Promise<OptionsPage<ThresholdSubject>>;
     /** Checked on every evaluation: losing access stops the readings. */
     mayRead(actor: RunActor, subjectId: string): Promise<boolean>;
     readonly sources: readonly ThresholdSource[];
@@ -84,8 +87,10 @@ const SAMPLED = ["cpu", "memory", "disk", "network_in", "network_out"] as const;
 
 registerThresholdKind({
     kind: "host",
-    subjects: async (actor) =>
-        (await listAlarmTargets(actor.id)).hosts.map(({ id, name }) => ({ id, name })),
+    subjects: async (actor, request) => {
+        const page = await alarmTargetOptions(actor.id, "host", request);
+        return { ...page, items: page.items.map(({ id, name }) => ({ id, name })) };
+    },
     mayRead: (actor, id) => owns(actor, "host", id),
     sources: SAMPLED.map((metric) => ({
         id: `host.${metric}`,
@@ -96,7 +101,7 @@ registerThresholdKind({
 
 registerThresholdKind({
     kind: "app",
-    subjects: async (actor) => (await listAlarmTargets(actor.id)).apps,
+    subjects: (actor, request) => alarmTargetOptions(actor.id, "application", request),
     mayRead: (actor, id) => owns(actor, "application", id),
     sources: SAMPLED.map((metric) => ({
         id: `app.${metric}`,
@@ -151,14 +156,8 @@ const UPS_READINGS: readonly { id: string; column: UpsColumn; unit: string; scal
 // A UPS is an instance administrator's, as every UPS screen and route is.
 registerThresholdKind({
     kind: "ups",
-    subjects: async (actor) =>
-        actor.isAdmin
-            ? prisma.ups.findMany({
-                  select: { id: true, name: true },
-                  orderBy: { name: "asc" },
-                  take: 200
-              })
-            : [],
+    subjects: async (actor, request) =>
+        actor.isAdmin ? upsOptions(request) : { items: [], next: null },
     mayRead: async (actor, id) =>
         actor.isAdmin &&
         (await prisma.ups.findUnique({ where: { id }, select: { id: true } })) !== null,

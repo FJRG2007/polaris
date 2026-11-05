@@ -22,6 +22,7 @@ import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches } from "@/lib/polar/code";
+import { readPoll } from "@/lib/poll-fetch";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
 import {
     Bot,
@@ -112,6 +113,99 @@ export function CodeSessionBar({
     );
 }
 
+/** Where the composer reads a page of repositories: searched, continued or by id. */
+export const REPOS_ROUTE = "/api/polar/code/repos";
+
+interface RepoEntry {
+    id: string;
+    name: string;
+}
+type RepoPage = { items: RepoEntry[]; next: string | null } | null;
+
+/** One connected repository by id, or null when it is gone or not this person's. */
+export async function readRepo(id: string): Promise<RepoEntry | null> {
+    const page = await readPoll<RepoPage>(REPOS_ROUTE, { id });
+    return page?.items[0] ?? null;
+}
+
+/**
+ * The repositories the menu lists: with no search, the first page the choices
+ * brought and any pages read after it; with one, the matches the server found.
+ * Only what somebody scrolled to is ever in the browser.
+ */
+function useRepoList(choices: PolarCodeChoices | null, query: string) {
+    const wanted = query.trim();
+    const [pages, setPages] = useState<{
+        key: string;
+        items: RepoEntry[];
+        next: string | null;
+    } | null>(null);
+    const [loading, setLoading] = useState(false);
+    // A refresh brings a new first page, and the pages read after the old one go.
+    useEffect(() => setPages(null), [choices]);
+    useEffect(() => {
+        if (!wanted) return;
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+            setLoading(true);
+            readPoll<RepoPage>(REPOS_ROUTE, { query: wanted }, controller.signal)
+                .then((page) =>
+                    setPages({ key: wanted, items: page?.items ?? [], next: page?.next ?? null })
+                )
+                .catch(() => undefined)
+                .finally(() => setLoading(false));
+        }, 200);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [wanted]);
+    const first = choices
+        ? { key: "", items: choices.repos, next: choices.reposNext ?? null }
+        : null;
+    const list = pages?.key === wanted ? pages : wanted ? null : first;
+    const more = () => {
+        if (!list?.next || loading) return;
+        setLoading(true);
+        readPoll<RepoPage>(REPOS_ROUTE, { query: wanted, cursor: list.next })
+            .then((page) => {
+                const seen = new Set(list.items.map((entry) => entry.id));
+                setPages({
+                    key: wanted,
+                    items: [
+                        ...list.items,
+                        ...(page?.items ?? []).filter((entry) => !seen.has(entry.id))
+                    ],
+                    next: page?.next ?? null
+                });
+            })
+            .catch(() => undefined)
+            .finally(() => setLoading(false));
+    };
+    return { items: list?.items ?? [], next: list?.next ?? null, loading, more };
+}
+
+/** The name of a chosen repository no list on screen holds - one past the
+ *  first page - read once by its id. */
+function useRepoName(repoId: string, known: readonly RepoEntry[]): string | null {
+    const [named, setNamed] = useState<RepoEntry | null>(null);
+    const missing =
+        repoId !== "" && repoId !== NO_REPO && !known.some((entry) => entry.id === repoId);
+    useEffect(() => {
+        if (!missing) return;
+        let live = true;
+        readRepo(repoId)
+            .then((entry) => {
+                if (live && entry) setNamed(entry);
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [missing, repoId]);
+    return named?.id === repoId ? named.name : null;
+}
+
 /** A new task's place: the button that opens the repository menu. */
 export function CodeRepoBar({
     fullPage,
@@ -134,10 +228,12 @@ export function CodeRepoBar({
     const t = useTranslations("polar");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
+    const list = useRepoList(choices, query);
     const repos = choices?.repos ?? [];
-    const repo = repos.find((entry) => entry.id === repoId) ?? null;
-    const name = repo?.name ?? t("code.workspace");
-    const shown = repos.filter((entry) => menuSearchMatches(entry.name, query));
+    const known = [...repos, ...list.items];
+    const chosen = useRepoName(repoId, known);
+    const name = known.find((entry) => entry.id === repoId)?.name ?? chosen ?? t("code.workspace");
+    const shown = list.items;
     const searching = query.trim().length > 0;
 
     return (
@@ -200,7 +296,20 @@ export function CodeRepoBar({
                             <Mark on={entry.id === repoId} />
                         </DropdownMenuItem>
                     ))}
-                    {searching && shown.length === 0 ? (
+                    {list.next ? (
+                        <DropdownMenuItem
+                            disabled={list.loading}
+                            onSelect={(event) => {
+                                // Stays open: the next page lands right here.
+                                event.preventDefault();
+                                list.more();
+                            }}
+                        >
+                            <ChevronDown className="size-3.5 shrink-0" />
+                            <span className="min-w-0 truncate">{t("code.moreRepos")}</span>
+                        </DropdownMenuItem>
+                    ) : null}
+                    {searching && shown.length === 0 && !list.loading ? (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                             {t("code.noRepoMatch")}
                         </p>

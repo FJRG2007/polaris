@@ -21,7 +21,8 @@ import { clearQueue } from "../lib/minecraft/queue-service";
 import { clearSnapshots } from "../lib/minecraft/inventory-service";
 import { releaseVersions } from "../lib/minecraft/blueprint-version";
 import { blueprintVersions, createGameServer, expectedMinecraftHeapMb } from "../lib/games-create";
-import { listGameMachines, listGameServerFacts, type GameMachine } from "../lib/games-service";
+import * as gamesService from "../lib/games-service";
+import type { GameMachine } from "../lib/games-service";
 import { clearGameServerPrefs, setGameServerPref } from "../lib/games-prefs";
 import { clearLogins } from "../lib/minecraft/polaris-login-service";
 import { clearSounds } from "../lib/minecraft/sounds-service";
@@ -53,8 +54,6 @@ const { installRef, requireGameServer, requireGameServerOwner } = host.appsInsta
 const { measureInstallData } = host.appsInstallDuplicate;
 
 export interface GameSetup {
-    /** Machines a server can run on, with what each has left. */
-    readonly machines: GameMachine[];
     /** What a server's name ends in, per game (".mc.example.com"), so the dialog
      *  can show the address before anything exists. Null with no domain. */
     readonly domainSuffixes: Readonly<Record<GameId, string | null>>;
@@ -71,23 +70,18 @@ export interface GameSetup {
  * Everything the create dialog needs that only the server knows, as fast as the
  * server can say it.
  *
- * The machine list comes back unmeasured on purpose. Measuring what each one has
- * free costs an SSH session per connected machine, and an unreachable machine
- * costs the full probe timeout - which the dialog used to spend with its game
- * picker and its machine list both behind skeletons, for a figure that is a
- * footnote under one of them. The names are what the choice is made from and
- * they are a database read away; the figures follow from gameMachinesAction.
+ * The machines are not part of it: the dialog's picker reads them a page at a
+ * time (gameMachineOptionsAction) and measures only the one chosen
+ * (gameMachineAction).
  */
 export async function gameSetupAction(): Promise<GameSetup> {
     const user = await requirePermission("games.manage");
-    const [machines, suffixes, games, yourAddress] = await Promise.all([
-        listGameMachines(user.id, false),
+    const [suffixes, games, yourAddress] = await Promise.all([
         Promise.all(GAMES.map((game) => gameDomainSuffix(game.domainLabel).catch(() => null))),
         installedGameIds(user.id),
         clientIp()
     ]);
     return {
-        machines,
         domainSuffixes: Object.fromEntries(
             GAMES.map((game, index) => [game.id, suffixes[index] ?? null])
         ) as Record<GameId, string | null>,
@@ -96,19 +90,48 @@ export async function gameSetupAction(): Promise<GameSetup> {
     };
 }
 
+const machineOptionsInput = z
+    .object({
+        query: z.string().trim().max(120).default(""),
+        cursor: z.string().max(2048).nullable().default(null),
+        /** Read these back by id - how the picker names what is chosen. */
+        ids: z
+            .array(z.union([z.string().uuid(), z.literal("local")]))
+            .min(1)
+            .max(50)
+            .optional()
+    })
+    .strict();
+
 /**
- * What each machine actually has free, measured.
- *
- * The half of the setup above that costs a round trip to every connected
- * machine, asked for on its own so it can arrive late without holding anything
- * up. A machine that cannot be reached simply reports nothing, exactly as it did
- * before, and the dialog goes on offering it - refusing to let somebody pick a
- * machine because Polaris could not measure it would be a worse answer than a
- * missing figure.
+ * The machines a server can run on, a page at a time and searched on the
+ * server, each with the last figure measured on it.
  */
-export async function gameMachinesAction(): Promise<GameMachine[]> {
+export async function gameMachineOptionsAction(
+    input: unknown
+): Promise<{ items: GameMachine[]; next: string | null } | { error: string }> {
     const user = await requirePermission("games.manage");
-    return listGameMachines(user.id, true);
+    const parsed = machineOptionsInput.safeParse(input);
+    if (!parsed.success) return { error: (await gameWords("games"))("create.machinesFailed") };
+    try {
+        return await gamesService.gameMachinePage(user.id, parsed.data);
+    } catch (error) {
+        console.error("[game-servers] machine options failed", error);
+        return { error: (await gameWords("games"))("create.machinesFailed") };
+    }
+}
+
+/**
+ * What the chosen machine actually has free, measured - only that machine, so
+ * one that cannot be reached elsewhere costs nothing. A machine that cannot be
+ * measured reports no figure and stays offered: refusing it because Polaris
+ * could not measure it would be a worse answer than a missing figure.
+ */
+export async function gameMachineAction(machineId: string): Promise<GameMachine | null> {
+    const user = await requirePermission("games.manage");
+    const id = z.union([z.string().uuid(), z.literal("local")]).safeParse(machineId);
+    if (!id.success) return null;
+    return gamesService.measuredGameMachine(user.id, id.data);
 }
 
 /**
@@ -622,17 +645,28 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
  * start and stop (`games.manage`) or use the console of (`games.console`), as
  * their pages would let it. Asked again on every run, as the run-as account.
  */
-export async function automationServersAction(
-    permission: unknown
-): Promise<{ servers?: { id: string; name: string }[]; error?: string }> {
-    const parsed = z.enum(["games.manage", "games.console"]).safeParse(permission);
+const automationServerOptionsInput = z
+    .object({
+        permission: z.enum(["games.manage", "games.console"]),
+        query: z.string().trim().max(120).default(""),
+        cursor: z.string().max(2048).nullable().default(null),
+        limit: z.number().int().min(1).max(50).default(50),
+        /** Read these back by id - how the picker names, or misses, what is chosen. */
+        ids: z.array(z.string().uuid()).min(1).max(50).optional()
+    })
+    .strict();
+
+export async function automationServerOptionsAction(
+    input: unknown
+): Promise<{ items: { id: string; name: string }[]; next: string | null } | { error: string }> {
+    const parsed = automationServerOptionsInput.safeParse(input);
     if (!parsed.success)
         return { error: (await gameWords("games"))("errors.couldNotChangeTheServer") };
     try {
+        const { permission, ...request } = parsed.data;
         const user = await host.session.requireUser();
-        const granted = await host.appsInstallAccess.reachableInstallIds(user, parsed.data);
-        const servers = await listGameServerFacts(user.id, granted);
-        return { servers: servers.map((server) => ({ id: server.id, name: server.name })) };
+        const granted = await host.appsInstallAccess.reachableInstallIds(user, permission);
+        return await gamesService.gameServerOptionsPage(user.id, granted, request);
     } catch (caught) {
         return {
             error:

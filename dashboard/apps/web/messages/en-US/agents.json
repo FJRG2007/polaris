@@ -202,6 +202,8 @@
             "titlePlaceholder": "Fix the login redirect",
             "repository": "Repository",
             "noRepo": "No repository - just open the agent",
+            "repoSearch": "Search repositories",
+            "repoEmpty": "No repository matches",
             "workspaceHint": "It opens on a machine of your own with an empty directory and nothing checked out. The machine keeps its home, so what you install and sign in to stays there for next time.",
             "noRepos": "Nothing is connected yet. Add one under <link>Repositories</link> to have an agent work in it.",
             "agent": "Agent",

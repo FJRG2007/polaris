@@ -38,7 +38,6 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listCamerasAction: async () => ({ cameras }),
     listCameraSetsAction: async () => ({ sets: [] }),
     listRoomsAction: async () => ({ rooms: [] }),
-    listServersAction: async () => ({ servers: [] }),
     listStorageOptionsAction: async () => ({ options: [] }),
     detectionDefaultsAction: async () => ({ defaults: null }),
     liveCamerasAction: async () => {

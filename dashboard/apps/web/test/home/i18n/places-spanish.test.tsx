@@ -17,7 +17,8 @@ import { cleanup, render } from "@testing-library/react";
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     savePlaceAction: async () => ({}),
-    discoverCamerasAction: async () => ({ found: [] })
+    discoverCamerasAction: async () => ({ found: [] }),
+    machineOptionsAction: async () => ({ items: [], next: null })
 }));
 
 const { PlaceDialog } = await import("@polaris-app/places/src/screens/place-dialog");
@@ -55,7 +56,7 @@ describe("a Places screen", () => {
 
     it("says what looking for cameras does, in Spanish", () => {
         const markup = drawn(
-            <DiscoverDialog known={new Set()} servers={[]} onClose={() => undefined} onPick={() => undefined} />,
+            <DiscoverDialog known={new Set()} onClose={() => undefined} onPick={() => undefined} />,
             "es-ES"
         );
         expect(markup).toContain("Polaris pregunta primero a la red");

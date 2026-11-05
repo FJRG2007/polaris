@@ -145,7 +145,10 @@
         "javaDetail": "Jugadores PC",
         "bedrockDetail": "Móviles, consolas, app de Windows",
         "bothDetail": "Un mundo Java al que Bedrock puede entrar, mediante Geyser",
-        "machineMemory": "{name} - {free} de {total} GB libres"
+        "machineMemory": "{name} - {free} de {total} GB libres",
+        "machinePlaceholder": "Elige una máquina",
+        "machineSearch": "Buscar máquinas",
+        "machineEmpty": "Sin coincidencias"
     },
     "errors": {
         "couldNotReadYourGame": "No se pudieron leer tus servidores",
@@ -1406,6 +1409,8 @@
     "automation": {
         "server": "Servidor",
         "serverPick": "Elige un servidor",
+        "serverSearch": "Buscar servidores",
+        "serverEmpty": "Sin coincidencias",
         "serverLoading": "Cargando servidores...",
         "serverNone": "No hay servidores que puedas gestionar.",
         "serverGone": "Ese servidor ya no existe o perdiste el acceso.",

@@ -869,6 +869,7 @@
         "workspaceHint": "An empty workspace",
         "searchRepos": "Search repositories",
         "noRepoMatch": "No repository matches",
+        "moreRepos": "Show more",
         "addRepos": "Add repositories",
         "addReposHint": "Opens GitHub to grant access to more repositories",
         "addReposUnavailable": "An administrator sets this up",

@@ -908,7 +908,6 @@
             "belowCharge": "Below charge (%)",
             "belowRuntime": "Below runtime (min)",
             "machines": "Machines",
-            "noMachines": "There are no machines to protect yet.",
             "save": "Save",
             "saved": "Saved",
             "incomplete": "Pick at least one machine and one threshold.",
@@ -1301,6 +1300,8 @@
         }
     },
     "machines": {
+        "loadMore": "Load more",
+        "moreFailed": "Could not load more. Try again.",
         "heading": "Machines",
         "intro": "Servers, containers and domains, with their load and alarm history.",
         "servers": "Servers",

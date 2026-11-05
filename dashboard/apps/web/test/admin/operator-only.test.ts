@@ -113,7 +113,7 @@ describe("game servers", () => {
         "repeatKeptCommandAction",
         // Names no server: lists only the ones `reachableInstallIds` grants the
         // reader the permission asked for, for an automation step's picker.
-        "automationServersAction"
+        "automationServerOptionsAction"
     ]);
 
     it("asks about the server named in every action on one", () => {
@@ -156,7 +156,12 @@ describe("game servers", () => {
         // Being given one server to help run is not an offer to start more of
         // them on somebody else's machine.
         const source = readFileSync(join(GAMES, "screens", "actions.ts"), "utf8");
-        for (const name of ["createGameServerAction", "gameSetupAction", "gameMachinesAction"]) {
+        for (const name of [
+            "createGameServerAction",
+            "gameSetupAction",
+            "gameMachineOptionsAction",
+            "gameMachineAction"
+        ]) {
             const action = exported(source).find((entry) => entry.name === name);
             expect(action?.body, name).toMatch(/requirePermission\("games\.manage"\)/);
         }

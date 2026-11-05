@@ -675,11 +675,6 @@ vi.mock("@/app/(app)/apps/marketplace/marketplace-polls", () => ({
         () => import("@/app/(app)/apps/marketplace/actions"),
         "listStorageConnectionsAction",
         0
-    ),
-    templateTargets: forward(
-        () => import("@/app/(app)/apps/deploy/actions"),
-        "listTemplateTargetsAction",
-        0
     )
 }));
 

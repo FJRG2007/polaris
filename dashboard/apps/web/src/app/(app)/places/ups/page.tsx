@@ -2,29 +2,21 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
-import { hostSubject } from "@/lib/metrics-shared";
 import { grantedSubjects } from "@/lib/access/grants";
 import { getTranslations } from "@/lib/i18n/request";
 import { homePathForUser, requireUser, sessionCan } from "@/lib/session";
 import { placeChoices } from "@/lib/ups/ups-service";
-import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
 import { UpsListView } from "./ups-list-view";
 
 export const dynamic = "force-dynamic";
 
-/** Every UPS Polaris watches. The machines are named from the database; what
+/** Every UPS Polaris watches. The machines are named by id as rows show them; what
  *  each UPS says arrives after the page has painted. Somebody lent a UPS, and
  *  holding nothing else, is shown the ones they were lent. */
 export default async function UpsPage() {
     const user = await requireUser();
     if (await sessionCan(user, "system.manage")) {
-        const [rows, places] = await Promise.all([listServerRows(user.id), placeChoices()]);
-        return (
-            <UpsListView
-                machines={rows.map((row) => ({ id: hostSubject(row.id), name: row.name }))}
-                places={places}
-            />
-        );
+        return <UpsListView places={await placeChoices()} />;
     }
     const lent = [...(await grantedSubjects(user.id, "place.ups")).keys()];
     if (lent.length === 0) redirect(`${await homePathForUser(user)}?denied=1`);

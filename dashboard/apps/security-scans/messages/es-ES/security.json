@@ -6,6 +6,8 @@
     "loadFailed": "No se pudo cargar este servidor. Inténtalo de nuevo en un momento.",
     "tryAgain": "Reintentar",
     "thisServer": "Este servidor",
+    "serverSearch": "Buscar servidores",
+    "serverEmpty": "Sin coincidencias",
     "tabs": {
         "malware": "Malware",
         "files": "Archivos",

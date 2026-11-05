@@ -908,7 +908,6 @@
             "belowCharge": "Bajo carga (%)",
             "belowRuntime": "Bajo autonomía (min)",
             "machines": "Máquinas",
-            "noMachines": "Aún no hay máquinas que proteger.",
             "save": "Guardar",
             "saved": "Guardado",
             "incomplete": "Elige al menos una máquina y un umbral.",
@@ -1301,6 +1300,8 @@
         }
     },
     "machines": {
+        "loadMore": "Cargar más",
+        "moreFailed": "No se pudo cargar más. Vuelve a intentarlo.",
         "heading": "Máquinas",
         "intro": "Servidores, contenedores y dominios, con su carga y alarmas.",
         "servers": "Servidores",

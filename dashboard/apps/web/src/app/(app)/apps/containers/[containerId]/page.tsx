@@ -40,9 +40,8 @@ export default async function ContainerPage({
 }) {
     const user = await requirePermission("deploy.read");
     const [{ containerId }, query] = await Promise.all([params, searchParams]);
-    const hosts = await containerHosts(user);
-
     const requested = pick(query.c);
+    const hosts = await containerHosts(user, requested);
     const connection = selectConnection(hosts, requested);
     if (!connection || connection.id !== requested) notFound();
 
