@@ -919,26 +919,6 @@ const ADMIN_AREAS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Chat", // i18n-ignore
-                href: "/admin/apps/chat/settings",
-                adminOnly: true,
-                icon: MessageSquare,
-                keywords: [
-                    "messages",
-                    "limits",
-                    "edit history",
-                    "delete",
-                    "attachments",
-                    "rate limit",
-                    "direct messages",
-                    "group chats",
-                    "calls",
-                    "call server",
-                    "video calls",
-                    "meetings"
-                ]
-            },
-            {
                 label: "Safety", // i18n-ignore
                 href: "/admin/safety",
                 adminOnly: true,
@@ -981,6 +961,26 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Store,
                 keywords: ["marketplace", "install", "catalog", "built in"]
+            },
+            {
+                label: "Chat", // i18n-ignore
+                href: "/admin/apps/chat/settings",
+                adminOnly: true,
+                icon: MessageSquare,
+                keywords: [
+                    "messages",
+                    "limits",
+                    "edit history",
+                    "delete",
+                    "attachments",
+                    "rate limit",
+                    "direct messages",
+                    "group chats",
+                    "calls",
+                    "call server",
+                    "video calls",
+                    "meetings"
+                ]
             },
             {
                 label: "Get started", // i18n-ignore

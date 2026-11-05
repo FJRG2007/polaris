@@ -3,28 +3,23 @@
  *
  * Chat is always installed, so the shared app settings page draws them with no
  * catalog entry and no install row behind it - for administrators only - and the
- * old /admin/chat address sends a reader there for good.
+ * old /admin/chat address keeps sending a reader there (temporarily, like every
+ * moved screen: a cached 308 could never be taken back).
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { permanentRedirect, notFound, requireAdmin, hasAppInstall, ChatAdminSettings } = vi.hoisted(
-    () => ({
-        permanentRedirect: vi.fn((to: string): never => {
-            throw new Error(`permanent:${to}`);
-        }),
-        notFound: vi.fn((): never => {
-            throw new Error("not-found");
-        }),
-        requireAdmin: vi.fn(),
-        hasAppInstall: vi.fn(async () => true),
-        ChatAdminSettings: function ChatAdminSettings() {
-            return null;
-        }
-    })
-);
+const { notFound, requireAdmin, hasAppInstall, ChatAdminSettings } = vi.hoisted(() => ({
+    notFound: vi.fn((): never => {
+        throw new Error("not-found");
+    }),
+    requireAdmin: vi.fn(),
+    hasAppInstall: vi.fn(async () => true),
+    ChatAdminSettings: function ChatAdminSettings() {
+        return null;
+    }
+}));
 vi.mock("next/navigation", () => ({
-    permanentRedirect,
     notFound,
     redirect: (to: string): never => {
         throw new Error(`redirect:${to}`);
@@ -39,9 +34,12 @@ vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings
 }));
 
-import ChatMoved from "@/app/(app)/admin/chat/page";
+import config from "../../next.config.mjs";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 import SettingsPage from "@/app/(app)/admin/apps/[appId]/settings/page";
 import { builtInSettingsHref, CHAT_SETTINGS_PATH } from "@/lib/apps/app-settings";
+import { builtInApps } from "@/lib/apps/marketplace-store";
 
 /** Whether a rendered tree holds an element of this component type. */
 function holds(node: unknown, type: unknown): boolean {
@@ -65,9 +63,15 @@ describe("Chat settings under Polaris apps", () => {
         hasAppInstall.mockClear();
     });
 
-    it("sends /admin/chat to its new place for good", () => {
-        expect(() => ChatMoved()).toThrow("permanent:/admin/apps/chat/settings");
+    it("sends /admin/chat to its new place, with no page left to answer it", async () => {
+        const rules = await config.redirects();
+        expect(rules).toContainEqual({
+            source: "/admin/chat",
+            destination: CHAT_SETTINGS_PATH,
+            permanent: false
+        });
         expect(CHAT_SETTINGS_PATH).toBe("/admin/apps/chat/settings");
+        expect(existsSync(join(process.cwd(), "src/app/(app)/admin/chat/page.tsx"))).toBe(false);
     });
 
     it("draws the chat settings for an administrator, with no install row asked", async () => {
@@ -83,6 +87,7 @@ describe("Chat settings under Polaris apps", () => {
     });
 
     it("offers settings on the Chat card and on no other built-in", () => {
+        expect(builtInApps().map((app) => app.id)).toContain("chat");
         expect(builtInSettingsHref("chat")).toBe("/admin/apps/chat/settings");
         expect(builtInSettingsHref("notes")).toBeNull();
     });
