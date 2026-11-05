@@ -16,7 +16,10 @@ import { createPortal } from "react-dom";
 function currentRoot(): HTMLElement | null {
     if (typeof document === "undefined") return null;
     const full = document.fullscreenElement;
-    return full instanceof HTMLElement ? full : document.body;
+    // A video, a canvas or a frame draws no children of ours, so a note put
+    // inside one would be just as hidden; the body is no worse there.
+    const holds = full instanceof HTMLElement && !/^(VIDEO|CANVAS|IFRAME|IMG)$/.test(full.tagName);
+    return holds ? full : document.body;
 }
 
 /** The element floating notes are portaled into right now. */
