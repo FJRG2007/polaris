@@ -590,8 +590,12 @@
             "description": "A session stopped on a question or a permission prompt and is waiting for an answer."
         },
         "agentRun": {
-            "label": "A background run finished",
-            "description": "An agent run started by a trigger or from Polaris succeeded or failed."
+            "label": "A background run failed",
+            "description": "An agent run started by a trigger or from Polaris failed."
+        },
+        "agentRunSucceeded": {
+            "label": "A background run succeeded",
+            "description": "An agent run started by a trigger or from Polaris finished without a problem."
         },
         "agentEnded": {
             "label": "A session ended on its own",

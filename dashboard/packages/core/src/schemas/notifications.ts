@@ -983,12 +983,25 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        // The failure keeps the original id, so a rule somebody already saved for
+        // "a background run finished" goes on applying to the half that needs one.
         id: "agent.run",
         group: "agents",
-        label: "A background run finished",
-        description: "An agent run started by a trigger or from Polaris succeeded or failed.",
-        level: "info",
+        label: "A background run failed",
+        description: "An agent run started by a trigger or from Polaris failed.",
+        level: "danger",
         defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.run.succeeded",
+        group: "agents",
+        label: "A background run succeeded",
+        description:
+            "An agent run started by a trigger or from Polaris finished without a problem.",
+        level: "success",
+        // Off: a trigger fires on every pull request, and a bell row for each one
+        // that went fine is noise. The run is still listed under Agents.
+        defaults: { inapp: false, email: false }
     },
     {
         id: "agent.ended",

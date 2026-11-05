@@ -276,11 +276,11 @@ describe("a background run that finished", () => {
         expect(notify).toHaveBeenCalledTimes(2);
         expect(notify.mock.calls[0]![0]).toMatchObject({
             userId: "owner",
-            event: "agent.run",
+            event: "agent.run.succeeded",
             level: "success",
             href: "/apps/agents/runs?run=r1"
         });
-        expect(notify.mock.calls[1]![0]).toMatchObject({ level: "danger" });
+        expect(notify.mock.calls[1]![0]).toMatchObject({ event: "agent.run", level: "danger" });
     });
 
     it("says nothing about a run somebody cancelled", async () => {

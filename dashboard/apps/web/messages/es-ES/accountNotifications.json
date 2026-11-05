@@ -590,8 +590,12 @@
             "description": "Una sesión se paró en una pregunta o un permiso y espera tu respuesta."
         },
         "agentRun": {
-            "label": "Terminó una ejecución",
-            "description": "Una ejecución de agente lanzada por un disparador o desde Polaris salió bien o mal."
+            "label": "Falló una ejecución",
+            "description": "Una ejecución de agente lanzada por un disparador o desde Polaris falló."
+        },
+        "agentRunSucceeded": {
+            "label": "Salió bien una ejecución",
+            "description": "Una ejecución de agente lanzada por un disparador o desde Polaris terminó sin problemas."
         },
         "agentEnded": {
             "label": "Una sesión terminó sola",

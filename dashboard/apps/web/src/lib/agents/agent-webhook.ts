@@ -22,6 +22,7 @@ import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
 import {
+    AGENT_WORKFLOW_PATH,
     AGENT_TRIGGER_LABELS,
     ALWAYS_ON_TRIGGER,
     policyAllowsTrigger,
@@ -67,7 +68,7 @@ interface Payload {
         labels?: Array<{ name?: string }>;
     };
     check_suite?: { conclusion?: string; pull_requests?: Array<{ number?: number }> };
-    workflow_run?: { id?: number; conclusion?: string; status?: string };
+    workflow_run?: { id?: number; conclusion?: string; status?: string; path?: string };
 }
 
 /**
@@ -155,11 +156,17 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
  *
  * Matched on a word boundary so `@polaris-agent` does not fire on
  * `@polaris-agent-docs`, and case-insensitively because GitHub logins are.
+ *
+ * A slash after the handle is a team or a package scope (`@polaris/ui`), not the
+ * app, and text in code is quoted rather than addressed - GitHub notifies
+ * neither. A pull request body that named `@polaris/ui` in a code span used to
+ * start a run for every pull request it opened.
  */
-function mentions(text: string, appHandle: string): boolean {
+export function mentions(text: string, appHandle: string): boolean {
     if (!appHandle) return false;
+    const prose = text.replace(/```[\s\S]*?(?:```|$)/g, " ").replace(/`[^`\n]*`/g, " ");
     const escaped = appHandle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`@${escaped}(?![A-Za-z0-9-])`, "i").test(text);
+    return new RegExp(`@${escaped}(?![A-Za-z0-9/-])`, "i").test(prose);
 }
 
 /** How much of a body is worth sending. Enough for any issue somebody actually
@@ -368,6 +375,11 @@ async function canWriteToRepo(repoFullName: string, actor: string): Promise<bool
     }
 }
 
+/** Whether a finished workflow is the agent's own, by the file it ran from. */
+export function isAgentWorkflowRun(workflowRun: { path?: string } | undefined): boolean {
+    return (workflowRun?.path ?? "").split("@")[0] === AGENT_WORKFLOW_PATH;
+}
+
 /**
  * Close out a run whose workflow has finished.
  *
@@ -387,6 +399,12 @@ async function canWriteToRepo(repoFullName: string, actor: string): Promise<bool
 async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
     const githubRunId = payload.workflow_run?.id;
     if (!githubRunId || payload.workflow_run?.status !== "completed") return [];
+    // GitHub sends this for every workflow in the repository. Another one - a
+    // pull request's own CI - finishing first used to be taken for the agent's
+    // job by the fallback below: the run was closed with that workflow's
+    // conclusion, the bell said "succeeded", and the real job was then refused
+    // as "not a recognized run" because its row was no longer open.
+    if (!isAgentWorkflowRun(payload.workflow_run)) return [];
 
     const open = { state: { in: ["queued", "running"] } };
     const repoFullName = payload.repository?.full_name;

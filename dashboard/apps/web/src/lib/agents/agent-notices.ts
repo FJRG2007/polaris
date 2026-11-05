@@ -212,7 +212,7 @@ export async function noticeRunFinished(
         const repo = run.repo.repoFullName;
         await notify({
             userId,
-            event: "agent.run",
+            event: state === "succeeded" ? "agent.run.succeeded" : "agent.run",
             title:
                 state === "succeeded"
                     ? t("agents.runSucceededTitle", { repo })
