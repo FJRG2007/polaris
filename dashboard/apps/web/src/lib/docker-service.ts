@@ -54,14 +54,6 @@ export function localDockerDriver(): DockerDriver {
     return new DockerDriver(rpc);
 }
 
-export async function listDockerConnections(ownerId: string) {
-    return prisma.dockerConnection.findMany({
-        where: { ownerId },
-        select: { id: true, name: true, transport: true, status: true, createdAt: true },
-        orderBy: { createdAt: "asc" }
-    });
-}
-
 /** Load a stored connection scoped to its owner and decrypt whatever secret
  *  material it carries. A socket or install-key connection has none. */
 async function loadDockerConnection(

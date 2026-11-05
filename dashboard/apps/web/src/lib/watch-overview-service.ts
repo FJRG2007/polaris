@@ -254,7 +254,9 @@ async function watchHostPage(ownerId: string, cursor: string | null, limit: numb
 }
 
 /** One page of server cards: the machine Polaris runs on first, then the
- *  registered servers by name. */
+ *  registered servers by name. Each card links by id: whether a name is unique
+ *  is not something one page can tell, and an address must not change with the
+ *  page that drew it. */
 export async function getWatchServerPage(
     ownerId: string,
     cursor: string | null,
@@ -264,7 +266,7 @@ export async function getWatchServerPage(
         watchHostPage(ownerId, cursor, limit),
         firingByTarget(ownerId)
     ]);
-    const cards = await serverCards(hosts, alarms);
+    const cards = await serverCards(hosts, alarms, { byId: true });
     return { cards: hosts.first ? cards : cards.slice(1), next: hosts.next };
 }
 
@@ -285,13 +287,17 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
 
 async function serverCards(
     hosts: Pick<Awaited<ReturnType<typeof watchHosts>>, "local" | "remote">,
-    alarms: Map<string, number>
+    alarms: Map<string, number>,
+    /** Link every card by its id rather than its name - for a list that is a page. */
+    { byId = false }: { byId?: boolean } = {}
 ): Promise<WatchCard[]> {
     const now = Date.now();
     const { local, remote } = hosts;
     const name = await localServerName(local?.name);
     const machine = { id: local?.id ?? LOCAL_SERVER_ID, name };
     const servers = [machine, ...remote];
+    const address = (server: { id: string; name: string }) =>
+        byId ? server.id : serverSlug(servers, server, LOCAL_SERVER_ID);
 
     const ids = [LOCAL_HOST_SUBJECT, ...remote.map((host) => host.id)];
     const series = await sparklines("host", ids, now);
@@ -308,7 +314,7 @@ async function serverCards(
             alarms: local ? (alarms.get(local.id) ?? 0) : 0,
             // Addressed as the machine, not as the reserved subject its samples
             // are filed under.
-            href: `/watch/server/${serverSlug(servers, machine, LOCAL_SERVER_ID)}`
+            href: `/watch/server/${address(machine)}`
         },
         ...remote.map((host) => ({
             id: host.id,
@@ -317,7 +323,7 @@ async function serverCards(
             detail: `${host.username}@${host.address}`,
             ...readingsFor(series.get(host.id), now),
             alarms: alarms.get(host.id) ?? 0,
-            href: `/watch/server/${serverSlug(servers, host, LOCAL_SERVER_ID)}`
+            href: `/watch/server/${address(host)}`
         }))
     ];
 }

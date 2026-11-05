@@ -48,6 +48,7 @@ vi.mock("@/lib/access/grants", () => ({ grantedSubjects: async () => new Map() }
 const { machineDomainPage, machineServerPage, SERVER_PAGE, DOMAIN_PAGE } = await import(
     "@/lib/machines/machines-service"
 );
+const { getWatchServerPage } = await import("@/lib/watch-overview-service");
 
 /** Host ids are uuids, as the cursor requires. */
 const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -96,6 +97,20 @@ describe("machineServerPage", () => {
         ]);
         expect(second.items.map((card) => card.name)).toEqual(["zz"]);
         expect(second.next).toBeNull();
+    });
+});
+
+describe("getWatchServerPage", () => {
+    it("links every server by id, so an address never depends on the page", async () => {
+        // "zz" is unique on this page, but a namesake may sort onto another one.
+        hostFindMany.mockImplementation(async (args) =>
+            (args.take as number) === 5 ? [host(LOCAL, "Home box")] : [host(uid(7), "zz")]
+        );
+        const first = await getWatchServerPage("owner", null, 2);
+        expect(first.cards.map((card) => card.href)).toEqual([
+            `/watch/server/${LOCAL}`,
+            `/watch/server/${uid(7)}`
+        ]);
     });
 });
 
