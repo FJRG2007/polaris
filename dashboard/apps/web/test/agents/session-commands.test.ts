@@ -111,9 +111,26 @@ describe("the boot script", () => {
         expect(argv[2]).toMatch(/^echo [A-Za-z0-9+/=]+ \| base64 -d \| sh$/);
     });
 
-    it("writes the hooks into the worktree, never into the machine's own home", () => {
-        expect(commands.SESSION_SETUP).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
-        expect(commands.SESSION_SETUP).not.toContain('"$HOME/.claude');
+    it("writes its own files beside the checkout, never into it or into the home", () => {
+        const setup = commands.SESSION_SETUP;
+        expect(setup).toContain('base64 -d > "$POLARIS_STATE_DIR/settings.json"');
+        expect(setup).toContain('base64 -d > "$POLARIS_STATE_DIR/mcp.json"');
+        expect(setup).toContain('base64 -d > "$POLARIS_STATE_DIR/hook.sh"');
+        // Nothing that carries the session's token lands where git can see it,
+        // and a repository's own tracked .mcp.json is never overwritten.
+        expect(setup).not.toContain("$POLARIS_WORKDIR/.mcp.json");
+        expect(setup).not.toContain("$POLARIS_WORKDIR/.claude");
+        expect(setup).not.toContain('"$HOME/.claude');
+    });
+
+    it("points Claude at those files with its own flags", () => {
+        const setup = commands.SESSION_SETUP;
+        expect(setup).toContain('if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then');
+        expect(setup).toContain(
+            '--settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\"'
+        );
+        // Never echoed: the launch line is shown in the terminal.
+        expect(setup).not.toContain('echo "polaris: starting $POLARIS_LAUNCH"');
     });
 
     it("keeps the container alive after the agent inside it exits", () => {
@@ -494,7 +511,7 @@ describe("the boot script for an enrolled server", () => {
 
     it("clones and writes the hooks exactly as the container does", () => {
         expect(host).toContain('git checkout -b "$POLARIS_BRANCH"');
-        expect(host).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
+        expect(host).toContain('"$POLARIS_STATE_DIR/settings.json"');
         expect(host).toContain("unset GIT_AUTH_HEADER");
     });
 });
@@ -568,12 +585,12 @@ describe("the home a session keeps", () => {
         expect(boot.match(/chown -R "\$POLARIS_RUNAS" "\$POLARIS_WORKDIR"/g)).toHaveLength(1);
     });
 
-    it("still gives the agent the files Polaris wrote into a workspace it kept", () => {
-        // Written as root on every boot, so skipping the walk must not leave the
-        // hook script and the tool registration owned by somebody the agent is
-        // not.
+    it("still gives the agent the files Polaris wrote, on every boot", () => {
+        // Written as root on every boot, so skipping the walk of a kept
+        // workspace must not leave the hook script and the tool registration
+        // owned by somebody the agent is not.
         expect(commands.SESSION_SETUP).toContain(
-            'chown "$POLARIS_RUNAS" "$POLARIS_WORKDIR/.claude" "$POLARIS_WORKDIR/.claude/polaris-hook.sh" "$POLARIS_WORKDIR/.claude/settings.local.json" "$POLARIS_WORKDIR/.mcp.json"'
+            'chown -R "$POLARIS_RUNAS" "$POLARIS_STATE_DIR"'
         );
     });
 
@@ -834,5 +851,24 @@ describe("finding the address a login printed", () => {
         // Eighty is what every one of these tools falls back to, so what it draws
         // at this size is a layout its vendor tested.
         expect(commands.SIGNIN_COLS).toBe(80);
+    });
+});
+
+describe("the directories a server's session names", () => {
+    it("expands a stored $HOME prefix the way the agent's hook command will", () => {
+        const lines = commands.SESSION_SETUP.split("\n").filter((line) =>
+            line.startsWith('case "$POLARIS_')
+        );
+        expect(lines).toHaveLength(2);
+        const result = spawnSync("sh", ["-c", `${lines.join("\n")}\necho "$POLARIS_WORKDIR|$POLARIS_STATE_DIR"`], {
+            encoding: "utf8",
+            env: {
+                ...process.env,
+                HOME: "/home/someone",
+                POLARIS_WORKDIR: "$HOME/.polaris/sessions/s1/repo",
+                POLARIS_STATE_DIR: "/session/polaris"
+            }
+        });
+        expect(result.stdout.trim()).toBe("/home/someone/.polaris/sessions/s1/repo|/session/polaris");
     });
 });

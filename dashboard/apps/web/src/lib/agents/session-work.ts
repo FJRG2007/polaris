@@ -38,6 +38,9 @@ const MARK = "polaris-work:";
  *  the daemon returns, so the status line after it is never what gets cut. */
 const TAIL_BYTES = 800;
 
+/** Paths an older build of Polaris wrote into a checkout. See `saveWorkScript`. */
+export const POLARIS_FILES = [".mcp.json", ".claude/settings.local.json", ".claude/polaris-hook.sh"] as const;
+
 const WIP_MESSAGE = "WIP: work left in the session when it stopped";
 
 export interface SaveWorkInput {
@@ -96,7 +99,17 @@ export function saveWorkScript(input: SaveWorkInput): string {
         "    export GIT_AUTHOR_NAME=Polaris GIT_COMMITTER_NAME=Polaris",
         "    export GIT_AUTHOR_EMAIL=agent@polaris.invalid GIT_COMMITTER_EMAIL=agent@polaris.invalid",
         "  fi",
-        `  g add -A >/dev/null 2>&1 && g commit -q --no-verify -m ${shellQuote(input.message ?? WIP_MESSAGE)} >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }`,
+        `  g add -A >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }`,
+        // Never a file Polaris wrote. Sessions started before Polaris kept its
+        // files outside the checkout wrote them into it - one of them over a
+        // `.mcp.json` the repository may track - and two of them carry the
+        // session's token. Taken back out of the index by what is IN them, so an
+        // agent's own legitimate edit to the same path is still committed.
+        ...POLARIS_FILES.map(
+            (file) =>
+                `  if g show :${shellQuote(file)} 2>/dev/null | grep -q -e 'Bearer ' -e 'polaris-hook.sh' -e 'Written by Polaris'; then g reset -q -- ${shellQuote(file)} >/dev/null 2>&1 || g rm -q --cached -- ${shellQuote(file)} >/dev/null 2>&1 || true; fi`
+        ),
+        `  if ! g diff --cached --quiet 2>/dev/null; then g commit -q --no-verify -m ${shellQuote(input.message ?? WIP_MESSAGE)} >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }; fi`,
         "fi",
         "count=$(ahead)",
         `policy=${shellQuote(input.policy)}`,

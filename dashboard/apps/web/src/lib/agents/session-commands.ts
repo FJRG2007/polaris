@@ -235,6 +235,11 @@ export const AGENT_ACCOUNT_SETUP = AGENT_ACCOUNT.join("\n");
  * behind.
  */
 const PREPARE_WORKTREE = [
+    // A server's directories are stored as `$HOME/...` and arrive quoted, so the
+    // shell would otherwise make a directory literally named `$HOME`, while the
+    // hook command the agent runs expands it - two different places.
+    "case \"$POLARIS_WORKDIR\" in \x27$HOME\x27/*) POLARIS_WORKDIR=\"$HOME/$(printf %s \"$POLARIS_WORKDIR\" | cut -c7-)\" ;; esac",
+    "case \"$POLARIS_STATE_DIR\" in \x27$HOME\x27/*) POLARIS_STATE_DIR=\"$HOME/$(printf %s \"$POLARIS_STATE_DIR\" | cut -c7-)\" ;; esac",
     // Nothing in this session may ever stop to ask a person for a password.
     //
     // Not a tidying flag: the setup runs on a real terminal now, and a git that
@@ -249,6 +254,10 @@ const PREPARE_WORKTREE = [
     // workspace is only on the session that opens it for the first time, and
     // every one after that finds what the last one left. See the chown below.
     "POLARIS_WORKDIR_NEW=no",
+    // Polaris's own files for this session, outside the checkout. Private to the
+    // agent's account: two of them carry the session's token.
+    'mkdir -p "$POLARIS_STATE_DIR"',
+    'chmod 0700 "$POLARIS_STATE_DIR"',
     'if [ -z "$GITHUB_REPOSITORY" ]; then',
     '  echo "polaris: opening your workspace"',
     '  if [ ! -d "$POLARIS_WORKDIR" ]; then',
@@ -276,15 +285,20 @@ const PREPARE_WORKTREE = [
     "POLARIS_WORKDIR_NEW=yes",
     "fi",
     // The agent reports what it is doing through a script Polaris registers in
-    // the agent's own configuration. Written from the environment so neither the
-    // URL nor the token is ever an argument.
+    // the agent's own configuration, and gets the Polaris tools through an MCP
+    // registration. Written from the environment so neither the URL nor the
+    // token is ever an argument.
     //
-    // Into the WORKTREE rather than into the home directory, and that is the
-    // whole reason a session on somebody's own server is usable at all: the
-    // machine's `~/.claude` holds their login and their settings, and a Polaris
-    // that wrote its hooks there would be hijacking every agent that person ever
-    // starts. A project-local settings file applies to this worktree and to
-    // nothing else, and is excluded from git so the agent cannot commit it.
+    // BESIDE the checkout, never inside it. These files carry the session's own
+    // bearer token, and a file in the worktree is a file the agent can commit:
+    // `.git/info/exclude` hides nothing a repository already tracks, and plenty
+    // of repositories track `.mcp.json` - so writing ours over theirs both threw
+    // away the repository's own servers and put the token one `git add -A` away
+    // from a push. Outside the worktree there is nothing to exclude and nothing
+    // of the repository's to overwrite. The agent is pointed at them with its
+    // own flags instead (see START_AGENT), which also keeps them out of the
+    // home: on somebody's own server that home is theirs, and hooks written
+    // there would hijack every agent that person ever starts.
     //
     // Base64, and not for tidiness. The host daemon refuses any environment value
     // holding a control character - a deliberate rule, because these values are
@@ -293,34 +307,23 @@ const PREPARE_WORKTREE = [
     // this box was refused before it started with a message about a variable name
     // nobody had ever seen. Base64 has no character that rule objects to, so the
     // rule keeps doing its job and the files still arrive.
-    'mkdir -p "$POLARIS_WORKDIR/.claude"',
-    'printf %s "$POLARIS_HOOK_SCRIPT" | base64 -d > "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
-    'chmod +x "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
-    'printf %s "$POLARIS_HOOK_SETTINGS" | base64 -d > "$POLARIS_WORKDIR/.claude/settings.local.json"',
-    // The Polaris tools, registered in the worktree so the agent has them on its
-    // first turn without anybody configuring anything.
-    'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_WORKDIR/.mcp.json"',
-    // Only where there is a checkout to exclude them from. A workspace has no
-    // git directory, and appending into one that is not there fails the whole
-    // setup under `set -e` - a session that dies on its way up for want of a
-    // file nobody asked for.
-    'if [ -d "$POLARIS_WORKDIR/.git" ]; then',
-    '  printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
-    "fi",
+    'printf %s "$POLARIS_HOOK_SCRIPT" | base64 -d > "$POLARIS_STATE_DIR/hook.sh"',
+    'chmod 0700 "$POLARIS_STATE_DIR/hook.sh"',
+    'printf %s "$POLARIS_HOOK_SETTINGS" | base64 -d > "$POLARIS_STATE_DIR/settings.json"',
+    'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_STATE_DIR/mcp.json"',
+    'chmod 0600 "$POLARIS_STATE_DIR/settings.json" "$POLARIS_STATE_DIR/mcp.json"',
     // Made as root because the image starts as root; owned by the agent, because
     // the agent is who edits it.
     //
     // Recursively only the once, for the same reason the home's is: a checkout
     // is a fresh tree and cheap to walk, but a workspace is kept and fills with
     // node_modules and caches, so a walk of it on every boot is minutes of
-    // exactly the wait this whole thing exists to remove. On a workspace that is
-    // already there, only the files Polaris just wrote into it change hands.
+    // exactly the wait this whole thing exists to remove.
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
     '  if [ "$POLARIS_WORKDIR_NEW" = "yes" ]; then',
     '    chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
-    "  else",
-    '    chown "$POLARIS_RUNAS" "$POLARIS_WORKDIR/.claude" "$POLARIS_WORKDIR/.claude/polaris-hook.sh" "$POLARIS_WORKDIR/.claude/settings.local.json" "$POLARIS_WORKDIR/.mcp.json" 2>/dev/null || true',
     "  fi",
+    '  chown -R "$POLARIS_RUNAS" "$POLARIS_STATE_DIR" 2>/dev/null || true',
     "fi"
 ];
 
@@ -616,7 +619,12 @@ const START_AGENT = [
     // the next one.
     "  echo \"polaris: this machine keeps its logins. 'enigma account add <name> --login' adds another, 'enigma account use <name>' picks it.\"",
     "fi",
-    'echo "polaris: starting $POLARIS_LAUNCH"',
+    // The hooks and the Polaris tools, from beside the checkout rather than from
+    // the repository's own `.claude` and `.mcp.json`. See PREPARE_WORKTREE.
+    'if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then',
+    '  POLARIS_LAUNCH="$POLARIS_LAUNCH --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
+    "fi",
+    'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
     // Written last, so anything holding a prompt knows the terminal it is about
     // to type into belongs to the agent rather than to the installer.
     `: > ${AGENT_READY_FLAG}`,

@@ -70,6 +70,21 @@ function hostWorkdir(sessionId: string): string {
     return `$HOME/.polaris/sessions/${sessionId}/repo`;
 }
 
+/**
+ * Where Polaris keeps its own files for a session: the hook script, the hook
+ * settings and the MCP registration, two of which carry the session's token.
+ *
+ * Never inside the checkout, where a tracked `.mcp.json` would be overwritten
+ * and the token would be one `git add -A` from a push, and never in the home,
+ * which on a server is somebody's own. Per session, so two sessions of one
+ * account never read each other's token.
+ */
+function stateDirFor(session: { id: string; place: string }): string {
+    return session.place === "host"
+        ? `$HOME/.polaris/sessions/${session.id}/polaris`
+        : "/session/polaris";
+}
+
 /** What the machine needs to know to bring a session up. Assembled once and used
  *  by both places, so the two cannot drift on what a session actually is. */
 interface Bootstrap {
@@ -77,6 +92,10 @@ interface Bootstrap {
     readonly branch: string;
     readonly baseRef: string;
     readonly workdir: string;
+    /** Polaris's own files for the session. See `stateDirFor`. */
+    readonly stateDir: string;
+    /** `claude` when the agent takes its hooks and MCP servers from flags. */
+    readonly agentConfig: string;
     readonly agentBinary: string;
     readonly agentCommand: string;
     readonly agentInstall: string;
@@ -236,6 +255,10 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         branch: session.branch,
         baseRef: session.baseRef,
         workdir: workdirFor(session),
+        stateDir: stateDirFor(session),
+        // Claude takes its hooks and its MCP servers from flags, so Polaris's
+        // own files never have to be written into the repository.
+        agentConfig: agent.cli.id === "claude" ? "claude" : "",
         agentBinary: agent.binary,
         agentCommand: agent.command,
         agentInstall: agent.install,
@@ -255,7 +278,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
             session.place === "host" ? "" : asFile(commands.firstRunScript(agent.cli.firstRun)),
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(
-            claudeHookSettings(`${workdirFor(session)}/.claude/polaris-hook.sh`)
+            claudeHookSettings(`${stateDirFor(session)}/hook.sh`)
         ),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         // Empty for a workspace, which clones nothing. A header built around an
@@ -313,6 +336,8 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         GIT_AUTH_HEADER: boot.cloneHeader,
         GH_TOKEN: boot.githubToken,
         POLARIS_WORKDIR: boot.workdir,
+        POLARIS_STATE_DIR: boot.stateDir,
+        POLARIS_AGENT_CONFIG: boot.agentConfig,
         POLARIS_BRANCH: boot.branch,
         POLARIS_BASE_REF: boot.baseRef,
         POLARIS_TMUX: commands.TMUX_SESSION,
