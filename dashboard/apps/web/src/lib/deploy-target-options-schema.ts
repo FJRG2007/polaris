@@ -66,3 +66,29 @@ export interface ServiceOption {
     readonly project: string;
     readonly targetId: string;
 }
+
+export const templateProjectOptionsRequestSchema = z.object({ ...pageFields }).strict();
+export type TemplateProjectOptionsRequest = z.input<typeof templateProjectOptionsRequestSchema>;
+
+export const templateEnvironmentOptionsRequestSchema = z
+    .object({ ...pageFields, projectId: z.string().uuid() })
+    .strict();
+export type TemplateEnvironmentOptionsRequest = z.input<
+    typeof templateEnvironmentOptionsRequestSchema
+>;
+
+/** One project a marketplace template can go into, as its picker shows it. */
+export interface TemplateProjectOption {
+    readonly id: string;
+    readonly name: string;
+    /** The environment it lands in unless another is picked - the default one. */
+    readonly environmentId: string | null;
+    /** Whether there is more than one environment to choose between. */
+    readonly manyEnvironments: boolean;
+}
+
+/** One environment of that project. */
+export interface TemplateEnvironmentOption {
+    readonly id: string;
+    readonly name: string;
+}

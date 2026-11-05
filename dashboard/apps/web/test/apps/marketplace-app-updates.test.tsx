@@ -19,7 +19,6 @@ vi.mock("@/lib/app-bundles/actions", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
-    listTemplateTargetsAction: vi.fn(async () => []),
     listDeployServersAction: vi.fn(async () => []),
     createApplicationAction: vi.fn()
 }));

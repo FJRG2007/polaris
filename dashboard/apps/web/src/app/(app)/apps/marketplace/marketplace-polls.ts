@@ -7,20 +7,12 @@
 
 import { readPoll } from "@/lib/poll-fetch";
 import type * as marketplaceActionsModule from "@/app/(app)/apps/marketplace/actions";
-import type * as deployActionsModule from "@/app/(app)/apps/deploy/actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 
 export const storageConnections = (signal?: AbortSignal) =>
     readPoll<Answer<typeof marketplaceActionsModule.listStorageConnectionsAction>>(
         "/api/marketplace/storage-connections",
-        {},
-        signal
-    );
-
-export const templateTargets = (signal?: AbortSignal) =>
-    readPoll<Answer<typeof deployActionsModule.listTemplateTargetsAction>>(
-        "/api/marketplace/template-targets",
         {},
         signal
     );

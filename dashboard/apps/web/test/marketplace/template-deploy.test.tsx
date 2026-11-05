@@ -13,14 +13,16 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 
 const push = vi.hoisted(() => vi.fn());
 const deploy = vi.hoisted(() => ({
-    listTemplateTargetsAction: vi.fn(async () => [
-        {
-            id: "project-1",
-            name: "Website",
-            environments: [{ id: "env-1", name: "production", isDefault: true }]
-        }
-    ]),
     createApplicationAction: vi.fn(async () => ({}))
+}));
+const targets = vi.hoisted(() => ({
+    templateProjectOptionsAction: vi.fn(async (_input: unknown) => ({
+        items: [
+            { id: "project-1", name: "Website", environmentId: "env-1", manyEnvironments: false }
+        ],
+        next: null as string | null
+    })),
+    templateEnvironmentOptionsAction: vi.fn(async () => ({ items: [], next: null }))
 }));
 const serverOptions = vi.hoisted(() => ({
     listServerOptionsAction: vi.fn(async () => ({
@@ -51,6 +53,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/app/(app)/apps/deploy/actions", () => deploy);
 vi.mock("@/app/(app)/server-options-actions", () => serverOptions);
+vi.mock("@/app/(app)/deploy-target-options-actions", () => targets);
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     installAppAction: vi.fn(),
     listStorageConnectionsAction: vi.fn(async () => [])
@@ -75,6 +78,8 @@ describe("deploying a template from the marketplace", () => {
         const dialog = await screen.findByRole("dialog");
         expect(within(dialog).getByText("Deploy n8n")).toBeTruthy();
         fireEvent.click(await within(dialog).findByRole("button", { name: "Continue" }));
+        // Only the first project is read up front; the picker pages the rest.
+        expect(targets.templateProjectOptionsAction).toHaveBeenCalledWith({ limit: 1 });
 
         // Deploy's own form, already on the template, with the name it suggests.
         const name = await within(dialog).findByDisplayValue("n8n");
@@ -100,7 +105,7 @@ describe("deploying a template from the marketplace", () => {
     });
 
     it("says what to do when there is no project to deploy into", async () => {
-        deploy.listTemplateTargetsAction.mockResolvedValueOnce([]);
+        targets.templateProjectOptionsAction.mockResolvedValueOnce({ items: [], next: null });
         render(<MarketplaceView installed={[]} canInstall />, { wrapper: MessagesWrapper });
         fireEvent.click(within(cardOf("n8n")).getByRole("button", { name: "Deploy" }));
         const dialog = await screen.findByRole("dialog");

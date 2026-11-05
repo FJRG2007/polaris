@@ -7,3 +7,10 @@ import { vi } from "vitest";
 vi.mock("@/app/(app)/server-options-actions", () => ({
     listServerOptionsAction: async () => ({ items: [], next: null })
 }));
+
+vi.mock("@/app/(app)/deploy-target-options-actions", () => ({
+    listDeployTargetOptionsAction: async () => ({ items: [], next: null }),
+    listServiceOptionsAction: async () => ({ items: [], next: null }),
+    templateProjectOptionsAction: async () => ({ items: [], next: null }),
+    templateEnvironmentOptionsAction: async () => ({ items: [], next: null })
+}));

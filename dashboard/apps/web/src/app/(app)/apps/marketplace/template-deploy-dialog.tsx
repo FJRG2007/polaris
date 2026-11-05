@@ -14,18 +14,17 @@ import { useEffect, useState } from "react";
 import { Field } from "../deploy/form-field";
 import { NewTemplateForm } from "../deploy/service-form";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { type TemplateTarget } from "../deploy/actions";
+import { PagedPicker } from "@/components/paged-picker";
+import * as options from "@/app/(app)/deploy-target-options-actions";
+import type { TemplateProjectOption } from "@/lib/deploy-target-options-schema";
 import {
     Button,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
-    DialogTitle,
-    SearchableSelect,
-    Select
+    DialogTitle
 } from "@polaris/ui";
-import * as polls from "./marketplace-polls";
 
 export function TemplateDeployDialog({
     templateId,
@@ -39,37 +38,31 @@ export function TemplateDeployDialog({
 }) {
     const t = useTranslations("marketplace");
     const router = useRouter();
-    const [targets, setTargets] = useState<TemplateTarget[] | null>(null);
+    // The first project and its default environment are chosen up front; the
+    // pickers page the rest from the server as somebody searches or scrolls.
+    const [project, setProject] = useState<TemplateProjectOption | null | undefined>(undefined);
     const [failed, setFailed] = useState(false);
-    const [projectId, setProjectId] = useState("");
     const [environmentId, setEnvironmentId] = useState("");
     const [chosen, setChosen] = useState(false);
 
     useEffect(() => {
-        void polls
-            .templateTargets()
-            .then((list) => {
-                setTargets(list);
-                const first = list[0];
-                if (!first) return;
-                setProjectId(first.id);
-                setEnvironmentId(
-                    first.environments.find((env) => env.isDefault)?.id ??
-                        first.environments[0]?.id ??
-                        ""
-                );
+        void options
+            .templateProjectOptionsAction({ limit: 1 })
+            .then((page) => {
+                if ("error" in page) return setFailed(true);
+                const first = page.items[0] ?? null;
+                setProject(first);
+                setEnvironmentId(first?.environmentId ?? "");
             })
             .catch(() => setFailed(true));
     }, []);
 
-    const project = targets?.find((item) => item.id === projectId);
+    const projectId = project?.id ?? "";
 
-    function pickProject(id: string) {
-        setProjectId(id);
-        const next = targets?.find((item) => item.id === id);
-        setEnvironmentId(
-            next?.environments.find((env) => env.isDefault)?.id ?? next?.environments[0]?.id ?? ""
-        );
+    function pickProject(next: TemplateProjectOption | null) {
+        if (!next) return;
+        setProject(next);
+        setEnvironmentId(next.environmentId ?? "");
     }
 
     return (
@@ -92,11 +85,11 @@ export function TemplateDeployDialog({
                     <p role="alert" className="text-sm text-danger">
                         {t("templateDeploy.failed")}
                     </p>
-                ) : targets === null ? (
+                ) : project === undefined ? (
                     <div className="flex justify-center py-6" aria-busy>
                         <Loader2 className="size-5 animate-spin text-muted-foreground" />
                     </div>
-                ) : targets.length === 0 ? (
+                ) : project === null ? (
                     <div className="flex flex-col items-start gap-3">
                         <p className="text-sm text-muted-foreground">
                             {t("templateDeploy.noProjects")}
@@ -108,29 +101,33 @@ export function TemplateDeployDialog({
                 ) : (
                     <div className="flex flex-col gap-3">
                         <Field label={t("templateDeploy.project")}>
-                            <SearchableSelect
+                            <PagedPicker<TemplateProjectOption>
+                                read={options.templateProjectOptionsAction}
+                                scope={{}}
+                                cache="template-projects"
                                 className="w-full"
                                 value={projectId}
-                                onValueChange={pickProject}
+                                selectedLabel={project.name}
+                                onValueChange={(_, item) => pickProject(item)}
                                 aria-label={t("templateDeploy.project")}
+                                placeholder={t("templateDeploy.project")}
                                 searchPlaceholder={t("templateDeploy.projectSearch")}
                                 emptyText={t("templateDeploy.projectNone")}
-                                options={targets.map((item) => ({
-                                    value: item.id,
-                                    label: item.name
-                                }))}
                             />
                         </Field>
-                        {project && project.environments.length > 1 ? (
+                        {project.manyEnvironments ? (
                             <Field label={t("templateDeploy.environment")}>
-                                <Select
+                                <PagedPicker
+                                    read={options.templateEnvironmentOptionsAction}
+                                    scope={{ projectId }}
+                                    cache="template-environments"
+                                    className="w-full"
                                     value={environmentId}
-                                    onValueChange={setEnvironmentId}
+                                    onValueChange={(id) => setEnvironmentId(id)}
                                     aria-label={t("templateDeploy.environment")}
-                                    options={project.environments.map((env) => ({
-                                        value: env.id,
-                                        label: env.name
-                                    }))}
+                                    placeholder={t("templateDeploy.environment")}
+                                    searchPlaceholder={t("templateDeploy.environmentSearch")}
+                                    emptyText={t("templateDeploy.environmentNone")}
                                 />
                             </Field>
                         ) : null}

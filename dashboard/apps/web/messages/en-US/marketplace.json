@@ -152,6 +152,8 @@
         "projectSearch": "Search projects",
         "projectNone": "No project matches",
         "environment": "Environment",
+        "environmentSearch": "Search environments",
+        "environmentNone": "No environment matches",
         "next": "Continue"
     },
     "polaris": {

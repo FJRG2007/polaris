@@ -7,16 +7,23 @@
 
 import { getTranslations } from "@/lib/i18n/request";
 import { requireAdmin, requirePermission } from "@/lib/session";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requireProjectAccess } from "@/lib/deploy-project-access";
 import {
     deployTargetOptionsRequestSchema,
     serviceOptionsRequestSchema,
+    templateEnvironmentOptionsRequestSchema,
+    templateProjectOptionsRequestSchema,
     type DeployTargetOption,
-    type ServiceOption
+    type ServiceOption,
+    type TemplateEnvironmentOption,
+    type TemplateProjectOption
 } from "@/lib/deploy-target-options-schema";
 import {
     readDeployTargetOptions,
     readServiceOptions,
+    readTemplateEnvironmentOptions,
+    readTemplateProjectOptions,
     type OptionsPage
 } from "@/lib/deploy-target-options";
 
@@ -56,6 +63,41 @@ export async function listServiceOptionsAction(
         return await readServiceOptions(user.id, parsed.data);
     } catch (error) {
         console.error("[service-options] read failed", error);
+        return { error: t("asyncSelect.failed") };
+    }
+}
+
+/** The projects a marketplace template can go into, on the shelf that is open,
+ *  under deploy.manage as creating the service from it is. */
+export async function templateProjectOptionsAction(
+    input: unknown
+): Promise<OptionsPage<TemplateProjectOption> | { error: string }> {
+    const user = await requirePermission("deploy.manage");
+    const t = await getTranslations("components");
+    const parsed = templateProjectOptionsRequestSchema.safeParse(input);
+    if (!parsed.success) return { error: t("asyncSelect.failed") };
+    try {
+        return await readTemplateProjectOptions(user.id, await scopeOrgIdFor(user.id), parsed.data);
+    } catch (error) {
+        console.error("[template-project-options] read failed", error);
+        return { error: t("asyncSelect.failed") };
+    }
+}
+
+/** The environments of one of those projects. */
+export async function templateEnvironmentOptionsAction(
+    input: unknown
+): Promise<OptionsPage<TemplateEnvironmentOption> | { error: string }> {
+    const user = await requirePermission("deploy.manage");
+    const t = await getTranslations("components");
+    const parsed = templateEnvironmentOptionsRequestSchema.safeParse(input);
+    if (!parsed.success) return { error: t("asyncSelect.failed") };
+    try {
+        const { projectId, ...page } = parsed.data;
+        const orgId = await scopeOrgIdFor(user.id);
+        return await readTemplateEnvironmentOptions(user.id, orgId, projectId, page);
+    } catch (error) {
+        console.error("[template-environment-options] read failed", error);
         return { error: t("asyncSelect.failed") };
     }
 }
