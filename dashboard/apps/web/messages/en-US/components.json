@@ -90,7 +90,8 @@
             "forever": "Until I unmute"
         },
         "direct": "Direct message",
-        "count": "{count} messages"
+        "count": "{count} messages",
+        "locked": "New message"
     },
     "mailUnread": {
         "title": "New mail",

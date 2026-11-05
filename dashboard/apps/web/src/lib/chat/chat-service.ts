@@ -102,6 +102,11 @@ export interface ChatChannelView {
     /** Whether this reader keeps it at the top of their list. Theirs alone -
      *  pinning a conversation says nothing to the other people in it. */
     readonly pinned: boolean;
+    /** Behind this reader's chat lock code - theirs alone. Its last message is
+     *  left out of the list while it is. */
+    readonly locked: boolean;
+    /** Out of this reader's list until a message arrives, unless muted. */
+    readonly hidden: boolean;
     /** When the quiet ends, or null when it does not - either because the
      *  conversation is not muted or because it was muted with no end. */
     readonly mutedUntil: string | null;
@@ -754,6 +759,8 @@ export async function listChannels(
                 mutedUntil: true,
                 notifyLevel: true,
                 pinnedAt: true,
+                locked: true,
+                hiddenAt: true,
                 translation: true,
                 role: true,
                 timeoutUntil: true
@@ -926,7 +933,9 @@ export async function listChannels(
             archived: channel.archived,
             lastMessageAt: channel.lastMessageAt?.toISOString() ?? null,
             unread: unread.get(channel.id) ?? 0,
-            last: withReceipt(last.get(channel.id) ?? null, receipts.has(channel.id)),
+            last: membership?.locked
+                ? null
+                : withReceipt(last.get(channel.id) ?? null, receipts.has(channel.id)),
             // Worked out rather than read: a mute with an end that has passed is
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,
@@ -934,6 +943,8 @@ export async function listChannels(
             notifyLevel: channelNotifyOf(membership?.notifyLevel),
             translation: core.readChatTranslation(membership?.translation),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
+            locked: membership?.locked ?? false,
+            hidden: membership?.hiddenAt !== null && membership?.hiddenAt !== undefined,
             mayAdminister,
             mayChangePrivacy: Boolean(channel.spaceId && administered.has(channel.spaceId)),
             // The one standing a group confers: its owner may take a message

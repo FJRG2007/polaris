@@ -224,7 +224,11 @@
         "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial",
         "inviteSendLimit": "Too many invites at once. Try again in {seconds} s.",
         "tooManyReminders": "You can have up to {max} reminders waiting",
-        "translationSettingInvalid": "That is not a translation setting"
+        "translationSettingInvalid": "That is not a translation setting",
+        "lockNoCode": "Set a chat lock code first",
+        "lockTooMany": "Too many tries. Wait a few minutes",
+        "lockWrongCode": "That code is not right",
+        "lockRequired": "This chat is locked. Enter your code to open it"
     },
     "media": {
         "refused": {
@@ -2194,5 +2198,35 @@
         "delivered": "Delivered",
         "sent": "Sent",
         "muted": "Muted"
+    },
+    "lock": {
+        "lock": "Lock chat",
+        "unlockChat": "Remove lock",
+        "hide": "Hide chat",
+        "unhide": "Show chat",
+        "lockedChats": "Locked chats",
+        "hiddenChats": "Hidden chats",
+        "locked": "Locked",
+        "enterCode": "Enter your chat lock code",
+        "code": "Code",
+        "open": "Open",
+        "cancel": "Cancel",
+        "save": "Save",
+        "settings": "Chat lock",
+        "setCode": "Set code",
+        "changeCode": "Change code",
+        "newCode": "New code",
+        "currentCode": "Current code",
+        "codeHint": "At least 4 characters",
+        "hideLocked": "Hide locked chats from the list",
+        "newMessage": "New message",
+        "noneHidden": "No hidden chats",
+        "noneLocked": "No locked chats",
+        "failed": "That did not save. Try again",
+        "lockedNotice": "Locked chat",
+        "settingsHint": "One code opens every chat you lock",
+        "manage": "Chat lock settings",
+        "back": "All chats",
+        "removeLockAsk": "Enter your code to remove the lock"
     }
 }

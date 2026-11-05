@@ -55,6 +55,7 @@ import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
+import { requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -277,10 +278,13 @@ const PAGE = 50;
 export async function readChannel(
     actor: ChatActor,
     channelId: string,
-    before?: string
+    before?: string,
+    /** The unlock proof, for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<ChatPage> {
     const access = await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
+    await requireUnlocked(actor, channelId, proof);
     await markDelivered(actor, access);
     const floor = await history.readableSince(actor, channelId);
 
@@ -361,10 +365,12 @@ export async function readThread(
 export async function readSince(
     actor: ChatActor,
     channelId: string,
-    afterId: string | null
+    afterId: string | null,
+    proof?: string | null
 ): Promise<ChatNewerPage> {
     const access = await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
+    await requireUnlocked(actor, channelId, proof);
     await markDelivered(actor, access);
     const cursor = afterId
         ? await prisma.chatMessage.findFirst({
@@ -577,6 +583,8 @@ export async function send(
                 data: { replyCount: { increment: 1 }, lastReplyAt: message.createdAt }
             });
         }
+        // A hidden conversation comes back with a new message, unless muted.
+        await unhideOnMessage(tx, input.channelId, actor.id, message.createdAt);
         // Posting is reading: the sender is caught up by definition, and without
         // this their own message would light their own badge.
         await tx.chatChannelMember.upsert({

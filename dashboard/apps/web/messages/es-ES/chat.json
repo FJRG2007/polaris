@@ -224,7 +224,11 @@
         "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
         "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s.",
         "tooManyReminders": "Puedes tener hasta {max} recordatorios pendientes",
-        "translationSettingInvalid": "Eso no es un ajuste de traducción"
+        "translationSettingInvalid": "Eso no es un ajuste de traducción",
+        "lockNoCode": "Primero define un código de bloqueo",
+        "lockTooMany": "Demasiados intentos. Espera unos minutos",
+        "lockWrongCode": "Ese código no es correcto",
+        "lockRequired": "Este chat está bloqueado. Escribe tu código para abrirlo"
     },
     "media": {
         "refused": {
@@ -2194,5 +2198,35 @@
         "delivered": "Entregado",
         "sent": "Enviado",
         "muted": "Silenciado"
+    },
+    "lock": {
+        "lock": "Bloquear chat",
+        "unlockChat": "Quitar bloqueo",
+        "hide": "Ocultar chat",
+        "unhide": "Mostrar chat",
+        "lockedChats": "Chats bloqueados",
+        "hiddenChats": "Chats ocultos",
+        "locked": "Bloqueado",
+        "enterCode": "Escribe tu código de bloqueo",
+        "code": "Código",
+        "open": "Abrir",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "settings": "Bloqueo de chats",
+        "setCode": "Definir código",
+        "changeCode": "Cambiar código",
+        "newCode": "Código nuevo",
+        "currentCode": "Código actual",
+        "codeHint": "Al menos 4 caracteres",
+        "hideLocked": "Ocultar chats bloqueados de la lista",
+        "newMessage": "Mensaje nuevo",
+        "noneHidden": "No hay chats ocultos",
+        "noneLocked": "No hay chats bloqueados",
+        "failed": "No se guardó. Inténtalo de nuevo",
+        "lockedNotice": "Chat bloqueado",
+        "settingsHint": "Un solo código abre todos los chats que bloquees",
+        "manage": "Ajustes del bloqueo de chats",
+        "back": "Todos los chats",
+        "removeLockAsk": "Escribe tu código para quitar el bloqueo"
     }
 }

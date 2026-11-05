@@ -77,6 +77,9 @@ async function actor(): Promise<{ id: string; name: string }> {
 /** Run one write and turn a refusal into a sentence - see `guardChat`. */
 const guard = guardChat;
 
+/** An unlock proof as a tab hands it back: anything else reads as none. */
+const proofSchema = z.string().max(200).nullish();
+
 // ---------------------------------------------------------------------------
 // Reading
 // ---------------------------------------------------------------------------
@@ -105,11 +108,16 @@ export async function conversationsElsewhereAction(): Promise<{ chats: ChatElsew
  */
 export async function readChannelAction(
     channelId: string,
-    before?: string
+    before?: string,
+    /** The unlock proof for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<{ page?: ChatPage; channel?: ChatChannelView | null; error?: string }> {
     const me = await actor();
+    const unlock = proofSchema.safeParse(proof);
     const [result, described] = await Promise.all([
-        guard(() => messages.readChannel(me, channelId, before)),
+        guard(() =>
+            messages.readChannel(me, channelId, before, unlock.success ? unlock.data : null)
+        ),
         // Only for the newest page: an older one is somebody scrolling a
         // conversation whose header is already drawn.
         before === undefined
@@ -133,10 +141,14 @@ export async function readChannelAction(
 
 export async function readSinceAction(
     channelId: string,
-    afterId: string | null
+    afterId: string | null,
+    proof?: string | null
 ): Promise<{ page?: ChatNewerPage; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.readSince(me, channelId, afterId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.readSince(me, channelId, afterId, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { page: result.value };
 }
 

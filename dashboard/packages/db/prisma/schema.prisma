@@ -363,6 +363,7 @@ model User {
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
+    chatLock               ChatLock?
     chatPollVotes        ChatPollVote[]
     contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
@@ -9791,6 +9792,10 @@ model ChatChannelMember {
     // `chatTranslationPrefsSchema`. Theirs alone: each reader sees the room in
     // their own language. Null is off, and so is anything that does not parse.
     translation       Json?
+    // Behind this reader's chat lock code. Theirs alone, like the pin.
+    locked            Boolean   @default(false)
+    // Out of this reader's list until a message arrives, unless it is muted.
+    hiddenAt          DateTime?
     createdAt         DateTime  @default(now())
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -9798,6 +9803,18 @@ model ChatChannelMember {
 
     @@unique([channelId, userId])
     @@index([userId])
+}
+
+// One person's chat lock: the code that opens their locked conversations, and
+// whether those are left out of the list. Absent means no code has been set.
+model ChatLock {
+    userId     String   @id @db.Uuid
+    // scrypt, through the same helper as link passwords.
+    codeHash   String
+    hideLocked Boolean  @default(false)
+    updatedAt  DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // One message.
