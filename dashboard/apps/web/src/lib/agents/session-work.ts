@@ -39,7 +39,11 @@ const MARK = "polaris-work:";
 const TAIL_BYTES = 800;
 
 /** Paths an older build of Polaris wrote into a checkout. See `saveWorkScript`. */
-export const POLARIS_FILES = [".mcp.json", ".claude/settings.local.json", ".claude/polaris-hook.sh"] as const;
+export const POLARIS_FILES = [
+    ".mcp.json",
+    ".claude/settings.local.json",
+    ".claude/polaris-hook.sh"
+] as const;
 
 const WIP_MESSAGE = "WIP: work left in the session when it stopped";
 

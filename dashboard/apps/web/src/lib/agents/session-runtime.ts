@@ -278,9 +278,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         firstRun:
             session.place === "host" ? "" : asFile(commands.firstRunScript(agent.cli.firstRun)),
         hookScript: hookScript(ingest, token),
-        hookSettings: JSON.stringify(
-            claudeHookSettings(`${stateDirFor(session)}/hook.sh`)
-        ),
+        hookSettings: JSON.stringify(claudeHookSettings(`${stateDirFor(session)}/hook.sh`)),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
@@ -323,7 +321,10 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
  */
 async function cloneToken(repoFullName: string): Promise<string> {
     const scoped = scoping.repositoryScope(repoFullName, scoping.CLONE_PERMISSIONS);
-    if (!scoped) throw new SessionRefusal(`Polaris cannot read ${repoFullName} as a GitHub repository name.`);
+    if (!scoped)
+        throw new SessionRefusal(
+            `Polaris cannot read ${repoFullName} as a GitHub repository name.`
+        );
     let token: string | null;
     try {
         token = await githubAppInstallationToken(scoped.owner, scoped.scope);

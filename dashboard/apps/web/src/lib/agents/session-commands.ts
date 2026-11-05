@@ -238,8 +238,8 @@ const PREPARE_WORKTREE = [
     // A server's directories are stored as `$HOME/...` and arrive quoted, so the
     // shell would otherwise make a directory literally named `$HOME`, while the
     // hook command the agent runs expands it - two different places.
-    "case \"$POLARIS_WORKDIR\" in \x27$HOME\x27/*) POLARIS_WORKDIR=\"$HOME/$(printf %s \"$POLARIS_WORKDIR\" | cut -c7-)\" ;; esac",
-    "case \"$POLARIS_STATE_DIR\" in \x27$HOME\x27/*) POLARIS_STATE_DIR=\"$HOME/$(printf %s \"$POLARIS_STATE_DIR\" | cut -c7-)\" ;; esac",
+    'case "$POLARIS_WORKDIR" in \x27$HOME\x27/*) POLARIS_WORKDIR="$HOME/$(printf %s "$POLARIS_WORKDIR" | cut -c7-)" ;; esac',
+    'case "$POLARIS_STATE_DIR" in \x27$HOME\x27/*) POLARIS_STATE_DIR="$HOME/$(printf %s "$POLARIS_STATE_DIR" | cut -c7-)" ;; esac',
     // Nothing in this session may ever stop to ask a person for a password.
     //
     // Not a tidying flag: the setup runs on a real terminal now, and a git that
@@ -291,7 +291,7 @@ const PREPARE_WORKTREE = [
     '  printf %s "$POLARIS_GIT_CREDENTIAL" | base64 -d > "$POLARIS_STATE_DIR/git-credential.sh"',
     '  chmod 0700 "$POLARIS_STATE_DIR/git-credential.sh"',
     '  git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""',
-    '  git config credential.username x-access-token',
+    "  git config credential.username x-access-token",
     "fi",
     'git checkout -b "$POLARIS_BRANCH"',
     "POLARIS_WORKDIR_NEW=yes",

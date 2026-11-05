@@ -589,9 +589,7 @@ describe("the home a session keeps", () => {
         // Written as root on every boot, so skipping the walk of a kept
         // workspace must not leave the hook script and the tool registration
         // owned by somebody the agent is not.
-        expect(commands.SESSION_SETUP).toContain(
-            'chown -R "$POLARIS_RUNAS" "$POLARIS_STATE_DIR"'
-        );
+        expect(commands.SESSION_SETUP).toContain('chown -R "$POLARIS_RUNAS" "$POLARIS_STATE_DIR"');
     });
 
     it("marks a checkout as new, since it is a tree that was just cloned", () => {
@@ -860,15 +858,21 @@ describe("the directories a server's session names", () => {
             line.startsWith('case "$POLARIS_')
         );
         expect(lines).toHaveLength(2);
-        const result = spawnSync("sh", ["-c", `${lines.join("\n")}\necho "$POLARIS_WORKDIR|$POLARIS_STATE_DIR"`], {
-            encoding: "utf8",
-            env: {
-                ...process.env,
-                HOME: "/home/someone",
-                POLARIS_WORKDIR: "$HOME/.polaris/sessions/s1/repo",
-                POLARIS_STATE_DIR: "/session/polaris"
+        const result = spawnSync(
+            "sh",
+            ["-c", `${lines.join("\n")}\necho "$POLARIS_WORKDIR|$POLARIS_STATE_DIR"`],
+            {
+                encoding: "utf8",
+                env: {
+                    ...process.env,
+                    HOME: "/home/someone",
+                    POLARIS_WORKDIR: "$HOME/.polaris/sessions/s1/repo",
+                    POLARIS_STATE_DIR: "/session/polaris"
+                }
             }
-        });
-        expect(result.stdout.trim()).toBe("/home/someone/.polaris/sessions/s1/repo|/session/polaris");
+        );
+        expect(result.stdout.trim()).toBe(
+            "/home/someone/.polaris/sessions/s1/repo|/session/polaris"
+        );
     });
 });

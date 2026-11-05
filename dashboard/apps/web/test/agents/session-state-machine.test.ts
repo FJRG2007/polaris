@@ -6,7 +6,11 @@
 
 import * as core from "@polaris/core";
 import { describe, expect, it } from "vitest";
-import { CLAUDE_HOOK_EVENTS, claudeHookSettings, normalizeHookEvent } from "@/lib/agents/session-hooks";
+import {
+    CLAUDE_HOOK_EVENTS,
+    claudeHookSettings,
+    normalizeHookEvent
+} from "@/lib/agents/session-hooks";
 
 /** The state a session in `from` lands in after one hook, or `from` when the
  *  hook says nothing. */
@@ -18,11 +22,15 @@ function after(payload: Record<string, unknown>, from: core.AgentSessionState = 
 
 describe("each hook's transition", () => {
     it("SessionStart leaves the agent at its prompt, not working", () => {
-        expect(after({ hook_event_name: "SessionStart", source: "startup" }, "starting")).toBe("idle");
+        expect(after({ hook_event_name: "SessionStart", source: "startup" }, "starting")).toBe(
+            "idle"
+        );
     });
 
     it("UserPromptSubmit starts work", () => {
-        expect(after({ hook_event_name: "UserPromptSubmit", prompt: "fix it" }, "idle")).toBe("working");
+        expect(after({ hook_event_name: "UserPromptSubmit", prompt: "fix it" }, "idle")).toBe(
+            "working"
+        );
     });
 
     it("PermissionRequest needs the person, and says which tool", () => {
@@ -41,17 +49,24 @@ describe("each hook's transition", () => {
 
     it("Notification asking for something needs the person", () => {
         expect(
-            after({ hook_event_name: "Notification", notification_type: "permission_prompt", message: "Allow?" })
+            after({
+                hook_event_name: "Notification",
+                notification_type: "permission_prompt",
+                message: "Allow?"
+            })
         ).toBe("waiting");
     });
 
     it("the idle nudge after a finished turn moves nothing", () => {
         expect(
-            normalizeHookEvent({ hook_event_name: "Notification", notification_type: "idle_prompt" })
+            normalizeHookEvent({
+                hook_event_name: "Notification",
+                notification_type: "idle_prompt"
+            })
         ).toBeNull();
-        expect(after({ hook_event_name: "Notification", notification_type: "idle_prompt" }, "idle")).toBe(
-            "idle"
-        );
+        expect(
+            after({ hook_event_name: "Notification", notification_type: "idle_prompt" }, "idle")
+        ).toBe("idle");
     });
 
     it("Stop ends the turn", () => {
@@ -59,7 +74,11 @@ describe("each hook's transition", () => {
     });
 
     it("StopFailure ends the turn with its reason and keeps the session alive", () => {
-        const payload = { hook_event_name: "StopFailure", error: "rate_limit", error_details: "429" };
+        const payload = {
+            hook_event_name: "StopFailure",
+            error: "rate_limit",
+            error_details: "429"
+        };
         expect(normalizeHookEvent(payload)).toEqual({
             kind: "turn.failed",
             detail: "rate_limit: 429",
@@ -96,7 +115,13 @@ describe("each hook's transition", () => {
 
     it("registers the hooks these transitions need, and not PreCompact", () => {
         const names = CLAUDE_HOOK_EVENTS.map((entry) => entry.event);
-        for (const name of ["PermissionRequest", "StopFailure", "PostCompact", "SessionStart", "Stop"])
+        for (const name of [
+            "PermissionRequest",
+            "StopFailure",
+            "PostCompact",
+            "SessionStart",
+            "Stop"
+        ])
             expect(names).toContain(name);
         expect(names).not.toContain("PreCompact");
         const settings = claudeHookSettings("/s/hook.sh") as { hooks: Record<string, unknown> };
@@ -109,7 +134,11 @@ describe("hooks that arrive out of order", () => {
 
     it("applies a newer event", () => {
         expect(
-            core.applySessionEvents({ state: "working", seq: at(10) }, [{ kind: "turn.end" }], at(11))
+            core.applySessionEvents(
+                { state: "working", seq: at(10) },
+                [{ kind: "turn.end" }],
+                at(11)
+            )
         ).toEqual({ state: "idle", seq: at(11), stale: false });
     });
 
@@ -121,13 +150,18 @@ describe("hooks that arrive out of order", () => {
             at(20)
         );
         expect(
-            core.applySessionEvents({ state: settled.state, seq: settled.seq }, [{ kind: "tool.start" }], at(15))
+            core.applySessionEvents(
+                { state: settled.state, seq: settled.seq },
+                [{ kind: "tool.start" }],
+                at(15)
+            )
         ).toEqual({ state: "idle", seq: at(20), stale: true });
     });
 
     it("applies equal sequences, which is what a seconds-only clock sends", () => {
         expect(
-            core.applySessionEvents({ state: "idle", seq: at(5) }, [{ kind: "prompt" }], at(5)).state
+            core.applySessionEvents({ state: "idle", seq: at(5) }, [{ kind: "prompt" }], at(5))
+                .state
         ).toBe("working");
     });
 
@@ -139,7 +173,8 @@ describe("hooks that arrive out of order", () => {
 
     it("never reopens a session that is over", () => {
         expect(
-            core.applySessionEvents({ state: "stopped", seq: null }, [{ kind: "prompt" }], at(9)).state
+            core.applySessionEvents({ state: "stopped", seq: null }, [{ kind: "prompt" }], at(9))
+                .state
         ).toBe("stopped");
     });
 

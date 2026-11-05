@@ -48,7 +48,9 @@ describe("what a session's token may reach", () => {
     });
 
     it("clones with read access only", () => {
-        expect(scoping.repositoryScope("a/b", scoping.CLONE_PERMISSIONS)?.scope.permissions).toEqual({
+        expect(
+            scoping.repositoryScope("a/b", scoping.CLONE_PERMISSIONS)?.scope.permissions
+        ).toEqual({
             contents: "read"
         });
     });
@@ -80,7 +82,10 @@ describe("the credential helper", () => {
         const script = join(dir, "helper.sh");
         writeFileSync(
             script,
-            gitCredentialScript("https://polaris.example.test/api/agents/sessions/s1/git-credential", "tok-1")
+            gitCredentialScript(
+                "https://polaris.example.test/api/agents/sessions/s1/git-credential",
+                "tok-1"
+            )
         );
         const result = spawnSync("sh", [script.replace(/\\/g, "/"), action], {
             input: "protocol=https\nhost=github.com\n\n",
@@ -107,7 +112,9 @@ describe("the boot script and GitHub", () => {
     it("drops the clone header from the checkout's config and installs the helper", () => {
         const setup = commands.SESSION_SETUP;
         expect(setup).toContain("git config --unset-all http.extraHeader || true");
-        expect(setup).toContain('git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""');
+        expect(setup).toContain(
+            'git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""'
+        );
         expect(setup.indexOf("--unset-all http.extraHeader")).toBeLessThan(
             setup.indexOf('git checkout -b "$POLARIS_BRANCH"')
         );
