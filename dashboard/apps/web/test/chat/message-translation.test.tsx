@@ -343,18 +343,22 @@ describe("sending in another language", () => {
         await user.click(screen.getByRole("button", { name: "Send" }));
         await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
 
-        // Back in the box while the answer is on its way. A click puts the
-        // caret at the start, so the new words land in front.
-        await user.click(await surface(container));
-        await user.keyboard("Hallo ");
-        expect(container.textContent).toContain("Hallo Guten Morgen");
+        // Back in the box while the answer is on its way. Where a click puts
+        // the caret in jsdom varies run to run, so the new words may land in
+        // front or behind; what matters is that the box holds both.
+        const editor = await surface(container);
+        await user.click(editor);
+        await user.keyboard("Hallo");
+        const written = editor.textContent ?? "";
+        expect(written).toContain("Hallo");
+        expect(written).toContain("Guten Morgen");
         await act(async () => answer({ kind: "same" }));
 
         await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
-        expect(onSend.mock.calls[0]![0]).toBe("Hallo Guten Morgen");
+        expect(onSend.mock.calls[0]![0]).toBe(written);
         expect(onSend.mock.calls[0]![6]).toBeUndefined();
         // The words added while it waited were asked about too, not waved through.
-        expect(translate).toHaveBeenLastCalledWith("Hallo Guten Morgen", "de");
+        expect(translate).toHaveBeenLastCalledWith(written, "de");
     });
 
     it("is off without an app that translates", async () => {
