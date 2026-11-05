@@ -40,13 +40,14 @@ import { DriverError, type DeviceSnapshot } from "./contract";
 /**
  * Their categories, as kinds.
  *
- * The ones whose whole behavior is on and off, and air conditioners (`kt`),
- * which have controls of their own. A thermostat and a curtain motor are real
+ * The ones whose whole behavior is on and off, and air conditioners (`kt`)
+ * and dehumidifiers (`cs`), which have controls of their own. A thermostat and a curtain motor are real
  * devices on the same account and are deliberately left out: listing one with an
  * "On" would be a button that does something other than what it says.
  */
 const CATEGORY_KINDS: Readonly<Record<string, DeviceSnapshot["kind"]>> = {
     kt: "climate",
+    cs: "dehumidifier",
     kg: "switch",
     tdq: "switch",
     tgkg: "switch",
@@ -150,6 +151,13 @@ export function tuyaSnapshots(
         if (!kind) continue;
         const byCode = new Map(device.status.map((point) => [point.code, point.value]));
         const reached = tuyaReachWord(reach.get(device.id));
+        if (kind === "dehumidifier") {
+            snapshots.push({
+                ...dehumidifierSnapshot(device, byCode, specs.get(device.id) ?? null),
+                reach: reached
+            });
+            continue;
+        }
         if (kind === "climate") {
             snapshots.push({
                 ...climateSnapshot(device, byCode, specs.get(device.id) ?? null),
@@ -423,10 +431,11 @@ export function tuyaDraws(device: Pick<TuyaDeviceShape, "category">): boolean {
     return CATEGORY_KINDS[device.category] !== undefined;
 }
 
-/** Whether a device is read as an air conditioner, and so needs its
- *  specification to be understood. */
+/** Whether a device is read as an air conditioner or a dehumidifier, and so
+ *  needs its specification to be understood. */
 export function needsSpec(device: Pick<TuyaDeviceShape, "category">): boolean {
-    return CATEGORY_KINDS[device.category] === "climate";
+    const kind = CATEGORY_KINDS[device.category];
+    return kind === "climate" || kind === "dehumidifier";
 }
 
 /** The temperature point a unit is set by: Celsius where it has it. */
@@ -525,6 +534,131 @@ export function tuyaClimateCommands(
     }
 }
 
+// --- dehumidifiers (category cs) --------------------------------------------------
+
+/*
+ * Tuya's standard instruction set for a dehumidifier (category `cs`): `switch`,
+ * `dehumidify_set_value` for the humidity to dry to, `mode` and
+ * `fan_speed_enum` as enums each product fills in, `humidity_indoor` for the
+ * reading, and `fault`, a bitmap whose `tankfull` bit is the full-tank warning
+ * (Home Assistant's Tuya integration reads the same bit for `cs`). A mode or
+ * speed is taken only where its word is already one of ours, since what the
+ * others mean differs product to product.
+ */
+
+const pointOf = (spec: TuyaSpec, code: string) =>
+    spec.functions.find((point) => point.code === code) ??
+    spec.status.find((point) => point.code === code);
+
+function ourWord<T extends string>(words: readonly T[], word: unknown): T | null {
+    return typeof word === "string" && (words as readonly string[]).includes(word)
+        ? (word as T)
+        : null;
+}
+
+const bitmapSchema = z.object({ label: z.array(z.string()).max(32) });
+
+/** Whether the bitmap `fault` has its `tankfull` bit set, or undefined where
+ *  the unit does not say which bit that is. */
+function tankFullOf(status: ReadonlyMap<string, unknown>, spec: TuyaSpec): boolean | undefined {
+    const labels = bitmapSchema.safeParse(valuesOf(pointOf(spec, "fault")));
+    const bit = labels.success ? labels.data.label.indexOf("tankfull") : -1;
+    const value = numberOf(status.get("fault"));
+    if (bit < 0 || value === null) return undefined;
+    return Math.floor(value / 2 ** bit) % 2 === 1;
+}
+
+/** One dehumidifier's data points and specification, as Places' `air` settings. */
+export function tuyaDehumidifier(
+    status: ReadonlyMap<string, unknown>,
+    spec: TuyaSpec | null
+): kinds.AirSettings | null {
+    if (!spec) return null;
+    const range = integerOf(pointOf(spec, "dehumidify_set_value"));
+    const factor = 10 ** (range?.scale ?? 0);
+    const reading = numberOf(status.get("humidity_indoor"));
+    const readingScale = integerOf(pointOf(spec, "humidity_indoor"))?.scale ?? 0;
+    const target = numberOf(status.get("dehumidify_set_value"));
+    const modes = enumOf(pointOf(spec, "mode")).flatMap((word) => {
+        const ours = ourWord(kinds.AIR_MODES, word);
+        return ours ? [ours] : [];
+    });
+    const speeds = enumOf(pointOf(spec, "fan_speed_enum")).flatMap((word) => {
+        const ours = ourWord(kinds.AIR_SPEEDS, word);
+        return ours ? [ours] : [];
+    });
+    return kinds.airSettings({
+        mode: ourWord(modes, status.get("mode")),
+        modes: [...new Set(modes)],
+        speed: ourWord(speeds, status.get("fan_speed_enum")),
+        speeds: [...new Set(speeds)],
+        humidity:
+            range && range.min < range.max
+                ? {
+                      target: target === null ? null : target / factor,
+                      min: range.min / factor,
+                      max: range.max / factor,
+                      step: range.step / factor
+                  }
+                : null,
+        options: {},
+        readings: reading === null ? {} : { humidity: reading / 10 ** readingScale },
+        filters: [],
+        tankFull: tankFullOf(status, spec)
+    });
+}
+
+function dehumidifierSnapshot(
+    device: TuyaDeviceShape,
+    byCode: ReadonlyMap<string, unknown>,
+    spec: TuyaSpec | null
+): DeviceSnapshot {
+    return {
+        externalId: device.id,
+        kind: "dehumidifier",
+        name: device.name.trim() || "Tuya device",
+        model: (device.product_name ?? "").trim() || (device.model ?? "").trim() || null,
+        firmware: null,
+        state: device.online ? (byCode.get("switch") === true ? "on" : "off") : "unknown",
+        doorState: "none",
+        batteryPercent: null,
+        batteryCritical: false,
+        online: device.online,
+        air: tuyaDehumidifier(byCode, spec)
+    };
+}
+
+/** What to send for one setting on one dehumidifier, in its own codes and scale. */
+export function tuyaDehumidifierCommands(
+    action: DeviceAction,
+    command: kinds.AirCommand | undefined,
+    spec: TuyaSpec | null
+): { code: string; value: unknown }[] {
+    if (action === "turn-on" || action === "turn-off")
+        return [{ code: "switch", value: action === "turn-on" }];
+    if (!command || command.action !== action) throw new HomeError("Say what to set it to");
+    if (!spec) throw new HomeError("That device has not said what it can be set to yet");
+    switch (command.action) {
+        case "set-mode":
+            if (!enumOf(pointOf(spec, "mode")).includes(command.mode))
+                throw new HomeError("That mode is not one this device has");
+            return [{ code: "mode", value: command.mode }];
+        case "set-fan":
+            if (!enumOf(pointOf(spec, "fan_speed_enum")).includes(command.speed))
+                throw new HomeError("That fan speed is not one this device has");
+            return [{ code: "fan_speed_enum", value: command.speed }];
+        case "set-humidity": {
+            const range = integerOf(pointOf(spec, "dehumidify_set_value"));
+            const value = range ? Math.round(command.target * 10 ** range.scale) : null;
+            if (!range || value === null || value < range.min || value > range.max)
+                throw new HomeError("That humidity is not one this device accepts");
+            return [{ code: "dehumidify_set_value", value }];
+        }
+        default:
+            throw new HomeError("That setting is not one this device has");
+    }
+}
+
 /** The specifications of the air conditioners among these devices. One that
  *  cannot be read leaves that unit drawn without its settings rather than the
  *  whole account unread. */
@@ -561,6 +695,13 @@ export async function tuyaActionFor(
         const spec =
             reported.size > 0 ? null : await tuyaSpecFor(deviceId, fetch).catch(() => null);
         return { deviceId, commands: tuyaSwitchCommands(code, parsed.data, reported, spec) };
+    }
+    if (device.kind === "dehumidifier") {
+        const spec = await tuyaSpecFor(device.externalId, fetch);
+        return {
+            deviceId: device.externalId,
+            commands: tuyaDehumidifierCommands(action, kinds.airCommandOf(command), spec)
+        };
     }
     if (device.kind !== "climate") return tuyaCommandFor(device.externalId, action);
     const spec = await tuyaSpecFor(device.externalId, fetch);

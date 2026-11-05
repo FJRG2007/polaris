@@ -548,6 +548,28 @@
         "nukiRate": "Nuki is answering too many requests at once. Try again in a minute.",
         "nukiOdd": "Nuki answered with something unexpected.",
         "tuyaUnreachable": "Tuya could not be reached. Try again in a moment.",
+        "mideaMissing": "That connection is missing its email or password",
+        "mideaNoKey": "MSmartHome gave no key for this dehumidifier. Sync again in a minute.",
+        "mideaNoMode": "This dehumidifier has no such mode.",
+        "mideaNoSpeed": "This dehumidifier has no such fan speed.",
+        "mideaCannot": "A dehumidifier cannot do that.",
+        "mideaNone": "That MSmartHome account has no dehumidifier. Add it in the MSmartHome app first, then connect again.",
+        "mideaGone": "That dehumidifier is no longer on the MSmartHome account.",
+        "mideaCloudPassword": "MSmartHome refused that email or password.",
+        "mideaCloudEnded": "MSmartHome ended the sign-in. Sign in again.",
+        "mideaCloudLocked": "MSmartHome locked the account for about five minutes after too many tries. Try again then.",
+        "mideaCloudCrowded": "Too many phones and apps are signed in to that MSmartHome account. Sign out of one and try again.",
+        "mideaCloudOtherAccount": "That appliance belongs to another MSmartHome account.",
+        "mideaCloudUnreachable": "MSmartHome could not be reached. Try again in a moment.",
+        "mideaCloudUnknownEmail": "MSmartHome does not know that email.",
+        "mideaCloudUnfinished": "MSmartHome did not finish the sign-in. Try again in a moment.",
+        "mideaCloudCode": "MSmartHome answered with error {code}{said}.",
+        "mideaTooManyAddresses": "Type at most {count} addresses",
+        "mideaUnreachableAt": "The dehumidifier did not answer at {address}. Check it is switched on and on the same network as Polaris.",
+        "mideaOffline": "{name} shows as offline in the MSmartHome app. Check it is plugged in and on Wi-Fi.",
+        "mideaNotFound": "{name} did not answer the scan on this network. Type its IP address in the connection: your router's list of devices shows it.",
+        "mideaKeyRefused": "The dehumidifier at {address} refused the key MSmartHome gave for it. Remove it from the MSmartHome app, add it again, and sync.",
+        "mideaHumidityRange": "A dehumidifier takes {min} to {max}% humidity.",
         "tuyaOdd": "Tuya answered with something unexpected.",
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
@@ -1226,6 +1248,30 @@
                     "hint": "PETKIT allows one sign-in per account: signing in here signs the PETKIT app out on the same account. On, Polaris signs back in whenever the app takes it. Turn it off while you need the app."
                 }
             }
+        },
+        "midea-lan": {
+            "label": "Midea / Comfee",
+            "summary": "Midea and Comfee dehumidifiers on your MSmartHome account, controlled on this network.",
+            "note": "Your MSmartHome account lists the dehumidifiers and their keys. Readings and changes go straight to each unit, so it has to be on the same network as Polaris.",
+            "steps": {
+                "s0": "Add the dehumidifier in the MSmartHome app and check it shows as online.",
+                "s1": "Sign in here with the same email and password.",
+                "s2": "If a dehumidifier is not found, type its IP address. Your router's device list shows it."
+            },
+            "fields": {
+                "email": {
+                    "label": "Email",
+                    "placeholder": "The MSmartHome account's email"
+                },
+                "password": {
+                    "label": "Password"
+                },
+                "hosts": {
+                    "label": "Addresses",
+                    "hint": "Only for a dehumidifier the network scan misses. Separate several with commas.",
+                    "placeholder": "192.168.1.40, 192.168.1.41"
+                }
+            }
         }
     },
     "actions": {
@@ -1485,6 +1531,7 @@
             "sensor": "Sensor",
             "climate": "Air conditioner",
             "air": "Air purifier",
+            "dehumidifier": "Dehumidifier",
             "appliance": "Kitchen appliance",
             "litter": "Litter box"
         },
@@ -1497,6 +1544,7 @@
             "sensor": "Sensors",
             "climate": "Climate",
             "air": "Air",
+            "dehumidifier": "Air",
             "appliance": "Kitchen",
             "litter": "Cats"
         },
@@ -1657,9 +1705,15 @@
                 "natural": "Natural",
                 "ventilation": "Ventilation",
                 "eco": "Eco",
-                "pet_hair": "Pet hair boost"
+                "pet_hair": "Pet hair boost",
+                "manual": "Target",
+                "continuous": "Continuous",
+                "clothes_dry": "Dry laundry",
+                "shoes_dry": "Dry shoes",
+                "silent": "Silent"
             },
             "speeds": {
+                "lowest": "Lowest",
                 "sleep": "Sleep",
                 "night": "Night",
                 "gentle": "Gentle",
@@ -1678,7 +1732,8 @@
                 "speed_10": "Speed 10",
                 "speed_11": "Speed 11",
                 "speed_12": "Speed 12",
-                "turbo": "Turbo"
+                "turbo": "Turbo",
+                "auto": "Auto"
             },
             "options": {
                 "childLock": "Child lock",
@@ -1829,6 +1884,8 @@
         "disconnect": "Disconnect",
         "filterSoon": "Change filter soon",
         "filterNow": "Change filter",
+        "tankFull": "Tank full",
+        "tankFullHint": "Empty the water tank to start it again",
         "connectLocally": "Connect {name} locally",
         "accountSettings": "Settings for {name}",
         "batteryLowTitle": "Battery at or under {percent}%"
@@ -2549,6 +2606,7 @@
                 "opener": "{count, plural, one {# door opener} other {# door openers}}",
                 "climate": "{count, plural, one {# air conditioner} other {# air conditioners}}",
                 "air": "{count, plural, one {# air purifier} other {# air purifiers}}",
+                "dehumidifier": "{count, plural, one {# dehumidifier} other {# dehumidifiers}}",
                 "switch": "{count, plural, one {# switch} other {# switches}}",
                 "outlet": "{count, plural, one {# socket} other {# sockets}}",
                 "light": "{count, plural, one {# light} other {# lights}}",

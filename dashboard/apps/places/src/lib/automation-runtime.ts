@@ -27,6 +27,7 @@ import {
     airSettings,
     climateSettings,
     filterLife,
+    isAirKind,
     wornFilter
 } from "./device-kinds";
 import { prismaAutomationStore } from "./automation-store";
@@ -84,9 +85,10 @@ function figuresOf(air: ReturnType<typeof airSettings>): Record<string, string> 
 }
 
 function readout(row: ObservedRow): DeviceReadout {
-    const air = row.kind === "air" ? airSettings(row.air) : null;
-    const mode =
-        row.kind === "air" ? (air?.mode ?? "") : (climateSettings(row.climate)?.mode ?? "");
+    const air = isAirKind(row.kind) ? airSettings(row.air) : null;
+    const mode = isAirKind(row.kind)
+        ? (air?.mode ?? "")
+        : (climateSettings(row.climate)?.mode ?? "");
     const filter = wornFilter(air)?.state;
     const figures = figuresOf(air);
     // The reading decides a smoke or leak sensor's line, so it goes in too.

@@ -120,6 +120,7 @@ const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     opener: DoorOpen,
     climate: AirVent,
     air: Wind,
+    dehumidifier: Droplets,
     switch: ToggleRight,
     outlet: Plug,
     light: Lightbulb,
@@ -218,7 +219,7 @@ export function DeviceControls({
             />
         );
     }
-    if (kinds.deviceKind(device.kind) === "air") {
+    if (kinds.isAirKind(device.kind)) {
         return (
             <AirControls
                 device={device}

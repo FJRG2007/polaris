@@ -548,6 +548,28 @@
         "nukiRate": "Nuki está atendiendo demasiadas peticiones a la vez. Inténtalo de nuevo en un minuto.",
         "nukiOdd": "Nuki respondió algo inesperado.",
         "tuyaUnreachable": "No se pudo contactar con Tuya. Inténtalo de nuevo en un momento.",
+        "mideaMissing": "A esa conexión le falta el correo o la contraseña",
+        "mideaNoKey": "MSmartHome no dio clave para este deshumectador. Sincroniza en un minuto.",
+        "mideaNoMode": "Este deshumectador no tiene ese modo.",
+        "mideaNoSpeed": "Este deshumectador no tiene esa velocidad.",
+        "mideaCannot": "Un deshumectador no puede hacer eso.",
+        "mideaNone": "Esa cuenta de MSmartHome no tiene deshumectador. Añádelo en su app y vuelve a conectar.",
+        "mideaGone": "Ese deshumectador ya no está en la cuenta de MSmartHome.",
+        "mideaCloudPassword": "MSmartHome rechazó ese email o esa contraseña.",
+        "mideaCloudEnded": "MSmartHome cerró la sesión. Vuelve a iniciar sesión.",
+        "mideaCloudLocked": "MSmartHome bloqueó la cuenta unos cinco minutos tras demasiados intentos. Vuelve a probar pasado ese tiempo.",
+        "mideaCloudCrowded": "Hay demasiados móviles y apps con sesión iniciada en esa cuenta de MSmartHome. Cierra la sesión en uno y vuelve a probar.",
+        "mideaCloudOtherAccount": "Ese aparato pertenece a otra cuenta de MSmartHome.",
+        "mideaCloudUnreachable": "No se pudo contactar con MSmartHome. Vuelve a probar en un momento.",
+        "mideaCloudUnknownEmail": "MSmartHome no conoce ese email.",
+        "mideaCloudUnfinished": "MSmartHome no terminó el inicio de sesión. Vuelve a probar en un momento.",
+        "mideaCloudCode": "MSmartHome respondió con el error {code}{said}.",
+        "mideaTooManyAddresses": "Escribe {count} direcciones como mucho",
+        "mideaUnreachableAt": "El deshumectador no respondió en {address}. Comprueba que está encendido y en la misma red que Polaris.",
+        "mideaOffline": "{name} aparece sin conexión en la app MSmartHome. Comprueba que está enchufado y conectado a la wifi.",
+        "mideaNotFound": "{name} no respondió a la búsqueda en esta red. Escribe su IP en la conexión: aparece en la lista de dispositivos de tu router.",
+        "mideaKeyRefused": "El deshumectador de {address} rechazó la clave que dio MSmartHome. Quítalo de la app MSmartHome, vuelve a añadirlo y sincroniza.",
+        "mideaHumidityRange": "Un deshumectador admite del {min} al {max} % de humedad.",
         "tuyaOdd": "Tuya respondió algo inesperado.",
         "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
         "tuyaRefused": "Tuya rechazó la petición.",
@@ -1226,6 +1248,30 @@
                     "hint": "PETKIT permite una sola sesión por cuenta: entrar aquí cierra la app de PETKIT en esa cuenta. Activo, Polaris vuelve a entrar cuando la app se la quita. Desactívalo mientras uses la app."
                 }
             }
+        },
+        "midea-lan": {
+            "label": "Midea / Comfee",
+            "summary": "Deshumectadores Midea y Comfee de tu cuenta de MSmartHome, controlados en esta red.",
+            "note": "Tu cuenta de MSmartHome indica los deshumectadores y sus claves. Las lecturas y los cambios van directos a cada equipo, así que tiene que estar en la misma red que Polaris.",
+            "steps": {
+                "s0": "Añade el deshumectador en la app MSmartHome y comprueba que aparece conectado.",
+                "s1": "Inicia sesión aquí con el mismo correo y la misma contraseña.",
+                "s2": "Si no se encuentra un deshumectador, escribe su IP. La lista de dispositivos del router la muestra."
+            },
+            "fields": {
+                "email": {
+                    "label": "Correo",
+                    "placeholder": "El correo de la cuenta de MSmartHome"
+                },
+                "password": {
+                    "label": "Contraseña"
+                },
+                "hosts": {
+                    "label": "Direcciones",
+                    "hint": "Solo para un deshumectador que la búsqueda en la red no encuentre. Separa varias con comas.",
+                    "placeholder": "192.168.1.40, 192.168.1.41"
+                }
+            }
         }
     },
     "actions": {
@@ -1485,6 +1531,7 @@
             "sensor": "Sensor",
             "climate": "Aire acondicionado",
             "air": "Purificador",
+            "dehumidifier": "Deshumectador",
             "appliance": "Electrodoméstico",
             "litter": "Arenero"
         },
@@ -1497,6 +1544,7 @@
             "sensor": "Sensores",
             "climate": "Clima",
             "air": "Aire",
+            "dehumidifier": "Aire",
             "appliance": "Cocina",
             "litter": "Gatos"
         },
@@ -1657,9 +1705,15 @@
                 "natural": "Natural",
                 "ventilation": "Ventilación",
                 "eco": "Eco",
-                "pet_hair": "Pelo de mascota"
+                "pet_hair": "Pelo de mascota",
+                "manual": "Objetivo",
+                "continuous": "Continuo",
+                "clothes_dry": "Secar ropa",
+                "shoes_dry": "Calzado",
+                "silent": "Silencio"
             },
             "speeds": {
+                "lowest": "Mínima",
                 "sleep": "Sueño",
                 "night": "Noche",
                 "gentle": "Suave",
@@ -1678,7 +1732,8 @@
                 "speed_10": "Nivel 10",
                 "speed_11": "Nivel 11",
                 "speed_12": "Nivel 12",
-                "turbo": "Turbo"
+                "turbo": "Turbo",
+                "auto": "Auto"
             },
             "options": {
                 "childLock": "Bloqueo niños",
@@ -1829,6 +1884,8 @@
         "disconnect": "Desconectar",
         "filterSoon": "Filtro: cambiar pronto",
         "filterNow": "Cambiar filtro",
+        "tankFull": "Tanque lleno",
+        "tankFullHint": "Vacía el depósito de agua para que vuelva a funcionar",
         "connectLocally": "Conectar {name} en local",
         "accountSettings": "Ajustes de {name}",
         "batteryLowTitle": "Batería al {percent}% o menos"
@@ -2549,6 +2606,7 @@
                 "opener": "{count, plural, one {# abrepuertas} other {# abrepuertas}}",
                 "climate": "{count, plural, one {# aire acondicionado} other {# aires acondicionados}}",
                 "air": "{count, plural, one {# purificador} other {# purificadores}}",
+                "dehumidifier": "{count, plural, one {# deshumectador} other {# deshumectadores}}",
                 "switch": "{count, plural, one {# interruptor} other {# interruptores}}",
                 "outlet": "{count, plural, one {# enchufe} other {# enchufes}}",
                 "light": "{count, plural, one {# luz} other {# luces}}",

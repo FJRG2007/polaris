@@ -179,7 +179,13 @@ const SERVICE_IMAGES: Record<string, string> = {
     // (Wikimedia Commons, "Philips shield (2013).svg", public domain), editor
     // metadata stripped. Not in any icon registry; the wordmark is unreadable
     // at icon size. Their blue, with the stars and waves in white.
-    philips: "/logos/philips.svg"
+    philips: "/logos/philips.svg",
+    // Midea's wordmark as Midea Group publish it (Wikimedia Commons,
+    // "Midea.svg", public domain, sourced from global.midea.com), reduced to
+    // the two wordmark paths that file draws - its unused symbols and editor
+    // metadata stripped. Not in any icon registry. Their single sky blue reads on
+    // both surfaces. Also the mark of the Comfee units Midea makes.
+    midea: "/logos/midea.svg"
 };
 
 /**

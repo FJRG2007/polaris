@@ -424,7 +424,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         // Polaris' own bound: long enough to find the phone, short enough that
         // a code left on a screen is not waited on for ever.
         pairing: { kind: "qr", pollMs: 3_000, lifetimeMs: 120_000 },
-        kinds: ["switch", "outlet", "light", "climate"],
+        kinds: ["switch", "outlet", "light", "climate", "dehumidifier"],
         search: [
             "smart life",
             "tuya smart",
@@ -482,7 +482,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 }))
             }
         ],
-        kinds: ["switch", "outlet", "light", "climate"],
+        kinds: ["switch", "outlet", "light", "climate", "dehumidifier"],
         search: [
             "smart life",
             "switch",
@@ -1075,6 +1075,60 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "litter box",
             "cat litter",
             "self-cleaning"
+        ]
+    },
+    // Midea dehumidifiers, and the brands Midea makes them under (Comfee):
+    // the MSmartHome account says which units there are and the
+    // key each one takes; every reading and change then goes to the unit on
+    // this network, as Home Assistant's midea_ac_lan does it.
+    {
+        id: "midea-lan",
+        brand: "Midea",
+        recommended: true,
+        logo: "midea",
+        label: en("connections.midea-lan.label"),
+        reach: "same-network",
+        summary: en("connections.midea-lan.summary"),
+        note: en("connections.midea-lan.note"),
+        steps: [
+            en("connections.midea-lan.steps.s0"),
+            en("connections.midea-lan.steps.s1"),
+            en("connections.midea-lan.steps.s2")
+        ],
+        fields: [
+            {
+                key: "email",
+                label: en("connections.midea-lan.fields.email.label"),
+                placeholder: en("connections.midea-lan.fields.email.placeholder"),
+                format: "email",
+                maxLength: 254
+            },
+            {
+                key: "password",
+                label: en("connections.midea-lan.fields.password.label"),
+                secret: true,
+                minLength: 1,
+                maxLength: 200
+            },
+            {
+                key: "hosts",
+                label: en("connections.midea-lan.fields.hosts.label"),
+                hint: en("connections.midea-lan.fields.hosts.hint"),
+                placeholder: en("connections.midea-lan.fields.hosts.placeholder"),
+                optional: true,
+                maxLength: 400
+            }
+        ],
+        kinds: ["dehumidifier"],
+        search: [
+            "midea",
+            "comfee",
+            "msmarthome",
+            "msmart",
+            "dehumidifier",
+            "deshumidificador",
+            "deshumectador",
+            "local"
         ]
     },
     // SwitchBot: their cloud API is the one documented way in, and the most

@@ -43,6 +43,7 @@ import {
     deviceKind,
     actionsFor,
     deviceCommandSchema,
+    isAirKind,
     needsCommand,
     type DeviceAction,
     type DeviceView
@@ -417,7 +418,7 @@ const controlTool = () =>
             let setting: z.infer<typeof deviceCommandSchema> | undefined;
             if (needsCommand(input.action)) {
                 const target = await attempt(() => devices.getDevice(install.id, input.deviceId));
-                const fan = target.kind === "air" ? { speed: input.fan } : { fan: input.fan };
+                const fan = isAirKind(target.kind) ? { speed: input.fan } : { fan: input.fan };
                 const parsed = deviceCommandSchema.safeParse({
                     action: input.action,
                     ...(input.action === "set-mode" ? { mode: input.mode } : {}),

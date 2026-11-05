@@ -34,6 +34,7 @@ import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
 import { PHILIPS_DYNALITE, philipsDynaliteDriver } from "./drivers/philips-dynalite";
 import { SHELLY_LOCAL, shellyLocalDriver } from "./drivers/shelly-local";
 import { GREE_LOCAL, greeLocalDriver } from "./drivers/gree-local";
+import { MIDEA_LAN, mideaLanDriver } from "./drivers/midea-lan";
 import { PHILIPS_COAP, philipsCoapDriver } from "./drivers/philips-coap";
 import { PHILIPS_CLOUD, philipsCloudDriver } from "./drivers/philips-cloud";
 import { KASA_LOCAL, TAPO_LOCAL, kasaLocalDriver, tapoLocalDriver } from "./drivers/tplink-local";
@@ -68,6 +69,7 @@ const BUILT: Readonly<Record<string, DeviceDriver>> = {
     [HOME_ASSISTANT]: homeAssistantDriver,
     [SWITCHBOT_CLOUD]: switchBotCloudDriver,
     [GREE_LOCAL]: greeLocalDriver,
+    [MIDEA_LAN]: mideaLanDriver,
     [PHILIPS_COAP]: philipsCoapDriver,
     [PHILIPS_CLOUD]: philipsCloudDriver,
     [PHILIPS_DYNALITE]: philipsDynaliteDriver

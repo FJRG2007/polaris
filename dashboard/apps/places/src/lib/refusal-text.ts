@@ -225,6 +225,36 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Nuki answered with something unexpected.", "refusals.nukiOdd"],
     ["Tuya could not be reached. Try again in a moment.", "refusals.tuyaUnreachable"],
     ["Tuya answered with something unexpected.", "refusals.tuyaOdd"],
+    ["That connection is missing its email or password", "refusals.mideaMissing"],
+    [
+        "MSmartHome gave no key for this dehumidifier. Sync again in a minute.",
+        "refusals.mideaNoKey"
+    ],
+    ["This dehumidifier has no such mode.", "refusals.mideaNoMode"],
+    ["This dehumidifier has no such fan speed.", "refusals.mideaNoSpeed"],
+    ["A dehumidifier cannot do that.", "refusals.mideaCannot"],
+    [
+        "That MSmartHome account has no dehumidifier. Add it in the MSmartHome app first, then connect again.",
+        "refusals.mideaNone"
+    ],
+    ["That dehumidifier is no longer on the MSmartHome account.", "refusals.mideaGone"],
+    ["MSmartHome refused that email or password.", "refusals.mideaCloudPassword"],
+    ["MSmartHome ended the sign-in. Sign in again.", "refusals.mideaCloudEnded"],
+    [
+        "MSmartHome locked the account for about five minutes after too many tries. Try again then.",
+        "refusals.mideaCloudLocked"
+    ],
+    [
+        "Too many phones and apps are signed in to that MSmartHome account. Sign out of one and try again.",
+        "refusals.mideaCloudCrowded"
+    ],
+    ["That appliance belongs to another MSmartHome account.", "refusals.mideaCloudOtherAccount"],
+    ["MSmartHome could not be reached. Try again in a moment.", "refusals.mideaCloudUnreachable"],
+    ["MSmartHome does not know that email.", "refusals.mideaCloudUnknownEmail"],
+    [
+        "MSmartHome did not finish the sign-in. Try again in a moment.",
+        "refusals.mideaCloudUnfinished"
+    ],
     [
         "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "refusals.tuyaKeys"
@@ -574,6 +604,45 @@ const SHAPED: readonly {
         pattern: /^Tuya refused the User Code: (.+)\.$/s,
         key: "refusals.tuyaUserCodeBecause",
         params: ["detail"]
+    },
+    {
+        pattern: /^Type at most (\d+) addresses$/,
+        key: "refusals.mideaTooManyAddresses",
+        params: ["count"]
+    },
+    {
+        pattern:
+            /^The dehumidifier did not answer at (.+)\. Check it is switched on and on the same network as Polaris\.$/s,
+        key: "refusals.mideaUnreachableAt",
+        params: ["address"]
+    },
+    {
+        pattern:
+            /^(.+) shows as offline in the MSmartHome app\. Check it is plugged in and on Wi-Fi\.$/s,
+        key: "refusals.mideaOffline",
+        params: ["name"]
+    },
+    {
+        pattern:
+            /^(.+) did not answer the scan on this network\. Type its IP address in the connection: your router's list of devices shows it\.$/s,
+        key: "refusals.mideaNotFound",
+        params: ["name"]
+    },
+    {
+        pattern:
+            /^The dehumidifier at (.+) refused the key MSmartHome gave for it\. Remove it from the MSmartHome app, add it again, and sync\.$/s,
+        key: "refusals.mideaKeyRefused",
+        params: ["address"]
+    },
+    {
+        pattern: /^A dehumidifier takes (\d+) to (\d+)% humidity\.$/,
+        key: "refusals.mideaHumidityRange",
+        params: ["min", "max"]
+    },
+    {
+        pattern: /^MSmartHome answered with error (-?\d+|NaN)( \(.+\))?\.$/s,
+        key: "refusals.mideaCloudCode",
+        params: ["code", "said"]
     },
     {
         pattern: /^(.+) could not be reached$/s,
