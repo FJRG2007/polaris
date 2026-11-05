@@ -127,7 +127,7 @@
         "deployedHint": "Rellena la dirección de una de tus apps.",
         "deployedPlaceholder": "Elige una app",
         "deployedSearch": "Buscar apps o direcciones",
-        "deployedEmpty": "Ninguna app coincide",
+        "deployedEmpty": "Sin coincidencias",
         "url": "URL",
         "urlHint": "No se siguen las redirecciones.",
         "host": "Host",

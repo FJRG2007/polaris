@@ -2,7 +2,7 @@
     "hosts": {
         "find": "Buscar un host",
         "search": "Buscar hosts",
-        "noMatch": "Ningún host coincide",
+        "noMatch": "Sin coincidencias",
         "noAnswer": "No responde",
         "title": "Hosts de Docker",
         "none": "Aún no hay hosts.",

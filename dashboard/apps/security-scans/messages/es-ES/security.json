@@ -7,7 +7,7 @@
     "tryAgain": "Reintentar",
     "thisServer": "Este servidor",
     "serverSearch": "Buscar servidores",
-    "serverEmpty": "Ningún servidor coincide",
+    "serverEmpty": "Sin coincidencias",
     "tabs": {
         "malware": "Malware",
         "files": "Archivos",

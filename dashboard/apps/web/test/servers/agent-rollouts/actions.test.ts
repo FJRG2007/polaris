@@ -23,6 +23,7 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/audit-service", () => ({
     recordAudit: async (entry: { action: string }) => void called.push(`audit ${entry.action}`)
 }));
+vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/docker-service", () => ({

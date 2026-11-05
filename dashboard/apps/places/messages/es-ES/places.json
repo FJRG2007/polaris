@@ -1231,7 +1231,7 @@
     "machinePicker": {
         "placeholder": "Elige una máquina",
         "search": "Buscar máquinas",
-        "empty": "Ninguna máquina coincide"
+        "empty": "Sin coincidencias"
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
