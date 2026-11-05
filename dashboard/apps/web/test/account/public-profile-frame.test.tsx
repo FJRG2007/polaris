@@ -59,6 +59,8 @@ vi.mock("@/app/u/[username]/profile-card", () => ({
 vi.mock("@/lib/badges/badge-service", () => ({
     badgesFor: async () => ({ shown: [], available: [], arrangement: null })
 }));
+// So is the name tag; its rules are asserted in test/name-tags.
+vi.mock("@/lib/name-tags/name-tag-service", () => ({ nameTagsFor: async () => new Map() }));
 vi.mock("@/app/o/[slug]/org-profile-card", () => ({ OrgProfileCard: () => <p>org card</p> }));
 // The catalogs a page hands its cards come from the request; there is none here.
 vi.mock("@/components/i18n/messages", () => ({
