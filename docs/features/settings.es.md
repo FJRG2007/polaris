@@ -59,9 +59,9 @@ Cómo demuestras que eres tú y cuánto dura una sesión: contraseña, app de
 autenticación, códigos por correo o WhatsApp, passkeys, códigos de respaldo, un
 PIN de desbloqueo rápido, dispositivos de confianza, inicio de sesión con una
 cuenta conectada, bloqueo por inactividad y límites de sesión, y un sucesor
-para tus organizaciones. La cuenta también tiene su perfil, privacidad,
-notificaciones, sesiones, claves de API y los asistentes de IA que pueden
-actuar por ti.
+para tus organizaciones. La cuenta también tiene su perfil, las insignias
+ganadas por la actividad en las aplicaciones, privacidad, notificaciones,
+sesiones, claves de API y los asistentes de IA que pueden actuar por ti.
 
 ## Todo lo demás también se configura
 

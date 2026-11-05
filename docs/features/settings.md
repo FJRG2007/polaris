@@ -58,8 +58,8 @@ How you prove it is you, and how long a session stays open: password,
 authenticator app, codes by email or WhatsApp, passkeys, backup codes, a quick
 unlock PIN, trusted devices, sign-in with a connected account, idle lock and
 session limits, and a successor for your organizations. The account also has
-its profile, privacy, notifications, sessions, API keys and the AI assistants
-that may act as you.
+its profile, badges earned from activity across the apps, privacy,
+notifications, sessions, API keys and the AI assistants that may act as you.
 
 ## Everything else is configurable too
 
