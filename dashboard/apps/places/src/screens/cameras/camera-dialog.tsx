@@ -84,7 +84,6 @@ import { hostUi } from "@polaris/app-host/client";
 
 const { runAction } = hostUi.runAction;
 
-
 /** What the form holds. Strings for anything typed, so a half-typed port is a
  *  half-typed port rather than NaN. */
 interface FormState {

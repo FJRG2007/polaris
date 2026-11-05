@@ -694,7 +694,10 @@ function machineFigures(
 ): Pick<GameMachine, "memoryTotalBytes" | "memoryFreeBytes"> {
     const total = metrics?.memoryTotalBytes ?? null;
     const used = metrics?.memoryUsedBytes ?? null;
-    return { memoryTotalBytes: total, memoryFreeBytes: total !== null && used !== null ? total - used : null };
+    return {
+        memoryTotalBytes: total,
+        memoryFreeBytes: total !== null && used !== null ? total - used : null
+    };
 }
 
 /** The largest page of machines the create dialog is handed. */

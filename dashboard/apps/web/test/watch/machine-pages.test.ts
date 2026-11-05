@@ -45,9 +45,8 @@ vi.mock("@/lib/container-stats-cache", () => ({
 }));
 vi.mock("@/lib/access/grants", () => ({ grantedSubjects: async () => new Map() }));
 
-const { machineDomainPage, machineServerPage, SERVER_PAGE, DOMAIN_PAGE } = await import(
-    "@/lib/machines/machines-service"
-);
+const { machineDomainPage, machineServerPage, SERVER_PAGE, DOMAIN_PAGE } =
+    await import("@/lib/machines/machines-service");
 const { getWatchServerPage } = await import("@/lib/watch-overview-service");
 
 /** Host ids are uuids, as the cursor requires. */

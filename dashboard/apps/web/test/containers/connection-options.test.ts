@@ -82,7 +82,10 @@ describe("connectionOptionsPage", () => {
         expect(after.where.AND).toEqual([
             { OR: [{ name: { gt: "h20" } }, { name: "h20", id: { gt: uid(20) } }] }
         ]);
-        expect(second).toEqual({ items: [expect.objectContaining({ hostId: uid(21) })], next: null });
+        expect(second).toEqual({
+            items: [expect.objectContaining({ hostId: uid(21) })],
+            next: null
+        });
     });
 
     it("stops inside the stored connections when they fill the page", async () => {

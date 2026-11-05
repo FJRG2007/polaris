@@ -12,9 +12,8 @@ vi.mock("@polaris/db", () => ({
     prisma: { agentRepo: { findMany: (args: Record<string, unknown>) => findMany(args) } }
 }));
 
-const { repoOptionsInput, repoOptionsPage, firstRepoPage } = await import(
-    "@/lib/agents/repo-options"
-);
+const { repoOptionsInput, repoOptionsPage, firstRepoPage } =
+    await import("@/lib/agents/repo-options");
 
 const OWNER = "0190a000-0000-7000-8000-000000000001";
 const row = (id: string, repoFullName: string) => ({ id, repoFullName });
@@ -24,8 +23,15 @@ beforeEach(() => findMany.mockReset());
 describe("repoOptionsPage", () => {
     it("reads the owner's enabled repositories one page at a time, by name", async () => {
         findMany.mockResolvedValueOnce([row("a", "acme/api"), row("b", "acme/web")]);
-        const page = await repoOptionsPage(OWNER, repoOptionsInput.parse({ limit: 1, query: " acme " }));
-        const args = findMany.mock.calls[0]![0] as { where: unknown; take: number; orderBy: unknown };
+        const page = await repoOptionsPage(
+            OWNER,
+            repoOptionsInput.parse({ limit: 1, query: " acme " })
+        );
+        const args = findMany.mock.calls[0]![0] as {
+            where: unknown;
+            take: number;
+            orderBy: unknown;
+        };
         expect(args.take).toBe(2);
         expect(args.orderBy).toEqual({ repoFullName: "asc" });
         expect(args.where).toEqual({

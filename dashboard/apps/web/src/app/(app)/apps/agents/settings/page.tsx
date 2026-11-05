@@ -3,7 +3,11 @@ import { PageHeader } from "@polaris/ui";
 import { SettingsView } from "./settings-view";
 import { requirePermission } from "@/lib/session";
 import { providersFor } from "@/lib/agents/model-keys";
-import { getPlatformAgentDefaults, listAgentDefaults, repoScopes } from "@/lib/agents/agent-defaults-service";
+import {
+    getPlatformAgentDefaults,
+    listAgentDefaults,
+    repoScopes
+} from "@/lib/agents/agent-defaults-service";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +33,7 @@ export default async function AgentSettingsPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("pages.settingsTitle")}
-                description={t("pages.settings")}
-            />
+            <PageHeader title={t("pages.settingsTitle")} description={t("pages.settings")} />
             <SettingsView
                 tiers={tiers}
                 owners={owners}

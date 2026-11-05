@@ -37,7 +37,10 @@ function usePages<T extends { id: string }>(kind: Kind, initial: T[], first: str
             // is shown once, where it was first seen.
             setItems((shown) => {
                 const seen = new Set(shown.map((item) => item.id));
-                return [...shown, ...(page.items as unknown as T[]).filter((item) => !seen.has(item.id))];
+                return [
+                    ...shown,
+                    ...(page.items as unknown as T[]).filter((item) => !seen.has(item.id))
+                ];
             });
             setNext(page.next);
         });

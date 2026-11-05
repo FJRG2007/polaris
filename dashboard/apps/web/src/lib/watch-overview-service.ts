@@ -195,7 +195,13 @@ export async function getWatchServers(ownerId: string): Promise<WatchCard[]> {
     return buildServers(ownerId, await firingByTarget(ownerId));
 }
 
-const HOST_SELECT = { id: true, name: true, address: true, username: true, dockerId: true } as const;
+const HOST_SELECT = {
+    id: true,
+    name: true,
+    address: true,
+    username: true,
+    dockerId: true
+} as const;
 
 /** A page of the cards a list draws, and where the next one starts. */
 export interface CardPage {
@@ -217,7 +223,12 @@ async function watchHostPage(ownerId: string, cursor: string | null, limit: numb
             where: {
                 ownerId,
                 ...(after
-                    ? { OR: [{ name: { gt: after.name } }, { name: after.name, id: { gt: after.id } }] }
+                    ? {
+                          OR: [
+                              { name: { gt: after.name } },
+                              { name: after.name, id: { gt: after.id } }
+                          ]
+                      }
                     : {})
             },
             select: HOST_SELECT,

@@ -74,9 +74,7 @@ export function DiscoverDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("cameras.discover")}</DialogTitle>
-                    <DialogDescription>
-                        {t("discover.intro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("discover.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">

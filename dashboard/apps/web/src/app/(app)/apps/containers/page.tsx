@@ -32,10 +32,7 @@ export default async function ContainersPage({
 
     return (
         <>
-            <PageHeader
-                title={t("overview.containers")}
-                description={t("page.description")}
-            />
+            <PageHeader title={t("overview.containers")} description={t("page.description")} />
             <ContainersView
                 connections={hosts.connections}
                 more={hosts.more}

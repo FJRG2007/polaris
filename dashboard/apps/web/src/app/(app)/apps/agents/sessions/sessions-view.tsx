@@ -321,9 +321,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             scope={{}}
                             cache="agent-session-repos"
                             value={repoId || null}
-                            selectedLabel={
-                                choices?.repos.find((repo) => repo.id === repoId)?.name
-                            }
+                            selectedLabel={choices?.repos.find((repo) => repo.id === repoId)?.name}
                             onValueChange={(value) => {
                                 setRepoId(value);
                                 setGap(null);
