@@ -149,6 +149,22 @@ export async function GET(request: Request): Promise<Response> {
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
 
+                // A call declined on another of this person's devices: theirs
+                // alone, so every other screen of theirs stops ringing it.
+                if (change.kind === "call-settled") {
+                    if (!change.meetingId || !change.audience?.includes(actor.id)) return;
+                    send({ kind: "call-settled", meetingId: change.meetingId });
+                    return;
+                }
+                // An invitation to play: to the people invited and nobody else,
+                // with the session's id alone - the toast reads the invitation
+                // through the check that decides whether it is theirs.
+                if (change.kind === "game-invite") {
+                    if (!change.sessionId || !change.audience?.includes(actor.id)) return;
+                    send({ kind: "game-invite", sessionId: change.sessionId });
+                    return;
+                }
+
                 // Somebody's face changed. Sent on whether this reader shares
                 // a room with them, which is the same question as whether their
                 // face could be on this screen, and it carries the id alone -
@@ -157,22 +173,6 @@ export async function GET(request: Request): Promise<Response> {
                 //
                 // Their own browser is skipped: it changed it, and it already
                 // redrew.
-                // An invitation to play: to the people invited and nobody else,
-                // with the session's id alone - the toast reads the invitation
-                // through the check that decides whether it is theirs.
-                // A call declined on another of this person's devices: theirs
-                // alone, so every other screen of theirs stops ringing it.
-                if (change.kind === "call-settled") {
-                    if (!change.meetingId || !change.audience?.includes(actor.id)) return;
-                    send({ kind: "call-settled", meetingId: change.meetingId });
-                    return;
-                }
-                if (change.kind === "game-invite") {
-                    if (!change.sessionId || !change.audience?.includes(actor.id)) return;
-                    send({ kind: "game-invite", sessionId: change.sessionId });
-                    return;
-                }
-
                 if (change.kind === "appearance") {
                     if (change.actorId === actor.id) return;
                     if (!change.channels?.some((id) => scope.reachable().has(id))) return;
