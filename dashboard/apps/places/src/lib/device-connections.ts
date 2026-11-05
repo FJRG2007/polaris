@@ -1080,8 +1080,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // Midea dehumidifiers, and the brands Midea makes them under (Comfee):
     // the MSmartHome account says which units there are and the
     // key each one takes; every reading and change then goes to the unit on
-    // this network, as Home Assistant's midea_ac_lan does it. No Simple Icons
-    // mark exists for Midea, so the generic one stands in.
+    // this network, as Home Assistant's midea_ac_lan does it.
     {
         id: "midea-lan",
         brand: "Midea",
