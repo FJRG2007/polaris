@@ -1226,6 +1226,30 @@
                     "hint": "PETKIT allows one sign-in per account: signing in here signs the PETKIT app out on the same account. On, Polaris signs back in whenever the app takes it. Turn it off while you need the app."
                 }
             }
+        },
+        "midea-lan": {
+            "label": "Midea / Comfee",
+            "summary": "Midea and Comfee dehumidifiers on your MSmartHome account, controlled on this network.",
+            "note": "Your MSmartHome account lists the dehumidifiers and their keys. Readings and changes go straight to each unit, so it has to be on the same network as Polaris.",
+            "steps": {
+                "s0": "Add the dehumidifier in the MSmartHome app and check it shows as online.",
+                "s1": "Sign in here with the same email and password.",
+                "s2": "If a dehumidifier is not found, type its IP address. Your router's device list shows it."
+            },
+            "fields": {
+                "email": {
+                    "label": "Email",
+                    "placeholder": "The MSmartHome account's email"
+                },
+                "password": {
+                    "label": "Password"
+                },
+                "hosts": {
+                    "label": "Addresses",
+                    "hint": "Only for a dehumidifier the network scan misses. Separate several with commas.",
+                    "placeholder": "192.168.1.40, 192.168.1.41"
+                }
+            }
         }
     },
     "actions": {

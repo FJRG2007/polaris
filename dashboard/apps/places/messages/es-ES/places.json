@@ -1226,6 +1226,30 @@
                     "hint": "PETKIT permite una sola sesión por cuenta: entrar aquí cierra la app de PETKIT en esa cuenta. Activo, Polaris vuelve a entrar cuando la app se la quita. Desactívalo mientras uses la app."
                 }
             }
+        },
+        "midea-lan": {
+            "label": "Midea / Comfee",
+            "summary": "Deshumidificadores Midea y Comfee de tu cuenta de MSmartHome, controlados en esta red.",
+            "note": "Tu cuenta de MSmartHome indica los deshumidificadores y sus claves. Las lecturas y los cambios van directos a cada equipo, así que tiene que estar en la misma red que Polaris.",
+            "steps": {
+                "s0": "Añade el deshumidificador en la app MSmartHome y comprueba que aparece conectado.",
+                "s1": "Inicia sesión aquí con el mismo correo y la misma contraseña.",
+                "s2": "Si no se encuentra un deshumidificador, escribe su IP. La lista de dispositivos del router la muestra."
+            },
+            "fields": {
+                "email": {
+                    "label": "Correo",
+                    "placeholder": "El correo de la cuenta de MSmartHome"
+                },
+                "password": {
+                    "label": "Contraseña"
+                },
+                "hosts": {
+                    "label": "Direcciones",
+                    "hint": "Solo para un deshumidificador que la búsqueda en la red no encuentre. Separa varias con comas.",
+                    "placeholder": "192.168.1.40, 192.168.1.41"
+                }
+            }
         }
     },
     "actions": {

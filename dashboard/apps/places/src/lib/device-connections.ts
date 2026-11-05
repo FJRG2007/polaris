@@ -1077,6 +1077,60 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "self-cleaning"
         ]
     },
+    // Midea dehumidifiers, and the brands Midea makes them under (Comfee):
+    // the MSmartHome account says which units there are and the
+    // key each one takes; every reading and change then goes to the unit on
+    // this network, as Home Assistant's midea_ac_lan does it. No Simple Icons
+    // mark exists for Midea, so the generic one stands in.
+    {
+        id: "midea-lan",
+        brand: "Midea",
+        recommended: true,
+        logo: "midea",
+        label: en("connections.midea-lan.label"),
+        reach: "same-network",
+        summary: en("connections.midea-lan.summary"),
+        note: en("connections.midea-lan.note"),
+        steps: [
+            en("connections.midea-lan.steps.s0"),
+            en("connections.midea-lan.steps.s1"),
+            en("connections.midea-lan.steps.s2")
+        ],
+        fields: [
+            {
+                key: "email",
+                label: en("connections.midea-lan.fields.email.label"),
+                placeholder: en("connections.midea-lan.fields.email.placeholder"),
+                format: "email",
+                maxLength: 254
+            },
+            {
+                key: "password",
+                label: en("connections.midea-lan.fields.password.label"),
+                secret: true,
+                minLength: 1,
+                maxLength: 200
+            },
+            {
+                key: "hosts",
+                label: en("connections.midea-lan.fields.hosts.label"),
+                hint: en("connections.midea-lan.fields.hosts.hint"),
+                placeholder: en("connections.midea-lan.fields.hosts.placeholder"),
+                optional: true,
+                maxLength: 400
+            }
+        ],
+        kinds: ["dehumidifier"],
+        search: [
+            "midea",
+            "comfee",
+            "msmarthome",
+            "msmart",
+            "dehumidifier",
+            "deshumidificador",
+            "local"
+        ]
+    },
     // SwitchBot: their cloud API is the one documented way in, and the most
     // convenient - a token and a secret from the app, and every device on the
     // account arrives, including the Bluetooth ones behind a hub.
