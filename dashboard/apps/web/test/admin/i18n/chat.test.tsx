@@ -44,7 +44,16 @@ describe("admin chat in Spanish", () => {
     });
 
     it("keeps the link inside the translated sentence", async () => {
-        settings = { url: "", key: "", hasSecret: false, shipped: true, ready: true, answering: false, unused: null, container: "stopped" };
+        settings = {
+            url: "",
+            key: "",
+            hasSecret: false,
+            shipped: true,
+            ready: true,
+            answering: false,
+            unused: null,
+            container: "stopped"
+        };
         render(withMessages(<CallServerView />, "es-ES"));
 
         const link = await screen.findByRole("link", { name: "Contenedores" });
@@ -55,7 +64,16 @@ describe("admin chat in Spanish", () => {
     });
 
     it("chooses where a running server is in Spanish", async () => {
-        settings = { url: "", key: "", hasSecret: false, shipped: true, ready: true, answering: true, unused: null, container: "running" };
+        settings = {
+            url: "",
+            key: "",
+            hasSecret: false,
+            shipped: true,
+            ready: true,
+            answering: true,
+            unused: null,
+            container: "running"
+        };
         render(withMessages(<CallServerView />, "es-ES"));
 
         expect(await screen.findByText("En marcha en este servidor.")).toBeTruthy();

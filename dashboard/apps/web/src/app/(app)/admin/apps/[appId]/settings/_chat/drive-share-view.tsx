@@ -51,8 +51,16 @@ export function DriveShareView({ how }: { how: DriveShare }) {
                 value={chosen}
                 onValueChange={(next) => void change(next as DriveShare)}
                 options={[
-                    { value: "copy", label: t("chat.driveShare.copy.label"), title: t("chat.driveShare.copy.title") },
-                    { value: "link", label: t("chat.driveShare.link.label"), title: t("chat.driveShare.link.title") }
+                    {
+                        value: "copy",
+                        label: t("chat.driveShare.copy.label"),
+                        title: t("chat.driveShare.copy.title")
+                    },
+                    {
+                        value: "link",
+                        label: t("chat.driveShare.link.label"),
+                        title: t("chat.driveShare.link.title")
+                    }
                 ]}
             />
             {error && (

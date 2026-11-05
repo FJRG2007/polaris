@@ -191,7 +191,9 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             rules.maxAttachments === 0 && "opacity-50"
                         )}
                     >
-                        <span className="text-sm font-medium">{t("chat.rules.fields.maxAttachmentMib.label")}</span>
+                        <span className="text-sm font-medium">
+                            {t("chat.rules.fields.maxAttachmentMib.label")}
+                        </span>
                         <SizeField
                             value={rules.maxAttachmentMib}
                             stored="MB"
@@ -242,7 +244,11 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             {saving && <Loader2 className="size-4 animate-spin" />}
                             {t(`chat.rules.scopes.${scope}.save`)}
                         </Button>
-                        {!dirty && <span className="text-xs text-muted-foreground">{t("chat.rules.saved")}</span>}
+                        {!dirty && (
+                            <span className="text-xs text-muted-foreground">
+                                {t("chat.rules.saved")}
+                            </span>
+                        )}
                     </div>
                 </CardBody>
             </Card>
