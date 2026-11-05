@@ -19,24 +19,27 @@ import { Select } from "@polaris/ui";
 import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    SCOPE_KINDS,
-    scopeKindLabel,
-    scopeNeedsTarget,
-    scopeOptions,
-    type ScopeCatalog,
-    type ScopeKind
-} from "./scope-kinds";
+import { PagedPicker } from "@/components/paged-picker";
+import { firewallScopeOptionsAction } from "./actions";
+import type { FirewallScopeOption } from "@/lib/firewall-scope-options-schema";
+import { SCOPE_KINDS, scopeKindLabel, scopeNeedsTarget, type ScopeKind } from "./scope-kinds";
+
+const optionLabel = (option: FirewallScopeOption) =>
+    option.path ? `${option.path} / ${option.name}` : option.name;
 
 export function ScopePicker({
     kind,
     id,
-    catalog,
+    label,
+    offerMarketplace,
     canOperate
 }: {
     kind: ScopeKind;
+    /** The chosen target, resolved by the page - empty when the kind has none. */
     id: string;
-    catalog: ScopeCatalog;
+    label: string;
+    /** Whether anything is installed from the marketplace to offer a shortcut to. */
+    offerMarketplace: boolean;
     /** The two instance-wide scopes are operator controls, so a member is not offered
      *  them at all rather than being offered them and refused. */
     canOperate: boolean;
@@ -48,8 +51,7 @@ export function ScopePicker({
         (entry) => canOperate || (entry !== "polaris" && entry !== "global")
         // Nothing installed from the marketplace means no shortcut to offer, and a
         // kind that resolves to an empty list is one that only wastes a click.
-    ).filter((entry) => entry !== "marketplace" || catalog.marketplace.length > 0);
-    const targets = scopeOptions(kind, catalog);
+    ).filter((entry) => entry !== "marketplace" || offerMarketplace);
 
     function go(nextKind: ScopeKind, nextId: string) {
         const next = new URLSearchParams(params.toString());
@@ -66,22 +68,27 @@ export function ScopePicker({
             className="h-8 min-w-0 flex-1 font-medium md:w-48 md:min-w-[12rem] md:flex-none"
             options={kinds.map((entry) => ({ value: entry, label: scopeKindLabel(t, entry) }))}
             onValueChange={(value) => {
-                const nextKind = value as ScopeKind;
-                // Moving to a kind that names something lands on its first entry, so the
-                // page is never showing a chooser with nothing chosen.
-                const first = scopeNeedsTarget(nextKind) ? (scopeOptions(nextKind, catalog)[0]?.id ?? "") : "";
-                go(nextKind, first);
+                // Moving to a kind that names something lands on its first entry - the
+                // page resolves it - so it is never showing a chooser with nothing chosen.
+                go(value as ScopeKind, "");
             }}
         />
     );
 
-    const targetSelect = !scopeNeedsTarget(kind) ? null : targets.length > 0 ? (
-        <Select
-            value={id || (targets[0]?.id ?? "")}
-            aria-label={t("picker.target")}
-            className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
-            options={targets.map((target) => ({ value: target.id, label: target.label }))}
+    const targetSelect = !scopeNeedsTarget(kind) ? null : id ? (
+        <PagedPicker<FirewallScopeOption>
+            read={firewallScopeOptionsAction}
+            scope={{ kind }}
+            cache="firewall-scope"
+            value={id}
+            selectedLabel={label}
+            itemLabel={optionLabel}
             onValueChange={(value) => go(kind, value)}
+            aria-label={t("picker.target")}
+            placeholder={t("picker.target")}
+            searchPlaceholder={t("picker.search")}
+            emptyText={t("picker.empty")}
+            className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
         />
     ) : (
         <span className="whitespace-nowrap text-sm text-muted-foreground">{t("picker.none")}</span>

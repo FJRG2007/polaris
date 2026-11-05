@@ -503,7 +503,9 @@
     "picker": {
         "scope": "Scope",
         "target": "Scope target",
-        "none": "Nothing of that kind yet."
+        "none": "Nothing of that kind yet.",
+        "search": "Search",
+        "empty": "No match."
     },
     "describe": {
         "marketplace": "Applies to {label} alone. It is an installed app, and these are the rules on the service it runs.",

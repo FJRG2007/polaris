@@ -4178,6 +4178,7 @@ model InstalledApp {
     updatedAt       DateTime @updatedAt
 
     @@index([ownerId])
+    @@index([ownerId, name, id])
     @@index([catalogId])
     @@index([targetId])
     @@index([applicationId])
@@ -4907,6 +4908,7 @@ model Project {
     @@index([ownerId])
     @@index([orgId])
     @@index([binnedAt])
+    @@index([name, id])
 }
 
 // Access to a project, held by somebody other than the owner. The owner is never
@@ -5087,6 +5089,7 @@ model Environment {
 
     @@unique([projectId, slug])
     @@index([projectId])
+    @@index([name, id])
 }
 
 // One promotion of an environment into another: each service in the target

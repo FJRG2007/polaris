@@ -497,16 +497,17 @@ export async function listInstalledAppScopes(ownerId: string): Promise<Installed
         orderBy: { name: "asc" },
         select: { name: true, catalogId: true, applicationId: true }
     });
-    return rows.map((row) => {
-        const manifest = findApp(row.catalogId);
-        // The catalog name disambiguates two installs of the same app, which is the
-        // case the bare instance name reads worst in.
-        const kind = manifest?.name ?? row.catalogId;
-        return {
-            applicationId: row.applicationId as string,
-            label: kind === row.name ? row.name : `${row.name} (${kind})`
-        };
-    });
+    return rows.map((row) => ({
+        applicationId: row.applicationId as string,
+        label: installedAppScopeLabel(row.name, row.catalogId)
+    }));
+}
+
+/** An install as a scope picker names it. The catalog name disambiguates two
+ *  installs of the same app, which is the case the bare instance name reads worst in. */
+export function installedAppScopeLabel(name: string, catalogId: string): string {
+    const kind = findApp(catalogId)?.name ?? catalogId;
+    return kind === name ? name : `${name} (${kind})`;
 }
 
 export interface InstalledAppDetail extends InstalledAppView {

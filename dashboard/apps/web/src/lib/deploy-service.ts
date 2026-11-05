@@ -200,7 +200,7 @@ export async function readDeployment(
  * the Polaris happens to have, and reading it the loose way would publish a
  * company's services to strangers on a shared instance.
  */
-async function visibleProjectWhere(userId: string) {
+export async function visibleProjectWhere(userId: string) {
     const [belongsTo, runs, entries] = await Promise.all([
         memberOrgIds(userId),
         orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage"),

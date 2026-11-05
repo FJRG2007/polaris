@@ -16,26 +16,16 @@
 import { WafEditor } from "./waf-editor";
 import { notFound } from "next/navigation";
 import { ScopePicker } from "./scope-picker";
-import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
-import { listProjectScopes } from "@/lib/deploy-service";
-import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
 import { firewallSlot } from "@/lib/app-extensions/registry";
-import { listInstalledAppScopes } from "@/lib/apps/install-service";
+import * as scopeOptions from "@/lib/firewall-scope-options";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import {
-    ruleScopeFor,
-    scopeNeedsTarget,
-    scopeOptions,
-    type ScopeCatalog,
-    type ScopeKind,
-    type ScopeOption
-} from "./scope-kinds";
+import { ruleScopeFor, scopeNeedsTarget, type ScopeKind } from "./scope-kinds";
 
 export const dynamic = "force-dynamic";
 
@@ -71,43 +61,6 @@ export default async function FirewallPage({
     const canOperate = await userHasManage(user, "system.manage");
     const t = await getTranslations("firewall");
 
-    const [projects, hosts, groups, marketplace] = await Promise.all([
-        listProjectScopes(user.id),
-        listHosts(user.id),
-        listHostGroups(user.id),
-        listInstalledAppScopes(user.id)
-    ]);
-
-    const environments: ScopeOption[] = [];
-    const services: ScopeOption[] = [];
-    for (const project of projects) {
-        for (const environment of project.environments) {
-            environments.push({
-                id: environment.id,
-                label: `${project.name} / ${environment.name}`
-            });
-            for (const application of environment.applications) {
-                services.push({
-                    id: application.id,
-                    label: `${project.name} / ${environment.name} / ${application.name}`
-                });
-            }
-        }
-    }
-    // An install whose service this caller cannot see is not offered: the shortcut
-    // must not become a way round the ownership the service list already applies.
-    const visible = new Set(services.map((service) => service.id));
-    const catalog: ScopeCatalog = {
-        projects: projects.map((project) => ({ id: project.id, label: project.name })),
-        environments,
-        services,
-        marketplace: marketplace
-            .filter((app) => visible.has(app.applicationId))
-            .map((app) => ({ id: app.applicationId, label: app.label })),
-        servers: hosts.map((host) => ({ id: host.id, label: host.name })),
-        serverGroups: groups.map((group) => ({ id: group.id, label: group.name }))
-    };
-
     // An unknown scope in the URL is a typo or a stale link, not a 404: fall back to
     // the widest thing this caller is allowed to see.
     //
@@ -124,17 +77,25 @@ export default async function FirewallPage({
     // rules written here are the same rows the Service scope would show.
     const ruleScope = ruleScopeFor(kind);
 
-    const options = scopeOptions(kind, catalog);
-    const scopeId = scopeNeedsTarget(kind)
-        ? (options.find((option) => option.id === id)?.id ?? options[0]?.id ?? "")
-        : "";
-    if (scopeNeedsTarget(kind) && id && !options.some((option) => option.id === id)) {
-        // An id that is not the caller's must not silently resolve to their first
-        // project - that would be a link to someone else's rules quietly rewritten
-        // into a link to their own.
-        notFound();
-    }
-    const label = options.find((option) => option.id === scopeId)?.label ?? "";
+    // Only the one target in the URL - or the first one, when it names none - is read
+    // here; the picker pages the rest from the server as somebody scrolls.
+    const [resolved, marketplace] = await Promise.all([
+        kind === "polaris" || kind === "global"
+            ? null
+            : scopeOptions.resolveFirewallScope(user.id, kind, id),
+        // Nothing installed from the marketplace means no shortcut to offer.
+        kind === "marketplace"
+            ? null
+            : scopeOptions.resolveFirewallScope(user.id, "marketplace", undefined)
+    ]);
+    // An id that is not the caller's must not silently resolve to their first
+    // project - that would be a link to someone else's rules quietly rewritten
+    // into a link to their own.
+    if (resolved?.refused) notFound();
+    const chosen = resolved?.option ?? null;
+    const scopeId = chosen?.id ?? "";
+    const label = chosen ? scopeOptions.firewallScopeLabel(chosen) : "";
+    const offerMarketplace = kind === "marketplace" || Boolean(marketplace?.option);
     // A service an installed app runs may be guarded by something else entirely -
     // a game server by its player list, not the HTTP rules below. Asked only when
     // one service is in scope, which is the only case where it can be one.
@@ -150,7 +111,9 @@ export default async function FirewallPage({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 items-baseline gap-2">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("page.title")}
+                    </h1>
                     {/* The selects live in the app bar on a wide screen, where the
                         chosen scope is no longer next to the title - so the title
                         carries it. */}
@@ -163,7 +126,13 @@ export default async function FirewallPage({
                         </span>
                     ) : null}
                 </div>
-                <ScopePicker kind={kind} id={scopeId} catalog={catalog} canOperate={canOperate} />
+                <ScopePicker
+                    kind={kind}
+                    id={scopeId}
+                    label={label}
+                    offerMarketplace={offerMarketplace}
+                    canOperate={canOperate}
+                />
             </div>
 
             {scopeNeedsTarget(kind) && !scopeId ? (

@@ -11,24 +11,6 @@
 import type { WafScopeType } from "@polaris/core";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
-/** One selectable target within a kind. */
-export interface ScopeOption {
-    readonly id: string;
-    readonly label: string;
-}
-
-/** Everything the picker can offer, resolved on the server. */
-export interface ScopeCatalog {
-    readonly projects: readonly ScopeOption[];
-    readonly environments: readonly ScopeOption[];
-    readonly services: readonly ScopeOption[];
-    /** The subset of `services` that an installed marketplace app is running, named
-     *  as the app rather than as the container underneath it. */
-    readonly marketplace: readonly ScopeOption[];
-    readonly servers: readonly ScopeOption[];
-    readonly serverGroups: readonly ScopeOption[];
-}
-
 /**
  * The kinds, in the order they narrow: the whole instance, then a machine, then a
  * project, then one service on it.
@@ -78,24 +60,4 @@ const NEEDS_TARGET = new Set<ScopeKind>([
 /** Whether a kind names a target, so both sides agree on when an id is required. */
 export function scopeNeedsTarget(kind: ScopeKind): boolean {
     return NEEDS_TARGET.has(kind);
-}
-
-/** The targets on offer for a kind. */
-export function scopeOptions(kind: ScopeKind, catalog: ScopeCatalog): readonly ScopeOption[] {
-    switch (kind) {
-        case "project":
-            return catalog.projects;
-        case "environment":
-            return catalog.environments;
-        case "marketplace":
-            return catalog.marketplace;
-        case "application":
-            return catalog.services;
-        case "server":
-            return catalog.servers;
-        case "server-group":
-            return catalog.serverGroups;
-        default:
-            return [];
-    }
 }
