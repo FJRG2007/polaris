@@ -2181,6 +2181,7 @@ model DockerConnection {
     owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
     @@index([ownerId])
+    @@index([ownerId, name, id])
 }
 
 // A global server registered once (SSH) and consumed by multiple apps: Docker

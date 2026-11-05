@@ -33,7 +33,13 @@ import {
 } from "@/lib/watch/card-order";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn, useToast } from "@polaris/ui";
-import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
+import { PagedPicker } from "@/components/paged-picker";
+import {
+    connectionOptionsAction,
+    containerAction,
+    deleteDockerConnectionAction,
+    removeContainerAction
+} from "./actions";
 import {
     useCallback,
     useEffect,
@@ -88,9 +94,13 @@ export function ContainersView({
     connectionId,
     sshEnabled,
     canManage,
-    localDiagnostic
+    localDiagnostic,
+    more = false
 }: {
+    /** The first page of hosts, and the selected one when it is past it. */
     connections: DockerConnectionSummary[];
+    /** Whether there are hosts past that page, found through the picker. */
+    more?: boolean;
     connectionId: string | null;
     sshEnabled: boolean;
     canManage: boolean;
@@ -297,6 +307,21 @@ export function ContainersView({
                     </h2>
                     <DockerConnectionDialog sshEnabled={sshEnabled} />
                 </div>
+                {more ? (
+                    <PagedPicker<DockerConnectionSummary>
+                        read={connectionOptionsAction}
+                        scope={{}}
+                        cache="container-hosts"
+                        value={null}
+                        onValueChange={(id) =>
+                            router.push(`/apps/containers?c=${encodeURIComponent(id)}`)
+                        }
+                        placeholder={t("hosts.find")}
+                        searchPlaceholder={t("hosts.search")}
+                        emptyText={t("hosts.noMatch")}
+                        aria-label={t("hosts.find")}
+                    />
+                ) : null}
                 <nav className="flex flex-col gap-1">
                     {connections.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("hosts.none")}</p>

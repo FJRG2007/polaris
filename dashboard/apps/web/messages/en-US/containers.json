@@ -1,5 +1,8 @@
 {
     "hosts": {
+        "find": "Find a host",
+        "search": "Search hosts",
+        "noMatch": "No host matches",
         "noAnswer": "No answer",
         "title": "Docker hosts",
         "none": "No hosts yet.",
