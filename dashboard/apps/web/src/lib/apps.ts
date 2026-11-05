@@ -119,6 +119,7 @@ import {
     Plus,
     EthernetPort,
     FileBadge,
+    Award,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -774,6 +775,7 @@ const ADMIN_AREAS: AppSubapp[] = [
             "/admin/groups",
             "/admin/announcements",
             "/admin/organizations",
+            "/admin/badges",
             "/admin/roles",
             "/admin/policies",
             "/admin/security",
@@ -816,6 +818,13 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Building2,
                 keywords: ["org", "orgs", "teams", "company", "limits", "turn off"]
+            },
+            {
+                label: "Badges", // i18n-ignore
+                href: "/admin/badges",
+                adminOnly: true,
+                icon: Award,
+                keywords: ["badges", "awards", "staff", "custom badge", "give badge"]
             },
             {
                 label: "Roles", // i18n-ignore
@@ -2284,6 +2293,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "minecraft",
                 "rich presence"
             ],
+            group: PRIVACY_GROUP
+        },
+        {
+            label: "Badges", // i18n-ignore
+            href: "/account/badges",
+            icon: Award,
+            keywords: ["badges", "awards", "achievements", "levels", "profile", "rarity"],
             group: PRIVACY_GROUP
         },
         {

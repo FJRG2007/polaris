@@ -10,7 +10,16 @@ import { Messages } from "@/components/i18n/messages";
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
     return (
-        <Messages namespaces={["account", "accountSecurity", "accountPrivacy", "accountNotifications", "validation"]}>
+        <Messages
+            namespaces={[
+                "account",
+                "accountSecurity",
+                "accountPrivacy",
+                "accountNotifications",
+                "badges",
+                "validation"
+            ]}
+        >
             {children}
         </Messages>
     );

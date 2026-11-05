@@ -81,6 +81,7 @@ import deploySettings from "./deploySettings.json";
 import domainSecurity from "./domainSecurity.json";
 import accountSecurity from "./accountSecurity.json";
 import accountNotifications from "./accountNotifications.json";
+import badges from "./badges.json";
 
 export default {
     account,
@@ -157,5 +158,6 @@ export default {
     validation,
     vault,
     automations,
-    watch
+    watch,
+    badges
 };

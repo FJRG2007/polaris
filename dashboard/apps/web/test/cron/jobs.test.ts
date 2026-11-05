@@ -104,6 +104,9 @@ describe("the work Polaris runs on a schedule", () => {
             // (or back) and announce it twice.
             "backup-access",
             "backups",
+            // The badge sweep walks people from a shared cursor; two passes
+            // would walk the same people twice.
+            "badge-unlocks",
             // A budget crossing its threshold is told to the people running
             // the organization once; two passes would each tell them.
             "billing-budgets",

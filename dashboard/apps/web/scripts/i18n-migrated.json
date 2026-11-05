@@ -2531,6 +2531,18 @@
         "web/src/lib/deploy-target-options.ts",
         "web/src/lib/deploy-target-options-schema.ts",
         "web/src/lib/server-options.ts",
-        "web/src/lib/server-options-schema.ts"
+        "web/src/lib/server-options-schema.ts",
+        "web/src/app/(app)/account/badges/actions.ts",
+        "web/src/app/(app)/account/badges/badges-settings.tsx",
+        "web/src/app/(app)/account/badges/page.tsx",
+        "web/src/app/(app)/admin/badges/actions.ts",
+        "web/src/app/(app)/admin/badges/badges-admin.tsx",
+        "web/src/app/(app)/admin/badges/page.tsx",
+        "web/src/components/badges/badge-icon.tsx",
+        "web/src/components/badges/badges-dialog.tsx",
+        "web/src/components/profile-name-extras.tsx",
+        "web/src/app/u/[username]/profile-body.tsx",
+        "web/src/app/(app)/account/layout.tsx",
+        "web/src/app/(app)/admin/layout.tsx"
     ]
 }

@@ -30,6 +30,8 @@
 
 import Link from "next/link";
 import { FollowLists } from "./follow-lists";
+import type { BadgesForViewer } from "@/lib/badges/badge-service";
+import { ProfileNameExtras } from "@/components/profile-name-extras";
 import { ProfileActions } from "./profile-actions";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { MutualPanel } from "@/components/mutual-panel";
@@ -63,7 +65,8 @@ import {
 export function ProfileCard({
     profile,
     own,
-    signedIn
+    signedIn,
+    badges
 }: {
     profile: PublicProfile;
     own: boolean;
@@ -71,6 +74,7 @@ export function ProfileCard({
      *  somebody needs one, so a stranger is shown the page and no buttons rather
      *  than buttons that send them to a sign-in screen. */
     signedIn: boolean;
+    badges: BadgesForViewer;
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("publicPages");
@@ -163,6 +167,7 @@ export function ProfileCard({
                             </span>
                         ) : null}
                     </h1>
+                    <ProfileNameExtras badges={badges} own={own} />
                     {profile.fullName && profile.fullName !== profile.name ? (
                         <p className="text-muted-foreground text-sm">{profile.fullName}</p>
                     ) : null}

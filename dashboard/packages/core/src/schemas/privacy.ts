@@ -130,6 +130,7 @@ export const PRIVACY_FIELD_LABELS = {
     discoverable: "Whether people can find you",
     lastSeen: "When you were last here",
     activity: "What you are playing or listening to",
+    badges: "Your badges",
     readReceipts: "That you have read a message",
     avatar: "Your photo",
     photoFullSize: "Opening your photo",
@@ -150,6 +151,7 @@ export const PRIVACY_FIELD_NOTES = {
     discoverable:
         "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
     lastSeen: "Whether other people can see that you are here now, or when you last were.",
+    badges: "Who sees the badges on your profile and how far you are with each. A badge can have its own rule, set on its row under Badges.",
     activity:
         "The game or song shown beside your name. Only ever shown to people who can also see that you are here, and never while you appear offline.",
     readReceipts:
@@ -190,6 +192,7 @@ export const PRIVACY_FIELDS = [
     "calls",
     "lastSeen",
     "activity",
+    "badges",
     "readReceipts",
     "forwarding"
 ] as const;
@@ -232,7 +235,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "presence",
         label: "Presence",
-        fields: ["lastSeen", "activity"]
+        fields: ["lastSeen", "activity", "badges"]
     },
     {
         id: "messages",
@@ -334,6 +337,7 @@ export const privacySettingsSchema = z.object({
      * are doing, and somebody invisible is doing nothing at all.
      */
     activity: open,
+    badges: open,
     readReceipts: open,
     avatar: open,
     /**

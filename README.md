@@ -439,7 +439,9 @@ Each app is enabled per account and per role.
 **The account itself**
 
 Passwords, passkeys, two-factor, trusted devices, QR sign-in from another device,
-sessions, API keys, access rules, privacy and notification settings. Claude,
+sessions, API keys, access rules, privacy and notification settings, and
+profile badges earned from activity across the apps (administrators can also
+grant custom ones). Claude,
 ChatGPT, Cursor, VS Code and any other MCP client can connect as you, limited to
 what you approve - see
 [`docs/connecting-ai-assistants.md`](docs/connecting-ai-assistants.md).

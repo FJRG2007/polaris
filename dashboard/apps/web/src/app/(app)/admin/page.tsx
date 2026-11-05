@@ -5,6 +5,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import {
     Activity,
+    Award,
     Blocks,
     Bot,
     Building2,
@@ -54,6 +55,7 @@ const SECTIONS = [
     { key: "billing", href: "/admin/billing", icon: Wallet },
     { key: "organizations", href: "/admin/organizations", icon: Building2 },
     { key: "display", href: "/admin/display", icon: SlidersHorizontal },
+    { key: "badges", href: "/admin/badges", icon: Award },
     { key: "agents", href: "/admin/agents", icon: Bot },
     { key: "uploads", href: "/admin/uploads", icon: HardDrive },
     { key: "integrations", href: "/admin/integrations", icon: Blocks },

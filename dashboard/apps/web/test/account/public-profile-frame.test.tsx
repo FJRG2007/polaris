@@ -55,6 +55,10 @@ vi.mock("@/components/public-chrome", () => ({
 vi.mock("@/app/u/[username]/profile-card", () => ({
     ProfileCard: ({ signedIn }: { signedIn: boolean }) => <p>{`card signedIn=${signedIn}`}</p>
 }));
+// Badges are read beside the card; what they show is asserted in test/badges.
+vi.mock("@/lib/badges/badge-service", () => ({
+    badgesFor: async () => ({ shown: [], available: [], arrangement: null })
+}));
 vi.mock("@/app/o/[slug]/org-profile-card", () => ({ OrgProfileCard: () => <p>org card</p> }));
 // The catalogs a page hands its cards come from the request; there is none here.
 vi.mock("@/components/i18n/messages", () => ({

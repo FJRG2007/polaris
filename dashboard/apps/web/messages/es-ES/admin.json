@@ -2660,6 +2660,10 @@
                 "title": "Formatos por defecto",
                 "description": "Las unidades, fechas y formatos de número con los que empiezan las cuentas nuevas."
             },
+            "badges": {
+                "title": "Insignias",
+                "description": "Insignias propias para dar a gente, junto a las que ganan."
+            },
             "agents": {
                 "title": "Ajustes de agentes",
                 "description": "Dónde pueden ejecutarse los agentes de código y qué pueden abrir por su cuenta."
