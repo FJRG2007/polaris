@@ -1300,6 +1300,8 @@
         }
     },
     "machines": {
+        "loadMore": "Cargar más",
+        "moreFailed": "No se pudo cargar más. Vuelve a intentarlo.",
         "heading": "Máquinas",
         "intro": "Servidores, contenedores y dominios, con su carga y alarmas.",
         "servers": "Servidores",

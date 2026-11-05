@@ -1300,6 +1300,8 @@
         }
     },
     "machines": {
+        "loadMore": "Load more",
+        "moreFailed": "Could not load more. Try again.",
         "heading": "Machines",
         "intro": "Servers, containers and domains, with their load and alarm history.",
         "servers": "Servers",

@@ -14,7 +14,13 @@ import { grantedSubjects } from "@/lib/access/grants";
 import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import type { AlarmEventPoint } from "@/lib/machines/alarm-episodes";
 import { inPlaces } from "@/lib/machines/machine-links";
-import { getWatchContainers, getWatchServers, type WatchCard } from "@/lib/watch-overview-service";
+import {
+    getWatchContainerPage,
+    getWatchContainers,
+    getWatchServerPage,
+    getWatchServers,
+    type WatchCard
+} from "@/lib/watch-overview-service";
 
 export { machineHref, type MachineKind } from "@/lib/machines/machine-links";
 
@@ -24,6 +30,17 @@ export const HISTORY_DAYS = 90;
  *  its oldest left out rather than the page held up. */
 const MAX_EVENTS = 2000;
 const MAX_DOMAINS = 200;
+/** Servers per page of the Places list, and machines whose containers are
+ *  listed per page - each of those is a round trip to its engine. */
+export const SERVER_PAGE = 24;
+export const CONTAINER_MACHINE_PAGE = 8;
+export const DOMAIN_PAGE = 50;
+
+/** A page of a machines group, and where the next one starts. */
+export interface MachinePage<T> {
+    readonly items: T[];
+    readonly next: string | null;
+}
 
 export interface DomainDevice {
     readonly id: string;
@@ -44,6 +61,59 @@ export async function machineServers(ownerId: string): Promise<WatchCard[]> {
 
 export async function machineContainers(ownerId: string): Promise<WatchCard[]> {
     return (await getWatchContainers(ownerId)).map(inPlaces);
+}
+
+/** A page of the account's servers as cards, the machine Polaris runs on first. */
+export async function machineServerPage(
+    ownerId: string,
+    cursor: string | null
+): Promise<MachinePage<WatchCard>> {
+    const page = await getWatchServerPage(ownerId, cursor, SERVER_PAGE);
+    return { items: page.cards.map(inPlaces), next: page.next };
+}
+
+/** The containers on a page of the account's machines. */
+export async function machineContainerPage(
+    ownerId: string,
+    cursor: string | null
+): Promise<MachinePage<WatchCard>> {
+    const page = await getWatchContainerPage(ownerId, cursor, CONTAINER_MACHINE_PAGE);
+    return { items: page.cards.map(inPlaces), next: page.next };
+}
+
+/** A page of the account's domains by hostname, continued on it (it is unique). */
+export async function machineDomainPage(
+    ownerId: string,
+    cursor: string | null
+): Promise<MachinePage<DomainDevice>> {
+    const after = decodeHostnameCursor(cursor);
+    const rows = await readDomains(
+        {
+            application: { environment: { project: { ownerId } } },
+            ...(after ? { hostname: { gt: after } } : {})
+        },
+        DOMAIN_PAGE + 1
+    );
+    const items = rows.slice(0, DOMAIN_PAGE);
+    const last = items[items.length - 1];
+    return {
+        items,
+        next: rows.length > DOMAIN_PAGE && last ? encodeHostnameCursor(last.hostname) : null
+    };
+}
+
+function encodeHostnameCursor(hostname: string): string {
+    return Buffer.from(JSON.stringify([hostname])).toString("base64url");
+}
+
+function decodeHostnameCursor(raw: string | null): string | null {
+    if (!raw || raw.length > 1024) return null;
+    try {
+        const [hostname] = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown[];
+        return typeof hostname === "string" ? hostname : null;
+    } catch {
+        return null;
+    }
 }
 
 /** One of the account's containers as Watch lists it, its link still into
@@ -102,7 +172,10 @@ export async function machineDomains(ownerId: string, id?: string): Promise<Doma
     });
 }
 
-async function readDomains(where: Prisma.DomainWhereInput): Promise<DomainDevice[]> {
+async function readDomains(
+    where: Prisma.DomainWhereInput,
+    take: number = MAX_DOMAINS
+): Promise<DomainDevice[]> {
     const rows = await prisma.domain.findMany({
         where,
         select: {
@@ -118,7 +191,7 @@ async function readDomains(where: Prisma.DomainWhereInput): Promise<DomainDevice
             }
         },
         orderBy: { hostname: "asc" },
-        take: MAX_DOMAINS
+        take
     });
     return rows.map((row) => ({
         id: row.id,

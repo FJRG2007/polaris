@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { grantedSubjects } from "@/lib/access/grants";
 import { requireUser, sessionCan } from "@/lib/session";
 import { PageHeader, Skeleton } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import * as machines from "@/lib/machines/machines-service";
-import { WatchCardList } from "@/app/(app)/watch/watch-cards";
+import { MachineCards, MachineDomains } from "./machine-groups";
 
 export const dynamic = "force-dynamic";
 
@@ -79,13 +78,14 @@ async function Servers({
 }) {
     const t = await getTranslations("servers");
     const [own, lent] = await Promise.all([
-        ownerId ? machines.machineServers(ownerId) : [],
+        ownerId ? machines.machineServerPage(ownerId, null) : { items: [], next: null },
         borrows ? machines.lentMachineServers(userId, t("machines.lent")) : []
     ]);
-    const cards = [...own, ...lent];
     return (
-        <WatchCardList
-            cards={cards}
+        <MachineCards
+            kind="servers"
+            cards={[...own.items, ...lent]}
+            next={own.next}
             empty={t("machines.noServers")}
             label={t("machines.servers")}
         />
@@ -93,13 +93,15 @@ async function Servers({
 }
 
 async function Containers({ ownerId }: { ownerId: string }) {
-    const [t, cards] = await Promise.all([
+    const [t, page] = await Promise.all([
         getTranslations("servers"),
-        machines.machineContainers(ownerId)
+        machines.machineContainerPage(ownerId, null)
     ]);
     return (
-        <WatchCardList
-            cards={cards}
+        <MachineCards
+            kind="containers"
+            cards={page.items}
+            next={page.next}
             empty={t("machines.noContainers")}
             label={t("machines.containers")}
         />
@@ -115,47 +117,9 @@ async function Domains({
     userId: string;
     borrows: boolean;
 }) {
-    const [t, own, lent] = await Promise.all([
-        getTranslations("servers"),
-        ownerId ? machines.machineDomains(ownerId) : [],
+    const [own, lent] = await Promise.all([
+        ownerId ? machines.machineDomainPage(ownerId, null) : { items: [], next: null },
         borrows ? machines.lentMachineDomains(userId) : []
     ]);
-    const rows = [...own, ...lent];
-    if (rows.length === 0)
-        return <p className="text-sm text-muted-foreground">{t("machines.noDomains")}</p>;
-    return (
-        <ul className="flex flex-col divide-y rounded-md border">
-            {rows.map((row) => (
-                <li key={row.id} className="min-w-0">
-                    <Link
-                        href={machines.machineHref("domain", row.id)}
-                        className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm hover:bg-muted"
-                    >
-                        <span
-                            aria-hidden
-                            className={`size-2 shrink-0 rounded-full ${
-                                row.status === "up"
-                                    ? "bg-success"
-                                    : row.status === "down"
-                                      ? "bg-danger"
-                                      : "bg-muted-foreground"
-                            }`}
-                        />
-                        <span className="min-w-0 flex-1 truncate" title={row.hostname}>
-                            {row.hostname}
-                        </span>
-                        <span
-                            className="min-w-0 max-w-[40%] truncate text-xs text-muted-foreground"
-                            title={row.service || t("machines.lent")}
-                        >
-                            {row.service || t("machines.lent")}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                            {t(`machines.${row.status ?? "unknown"}`)}
-                        </span>
-                    </Link>
-                </li>
-            ))}
-        </ul>
-    );
+    return <MachineDomains rows={[...own.items, ...lent]} next={own.next} />;
 }
