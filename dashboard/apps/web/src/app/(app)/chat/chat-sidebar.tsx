@@ -127,7 +127,7 @@ import {
     ShortcutHint,
     shortcutPressed
 } from "@polaris/ui";
-import { GroupNameDialog } from "./group-name-dialog";
+import { EditGroupDialog } from "./edit-group-dialog";
 
 /** How the shared mute list draws itself inside a right-click menu. */
 const CONTEXT_PARTS: MenuParts = {
@@ -1717,7 +1717,7 @@ function RowMenu({
                                 mayNameGroup && (
                                     <ContextMenuItem onSelect={() => setRenamingGroup(true)}>
                                         <Pencil className="size-3.5" />
-                                        {t("channelHeader.nameThisGroup")}
+                                        {t("editGroup.menu")}
                                         <ShortcutHint id="general.rename" />
                                     </ContextMenuItem>
                                 ),
@@ -1815,7 +1815,7 @@ function RowMenu({
             mounted inside one is unmounted the moment it is asked for. */}
             {removeFriendDialog}
             {renamingGroup ? (
-                <GroupNameDialog
+                <EditGroupDialog
                     channel={channel}
                     open
                     onOpenChange={setRenamingGroup}

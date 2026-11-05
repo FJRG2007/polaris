@@ -1,15 +1,20 @@
 // @vitest-environment jsdom
 
-/** Naming a group survives a request that fails, and is sent once. */
+/** Editing a group: Save waits for a change, survives a failure, and sends once. */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { GroupNameDialog } from "@/app/(app)/chat/group-name-dialog";
+import { EditGroupDialog, groupEditDirty } from "@/app/(app)/chat/edit-group-dialog";
 import { MessagesWrapper } from "../setup/i18n";
 
 const rename = vi.hoisted(() => vi.fn());
 
-vi.mock("@/app/(app)/chat/actions", () => ({ renameGroupAction: rename }));
+vi.mock("@/app/(app)/chat/actions", () => ({
+    renameGroupAction: rename,
+    setGroupGifAction: vi.fn(),
+    tenorReadyAction: async () => false,
+    searchTenorAction: async () => ({ results: [] })
+}));
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => undefined }));
 
 afterEach(() => {
@@ -20,7 +25,7 @@ afterEach(() => {
 
 function open(onOpenChange = vi.fn()) {
     render(
-        <GroupNameDialog
+        <EditGroupDialog
             channel={{ id: "c1", name: "Old" }}
             open
             onOpenChange={onOpenChange}
@@ -28,12 +33,27 @@ function open(onOpenChange = vi.fn()) {
         />,
         { wrapper: MessagesWrapper }
     );
-    const field = screen.getByRole("textbox");
+    const field = screen.getByRole("textbox", { name: "Group name" });
     fireEvent.change(field, { target: { value: "New" } });
     return field;
 }
 
-describe("naming a group", () => {
+describe("editing a group", () => {
+    it("keeps Save off until something differs from what was loaded", () => {
+        expect(groupEditDirty("Old", "Old", { kind: "keep" })).toBe(false);
+        expect(groupEditDirty("Old", "Old ", { kind: "keep" })).toBe(false);
+        expect(groupEditDirty("Old", "New", { kind: "keep" })).toBe(true);
+        expect(groupEditDirty("Old", "Old", { kind: "remove" })).toBe(true);
+    });
+
+    it("titles the dialog and disables Save on a name typed back", () => {
+        const field = open();
+        expect(screen.getByText("Edit group")).toBeTruthy();
+        fireEvent.change(field, { target: { value: "Old" } });
+        const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+        expect(save.disabled).toBe(true);
+    });
+
     it("stays open with the reason when the action rejects", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         rename.mockRejectedValue(new Error("Failed to find Server Action"));

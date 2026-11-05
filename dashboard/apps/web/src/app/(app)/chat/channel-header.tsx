@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
-import { GroupNameDialog } from "./group-name-dialog";
+import { EditGroupDialog } from "./edit-group-dialog";
 import { useChat } from "./chat-context";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,7 +29,6 @@ import { TranslationDialog } from "./translation-dialog";
 import { useTextTranslator } from "@/components/text-translation/provider";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
-import { ChatPictureDialog } from "./picture-dialog";
 import { AddPeopleDialog } from "./add-people-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NotifyOptions } from "./notify-menu";
@@ -41,7 +40,6 @@ import {
     ArrowLeft,
     Hash,
     House,
-    Image as ImageIcon,
     Languages,
     Link2,
     LogOut,
@@ -126,7 +124,6 @@ export function ChannelHeader({
     const mayCall = may.call;
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
-    const [picturing, setPicturing] = useState(false);
     const [settings, setSettings] = useState(false);
     const [naming, setNaming] = useState(false);
     const [translating, setTranslating] = useState(false);
@@ -480,13 +477,7 @@ export function ChannelHeader({
                                     {channel.mayPicture && (
                                         <DropdownMenuItem onSelect={() => setRenaming(true)}>
                                             <Pencil className="size-3.5" />
-                                            {t("channelHeader.nameThisGroup")}
-                                        </DropdownMenuItem>
-                                    )}
-                                    {channel.mayPicture && (
-                                        <DropdownMenuItem onSelect={() => setPicturing(true)}>
-                                            <ImageIcon className="size-3.5" />
-                                            {t("channelHeader.groupPicture")}
+                                            {t("editGroup.menu")}
                                         </DropdownMenuItem>
                                     )}
                                     {/* Only the owner's. Offering a switch the
@@ -676,21 +667,6 @@ export function ChannelHeader({
                 />
             )}
 
-            <ChatPictureDialog
-                open={picturing}
-                onOpenChange={setPicturing}
-                kind="channel"
-                id={channel.id}
-                name={channel.name}
-                members={channel.others}
-                // Drawn from one URL in half a dozen places, none of which will
-                // ask for it again on their own: the elements already on screen
-                // are pointed at exactly the address they were. The bytes in the
-                // browser have been replaced by now, so this is a redraw and not
-                // a round trip.
-                onChanged={() => window.location.reload()}
-            />
-
             <AddPeopleDialog
                 open={adding}
                 onOpenChange={setAdding}
@@ -698,7 +674,7 @@ export function ChannelHeader({
                 onAdded={onChanged}
             />
 
-            <GroupNameDialog
+            <EditGroupDialog
                 channel={channel}
                 open={renaming}
                 onOpenChange={setRenaming}

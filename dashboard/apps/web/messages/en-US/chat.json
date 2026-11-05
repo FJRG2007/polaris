@@ -2161,5 +2161,21 @@
         "sendTranslation": "Send translation",
         "sendAsWritten": "Send as written",
         "keepEditing": "Keep editing"
+    },
+    "editGroup": {
+        "menu": "Edit group",
+        "title": "Edit group",
+        "name": "Group name",
+        "changeIcon": "Change icon",
+        "removeIcon": "Remove icon",
+        "uploadImage": "Upload image",
+        "chooseGif": "Choose GIF",
+        "searchGifs": "Search GIFs",
+        "gifsOff": "GIFs are not connected here",
+        "noGifs": "No GIFs found",
+        "back": "Back",
+        "notYours": "You cannot change this group's icon",
+        "tooBig": "That GIF is too large for an icon",
+        "notAnImage": "That is not a picture"
     }
 }

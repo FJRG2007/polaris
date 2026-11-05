@@ -17,11 +17,11 @@
  */
 
 import { storageRefusal } from "@/lib/storage-refusal";
-import { prisma } from "@polaris/db";
 import { apiUser } from "@/lib/api-session";
 import { inviteShowsSpace } from "@/lib/chat/invite-cards";
 
-import { channelAccess, picturesAllowed, spaceAccess } from "@/lib/chat/access";
+import { channelAccess, spaceAccess } from "@/lib/chat/access";
+import { mayChangeChatPicture } from "@/lib/chat/picture-access";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 import {
     deleteAvatar,
@@ -117,7 +117,7 @@ export async function POST(
     const { kind, subjectId } = await params;
     const what = kindOf(kind);
     if (!what) return new Response("Not found", { status: 404 });
-    if (!(await mayWrite(user.id, what, subjectId))) {
+    if (!(await mayChangeChatPicture(user.id, what, subjectId))) {
         return new Response("That is not yours to change", { status: 403 });
     }
 
@@ -155,7 +155,7 @@ export async function DELETE(
     const { kind, subjectId } = await params;
     const what = kindOf(kind);
     if (!what) return new Response("Not found", { status: 404 });
-    if (!(await mayWrite(user.id, what, subjectId))) {
+    if (!(await mayChangeChatPicture(user.id, what, subjectId))) {
         return new Response("That is not yours to change", { status: 403 });
     }
 
@@ -167,30 +167,4 @@ async function mayRead(userId: string, kind: Kind, id: string): Promise<boolean>
     const actor = { id: userId };
     if (kind === "space") return (await spaceAccess(actor, id)) !== null;
     return (await channelAccess(actor, id)) !== null;
-}
-
-/**
- * Who may change it.
- *
- * A space: its owner, or somebody who administers it. A channel inside one: the
- * same people. A group message has no administrators at all - everybody in one
- * is equal in it - so the answer there is the person who started it, which is
- * what the ask was and what every messenger does.
- */
-async function mayWrite(userId: string, kind: Kind, id: string): Promise<boolean> {
-    const actor = { id: userId };
-    if (kind === "space") {
-        const access = await spaceAccess(actor, id);
-        return access === "owner" || access === "admin";
-    }
-
-    const access = await channelAccess(actor, id);
-    if (!access) return false;
-
-    const channel = await prisma.chatChannel.findUnique({
-        where: { id },
-        select: { kind: true, ownerId: true, membersMayEdit: true }
-    });
-    if (!channel) return false;
-    return picturesAllowed({ ...channel, mayAdminister: access.mayAdminister }, userId);
 }

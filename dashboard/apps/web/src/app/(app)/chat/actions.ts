@@ -63,6 +63,8 @@ import type {
 } from "@/lib/chat/messages";
 import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/chat-service";
 import { requirePostable, searchForConversation } from "@/lib/chat/access";
+import { mayChangeChatPicture } from "@/lib/chat/picture-access";
+import { MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
 
 const CHAT_PATH = "/chat";
 
@@ -1306,6 +1308,46 @@ export async function renameGroupAction(input: unknown): Promise<{ error?: strin
     const result = await guard(() => chat.renameGroup(me, parsed.data.channelId, parsed.data.name));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
+}
+
+/** A GIF from the picker as a group's picture. */
+const groupGifSchema = z.object({
+    channelId: z.string().trim().min(1).max(64),
+    address: z.string().trim().url().max(2048)
+});
+
+/**
+ * Put a GIF from the picker on a group.
+ *
+ * The file is pulled down and stored like an uploaded picture rather than
+ * linked, for the reason `sendMediaAction` gives, and through the same
+ * permission the upload route checks.
+ */
+export async function setGroupGifAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const t = await getTranslations("chat");
+    const parsed = groupGifSchema.safeParse(input);
+    if (!parsed.success) return { error: t("errors.notSaved") };
+
+    const { channelId, address } = parsed.data;
+    if (!(await mayChangeChatPicture(me.id, "channel", channelId))) {
+        return { error: t("editGroup.notYours") };
+    }
+
+    const media = await fetchRemoteMedia(address);
+    if (!media) return { error: t("errors.notFetched") };
+    if (media.bytes.length > MAX_AVATAR_BYTES) return { error: t("editGroup.tooBig") };
+    const mime = sniffImageMime(media.bytes);
+    if (!mime) return { error: t("editGroup.notAnImage") };
+
+    try {
+        await storeAvatar({ kind: "channel", id: channelId }, media.bytes, mime);
+    } catch (error) {
+        console.error("chat: could not store the group GIF:", error);
+        return { error: t("errors.notSaved") };
+    }
+    revalidatePath(CHAT_PATH);
+    return {};
 }
 
 /**
