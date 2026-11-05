@@ -27,6 +27,7 @@ import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
 import { dedupeCodeRows, POLAR_CODE_PAGE } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
+import * as repoOptions from "@/lib/agents/repo-options";
 import {
     listSessionsAction,
     promptSessionAction,
@@ -189,6 +190,17 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
         githubAppInstallUrl().catch(() => null)
     ]);
     return { ...choices, installUrl };
+}
+
+/** A page of the person's connected repositories for the composer's repository
+ *  menu - searched, continued, or read back by id - or null for somebody who
+ *  cannot start a session. */
+export async function polarCodeRepos(
+    user: SessionUser,
+    request: repoOptions.RepoOptionsRequest
+): Promise<{ items: repoOptions.RepoOption[]; next: string | null } | null> {
+    if ((await accessOf(user)) !== "manage") return null;
+    return repoOptions.repoOptionsPage(user.id, request);
 }
 
 /** A repository's branches for the composer's branch chip. */

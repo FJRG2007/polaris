@@ -56,6 +56,8 @@ const SESSIONS_PATH = "/apps/agents/sessions";
 export async function sessionChoicesAction(): Promise<{
     agents: AgentOption[];
     repos: { id: string; name: string }[];
+    /** Where the repositories after `repos` start, or null when that is all. */
+    reposNext: string | null;
     /** Whether this deployment offers a machine everybody shares. */
     sharedWorkspace: boolean;
 }> {
@@ -66,7 +68,12 @@ export async function sessionChoicesAction(): Promise<{
         repoOptions.firstRepoPage(user.id),
         sharedWorkspaceAllowed()
     ]);
-    return { sharedWorkspace, agents: await agentOptionsFor(user.id), repos: repos.items };
+    return {
+        sharedWorkspace,
+        agents: await agentOptionsFor(user.id),
+        repos: repos.items,
+        reposNext: repos.next
+    };
 }
 
 /** A page of the repositories a session can start on, or the ones named by id. */

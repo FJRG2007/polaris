@@ -232,6 +232,46 @@ describe("the repository bar", () => {
     });
 });
 
+describe("the repository menu past its first page", () => {
+    const LATER = { id: "33333333-3333-4333-8333-333333333333", name: "acme/zz" };
+
+    it("reads the next page, and a pick from it survives a refresh", async () => {
+        const fetched = globalThis.fetch as ReturnType<typeof vi.fn>;
+        const served = fetched.getMockImplementation() as (url: string) => Promise<Response>;
+        const asked: string[] = [];
+        fetched.mockImplementation(async (url: string) => {
+            if (url.startsWith("/api/polar/code/choices"))
+                return answer({ ...CHOICES, reposNext: "after-web" });
+            if (url.startsWith("/api/polar/code/repos")) {
+                asked.push(url);
+                return answer({ items: [LATER], next: null });
+            }
+            return served(url);
+        });
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        await openCode();
+        press(screen.getByRole("button", { name: /^Where the agent works: acme\/web$/ }));
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Show more" }));
+        fireEvent.click(await screen.findByRole("menuitem", { name: /acme\/zz/ }));
+        expect(asked[0]).toContain("cursor=after-web");
+        const bar = await screen.findByRole("button", {
+            name: /^Where the agent works: acme\/zz$/
+        });
+
+        // The first page no longer holds the pick: it is read back by id, not dropped.
+        press(bar);
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Refresh the list" }));
+        await waitFor(() => expect(asked.some((url) => url.includes(`id=${LATER.id}`))).toBe(true));
+        expect(
+            await screen.findByRole("button", {
+                name: /^Where the agent works: acme\/zz$/,
+                // The menu is still open over it.
+                hidden: true
+            })
+        ).toBeTruthy();
+    });
+});
+
 describe("the branch chip", () => {
     it("names the default branch and lists the branches, the default one first", async () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
