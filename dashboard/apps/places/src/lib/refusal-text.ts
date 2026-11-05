@@ -225,6 +225,19 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Nuki answered with something unexpected.", "refusals.nukiOdd"],
     ["Tuya could not be reached. Try again in a moment.", "refusals.tuyaUnreachable"],
     ["Tuya answered with something unexpected.", "refusals.tuyaOdd"],
+    ["That connection is missing its email or password", "refusals.mideaMissing"],
+    [
+        "MSmartHome gave no key for this dehumidifier. Sync again in a minute.",
+        "refusals.mideaNoKey"
+    ],
+    ["This dehumidifier has no such mode.", "refusals.mideaNoMode"],
+    ["This dehumidifier has no such fan speed.", "refusals.mideaNoSpeed"],
+    ["A dehumidifier cannot do that.", "refusals.mideaCannot"],
+    [
+        "That MSmartHome account has no dehumidifier. Add it in the MSmartHome app first, then connect again.",
+        "refusals.mideaNone"
+    ],
+    ["That dehumidifier is no longer on the MSmartHome account.", "refusals.mideaGone"],
     [
         "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "refusals.tuyaKeys"

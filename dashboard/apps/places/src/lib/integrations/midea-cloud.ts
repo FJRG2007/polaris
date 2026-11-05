@@ -19,7 +19,8 @@
 
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 
-const fromDecimal = (value: string) => Buffer.from(BigInt(value).toString(16), "hex").toString("ascii");
+const fromDecimal = (value: string) =>
+    Buffer.from(BigInt(value).toString(16), "hex").toString("ascii");
 
 /** `SUPPORTED_CLOUDS["SmartHome"]` in midea-local's `cloud.py`. */
 export const MSMART_HOME = {
@@ -72,7 +73,10 @@ export function udpId(applianceId: bigint, method: 1 | 2): string {
 
 function appKeyCipher(): { key: Buffer; iv: Buffer } {
     const digest = sha256Hex(MSMART_HOME.appKey);
-    return { key: Buffer.from(digest.slice(0, 16), "ascii"), iv: Buffer.from(digest.slice(16, 32), "ascii") };
+    return {
+        key: Buffer.from(digest.slice(0, 16), "ascii"),
+        iv: Buffer.from(digest.slice(16, 32), "ascii")
+    };
 }
 
 function cbcEncrypt(key: Buffer, iv: Buffer, data: Buffer): Buffer {
@@ -82,7 +86,9 @@ function cbcEncrypt(key: Buffer, iv: Buffer, data: Buffer): Buffer {
 
 function cbcDecrypt(key: Buffer, iv: Buffer, hex: string): string {
     const decipher = createDecipheriv(`aes-${key.length * 8}-cbc`, key, iv);
-    return Buffer.concat([decipher.update(Buffer.from(hex, "hex")), decipher.final()]).toString("utf8");
+    return Buffer.concat([decipher.update(Buffer.from(hex, "hex")), decipher.final()]).toString(
+        "utf8"
+    );
 }
 
 /** `MSmartCloudSecurity.encrypt_account`. */
@@ -129,7 +135,11 @@ function cloudFailure(code: number, message: string): MideaCloudError {
     if (code === 3101 || code === 3102)
         return new MideaCloudError("MSmartHome refused that email or password.", "password", code);
     if (code === 3106 || code === 3144)
-        return new MideaCloudError("MSmartHome ended the sign-in. Sign in again.", "password", code);
+        return new MideaCloudError(
+            "MSmartHome ended the sign-in. Sign in again.",
+            "password",
+            code
+        );
     if (code === 7610)
         return new MideaCloudError(
             "MSmartHome locked the account for about five minutes after too many tries. Try again then.",
@@ -143,8 +153,16 @@ function cloudFailure(code: number, message: string): MideaCloudError {
             code
         );
     if (code === 3201)
-        return new MideaCloudError("That appliance belongs to another MSmartHome account.", "refused", code);
-    return new MideaCloudError(`MSmartHome answered with error ${code}${message ? ` (${message})` : ""}.`, "refused", code);
+        return new MideaCloudError(
+            "That appliance belongs to another MSmartHome account.",
+            "refused",
+            code
+        );
+    return new MideaCloudError(
+        `MSmartHome answered with error ${code}${message ? ` (${message})` : ""}.`,
+        "refused",
+        code
+    );
 }
 
 export type Fetcher = typeof fetch;
@@ -199,6 +217,9 @@ function endpointUrl(apiUrl: string, endpoint: string): string {
     return `${base}?alias=${encodeURI(endpoint)}`;
 }
 
+/** What every MSmartHome endpoint answers with. */
+type CloudReply = { code?: unknown; msg?: unknown; data?: unknown };
+
 /**
  * `SmartHomeCloud._api_request`: one signed call, retried on 9999 and on a
  * connection that fails, as midea-local retries them. Answers the `data` of a
@@ -211,7 +232,11 @@ async function request(
     data: Record<string, unknown>,
     strict: boolean
 ): Promise<Record<string, unknown> | null> {
-    const body = JSON.stringify({ reqId: randomBytes(16).toString("hex"), stamp: stamp(), ...data });
+    const body = JSON.stringify({
+        reqId: randomBytes(16).toString("hex"),
+        stamp: stamp(),
+        ...data
+    });
     const random = String(Math.floor(Date.now() / 1000));
     const headers: Record<string, string> = {
         "content-type": "application/json; charset=utf-8",
@@ -223,7 +248,7 @@ async function request(
     };
     if (session.uid) headers.uid = session.uid;
     if (session.accessToken) headers.accessToken = session.accessToken;
-    let answer: { code?: unknown; msg?: unknown; data?: unknown } | null = null;
+    let answer: CloudReply | null = null;
     for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
         try {
             const response = await fetcher(endpointUrl(session.apiUrl, endpoint), {
@@ -233,7 +258,7 @@ async function request(
                 cache: "no-store",
                 signal: AbortSignal.timeout(TIMEOUT_MS)
             });
-            answer = (await response.json()) as typeof answer;
+            answer = (await response.json()) as CloudReply;
         } catch {
             answer = null;
             continue;
@@ -241,23 +266,41 @@ async function request(
         if (Number(answer?.code) !== 9999 || attempt === ATTEMPTS - 1) break;
         await pause(1_000 * (attempt + 1));
     }
-    if (!answer) throw new MideaCloudError("MSmartHome could not be reached. Try again in a moment.", "unreachable");
+    if (!answer)
+        throw new MideaCloudError(
+            "MSmartHome could not be reached. Try again in a moment.",
+            "unreachable"
+        );
     const code = Number(answer.code);
-    if (code === 0 && answer.data && typeof answer.data === "object") return answer.data as Record<string, unknown>;
+    if (code === 0 && answer.data && typeof answer.data === "object")
+        return answer.data as Record<string, unknown>;
     if (strict) throw cloudFailure(code, typeof answer.msg === "string" ? answer.msg : "");
     return null;
 }
 
-const text = (value: unknown) => (typeof value === "string" ? value : value == null ? "" : String(value));
+const text = (value: unknown) =>
+    typeof value === "string" ? value : value == null ? "" : String(value);
 
 /** `SmartHomeCloud.login`, with `_re_route` before it. */
 export async function signIn(account: string, password: string): Promise<MideaSession> {
-    let session: MideaSession = { apiUrl: MSMART_HOME.apiUrl, account, uid: null, accessToken: null, keys: null };
+    let session: MideaSession = {
+        apiUrl: MSMART_HOME.apiUrl,
+        account,
+        uid: null,
+        accessToken: null,
+        keys: null
+    };
     const routed =
         (await request(
             session,
             "/v1/unitcenter/router/user/name",
-            { ...generalData(session), clientType: 8, clientSrc: 8, userType: "0", userName: encryptAccount(account) },
+            {
+                ...generalData(session),
+                clientType: 8,
+                clientSrc: 8,
+                userType: "0",
+                userName: encryptAccount(account)
+            },
             false
         )) ??
         (await request(
@@ -298,7 +341,10 @@ export async function signIn(account: string, password: string): Promise<MideaSe
     );
     const mdata = (answer?.mdata ?? {}) as Record<string, unknown>;
     if (!answer || !text(answer.uid) || !text(mdata.accessToken))
-        throw new MideaCloudError("MSmartHome did not finish the sign-in. Try again in a moment.", "refused");
+        throw new MideaCloudError(
+            "MSmartHome did not finish the sign-in. Try again in a moment.",
+            "refused"
+        );
     return {
         ...session,
         uid: text(answer.uid),
@@ -319,7 +365,12 @@ export interface MideaAppliance {
 }
 
 export async function listAppliances(session: MideaSession): Promise<MideaAppliance[]> {
-    const answer = await request(session, "/v1/appliance/user/list/get", generalData(session), true);
+    const answer = await request(
+        session,
+        "/v1/appliance/user/list/get",
+        generalData(session),
+        true
+    );
     const list = Array.isArray(answer?.list) ? (answer.list as Record<string, unknown>[]) : [];
     return list.flatMap((entry) => {
         const id = text(entry.id);
@@ -351,7 +402,10 @@ export interface MideaKey {
 
 /** `MideaCloud.get_cloud_keys`: the token and key for each UDP id form the
  *  cloud knows, method 1 first. A unit answers to one of them. */
-export async function applianceKeys(session: MideaSession, applianceId: string): Promise<MideaKey[]> {
+export async function applianceKeys(
+    session: MideaSession,
+    applianceId: string
+): Promise<MideaKey[]> {
     const keys: MideaKey[] = [];
     for (const method of [1, 2] as const) {
         const udpid = udpId(BigInt(applianceId), method);
@@ -361,11 +415,17 @@ export async function applianceKeys(session: MideaSession, applianceId: string):
             { ...generalData(session), udpid, applianceCodes: applianceId },
             true
         );
-        const tokens = Array.isArray(answer?.tokenlist) ? (answer.tokenlist as Record<string, unknown>[]) : [];
+        const tokens = Array.isArray(answer?.tokenlist)
+            ? (answer.tokenlist as Record<string, unknown>[])
+            : [];
         for (const token of tokens) {
             if (text(token.udpId) !== udpid) continue;
-            const found = { token: text(token.token).toLowerCase(), key: text(token.key).toLowerCase() };
-            if (/^[0-9a-f]+$/.test(found.token) && /^[0-9a-f]{64}$/.test(found.key)) keys.push(found);
+            const found = {
+                token: text(token.token).toLowerCase(),
+                key: text(token.key).toLowerCase()
+            };
+            if (/^[0-9a-f]+$/.test(found.token) && /^[0-9a-f]{64}$/.test(found.key))
+                keys.push(found);
         }
     }
     return keys;

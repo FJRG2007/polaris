@@ -150,7 +150,8 @@ export function a1Set(command: A1Command, messageId: number, protocolVersion = 0
     inner[2] = command.fanCode & 0xff;
     inner[6] = command.targetHumidity & 0xff;
     inner[7] = command.childLock ? 0x80 : 0;
-    inner[8] = (command.anion ? 0x40 : 0) | (command.pump ? 0x08 : 0) | (command.pumpEnable ? 0x10 : 0);
+    inner[8] =
+        (command.anion ? 0x40 : 0) | (command.pump ? 0x08 : 0) | (command.pumpEnable ? 0x10 : 0);
     inner[9] = command.swing ? 0x08 : 0;
     inner[12] = command.waterLevelSet & 0xff;
     return frame(MESSAGE_SET, a1Body(0x48, inner, messageId), protocolVersion);
@@ -221,7 +222,10 @@ export function parseA1(data: Uint8Array): A1Status | null {
 // --- 5A5A packets -----------------------------------------------------------------
 
 /** `LocalSecurity`'s fixed key and salt, as midea-local writes them (decimal). */
-const LOCAL_KEY = Buffer.from(BigInt("141661095494369103254425781617665632877").toString(16), "hex");
+const LOCAL_KEY = Buffer.from(
+    BigInt("141661095494369103254425781617665632877").toString(16),
+    "hex"
+);
 const LOCAL_SALT = Buffer.from(
     BigInt(
         "233912452794221312800602098970898185176935770387238278451789080441632479840061417076563"
@@ -289,7 +293,12 @@ export const DISCOVERY_MESSAGE = Buffer.from(
 export function discoveredId(data: Uint8Array): bigint | null {
     if (data.length < 104) return null;
     let packetData = Buffer.from(data);
-    if (packetData[0] === 0x83 && packetData[1] === 0x70 && packetData[8] === 0x5a && packetData[9] === 0x5a)
+    if (
+        packetData[0] === 0x83 &&
+        packetData[1] === 0x70 &&
+        packetData[8] === 0x5a &&
+        packetData[9] === 0x5a
+    )
         packetData = packetData.subarray(8, packetData.length - 16);
     else if (packetData[0] !== 0x5a || packetData[1] !== 0x5a) return null;
     const id = Buffer.alloc(8);
@@ -357,7 +366,7 @@ export class Session8370 {
     /** `LocalSecurity.encode_8370`. */
     encode(data: Uint8Array, messageType: number): Buffer {
         const encrypted = messageType === ENCRYPTED_RESPONSE || messageType === ENCRYPTED_REQUEST;
-        let payload = Buffer.from(data);
+        let payload: Buffer = Buffer.from(data);
         let size = payload.length;
         let padding = 0;
         if (encrypted && (size + 2) % 16 !== 0) {
@@ -365,7 +374,14 @@ export class Session8370 {
             size += padding + 32;
             payload = Buffer.concat([payload, this.random(padding)]);
         }
-        const header = Buffer.from([0x83, 0x70, (size >> 8) & 0xff, size & 0xff, 0x20, (padding << 4) | messageType]);
+        const header = Buffer.from([
+            0x83,
+            0x70,
+            (size >> 8) & 0xff,
+            size & 0xff,
+            0x20,
+            (padding << 4) | messageType
+        ]);
         const count = Buffer.from([(this.requestCount >> 8) & 0xff, this.requestCount & 0xff]);
         this.requestCount = this.requestCount + 1 >= 0xffff ? 0 : this.requestCount + 1;
         const body = Buffer.concat([count, payload]);

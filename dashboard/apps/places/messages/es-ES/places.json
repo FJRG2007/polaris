@@ -548,6 +548,13 @@
         "nukiRate": "Nuki está atendiendo demasiadas peticiones a la vez. Inténtalo de nuevo en un minuto.",
         "nukiOdd": "Nuki respondió algo inesperado.",
         "tuyaUnreachable": "No se pudo contactar con Tuya. Inténtalo de nuevo en un momento.",
+        "mideaMissing": "A esa conexión le falta el correo o la contraseña",
+        "mideaNoKey": "MSmartHome no dio clave para este deshumectador. Sincroniza en un minuto.",
+        "mideaNoMode": "Este deshumectador no tiene ese modo.",
+        "mideaNoSpeed": "Este deshumectador no tiene esa velocidad.",
+        "mideaCannot": "Un deshumectador no puede hacer eso.",
+        "mideaNone": "Esa cuenta de MSmartHome no tiene deshumectador. Añádelo en su app y vuelve a conectar.",
+        "mideaGone": "Ese deshumectador ya no está en la cuenta de MSmartHome.",
         "tuyaOdd": "Tuya respondió algo inesperado.",
         "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
         "tuyaRefused": "Tuya rechazó la petición.",
@@ -1229,12 +1236,12 @@
         },
         "midea-lan": {
             "label": "Midea / Comfee",
-            "summary": "Deshumidificadores Midea y Comfee de tu cuenta de MSmartHome, controlados en esta red.",
-            "note": "Tu cuenta de MSmartHome indica los deshumidificadores y sus claves. Las lecturas y los cambios van directos a cada equipo, así que tiene que estar en la misma red que Polaris.",
+            "summary": "Deshumectadores Midea y Comfee de tu cuenta de MSmartHome, controlados en esta red.",
+            "note": "Tu cuenta de MSmartHome indica los deshumectadores y sus claves. Las lecturas y los cambios van directos a cada equipo, así que tiene que estar en la misma red que Polaris.",
             "steps": {
-                "s0": "Añade el deshumidificador en la app MSmartHome y comprueba que aparece conectado.",
+                "s0": "Añade el deshumectador en la app MSmartHome y comprueba que aparece conectado.",
                 "s1": "Inicia sesión aquí con el mismo correo y la misma contraseña.",
-                "s2": "Si no se encuentra un deshumidificador, escribe su IP. La lista de dispositivos del router la muestra."
+                "s2": "Si no se encuentra un deshumectador, escribe su IP. La lista de dispositivos del router la muestra."
             },
             "fields": {
                 "email": {
@@ -1246,7 +1253,7 @@
                 },
                 "hosts": {
                     "label": "Direcciones",
-                    "hint": "Solo para un deshumidificador que la búsqueda en la red no encuentre. Separa varias con comas.",
+                    "hint": "Solo para un deshumectador que la búsqueda en la red no encuentre. Separa varias con comas.",
                     "placeholder": "192.168.1.40, 192.168.1.41"
                 }
             }
@@ -1509,7 +1516,7 @@
             "sensor": "Sensor",
             "climate": "Aire acondicionado",
             "air": "Purificador",
-            "dehumidifier": "Deshumidificador",
+            "dehumidifier": "Deshumectador",
             "appliance": "Electrodoméstico",
             "litter": "Arenero"
         },
@@ -1687,7 +1694,7 @@
                 "manual": "Objetivo",
                 "continuous": "Continuo",
                 "clothes_dry": "Secar ropa",
-                "shoes_dry": "Secar calzado",
+                "shoes_dry": "Calzado",
                 "silent": "Silencio"
             },
             "speeds": {
@@ -1862,7 +1869,7 @@
         "disconnect": "Desconectar",
         "filterSoon": "Filtro: cambiar pronto",
         "filterNow": "Cambiar filtro",
-        "tankFull": "Depósito lleno",
+        "tankFull": "Tanque lleno",
         "tankFullHint": "Vacía el depósito de agua para que vuelva a funcionar",
         "connectLocally": "Conectar {name} en local",
         "accountSettings": "Ajustes de {name}",
@@ -2584,7 +2591,7 @@
                 "opener": "{count, plural, one {# abrepuertas} other {# abrepuertas}}",
                 "climate": "{count, plural, one {# aire acondicionado} other {# aires acondicionados}}",
                 "air": "{count, plural, one {# purificador} other {# purificadores}}",
-                "dehumidifier": "{count, plural, one {# deshumidificador} other {# deshumidificadores}}",
+                "dehumidifier": "{count, plural, one {# deshumectador} other {# deshumectadores}}",
                 "switch": "{count, plural, one {# interruptor} other {# interruptores}}",
                 "outlet": "{count, plural, one {# enchufe} other {# enchufes}}",
                 "light": "{count, plural, one {# luz} other {# luces}}",

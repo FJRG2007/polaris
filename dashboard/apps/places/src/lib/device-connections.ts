@@ -1128,6 +1128,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "msmart",
             "dehumidifier",
             "deshumidificador",
+            "deshumectador",
             "local"
         ]
     },
