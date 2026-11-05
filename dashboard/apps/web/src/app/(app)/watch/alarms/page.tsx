@@ -34,7 +34,9 @@ export default async function WatchPage() {
     const routes = [
         ...(rule.inapp ? [t("alarms.routeInApp")] : []),
         ...(rule.email ? [t("alarms.routeEmail")] : []),
-        ...destinations.filter((entry) => rule.destinations.includes(entry.id)).map((entry) => entry.name)
+        ...destinations
+            .filter((entry) => rule.destinations.includes(entry.id))
+            .map((entry) => entry.name)
     ];
 
     return <WatchView initialAlarms={alarms} initialEvents={events} routes={routes} />;
