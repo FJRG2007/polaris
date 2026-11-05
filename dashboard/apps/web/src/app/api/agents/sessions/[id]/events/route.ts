@@ -20,6 +20,7 @@
 import { hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
 import { recordSessionEvents, sessionForToken } from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { parseHookSequence } from "@polaris/core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +72,10 @@ export async function POST(
     // outcome is in what the tool answered.
     const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
 
-    await recordSessionEvents(id, [{ kind, detail: event.detail, subject: event.subject }]);
+    await recordSessionEvents(
+        id,
+        [{ kind, detail: event.detail, subject: event.subject }],
+        parseHookSequence(request.headers.get("x-polaris-seq"))
+    );
     return acknowledged();
 }

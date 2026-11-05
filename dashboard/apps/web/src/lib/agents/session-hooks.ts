@@ -38,10 +38,19 @@ export const CLAUDE_HOOK_EVENTS = [
     { event: "UserPromptSubmit", matcher: null },
     { event: "PreToolUse", matcher: "*" },
     { event: "PostToolUse", matcher: "*" },
+    // The permission prompt itself, with the tool and what it would do. The
+    // reliable source for "Needs you"; Notification is the fallback for a
+    // question the agent asked.
+    { event: "PermissionRequest", matcher: "*" },
     { event: "Notification", matcher: null },
     { event: "Stop", matcher: null },
+    // A turn that ended on an API error or a usage limit. Without it such a
+    // session stayed on "Working" with nothing left running.
+    { event: "StopFailure", matcher: null },
     { event: "SubagentStop", matcher: null },
-    { event: "PreCompact", matcher: null },
+    // After, not before: a manual /compact never sends Stop, so the end of the
+    // compaction is the only thing that says the agent is back at its prompt.
+    { event: "PostCompact", matcher: null },
     { event: "SessionEnd", matcher: null }
 ] as const;
 
@@ -111,7 +120,11 @@ export function hookScript(ingestUrl: string, token: string): string {
     return [
         "#!/bin/sh",
         "# Written by Polaris. Reports this session's lifecycle events; parses nothing.",
+        // When the hook ran, taken here: posts can overtake each other on the
+        // way, and this is what puts them back in order. See applySessionEvents.
+        "seq=$(date +%s%N 2>/dev/null || true)",
         `curl -sS -m 4 -X POST ${shellQuote(ingestUrl)} \\`,
+        '  -H "X-Polaris-Seq: $seq" \\',
         `  -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
         '  -H "Content-Type: application/json" \\',
         "  --data-binary @- >/dev/null 2>&1",
@@ -181,9 +194,11 @@ const CLAUDE_EVENT_KINDS: Record<string, AgentSessionEventKind> = {
     // Blocked on a person: a permission prompt, or a question it asked and is
     // waiting on. The one event that should reach somebody.
     Notification: "question",
+    PermissionRequest: "permission",
     Stop: "turn.end",
+    StopFailure: "turn.failed",
     SubagentStop: "subagent.end",
-    PreCompact: "compact",
+    PostCompact: "compact",
     SessionEnd: "session.end"
 };
 
@@ -253,7 +268,24 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
             ? (record.tool_input as Record<string, unknown>)
             : {};
 
-    if (kind === "tool.start" || kind === "tool.end") {
+    // The 60-second "still waiting for your input" nudge fires after a turn
+    // has already ended. It says nothing Stop did not, and reading it as a
+    // permission prompt would interrupt somebody about a finished turn.
+    if (kind === "question" && record.notification_type === "idle_prompt") return null;
+    // An automatic compaction happens mid-turn and the turn carries on.
+    if (kind === "compact" && record.trigger === "auto") return null;
+    // Clearing or swapping the conversation is the tool starting over, not
+    // ending: the agent is still running in the same terminal.
+    if (kind === "session.end" && (record.reason === "clear" || record.reason === "resume"))
+        return { kind: "session.clear", detail: "", subject: "" };
+    if (kind === "turn.failed") {
+        const said = [record.error, record.error_details]
+            .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+            .join(": ");
+        return { kind, detail: clip(said || "The turn stopped on an error"), subject: "" };
+    }
+
+    if (kind === "tool.start" || kind === "tool.end" || kind === "permission") {
         const detail = toolDetail(tool, input);
         return { kind, detail: detail ? `${tool}: ${detail}` : tool, subject: tool };
     }

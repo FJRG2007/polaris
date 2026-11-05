@@ -473,40 +473,62 @@ export async function sessionOwner(sessionId: string): Promise<string | null> {
  */
 export async function recordSessionEvents(
     sessionId: string,
-    events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
+    events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[],
+    /** When the hook ran on the machine; see `core.applySessionEvents`. */
+    seq: bigint | null = null
 ): Promise<core.AgentSessionState | null> {
     if (events.length === 0) return null;
-    const current = await prisma.agentSession.findUnique({
-        where: { id: sessionId },
-        select: { state: true }
-    });
-    if (!current) return null;
-
-    const before = readState(current.state);
-    const state = core.replaySessionState(events, before);
-    const spoken = [...events].reverse().find((event) => event.detail !== "");
-
-    await prisma.$transaction([
-        prisma.agentSessionEvent.createMany({
-            data: events.map((event) => ({
-                sessionId,
-                kind: event.kind,
-                detail: event.detail,
-                subject: event.subject
-            }))
-        }),
-        prisma.agentSession.update({
+    // Compare-and-set rather than read-then-write: two hooks posted at once
+    // used to both read the same state and the slower write won, whatever
+    // order the events happened in. The update only lands if the row is still
+    // where this read it, and a lost race reads again.
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const current = await prisma.agentSession.findUnique({
             where: { id: sessionId },
-            data: {
-                state,
-                lastEventAt: new Date(),
-                ...(spoken ? { detail: spoken.detail } : {}),
-                ...(core.isSessionOver(state) ? { finishedAt: new Date() } : {})
-            }
-        })
-    ]);
-    await tellOwner(sessionId, before, state);
-    return state;
+            select: { state: true, lastEventSeq: true }
+        });
+        if (!current) return null;
+
+        const before = readState(current.state);
+        const next = core.applySessionEvents(
+            { state: before, seq: current.lastEventSeq },
+            events,
+            seq
+        );
+        const spoken = next.stale
+            ? undefined
+            : [...events].reverse().find((event) => event.detail !== "");
+
+        const applied = await prisma.$transaction(async (tx) => {
+            const moved = await tx.agentSession.updateMany({
+                where: { id: sessionId, state: current.state, lastEventSeq: current.lastEventSeq },
+                data: {
+                    state: next.state,
+                    lastEventSeq: next.seq,
+                    lastEventAt: new Date(),
+                    ...(spoken ? { detail: spoken.detail } : {}),
+                    ...(core.isSessionOver(next.state) && !core.isSessionOver(before)
+                        ? { finishedAt: new Date() }
+                        : {})
+                }
+            });
+            if (moved.count === 0) return false;
+            await tx.agentSessionEvent.createMany({
+                data: events.map((event) => ({
+                    sessionId,
+                    kind: event.kind,
+                    detail: event.detail,
+                    subject: event.subject
+                }))
+            });
+            return true;
+        });
+        if (!applied) continue;
+        if (!next.stale) await tellOwner(sessionId, before, next.state);
+        return next.state;
+    }
+    console.error(`[agent-session] ${sessionId}: gave up recording events after repeated races`);
+    return null;
 }
 
 /**

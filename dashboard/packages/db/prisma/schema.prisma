@@ -8880,6 +8880,10 @@ model AgentSession {
     // thinking hard from one whose machine went away, which look identical from
     // here and mean opposite things.
     lastEventAt DateTime?
+    // When the newest hook that moved the state ran, in nanoseconds on the
+    // session's machine. Posts can arrive out of order; one older than this is
+    // kept as history and moves nothing. Null until a hook sends one.
+    lastEventSeq BigInt?
     startedAt   DateTime?
     finishedAt  DateTime?
     // When the owner was told this session needs them, for the waiting episode

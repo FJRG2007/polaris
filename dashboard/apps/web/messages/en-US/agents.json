@@ -250,6 +250,8 @@
             "subagentEnd": "Subagent finished",
             "compact": "Compacting its context",
             "turnEnd": "Finished a turn",
+            "turnFailed": "Stopped on an error",
+            "sessionClear": "Started over",
             "sessionEnd": "Ended",
             "error": "Error"
         },

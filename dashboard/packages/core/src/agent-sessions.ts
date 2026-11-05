@@ -88,6 +88,12 @@ export const AGENT_SESSION_EVENTS = [
     "subagent.end",
     "compact",
     "turn.end",
+    // A turn the tool gave up on - a usage limit, a refused key, the provider
+    // down. The agent is still there and still listening, so it is not `error`.
+    "turn.failed",
+    // The conversation was cleared or swapped, and the agent is still running.
+    // Claude reports it as the end of a session; for the person it is not one.
+    "session.clear",
     "session.end",
     "error"
 ] as const;
@@ -124,8 +130,10 @@ export interface AgentSessionEvent {
  */
 export function stateAfterEvent(kind: AgentSessionEventKind): AgentSessionState | null {
     switch (kind) {
+        // A tool that just opened is at its prompt, not mid-turn. Calling it
+        // working left a session nobody had prompted on "Working" forever.
         case "session.start":
-        case "compact":
+            return "idle";
         case "tool.start":
         case "subagent.start":
         case "prompt":
@@ -133,7 +141,11 @@ export function stateAfterEvent(kind: AgentSessionEventKind): AgentSessionState 
         case "permission":
         case "question":
             return "waiting";
+        // A compaction somebody asked for ends at the prompt. An automatic one
+        // is dropped before it gets here: the turn it interrupted carries on.
+        case "compact":
         case "turn.end":
+        case "turn.failed":
             return "idle";
         case "session.end":
             return "stopped";
@@ -162,6 +174,56 @@ export function replaySessionState(
         if (next) state = next;
     }
     return state;
+}
+
+/** Where a session's ordering stands: its state, and the sequence of the newest
+ *  event that moved it. */
+export interface SessionPosition {
+    readonly state: AgentSessionState;
+    readonly seq: bigint | null;
+}
+
+/**
+ * What a batch of events does to a session, given where it is.
+ *
+ * Hooks are posted by separate processes, so two of them can arrive the wrong
+ * way round - a PreToolUse after the Stop that ended its turn, which left a
+ * finished session on "Working". Each post carries a sequence taken on the
+ * machine when the hook ran; one older than the newest already applied is kept
+ * as history but moves nothing. Equal is applied, because a machine whose clock
+ * has only seconds gives every event in a second the same number, and dropping
+ * those would drop most of them. A post with no sequence is applied as it
+ * arrives, which is all an older hook script could ever have had.
+ *
+ * A session that is over stays over: nothing a late hook says reopens it.
+ */
+export function applySessionEvents(
+    position: SessionPosition,
+    events: readonly { kind: AgentSessionEventKind }[],
+    seq: bigint | null
+): { state: AgentSessionState; seq: bigint | null; stale: boolean } {
+    const stale = seq !== null && position.seq !== null && seq < position.seq;
+    if (stale || isSessionOver(position.state))
+        return { state: position.state, seq: position.seq, stale: true };
+    return {
+        state: replaySessionState(events, position.state),
+        seq: seq ?? position.seq,
+        stale: false
+    };
+}
+
+/**
+ * The ordering number a hook sent, in nanoseconds, or null.
+ *
+ * The script sends `date +%s%N`. GNU date fills in the nanoseconds; a date that
+ * does not know `%N` leaves seconds followed by junk, which is read as whole
+ * seconds so a machine's events still compare with each other.
+ */
+export function parseHookSequence(value: string | null | undefined): bigint | null {
+    const digits = /^\d+/.exec((value ?? "").trim())?.[0] ?? "";
+    if (!digits || digits.length > 19) return null;
+    const read = BigInt(digits);
+    return digits.length <= 10 ? read * 1_000_000_000n : read;
 }
 
 // ---------------------------------------------------------------------------

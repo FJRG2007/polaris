@@ -251,6 +251,8 @@ export const SESSION_EVENT_KEYS: Readonly<Record<string, NamespaceKey<"agents">>
     "subagent.end": "session.events.subagentEnd",
     compact: "session.events.compact",
     "turn.end": "session.events.turnEnd",
+    "turn.failed": "session.events.turnFailed",
+    "session.clear": "session.events.sessionClear",
     "session.end": "session.events.sessionEnd",
     error: "session.events.error"
 };
