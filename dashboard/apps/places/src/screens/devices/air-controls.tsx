@@ -90,8 +90,9 @@ export function AirQualityChip({
     );
 }
 
-/** The chip a worn filter gets, on the row and in the panel. Nothing while every
- *  filter is fine: a row of "OK" chips would be noise. */
+/** The chip a worn filter or a full water tank gets, on the row and in the
+ *  panel. Nothing while all is fine: a row of "OK" chips would be noise. A full
+ *  tank comes first, since it has already stopped the unit. */
 export function FilterChip({
     air,
     className
@@ -100,6 +101,16 @@ export function FilterChip({
     className?: string;
 }) {
     const t = usePlacesT();
+    if (air?.tankFull) {
+        return (
+            <Badge
+                className={cn("shrink-0", FILTER_TONES.now, className)}
+                title={t("devicesView.tankFullHint")}
+            >
+                {t("devicesView.tankFull")}
+            </Badge>
+        );
+    }
     const worn = kinds.wornFilter(air);
     if (!worn || worn.state === "ok") return null;
     return (

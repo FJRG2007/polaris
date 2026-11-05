@@ -847,7 +847,7 @@ export function ValuePicker({
             : attribute === "door"
               ? [...auto.DOOR_WORDS]
               : attribute === "mode"
-                ? kinds.deviceKind(kind) === "air"
+                ? kinds.isAirKind(kind)
                     ? [...(device?.air?.modes ?? kinds.AIR_MODES)]
                     : [...(device?.climate?.modes ?? kinds.CLIMATE_MODES)]
                 : attribute === "filter"
@@ -1241,7 +1241,7 @@ export function SettingFields({
     const t = usePlacesT();
     const climate = device?.climate ?? null;
     const at = [...path, "setting"];
-    if (device && kinds.deviceKind(device.kind) === "air") {
+    if (device && kinds.isAirKind(device.kind)) {
         return (
             <AirSettingFields
                 device={device}

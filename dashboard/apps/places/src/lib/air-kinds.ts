@@ -1,5 +1,5 @@
 /**
- * Air purifiers and humidifiers: what they can be set to, what they measure and
+ * Air purifiers, humidifiers and dehumidifiers: what they can be set to, what they measure and
  * how worn their filters are.
  *
  * Its own kind rather than an air conditioner with fewer buttons. An air
@@ -45,13 +45,22 @@ export const AIR_MODES = [
     "natural",
     "ventilation",
     "eco",
-    "pet_hair"
+    "pet_hair",
+    // A dehumidifier's, in midea-local's words for the a1 modes
+    // (`MideaA1Device._default_modes`): dry to a set humidity, run without
+    // stopping, dry laundry, dry shoes, and run quietly.
+    "manual",
+    "continuous",
+    "clothes_dry",
+    "shoes_dry",
+    "silent"
 ] as const;
 export type AirMode = (typeof AIR_MODES)[number];
 
 /** The fan speeds a unit can be put on, in no particular order: a unit lists
  *  its own, slowest first, and that order is the one drawn. */
 export const AIR_SPEEDS = [
+    "lowest",
     "sleep",
     "night",
     "gentle",
@@ -70,7 +79,9 @@ export const AIR_SPEEDS = [
     "speed_10",
     "speed_11",
     "speed_12",
-    "turbo"
+    "turbo",
+    // Left to the unit, as a dehumidifier offers it.
+    "auto"
 ] as const;
 export type AirSpeed = (typeof AIR_SPEEDS)[number];
 
@@ -165,7 +176,10 @@ export const airSettingsSchema = z.object({
         humidity: percent.optional(),
         temperature: z.number().finite().min(-50).max(100).optional()
     }),
-    filters: z.array(filterSchema).max(MAX_FILTERS)
+    filters: z.array(filterSchema).max(MAX_FILTERS),
+    /** A dehumidifier whose water tank is full, which stops it until it is
+     *  emptied. Absent on a unit that does not say. */
+    tankFull: z.boolean().optional()
 });
 
 export type AirSettings = z.infer<typeof airSettingsSchema>;

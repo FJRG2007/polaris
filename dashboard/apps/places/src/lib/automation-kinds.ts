@@ -153,6 +153,7 @@ const WATCHED_STATES: Readonly<Record<DeviceKind, readonly kinds.DeviceState[]>>
     opener: ["locked", "unlatched"],
     climate: ["on", "off"],
     air: ["on", "off"],
+    dehumidifier: ["on", "off"],
     switch: ["on", "off"],
     outlet: ["on", "off"],
     light: ["on", "off"],
@@ -174,6 +175,7 @@ function ownAttributes(kind: string): readonly AutomationAttribute[] {
     if (which === "lock" || which === "opener") return ["state", "door"];
     if (which === "climate") return ["state", "mode"];
     if (which === "air") return ["state", "mode", "filter"];
+    if (which === "dehumidifier") return ["state", "mode"];
     return ["state"];
 }
 
@@ -203,7 +205,7 @@ export const READING_MEASURES = [...kinds.AIR_MEASURES, "filter", "quality"] as 
 export type ReadingMeasure = (typeof READING_MEASURES)[number];
 
 export function measuresFor(kind: string): readonly ReadingMeasure[] {
-    return kinds.deviceKind(kind) === "air" ? READING_MEASURES : [];
+    return kinds.isAirKind(kind) ? READING_MEASURES : [];
 }
 
 /**
@@ -218,7 +220,7 @@ export function figuresFor(
     reading?: string | null
 ): readonly (ReadingMeasure | undefined)[] {
     const which = kinds.deviceKind(kind);
-    if (which === "air") return READING_MEASURES;
+    if (kinds.isAirKind(which)) return READING_MEASURES;
     if (which === "climate") return [undefined];
     // The engine reads the first number in the text, so "21.5" and "21,5" are
     // both a figure; a word is not.
@@ -236,7 +238,7 @@ const MODE_WORDS: readonly string[] = [
  *  threshold trigger and a reading condition can watch. */
 export function measures(kind: string): boolean {
     const which = kinds.deviceKind(kind);
-    return which === "sensor" || which === "climate" || which === "air";
+    return which === "sensor" || which === "climate" || kinds.isAirKind(which);
 }
 
 /** A step may flip something rather than name where it should end up. Only for
@@ -1591,7 +1593,7 @@ export function blankSetting(
     climate: kinds.ClimateSettings | null | undefined,
     air?: { readonly kind: string; readonly settings: kinds.AirSettings | null | undefined }
 ): StepSetting | undefined {
-    if (air && kinds.deviceKind(air.kind) === "air") return blankAirSetting(action, air.settings);
+    if (air && kinds.isAirKind(air.kind)) return blankAirSetting(action, air.settings);
     switch (action) {
         case "set-mode":
             return { action, mode: climate?.mode ?? climate?.modes[0] ?? "cool" };
@@ -1767,7 +1769,7 @@ export function autoOffPlan(kind: string): { is: kinds.DeviceState; do: DeviceAc
         which === "outlet" ||
         which === "light" ||
         which === "climate" ||
-        which === "air"
+        kinds.isAirKind(which)
     )
         return { is: "on", do: "turn-off" };
     if (which === "lock") return { is: "unlocked", do: "lock" };

@@ -1485,6 +1485,7 @@
             "sensor": "Sensor",
             "climate": "Air conditioner",
             "air": "Air purifier",
+            "dehumidifier": "Dehumidifier",
             "appliance": "Kitchen appliance",
             "litter": "Litter box"
         },
@@ -1497,6 +1498,7 @@
             "sensor": "Sensors",
             "climate": "Climate",
             "air": "Air",
+            "dehumidifier": "Air",
             "appliance": "Kitchen",
             "litter": "Cats"
         },
@@ -1657,9 +1659,15 @@
                 "natural": "Natural",
                 "ventilation": "Ventilation",
                 "eco": "Eco",
-                "pet_hair": "Pet hair boost"
+                "pet_hair": "Pet hair boost",
+                "manual": "Target",
+                "continuous": "Continuous",
+                "clothes_dry": "Dry laundry",
+                "shoes_dry": "Dry shoes",
+                "silent": "Silent"
             },
             "speeds": {
+                "lowest": "Lowest",
                 "sleep": "Sleep",
                 "night": "Night",
                 "gentle": "Gentle",
@@ -1678,7 +1686,8 @@
                 "speed_10": "Speed 10",
                 "speed_11": "Speed 11",
                 "speed_12": "Speed 12",
-                "turbo": "Turbo"
+                "turbo": "Turbo",
+                "auto": "Auto"
             },
             "options": {
                 "childLock": "Child lock",
@@ -1829,6 +1838,8 @@
         "disconnect": "Disconnect",
         "filterSoon": "Change filter soon",
         "filterNow": "Change filter",
+        "tankFull": "Tank full",
+        "tankFullHint": "Empty the water tank to start it again",
         "connectLocally": "Connect {name} locally",
         "accountSettings": "Settings for {name}",
         "batteryLowTitle": "Battery at or under {percent}%"
@@ -2549,6 +2560,7 @@
                 "opener": "{count, plural, one {# door opener} other {# door openers}}",
                 "climate": "{count, plural, one {# air conditioner} other {# air conditioners}}",
                 "air": "{count, plural, one {# air purifier} other {# air purifiers}}",
+                "dehumidifier": "{count, plural, one {# dehumidifier} other {# dehumidifiers}}",
                 "switch": "{count, plural, one {# switch} other {# switches}}",
                 "outlet": "{count, plural, one {# socket} other {# sockets}}",
                 "light": "{count, plural, one {# light} other {# lights}}",

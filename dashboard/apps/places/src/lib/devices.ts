@@ -124,7 +124,7 @@ function climateColumn(
 
 /** A purifier's settings, as stored. Null for every other kind. */
 function airOf(row: Pick<DeviceRow, "kind" | "air">): kinds.AirSettings | null {
-    return kinds.deviceKind(row.kind) === "air" ? kinds.airSettings(row.air) : null;
+    return kinds.isAirKind(row.kind) ? kinds.airSettings(row.air) : null;
 }
 
 /** A purifier's settings to store, as the column takes them. */

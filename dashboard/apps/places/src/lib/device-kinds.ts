@@ -65,6 +65,7 @@ export const DEVICE_KINDS = [
     "opener",
     "climate",
     "air",
+    "dehumidifier",
     "switch",
     "outlet",
     "light",
@@ -80,6 +81,7 @@ export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
     opener: en("devices.kinds.opener"),
     climate: en("devices.kinds.climate"),
     air: en("devices.kinds.air"),
+    dehumidifier: en("devices.kinds.dehumidifier"),
     switch: en("devices.kinds.switch"),
     outlet: en("devices.kinds.outlet"),
     light: en("devices.kinds.light"),
@@ -95,6 +97,7 @@ export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
     opener: en("devices.groups.opener"),
     climate: en("devices.groups.climate"),
     air: en("devices.groups.air"),
+    dehumidifier: en("devices.groups.dehumidifier"),
     switch: en("devices.groups.switch"),
     outlet: en("devices.groups.outlet"),
     light: en("devices.groups.light"),
@@ -400,6 +403,11 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     // A purifier is switched, then put on a preset or a fan speed; a humidifier
     // also aims at a humidity. What a unit lacks, `airCommandIssue` refuses.
     air: ["turn-on", "turn-off", "set-mode", "set-fan", "set-option", "set-humidity"],
+    // A dehumidifier is a purifier's settings aimed the other way: switched,
+    // put on a mode or a fan speed, and given the humidity to dry the room to.
+    // It is read in the same `air` document; what a unit lacks, `airCommandIssue`
+    // refuses.
+    dehumidifier: ["turn-on", "turn-off", "set-mode", "set-fan", "set-humidity"],
     switch: ["turn-on", "turn-off"],
     outlet: ["turn-on", "turn-off"],
     // A light dims, warms and colours only where the bulb can: what one lacks,
@@ -419,6 +427,14 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
 
 export function actionsFor(kind: string): readonly DeviceAction[] {
     return KIND_ACTIONS[deviceKind(kind)];
+}
+
+/** Whether a kind keeps its settings in the `air` document - a purifier or
+ *  humidifier, and a dehumidifier - and so takes the same commands, controls
+ *  and automation figures. */
+export function isAirKind(kind: string): boolean {
+    const which = deviceKind(kind);
+    return which === "air" || which === "dehumidifier";
 }
 
 /**
@@ -719,7 +735,7 @@ export function commandFor(
         const parsed = climateCommandSchema.safeParse(command);
         return parsed.success ? { kind: "climate", command: parsed.data } : null;
     }
-    if (which === "air") {
+    if (isAirKind(which)) {
         const parsed = airCommandSchema.safeParse(command);
         return parsed.success ? { kind: "air", command: parsed.data } : null;
     }
@@ -842,7 +858,7 @@ export function badgeText(device: DeviceView, t: PlacesTranslator = en): string 
         return climateModeText(device.climate.mode, t);
     }
     // A purifier that is on says what it is running: "Sleep" rather than "On".
-    if (kind === "air" && device.state === "on" && device.air) {
+    if (isAirKind(kind) && device.state === "on" && device.air) {
         if (device.air.mode) return airModeText(device.air.mode, t);
         if (device.air.speed) return airSpeedText(device.air.speed, t);
     }

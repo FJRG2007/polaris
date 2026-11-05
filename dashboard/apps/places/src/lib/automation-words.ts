@@ -101,7 +101,7 @@ export function valueText(
     if (attribute === "door") return kinds.doorText(kinds.doorState(value), t) || value;
     if (attribute === "mode") {
         const mode = kinds.CLIMATE_MODES.find((entry) => entry === value);
-        if (mode && kinds.deviceKind(kind) !== "air") return kinds.climateModeText(mode, t);
+        if (mode && !kinds.isAirKind(kind)) return kinds.climateModeText(mode, t);
         const preset = kinds.AIR_MODES.find((entry) => entry === value);
         return preset
             ? kinds.airModeText(preset, t)
