@@ -87,11 +87,60 @@ function instanceForms(instanceName: string): string[] {
     );
 }
 
+/** Digits, Cyrillic and Greek capitals that draw like a Latin capital, as that
+ *  capital. */
+const LOOKALIKES: Readonly<Record<string, string>> = {
+    "0": "O",
+    "1": "I",
+    "3": "E",
+    "4": "A",
+    "5": "S",
+    "7": "T",
+    "8": "B",
+    "\u0410": "A",
+    "\u0412": "B",
+    "\u0415": "E",
+    "\u041A": "K",
+    "\u041C": "M",
+    "\u041D": "H",
+    "\u041E": "O",
+    "\u0420": "P",
+    "\u0421": "C",
+    "\u0422": "T",
+    "\u0425": "X",
+    "\u0423": "Y",
+    "\u0405": "S",
+    "\u0406": "I",
+    "\u0408": "J",
+    "\u0391": "A",
+    "\u0392": "B",
+    "\u0395": "E",
+    "\u0396": "Z",
+    "\u0397": "H",
+    "\u0399": "I",
+    "\u039A": "K",
+    "\u039C": "M",
+    "\u039D": "N",
+    "\u039F": "O",
+    "\u03A1": "P",
+    "\u03A4": "T",
+    "\u03A5": "Y",
+    "\u03A7": "X"
+};
+
+/** The shape a tag reads as: accents dropped and every lookalike folded to the
+ *  Latin capital it draws like, so "M0D" and a Cyrillic "MOD" read as MOD. */
+function readsAs(text: string): string {
+    return [...normalizeNameTagText(text).normalize("NFKD").replace(/\p{M}/gu, "").toUpperCase()]
+        .map((char) => LOOKALIKES[char] ?? char)
+        .join("");
+}
+
 /** Whether this text reads as the instance's staff or the instance itself. */
 export function isReservedNameTag(text: string, instanceName: string): boolean {
-    const normalized = normalizeNameTagText(text);
-    return (
-        RESERVED_NAME_TAGS.includes(normalized) || instanceForms(instanceName).includes(normalized)
+    const shape = readsAs(text);
+    return [...RESERVED_NAME_TAGS, ...instanceForms(instanceName)].some(
+        (word) => readsAs(word) === shape
     );
 }
 
@@ -132,7 +181,11 @@ export function nameTagDefinitionSchema(context: NameTagContext) {
             color: z.enum(NAME_TAG_COLORS)
         })
         .superRefine((value, ctx) => {
-            if (!context.staff && isReservedNameTag(value.text, context.instanceName))
+            if (
+                value.enabled &&
+                !context.staff &&
+                isReservedNameTag(value.text, context.instanceName)
+            )
                 ctx.addIssue({ code: "custom", path: ["text"], message: "reserved" });
         });
 }

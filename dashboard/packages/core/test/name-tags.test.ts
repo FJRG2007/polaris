@@ -38,6 +38,16 @@ describe("name tag schema", () => {
         expect(core.isReservedNameTag("ACME", "Polaris")).toBe(false);
     });
 
+    it("refuses lookalikes of reserved words", () => {
+        for (const text of ["M0D", "5TAF", "МОD", "АDМ", "P0L", "MÓD"])
+            expect(member.safeParse({ ...base, text }).error?.issues[0]?.message).toBe("reserved");
+        expect(core.isReservedNameTag("ÑU", "Polaris")).toBe(false);
+    });
+
+    it("lets a switched-off tag keep a reserved word", () => {
+        expect(member.safeParse({ ...base, enabled: false, text: "MOD" }).success).toBe(true);
+    });
+
     it("lets only organizations use their avatar, and only known colors", () => {
         expect(member.safeParse({ ...base, text: "ACME", emblem: "avatar" }).success).toBe(true);
         expect(staff.safeParse({ ...base, text: "ACME", emblem: "avatar" }).success).toBe(false);

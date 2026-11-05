@@ -80,6 +80,7 @@ export default async function OrganizationSettingsPage({
                 chatIsolated={chat?.chatIsolated === true}
                 chatOffered={chatOffered}
                 nameTag={nameTag}
+                nameTagStaff={user.isAdmin}
                 orgImage={chat?.image ? orgAvatarUrl(org.id) : null}
             />
         </Messages>

@@ -6,9 +6,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Check } from "lucide-react";
 import * as core from "@polaris/core";
-import { Button, Card, CardBody, CardHeader, CardTitle, cn, Skeleton } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Select, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { NameTagLabel } from "@/components/name-tags/name-tag-chip";
 import { nameTagErrorKey } from "@/components/name-tags/name-tag-editor";
@@ -78,35 +77,25 @@ export function MyNameTag() {
                     </div>
                 )}
                 {data && data !== "failed" && (
-                    <div
-                        role="radiogroup"
-                        aria-label={t("nameTags.mine.title")}
-                        className="flex flex-col gap-1"
-                    >
-                        {rows.map((row) => {
-                            const on = keyOf(row.choice) === keyOf(data.chosen);
-                            return (
-                                <button
-                                    key={keyOf(row.choice)}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={on}
-                                    onClick={() => void choose(row.choice)}
-                                    className={cn(
-                                        "hover:bg-muted flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                                        on && "bg-muted"
-                                    )}
-                                >
-                                    <span className="min-w-0 flex-1 truncate" title={row.name}>
-                                        {row.name}
-                                    </span>
-                                    {row.tag && <NameTagLabel tag={row.tag} />}
-                                    <Check className={cn("size-4 shrink-0", !on && "invisible")} />
-                                </button>
-                            );
-                        })}
+                    <div className="flex flex-col gap-1">
+                        <Select
+                            aria-label={t("nameTags.mine.title")}
+                            value={keyOf(data.chosen)}
+                            onValueChange={(value) => {
+                                const row = rows.find(
+                                    (candidate) => keyOf(candidate.choice) === value
+                                );
+                                if (row) void choose(row.choice);
+                            }}
+                            options={rows.map((row) => ({
+                                value: keyOf(row.choice),
+                                label: row.name,
+                                icon: row.tag ? <NameTagLabel tag={row.tag} /> : undefined
+                            }))}
+                            className="w-full sm:max-w-sm"
+                        />
                         {data.options.length === 0 && (
-                            <p className="text-muted-foreground px-2 text-xs">
+                            <p className="text-muted-foreground text-xs">
                                 {t("nameTags.mine.empty")}
                             </p>
                         )}

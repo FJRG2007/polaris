@@ -61,6 +61,7 @@ export function SettingsView({
     chatIsolated,
     chatOffered,
     nameTag,
+    nameTagStaff,
     orgImage
 }: {
     org: OrgDetail;
@@ -84,6 +85,8 @@ export function SettingsView({
     chatOffered: boolean;
     /** The tag members may wear; null for somebody who cannot manage it. */
     nameTag: NameTagFormValue | null;
+    /** An instance administrator, who may use the reserved words here too. */
+    nameTagStaff: boolean;
     orgImage: string | null;
 }) {
     const tt = useTranslations("badges");
@@ -132,7 +135,7 @@ export function SettingsView({
                             title={tt("nameTags.org.title")}
                             intro={tt("nameTags.org.intro")}
                             initial={nameTag}
-                            staff={false}
+                            staff={nameTagStaff}
                             image={orgImage}
                             onSave={async (value) => {
                                 const result = await setOrgNameTagAction(org.id, value);

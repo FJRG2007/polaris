@@ -6,6 +6,7 @@
  */
 
 import { requireAdmin } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
 import { findPeople } from "@/lib/people-search";
 import { getTranslations } from "@/lib/i18n/request";
 import * as badges from "@/lib/badges/badge-service";
@@ -40,6 +41,12 @@ export async function setInstanceNameTagAction(input: unknown): Promise<{ error?
     const actor = await scope();
     try {
         await nameTags.setInstanceTag(actor, input);
+        await recordAudit({
+            actorId: actor.id,
+            action: "instance.nameTag",
+            targetType: "setting",
+            targetId: nameTags.INSTANCE_TAG_KEY
+        });
         return {};
     } catch (caught) {
         if (caught instanceof nameTags.NameTagError) return { error: caught.code };

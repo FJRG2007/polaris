@@ -19,6 +19,7 @@ const known = new Map<string, { tag: core.NameTagView | null; at: number }>();
 const waiting = new Set<string>();
 const asking = new Set<string>();
 const listeners = new Set<() => void>();
+const shown = new Map<string, number>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 function emit(): void {
@@ -32,8 +33,10 @@ async function ask(ids: string[]): Promise<void> {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ ids })
         });
-        if (!response.ok) return;
-        const body = (await response.json()) as { tags?: Record<string, core.NameTagView> };
+        if (!response.ok && response.status !== 401) return;
+        const body = response.ok
+            ? ((await response.json()) as { tags?: Record<string, core.NameTagView> })
+            : {};
         const at = Date.now();
         for (const id of ids) known.set(id, { tag: body.tags?.[id] ?? null, at });
         emit();
@@ -67,15 +70,23 @@ function subscribe(listener: () => void): () => void {
 
 /** Drop what is kept - after somebody changes the tag they wear. */
 export function forgetNameTags(): void {
-    known.clear();
-    emit();
+    for (const [id, held] of known) known.set(id, { ...held, at: 0 });
+    for (const id of shown.keys()) want(id);
+}
+
+function show(id: string): () => void {
+    shown.set(id, (shown.get(id) ?? 0) + 1);
+    want(id);
+    return () => {
+        const count = (shown.get(id) ?? 1) - 1;
+        if (count > 0) shown.set(id, count);
+        else shown.delete(id);
+    };
 }
 
 /** This person's tag as the viewer may see it, or null. */
 export function useNameTag(id: string | null | undefined): core.NameTagView | null {
-    useEffect(() => {
-        if (id) want(id);
-    }, [id]);
+    useEffect(() => (id ? show(id) : undefined), [id]);
     return useSyncExternalStore(
         subscribe,
         () => (id ? (known.get(id)?.tag ?? null) : null),
