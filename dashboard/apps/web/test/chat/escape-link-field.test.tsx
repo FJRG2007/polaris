@@ -6,7 +6,7 @@
  */
 
 import type { Editor } from "@tiptap/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useCloseOnEscape } from "@/app/(app)/chat/close-on-escape";
 import { MessagesWrapper } from "../setup/i18n";
@@ -17,7 +17,13 @@ vi.mock("@tiptap/react/menus", () => ({
 
 const { SelectionToolbar } = await import("@/components/rich-text/toolbar");
 
-afterEach(cleanup);
+// The conversation decides once the press has been handled everywhere, in the
+// task after it - see `useCloseOnEscape`.
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+});
 
 const editor = { isActive: () => false, getAttributes: () => ({}) } as unknown as Editor;
 
@@ -36,9 +42,11 @@ describe("the link field over a selection", () => {
             key: "Escape"
         });
         expect(screen.queryByRole("textbox", { name: "Link address" })).toBeNull();
+        vi.runOnlyPendingTimers();
         expect(onClose).not.toHaveBeenCalled();
 
         fireEvent.keyDown(document.body, { key: "Escape" });
+        vi.runOnlyPendingTimers();
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 });
