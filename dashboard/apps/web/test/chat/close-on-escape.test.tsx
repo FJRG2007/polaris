@@ -9,13 +9,17 @@
  */
 
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { VideoViewer } from "@/components/video-viewer";
 import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
 import { closesConversation, useCloseOnEscape } from "@/app/(app)/chat/close-on-escape";
 
-afterEach(cleanup);
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+});
 
 const escape = (init: KeyboardEventInit = {}) =>
     new KeyboardEvent("keydown", { key: "Escape", cancelable: true, ...init });
@@ -89,7 +93,9 @@ describe("the conversation screen", () => {
             </>
         );
         window.dispatchEvent(escape());
+        vi.runOnlyPendingTimers();
         expect(onViewerClose).toHaveBeenCalledTimes(1);
+        vi.runOnlyPendingTimers();
         expect(onClose).not.toHaveBeenCalled();
         cleanup();
 
@@ -100,7 +106,9 @@ describe("the conversation screen", () => {
             </>
         );
         window.dispatchEvent(escape());
+        vi.runOnlyPendingTimers();
         expect(onViewerClose).toHaveBeenCalledTimes(2);
+        vi.runOnlyPendingTimers();
         expect(onClose).not.toHaveBeenCalled();
     });
 
@@ -110,9 +118,11 @@ describe("the conversation screen", () => {
         const box = screen.getByRole("textbox", { name: "Message" });
 
         fireEvent.keyDown(box, { key: "Escape" });
+        vi.runOnlyPendingTimers();
         expect(onClose).not.toHaveBeenCalled();
 
         fireEvent.keyDown(box, { key: "Escape" });
+        vi.runOnlyPendingTimers();
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
@@ -121,6 +131,26 @@ describe("the conversation screen", () => {
         const { unmount } = render(<Conversation onClose={onClose} />);
         unmount();
         window.dispatchEvent(escape());
+        vi.runOnlyPendingTimers();
         expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("whatever has the focus, even a handler that stops the press", () => {
+        const onClose = vi.fn();
+        render(
+            <>
+                <Conversation onClose={onClose} />
+                <button type="button" onKeyDown={(event) => event.stopPropagation()}>
+                    Elsewhere
+                </button>
+            </>
+        );
+        fireEvent.keyDown(screen.getByRole("button", { name: "Elsewhere" }), { key: "Escape" });
+        vi.runOnlyPendingTimers();
+        expect(onClose).toHaveBeenCalledTimes(1);
+
+        fireEvent.keyDown(document.body, { key: "Escape" });
+        vi.runOnlyPendingTimers();
+        expect(onClose).toHaveBeenCalledTimes(2);
     });
 });
