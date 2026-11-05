@@ -432,7 +432,7 @@ function HoldersDialog({
                     </p>
                 )}
                 {holders && holders.length > 0 && (
-                    <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto">
+                    <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overscroll-contain">
                         {holders.map((holder) => (
                             <li key={holder.id} className="flex min-w-0 items-center gap-2 py-2">
                                 {holder.username ? (
