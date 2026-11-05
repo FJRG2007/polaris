@@ -67,21 +67,21 @@ export default async function OrganizationSettingsPage({
     // The photo card is the account screens' own, and reads their namespace.
     return (
         <Messages namespaces={["account", "badges"]}>
-        <SettingsView
-            org={org}
-            isOwner={access.isOwner}
-            canManage={canManage}
-            canDelete={canDelete}
-            candidates={members
-                .filter((member) => member.role !== "owner")
-                .map((member) => ({ userId: member.userId, name: member.name }))}
-            successor={successor}
-            impact={impact}
-            chatIsolated={chat?.chatIsolated === true}
-            chatOffered={chatOffered}
-            nameTag={nameTag}
-            orgImage={chat?.image ? orgAvatarUrl(org.id) : null}
-        />
+            <SettingsView
+                org={org}
+                isOwner={access.isOwner}
+                canManage={canManage}
+                canDelete={canDelete}
+                candidates={members
+                    .filter((member) => member.role !== "owner")
+                    .map((member) => ({ userId: member.userId, name: member.name }))}
+                successor={successor}
+                impact={impact}
+                chatIsolated={chat?.chatIsolated === true}
+                chatOffered={chatOffered}
+                nameTag={nameTag}
+                orgImage={chat?.image ? orgAvatarUrl(org.id) : null}
+            />
         </Messages>
     );
 }

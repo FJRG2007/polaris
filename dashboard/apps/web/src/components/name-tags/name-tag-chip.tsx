@@ -9,7 +9,6 @@
 import { useState } from "react";
 import { Users } from "lucide-react";
 import * as core from "@polaris/core";
-import { nameTagCardAction } from "@/app/(app)/name-tag-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NameTagCard } from "@/lib/name-tags/name-tag-service";
 import {
@@ -108,7 +107,11 @@ export function NameTagButton({ tag, personId }: { tag: core.NameTagView; person
         event.stopPropagation();
         event.preventDefault();
         setCard("loading");
-        const answer = await nameTagCardAction(personId).catch(() => null);
+        // Loaded on the click: every name draws this button, and a static import
+        // would pull the server side into each screen that only shows a name.
+        const answer = await import("@/app/(app)/name-tag-actions")
+            .then((actions) => actions.nameTagCardAction(personId))
+            .catch(() => null);
         setCard(answer ?? null);
     };
 

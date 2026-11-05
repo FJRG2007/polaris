@@ -30,7 +30,15 @@ export function usePersonPress(): PersonPress | null {
  * the same label it always was, so a mention never looks like somewhere to click
  * and then goes nowhere.
  */
-export function PersonMention({ id, label, className }: { id: string; label: string; className: string }) {
+export function PersonMention({
+    id,
+    label,
+    className
+}: {
+    id: string;
+    label: string;
+    className: string;
+}) {
     const press = usePersonPress();
     if (!id) return <span className={className}>{label}</span>;
     // The tag sits outside the chip, as it does after every other drawn name.

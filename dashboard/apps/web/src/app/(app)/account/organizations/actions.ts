@@ -49,7 +49,10 @@ async function failure(caught: unknown, fallback: OrgsKey): Promise<{ error: str
 /** A payload the schema refused: its first issue in the reader's language, or
  *  the fallback when it named none. */
 async function invalid(message: string | undefined, fallback: OrgsKey): Promise<{ error: string }> {
-    const [t, tv] = await Promise.all([getTranslations("accountOrgs"), getTranslations("validation")]);
+    const [t, tv] = await Promise.all([
+        getTranslations("accountOrgs"),
+        getTranslations("validation")
+    ]);
     return { error: message === undefined ? t(fallback) : orgValidationMessage(t, tv, message) };
 }
 
@@ -84,8 +87,7 @@ async function record(
 export async function createOrgAction(input: unknown): Promise<{ slug?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.organizationSchema.safeParse(input);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         // The instance policy is checked here rather than in the service, so the
         // one place that says "may this account start one" is also the place the
@@ -108,8 +110,7 @@ export async function createOrgAction(input: unknown): Promise<{ slug?: string; 
 export async function updateOrgAction(orgId: string, input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.organizationProfileSchema.safeParse(input);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         // The name, the description and the photo are settings, not ownership:
         // whoever the organization trusted with its settings may change them.
@@ -180,8 +181,7 @@ export async function changeOrgSlugAction(
 ): Promise<{ slug?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.orgSlugField.safeParse(slug);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkHandle");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkHandle");
     try {
         await orgs.requireOrgPermission(caller, orgId, "settings.manage");
         await orgs.changeOrgSlug(orgId, parsed.data);
@@ -225,8 +225,7 @@ export async function transferOrgAction(
 export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.stepUpProofSchema.safeParse(proof);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.confirmFirst");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.confirmFirst");
     try {
         await orgs.requireOrgDeletion(caller, orgId);
         const proven = await proveStepUp(caller.id, `org-delete:${orgId}`, parsed.data);
@@ -269,8 +268,7 @@ export async function inviteOrgMemberAction(
 ): Promise<{ emailed?: boolean; url?: string; sendError?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.orgInviteSchema.safeParse({ identifier, role });
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
         await orgs.requireRoleWithinOwn(access, orgId, parsed.data.role);
@@ -475,8 +473,7 @@ export async function createTeamAction(
 ): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.teamSchema.safeParse(input);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         await orgs.requireOrgPermission(caller, orgId, "teams.manage");
         const id = await orgs.createTeam(orgId, parsed.data);
@@ -494,8 +491,7 @@ export async function updateTeamAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.teamSchema.safeParse(input);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const { orgId } = await orgs.requireTeam(caller, teamId, "manage");
         await orgs.updateTeam(teamId, parsed.data);
@@ -587,8 +583,7 @@ export async function createOrgRoleAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.orgRoleSchema.safeParse(input);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "roles.manage");
         orgs.requireWithinOwn(access, parsed.data.permissions);
@@ -611,8 +606,7 @@ export async function updateOrgRoleAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.orgRoleSchema.omit({ slug: true }).safeParse(input);
-    if (!parsed.success)
-        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "roles.manage");
         // The grants written, and the role as it stands: narrowing a role that
