@@ -20,7 +20,7 @@ export interface OptionsPage<T> {
     readonly next: string | null;
 }
 
-interface PageRequest {
+export interface PageRequest {
     readonly query: string;
     readonly cursor: string | null;
     readonly limit: number;
@@ -28,14 +28,14 @@ interface PageRequest {
 }
 
 /** Rows after the cursor in (name, id) order, or nothing for the first page. */
-function afterCursor(cursor: string | null) {
+export function afterCursor(cursor: string | null) {
     const after = decodeServerCursor(cursor);
     return after
         ? [{ OR: [{ name: { gt: after.name } }, { name: after.name, id: { gt: after.id } }] }]
         : [];
 }
 
-function pageOf<R extends { id: string; name: string }, T>(
+export function pageOf<R extends { id: string; name: string }, T>(
     rows: R[],
     limit: number,
     map: (row: R) => T
@@ -48,15 +48,18 @@ function pageOf<R extends { id: string; name: string }, T>(
     };
 }
 
-/** The deploy servers a scope offers: exactly what `createTunnel` and the
- *  backup relay (`relayTarget`) each accept. */
+/** The deploy servers a scope offers: exactly what `createTunnel`, the backup
+ *  relay (`relayTarget`) and moving a service home (`moveHome`) each accept.
+ *  For `project` the caller is the project's owner, resolved by the action. */
 export function deployTargetScopeWhere(
     callerId: string,
     scope: DeployTargetScope
 ): Prisma.DeployTargetWhereInput {
-    return scope === "relay"
-        ? { status: "active", kind: { not: "local" }, owner: { isAdmin: true } }
-        : { ownerId: callerId, status: "active" };
+    if (scope === "relay") {
+        return { status: "active", kind: { not: "local" }, owner: { isAdmin: true } };
+    }
+    if (scope === "project") return { ownerId: callerId };
+    return { ownerId: callerId, status: "active" };
 }
 
 export async function readDeployTargetOptions(

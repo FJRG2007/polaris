@@ -13,7 +13,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { mailServerSetupSchema } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
-import { useEffect, useState, useTransition } from "react";
+import { ServerPicker } from "@/components/server-picker";
+import { LOCAL_SERVER_OPTION } from "@/lib/server-options-schema";
+import { useState, useTransition } from "react";
 import { Loader2, Mails, Plus, Server } from "lucide-react";
 import { Field, forgetPanelData, PanelError, StatusBadge, usePanelData } from "./ui-bits";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -35,10 +37,8 @@ import {
     DialogTitle,
     EmptyState,
     Input,
-    Select,
     Skeleton
 } from "@polaris/ui";
-import * as polls from "./mail-server-polls";
 
 export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
     const t = useTranslations("mailServer");
@@ -235,20 +235,11 @@ function SetupDialog({
     const t = useTranslations("mailServer");
     const tcommon = useTranslations("common");
     const router = useRouter();
-    const [placements, setPlacements] = useState<{ id: string; name: string }[]>([]);
     const [serverId, setServerId] = useState("local");
     const [hostname, setHostname] = useState("");
     const [domain, setDomain] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!open) return;
-        polls
-            .placements()
-            .then(setPlacements)
-            .catch(() => setPlacements([{ id: "local", name: t("common.thisMachine") }]));
-    }, [open, t]);
 
     // Suggest the name from the domain the way almost everybody names it.
     const suggested =
@@ -297,14 +288,18 @@ function SetupDialog({
                 >
                     <Field label={t("setup.runsOn")} required hint={t("setup.runsOnHint")}>
                         {(id) => (
-                            <Select
+                            <ServerPicker
                                 id={id}
                                 value={serverId}
                                 onValueChange={setServerId}
-                                options={placements.map((placement) => ({
-                                    value: placement.id,
-                                    label: placement.name
-                                }))}
+                                selectedLabel={
+                                    serverId === LOCAL_SERVER_OPTION
+                                        ? t("common.thisMachine")
+                                        : undefined
+                                }
+                                includeLocal
+                                purpose="mailServer"
+                                aria-label={t("setup.runsOn")}
                             />
                         )}
                     </Field>

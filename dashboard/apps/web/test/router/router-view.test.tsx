@@ -55,13 +55,21 @@ afterEach(() => {
 
 describe("RouterSection", () => {
     it("says what to do when there is no machine", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: false,
+            first: null,
+            privateNetworks: []
+        });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("No machines yet")).toBeTruthy();
     });
 
     it("shows the ports and does not offer Apply until something changed", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: null, reading: READING });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("eth1")).toBeTruthy();
@@ -96,7 +104,11 @@ describe("RouterSection", () => {
 
     /** Open a machine with a saved plan, move its first line down and press Apply. */
     async function applyMovedLine(): Promise<HTMLElement> {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: SAVED, reading: READING });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         const down = await screen.findAllByRole("button", { name: "Move down" });
@@ -128,7 +140,11 @@ describe("RouterSection", () => {
     });
 
     it("says what is missing when Apply stays off", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: null, reading: READING });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         await screen.findByText("eth1");
@@ -138,7 +154,11 @@ describe("RouterSection", () => {
     });
 
     it("does not offer a port a plan cannot hold", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const ports = [
             { ...PORT, name: "eth0.20" },
             { ...PORT, name: "eth1" }
@@ -151,7 +171,11 @@ describe("RouterSection", () => {
     });
 
     it("warns about what is running, and not about a line still in the draft", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const ports = [{ ...PORT, name: "eth0", hasGateway: true }];
         const plan = { ...SAVED, wans: [{ interface: "eth0", vlan: null }] };
         readRouterAction.mockResolvedValue({
@@ -175,7 +199,11 @@ describe("RouterSection", () => {
 
     /** Save a network from its dialog unchanged, and send the draft with a moved line. */
     async function resaveNetwork(reading: unknown): Promise<{ wifi?: unknown }> {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         applyRouterAction.mockResolvedValue({});
         readRouterAction.mockResolvedValue({ plan: { ...SAVED, lans: [WIFI_LAN] }, reading });
         render(<RouterSection />, { wrapper: MessagesWrapper });
@@ -203,7 +231,11 @@ describe("RouterSection", () => {
 
     it("offers no access point on a port with no radio", async () => {
         const ports = [...READING.ports, { ...PORT, name: "wlan0", wireless: true }];
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({
             plan: { ...SAVED, lans: [{ ...WIFI_LAN, interface: "eth1" }] },
             reading: { ...READING, ports }
@@ -215,7 +247,11 @@ describe("RouterSection", () => {
     });
 
     it("judges what is running, not what the draft asks for", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const ports = [
             { ...PORT, name: "eth0", hasGateway: true },
             { ...PORT, name: "eth1" }
@@ -235,7 +271,11 @@ describe("RouterSection", () => {
     });
 
     it("names the connection type on the line's form", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: SAVED, reading: READING });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         fireEvent.click(
@@ -246,7 +286,11 @@ describe("RouterSection", () => {
     });
 
     it("names a missing prefix client and lets Apply try again", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const lans = SAVED.lans.map((lan) => ({ ...lan, ipv6: true }));
         readRouterAction.mockResolvedValue({
             plan: { ...SAVED, lans },
@@ -260,7 +304,11 @@ describe("RouterSection", () => {
     });
 
     it("blames the line only when the prefix client is there", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const lans = SAVED.lans.map((lan) => ({ ...lan, ipv6: true }));
         readRouterAction.mockResolvedValue({
             plan: { ...SAVED, lans },
@@ -273,7 +321,11 @@ describe("RouterSection", () => {
     });
 
     it("names a stored fixed address that blocks the next change", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const taken = { mac: "aa:bb:cc:dd:ee:01", address: "10.77.0.1" };
         const lans = SAVED.lans.map((lan) => ({ ...lan, reservations: [taken] }));
         readRouterAction.mockResolvedValue({ plan: { ...SAVED, lans }, reading: READING });
@@ -285,7 +337,11 @@ describe("RouterSection", () => {
     });
 
     it("stops the skeletons when the machine does not answer", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: null, reading: null });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Not answering")).toBeTruthy();
@@ -293,7 +349,11 @@ describe("RouterSection", () => {
     });
 
     it("draws a bounded list of devices and searches the rest", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         const clients = Array.from({ length: 300 }, (_, at) => ({
             address: `10.77.${Math.floor(at / 250)}.${(at % 250) + 2}`,
             mac: "aa:bb:cc:00:00:01",
@@ -312,7 +372,11 @@ describe("RouterSection", () => {
     });
 
     it("says the machine went back after a change that did not hold", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({
             plan: null,
             reading: { ...READING, rolledBack: true }
@@ -333,7 +397,11 @@ describe("RouterSection", () => {
     };
 
     it("names a port clash and ends it with one button", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: null, reading: VPS });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("This machine has one port, ens6")).toBeTruthy();
@@ -361,7 +429,11 @@ describe("RouterSection", () => {
     });
 
     it("moves a clashing network onto a free VLAN and lets it apply", async () => {
-        listMachinesAction.mockResolvedValue({ machines: [MACHINE], privateNetworks: [] });
+        listMachinesAction.mockResolvedValue({
+            hasMachines: true,
+            first: MACHINE,
+            privateNetworks: []
+        });
         readRouterAction.mockResolvedValue({ plan: ONE_PORT, reading: VPS });
         render(<RouterSection />, { wrapper: MessagesWrapper });
         expect(

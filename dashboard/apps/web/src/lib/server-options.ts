@@ -57,6 +57,7 @@ export function serverOptionsWhere(
     }
     if (filter.root) and.push({ OR: [{ sudo: true }, { username: "root" }] });
     if (filter.docker) and.push({ dockerId: { not: null } });
+    if (filter.active) and.push({ status: "active" });
     if (filter.online) and.push({ offlineSince: null, status: "active" });
     if (filter.withoutVpnNode) and.push({ vpnNode: { is: null } });
     if (filter.exclude?.length) and.push({ id: { notIn: [...filter.exclude] } });

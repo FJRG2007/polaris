@@ -688,6 +688,7 @@
         "moveAgain": "Moverlo de nuevo",
         "target": "Mover a",
         "targetPlaceholder": "Elige un servicio",
+        "targetSearch": "Buscar servicios",
         "start": "Comprobar y empezar",
         "starting": "Comprobando el servicio...",
         "route": "{source} -> {target}",

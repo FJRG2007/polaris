@@ -28,6 +28,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CircleAlert, Loader2 } from "lucide-react";
 import { IntegrationLogo } from "@/components/logos";
+import { DeployTargetPicker } from "@/components/deploy-target-picker";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { MoveHomePlan, MoveOutPlan } from "@/lib/deploy/migrate";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
@@ -484,7 +485,8 @@ export function MoveHomeDialog({
 }) {
     const t = useTranslations("deploy");
     const [plan, setPlan] = useState<MoveHomePlan | null>(null);
-    const [targets, setTargets] = useState<{ id: string; name: string }[]>([]);
+    const [firstTarget, setFirstTarget] = useState<{ id: string; name: string } | null>();
+    const [machine, setMachine] = useState<string>();
     const [environment, setEnvironment] = useState(
         service.environmentId || environments[0]?.id || ""
     );
@@ -523,9 +525,10 @@ export function MoveHomeDialog({
                 setRepoUrl(result.plan.source?.url ?? "");
                 setBranch(result.plan.source?.branch ?? "");
             }
-            const found = result.targets ?? [];
-            setTargets(found);
-            setTarget(found[0]?.id ?? "");
+            const first = result.firstTarget ?? null;
+            setFirstTarget(first);
+            setMachine(result.machine);
+            setTarget(first?.id ?? "");
         })();
         return () => {
             cancelled = true;
@@ -653,18 +656,23 @@ export function MoveHomeDialog({
 
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field label={t("move.home.server")} required>
-                                {targets.length === 0 ? (
+                                {firstTarget === null ? (
                                     <span className="text-xs text-muted-foreground">
                                         {t("move.home.noServer")}
                                     </span>
                                 ) : (
-                                    <Select
-                                        value={target}
+                                    <DeployTargetPicker
+                                        scope="project"
+                                        projectId={projectId}
+                                        value={target || null}
+                                        selectedLabel={
+                                            target === firstTarget?.id
+                                                ? firstTarget.name
+                                                : undefined
+                                        }
                                         onValueChange={setTarget}
-                                        options={targets.map((entry) => ({
-                                            value: entry.id,
-                                            label: entry.name
-                                        }))}
+                                        localLabel={(name) => machine ?? name}
+                                        disabled={firstTarget === undefined}
                                         aria-label={t("move.home.server")}
                                     />
                                 )}

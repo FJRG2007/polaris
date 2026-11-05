@@ -37,7 +37,7 @@ vi.mock("@/lib/deploy/dns-cutover-service", () => {
         CutoverRefusedError,
         cutoverPanel: async () => {
             state.calls.push("panel");
-            return { cutover: null, targets: [] };
+            return { cutover: null };
         },
         startCutover: async () => {
             state.calls.push("start");
@@ -73,7 +73,7 @@ describe("the domain move actions", () => {
 
     it("let a domain manager switch and roll back, answering with the panel", async () => {
         expect(await actions.switchCutoverAction(DOMAIN)).toEqual({
-            panel: { cutover: null, targets: [] }
+            panel: { cutover: null }
         });
         await actions.rollbackCutoverAction(DOMAIN);
         expect(state.calls).toEqual(["switch", "panel", "rollback", "panel"]);

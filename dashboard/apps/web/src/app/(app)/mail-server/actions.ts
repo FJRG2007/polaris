@@ -233,17 +233,6 @@ export async function listServersAction(): Promise<Result<{ servers: MailServerS
 }
 
 /** Where a new server can run: this machine and every server the person enrolled. */
-export async function listPlacementsAction(): Promise<{ id: string; name: string }[]> {
-    const who = await actor();
-    const hosts = await prisma.host.findMany({
-        where: { ownerId: who.id },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" }
-    });
-    const t = await getTranslations("mailServer");
-    return [{ id: "local", name: t("common.thisMachine") }, ...hosts];
-}
-
 export async function startSetupAction(input: unknown): Promise<Result<{ id: string }>> {
     const parsed = core.mailServerSetupSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);

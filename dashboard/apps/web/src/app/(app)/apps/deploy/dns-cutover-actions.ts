@@ -12,6 +12,8 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import * as cutovers from "@/lib/deploy/dns-cutover-service";
 import { requireDomainAccess } from "@/lib/deploy-project-access";
+import { pageFields } from "@/lib/deploy-target-options-schema";
+import type { OptionsPage } from "@/lib/deploy-target-options";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -20,6 +22,8 @@ const startSchema = z.object({
     domainId: z.string().uuid(),
     targetApplicationId: z.string().uuid()
 });
+
+const targetOptionsSchema = z.object({ ...pageFields, domainId: z.string().uuid() }).strict();
 
 export type CutoverPanel = Awaited<ReturnType<typeof cutovers.cutoverPanel>>;
 export type CutoverReply = { panel?: CutoverPanel; error?: string };
@@ -56,7 +60,7 @@ async function step(
         console.error("polaris: a DNS cutover step failed:", caught);
         return { error: await reply("cutover.failed") };
     }
-    return { panel: await cutovers.cutoverPanel(parsed.data, caller.environmentIds) };
+    return { panel: await cutovers.cutoverPanel(parsed.data) };
 }
 
 /** The domain's latest cutover and where it may move, checked again if stale. */
@@ -97,4 +101,28 @@ export async function rollbackCutoverAction(domainId: string): Promise<CutoverRe
     });
     revalidatePath(DEPLOY_PATH);
     return result;
+}
+
+/** A page of the services the domain may move to, under the same access as
+ *  starting the move. */
+export async function cutoverTargetOptionsAction(
+    input: unknown
+): Promise<OptionsPage<cutovers.CutoverTargetOption> | { error: string }> {
+    const parsed = targetOptionsSchema.safeParse(input);
+    if (!parsed.success) return { error: await reply("cutover.notAllowed") };
+    const caller = await access(parsed.data.domainId);
+    if (!caller) return { error: await reply("cutover.notAllowed") };
+    try {
+        return await cutovers.cutoverTargets(
+            parsed.data.domainId,
+            caller.environmentIds,
+            parsed.data
+        );
+    } catch (caught) {
+        if (caught instanceof cutovers.CutoverRefusedError) {
+            return { error: await reply(`cutover.refused.${caught.reason}`) };
+        }
+        console.error("polaris: the cutover targets could not be read:", caught);
+        return { error: await reply("cutover.failed") };
+    }
 }

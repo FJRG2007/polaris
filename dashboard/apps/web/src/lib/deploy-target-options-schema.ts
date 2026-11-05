@@ -11,7 +11,8 @@ import {
     SERVER_OPTIONS_PAGE
 } from "@/lib/server-options-schema";
 
-const pageFields = {
+/** The search, cursor, size and ids every paged option list takes. */
+export const pageFields = {
     query: z.string().trim().max(120).default(""),
     cursor: pageCursorSchema,
     limit: z.number().int().min(1).max(SERVER_OPTIONS_MAX_PAGE).default(SERVER_OPTIONS_PAGE),
@@ -22,14 +23,21 @@ const pageFields = {
 /**
  * Which deploy servers: `mine` is the caller's active ones, what a tunnel's
  * public end may be; `relay` is any admin's active non-local one, what the
- * backup way in may run through.
+ * backup way in may run through; `project` is every server of a project's
+ * owner, what a service moved home to that project may run on.
  */
-export const deployTargetScopeSchema = z.enum(["mine", "relay"]);
+export const deployTargetScopeSchema = z.enum(["mine", "relay", "project"]);
 export type DeployTargetScope = z.infer<typeof deployTargetScopeSchema>;
 
 export const deployTargetOptionsRequestSchema = z
-    .object({ ...pageFields, scope: deployTargetScopeSchema.default("mine") })
-    .strict();
+    .object({
+        ...pageFields,
+        scope: deployTargetScopeSchema.default("mine"),
+        /** The project whose owner's servers `project` reads. */
+        projectId: z.string().uuid().optional()
+    })
+    .strict()
+    .refine((value) => (value.scope === "project") === Boolean(value.projectId));
 
 export type DeployTargetOptionsRequest = z.input<typeof deployTargetOptionsRequestSchema>;
 

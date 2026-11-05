@@ -7,6 +7,7 @@
 
 import { getTranslations } from "@/lib/i18n/request";
 import { requireAdmin, requirePermission } from "@/lib/session";
+import { requireProjectAccess } from "@/lib/deploy-project-access";
 import {
     deployTargetOptionsRequestSchema,
     serviceOptionsRequestSchema,
@@ -24,15 +25,20 @@ export async function listDeployTargetOptionsAction(
 ): Promise<OptionsPage<DeployTargetOption> | { error: string }> {
     const parsed = deployTargetOptionsRequestSchema.safeParse(input);
     // The relay is chosen on an admin screen; a tunnel's public end under
-    // deploy.manage, as creating the tunnel is.
+    // deploy.manage, as creating the tunnel is; a project's servers under
+    // deploy.read and read access to the project, as the move-home plan read them.
+    const scope = parsed.success ? parsed.data.scope : "mine";
     const user =
-        parsed.success && parsed.data.scope === "relay"
+        scope === "relay"
             ? await requireAdmin()
-            : await requirePermission("deploy.manage");
+            : await requirePermission(scope === "project" ? "deploy.read" : "deploy.manage");
     const t = await getTranslations("components");
     if (!parsed.success) return { error: t("asyncSelect.failed") };
     try {
-        return await readDeployTargetOptions(user.id, parsed.data.scope, parsed.data);
+        const ownerId = parsed.data.projectId
+            ? (await requireProjectAccess(parsed.data.projectId, user.id, "project.read")).ownerId
+            : user.id;
+        return await readDeployTargetOptions(ownerId, parsed.data.scope, parsed.data);
     } catch (error) {
         console.error("[deploy-target-options] read failed", error);
         return { error: t("asyncSelect.failed") };

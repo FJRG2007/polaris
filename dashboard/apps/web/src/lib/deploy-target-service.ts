@@ -53,6 +53,15 @@ export async function getOrCreateHostTarget(
     });
 }
 
+/** The owner's first server - what a form that picks one starts on - or null. */
+export async function firstDeployTarget(ownerId: string) {
+    return prisma.deployTarget.findFirst({
+        where: { ownerId },
+        select: { id: true, name: true, kind: true },
+        orderBy: { createdAt: "asc" }
+    });
+}
+
 export async function listDeployTargets(ownerId: string) {
     return prisma.deployTarget.findMany({
         where: { ownerId },

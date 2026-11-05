@@ -67,7 +67,9 @@ import {
     type StoreShelf,
     type StoreSort
 } from "@/lib/apps/marketplace-store";
-import { installAppAction, type InstallTarget, type StorageConnectionOption } from "./actions";
+import { ServerPicker } from "@/components/server-picker";
+import { LOCAL_SERVER_OPTION } from "@/lib/server-options-schema";
+import { installAppAction, type StorageConnectionOption } from "./actions";
 import {
     AppPreview,
     BuiltInMark,
@@ -915,8 +917,7 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
     const envFields = promptedEnvVars(app);
 
     const [name, setName] = useState(app.name);
-    const [serverId, setServerId] = useState("");
-    const [targets, setTargets] = useState<InstallTarget[] | null>(null);
+    const [serverId, setServerId] = useState(LOCAL_SERVER_OPTION);
     const [connections, setConnections] = useState<StorageConnectionOption[]>([]);
     const [storage, setStorage] = useState<
         Record<string, { backing: "local" | "nas"; connectionId?: string }>
@@ -930,14 +931,12 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
 
     useEffect(() => {
         let active = true;
-        void Promise.all([polls.installTargets(), polls.storageConnections()])
-            .then(([loadedTargets, loadedConnections]) => {
-                if (!active) return;
-                setTargets(loadedTargets);
-                setConnections(loadedConnections);
-                setServerId((current) => current || loadedTargets[0]?.id || "local");
+        void polls
+            .storageConnections()
+            .then((loadedConnections) => {
+                if (active) setConnections(loadedConnections);
             })
-            .catch(() => active && setError(t("errors.servers")));
+            .catch(() => active && setError(t("errors.storage")));
         return () => {
             active = false;
         };
@@ -1008,14 +1007,17 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("wizard.server")}</span>
-                        <Select
+                        <ServerPicker
                             value={serverId}
                             onValueChange={setServerId}
-                            placeholder={targets ? t("wizard.chooseServer") : t("wizard.loading")}
-                            options={(targets ?? []).map((target) => ({
-                                value: target.id,
-                                label: target.name
-                            }))}
+                            selectedLabel={
+                                serverId === LOCAL_SERVER_OPTION
+                                    ? t("wizard.thisServer")
+                                    : undefined
+                            }
+                            includeLocal
+                            placeholder={t("wizard.chooseServer")}
+                            aria-label={t("wizard.server")}
                         />
                     </label>
 

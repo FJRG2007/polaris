@@ -335,12 +335,12 @@ export async function listNetworks(viewer: rules.VpnViewer): Promise<NetworkView
 }
 
 /** The servers a gateway can run on: an administrator's own, active ones. */
-export async function networkServers(ownerId: string): Promise<NetworkServer[]> {
-    if (!canRunGateways()) return [];
-    return prisma.deployTarget.findMany({
+export async function firstNetworkServer(ownerId: string): Promise<NetworkServer | null> {
+    if (!canRunGateways()) return null;
+    // One row: the dialog opens on it, and the picker pages the rest.
+    return prisma.deployTarget.findFirst({
         where: { ownerId, status: "active" },
         select: { id: true, name: true },
-        orderBy: { name: "asc" },
-        take: 200
+        orderBy: [{ name: "asc" }, { id: "asc" }]
     });
 }

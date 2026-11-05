@@ -10,7 +10,9 @@
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { PagedPicker } from "@/components/paged-picker";
+import type { CutoverTargetOption } from "@/lib/deploy/dns-cutover-service";
 import * as polls from "./deploy-polls";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import type { CutoverFailure, CutoverPhase, CutoverView } from "@/lib/deploy/dns-cutover";
@@ -24,6 +26,7 @@ import {
     XCircle
 } from "lucide-react";
 import {
+    cutoverTargetOptionsAction,
     rollbackCutoverAction,
     startCutoverAction,
     switchCutoverAction,
@@ -40,7 +43,6 @@ import {
     DialogHeader,
     DialogTitle,
     DnsRecordTable,
-    Select,
     Skeleton
 } from "@polaris/ui";
 
@@ -191,6 +193,7 @@ export function DomainCutoverButton({
                             <CutoverBody
                                 t={t}
                                 panel={panel}
+                                domainId={domainId}
                                 hostname={hostname}
                                 pending={pending}
                                 onStart={(targetApplicationId) =>
@@ -236,6 +239,7 @@ export function DomainCutoverButton({
 function CutoverBody({
     t,
     panel,
+    domainId,
     hostname,
     pending,
     onStart,
@@ -245,6 +249,7 @@ function CutoverBody({
 }: {
     t: CutoverT;
     panel: CutoverPanel;
+    domainId: string;
     hostname: string;
     pending: boolean;
     onStart: (targetApplicationId: string) => void;
@@ -274,7 +279,7 @@ function CutoverBody({
             {closed ? (
                 <StartForm
                     t={t}
-                    targets={panel.targets}
+                    domainId={domainId}
                     pending={pending}
                     again={cutover !== null}
                     preselect={
@@ -289,25 +294,25 @@ function CutoverBody({
     );
 }
 
+const targetEnvironment = (target: CutoverTargetOption) => target.environment;
+
 function StartForm({
     t,
-    targets,
+    domainId,
     pending,
     again,
     preselect,
     onStart
 }: {
     t: CutoverT;
-    targets: CutoverPanel["targets"];
+    domainId: string;
     pending: boolean;
     again: boolean;
     preselect: string | undefined;
     onStart: (targetApplicationId: string) => void;
 }) {
     const [target, setTarget] = useState(preselect ?? "");
-    if (targets.length === 0) {
-        return <p className="text-sm text-muted-foreground">{t("cutover.noTargets")}</p>;
-    }
+    const scope = useMemo(() => ({ domainId }), [domainId]);
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <span className="text-sm font-medium">
@@ -315,14 +320,16 @@ function StartForm({
             </span>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                 <div className="min-w-0 flex-1">
-                    <Select
-                        value={target}
-                        onValueChange={setTarget}
+                    <PagedPicker<CutoverTargetOption>
+                        read={cutoverTargetOptionsAction}
+                        scope={scope}
+                        cache="cutover-targets"
+                        value={target || null}
+                        onValueChange={(id) => setTarget(id)}
+                        itemDetail={targetEnvironment}
                         placeholder={t("cutover.targetPlaceholder")}
-                        options={targets.map((entry) => ({
-                            value: entry.id,
-                            label: `${entry.name} (${entry.environment})`
-                        }))}
+                        searchPlaceholder={t("cutover.targetSearch")}
+                        emptyText={t("cutover.noTargets")}
                         aria-label={t("cutover.target")}
                     />
                 </div>

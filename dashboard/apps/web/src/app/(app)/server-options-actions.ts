@@ -11,15 +11,31 @@ import { getTranslations } from "@/lib/i18n/request";
 import {
     LOCAL_SERVER_OPTION,
     serverOptionsRequestSchema,
-    type ServerOption
+    type ServerFilter,
+    type ServerOption,
+    type ServerPurpose
 } from "@/lib/server-options-schema";
 import { readServerOptions, type ServerOptionsPage } from "@/lib/server-options";
 
 /** The screens that pick among one's own servers: databases read under
- *  `deploy.read`, runners and the rest of the server tools under `system.manage`. */
-async function mayPickServers(user: SessionUser): Promise<boolean> {
+ *  `deploy.read`, runners and the rest of the server tools under `system.manage`,
+ *  an agent session's machine under `agents.manage` and a mail server's under
+ *  `mailserver.manage`, as starting either is. */
+async function mayPickServers(
+    user: SessionUser,
+    purpose: ServerPurpose | undefined
+): Promise<boolean> {
+    if (purpose === "agentSession") return sessionCan(user, "agents.manage");
+    if (purpose === "mailServer") return sessionCan(user, "mailserver.manage");
     return (await sessionCan(user, "deploy.read")) || sessionCan(user, "system.manage");
 }
+
+/** What each purpose accepts, applied whatever the picker asked for. */
+const PURPOSE_FILTER: Record<ServerPurpose, ServerFilter> = {
+    // A session starts only on a server that is enrolled and switched on.
+    agentSession: { active: true },
+    mailServer: {}
+};
 
 export async function listServerOptionsAction(
     input: unknown
@@ -31,8 +47,14 @@ export async function listServerOptionsAction(
     const user = environmentId ? await requirePermission("deploy.manage") : await requireUser();
     const t = await getTranslations("components");
     if (!parsed.success) return { error: t("asyncSelect.failed") };
-    if (!environmentId && !(await mayPickServers(user))) return { error: t("asyncSelect.failed") };
-    const request = parsed.data;
+    if (!environmentId && !(await mayPickServers(user, parsed.data.purpose)))
+        return { error: t("asyncSelect.failed") };
+    const request = parsed.data.purpose
+        ? {
+              ...parsed.data,
+              filter: { ...parsed.data.filter, ...PURPOSE_FILTER[parsed.data.purpose] }
+          }
+        : parsed.data;
     try {
         const ownerId = environmentId
             ? (await requireEnvironmentAccess(environmentId, user.id, "project.read")).ownerId

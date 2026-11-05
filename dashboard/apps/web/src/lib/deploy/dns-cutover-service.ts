@@ -10,7 +10,13 @@
  * the work once.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
+import {
+    afterCursor,
+    pageOf,
+    type OptionsPage,
+    type PageRequest
+} from "@/lib/deploy-target-options";
 import * as machine from "./dns-cutover";
 import { serviceDnsTarget } from "@/lib/domain-dns";
 import { backupRecordsTarget } from "@/lib/backup-access";
@@ -27,8 +33,6 @@ import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-servi
 
 /** How many open cutovers one background pass looks at. */
 const PASS_LIMIT = 20;
-/** How many services the target list offers. */
-const TARGET_LIMIT = 100;
 /** Retries of the pre-flight probe while the target's edge loads the staged route. */
 const PROBE_ATTEMPTS = 3;
 const PROBE_GAP_MS = 1500;
@@ -144,25 +148,42 @@ function readWritten(value: string): Written {
     }
 }
 
-/** The services in the same project a domain may move to, within the environments
- *  this access reaches. */
+/** A service a domain may move to, as the target picker shows it. */
+export interface CutoverTargetOption {
+    readonly id: string;
+    readonly name: string;
+    readonly environment: string;
+}
+
+/** A page of the services in the same project a domain may move to, within the
+ *  environments this access reaches - the same set `startCutover` accepts -
+ *  searched by name and ordered by name then id. */
 export async function cutoverTargets(
     domainId: string,
-    environmentIds: readonly string[] | null
-): Promise<{ id: string; name: string; environment: string }[]> {
+    environmentIds: readonly string[] | null,
+    request: PageRequest
+): Promise<OptionsPage<CutoverTargetOption>> {
     const domain = await loadDomain(domainId);
     if (!domain) throw new CutoverRefusedError("not-found");
+    const and: Prisma.ApplicationWhereInput[] = [
+        { id: { not: domain.application.id } },
+        { environment: { projectId: domain.application.environment.projectId } }
+    ];
+    if (environmentIds) and.push({ environmentId: { in: [...environmentIds] } });
+    if (request.ids) and.push({ id: { in: [...request.ids] } });
+    if (request.query) and.push({ name: { contains: request.query, mode: "insensitive" } });
+    and.push(...afterCursor(request.cursor));
     const apps = await prisma.application.findMany({
-        where: {
-            id: { not: domain.application.id },
-            environment: { projectId: domain.application.environment.projectId },
-            ...(environmentIds ? { environmentId: { in: [...environmentIds] } } : {})
-        },
+        where: { AND: and },
         select: { id: true, name: true, environment: { select: { name: true } } },
-        orderBy: { name: "asc" },
-        take: TARGET_LIMIT
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: request.limit + 1
     });
-    return apps.map((app) => ({ id: app.id, name: app.name, environment: app.environment.name }));
+    return pageOf(apps, request.limit, (app) => ({
+        id: app.id,
+        name: app.name,
+        environment: app.environment.name
+    }));
 }
 
 /** The Cloudflare token and zone that hold this hostname's record, when Polaris has
@@ -513,15 +534,11 @@ async function moveRoute(domainId: string, applicationId: string, route?: Cutove
 
 /**
  * What the screen shows for a domain: its latest cutover, freshly checked when the
- * screen has been waiting on it longer than the gap, and the services it may move to.
+ * screen has been waiting on it longer than the gap.
  */
 export async function cutoverPanel(
-    domainId: string,
-    environmentIds: readonly string[] | null
-): Promise<{
-    cutover: machine.CutoverView | null;
-    targets: { id: string; name: string; environment: string }[];
-}> {
+    domainId: string
+): Promise<{ cutover: machine.CutoverView | null }> {
     const latest = () =>
         prisma.dnsCutover.findFirst({ where: { domainId }, orderBy: { createdAt: "desc" } });
     let row = await latest();
@@ -541,8 +558,7 @@ export async function cutoverPanel(
             row = await latest();
         }
     }
-    const targets = await cutoverTargets(domainId, environmentIds);
-    if (!row) return { cutover: null, targets };
+    if (!row) return { cutover: null };
     const names = new Map(
         (
             await prisma.application.findMany({
@@ -555,8 +571,7 @@ export async function cutoverPanel(
         cutover: machine.cutoverView(row, {
             source: names.get(row.sourceApplicationId) ?? "",
             target: names.get(row.targetApplicationId) ?? ""
-        }),
-        targets
+        })
     };
 }
 
