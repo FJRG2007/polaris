@@ -202,6 +202,8 @@
             "titlePlaceholder": "Arreglar la redirección",
             "repository": "Repositorio",
             "noRepo": "Sin repositorio - solo abrir el agente",
+            "repoSearch": "Buscar repositorios",
+            "repoEmpty": "Ningún repositorio coincide",
             "workspaceHint": "Se abre en una máquina propia con un directorio vacío y nada descargado. La máquina conserva su carpeta personal, así que lo que instales y donde inicies sesión se queda para la próxima vez.",
             "noRepos": "Aún no hay nada conectado. Añade uno en <link>Repositorios</link> para que un agente trabaje en él.",
             "agent": "Agente",

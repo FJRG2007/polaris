@@ -28,6 +28,7 @@ import { prisma } from "@polaris/db";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
+import * as repoOptions from "@/lib/agents/repo-options";
 import { startSessionAction } from "@/app/(app)/apps/agents/sessions/actions";
 import * as tasks from "@/lib/tasks/task-service";
 import * as views from "@/lib/tasks/view-service";
@@ -2297,18 +2298,27 @@ export async function agentHandoffChoicesAction(): Promise<{
     // press it once are finding out what it does.
     const allowed = await sessionCan(user, "agents.manage");
     if (!allowed) return { repos: [], agents: [] };
-    const repos = await prisma.agentRepo.findMany({
-        where: { ownerId: user.id, enabled: true },
-        select: { id: true, repoFullName: true },
-        orderBy: { repoFullName: "asc" }
-    });
+    // The first page only: the default and whether there are any. The picker
+    // reads the rest through `agentHandoffRepoOptionsAction`.
+    const repos = await repoOptions.firstRepoPage(user.id);
     return {
-        repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
+        repos: repos.items,
         // With whether this account can sign each one in, for the same reason the
         // sessions screen carries it: a task handed to an agent nobody can sign
         // in is a task that goes quiet, and the board never learns why.
         agents: await agentOptionsFor(user.id)
     };
+}
+
+/** A page of the repositories a task can be handed to an agent on. */
+export async function agentHandoffRepoOptionsAction(
+    input: unknown
+): Promise<{ items: repoOptions.RepoOption[]; next: string | null } | { error: string }> {
+    const user = await requirePermission("tasks.read");
+    if (!(await sessionCan(user, "agents.manage"))) return { items: [], next: null };
+    const parsed = repoOptions.repoOptionsInput.safeParse(input ?? {});
+    if (!parsed.success) return { error: "invalid" };
+    return repoOptions.repoOptionsPage(user.id, parsed.data);
 }
 
 /** Start a session on a task. The Agents app owns what that means; this is the

@@ -20,7 +20,9 @@ import { Bot, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
-import { handTaskToAgentAction } from "./actions";
+import { PagedPicker } from "@/components/paged-picker";
+import type { RepoOption } from "@/lib/agents/repo-options";
+import { agentHandoffRepoOptionsAction, handTaskToAgentAction } from "./actions";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import {
     accountOf,
@@ -36,7 +38,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Select,
     Textarea
 } from "@polaris/ui";
 import * as polls from "./tasks-polls";
@@ -157,14 +158,17 @@ function HandOffDialog({
                             <span className="text-xs text-muted-foreground">
                                 {t("agent.repository")}
                             </span>
-                            <Select
-                                value={repoId}
-                                onValueChange={setRepoId}
-                                options={(repos ?? []).map((repo) => ({
-                                    value: repo.id,
-                                    label: repo.name
-                                }))}
+                            <PagedPicker<RepoOption>
+                                read={agentHandoffRepoOptionsAction}
+                                scope={{}}
+                                cache="task-handoff-repos"
+                                value={repoId || null}
+                                selectedLabel={repos?.find((repo) => repo.id === repoId)?.name}
+                                onValueChange={(value) => setRepoId(value)}
                                 placeholder={t("agent.pickRepository")}
+                                searchPlaceholder={t("agent.repoSearch")}
+                                emptyText={t("agent.repoEmpty")}
+                                aria-label={t("agent.repository")}
                             />
                         </label>
                         <label className="block space-y-1">

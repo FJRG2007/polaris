@@ -20,6 +20,7 @@ import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as work from "@/lib/agents/session-work";
+import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -59,19 +60,23 @@ export async function sessionChoicesAction(): Promise<{
     sharedWorkspace: boolean;
 }> {
     const user = await requirePermission("agents.manage");
+    // The first page only: it names the default and says whether there are
+    // any. The picker reads the rest through `repoOptionsAction`.
     const [repos, sharedWorkspace] = await Promise.all([
-        prisma.agentRepo.findMany({
-            where: { ownerId: user.id, enabled: true },
-            select: { id: true, repoFullName: true },
-            orderBy: { repoFullName: "asc" }
-        }),
+        repoOptions.firstRepoPage(user.id),
         sharedWorkspaceAllowed()
     ]);
-    return {
-        sharedWorkspace,
-        agents: await agentOptionsFor(user.id),
-        repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName }))
-    };
+    return { sharedWorkspace, agents: await agentOptionsFor(user.id), repos: repos.items };
+}
+
+/** A page of the repositories a session can start on, or the ones named by id. */
+export async function repoOptionsAction(
+    input: unknown
+): Promise<{ items: repoOptions.RepoOption[]; next: string | null } | { error: string }> {
+    const user = await requirePermission("agents.manage");
+    const parsed = repoOptions.repoOptionsInput.safeParse(input ?? {});
+    if (!parsed.success) return { error: "invalid" };
+    return repoOptions.repoOptionsPage(user.id, parsed.data);
 }
 
 const listPage = z

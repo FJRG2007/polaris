@@ -27,7 +27,9 @@ import {
 } from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
 import { ServerPicker } from "@/components/server-picker";
-import { startSessionAction, stopSessionAction } from "./actions";
+import { PagedPicker } from "@/components/paged-picker";
+import type { RepoOption } from "@/lib/agents/repo-options";
+import { repoOptionsAction, startSessionAction, stopSessionAction } from "./actions";
 import type { GithubInstallGap } from "@/lib/github-app-reach";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
 import {
@@ -314,24 +316,26 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         <span className="text-xs text-muted-foreground">
                             {t("sessions.form.repository")}
                         </span>
-                        <Select
-                            value={repoId}
+                        <PagedPicker<RepoOption>
+                            read={repoOptionsAction}
+                            scope={{}}
+                            cache="agent-session-repos"
+                            value={repoId || null}
+                            selectedLabel={
+                                choices?.repos.find((repo) => repo.id === repoId)?.name
+                            }
                             onValueChange={(value) => {
                                 setRepoId(value);
                                 setGap(null);
                             }}
-                            options={[
-                                // First, because it is the answer that needs
-                                // nothing set up. Somebody who just wants an
-                                // agent should not have to connect a
-                                // repository to get one.
-                                { value: NO_REPO, label: t("sessions.form.noRepo") },
-                                ...(choices?.repos ?? []).map((repo) => ({
-                                    value: repo.id,
-                                    label: repo.name
-                                }))
-                            ]}
+                            // First, because it is the answer that needs nothing
+                            // set up. Somebody who just wants an agent should not
+                            // have to connect a repository to get one.
+                            fixed={[{ value: NO_REPO, label: t("sessions.form.noRepo") }]}
                             placeholder={t("text.pickRepository")}
+                            searchPlaceholder={t("sessions.form.repoSearch")}
+                            emptyText={t("sessions.form.repoEmpty")}
+                            aria-label={t("sessions.form.repository")}
                         />
                     </label>
 

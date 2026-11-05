@@ -7,6 +7,8 @@
         "noRepos": "Un agente trabaja en un repositorio al que ya llega la app Agentes, y todavía no hay ninguno conectado.",
         "repository": "Repositorio",
         "pickRepository": "Elige un repositorio",
+        "repoSearch": "Buscar repositorios",
+        "repoEmpty": "Ningún repositorio coincide",
         "agent": "Agente",
         "prompt": "Lo que se le pide",
         "start": "Empezar"
