@@ -86,6 +86,22 @@ describe("their own doing", () => {
         expect(tab.frames()).toEqual([]);
     });
 
+    it("tells their other devices they answered a call, so those stop ringing", async () => {
+        const tab = await listen();
+        publishChatChange({
+            channelId: "room",
+            kind: "call",
+            actorId: READER.id,
+            actorName: "Reader",
+            call: { meetingId: "m1", state: "moved", count: 2 }
+        });
+        await wait(250);
+        tab.close();
+        expect(tab.frames()).toEqual([
+            expect.objectContaining({ kind: "call", meetingId: "m1", userId: READER.id })
+        ]);
+    });
+
     it("tells their other tabs about a change addressed to them alone", async () => {
         // Blocking somebody, done in another tab.
         const tab = await listen();
@@ -93,5 +109,25 @@ describe("their own doing", () => {
         await wait(100);
         tab.close();
         expect(tab.frames()).toEqual([{ kind: "channels" }]);
+    });
+
+    it("stops a call ringing on their other devices when one of them declined it", async () => {
+        const tab = await listen();
+        // Somebody else declining tells this reader nothing.
+        publishChatChange({
+            kind: "call-settled",
+            actorId: "other",
+            audience: ["other"],
+            meetingId: "m1"
+        });
+        publishChatChange({
+            kind: "call-settled",
+            actorId: READER.id,
+            audience: [READER.id],
+            meetingId: "m2"
+        });
+        await wait(100);
+        tab.close();
+        expect(tab.frames()).toEqual([{ kind: "call-settled", meetingId: "m2" }]);
     });
 });

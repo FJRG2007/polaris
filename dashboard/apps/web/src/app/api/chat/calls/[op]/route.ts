@@ -28,6 +28,7 @@ const guest = { signedIn: false };
 const STEPS: Record<string, (request: Request) => Promise<Response>> = {
     start: actionRoute(channel, ({ channelId }) => calls.startCallAction(channelId)),
     join: actionRoute(meeting, ({ meetingId }) => calls.joinCallAction(meetingId)),
+    decline: actionRoute(meeting, ({ meetingId }) => calls.declineCallAction(meetingId)),
     "join-meeting": actionRoute(meeting, ({ meetingId }) => calls.joinMeetingAction(meetingId)),
     ticket: actionRoute(meeting, ({ meetingId }) => calls.callTokenAction(meetingId), guest),
     read: actionRoute(meeting, ({ meetingId }) => calls.readCallAction(meetingId), guest),

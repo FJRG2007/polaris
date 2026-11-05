@@ -28,6 +28,7 @@ import { callsOutsideNow } from "@/lib/backup-access/service";
 import { mayRing } from "@/lib/privacy-service";
 import { presenceFor } from "@/lib/presence-service";
 import { requirePermission } from "@/lib/session";
+import { publishChatChange } from "@/lib/chat/live";
 import { getTranslations } from "@/lib/i18n/request";
 import { translatorFor } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
@@ -331,6 +332,21 @@ export async function claimCallAction(meetingId: string, deviceId: string): Prom
     // The seat comes from the request rather than from the browser: which chair
     // a claim is about is exactly the thing a browser must not be able to name.
     meetings.claimCall(meetingId, seat.participantId, String(deviceId).slice(0, 100));
+}
+
+/**
+ * Decline a ringing call on every device of this account.
+ *
+ * Declining on one telephone has to stop the others: the desk, the phone and
+ * every tab ring for the same person. The caller is not told - a refused call
+ * and a missed one look the same from the other end - so this goes to the
+ * account that declined and nobody else, and names nothing but the meeting id
+ * the browser already had.
+ */
+export async function declineCallAction(meetingId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("chat.use");
+    publishChatChange({ kind: "call-settled", actorId: user.id, audience: [user.id], meetingId });
+    return {};
 }
 
 // Keeping and giving back a seat are a route (`api/chat/meetings/[id]/seat`),

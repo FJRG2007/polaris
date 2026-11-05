@@ -52,6 +52,12 @@ export function useRingingHere(
     useChatStream(
         useCallback(
             (frame) => {
+                // Declined on another of this person's devices.
+                if (frame.kind === "call-settled") {
+                    const meetingId = frame.meetingId;
+                    setRing((current) => (current?.meetingId === meetingId ? null : current));
+                    return;
+                }
                 if (frame.kind !== "call") return;
                 setRing((current) => ringAfter(current, frame, viewerId, channelId, Date.now()));
             },
