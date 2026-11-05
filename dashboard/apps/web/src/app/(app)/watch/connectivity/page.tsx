@@ -12,6 +12,7 @@
 import { redirect } from "next/navigation";
 import { homePathForUser, requireUser } from "@/lib/session";
 import { connectivityReach } from "@/lib/connectivity/access";
+import { Messages } from "@/components/i18n/messages";
 import { ConnectivityView } from "./connectivity-view";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,10 @@ export default async function ConnectivityPage() {
     if (!reach) redirect(`${await homePathForUser(user)}?denied=1`);
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col">
-            <ConnectivityView admin={reach === "admin"} />
+            {/* The "tell me when it comes back" shortcut names its automation. */}
+            <Messages namespaces={["automations"]}>
+                <ConnectivityView admin={reach === "admin"} />
+            </Messages>
         </div>
     );
 }

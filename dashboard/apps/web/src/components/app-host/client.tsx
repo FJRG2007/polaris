@@ -20,6 +20,8 @@
  */
 
 import dynamic from "next/dynamic";
+import type { ComponentProps } from "react";
+import { Skeleton } from "@polaris/ui";
 import { provideAppHostUi } from "@polaris/app-host/client";
 import {
     canOpenGameTab,
@@ -58,17 +60,52 @@ const FilePickerDialog = dynamic(
     { ssr: false }
 );
 
+/**
+ * These two draw words from the automations catalog, and an app draws them on
+ * its own routes (Places' automation editor), which no layout of ours hands
+ * that catalog to. So each brings it along; where the route already has it
+ * (the automations editor) nothing is fetched.
+ */
 const NoticeDeliveryFields = dynamic(
     () =>
-        import("@/components/automations/notice-delivery-fields").then(
-            (module) => module.NoticeDeliveryFields
-        ),
+        Promise.all([
+            import("@/components/automations/notice-delivery-fields"),
+            import("@/components/i18n/client-namespaces")
+        ]).then(([module, i18n]) => {
+            const Fields = module.NoticeDeliveryFields;
+            return function NoticeDeliveryFieldsWithWords(props: ComponentProps<typeof Fields>) {
+                return (
+                    <i18n.ClientMessages
+                        namespaces={["automations"]}
+                        fallback={<Skeleton className="h-24 w-full" />}
+                    >
+                        <Fields {...props} />
+                    </i18n.ClientMessages>
+                );
+            };
+        }),
     { ssr: false }
 );
 
 /** A text field of an app's automation node that takes `{{ }}` values. */
 const RefInput = dynamic(
-    () => import("@/app/(app)/automations/[id]/references").then((module) => module.RefInput),
+    () =>
+        Promise.all([
+            import("@/app/(app)/automations/[id]/references"),
+            import("@/components/i18n/client-namespaces")
+        ]).then(([module, i18n]) => {
+            const Input = module.RefInput;
+            return function RefInputWithWords(props: ComponentProps<typeof Input>) {
+                return (
+                    <i18n.ClientMessages
+                        namespaces={["automations"]}
+                        fallback={<Skeleton className="h-9 w-full" />}
+                    >
+                        <Input {...props} />
+                    </i18n.ClientMessages>
+                );
+            };
+        }),
     { ssr: false }
 );
 

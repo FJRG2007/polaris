@@ -171,6 +171,13 @@ export function MessagesProvider({
     return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
+/** Whether every one of these namespaces already reached this point of the tree. */
+export function useHasMessages(namespaces: readonly string[]): boolean {
+    const state = useContext(I18nContext);
+    const messages = state?.messages as Record<string, unknown> | undefined;
+    return namespaces.every((namespace) => messages?.[namespace] !== undefined);
+}
+
 /** The locale this page is drawn in. */
 export function useLocale(): Locale {
     return useContext(I18nContext)?.locale ?? DEFAULT_LOCALE;

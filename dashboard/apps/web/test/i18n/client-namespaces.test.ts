@@ -24,12 +24,15 @@ const SRC = join(WEB, "src");
 const APP = join(SRC, "app");
 const SHELL_ROUTE = join(APP, "(app)");
 
-/** What the root layout and the app shell (`components/app-chrome.tsx`) give
- *  every screen. */
+/** What the root layout gives every screen. */
 const ROOT = ["common", "components"];
-const SHELL = ["nav", "chat", "shortcuts", "tours"];
 
 const ROUTE_FILE = /^(page|layout|template|loading|error|not-found|default|global-error)\.tsx?$/;
+
+/** What the app shell gives every screen under (app): read from the shell
+ *  itself, so a namespace added there is never reported missing and one taken
+ *  out of it is. */
+const SHELL = provided(readFileSync(join(SRC, "components", "app-chrome.tsx"), "utf8"));
 
 function files(dir: string): string[] {
     return readdirSync(dir).flatMap((entry) => {
@@ -146,8 +149,38 @@ describe("client translation namespaces", () => {
             return within(path, APP) ? [dirname(path)] : [];
         };
 
+        /** What a file draws: everything reachable through its rendered imports,
+         *  stopping at route files, which render on routes of their own. */
+        const drawn = new Map<string, Set<string>>();
+        const draws = (from: string): Set<string> => {
+            const known = drawn.get(from);
+            if (known) return known;
+            const seen = new Set<string>();
+            const stack = [...(imports.get(from) ?? [])];
+            while (stack.length > 0) {
+                const path = stack.pop()!;
+                if (seen.has(path) || isRoute(path)) continue;
+                seen.add(path);
+                stack.push(...(imports.get(path) ?? []));
+            }
+            drawn.set(from, seen);
+            return seen;
+        };
+
+        // A route file's `<Messages>` covers its folder and every folder below it.
+        // Any other file's provider (a `ClientMessages` around one embedded list)
+        // covers only what that file draws inside it, on the routes it renders
+        // on - never its siblings. Counting it for the whole route is how
+        // Watch > Connectivity printed "automations.templates.internetBack.action":
+        // an embedded automations list somewhere under (app) made every screen
+        // under (app) look as if it had the automations catalog.
         const providers = [...sources]
-            .map(([path, source]) => ({ routes: routes(path), names: provided(source) }))
+            .map(([path, source]) => ({
+                path,
+                route: isRoute(path),
+                routes: routes(path),
+                names: provided(source)
+            }))
             .filter((entry) => entry.names.length > 0);
 
         const missing = all
@@ -159,7 +192,11 @@ describe("client translation namespaces", () => {
                 return routes(path).flatMap((route) => {
                     const have = new Set([...ROOT, ...(within(route, SHELL_ROUTE) ? SHELL : [])]);
                     for (const entry of providers) {
-                        if (!entry.routes.some((dir) => within(route, dir))) continue;
+                        if (entry.route) {
+                            if (!entry.routes.some((dir) => within(route, dir))) continue;
+                        } else if (!entry.routes.includes(route) || !draws(entry.path).has(path)) {
+                            continue;
+                        }
                         entry.names.forEach((namespace) => have.add(namespace));
                     }
                     const where = relative(APP, route).split(sep).join("/") || "/";

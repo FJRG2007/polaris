@@ -11,7 +11,7 @@ import { Button } from "@polaris/ui";
 import type { Namespaces } from "@polaris/core";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { MessagesProvider, useLocale, useTranslations } from "./i18n-provider";
+import { MessagesProvider, useHasMessages, useLocale, useTranslations } from "./i18n-provider";
 import * as polls from "../shared-polls";
 
 /** The namespaces the action hands out; anything else it refuses. */
@@ -30,12 +30,15 @@ export function ClientMessages({
 }) {
     const locale = useLocale();
     const key = `${locale}:${namespaces.join(",")}`;
+    // A screen whose route already handed these down draws at once and asks for nothing.
+    const held = useHasMessages(namespaces);
     const t = useTranslations("common");
     const [messages, setMessages] = useState<Namespaces | null>(() => kept.get(key) ?? null);
     const [failed, setFailed] = useState(false);
     const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
+        if (held) return;
         const ready = kept.get(key);
         if (ready) {
             setMessages(ready);
@@ -62,8 +65,9 @@ export function ClientMessages({
         };
         // The key names the namespaces; the array itself is a new one each render.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [key, attempt]);
+    }, [key, attempt, held]);
 
+    if (held) return <>{children}</>;
     if (!messages && failed) {
         return (
             <div
