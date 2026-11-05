@@ -54,6 +54,7 @@ import {
 } from "react";
 import { useNoteState, type Shown } from "./toast-state";
 import { ConversationNote } from "./toast-conversation";
+import { useOverlayRoot } from "../lib/overlay-root";
 
 /** How many are on screen at once. */
 const MOST = 4;
@@ -214,6 +215,7 @@ function ToastStack({
     onDismiss: (id: string) => void;
 }) {
     const [mounted, setMounted] = useState(false);
+    const root = useOverlayRoot();
     useEffect(() => setMounted(true), []);
 
     // One dismiss per note for as long as it is shown. A new one on every draw
@@ -232,10 +234,10 @@ function ToastStack({
         if (!shown.some((toast) => toast.id === id)) closers.current.delete(id);
     }
 
-    if (!mounted || shown.length === 0 || typeof document === "undefined") return null;
+    if (!mounted || shown.length === 0 || !root) return null;
 
     return createPortal(
-        <div className="pointer-events-none fixed right-4 top-[calc(1rem+var(--window-controls-height))] z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+        <div className="pointer-events-none fixed right-4 top-[calc(1rem+var(--window-controls-height))] z-[200] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
             {shown.map((toast) =>
                 toast.conversation ? (
                     <ConversationNote
@@ -249,7 +251,7 @@ function ToastStack({
                 )
             )}
         </div>,
-        document.body
+        root
     );
 }
 

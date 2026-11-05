@@ -68,7 +68,7 @@ export function GameInviteToasts() {
     if (invites.length === 0) return null;
     return (
         <ul
-            className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
+            className="pointer-events-none fixed bottom-4 right-4 z-[200] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
             aria-label={t("gameInvites.label")}
         >
             {invites.slice(0, 3).map((invite) => {

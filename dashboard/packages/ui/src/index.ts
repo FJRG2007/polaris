@@ -6,6 +6,7 @@
  */
 
 export { cn } from "./lib/cn";
+export { OverlayPortal, useOverlayRoot } from "./lib/overlay-root";
 export { applePlatform, formatShortcut } from "./lib/shortcut";
 export { KeyNamesProvider, useKeyNames } from "./lib/key-names";
 export { keepFocusOnClose } from "./lib/menu-focus";

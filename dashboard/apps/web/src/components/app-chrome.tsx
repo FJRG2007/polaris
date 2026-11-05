@@ -70,6 +70,7 @@ import {
     AppShell,
     CapabilityProvider,
     KeyNamesProvider,
+    OverlayPortal,
     PolarisMark,
     ShortcutsProvider,
     ToastProvider
@@ -333,41 +334,43 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                         of the other. They stack instead, urgent nearest
                                         the corner, and the column takes no clicks of its
                                         own - only the cards in it do. */}
-                                                                                <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
-                                                                                    {/* An update landing under an open tab, said out
+                                                                                <OverlayPortal>
+                                                                                    <div className="pointer-events-none fixed bottom-4 right-4 z-[200] flex flex-col items-end gap-2">
+                                                                                        {/* An update landing under an open tab, said out
                                             loud before a click is refused by a server that
                                             no longer knows this bundle. */}
-                                                                                    <NewBuildBanner
-                                                                                        served={
-                                                                                            build
-                                                                                        }
-                                                                                    />
-                                                                                    {/* Out here rather than inside Chat: a call you only
+                                                                                        <NewBuildBanner
+                                                                                            served={
+                                                                                                build
+                                                                                            }
+                                                                                        />
+                                                                                        {/* Out here rather than inside Chat: a call you only
                                             hear about while looking at the conversation it
                                             is in is a notice, not a call. Only for somebody
                                             who has Chat at all - the stream it listens on
                                             refuses anybody else. */}
-                                                                                    {apps.ids.includes(
-                                                                                        "chat"
-                                                                                    ) ? (
-                                                                                        <>
-                                                                                            <IncomingCalls
-                                                                                                viewerId={
-                                                                                                    user.id
-                                                                                                }
-                                                                                            />
-                                                                                            <GameInviteToasts />
-                                                                                        </>
-                                                                                    ) : null}
-                                                                                    {/* Beside the ringing card and never at the same
+                                                                                        {apps.ids.includes(
+                                                                                            "chat"
+                                                                                        ) ? (
+                                                                                            <>
+                                                                                                <IncomingCalls
+                                                                                                    viewerId={
+                                                                                                        user.id
+                                                                                                    }
+                                                                                                />
+                                                                                                <GameInviteToasts />
+                                                                                            </>
+                                                                                        ) : null}
+                                                                                        {/* Beside the ringing card and never at the same
                                             time as one: a call you are already in
                                             somewhere is not a call coming in. */}
-                                                                                    {apps.ids.includes(
-                                                                                        "chat"
-                                                                                    ) ? (
-                                                                                        <CallElsewhere />
-                                                                                    ) : null}
-                                                                                </div>
+                                                                                        {apps.ids.includes(
+                                                                                            "chat"
+                                                                                        ) ? (
+                                                                                            <CallElsewhere />
+                                                                                        ) : null}
+                                                                                    </div>
+                                                                                </OverlayPortal>
                                                                                 {/* Messages announce themselves in the corner and
                                         are then gone. Never through the bell: that is a
                                         record of things to come back to, and a chat
