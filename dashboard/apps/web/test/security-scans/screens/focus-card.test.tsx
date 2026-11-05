@@ -19,7 +19,8 @@ vi.mock("@polaris/app-host/client", async () => {
     return {
         hostUi: {
             i18nProvider: { useClient: () => "browser", useLocale: () => "en-US" },
-            liveRead: { useLiveRead }
+            liveRead: { useLiveRead },
+            pagedPicker: { PagedPicker: () => null }
         }
     };
 });

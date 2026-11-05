@@ -4863,6 +4863,7 @@ model DeployTarget {
     @@unique([ownerId, name])
     @@index([ownerId])
     @@index([hostId])
+    @@index([name, id])
 }
 
 model Project {

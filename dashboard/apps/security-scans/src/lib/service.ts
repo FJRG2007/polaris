@@ -171,20 +171,70 @@ async function imageOf(applicationId: string): Promise<string | null> {
 /* Reading                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export async function listServers() {
+/** Where the next page of servers starts: the last name and id handed out. */
+function encodeCursor(name: string, id: string): string {
+    return Buffer.from(JSON.stringify([name, id])).toString("base64url");
+}
+
+function decodeCursor(raw: string | null): { name: string; id: string } | null {
+    if (!raw) return null;
+    try {
+        const [name, id] = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown[];
+        return typeof name === "string" && typeof id === "string" ? { name, id } : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The servers scans run on, a page at a time: searched by name in the
+ * database and ordered by name, each with its scan settings, so the picker and
+ * the server shown never need the whole list.
+ */
+export async function listServers(request: {
+    query: string;
+    cursor: string | null;
+    limit: number;
+    ids?: readonly string[];
+}) {
+    const after = decodeCursor(request.cursor);
     const targets = await prisma.deployTarget.findMany({
+        where: {
+            AND: [
+                ...(request.ids ? [{ id: { in: [...request.ids] } }] : []),
+                ...(request.query
+                    ? [{ name: { contains: request.query, mode: "insensitive" as const } }]
+                    : []),
+                ...(after
+                    ? [
+                          {
+                              OR: [
+                                  { name: { gt: after.name } },
+                                  { name: after.name, id: { gt: after.id } }
+                              ]
+                          }
+                      ]
+                    : [])
+            ]
+        },
         select: { id: true, name: true, kind: true, securitySetting: true },
-        orderBy: { createdAt: "asc" },
-        take: 100
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        // One past the page: the extra row is how the end is known without counting.
+        take: request.limit + 1
     });
-    return targets.map((t) => ({
-        id: t.id,
-        name: t.name,
-        local: t.kind === "local",
-        everyHours: t.securitySetting?.everyHours ?? 0,
-        updates: t.securitySetting?.updates ?? "unknown",
-        distro: t.securitySetting?.distro ?? null
-    }));
+    const page = targets.slice(0, request.limit);
+    const last = page[page.length - 1];
+    return {
+        items: page.map((t) => ({
+            id: t.id,
+            name: t.name,
+            local: t.kind === "local",
+            everyHours: t.securitySetting?.everyHours ?? 0,
+            updates: t.securitySetting?.updates ?? "unknown",
+            distro: t.securitySetting?.distro ?? null
+        })),
+        next: targets.length > request.limit && last ? encodeCursor(last.name, last.id) : null
+    };
 }
 
 export async function serverOverview(targetId: string) {

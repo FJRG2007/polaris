@@ -26,9 +26,18 @@ async function run<T>(work: () => Promise<T>): Promise<Result<T>> {
 
 const service = () => import("../lib/service");
 
-export async function serversAction() {
+/** A page of the servers scans run on, or the ones named by id. */
+export async function serversAction(input: unknown) {
     await requireSecurityUser();
-    return run(async () => (await service()).listServers());
+    const parsed = schemas.serverOptionsInput.safeParse(input ?? {});
+    if (!parsed.success) return { ok: false, error: "invalid" } as const;
+    return run(async () => (await service()).listServers(parsed.data));
+}
+
+/** The same page in the shape a paged picker reads. */
+export async function serverOptionsAction(input: unknown) {
+    const result = await serversAction(input);
+    return result.ok ? result.data : { error: "failed" };
 }
 
 export async function overviewAction(input: unknown) {
