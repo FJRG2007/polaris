@@ -94,5 +94,65 @@
             "leaf": "Leaf",
             "gem": "Gem"
         }
+    },
+    "nameTags": {
+        "org": {
+            "title": "Name tag",
+            "intro": "A short tag members can show after their name."
+        },
+        "instance": {
+            "title": "Instance tag",
+            "intro": "A tag anyone here can wear. Reserved words are allowed."
+        },
+        "mine": {
+            "title": "Your tag",
+            "intro": "Shown after your name, to the same people who see your badges.",
+            "none": "Wear none",
+            "empty": "None of your organizations has a tag yet.",
+            "loadFailed": "Your tags could not be loaded.",
+            "retry": "Try again"
+        },
+        "editor": {
+            "enabled": "Members can wear it",
+            "enabledHint": "Turning it off removes it from everybody at once.",
+            "text": "Tag text",
+            "textHint": "Up to 4 letters or numbers, shown in capitals.",
+            "emblem": "Emblem",
+            "color": "Color",
+            "avatar": "Photo",
+            "preview": "Preview",
+            "save": "Save tag",
+            "saved": "Tag saved."
+        },
+        "emblems": {
+            "spark": "Spark",
+            "shield": "Shield",
+            "bolt": "Bolt",
+            "leaf": "Leaf",
+            "flame": "Flame",
+            "gem": "Gem",
+            "wave": "Wave",
+            "orbit": "Orbit"
+        },
+        "colors": {
+            "slate": "Slate",
+            "red": "Red",
+            "amber": "Amber",
+            "green": "Green",
+            "teal": "Teal",
+            "blue": "Blue",
+            "violet": "Violet",
+            "pink": "Pink"
+        },
+        "errors": {
+            "required": "Type a tag.",
+            "tooLong": "Use 4 characters at most.",
+            "characters": "Use letters and numbers only.",
+            "reserved": "That tag is kept for the instance staff.",
+            "emblem": "Pick an emblem.",
+            "invalid": "That tag could not be saved.",
+            "forbidden": "Only administrators can do that.",
+            "unavailable": "You cannot wear that tag right now."
+        }
     }
 }

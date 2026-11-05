@@ -27,10 +27,12 @@ import { OrgPicturesCard } from "@/app/(app)/account/avatar-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
 import { OrgSuccessorCard, type OrgSuccessorPerson } from "./successor-card";
+import { NameTagEditor, type NameTagFormValue } from "@/components/name-tags/name-tag-editor";
 import {
     changeOrgSlugAction,
     deleteOrgAction,
     setOrgChatAction,
+    setOrgNameTagAction,
     transferOrgAction,
     updateOrgAction
 } from "@/app/(app)/account/organizations/actions";
@@ -57,7 +59,10 @@ export function SettingsView({
     successor,
     impact,
     chatIsolated,
-    chatOffered
+    chatOffered,
+    nameTag,
+    nameTagStaff,
+    orgImage
 }: {
     org: OrgDetail;
     isOwner: boolean;
@@ -78,7 +83,13 @@ export function SettingsView({
     /** Whether this Polaris offers the choice at all. False hides nothing that
      *  was said - it only takes the switch away. */
     chatOffered: boolean;
+    /** The tag members may wear; null for somebody who cannot manage it. */
+    nameTag: NameTagFormValue | null;
+    /** An instance administrator, who may use the reserved words here too. */
+    nameTagStaff: boolean;
+    orgImage: string | null;
 }) {
+    const tt = useTranslations("badges");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState("");
@@ -119,6 +130,20 @@ export function SettingsView({
                         changes what people see rather than what the
                         organization is called. */}
                     {chatOffered && <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />}
+                    {nameTag && (
+                        <NameTagEditor
+                            title={tt("nameTags.org.title")}
+                            intro={tt("nameTags.org.intro")}
+                            initial={nameTag}
+                            staff={nameTagStaff}
+                            image={orgImage}
+                            onSave={async (value) => {
+                                const result = await setOrgNameTagAction(org.id, value);
+                                if (!result.error) router.refresh();
+                                return result;
+                            }}
+                        />
+                    )}
                 </>
             )}
 

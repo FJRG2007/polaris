@@ -30,6 +30,7 @@
 
 import Link from "next/link";
 import { FollowLists } from "./follow-lists";
+import type { NameTagView } from "@polaris/core";
 import type { BadgesForViewer } from "@/lib/badges/badge-service";
 import { ProfileNameExtras } from "@/components/profile-name-extras";
 import { ProfileActions } from "./profile-actions";
@@ -66,7 +67,8 @@ export function ProfileCard({
     profile,
     own,
     signedIn,
-    badges
+    badges,
+    tag
 }: {
     profile: PublicProfile;
     own: boolean;
@@ -75,6 +77,8 @@ export function ProfileCard({
      *  than buttons that send them to a sign-in screen. */
     signedIn: boolean;
     badges: BadgesForViewer;
+    /** The name tag this viewer may see, decided on the server. */
+    tag: NameTagView | null;
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("publicPages");
@@ -167,7 +171,7 @@ export function ProfileCard({
                             </span>
                         ) : null}
                     </h1>
-                    <ProfileNameExtras badges={badges} own={own} />
+                    <ProfileNameExtras badges={badges} own={own} personId={profile.id} tag={tag} />
                     {profile.fullName && profile.fullName !== profile.name ? (
                         <p className="text-muted-foreground text-sm">{profile.fullName}</p>
                     ) : null}

@@ -27,6 +27,7 @@ import { nameLookOf, nameplateOf, type Nameplate } from "@polaris/core";
 import { nameStyleClass, nameLookCss, nameplateCss } from "@/lib/profile-style-css";
 import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
 import { useContactName, useProfileName, useProfileStyle } from "@/components/profile-style-store";
+import { PersonNameTag } from "@/components/name-tags/person-name-tag";
 
 /**
  * The places a person is a row of data rather than a person.
@@ -125,7 +126,7 @@ export function PersonName({
     // called them something else goes on seeing their own name for them.
     const called = useContactName(id);
     const shown = (real ? null : called) ?? live ?? name;
-    return (
+    const drawn = (
         <span
             className={cn(className, nameStyleClass(style))}
             style={style ? nameLookCss(style) : undefined}
@@ -133,6 +134,15 @@ export function PersonName({
             {shown}
             {children}
         </span>
+    );
+    // A tag is what its owner says about themselves, like a painted name, so a
+    // list of accounts as records draws without it.
+    if (plain || !id) return drawn;
+    return (
+        <>
+            {drawn}
+            <PersonNameTag id={id} />
+        </>
     );
 }
 

@@ -50,7 +50,9 @@ beforeEach(() => {
     asked = [];
     refusing = null;
     tick = 0;
-    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+    vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+        // A drawn name also asks for its tag; that lookup has no clock of its own.
+        if (url !== "/api/profile/styles") return { ok: true, json: async () => ({ tags: {} }) };
         const body = JSON.parse(init.body) as { ids: string[]; since?: string };
         asked.push(body);
         if (refusing && body.ids.includes(refusing)) return { ok: false, json: async () => ({}) };

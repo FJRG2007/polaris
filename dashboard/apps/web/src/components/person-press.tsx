@@ -10,6 +10,7 @@
  */
 
 import { createContext, useContext } from "react";
+import { PersonNameTag } from "@/components/name-tags/person-name-tag";
 
 /** Somebody pressed, and the thing they were pressed on - which is where a card
  *  about them opens beside. */
@@ -29,21 +30,40 @@ export function usePersonPress(): PersonPress | null {
  * the same label it always was, so a mention never looks like somewhere to click
  * and then goes nowhere.
  */
-export function PersonMention({ id, label, className }: { id: string; label: string; className: string }) {
+export function PersonMention({
+    id,
+    label,
+    className
+}: {
+    id: string;
+    label: string;
+    className: string;
+}) {
     const press = usePersonPress();
-    if (!press || !id) return <span className={className}>{label}</span>;
+    if (!id) return <span className={className}>{label}</span>;
+    // The tag sits outside the chip, as it does after every other drawn name.
+    if (!press)
+        return (
+            <>
+                <span className={className}>{label}</span>
+                <PersonNameTag id={id} />
+            </>
+        );
     return (
-        <button
-            type="button"
-            onClick={(event) => {
-                // A mention inside a message sits inside that message's own
-                // press targets; this press is about the person.
-                event.stopPropagation();
-                press({ id, name: label.replace(/^@/, "") }, event.currentTarget);
-            }}
-            className={`${className} cursor-pointer hover:bg-primary/25`}
-        >
-            {label}
-        </button>
+        <>
+            <button
+                type="button"
+                onClick={(event) => {
+                    // A mention inside a message sits inside that message's own
+                    // press targets; this press is about the person.
+                    event.stopPropagation();
+                    press({ id, name: label.replace(/^@/, "") }, event.currentTarget);
+                }}
+                className={`${className} cursor-pointer hover:bg-primary/25`}
+            >
+                {label}
+            </button>
+            <PersonNameTag id={id} />
+        </>
     );
 }

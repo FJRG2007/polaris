@@ -46,7 +46,9 @@ beforeEach(() => {
     asked = [];
     names = { [ADA]: "Ada" };
     nicknames = { [ADA]: "Dad" };
-    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+    vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+        // A drawn name also asks for its tag; only the names lookup is counted.
+        if (url !== "/api/profile/styles") return { ok: true, json: async () => ({ tags: {} }) };
         const body = JSON.parse(init.body) as { ids: string[]; since?: string };
         asked.push(body);
         const mine = (given: Record<string, string>): Record<string, string> =>

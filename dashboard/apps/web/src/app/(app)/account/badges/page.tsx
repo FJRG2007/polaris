@@ -5,6 +5,7 @@
 
 import { requireUser } from "@/lib/session";
 import { BadgesSettings } from "./badges-settings";
+import { MyNameTag } from "./my-name-tag";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function BadgesPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
             </div>
+            <MyNameTag />
             <BadgesSettings userId={user.id} />
         </div>
     );
