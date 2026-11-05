@@ -4,12 +4,16 @@
  * them among its own routes, named by `settingsAt` in its catalog entry, and
  * this sends the reader there - so every app's settings have the same address
  * whichever code draws them.
+ *
+ * An app every Polaris comes with (Chat) is always installed: it has no catalog
+ * entry and no install row, and its settings are drawn here all the same.
  */
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
-import { appSettingsPath } from "@/lib/apps/app-settings";
+import { appSettingsPath, builtInHasSettings } from "@/lib/apps/app-settings";
+import { ChatAdminSettings } from "./_chat/chat-settings";
 import { PageHeader } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
@@ -27,6 +31,7 @@ export default async function PolarisAppSettingsPage({
 }) {
     const user = await requireAdmin();
     const { appId } = await params;
+    if (builtInHasSettings(appId)) return <BuiltInSettings appId={appId} />;
     const app = findStoreApp(appId);
     if (!app?.settingsAt) notFound();
     if (!(await hasAppInstall(user, app.id))) redirect(`/admin/apps/${encodeURIComponent(app.id)}`);
@@ -47,5 +52,31 @@ export default async function PolarisAppSettingsPage({
                 <VpnAdminSettings />
             </div>
         </Messages>
+    );
+}
+
+/** The settings of an app every Polaris comes with. Only an administrator gets
+ *  here: the page asked `requireAdmin` before choosing this branch. */
+async function BuiltInSettings({ appId }: { appId: string }) {
+    const [t, admin] = await Promise.all([
+        getTranslations("marketplace"),
+        getTranslations("admin")
+    ]);
+    if (appId !== "chat") notFound();
+    return (
+        <div className="flex min-w-0 flex-col gap-4">
+            <Link
+                href="/admin/apps"
+                className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+            >
+                <ArrowLeft className="size-4" />
+                {t("polaris.title")}
+            </Link>
+            <PageHeader
+                title={admin("chat.page.title")}
+                description={admin("chat.page.description")}
+            />
+            <ChatAdminSettings />
+        </div>
     );
 }

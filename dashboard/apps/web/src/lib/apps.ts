@@ -893,7 +893,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         label: "Communication", // i18n-ignore
         icon: MessageSquare,
         base: "/admin/email",
-        match: ["/admin/chat", "/admin/safety"],
+        match: ["/admin/safety"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -920,7 +920,7 @@ const ADMIN_AREAS: AppSubapp[] = [
             },
             {
                 label: "Chat", // i18n-ignore
-                href: "/admin/chat",
+                href: "/admin/apps/chat/settings",
                 adminOnly: true,
                 icon: MessageSquare,
                 keywords: [

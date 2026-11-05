@@ -9,12 +9,12 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { CallServerView } from "@/app/(app)/admin/chat/call-server-view";
+import { CallServerView } from "@/app/(app)/admin/apps/[appId]/settings/_chat/call-server-view";
 import { MessagesWrapper } from "../setup/i18n";
 
 let settings: Record<string, unknown> = {};
 
-vi.mock("@/app/(app)/admin/chat/actions", () => ({
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/actions", () => ({
     callServerSettingsAction: async () => ({ settings, error: null }),
     setCallServerAction: async () => ({})
 }));

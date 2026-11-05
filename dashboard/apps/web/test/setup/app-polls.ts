@@ -478,7 +478,7 @@ vi.mock("@/app/(app)/chat/chat-reads", () => ({
 
 vi.mock("@/app/(app)/admin/admin-polls", () => ({
     callServerSettings: forward(
-        () => import("@/app/(app)/admin/chat/actions"),
+        () => import("@/app/(app)/admin/apps/[appId]/settings/_chat/actions"),
         "callServerSettingsAction",
         0
     ),

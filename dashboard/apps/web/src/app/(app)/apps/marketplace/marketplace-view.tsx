@@ -25,10 +25,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpCircle, Loader2, Search, Store } from "lucide-react";
+import { ArrowUpCircle, Loader2, Search, Settings, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
-import { appSettingsHref } from "@/lib/apps/app-settings";
+import { appSettingsHref, builtInSettingsHref } from "@/lib/apps/app-settings";
 import { APP_CATEGORIES, resolveActiveApp } from "@/lib/apps";
 import { useLocalizeStoreApp } from "./use-store-words";
 import { TemplateDeployDialog } from "./template-deploy-dialog";
@@ -661,7 +661,8 @@ function NativeUpdateNote({ update }: { update: NativeUpdate }) {
 /**
  * An app every Polaris comes with, on the same card as the ones an
  * administrator switches on. Nothing installs it, so nothing offers to remove
- * it: the card says it is built in, and opens it.
+ * it: the card says it is built in, and opens it - and its settings, for one
+ * that has them, since it is always installed.
  */
 function BuiltInCard({
     entry,
@@ -673,6 +674,7 @@ function BuiltInCard({
     const t = useTranslations("marketplace");
     const navLabel = useNavLabel();
     const locale = useLocale();
+    const settingsHref = builtInSettingsHref(entry.id);
     return (
         <store.StoreCard
             preview={
@@ -709,9 +711,24 @@ function BuiltInCard({
             badges={<Badge>{navLabel(switcherCategory(entry.category))}</Badge>}
             status={<Badge>{t("polaris.builtIn")}</Badge>}
             actions={
-                <Button asChild size="sm">
-                    <Link href={entry.href}>{t("card.open")}</Link>
-                </Button>
+                <>
+                    <Button asChild size="sm">
+                        <Link href={entry.href}>{t("card.open")}</Link>
+                    </Button>
+                    {settingsHref ? (
+                        <Button
+                            asChild
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={t("detail.settings")}
+                            title={t("detail.settings")}
+                        >
+                            <Link href={settingsHref}>
+                                <Settings className="size-4" />
+                            </Link>
+                        </Button>
+                    ) : null}
+                </>
             }
         />
     );
