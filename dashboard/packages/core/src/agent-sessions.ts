@@ -226,6 +226,30 @@ export function parseHookSequence(value: string | null | undefined): bigint | nu
     return digits.length <= 10 ? read * 1_000_000_000n : read;
 }
 
+/** What asking a session's machine whether its terminal is there came back
+ *  with. `unreachable` is the machine not answering at all - a server that is
+ *  down, a daemon restarting - which is not the same as an answer of no. */
+export type SessionProbe = "alive" | "dead" | "unreachable";
+
+/**
+ * Whether the silence sweep fails a quiet session, given what a probe said.
+ *
+ * Only a machine that answered "no terminal" is dead. One that could not be
+ * asked is given four times the silence allowance before it is written off,
+ * because a box rebooting or a server briefly offline would otherwise fail
+ * every session on it - and past that, a machine nobody can reach for a day is
+ * not coming back for these sessions.
+ */
+export function sweepVerdict(
+    probe: SessionProbe,
+    silentForMs: number,
+    maxSilentMs: number
+): "keep" | "fail" {
+    if (probe === "alive") return "keep";
+    if (probe === "dead") return "fail";
+    return silentForMs > maxSilentMs * 4 ? "fail" : "keep";
+}
+
 // ---------------------------------------------------------------------------
 // Steering
 // ---------------------------------------------------------------------------

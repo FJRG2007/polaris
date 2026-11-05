@@ -8884,6 +8884,11 @@ model AgentSession {
     // session's machine. Posts can arrive out of order; one older than this is
     // kept as history and moves nothing. Null until a hook sends one.
     lastEventSeq BigInt?
+    // When the silence sweep last found the session's terminal still there. A
+    // session that reports nothing - waiting on somebody, or an agent with no
+    // hooks - is probed rather than failed, and not probed again until it has
+    // been quiet for another stretch.
+    lastAliveAt DateTime?
     startedAt   DateTime?
     finishedAt  DateTime?
     // When the owner was told this session needs them, for the waiting episode

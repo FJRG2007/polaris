@@ -55,7 +55,7 @@ vi.mock("@polaris/db", () => {
     const table = (rows: Map<string, Record<string, unknown>>) => ({
         findUnique: async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null,
         findMany: async ({ where }: { where: Record<string, unknown> }) => {
-            const { OR: _or, createdAt: _created, ...rest } = where;
+            const { OR: _or, AND: _and, createdAt: _created, ...rest } = where;
             return [...rows.values()].filter((row) => matches(row, rest));
         },
         update: async ({
@@ -108,7 +108,13 @@ vi.mock("@polaris/db", () => {
                     return { count };
                 }
             },
-            $transaction: async (calls: Promise<unknown>[]) => Promise.all(calls)
+            // Both forms: a list of calls, and an interactive callback.
+            $transaction: async function transaction(
+                calls: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>)
+            ): Promise<unknown> {
+                if (typeof calls === "function") return calls(this);
+                return Promise.all(calls);
+            }
         }
     };
 });
@@ -380,10 +386,21 @@ describe("stopping a session never loses its work", () => {
 });
 
 describe("the sweep of silent sessions", () => {
+    it("leaves a quiet session alone while its terminal answers", async () => {
+        session({ id: "s1", lastEventAt: new Date(0) });
+        expect(await runtime.sweepSilentSessions(1)).toBe(0);
+        expect(db.sessions.get("s1")).toMatchObject({ state: "working" });
+        expect(db.sessions.get("s1")?.lastAliveAt).toBeInstanceOf(Date);
+        expect(daemon.composeDown).not.toHaveBeenCalled();
+    });
+
     it("takes the same path as Stop: push first, keep on failure", async () => {
         session({ id: "s1", lastEventAt: new Date(0) });
         session({ id: "s2", containerId: "polaris-session-s2", lastEventAt: new Date(0) });
+        // Each is probed first, and only a terminal that is gone is failed.
+        daemon.runIn.mockResolvedValueOnce({ code: 1, output: "" });
         said("polaris-work: pushed 1 polaris/fix-login");
+        daemon.runIn.mockResolvedValueOnce({ code: 1, output: "" });
         said("polaris-work: noauth 4 polaris/fix-login");
 
         expect(await runtime.sweepSilentSessions(1)).toBe(2);

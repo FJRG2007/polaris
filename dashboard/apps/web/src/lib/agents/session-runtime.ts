@@ -799,23 +799,43 @@ export async function stopSession(sessionId: string): Promise<SaveOutcome | null
 }
 
 /**
- * Sessions whose machine has gone quiet for long enough to say so.
+ * Sessions whose machine has gone quiet for long enough to ask whether it is
+ * still there.
  *
- * A session that is thinking hard and one whose container was reaped look
- * identical from here: both are a row that says "working" and has not reported
- * anything. The difference is time, and after enough of it the honest reading is
- * that nobody is going to report anything again.
+ * Silence is not death. A session waiting on a permission prompt, one that
+ * finished its turn overnight, and every agent that reports nothing at all
+ * (anything but Claude) are all silent by nature, and failing them after six
+ * hours ended work somebody was coming back to. So silence only earns a probe:
+ * the runtime's own `aliveCommand` asks whether the terminal is still there,
+ * and only a session whose terminal is gone is failed. One that answers is
+ * left alone and not asked again for another stretch. See `sweepVerdict`.
  */
 export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Promise<number> {
-    const cutoff = new Date(Date.now() - maxSilentMs);
-    const stale = await prisma.agentSession.findMany({
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - maxSilentMs);
+    const quiet = await prisma.agentSession.findMany({
         where: {
             state: { notIn: ["stopped", "failed"] },
-            OR: [{ lastEventAt: { lt: cutoff } }, { lastEventAt: null, createdAt: { lt: cutoff } }]
+            OR: [{ lastEventAt: { lt: cutoff } }, { lastEventAt: null, createdAt: { lt: cutoff } }],
+            AND: [{ OR: [{ lastAliveAt: null }, { lastAliveAt: { lt: cutoff } }] }]
         },
-        select: { id: true, place: true, containerId: true }
+        select: { id: true, place: true, containerId: true, lastEventAt: true, createdAt: true },
+        take: 200
     });
-    for (const session of stale) {
+    let failed = 0;
+    for (const session of quiet) {
+        const probe = await probeSession(session.id);
+        const heard = session.lastEventAt ?? session.createdAt;
+        const verdict = core.sweepVerdict(probe, now.getTime() - heard.getTime(), maxSilentMs);
+        if (verdict === "keep") {
+            if (probe === "alive")
+                await prisma.agentSession.update({
+                    where: { id: session.id },
+                    data: { lastAliveAt: now }
+                });
+            continue;
+        }
+        failed += 1;
         await finishSession(
             session.id,
             "failed",
@@ -833,5 +853,17 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
                 );
             });
     }
-    return stale.length;
+    return failed;
+}
+
+/** Whether a session's terminal is still there: its tmux session answers,
+ *  does not, or the machine could not be asked at all. */
+async function probeSession(sessionId: string): Promise<core.SessionProbe> {
+    try {
+        const result = await runInSession(sessionId, commands.aliveCommand());
+        return result.code === 0 ? "alive" : "dead";
+    } catch (error) {
+        console.error(`[agent-session] ${sessionId}: liveness probe failed:`, error);
+        return "unreachable";
+    }
 }
