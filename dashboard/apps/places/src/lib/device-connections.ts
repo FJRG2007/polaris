@@ -424,7 +424,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         // Polaris' own bound: long enough to find the phone, short enough that
         // a code left on a screen is not waited on for ever.
         pairing: { kind: "qr", pollMs: 3_000, lifetimeMs: 120_000 },
-        kinds: ["switch", "outlet", "light", "climate"],
+        kinds: ["switch", "outlet", "light", "climate", "dehumidifier"],
         search: [
             "smart life",
             "tuya smart",
@@ -482,7 +482,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 }))
             }
         ],
-        kinds: ["switch", "outlet", "light", "climate"],
+        kinds: ["switch", "outlet", "light", "climate", "dehumidifier"],
         search: [
             "smart life",
             "switch",
