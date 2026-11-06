@@ -1345,7 +1345,14 @@
         "delivered": "Delivered",
         "read": "Read",
         "theTimeWasNotRecorded": "The time was not recorded.",
-        "notYet": "Not yet."
+        "notYet": "Not yet.",
+        "notOnTheirDevice": "Not on their device yet.",
+        "notOpened": "Not opened yet.",
+        "readBy": "Read by {count} of {total}",
+        "readByEveryone": "Read by everyone",
+        "waiting": "Not yet read",
+        "unknown": "Hidden",
+        "readers": "Members"
     },
     "savedDrafts": {
         "savedDrafts": "Saved drafts",

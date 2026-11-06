@@ -1640,8 +1640,9 @@ function Writer({
  *
  * One tick for sent, two for delivered, two in colour for read - the shape
  * everybody already reads without being taught. It only ever appears on your own
- * messages in a one-to-one conversation, and only when both people allow it, so
- * its absence is not a state to be explained.
+ * messages in a one-to-one conversation or a group, and only where the settings
+ * allow it, so its absence is not a state to be explained. In a group it is read
+ * once everybody has read it, and pressing it lists who has.
  *
  * Pressable, because "did they actually see this, and when" is a real question
  * and the glyph is where somebody asks it. The same three moments are in the

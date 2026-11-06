@@ -640,7 +640,7 @@ export function MessageMenu({
                         ))}
 
                     {/* Only where there are ticks to explain, which is exactly a
-                        one-to-one conversation, your own message, and both people
+                        one-to-one or a group, your own message, and the settings
                         allowing them - the same rule that decides whether the ticks
                         are drawn, asked once on the server and carried here. */}
                     {message.receipt && !message.deleted && (

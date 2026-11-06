@@ -34,7 +34,8 @@ import { noticeParts, noticePeople, noticeString, type NoticePart } from "./noti
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
-import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
+import { allowedBy, maySee, receiptsAmong } from "@/lib/privacy-service";
+import * as groupReceipts from "./group-receipts";
 import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { confineCustomEmoji, reactionEmoji } from "./custom-emoji";
@@ -1453,30 +1454,36 @@ export async function markUnread(actor: ChatActor, input: core.ChatMarkUnreadInp
  * Whose screens a read is for.
  *
  * Always the reader's own, which is the count coming down on the desktop they
- * left open. The other person as well, but only in a one-to-one conversation
- * where the ticks are theirs to see: the frame arrives at the instant somebody
+ * left open. The others as well, but only in a conversation that has ticks - a
+ * one-to-one, or a group within `GROUP_RECEIPT_MAX_MEMBERS` - and only those
+ * whose ticks are theirs to see: the frame arrives at the instant somebody
  * opened the message, which is the fact the setting withholds - a receipt
  * nothing draws is still a receipt if it is on the wire.
  *
- * One person everywhere else. No screen consumes somebody else's read outside a
- * one-to-one - "read by four of the seven here" is a different feature - and
- * telling fifty members about each other's reading is a frame per pair per
- * message for nothing.
+ * One person everywhere else. No screen consumes somebody else's read in a room
+ * of a space, and telling fifty members about each other's reading is a frame
+ * per pair per message for nothing.
  */
 async function readAudience(actor: ChatActor, channel: ChannelAccess): Promise<string[]> {
-    if (channel.kind !== "dm") return [actor.id];
+    if (channel.spaceId) return [actor.id];
+    if (channel.kind !== "dm" && channel.kind !== "group") return [actor.id];
 
-    const other = await prisma.chatChannelMember.findFirst({
+    const others = await prisma.chatChannelMember.findMany({
         where: { channelId: channel.channelId, userId: { not: actor.id } },
-        select: { userId: true }
+        select: { userId: true },
+        take: groupReceipts.GROUP_RECEIPT_MAX_MEMBERS
     });
-    if (!other) return [actor.id];
+    if (others.length === 0 || others.length > groupReceipts.GROUP_RECEIPT_MAX_MEMBERS - 1)
+        return [actor.id];
 
     // Not resolved as an administrator, for the same reason `receiptStateIn` is
     // not: these are the ticks under somebody's own messages, and the admin
     // exception is about reading somebody else's.
-    const allowed = await receiptsBetween({ id: actor.id, isAdmin: false }, other.userId);
-    return allowed ? [actor.id, other.userId] : [actor.id];
+    const allowed = await receiptsAmong(
+        { id: actor.id, isAdmin: false },
+        others.map((other) => other.userId)
+    );
+    return [actor.id, ...allowed];
 }
 
 /**
@@ -1524,13 +1531,25 @@ export interface MessageDelivery {
     readonly deliveredAt: string | null;
     readonly readAt: string | null;
     readonly state: core.MessageReceipt;
+    /**
+     * Where each of the other members stands, in a group. Null in a one-to-one,
+     * where the three moments above already are that one person.
+     *
+     * "unknown" is a member whose ticks are withheld by either side's setting:
+     * shown as such, never as having read it.
+     */
+    readonly readers: readonly MessageReader[] | null;
 }
+
+/** One member of a group, and how far one message has got with them. */
+export type MessageReader = groupReceipts.NamedReceipt;
 
 /**
  * When a message was sent, arrived and was read.
  *
- * Only for the reader's own message in a one-to-one conversation where both
- * settings allow the ticks - the same rule that decides whether they are drawn.
+ * Only for the reader's own message where the ticks are drawn - a one-to-one
+ * both settings allow, or a group within the receipt cap - which in a group also
+ * lists each member and how far they have got.
  * Null when there is nothing to say, which is the panel's cue not to be offered.
  */
 export async function deliveryOf(
@@ -1560,8 +1579,28 @@ export async function deliveryOf(
         sentAt: row.createdAt.toISOString(),
         deliveredAt: row.deliveredAt?.toISOString() ?? null,
         readAt: row.readAt?.toISOString() ?? null,
-        state: receiptAt(state, row.createdAt)
+        state: receiptAt(state, row.createdAt),
+        readers: state.group ? await readersOf(actor, state, row.createdAt) : null
     };
+}
+
+/** Each other member of a group by the name this reader knows them by, read
+ *  ones first. Bounded by the marks, which are bounded by the receipt cap. */
+async function readersOf(
+    actor: ChatActor,
+    state: ReceiptState,
+    createdAt: Date
+): Promise<MessageReader[]> {
+    const ids = state.marks.map((mark) => mark.userId);
+    const [users, called] = await Promise.all([
+        prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+        nicknamesFor(actor.id, ids)
+    ]);
+    const names = new Map(users.map((user) => [user.id, called.get(user.id) ?? user.name]));
+    return groupReceipts.readersAt(
+        state.marks.map((mark) => ({ ...mark, name: names.get(mark.userId) ?? "" })),
+        createdAt
+    );
 }
 
 /**
@@ -2092,22 +2131,27 @@ export async function decorateMessages(
     });
 }
 
-/** How far the other person in a one-to-one conversation has got. Null when
- *  there is no such person, or when the ticks are not theirs to be shown. */
+/** How far the other people in a conversation have got. Null when there is
+ *  nobody whose ticks are the reader's to see. */
 interface ReceiptState {
-    readonly deliveredAt: Date | null;
-    readonly readAt: Date | null;
+    /** A group rather than a one-to-one, which is what decides whether there is
+     *  a list of people to show. */
+    readonly group: boolean;
+    /** One per other member: a single one in a one-to-one. */
+    readonly marks: readonly groupReceipts.MemberMark[];
 }
 
 /**
  * The other side's marks, if this is a conversation that has ticks at all.
  *
- * Everything about this is deliberately narrow. Only a one-to-one conversation:
- * "read by three of the seven people here" is a different feature and not one
- * anybody asked for. Only when both settings allow it, because a receipt you can
- * see and they cannot is a mirror rather than a setting. And nothing at all in a
- * page with none of the reader's own messages in it, which costs the lookup
- * nothing.
+ * Deliberately narrow. Only a conversation of people rather than a room in a
+ * space: a one-to-one, or a group no larger than `GROUP_RECEIPT_MAX_MEMBERS`.
+ * Only where the settings allow it, asked of each member in both directions,
+ * because a receipt you can see and they cannot is a mirror rather than a
+ * setting. In a group, a member whose ticks are withheld stays in the list as
+ * unknown, so the message never reads as seen by everybody on their behalf.
+ * And nothing at all in a page with none of the reader's own messages in it,
+ * which costs the lookup nothing.
  */
 async function receiptStateFor(
     actor: ChatActor,
@@ -2123,23 +2167,39 @@ async function receiptStateFor(
 async function receiptStateIn(actor: ChatActor, channelId: string): Promise<ReceiptState | null> {
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
-        select: { kind: true }
+        select: { kind: true, spaceId: true }
     });
-    if (channel?.kind !== "dm") return null;
+    if (!channel || channel.spaceId) return null;
+    if (channel.kind !== "dm" && channel.kind !== "group") return null;
 
-    const other = await prisma.chatChannelMember.findFirst({
+    // One past the cap, so a conversation over it is recognised without reading
+    // all of it.
+    const others = await prisma.chatChannelMember.findMany({
         where: { channelId, userId: { not: actor.id } },
-        select: { userId: true, lastReadAt: true, lastDeliveredAt: true }
+        select: { userId: true, lastReadAt: true, lastDeliveredAt: true },
+        orderBy: { userId: "asc" },
+        take: groupReceipts.GROUP_RECEIPT_MAX_MEMBERS
     });
-    if (!other) return null;
+    if (others.length === 0) return null;
 
     // The reader is not resolved as an administrator here: these are their own
     // messages in their own conversation, and the admin exception is about
     // reading somebody else's.
-    const allowed = await receiptsBetween({ id: actor.id, isAdmin: false }, other.userId);
-    if (!allowed) return null;
+    const allowed = await receiptsAmong(
+        { id: actor.id, isAdmin: false },
+        others.map((other) => other.userId)
+    );
 
-    return { deliveredAt: other.lastDeliveredAt, readAt: other.lastReadAt };
+    const marks = others.map((other) => ({
+        userId: other.userId,
+        readAt: other.lastReadAt,
+        deliveredAt: other.lastDeliveredAt,
+        allowed: allowed.has(other.userId)
+    }));
+    // A one-to-one shows nothing rather than an unknown: there is only the one
+    // person, and an unknown tick there is the setting announcing itself.
+    if (channel.kind === "dm" && !marks[0]!.allowed) return null;
+    return groupReceipts.ticksShown(marks) ? { group: channel.kind === "group", marks } : null;
 }
 
 /** The ticks for one message. */
@@ -2153,11 +2213,9 @@ function receiptFor(
 }
 
 /** Which tick one of the reader's own messages has earned, given how far the
- *  other side has got. */
+ *  others have got. */
 function receiptAt(state: ReceiptState, createdAt: Date): core.MessageReceipt {
-    if (state.readAt && state.readAt >= createdAt) return "read";
-    if (state.deliveredAt && state.deliveredAt >= createdAt) return "delivered";
-    return "sent";
+    return groupReceipts.receiptAmong(state.marks, createdAt);
 }
 
 /** The card under one message, or null when there is no link or nothing is yet

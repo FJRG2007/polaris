@@ -82,9 +82,13 @@ describe("a frame arriving", () => {
         expect(full).toBe(0);
     });
 
-    it("asks for nothing when somebody else caught up", () => {
+    it("asks for the list alone when somebody else caught up", () => {
+        // Their read moves the tick on the reader's own last message in that
+        // row - a one-to-one or a group - and the frame only reaches people
+        // whose ticks it moves.
         onFrame?.({ kind: "read", channelId: "c1", userId: "grace" });
-        expect(channelsOnly + full).toBe(0);
+        expect(channelsOnly).toBe(1);
+        expect(full).toBe(0);
     });
 
     it("asks for everything when who is in what changed", () => {

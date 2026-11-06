@@ -15,6 +15,7 @@ import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
 import { receiptsAmong } from "@/lib/privacy-service";
+import * as groupReceipts from "./group-receipts";
 import { lastMessages, withReceipt, type ChatLastMessage } from "@/lib/chat/last-messages";
 import { nicknamesFor } from "@/lib/contact-names";
 import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
@@ -814,7 +815,14 @@ export async function listChannels(
             // rail.
             members: {
                 where: { channel: { spaceId: null } },
-                select: { userId: true, user: { select: { name: true } } }
+                // The marks as well: a group's last-message tick is how far
+                // its members have got, and these rows are already here.
+                select: {
+                    userId: true,
+                    lastReadAt: true,
+                    lastDeliveredAt: true,
+                    user: { select: { name: true } }
+                }
             }
         }
     });
@@ -885,19 +893,39 @@ export async function listChannels(
 
     // The ticks under the reader's own last message, only where the
     // conversation itself would draw them: a one-to-one whose two sides both
-    // allow read receipts. Asked about every such conversation in one go.
-    const ticked = new Map<string, string>();
+    // allow read receipts, or a group within the receipt cap where at least one
+    // member's are visible. Asked about every such person in one go.
+    const ticked = new Map<
+        string,
+        { kind: string; others: (typeof channels)[number]["members"] }
+    >();
     for (const channel of channels) {
-        if (channel.kind !== "dm" || last.get(channel.id)?.authorId !== actor.id) continue;
-        const other = channel.members.find((member) => member.userId !== actor.id);
-        if (other) ticked.set(channel.id, other.userId);
+        if (channel.spaceId || last.get(channel.id)?.authorId !== actor.id) continue;
+        if (channel.kind !== "dm" && channel.kind !== "group") continue;
+        const others = channel.members.filter((member) => member.userId !== actor.id);
+        if (others.length > 0) ticked.set(channel.id, { kind: channel.kind, others });
     }
-    const allowed = await receiptsAmong({ id: actor.id, isAdmin: false }, [
-        ...ticked.values()
-    ]).catch(() => new Set<string>());
-    const receipts = new Set(
-        [...ticked].filter(([, userId]) => allowed.has(userId)).map(([channelId]) => channelId)
-    );
+    const allowed = await receiptsAmong(
+        { id: actor.id, isAdmin: false },
+        [...ticked.values()].flatMap(({ others }) => others.map((member) => member.userId))
+    ).catch(() => new Set<string>());
+    // A one-to-one keeps the marks its message carries; a group's are worked
+    // out from the members', because nothing on a group message is stamped.
+    const receipts = new Map<string, core.MessageReceipt | true>();
+    for (const [channelId, { kind, others }] of ticked) {
+        const marks = others.map((member) => ({
+            userId: member.userId,
+            readAt: member.lastReadAt,
+            deliveredAt: member.lastDeliveredAt,
+            allowed: allowed.has(member.userId)
+        }));
+        if (kind === "dm") {
+            if (marks[0]!.allowed) receipts.set(channelId, true);
+        } else if (groupReceipts.ticksShown(marks)) {
+            const at = new Date(last.get(channelId)!.at);
+            receipts.set(channelId, groupReceipts.receiptAmong(marks, at));
+        }
+    }
 
     return channels.map((channel) => {
         const others = channel.members
@@ -936,7 +964,7 @@ export async function listChannels(
             unread: unread.get(channel.id) ?? 0,
             last: membership?.locked
                 ? null
-                : withReceipt(last.get(channel.id) ?? null, receipts.has(channel.id)),
+                : withReceipt(last.get(channel.id) ?? null, receipts.get(channel.id) ?? false),
             // Worked out rather than read: a mute with an end that has passed is
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,

@@ -1345,7 +1345,14 @@
         "delivered": "Entregado",
         "read": "Leído",
         "theTimeWasNotRecorded": "No se registró la hora.",
-        "notYet": "Todavía no."
+        "notYet": "Todavía no.",
+        "notOnTheirDevice": "Aún no está en su dispositivo.",
+        "notOpened": "Aún no lo ha abierto.",
+        "readBy": "Leído por {count} de {total}",
+        "readByEveryone": "Leído por todos",
+        "waiting": "Aún sin leer",
+        "unknown": "Oculto",
+        "readers": "Miembros"
     },
     "savedDrafts": {
         "savedDrafts": "Borradores",

@@ -124,10 +124,11 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // before this they stayed up until the page was reloaded. The one
                 // trigger on purpose: the screen that performed the read is told
                 // by this frame like every other, so it does not ask for the list
-                // again on its own. Somebody else catching up changes nothing
-                // here, and is only ever announced to them and the one person
-                // whose ticks it moves.
-                if (frame.kind === "read" && frame.userId === viewerId) refreshChannels();
+                // again on its own. Somebody else catching up moves the tick on
+                // this reader's last message in that row, and is only ever
+                // announced to the people whose ticks it moves - the other side
+                // of a one-to-one, or the members of a group who may see them.
+                if (frame.kind === "read") refreshChannels();
             },
             [refresh, refreshChannels, viewerId]
         )

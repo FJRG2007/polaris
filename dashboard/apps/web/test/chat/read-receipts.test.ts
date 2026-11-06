@@ -30,9 +30,16 @@ const SENT = new Date("2026-08-17T10:00:00Z");
 let kind = "dm";
 let messages: MessageRow[] = [];
 let mark: { lastReadAt: Date | null; lastDeliveredAt: Date | null } | null = null;
-/** The other person in the conversation, as the membership table has them. */
-let other: { userId: string; lastReadAt: Date | null; lastDeliveredAt: Date | null } | null = null;
+interface MemberRow {
+    userId: string;
+    lastReadAt: Date | null;
+    lastDeliveredAt: Date | null;
+}
+/** The other people in the conversation, as the membership table has them. */
+let others: MemberRow[] = [];
 let receiptsAllowed = true;
+/** Members whose own setting withholds their ticks from the reader. */
+let hidden = new Set<string>();
 
 let announced: {
     kind: string;
@@ -72,6 +79,8 @@ vi.mock("@/lib/chat/live", () => ({
 
 vi.mock("@/lib/privacy-service", () => ({
     receiptsBetween: async () => receiptsAllowed,
+    receiptsAmong: async (_viewer: unknown, ids: readonly string[]) =>
+        new Set(receiptsAllowed ? ids.filter((id) => !hidden.has(id)) : []),
     maySee: async () => true,
     allowedBy: async () => new Set<string>()
 }));
@@ -81,9 +90,14 @@ vi.mock("@polaris/db", () => ({
         chatChannel: { findUnique: async () => ({ kind }), findMany: async () => [] },
         chatChannelMember: {
             findUnique: async () => mark,
-            findFirst: async () => other,
+            findFirst: async () => others[0] ?? null,
+            findMany: async ({ take }: { take?: number }) => others.slice(0, take),
             upsert: async () => undefined,
             updateMany: async () => undefined
+        },
+        user: {
+            findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
+                where.id.in.map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1) }))
         },
         chatMessage: {
             findFirst: async ({ where }: { where: { id: string } }) =>
@@ -108,7 +122,10 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+vi.mock("@/lib/contact-names", () => ({ nicknamesFor: async () => new Map<string, string>() }));
+
 const { deliveryOf, markRead, receiptsFor } = await import("@/lib/chat/messages");
+const { GROUP_RECEIPT_MAX_MEMBERS } = await import("@/lib/chat/group-receipts");
 
 const ada = { id: "ada" };
 
@@ -127,10 +144,11 @@ function message(id: string, authorId: string | null, minutes: number): MessageR
 beforeEach(() => {
     kind = "dm";
     receiptsAllowed = true;
+    hidden = new Set();
     announced = [];
     stamped = [];
     mark = { lastReadAt: null, lastDeliveredAt: null };
-    other = { userId: "grace", lastReadAt: null, lastDeliveredAt: null };
+    others = [{ userId: "grace", lastReadAt: null, lastDeliveredAt: null }];
     messages = [message("m1", "grace", 0), message("m2", "ada", 1), message("m3", "grace", 2)];
 });
 
@@ -187,7 +205,7 @@ describe("catching up", () => {
 
 describe("the ticks, asked for on their own", () => {
     it("answers for the reader's own messages", async () => {
-        other = { userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null };
+        others = [{ userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null }];
         const marks = await receiptsFor(ada, "c1", ["m2"]);
         expect(marks).toEqual({ m2: "read" });
     });
@@ -207,19 +225,20 @@ describe("the three moments", () => {
         const delivered = new Date("2026-08-17T10:05:00Z");
         const read = new Date("2026-08-17T10:06:00Z");
         messages[1] = { ...messages[1]!, deliveredAt: delivered, readAt: read };
-        other = { userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null };
+        others = [{ userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null }];
 
         const delivery = await deliveryOf(ada, "m2");
         expect(delivery).toEqual({
             sentAt: messages[1]!.createdAt.toISOString(),
             deliveredAt: delivered.toISOString(),
             readAt: read.toISOString(),
-            state: "read"
+            state: "read",
+            readers: null
         });
     });
 
     it("say how far it got even when the moments were never recorded", async () => {
-        other = { userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null };
+        others = [{ userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null }];
         const delivery = await deliveryOf(ada, "m2");
         // An old message: read, and nobody wrote down when.
         expect(delivery).toMatchObject({ state: "read", readAt: null, deliveredAt: null });
@@ -227,5 +246,73 @@ describe("the three moments", () => {
 
     it("are nobody else's message to ask about", async () => {
         expect(await deliveryOf(ada, "m1")).toBeNull();
+    });
+});
+
+describe("in a group", () => {
+    const at = (row: number) => messages[row]!.createdAt;
+
+    beforeEach(() => {
+        kind = "group";
+        others = [
+            { userId: "grace", lastReadAt: null, lastDeliveredAt: null },
+            { userId: "linus", lastReadAt: null, lastDeliveredAt: null }
+        ];
+    });
+
+    it("turns read only once every other member has read it", async () => {
+        others[0]!.lastReadAt = at(1);
+        others[1]!.lastDeliveredAt = at(1);
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "delivered" });
+        others[1]!.lastReadAt = at(2);
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "read" });
+    });
+
+    it("never counts a member whose ticks are withheld as having read it", async () => {
+        others[0]!.lastReadAt = at(1);
+        others[1]!.lastReadAt = at(1);
+        hidden = new Set(["linus"]);
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "sent" });
+
+        const delivery = await deliveryOf(ada, "m2");
+        expect(delivery?.readers).toEqual([
+            { id: "grace", name: "Grace", state: "read" },
+            { id: "linus", name: "Linus", state: "unknown" }
+        ]);
+    });
+
+    it("shows nothing to a reader who withholds their own", async () => {
+        receiptsAllowed = false;
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
+        expect(await deliveryOf(ada, "m2")).toBeNull();
+    });
+
+    it("lists who has read it, read first", async () => {
+        others[1]!.lastReadAt = at(1);
+        const delivery = await deliveryOf(ada, "m2");
+        expect(delivery?.state).toBe("sent");
+        expect(delivery?.readers).toEqual([
+            { id: "linus", name: "Linus", state: "read" },
+            { id: "grace", name: "Grace", state: "sent" }
+        ]);
+    });
+
+    it("tells the members whose ticks a read moves, and nobody withheld", async () => {
+        hidden = new Set(["linus"]);
+        await markRead(ada, { channelId: "c1", messageId: "m3" });
+        expect(announced.at(-1)?.audience).toEqual(["ada", "grace"]);
+        // Nothing is stamped on a group message: the marks answer it.
+        expect(stamped).toHaveLength(0);
+    });
+
+    it("has no ticks past the cap", async () => {
+        others = Array.from({ length: GROUP_RECEIPT_MAX_MEMBERS }, (_, index) => ({
+            userId: `member-${index}`,
+            lastReadAt: at(2),
+            lastDeliveredAt: at(2)
+        }));
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
+        await markRead(ada, { channelId: "c1", messageId: "m3" });
+        expect(announced.at(-1)?.audience).toEqual(["ada"]);
     });
 });

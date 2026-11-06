@@ -93,7 +93,8 @@ vi.mock("@/lib/blocks", () => ({ blockedBy: async () => new Set() }));
 vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async () => new Set(),
     maySee: async () => false,
-    receiptsBetween: async () => false
+    receiptsBetween: async () => false,
+    receiptsAmong: async () => new Set<string>()
 }));
 
 /** The `where` of a `chatMessage.findFirst`, as this module writes them. */
@@ -128,6 +129,7 @@ vi.mock("@polaris/db", () => {
         chatChannelMember: {
             findUnique: async () => ({ ...mark, role: "member" }),
             findFirst: async () => ({ userId: "grace" }),
+            findMany: async () => [{ userId: "grace" }],
             update: async ({
                 data
             }: {

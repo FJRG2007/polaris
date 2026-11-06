@@ -236,8 +236,8 @@ export async function GET(request: Request): Promise<Response> {
                 // marks, not a page to go and fetch.
                 //
                 // Addressed, always: the publisher names the reader's own account
-                // and, only where the ticks are that person's to see, the one
-                // other person in the conversation. Anybody else is not told that
+                // and, only where the ticks are theirs to see, the other people
+                // in a one-to-one or a group. Anybody else is not told that
                 // somebody read something, because the fact is on the wire
                 // whether or not a screen draws it.
                 if (change.kind === "read") {
