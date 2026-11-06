@@ -205,7 +205,10 @@ export async function accountRecoveryStatus(ticket: string): Promise<AccountReco
         select: { status: true, expiresAt: true }
     });
     if (!row) return "pending";
-    if (row.status === "pending" && row.expiresAt.getTime() < Date.now()) return "expired";
+    // An approved ticket expires too: an administrator issues one already approved
+    // with a short life, and the page should say so before a password is typed.
+    const live = row.status === "pending" || row.status === "approved";
+    if (live && row.expiresAt.getTime() < Date.now()) return "expired";
     return row.status as AccountRecoveryStatus;
 }
 
@@ -218,7 +221,7 @@ export async function accountRecoveryStatus(ticket: string): Promise<AccountReco
  * The breach check runs on both sides - the client's is for the person typing,
  * this one is the one that decides.
  */
-async function unacceptablePassword(userId: string, password: string): Promise<string | null> {
+export async function unacceptablePassword(userId: string, password: string): Promise<string | null> {
     const account = await prisma.user.findUnique({
         where: { id: userId },
         select: { name: true, email: true, username: true }
@@ -262,6 +265,9 @@ export async function completeAccountRecovery(
         await prisma.accountRecovery.updateMany({ where: { id: row.id }, data: { status: "approved" } });
         return result;
     }
+    // A password they chose themselves answers a temporary one an administrator
+    // handed out, so the change-password hold ends here too.
+    await prisma.user.update({ where: { id: row.userId }, data: { passwordChangeRequired: false } });
     await revokeUserSessions(row.userId, row.userId);
     await recordAudit({
         actorId: row.userId,

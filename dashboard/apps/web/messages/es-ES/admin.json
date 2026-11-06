@@ -3540,7 +3540,16 @@
             "unknownGroup": "Grupo desconocido.",
             "unknownPolicy": "Política desconocida.",
             "notCapability": "Eso no es una capacidad.",
-            "unknownAccess": "Acceso desconocido."
+            "unknownAccess": "Acceso desconocido.",
+            "confirmFirst": "Confirma antes que eres tú.",
+            "credentialsSelf": "Cambia tu acceso desde tu página de seguridad.",
+            "outranked": "Esta cuenta está por encima de la tuya.",
+            "tooMany": "Demasiados intentos. Prueba en {minutes} min.",
+            "mailNoChannel": "El correo de cuentas no está configurado aquí.",
+            "mailUnverified": "Su dirección no está confirmada.",
+            "mailFailed": "No se pudo enviar el correo. Reinténtalo.",
+            "emailUnchanged": "Esa ya es su dirección.",
+            "emailTaken": "Otra cuenta usa esa dirección."
         },
         "nav": {
             "label": "Secciones",
@@ -3549,6 +3558,51 @@
             "sessions": "Sesiones",
             "access": "Permisos",
             "danger": "Zona de riesgo"
+        },
+        "credentials": {
+            "self": "Es tu cuenta. Cambia tu contraseña y dirección desde tu página de seguridad.",
+            "title": "Recuperar contraseña",
+            "hint": "Ayuda a {name} a volver a entrar.",
+            "link": {
+                "title": "Enlace de un solo uso",
+                "hint": "Lo abre y elige otra contraseña. Sirve una vez.",
+                "create": "Crear enlace",
+                "copy": "Copiar",
+                "once": "Solo se muestra ahora. Caduca {time}."
+            },
+            "mail": {
+                "title": "Enviar enlace",
+                "hint": "Se envía a {email}.",
+                "send": "Enviar correo",
+                "sent": "Enlace enviado a {email}.",
+                "noChannel": "El correo de cuentas no está configurado aquí.",
+                "unverified": "Su dirección no está confirmada; no se envía nada."
+            },
+            "temporary": {
+                "title": "Contraseña temporal",
+                "hint": "Dile esta contraseña. Tendrá que cambiarla al volver a entrar y se cierran todos sus dispositivos.",
+                "label": "Contraseña temporal",
+                "placeholder": "Al menos 10 caracteres",
+                "generate": "Generar contraseña",
+                "copy": "Copiar contraseña",
+                "set": "Establecer",
+                "done": "{name} la cambiará al volver a entrar."
+            },
+            "email": {
+                "title": "Correo de acceso",
+                "hint": "Ahora {email}.",
+                "label": "Nuevo correo",
+                "placeholder": "nombre@ejemplo.com",
+                "save": "Cambiar correo",
+                "invalid": "Correo no válido",
+                "verified": "He confirmado esta dirección",
+                "keepOld": "Conservar {email} como extra",
+                "done": "Correo cambiado. Se le avisó en sus notificaciones."
+            },
+            "stepUp": {
+                "title": "Confirma que eres tú",
+                "description": "Vas a cambiar cómo entra {name}."
+            }
         }
     },
     "usersInvite": {

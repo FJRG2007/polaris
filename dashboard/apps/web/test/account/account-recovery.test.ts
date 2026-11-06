@@ -103,7 +103,8 @@ vi.mock("@polaris/db", () => ({
             ),
             findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
                 users.find((user) => user.id === where.id) ?? null
-            )
+            ),
+            update: vi.fn(async () => ({}))
         },
         $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations))
     }

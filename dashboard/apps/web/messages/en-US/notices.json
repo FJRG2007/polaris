@@ -521,5 +521,15 @@
             "app-tunnel-quick": "Service quick tunnel",
             "app-tunnel-ngrok": "Service ngrok tunnel"
         }
+    },
+    "accountAdmin": {
+        "resetMail": {
+            "subject": "Reset your Polaris password",
+            "body": "An administrator sent you this link to set a new password:\n\n{url}\n\nIt works once and expires in {minutes} minutes. If you did not ask for it, ignore this email."
+        },
+        "emailChanged": {
+            "title": "Your sign-in email changed",
+            "body": "An administrator changed your sign-in email from {from} to {to}."
+        }
     }
 }

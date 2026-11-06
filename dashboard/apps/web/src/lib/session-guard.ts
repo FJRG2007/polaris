@@ -172,6 +172,9 @@ export async function revokeSessionsRefusedByRules(userId: string): Promise<numb
 /** Where an account with no second factor is sent to arm one. */
 export const ENROLL_PATH = "/oauth/enroll";
 
+/** Where an account holding a temporary password picks its own. */
+export const PASSWORD_CHANGE_PATH = "/oauth/change-password";
+
 /**
  * The instance's own demand, as a verdict: an account carrying no second factor
  * on a deployment that requires one goes to the step that arms one, and nowhere
@@ -216,6 +219,8 @@ export async function guardSession({
                 // The other way a sign-in proves itself. The approval gate stands
                 // in for a second factor rather than stacking on top of one.
                 twoFactorEnabled: true,
+                // A temporary password an administrator handed out, still unreplaced.
+                passwordChangeRequired: true,
                 security: {
                     select: {
                         idleLockMinutes: true,
@@ -387,6 +392,10 @@ export async function guardSession({
     //    them to arm a factor through it would be asking the wrong question first.
     const owed = await secondFactorVerdict(record.twoFactorEnabled === true);
     if (owed) return owed;
+
+    // 6b. A temporary password from an administrator. Nothing else is served
+    //     until the account replaces it with one only its owner knows.
+    if (record.passwordChangeRequired) return { ok: false, redirect: PASSWORD_CHANGE_PATH };
 
     // 7. Keep the activity stamp fresh, but not on every single request. A
     //    session opened before the host was recorded adopts it here, which is the

@@ -45,7 +45,8 @@ export const STEP_UP_PURPOSES = [
     "lockdown",
     "close-account",
     "vault-passkeys",
-    "chat-lock-reset"
+    "chat-lock-reset",
+    "admin-credentials"
 ] as const;
 
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];
