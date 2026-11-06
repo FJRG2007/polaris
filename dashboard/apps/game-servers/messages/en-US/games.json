@@ -1,4 +1,12 @@
 {
+    "dnsLeftovers": {
+        "title": "{count, plural, one {# DNS record} other {# DNS records}} from deleted servers still in your zone",
+        "retrying": "Polaris tries to remove them again every hour.",
+        "reason": "Cloudflare would not remove them: {reason}. Polaris tries again every hour.",
+        "noToken": "Polaris has no Cloudflare connection to remove them with. An administrator can reconnect it under Integrations.",
+        "retry": "Try now",
+        "retryFailed": "Could not try again. Wait a moment and press it again."
+    },
     "list": {
         "gameServers": "Game servers",
         "runGameServersOnYour": "Run game servers on your own machines.",

@@ -34,6 +34,7 @@ import * as list from "./list";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GameLogo } from "../components/game-picker";
 import { NewServerDialog } from "./new-server-dialog";
+import { DnsLeftoversNotice } from "./dns-leftovers-notice";
 import { CopyStatus, DuplicateServerDialog } from "./duplicate-parts";
 import { useGamePresence } from "../components/use-game-presence";
 import type { GameServerFacts, GameServerLive } from "../lib/games-service";
@@ -418,6 +419,8 @@ export function GamesView({
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
+
+            {canCreate && <DnsLeftoversNotice />}
 
             {rows.length === 0 ? (
                 <Card data-tour="games.list">
