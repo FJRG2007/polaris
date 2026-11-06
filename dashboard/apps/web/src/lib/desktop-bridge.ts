@@ -48,6 +48,8 @@ export interface DesktopTvState {
     readonly phase: DesktopTvPhase;
     /** Addresses on the computer's network that answer on the ADB port. */
     readonly found: readonly string[];
+    /** TVs plugged into the computer by USB; null until listed. Absent on an app older than that. */
+    readonly usb?: readonly { readonly id: string; readonly name: string }[] | null;
     /** How it ended; an app newer than this page may name one it does not know. */
     readonly outcome: string | null;
     /** The folder on the computer the TV's backup was written to. */
@@ -60,9 +62,15 @@ export interface DesktopTvState {
 export interface DesktopTv {
     state(): Promise<DesktopTvState | null>;
     find(): Promise<DesktopTvState | null>;
+    /** Lists TVs plugged in by USB. Absent on an app older than that. */
+    findUsb?(): Promise<DesktopTvState | null>;
     /** Stops a search; an install under way runs to its end. */
     cancel(): Promise<DesktopTvState | null>;
-    start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
+    start(
+        input:
+            | { readonly host: string; readonly home: boolean }
+            | { readonly usb: string; readonly home: boolean }
+    ): Promise<boolean>;
     onState(listener: (state: DesktopTvState) => void): () => void;
 }
 

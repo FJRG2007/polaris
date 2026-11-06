@@ -72,7 +72,9 @@ const OUTCOMES = new Set([
     "backup-failed",
     "sideload-refused",
     "install-failed",
-    "install-interrupted"
+    "install-interrupted",
+    "usb-busy",
+    "usb-gone"
 ]);
 
 function validAddress(value: string): boolean {
@@ -105,6 +107,7 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     const [address, setAddress] = useState("");
     const [home, setHome] = useState(true);
     const [searched, setSearched] = useState(false);
+    const [usbId, setUsbId] = useState<string | null>(null);
     const [notStarted, setNotStarted] = useState(false);
     const [refused, setRefused] = useState(false);
 
@@ -139,6 +142,10 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     const valid = validAddress(address);
     const addressError = address.trim() && !valid ? t("downloads.tv.dialog.addressInvalid") : null;
     const outcome = state.outcome && OUTCOMES.has(state.outcome) ? state.outcome : null;
+    // Only an app that installs over USB sends the field and answers findUsb.
+    const findUsb = Array.isArray(state.usb) || state.usb === null ? tv.findUsb : undefined;
+    const usbListed = state.usb ?? [];
+    const usbPicked = usbListed.some((one) => one.id === usbId) ? usbId : null;
 
     return (
         <>
@@ -159,6 +166,7 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                             aria-invalid={addressError ? true : undefined}
                             onChange={(event) => {
                                 setAddress(event.target.value);
+                                setUsbId(null);
                                 setNotStarted(false);
                             }}
                             className="min-w-0 flex-1"
@@ -193,7 +201,10 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                                     size="sm"
                                     variant={host === address.trim() ? "primary" : "outline"}
                                     disabled={!idle}
-                                    onClick={() => setAddress(host)}
+                                    onClick={() => {
+                                        setAddress(host);
+                                        setUsbId(null);
+                                    }}
                                 >
                                     <Tv className="size-3.5 shrink-0" /> {host}
                                 </Button>
@@ -205,6 +216,48 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                         </p>
                     ) : null}
                 </div>
+
+                {findUsb ? (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                        <span className="text-sm font-medium">{t("downloads.tv.dialog.usb")}</span>
+                        <p className="text-xs text-muted-foreground">
+                            {t("downloads.tv.dialog.usbHint")}
+                        </p>
+                        <div className="flex min-w-0 flex-wrap gap-2">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled={!idle}
+                                onClick={() => void findUsb.call(tv)}
+                            >
+                                {t("downloads.tv.dialog.usbFind")}
+                            </Button>
+                            {usbListed.map((device) => (
+                                <Button
+                                    key={device.id}
+                                    size="sm"
+                                    variant={device.id === usbPicked ? "primary" : "outline"}
+                                    disabled={!idle}
+                                    title={device.id}
+                                    className="min-w-0 max-w-full"
+                                    onClick={() => {
+                                        setUsbId(device.id);
+                                        setAddress("");
+                                        setNotStarted(false);
+                                    }}
+                                >
+                                    <Tv className="size-3.5 shrink-0" />
+                                    <span className="truncate">{device.name}</span>
+                                </Button>
+                            ))}
+                        </div>
+                        {state.usb && state.usb.length === 0 && idle ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("downloads.tv.dialog.usbNone")}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 <label className="flex min-w-0 items-start gap-2 text-sm">
                     <Checkbox
@@ -258,10 +311,14 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                         : t("downloads.tv.dialog.close")}
                 </Button>
                 <Button
-                    disabled={!idle || !valid}
+                    disabled={!idle || (!valid && !usbPicked)}
                     onClick={() => {
                         void tv
-                            .start({ host: address.trim(), home })
+                            .start(
+                                usbPicked
+                                    ? { usb: usbPicked, home }
+                                    : { host: address.trim(), home }
+                            )
                             .then((started) => setNotStarted(!started));
                     }}
                 >
