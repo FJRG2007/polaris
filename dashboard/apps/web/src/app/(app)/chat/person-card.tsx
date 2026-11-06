@@ -375,10 +375,10 @@ export function PersonProfileDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 aria-describedby={undefined}
-                className="max-h-[90dvh] w-[min(52rem,95vw)] max-w-[min(52rem,95vw)] overflow-y-auto overflow-x-hidden p-0 md:grid md:grid-cols-[22rem_minmax(0,1fr)] md:overflow-hidden"
+                className="max-h-[90dvh] w-[min(52rem,95vw)] max-w-[min(52rem,95vw)] overflow-y-auto overflow-x-hidden overscroll-contain p-0 md:grid md:grid-cols-[22rem_minmax(0,1fr)] md:overflow-hidden"
             >
                 <DialogTitle className="sr-only">{profile?.name || person.name}</DialogTitle>
-                <div className="min-w-0 md:overflow-y-auto">
+                <div className="min-w-0 md:overflow-y-auto md:overscroll-contain">
                     <ProfileDetails
                         size="full"
                         person={person}
@@ -409,7 +409,7 @@ export function PersonProfileDialog({
                         }
                     />
                 </div>
-                <div className="min-w-0 border-t border-border p-5 md:overflow-y-auto md:border-l md:border-t-0 md:pr-14">
+                <div className="min-w-0 border-t border-border p-5 md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0 md:pr-14">
                     <ProfileActivityPane personId={person.id} profile={profile} loading={loading} />
                 </div>
             </DialogContent>

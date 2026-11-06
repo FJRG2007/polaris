@@ -52,6 +52,7 @@ vi.mock("@/lib/privacy-service", () => ({
     defaultFollowerAudience: async () => "everyone"
 }));
 vi.mock("@/lib/mutuals", () => ({ mutualsBetween }));
+vi.mock("@/lib/badges/badge-service", () => ({ badgesBesideName: async () => [] }));
 vi.mock("@/lib/friends-service", () => ({ areFriends: async () => false }));
 vi.mock("@/lib/blocks", () => ({
     blockedBy: async () => new Set(),

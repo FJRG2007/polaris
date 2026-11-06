@@ -34,7 +34,7 @@ import { prisma, VISIBLE_USER } from "@polaris/db";
 import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
 import { mutualsBetween } from "@/lib/mutuals";
-import { badgesBesideName, type BadgeView } from "@/lib/badges/badge-service";
+import type { BadgeView } from "@/lib/badges/badge-service";
 import { recentActivityFor, type RecentActivityView } from "@/lib/presence-activity/recent";
 import { channelAccess, type ChatActor } from "./access";
 
@@ -181,7 +181,13 @@ export async function chatProfile(
         self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
         roleIn(together, person.id),
         self ? ("self" as const) : standing(actor.id, person.id),
-        mayReadProfile ? badgesBesideName(person.id, reader) : [],
+        // Loaded on use: the badge service records audits, which reads the
+        // server's auth setup - nothing a profile read needs on import.
+        mayReadProfile
+            ? import("@/lib/badges/badge-service").then((badges) =>
+                  badges.badgesBesideName(person.id, reader)
+              )
+            : [],
         // Outside the profile audience a reader is told nothing somebody shares.
         options.recent && mayReadProfile
             ? recentActivityFor(reader, person.id).catch((caught: unknown) => {

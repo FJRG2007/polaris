@@ -1721,7 +1721,19 @@ const CASES: Case[] = [
                 )
             ).chatProfile("channelId-1", "userId-1"),
         action: "profileAction",
-        args: ["channelId-1", "userId-1"]
+        args: ["channelId-1", "userId-1", false]
+    },
+    {
+        name: "a person's larger profile asks what they did lately",
+        path: "/api/chat/profile",
+        ask: async () =>
+            (
+                await actual<typeof import("@/app/(app)/chat/chat-reads")>(
+                    "@/app/(app)/chat/chat-reads"
+                )
+            ).chatProfile("channelId-1", "userId-1", undefined, { recent: true }),
+        action: "profileAction",
+        args: ["channelId-1", "userId-1", true]
     },
     {
         name: "the meetings the account can see, asked again on a timer",

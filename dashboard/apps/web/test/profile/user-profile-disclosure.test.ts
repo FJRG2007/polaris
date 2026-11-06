@@ -23,6 +23,7 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/lib/user-admin-service", () => ({ banUser: vi.fn(), unbanUser: vi.fn() }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
+vi.mock("@/lib/badges/badge-service", () => ({ badgesBesideName: async () => [] }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         user: {
