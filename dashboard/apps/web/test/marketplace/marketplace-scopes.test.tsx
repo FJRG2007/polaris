@@ -187,11 +187,18 @@ describe("the admin marketplace", () => {
         const cards = shelf.querySelectorAll("[data-built-in]");
         expect(cards.length).toBe(builtInApps().length);
         for (const card of cards) {
-            expect(within(card as HTMLElement).queryAllByRole("button")).toEqual([]);
+            // At most the "More" menu an app with settings carries, like every
+            // other card; never an install or uninstall button.
+            const buttons = within(card as HTMLElement).queryAllByRole("button");
+            for (const button of buttons)
+                expect(button.getAttribute("aria-label")).toMatch(/^More for /);
             expect(within(card as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
             expect(within(card as HTMLElement).getByText("Built in")).toBeTruthy();
         }
         expect(within(shelf).queryByText(/uninstall/i)).toBeNull();
+        // Chat's settings sit in its card's menu, where every app keeps them.
+        const chat = shelf.querySelector('[data-built-in="chat"]') as HTMLElement;
+        expect(within(chat).getByRole("button", { name: "More for Chat" })).toBeTruthy();
         // No separate built-in list and no Installed rows beside the cards.
         expect(screen.queryByRole("region", { name: "Built in" })).toBeNull();
         expect(screen.queryByRole("region", { name: "Installed" })).toBeNull();

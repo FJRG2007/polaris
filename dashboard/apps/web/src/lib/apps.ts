@@ -963,10 +963,13 @@ const ADMIN_AREAS: AppSubapp[] = [
                 keywords: ["marketplace", "install", "catalog", "built in"]
             },
             {
+                // Opened from Chat's card under Polaris apps, like every other
+                // app's settings; kept for search only.
                 label: "Chat", // i18n-ignore
                 href: "/admin/apps/chat/settings",
                 adminOnly: true,
                 icon: MessageSquare,
+                hidden: true,
                 keywords: [
                     "messages",
                     "limits",
@@ -983,10 +986,13 @@ const ADMIN_AREAS: AppSubapp[] = [
                 ]
             },
             {
+                // The first-run wizard: it opens itself on a new install, so the
+                // rail has no door to it; search still finds it.
                 label: "Get started", // i18n-ignore
                 href: "/admin/setup",
                 adminOnly: true,
                 icon: Rocket,
+                hidden: true,
                 keywords: ["setup", "first run", "wizard", "install apps", "onboarding"]
             },
             {

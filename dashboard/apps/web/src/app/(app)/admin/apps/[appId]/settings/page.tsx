@@ -40,7 +40,7 @@ export default async function PolarisAppSettingsPage({
     const t = await getTranslations("marketplace");
     return (
         <Messages namespaces={["vpn"]}>
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4">
                 <Link
                     href={`/admin/apps/${app.id}`}
                     className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
@@ -64,7 +64,7 @@ async function BuiltInSettings({ appId }: { appId: string }) {
     ]);
     if (appId !== "chat") notFound();
     return (
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
             <Link
                 href="/admin/apps"
                 className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
