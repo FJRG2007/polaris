@@ -72,7 +72,10 @@ vi.mock("@/lib/call-sounds", () => ({
     willBeHeard: async () => true
 }));
 
-vi.mock("@/lib/chat/call-elsewhere-request", () => ({ askCallElsewhere: async () => null }));
+vi.mock("@/lib/chat/call-elsewhere-request", () => ({
+    askCallElsewhere: async () => null,
+    askRingState: async () => null
+}));
 
 // Server actions the roster's menus reach, which this test never presses.
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
