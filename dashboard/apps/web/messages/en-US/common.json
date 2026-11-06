@@ -107,6 +107,7 @@
         },
         "looking": "Looking for it on this network...",
         "notFound": "It is not on this network either.",
+        "cannotLook": "Polaris does not know its own address on this network, so it could not look for it.",
         "lookForIt": "Look for it on this network"
     },
     "storage": {

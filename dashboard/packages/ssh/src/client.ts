@@ -73,8 +73,7 @@ const UNREACHABLE_CODES = new Set([
     "ENETUNREACH",
     "ETIMEDOUT",
     "ENOTFOUND",
-    "EAI_AGAIN",
-    "ECONNRESET"
+    "EAI_AGAIN"
 ]);
 
 /**
@@ -86,9 +85,9 @@ const UNREACHABLE_CODES = new Set([
 export function classifySshFailure(error: unknown): SshFailureKind {
     const code = (error as { code?: unknown } | null)?.code;
     const message = error instanceof Error ? error.message : String(error ?? "");
-    if ((typeof code === "string" && UNREACHABLE_CODES.has(code)) || /timed out/i.test(message)) {
-        return "unreachable";
-    }
+    const answered = (error as { answered?: unknown } | null)?.answered === true;
+    if (typeof code === "string" && UNREACHABLE_CODES.has(code) && !answered) return "unreachable";
+    if (!answered && /timed out/i.test(message)) return "unreachable";
     if (/host denied|verification failed/i.test(message)) return "identity";
     if (/authentication methods failed/i.test(message)) return "login";
     return "other";
@@ -106,12 +105,22 @@ export function hostKeyAccepted(presented: string, pins: string | string[] | und
 }
 
 /** Open an authenticated ssh2 client. Rejects if the host key does not match the
- *  pin, if auth fails, or on any transport error. The caller owns `client.end()`. */
+ *  pin, if auth fails, or on any transport error. The caller owns `client.end()`.
+ *  An error raised after the TCP connection opened carries `answered: true`. */
 export function openSshClient(options: SshConnectOptions): Promise<Client> {
     const client = new Client();
+    let answered = false;
     return new Promise<Client>((resolve, reject) => {
+        client.once("connect", () => {
+            answered = true;
+        });
         client.once("ready", () => resolve(client));
-        client.once("error", (error) => reject(error));
+        client.once("error", (error) => {
+            if (answered && error && typeof error === "object") {
+                Object.assign(error, { answered: true });
+            }
+            reject(error);
+        });
         try {
             client.connect(buildConnectConfig(options));
         } catch (error) {

@@ -107,6 +107,7 @@
         },
         "looking": "Buscándolo en esta red...",
         "notFound": "Tampoco está en esta red.",
+        "cannotLook": "Polaris no conoce su propia dirección en esta red, así que no pudo buscarlo.",
         "lookForIt": "Buscarlo en esta red"
     },
     "storage": {

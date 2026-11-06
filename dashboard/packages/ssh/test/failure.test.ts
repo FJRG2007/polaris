@@ -22,6 +22,20 @@ describe("classifySshFailure", () => {
         );
     });
 
+    it("does not read something that answered and then hung up as unreachable", () => {
+        expect(classifySshFailure(socketError("ECONNRESET", "read ECONNRESET"))).toBe("other");
+        expect(
+            classifySshFailure(
+                Object.assign(new Error("Timed out while waiting for handshake"), { answered: true })
+            )
+        ).toBe("other");
+        expect(
+            classifySshFailure(
+                Object.assign(socketError("ETIMEDOUT", "read ETIMEDOUT"), { answered: true })
+            )
+        ).toBe("other");
+    });
+
     it("reads a key that is not the pinned one as identity", () => {
         expect(classifySshFailure(new Error("Host denied (verification failed)"))).toBe("identity");
     });

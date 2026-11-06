@@ -17,6 +17,7 @@ import { Button } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { RotateCw, Search, ShieldAlert } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { LocalPath } from "@/lib/server-local-path";
 
 /** What to attach to: a container on a deploy target, a container on a
  *  Containers connection, a registered server - as the Polaris login, or as root
@@ -90,8 +91,31 @@ export function closeOutcome(
 }
 
 /** What looking for a server that stopped answering where it is recorded found:
- *  the address it moved to, or nothing. */
-export type FindServerResult = { found?: string; error?: string };
+ *  the address it moved to, or what the search saw instead. */
+export type FindServerResult = { found?: string; error?: string; path?: LocalPath };
+
+/** What the note says about the search, from what it returned. */
+type Search =
+    | { kind: "idle" | "looking" | "notFound" | "cannotLook" }
+    | { kind: "error"; text: string };
+
+/** Sort a search result into retry (it moved and was adopted, or it answers
+ *  where it is recorded again) or what to say. Pure and unit-tested. */
+export function searchOutcome(result: FindServerResult | null): "retry" | Search {
+    if (!result) return { kind: "notFound" };
+    if (result.found) return "retry";
+    if (result.error) return { kind: "error", text: result.error };
+    switch (result.path?.kind) {
+        case "unknown":
+            return { kind: "cannotLook" };
+        case "already":
+        case "none":
+        case "found":
+            return "retry";
+        default:
+            return { kind: "notFound" };
+    }
+}
 
 /** What the corner of the panel says: one of its own states, or the reason the
  *  far end gave, which is shown as it came. */
@@ -285,19 +309,22 @@ function FailureNote({
     const t = useTranslations("common");
     const known = failure.kind === "refused" ? CLOSE_REASONS[failure.reason] : undefined;
     const canFind = known === "unreachable" && Boolean(findServer);
-    const [search, setSearch] = useState<
-        { kind: "idle" | "looking" | "notFound" } | { kind: "error"; text: string }
-    >({ kind: "idle" });
+    const [search, setSearch] = useState<Search>({ kind: "idle" });
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     const look = async (): Promise<void> => {
         if (!findServer) return;
         setSearch({ kind: "looking" });
-        const result = await findServer().catch(() => null);
-        if (result?.found) {
-            onRetry();
-            return;
-        }
-        setSearch(result?.error ? { kind: "error", text: result.error } : { kind: "notFound" });
+        const outcome = searchOutcome(await findServer().catch(() => null));
+        if (!mounted.current) return;
+        if (outcome === "retry") onRetry();
+        else setSearch(outcome);
     };
 
     useEffect(() => {
@@ -318,6 +345,7 @@ function FailureNote({
                             : t("terminal.refused", { reason: failure.reason })}
                         {search.kind === "looking" ? ` ${t("terminal.looking")}` : null}
                         {search.kind === "notFound" ? ` ${t("terminal.notFound")}` : null}
+                        {search.kind === "cannotLook" ? ` ${t("terminal.cannotLook")}` : null}
                         {search.kind === "error" ? ` ${search.text}` : null}
                     </span>
                 ) : (

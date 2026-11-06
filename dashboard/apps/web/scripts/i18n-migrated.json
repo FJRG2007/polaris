@@ -812,6 +812,7 @@
         "web/src/app/(app)/apps/servers/server-storage.tsx",
         "web/src/app/(app)/apps/servers/server-usage.tsx",
         "web/src/app/(app)/apps/servers/servers-view.tsx",
+        "web/src/app/(app)/apps/servers/use-find-server.ts",
         "web/src/app/(app)/apps/servers/ssh-key-actions.ts",
         "web/src/app/(app)/apps/servers/ssh-key-words.ts",
         "web/src/app/(app)/apps/servers/compare/compare-view.tsx",

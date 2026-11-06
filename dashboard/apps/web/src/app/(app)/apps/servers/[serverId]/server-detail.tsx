@@ -32,7 +32,7 @@ import { ServerInsightsPanel } from "../insights/server-insights-panel";
 import { ServerTemplatesPanel } from "./server-templates-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
-import { recoverServerAddressAction } from "../actions";
+import { useFindServer } from "../use-find-server";
 import { useLiveResource } from "@/components/use-live-resource";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "../types";
@@ -108,6 +108,7 @@ export function ServerDetail({
     const t = useTranslations("servers");
     const tc = useTranslations("components");
     const router = useRouter();
+    const findServer = useFindServer();
     const query = useSearchParams();
     const [tab, setTab] = useState<TabId>(() => tabFromQuery(query.get("tab")) ?? "overview");
     const [shellOpen, setShellOpen] = useState(false);
@@ -435,13 +436,7 @@ export function ServerDetail({
                             key={asRoot ? "root" : "login"}
                             target={{ kind: "host", hostId: server.hostId ?? server.id, asRoot }}
                             label={`${asRoot ? "root" : server.detail}@${server.address}`}
-                            findServer={async () => {
-                                const result = await recoverServerAddressAction(
-                                    server.hostId ?? server.id
-                                );
-                                if (result.found) router.refresh();
-                                return result;
-                            }}
+                            findServer={() => findServer(server.hostId ?? server.id)}
                         />
                     ) : null}
                 </DialogContent>

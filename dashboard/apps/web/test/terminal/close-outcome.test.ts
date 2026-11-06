@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import enUS from "../../messages/en-US/common.json";
 import esES from "../../messages/es-ES/common.json";
-import { CLOSE_REASONS, closeOutcome } from "../../src/app/(app)/apps/deploy/terminal-panel";
+import { CLOSE_REASONS, closeOutcome, searchOutcome } from "../../src/app/(app)/apps/deploy/terminal-panel";
 
 describe("closeOutcome", () => {
     it("reads a refusal after the socket opened as that refusal", () => {
@@ -70,5 +70,32 @@ describe("the sidecar's close reasons", () => {
             expect(en[key], key).toBeTruthy();
             expect(es[key], key).toBeTruthy();
         }
+    });
+});
+
+describe("searchOutcome", () => {
+    it("opens the shell again when the server was moved or answers where it is recorded", () => {
+        expect(searchOutcome({ found: "192.0.2.20" })).toBe("retry");
+        expect(searchOutcome({ path: { kind: "already", address: "192.0.2.10" } })).toBe("retry");
+        expect(searchOutcome({ path: { kind: "none" } })).toBe("retry");
+        expect(
+            searchOutcome({ path: { kind: "found", address: "192.0.2.10", moved: false } })
+        ).toBe("retry");
+    });
+
+    it("says it could not look when Polaris does not know its own address", () => {
+        expect(searchOutcome({ path: { kind: "unknown" } })).toEqual({ kind: "cannotLook" });
+    });
+
+    it("says it is not on the network only after a search that found nothing", () => {
+        expect(searchOutcome({ path: { kind: "unreachable" } })).toEqual({ kind: "notFound" });
+        expect(searchOutcome(null)).toEqual({ kind: "notFound" });
+    });
+
+    it("shows the reason a search failed", () => {
+        expect(searchOutcome({ error: "Could not look" })).toEqual({
+            kind: "error",
+            text: "Could not look"
+        });
     });
 });
