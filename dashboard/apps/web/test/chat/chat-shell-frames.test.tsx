@@ -62,7 +62,8 @@ beforeEach(() => {
     render(
         <ChatShell viewerId="ada" viewerName="Ada" orgId={null} orgName={null} may={may}>
             {null}
-        </ChatShell>, { wrapper: MessagesWrapper }
+        </ChatShell>,
+        { wrapper: MessagesWrapper }
     );
 });
 
