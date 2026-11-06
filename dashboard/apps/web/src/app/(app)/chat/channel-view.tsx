@@ -114,6 +114,9 @@ const TYPING_TTL_MS = 4000;
  *  left without hanging up is gone from here within one window and a half. */
 const LIVE_CALL_RECHECK_MS = 15_000;
 
+/** How often a message still drawn as sending reads the conversation again. */
+const PENDING_RECHECK_MS = 5_000;
+
 /** Somebody who is mid-something in the box, and when they last said so. */
 interface Typist {
     readonly userId: string;
@@ -817,6 +820,39 @@ export function ChannelView({
     // other. Kept fresh every render so it is never the version from before the
     // conversation changed.
     catchUpAgain.current = () => void catchUp();
+
+    /**
+     * A message still drawn as sending is asked about until it is not.
+     *
+     * It settles on its own echo from the stream or on the send's answer, and a
+     * window that was not in front - the desktop app minimised to the tray, a
+     * tab behind another - could miss both: the frame arrived while the one
+     * fetch slot was held or the connection was being handed between tabs, and
+     * the reload after the send answered was the router's to run whenever it
+     * got round to it. The draft then sat on "sending" until the conversation
+     * was opened again, for a message everybody else had already read. So while
+     * any draft is waiting, the newest messages are read again on a timer and
+     * the moment the window comes back, and what they hold settles it.
+     */
+    const waiting = pending.length > 0;
+    useEffect(() => {
+        if (!waiting) return;
+        const recheck = () => {
+            settle(held.current);
+            void catchUp();
+        };
+        const onVisible = () => {
+            if (document.visibilityState === "visible") recheck();
+        };
+        const timer = setInterval(recheck, PENDING_RECHECK_MS);
+        document.addEventListener("visibilitychange", onVisible);
+        window.addEventListener("focus", recheck);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+            window.removeEventListener("focus", recheck);
+        };
+    }, [waiting, catchUp, settle]);
 
     /** Scroll to a message that is already drawn, and light it. */
     const landOn = useCallback((messageId: string): boolean => {
