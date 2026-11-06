@@ -4,11 +4,12 @@ import { RunState } from "../run-state";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
-import { cancelRunAction, startRunAction } from "../actions";
+import { cancelRunAction, setAgentPauseAction, startRunAction } from "../actions";
+import type { AgentPause } from "@/lib/agents/agent-pause";
 import type { GithubInstallGap } from "@/lib/github-app-reach";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
-import { Check, ExternalLink, Loader2, Play, Square, TriangleAlert } from "lucide-react";
+import { Check, ExternalLink, Loader2, Pause, Play, Square, TriangleAlert } from "lucide-react";
 import type { GateStepReport } from "@/lib/agents/agent-gate";
 import { isTerminalRunState } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -40,8 +41,34 @@ import {
  *  look stuck. */
 const REFRESH_MS = 5000;
 
-export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[] }) {
+export function RunsView({
+    runs,
+    repos,
+    pause,
+    canManage
+}: {
+    runs: AgentRunView[];
+    repos: string[];
+    /** Whether automatic runs are paused, and why; null when they start as usual. */
+    pause: AgentPause | null;
+    canManage: boolean;
+}) {
     const t = useTranslations("agents");
+    // Drawn at once, put back if the server refuses.
+    const [paused, setPaused] = useState(pause);
+    useEffect(() => setPaused(pause), [pause]);
+    const [toggling, setToggling] = useState(false);
+    const togglePause = () => {
+        const before = paused;
+        const next = !before;
+        setPaused(next ? { reason: "manual", since: new Date().toISOString() } : null);
+        setToggling(true);
+        void runAction(() => setAgentPauseAction({ paused: next }), setError).then((result) => {
+            setToggling(false);
+            if (!result || result.error) setPaused(before);
+            if (result?.error) setError(result.error);
+        });
+    };
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -65,12 +92,49 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
         <div className="space-y-4">
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-            {repos.length > 0 ? (
-                <div className="flex justify-end">
-                    <Button size="sm" onClick={() => setStarting(true)}>
-                        <Play className="size-4 shrink-0" />
-                        {t("runs.start")}
-                    </Button>
+            {paused ? (
+                <div
+                    role="status"
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-warning-edge bg-warning-soft px-4 py-3"
+                >
+                    <Pause className="size-4 shrink-0 text-warning-ink" />
+                    <div className="min-w-0 flex-1 text-sm">
+                        <p className="font-medium text-foreground">{t("runs.paused.title")}</p>
+                        <p className="text-muted-foreground">
+                            {paused.reason === "credits"
+                                ? t("runs.paused.credits")
+                                : t("runs.paused.manual")}
+                        </p>
+                    </div>
+                    {canManage ? (
+                        <Button size="sm" disabled={toggling} onClick={togglePause}>
+                            <Play className="size-4 shrink-0" />
+                            {t("runs.paused.resume")}
+                        </Button>
+                    ) : null}
+                </div>
+            ) : null}
+
+            {repos.length > 0 || (canManage && !paused) ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                    {canManage && !paused ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={toggling}
+                            title={t("runs.paused.pauseHint")}
+                            onClick={togglePause}
+                        >
+                            <Pause className="size-4 shrink-0" />
+                            {t("runs.paused.pause")}
+                        </Button>
+                    ) : null}
+                    {repos.length > 0 ? (
+                        <Button size="sm" onClick={() => setStarting(true)}>
+                            <Play className="size-4 shrink-0" />
+                            {t("runs.start")}
+                        </Button>
+                    ) : null}
                 </div>
             ) : null}
 

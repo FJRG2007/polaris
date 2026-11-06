@@ -23,6 +23,7 @@ import {
 } from "@/lib/github-app-reach";
 import { providersFor } from "@/lib/agents/model-keys";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
+import { pauseAgentRuns, resumeAgentRuns } from "@/lib/agents/agent-pause";
 import type { PickerModel } from "@/components/model-picker";
 import { syncRepoWorkflow } from "@/lib/agents/agent-workflow";
 import { listCatalogModels } from "@/lib/agents/model-catalog";
@@ -484,6 +485,17 @@ export async function startRunAction(
     return result.error
         ? { runId: result.runId, error: agentText(await getTranslations("agents"), result.error) }
         : { runId: result.runId };
+}
+
+/** Pause or resume every run nobody starts by hand (`lib/agents/agent-pause.ts`). */
+export async function setAgentPauseAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const parsed = z.object({ paused: z.boolean() }).safeParse(input);
+    if (!parsed.success) return { error: await say("errors.checkRequest") };
+    if (parsed.data.paused) await pauseAgentRuns(user.id, "manual");
+    else await resumeAgentRuns(user.id);
+    revalidatePath(`${AGENTS_PATH}/runs`);
+    return {};
 }
 
 /** Stop a run that is still going. */

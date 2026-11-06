@@ -26,6 +26,7 @@ import { providersFor } from "@/lib/agents/model-keys";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
 import { providerForModel } from "@/lib/agents/agent-providers";
 import { inheritedFallback } from "@/lib/agents/agent-defaults-service";
+import { CREDIT_FAILURE_KINDS, pauseAgentRuns } from "@/lib/agents/agent-pause";
 import { failureIsWorthRetrying, resolveModelChain, type AgentTrigger } from "@polaris/core";
 
 /** What a decision to fall back produced, for the caller that wanted to know. */
@@ -46,6 +47,26 @@ export interface FallbackOutcome {
  * case and costs one read.
  */
 export async function considerFallback(runId: string): Promise<FallbackOutcome> {
+    const run = await prisma.agentRun.findUnique({
+        where: { id: runId },
+        select: { state: true, failureKind: true, repo: { select: { ownerId: true } } }
+    });
+    const outcome = await fallBack(runId);
+    // Out of credit with nowhere left to fall back to: every run after this one
+    // would fail the same way, so the account's automatic runs stop until
+    // somebody resumes them.
+    if (
+        run?.state === "failed" &&
+        run.repo &&
+        CREDIT_FAILURE_KINDS.includes(run.failureKind ?? "") &&
+        !outcome.runId
+    ) {
+        await pauseAgentRuns(run.repo.ownerId, "credits");
+    }
+    return outcome;
+}
+
+async function fallBack(runId: string): Promise<FallbackOutcome> {
     const run = await prisma.agentRun.findUnique({
         where: { id: runId },
         select: {

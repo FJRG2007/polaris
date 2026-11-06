@@ -85,6 +85,7 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Type something": "text.typeSomething",
     "That is longer than a code": "text.tooLongForCode",
     "A usage limit stopped this run.": "text.limitStopped",
+    "Automatic runs are paused.": "text.pausedStopped",
     "Canceled from Polaris.": "text.cancelled",
     // The spelling runs finished before the catalogs moved to US English were stored with.
     "Cancelled from Polaris.": "text.cancelled",

@@ -16,6 +16,7 @@ import { githubAppInstallationToken } from "@/lib/github-service";
 import { startServerRun } from "@/lib/agents/agent-server-executor";
 import { createAgentRun, finishAgentRun } from "@/lib/agents/agent-run-service";
 import { checkUsageLimits } from "@/lib/agents/agent-usage-limits";
+import { pauseStops, readAgentPause } from "@/lib/agents/agent-pause";
 import { AGENT_WORKFLOW_PATH, type AgentExecution, type AgentTrigger } from "@polaris/core";
 import {
     installWorkflow,
@@ -74,6 +75,13 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
     // happened, and opening one to close it out immediately would put a failure
     // on the screen for something that was correctly prevented. A deployment
     // with no ceilings set pays one read of an empty table.
+    // A paused account starts nothing on its own (`agent-pause.ts`); like a
+    // ceiling, it is a run correctly prevented rather than one that failed.
+    if (pauseStops(input.trigger) && (await readAgentPause(input.repo.ownerId))) {
+        // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
+        return { error: "Automatic runs are paused." };
+    }
+
     const verdict = await checkUsageLimits({ ownerId: input.repo.ownerId, repoFullName: input.repo.repoFullName });
     // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
     if (!verdict.allowed) return { error: verdict.reason ?? "A usage limit stopped this run." };

@@ -126,6 +126,7 @@
         "typeSomething": "Escribe algo",
         "tooLongForCode": "Es más largo que un código",
         "limitStopped": "Un límite de uso detuvo esta ejecución.",
+        "pausedStopped": "Las ejecuciones automáticas están pausadas.",
         "cancelled": "Cancelada desde Polaris.",
         "stoppedReporting": "La ejecución dejó de informar y se cerró. Sus registros, si los hay, están en el trabajo con el que se ejecutó.",
         "workflowWrite": "No se pudo escribir el archivo de workflow",
@@ -460,6 +461,14 @@
         "state": "Estado",
         "openJob": "Abrir el trabajo que lo ejecutó",
         "stop": "Detener ejecución",
+        "paused": {
+            "title": "Ejecuciones automáticas en pausa",
+            "manual": "PRs, issues, menciones y automatizaciones no inician nada hasta reanudar. Las que lances aquí sí corren.",
+            "credits": "Tu proveedor se quedó sin crédito y Polaris las pausó. Añade crédito o cambia de proveedor y reanuda.",
+            "resume": "Reanudar",
+            "pause": "Pausar automáticas",
+            "pauseHint": "Evita que PRs, issues, menciones y automatizaciones inicien ejecuciones"
+        },
         "gate": {
             "verify": "Verificación",
             "review": "Revisión, pruebas y docs"
