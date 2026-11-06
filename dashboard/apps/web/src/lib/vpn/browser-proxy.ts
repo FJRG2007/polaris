@@ -46,6 +46,11 @@ export function edgeIsReady(output: string): boolean {
     return /^edge=ready$/m.test(output);
 }
 
+/** Why browsers cannot use a node yet. "edge": the machine has no edge that takes
+ *  pushed routes. "address": nothing public to name it by. "failed": Polaris could
+ *  not finish setting it up there. */
+export type ProxyIssue = "edge" | "address" | "failed";
+
 /** Each line is a person and what they have used since the proxy started. */
 export function parseProxyUsage(output: string): { userId: string; used: bigint }[] {
     return output.split("\n").flatMap((line) => {

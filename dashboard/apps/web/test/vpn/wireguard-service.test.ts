@@ -29,6 +29,8 @@ vi.mock("@polaris/db", () => ({ prisma: db }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: script.setting, setSetting: vi.fn() }));
 vi.mock("@/lib/deploy/server-edge", () => ({ edgeLauncher: () => "sh" }));
 vi.mock("@/lib/app-edge", () => ({ edgeHostnameTaken: script.taken }));
+vi.mock("@/lib/dymo-service", () => ({ dymoPlace: async () => null }));
+vi.mock("@/lib/domain-service", () => ({ deployBase: async () => "sslip.io" }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@polaris/storage", () => ({
     decryptSecret: vi.fn(),
@@ -146,6 +148,7 @@ describe("the browser route on a node's edge", () => {
         return sent;
     }
     const proxyHost = () => db.vpnNode.update.mock.calls.at(-1)?.[0].data.proxyHost;
+    const proxyIssue = () => db.vpnNode.update.mock.calls.at(-1)?.[0].data.proxyIssue;
 
     beforeEach(() => {
         db.vpnNode.update.mockImplementation(async ({ data }) => ({ ...node, ...data }));
@@ -155,6 +158,7 @@ describe("the browser route on a node's edge", () => {
         const sent = machine(true);
         await service.updateNode(NODE_ID, change);
         expect(proxyHost()).toBe("vpn.example.test");
+        expect(proxyIssue()).toBeNull();
         expect(sent.some((one) => one.includes("mv -f") && one.includes(FILE))).toBe(true);
     });
 
@@ -162,6 +166,7 @@ describe("the browser route on a node's edge", () => {
         const sent = machine(false);
         await service.updateNode(NODE_ID, change);
         expect(proxyHost()).toBeNull();
+        expect(proxyIssue()).toBe("edge");
         expect(sent.at(-1)).toContain(`rm -f`);
         expect(sent.at(-1)).toContain(FILE);
     });
@@ -174,11 +179,32 @@ describe("the browser route on a node's edge", () => {
         expect(sent.some((one) => one.includes("mv -f") && one.includes(FILE))).toBe(false);
     });
 
-    it("is taken back when the endpoint becomes an address", async () => {
+    it("goes by a wildcard name of the address when the endpoint is one", async () => {
         const sent = machine(true);
         await service.updateNode(NODE_ID, { ...change, endpoint: "198.51.100.7" });
+        expect(proxyHost()).toMatch(/-198-51-100-7.sslip.io$/);
+        expect(sent.some((one) => one.includes("mv -f") && one.includes(FILE))).toBe(true);
+    });
+
+    it("is taken back, saying why, when the endpoint is a private address", async () => {
+        const sent = machine(true);
+        await service.updateNode(NODE_ID, { ...change, endpoint: "192.168.1.7" });
         expect(proxyHost()).toBeNull();
+        expect(proxyIssue()).toBe("address");
         expect(sent.at(-1)).toContain(FILE);
+    });
+
+    it("is published again on request for a node that has the proxy", async () => {
+        db.vpnNode.findUnique.mockResolvedValue({
+            ...node,
+            endpoint: "vpn.example.test",
+            proxyHost: null,
+            encryptedProxyKey: "sealed"
+        });
+        const sent = machine(true);
+        await service.retryBrowserRoute(NODE_ID);
+        expect(proxyHost()).toBe("vpn.example.test");
+        expect(sent.some((one) => one.includes("public-key="))).toBe(false);
     });
 
     it("goes with the node", async () => {

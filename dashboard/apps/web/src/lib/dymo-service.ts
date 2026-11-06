@@ -13,7 +13,7 @@
  */
 
 import { takeServedLookup } from "@/lib/integrations/provider-pause";
-import { verifyIp } from "@/lib/integrations/dymo";
+import { locateIp, verifyIp, type IpPlace } from "@/lib/integrations/dymo";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -47,5 +47,22 @@ export async function dymoIpAllowed(
         return allow ? { allowed: true } : { allowed: false, reason: reasons[0] ?? "flagged" };
     } catch {
         return { allowed: true };
+    }
+}
+
+/**
+ * Where an address is, from Dymo, when the operator gave it a key. Null with no
+ * integration, no key, no lookup left in the budget, or any failure - the caller
+ * then falls back to the free providers.
+ */
+export async function dymoPlace(ip: string): Promise<IpPlace | null> {
+    const state = await getIntegrationState("dymo");
+    if (!state?.enabled) return null;
+    const apiKey = await getIntegrationSecret("dymo");
+    if (!apiKey || !(await takeServedLookup("dymo"))) return null;
+    try {
+        return await locateIp(apiKey, ip);
+    } catch {
+        return null;
     }
 }

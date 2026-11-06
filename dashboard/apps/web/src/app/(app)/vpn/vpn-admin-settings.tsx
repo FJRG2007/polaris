@@ -2,14 +2,17 @@
 
 /** The VPN's settings: the machines people connect through, and who may use them. */
 
+import Link from "next/link";
 import * as ui from "@polaris/ui";
+import { NodePlaceDialog } from "./node-place-dialog";
+import { countryName } from "./world-map";
 import { dropServerOptions, ServerPicker } from "@/components/server-picker";
 import { useVpnRead } from "./use-vpn-read";
 import * as actions from "./connect-actions";
 import { VpnOverviewSection } from "./overview";
 import { useState, useTransition } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { DEFAULT_DEVICE_LIMIT, DEFAULT_PORT, isPublicEndpoint } from "@/lib/vpn/wireguard";
 
 type NodeRow = actions.NodesAnswer["nodes"][number];
@@ -28,7 +31,9 @@ export function VpnAdminSettings() {
         actions.vpnAdminAction,
         t("errors.generic")
     );
+    const locale = useLocale();
     const [nodeDialog, setNodeDialog] = useState<NodeRow | "new" | null>(null);
+    const [placing, setPlacing] = useState<NodeRow | null>(null);
     const [accessDialog, setAccessDialog] = useState<AccessRow | "new" | null>(null);
     const [removing, setRemoving] = useState<NodeRow | null>(null);
     const [unreachable, setUnreachable] = useState(false);
@@ -127,6 +132,29 @@ export function VpnAdminSettings() {
                                 <span className="text-xs text-muted-foreground">
                                     {t("nodes.devices", { count: node._count.peers })}
                                 </span>
+                                {node.exit === "tor" ? null : (
+                                    <ui.Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="min-w-0"
+                                        title={
+                                            mine.has(node.hostId)
+                                                ? t("place.set")
+                                                : t("nodes.notYours")
+                                        }
+                                        disabled={!mine.has(node.hostId)}
+                                        onClick={() => setPlacing(node)}
+                                    >
+                                        <MapPin />
+                                        <span className="min-w-0 truncate">
+                                            {node.country
+                                                ? [node.city, countryName(node.country, locale)]
+                                                      .filter(Boolean)
+                                                      .join(", ")
+                                                : t("place.unknown")}
+                                        </span>
+                                    </ui.Button>
+                                )}
                                 <ui.Button
                                     size="icon"
                                     variant="ghost"
@@ -155,6 +183,19 @@ export function VpnAdminSettings() {
                                 >
                                     <Trash2 />
                                 </ui.Button>
+                                {node.publicKey && !node.proxyHost ? (
+                                    <BrowserRouteIssue
+                                        node={node}
+                                        owned={mine.has(node.hostId)}
+                                        pending={pending}
+                                        onEdit={() => setNodeDialog(node)}
+                                        onRetry={() =>
+                                            run(() =>
+                                                actions.retryVpnBrowserAction({ id: node.id })
+                                            )
+                                        }
+                                    />
+                                ) : null}
                             </li>
                         ))}
                     </ul>
@@ -251,6 +292,13 @@ export function VpnAdminSettings() {
                     onDone={done(() => setNodeDialog(null))}
                 />
             ) : null}
+            {placing ? (
+                <NodePlaceDialog
+                    node={placing}
+                    onClose={() => setPlacing(null)}
+                    onDone={done(() => setPlacing(null))}
+                />
+            ) : null}
             {accessDialog ? (
                 <AccessDialog
                     nodes={data?.nodes ?? []}
@@ -272,6 +320,54 @@ export function VpnAdminSettings() {
                     pending={pending}
                     onConfirm={() => remove(removing)}
                 />
+            ) : null}
+        </div>
+    );
+}
+
+/**
+ * Why browsers cannot use a server yet, and the one thing that fixes it: setting up
+ * the machine's edge on its own page, a public address in the server's settings, or
+ * simply trying again. Every case also offers to try again, since that is what
+ * picks up a fix made somewhere else.
+ */
+function BrowserRouteIssue({
+    node,
+    owned,
+    pending,
+    onEdit,
+    onRetry
+}: {
+    node: NodeRow;
+    owned: boolean;
+    pending: boolean;
+    onEdit: () => void;
+    onRetry: () => void;
+}) {
+    const t = useTranslations("vpn");
+    const issue =
+        node.proxyIssue === "edge" || node.proxyIssue === "address" ? node.proxyIssue : "failed";
+    return (
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 text-xs">
+            <ui.Badge variant="warning">{t("nodes.browser.title")}</ui.Badge>
+            <span className="min-w-0 text-muted-foreground">{t(`nodes.browser.${issue}`)}</span>
+            {owned && issue === "edge" ? (
+                <Link
+                    href={`/apps/servers/${encodeURIComponent(node.hostId)}`}
+                    className={ui.buttonVariants({ size: "sm", variant: "secondary" })}
+                >
+                    {t("nodes.browser.setUpEdge")}
+                </Link>
+            ) : null}
+            {owned && issue === "address" ? (
+                <ui.Button size="sm" variant="secondary" onClick={onEdit}>
+                    {t("nodes.browser.editAddress")}
+                </ui.Button>
+            ) : null}
+            {owned ? (
+                <ui.Button size="sm" variant="ghost" disabled={pending} onClick={onRetry}>
+                    {pending ? t("nodes.browser.retrying") : t("nodes.browser.retry")}
+                </ui.Button>
             ) : null}
         </div>
     );

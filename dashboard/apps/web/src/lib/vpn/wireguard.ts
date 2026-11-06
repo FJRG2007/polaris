@@ -56,6 +56,39 @@ export const nodeInputSchema = z.object({
 });
 export type NodeInput = z.infer<typeof nodeInputSchema>;
 
+/** A place set by hand. The spot is optional: picking a country on the map says none. */
+export const nodePlaceSchema = z
+    .object({
+        country: z
+            .string()
+            .trim()
+            .toUpperCase()
+            .regex(/^[A-Z]{2}$/),
+        city: z
+            .string()
+            .trim()
+            .max(80)
+            .transform((value) => value || null)
+            .nullable(),
+        latitude: z.number().finite().min(-90).max(90).nullable(),
+        longitude: z.number().finite().min(-180).max(180).nullable()
+    })
+    .refine((place) => (place.latitude === null) === (place.longitude === null), {
+        path: ["longitude"]
+    });
+export type NodePlace = z.infer<typeof nodePlaceSchema>;
+
+/** "41.38, 2.17" or "41.38 2.17", as typed or pasted. Pure; exported for tests. */
+export function parseCoordinates(text: string): { latitude: number; longitude: number } | null {
+    const parts = text.trim().split(/[\s,;]+/);
+    if (parts.length !== 2) return null;
+    const [latitude, longitude] = parts.map(Number);
+    if (latitude === undefined || longitude === undefined) return null;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    return { latitude, longitude };
+}
+
 export const accessInputSchema = z.object({
     userId: z.string().uuid(),
     /** Node ids; empty means every node. */

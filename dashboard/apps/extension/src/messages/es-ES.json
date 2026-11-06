@@ -425,6 +425,11 @@
             "unreachable": "Polaris no respondió. Inténtalo de nuevo en un momento.",
             "blocked": "Otra extensión controla el proxy del navegador. Apágala e inténtalo de nuevo.",
             "noTraffic": "El servidor no dejó pasar tráfico, así que el navegador sigue como estaba."
+        },
+        "browserIssue": {
+            "edge": "{name}: su máquina aún no tiene borde para navegadores. Un admin puede configurarlo.",
+            "address": "{name}: aún no tiene dirección pública que un navegador alcance.",
+            "failed": "{name}: Polaris no pudo prepararlo para navegadores. Un admin puede reintentar."
         }
     }
 }

@@ -13,6 +13,7 @@
 
 import { cn, Skeleton } from "@polaris/ui";
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/components/i18n/i18n-provider";
 
 interface WorldMapData {
     readonly width: number;
@@ -26,6 +27,15 @@ interface WorldMapData {
     }[];
 }
 
+/** A country code in the reader's language, or the code where the browser has no name. */
+export function countryName(code: string, locale: string): string {
+    try {
+        return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
+    } catch {
+        return code;
+    }
+}
+
 export interface MapPlace {
     readonly id: string;
     readonly country: string;
@@ -36,14 +46,18 @@ export function WorldMap({
     places,
     selected,
     active,
-    onSelect
+    onSelect,
+    onPickCountry
 }: {
     places: readonly MapPlace[];
     selected: string | null;
     active: string | null;
     onSelect: (id: string) => void;
+    /** When given, every country can be pressed, to place something there. */
+    onPickCountry?: (code: string) => void;
 }) {
     const [map, setMap] = useState<WorldMapData | null>(null);
+    const locale = useLocale();
 
     useEffect(() => {
         void import("./world-map.json")
@@ -66,7 +80,7 @@ export function WorldMap({
             viewBox={`0 0 ${map.width} ${map.height}`}
             className="h-auto w-full"
             role="group"
-            aria-hidden={marked.length === 0 ? true : undefined}
+            aria-hidden={marked.length === 0 && !onPickCountry ? true : undefined}
         >
             <path d={map.land} className="fill-muted" />
             {map.countries.map(({ id, d }) => (
@@ -75,8 +89,23 @@ export function WorldMap({
                     d={d}
                     className={cn(
                         "stroke-background [stroke-width:0.5]",
-                        byCountry.has(id) ? "fill-primary/30" : "fill-muted"
+                        byCountry.has(id) ? "fill-primary/30" : "fill-muted",
+                        onPickCountry &&
+                            "cursor-pointer outline-none hover:fill-primary/50 focus-visible:fill-primary/50"
                     )}
+                    role={onPickCountry ? "button" : undefined}
+                    tabIndex={onPickCountry ? 0 : undefined}
+                    aria-label={onPickCountry ? countryName(id, locale) : undefined}
+                    onClick={onPickCountry ? () => onPickCountry(id) : undefined}
+                    onKeyDown={
+                        onPickCountry
+                            ? (event) => {
+                                  if (event.key !== "Enter" && event.key !== " ") return;
+                                  event.preventDefault();
+                                  onPickCountry(id);
+                              }
+                            : undefined
+                    }
                 />
             ))}
             {marked.map(({ id, x, y }) => {
@@ -93,11 +122,12 @@ export function WorldMap({
                         aria-label={here.map((place) => place.label).join(", ")}
                         aria-pressed={isSelected}
                         className="cursor-pointer outline-none"
-                        onClick={() => onSelect(first.id)}
+                        onClick={() => (onPickCountry ? onPickCountry(id) : onSelect(first.id))}
                         onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
                             event.preventDefault();
-                            onSelect(first.id);
+                            if (onPickCountry) onPickCountry(id);
+                            else onSelect(first.id);
                         }}
                     >
                         <title>{here.map((place) => place.label).join(", ")}</title>

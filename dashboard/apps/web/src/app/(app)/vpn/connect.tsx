@@ -14,7 +14,7 @@ import { Power, Trash2 } from "lucide-react";
 import * as actions from "./connect-actions";
 import { openProfileAction } from "./profile-actions";
 import { desktopBridge } from "@/lib/desktop-bridge";
-import { WorldMap, type MapPlace } from "./world-map";
+import { countryName, WorldMap, type MapPlace } from "./world-map";
 import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -35,14 +35,6 @@ const TUNNEL_CODES: ReadonlySet<string> = new Set<TunnelCode>([
 
 function gib(bytes: string): string {
     return (Number(bytes) / GIB).toFixed(1);
-}
-
-function countryName(code: string, locale: string): string {
-    try {
-        return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
-    } catch {
-        return code;
-    }
 }
 
 export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {

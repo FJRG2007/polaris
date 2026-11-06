@@ -16269,9 +16269,16 @@ model VpnNode {
     proxyKeyId     String?
     /// The name the extension connects to. Null until the edge took the route.
     proxyHost      String?
+    /// Why browsers cannot use it yet, while proxyHost is null: "edge", "address" or "failed".
+    proxyIssue     String?
     /// Where traffic comes out, read from the endpoint's address. Null until it was.
     country     String?
     city        String?
+    /// The spot itself, where whoever placed it said.
+    latitude    Float?
+    longitude   Float?
+    /// "ip", "dymo" or "manual". A manual place is never replaced by a lookup.
+    placedBy    String?
     /// Which address block this node has; see nodeSubnet.
     subnetIndex Int       @unique
     createdAt   DateTime  @default(now())

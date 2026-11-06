@@ -425,6 +425,11 @@
             "unreachable": "Polaris did not answer. Try again in a moment.",
             "blocked": "Another extension controls this browser's proxy. Turn it off and try again.",
             "noTraffic": "The server did not carry traffic, so this browser stayed as it was."
+        },
+        "browserIssue": {
+            "edge": "{name}: its machine has no edge for browsers yet. An admin can set it up.",
+            "address": "{name}: it has no public address a browser can reach yet.",
+            "failed": "{name}: Polaris could not set it up for browsers. An admin can try again."
         }
     }
 }
