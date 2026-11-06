@@ -335,6 +335,7 @@
         "dictate": "Dictar",
         "dictateStop": "Parar y transcribir",
         "dictateCancel": "Descartar audio",
+        "dictateInCall": "La llamada ya usa el micrófono",
         "recording": "Grabando {time}",
         "silent": "Polar no oye nada. Revisa tu micrófono.",
         "transcribing": "Transcribiendo",

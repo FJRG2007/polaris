@@ -82,6 +82,7 @@ export type VoiceNotice =
 export function DictationButton({
     available,
     disabled,
+    refusal,
     payer = null,
     transcribers = [],
     transcriber = null,
@@ -91,6 +92,8 @@ export function DictationButton({
 }: {
     available: boolean;
     disabled?: boolean;
+    /** Why it cannot be used right now, said on hover and focus. */
+    refusal?: string;
     /** Who pays, as picked for the chat. */
     payer?: Payer | null;
     /** The models a key is held for, and the one in use. */
@@ -153,14 +156,18 @@ export function DictationButton({
             </PromptInputButton>
         );
     }
-    const usable = available && !disabled;
+    const usable = available && !disabled && !refusal;
     const button = (
         <PromptInputButton
-            label={available ? t("voice.dictate") : t("voice.unavailable")}
+            label={refusal ?? (available ? t("voice.dictate") : t("voice.unavailable"))}
             aria-disabled={!usable || undefined}
             disabled={disabled}
-            className={cn(!available && "opacity-50", available && "rounded-r-none")}
+            className={cn(
+                (!available || refusal) && "opacity-50",
+                available && "rounded-r-none"
+            )}
             onClick={() => {
+                if (refusal) return;
                 if (!available) return onNotice("unavailable");
                 if (!canRecord()) return onNotice("cannotRecord");
                 onNotice(null);
@@ -175,7 +182,7 @@ export function DictationButton({
         <span className="inline-flex items-center">
             {button}
             <DictationMenu
-                disabled={disabled}
+                disabled={disabled || Boolean(refusal)}
                 transcribers={transcribers}
                 transcriber={transcriber}
                 onTranscriber={onTranscriber}
@@ -400,14 +407,18 @@ export function VoiceModeButton({
  * Level (0-100) at which the gate opens while Polar is quiet: the same
  * threshold a call's voice-activity microphone opens at, which is the one this
  * person set against their own level in their devices. A number of its own
- * here was a second, higher bar that a normal voice never crossed.
+ * here was a second, higher bar that a normal voice never crossed. Never
+ * below `MIN_OPEN_AT`, so a slider at zero does not keep it open on silence.
  */
 function openAt(): number {
-    return voiceSettings().activityThreshold;
+    return Math.max(MIN_OPEN_AT, voiceSettings().activityThreshold);
 }
+const MIN_OPEN_AT = 4;
 /** While Polar talks the bar is higher, so its own voice leaking past echo
- *  cancellation does not count as you talking over it. */
+ *  cancellation does not count as you talking over it - and never lower than
+ *  the fixed bar that held it off before, however low the threshold is set. */
 const WHILE_SPEAKING = 5 / 3;
+const MIN_OPEN_AT_WHILE_SPEAKING = 30;
 /** How long an open microphone may produce nothing at all before the call
  *  says so, rather than sitting on "Listening" forever. */
 const NO_SOUND_AFTER_MS = 4000;
@@ -829,6 +840,8 @@ export function VoiceCall(props: VoiceCallProps) {
                     dispatch({ type: "failed", error: "cannot_record" });
                     return;
                 }
+                const quietAt = openAt();
+                const speakingAt = Math.max(MIN_OPEN_AT_WHILE_SPEAKING, quietAt * WHILE_SPEAKING);
                 let gate = false;
                 let voicedMs = 0;
                 let lastVoice = 0;
@@ -854,8 +867,7 @@ export function VoiceCall(props: VoiceCallProps) {
                             dispatch({ type: "failed", error: "no_sound" });
                         }
                     }
-                    const threshold =
-                        current.phase === "speaking" ? openAt() * WHILE_SPEAKING : openAt();
+                    const threshold = current.phase === "speaking" ? speakingAt : quietAt;
                     gate = speaking(level, threshold, gate);
                     if (gate) {
                         lastVoice = now;

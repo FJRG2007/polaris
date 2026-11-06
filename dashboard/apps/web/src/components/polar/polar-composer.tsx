@@ -221,7 +221,8 @@ export function PolarComposer({
                         </span>
                         <DictationButton
                             available={kit.voice.dictation}
-                            disabled={disabled || inCall}
+                            disabled={disabled}
+                            refusal={inCall ? t("voice.dictateInCall") : undefined}
                             payer={kit.payer}
                             transcribers={kit.voice.transcribers}
                             transcriber={kit.voice.transcriber}
