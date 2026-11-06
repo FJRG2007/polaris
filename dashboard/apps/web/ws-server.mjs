@@ -19,7 +19,13 @@
 
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
-import { clampDim, openRootShell, openShell, openSshClient } from "@polaris/ssh";
+import {
+    clampDim,
+    classifySshFailure,
+    openRootShell,
+    openShell,
+    openSshClient
+} from "@polaris/ssh";
 import {
     DockerDriver,
     socketTransport,
@@ -290,10 +296,24 @@ async function openSshSession(ticket, ws) {
         };
     } catch (error) {
         console.error(`polaris ws: ssh failed for ${target.host}:`, error?.message ?? error);
-        ws.close(4003, "could not open a shell on the server");
+        // The reason is a word the panel turns into a sentence, never the error
+        // itself, which names addresses and internals. The upgrade has already
+        // been accepted by now, so this close is the only thing the browser
+        // learns - a bare close read as "disconnected" with nothing to act on.
+        ws.close(4003, SSH_CLOSE_REASONS[classifySshFailure(error)]);
         return null;
     }
 }
+
+/** What a failed server shell closes with, by `classifySshFailure` kind. Read
+ *  by the terminal panel, which owns the words; "could not open a shell on the
+ *  server" is what this said for every kind before they were told apart. */
+const SSH_CLOSE_REASONS = {
+    unreachable: "server unreachable",
+    identity: "server identity changed",
+    login: "server refused the login",
+    other: "could not open a shell on the server"
+};
 
 async function redeem(token) {
     // Redeem via the web app's internal loopback route: this process runs outside

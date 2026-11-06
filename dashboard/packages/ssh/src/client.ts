@@ -63,6 +63,37 @@ export interface SshConnectOptions {
     readonly sock?: Duplex;
 }
 
+/** Why a connection to a server failed, in the terms a screen can act on. */
+export type SshFailureKind = "unreachable" | "identity" | "login" | "other";
+
+/** Socket errors that mean nothing answered at that address and port. */
+const UNREACHABLE_CODES = new Set([
+    "ECONNREFUSED",
+    "EHOSTUNREACH",
+    "ENETUNREACH",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ECONNRESET"
+]);
+
+/**
+ * Sort an `openSshClient` failure into what the reader can do about it: nothing
+ * answered (switched off, or not at the address on record), something answered
+ * without this server's pinned key, or it answered and turned the login away.
+ * Read from ssh2's own wording where it has no error code. Pure and unit-tested.
+ */
+export function classifySshFailure(error: unknown): SshFailureKind {
+    const code = (error as { code?: unknown } | null)?.code;
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if ((typeof code === "string" && UNREACHABLE_CODES.has(code)) || /timed out/i.test(message)) {
+        return "unreachable";
+    }
+    if (/host denied|verification failed/i.test(message)) return "identity";
+    if (/authentication methods failed/i.test(message)) return "login";
+    return "other";
+}
+
 /**
  * Whether a presented server key is accepted given the pin(s). `undefined` pins
  * mean trust-on-add (accept once, for capture); a string or array means the key

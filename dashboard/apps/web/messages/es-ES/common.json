@@ -95,7 +95,19 @@
         },
         "refused": "El servidor rechazó la sesión: {reason}.",
         "untrusted": "{surface, select, app {La app no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.} other {El navegador no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.}}",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "reasons": {
+            "expired": "Este terminal ya no era válido al conectarse. Vuelve a intentarlo.",
+            "noTerminal": "El contenedor no quiso abrir una shell. Puede que se haya detenido.",
+            "gone": "Este servidor o conexión ya no está disponible para ti.",
+            "unreachable": "Nada respondió en la dirección de este servidor. Está apagado, o se movió a otra dirección.",
+            "identity": "Algo respondió en la dirección de este servidor con otra clave, así que Polaris no inició sesión. Si el servidor se reinstaló, quítalo y vuelve a añadirlo en Servidores.",
+            "login": "El servidor rechazó el inicio de sesión: la cuenta o la clave de Polaris en él cambió o se eliminó. Vuelve a añadir el servidor en Servidores.",
+            "shell": "El servidor aceptó el inicio de sesión pero no quiso abrir una shell."
+        },
+        "looking": "Buscándolo en esta red...",
+        "notFound": "Tampoco está en esta red.",
+        "lookForIt": "Buscarlo en esta red"
     },
     "storage": {
         "unreachable": "Ahora no se pueden guardar archivos: el almacenamiento {name} no responde.",

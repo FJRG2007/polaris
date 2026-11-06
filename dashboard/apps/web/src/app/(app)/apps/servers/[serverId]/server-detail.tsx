@@ -32,6 +32,7 @@ import { ServerInsightsPanel } from "../insights/server-insights-panel";
 import { ServerTemplatesPanel } from "./server-templates-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
+import { recoverServerAddressAction } from "../actions";
 import { useLiveResource } from "@/components/use-live-resource";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "../types";
@@ -434,6 +435,13 @@ export function ServerDetail({
                             key={asRoot ? "root" : "login"}
                             target={{ kind: "host", hostId: server.hostId ?? server.id, asRoot }}
                             label={`${asRoot ? "root" : server.detail}@${server.address}`}
+                            findServer={async () => {
+                                const result = await recoverServerAddressAction(
+                                    server.hostId ?? server.id
+                                );
+                                if (result.found) router.refresh();
+                                return result;
+                            }}
                         />
                     ) : null}
                 </DialogContent>

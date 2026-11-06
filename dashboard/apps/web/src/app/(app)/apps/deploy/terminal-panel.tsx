@@ -15,7 +15,7 @@
 import "@xterm/xterm/css/xterm.css";
 import { Button } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
-import { RotateCw, ShieldAlert } from "lucide-react";
+import { RotateCw, Search, ShieldAlert } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** What to attach to: a container on a deploy target, a container on a
@@ -37,13 +37,79 @@ export type TerminalTarget =
  */
 type Failure = { kind: "unreachable" } | { kind: "refused"; reason: string };
 
+/**
+ * The reasons the terminal sidecar closes with (`ws-server.mjs`), and the
+ * sentence each one is shown as. The sidecar accepts the socket BEFORE it
+ * redeems the ticket or dials the server, so every one of these arrives on a
+ * connection that has already opened - which is why they used to read as a
+ * plain "disconnected" with nothing said and nothing to press.
+ */
+type CloseReason =
+    "expired" | "noTerminal" | "gone" | "unreachable" | "identity" | "login" | "shell";
+
+export const CLOSE_REASONS: Record<string, CloseReason | undefined> = {
+    "invalid ticket": "expired",
+    "could not open terminal": "noTerminal",
+    "server unavailable": "gone",
+    "connection unavailable": "gone",
+    "server unreachable": "unreachable",
+    "server identity changed": "identity",
+    "server refused the login": "login",
+    "could not open a shell on the server": "shell"
+};
+
+/** Close codes the sidecar uses for a session it refused (4001-4004). A close
+ *  in this range is a refusal even after the socket opened. */
+function isRefusal(code: number): boolean {
+    return code >= 4000 && code < 5000;
+}
+
+/**
+ * What a closed socket means for the panel. A session that ran and ended is just
+ * over. A refusal - a 4xxx close, which the sidecar sends after the socket has
+ * opened - says why, as does any close with a reason before it opened. A close
+ * that never opened and says nothing never reached the sidecar at all, which is
+ * almost always the certificate. Pure and unit-tested.
+ */
+export function closeOutcome(
+    opened: boolean,
+    code: number,
+    rawReason: string
+): { status: Status; failure: Failure | null } {
+    const reason = rawReason.trim();
+    if (opened && !(isRefusal(code) && reason)) {
+        return { status: { kind: "disconnected" }, failure: null };
+    }
+    return {
+        status:
+            reason && !CLOSE_REASONS[reason]
+                ? { kind: "reason", text: reason }
+                : { kind: "couldNotConnect" },
+        failure: reason ? { kind: "refused", reason } : { kind: "unreachable" }
+    };
+}
+
+/** What looking for a server that stopped answering where it is recorded found:
+ *  the address it moved to, or nothing. */
+export type FindServerResult = { found?: string; error?: string };
+
 /** What the corner of the panel says: one of its own states, or the reason the
  *  far end gave, which is shown as it came. */
 type Status =
     | { kind: "connecting" | "connected" | "disconnected" | "couldNotConnect" | "couldNotAuthorize" }
     | { kind: "reason"; text: string };
 
-export function TerminalPanel({ target, label }: { target: TerminalTarget; label: string }) {
+export function TerminalPanel({
+    target,
+    label,
+    findServer
+}: {
+    target: TerminalTarget;
+    label: string;
+    /** For a server shell: look for the server on the network after nothing
+     *  answered at its recorded address, and move it there when found. */
+    findServer?: () => Promise<FindServerResult>;
+}) {
     const t = useTranslations("common");
     const mountRef = useRef<HTMLDivElement>(null);
     const [status, setStatus] = useState<Status>({ kind: "connecting" });
@@ -51,6 +117,9 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
     // Bumped by Retry: the session is keyed on it, so asking again is a fresh
     // ticket and a fresh socket rather than a reconnect of the dead one.
     const [attempt, setAttempt] = useState(0);
+    // The server is looked for on its own once per panel, not once per failure:
+    // found and still refusing would otherwise go round for as long as it is open.
+    const lookedForServer = useRef(false);
     // The object identity of `target` would restart the session on every parent
     // render; its contents are what actually decide the connection.
     const key =
@@ -136,13 +205,9 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
             // far end closing with a reason (no ticket, no shell) is that reason,
             // while a close with nothing to say never got there at all.
             socket.onclose = (event) => {
-                if (opened) {
-                    setStatus({ kind: "disconnected" });
-                    return;
-                }
-                const reason = event.reason.trim();
-                setStatus(reason ? { kind: "reason", text: reason } : { kind: "couldNotConnect" });
-                setFailure(reason ? { kind: "refused", reason } : { kind: "unreachable" });
+                const outcome = closeOutcome(opened, event.code, event.reason);
+                setStatus(outcome.status);
+                setFailure(outcome.failure);
             };
             // Fires before the close on a connection that never opened; the close
             // handler has the code and reason, so this only avoids a silent gap.
@@ -183,7 +248,12 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                 className="h-80 w-full overflow-hidden rounded-md bg-[#0b0e14] p-2"
             />
             {failure ? (
-                <FailureNote failure={failure} onRetry={() => setAttempt((n) => n + 1)} />
+                <FailureNote
+                    failure={failure}
+                    findServer={findServer}
+                    looked={lookedForServer}
+                    onRetry={() => setAttempt((n) => n + 1)}
+                />
             ) : null}
         </div>
     );
@@ -195,15 +265,61 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
  * out says nothing at all, and the answer is almost never "try again" - it is the
  * certificate for this address, which a WebSocket refuses silently where a page
  * would at least offer to continue.
+ *
+ * A server that did not answer at its recorded address is looked for once on the
+ * network, without being asked: it is the one failure here Polaris can repair
+ * itself, and almost always a DHCP lease that moved. Found, the terminal opens
+ * again at the new address.
  */
-function FailureNote({ failure, onRetry }: { failure: Failure; onRetry: () => void }) {
+function FailureNote({
+    failure,
+    findServer,
+    looked,
+    onRetry
+}: {
+    failure: Failure;
+    findServer?: () => Promise<FindServerResult>;
+    looked: { current: boolean };
+    onRetry: () => void;
+}) {
     const t = useTranslations("common");
+    const known = failure.kind === "refused" ? CLOSE_REASONS[failure.reason] : undefined;
+    const canFind = known === "unreachable" && Boolean(findServer);
+    const [search, setSearch] = useState<
+        { kind: "idle" | "looking" | "notFound" } | { kind: "error"; text: string }
+    >({ kind: "idle" });
+
+    const look = async (): Promise<void> => {
+        if (!findServer) return;
+        setSearch({ kind: "looking" });
+        const result = await findServer().catch(() => null);
+        if (result?.found) {
+            onRetry();
+            return;
+        }
+        setSearch(result?.error ? { kind: "error", text: result.error } : { kind: "notFound" });
+    };
+
+    useEffect(() => {
+        if (!canFind || looked.current) return;
+        looked.current = true;
+        void look();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per failure
+    }, [canFind]);
+
     return (
         <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             <p className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 {failure.kind === "refused" ? (
-                    <span>{t("terminal.refused", { reason: failure.reason })}</span>
+                    <span className="min-w-0">
+                        {known
+                            ? t(`terminal.reasons.${known}`)
+                            : t("terminal.refused", { reason: failure.reason })}
+                        {search.kind === "looking" ? ` ${t("terminal.looking")}` : null}
+                        {search.kind === "notFound" ? ` ${t("terminal.notFound")}` : null}
+                        {search.kind === "error" ? ` ${search.text}` : null}
+                    </span>
                 ) : (
                     <span>
                         {t.rich("terminal.untrusted", {
@@ -220,10 +336,20 @@ function FailureNote({ failure, onRetry }: { failure: Failure; onRetry: () => vo
                     </span>
                 )}
             </p>
-            <div>
+            <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="secondary" onClick={onRetry}>
                     <RotateCw className="size-3.5" /> {t("terminal.retry")}
                 </Button>
+                {canFind ? (
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={search.kind === "looking"}
+                        onClick={() => void look()}
+                    >
+                        <Search className="size-3.5" /> {t("terminal.lookForIt")}
+                    </Button>
+                ) : null}
             </div>
         </div>
     );

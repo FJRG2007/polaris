@@ -140,6 +140,7 @@ function resolveMode(value: string): TerminalMode {
     if (value === "ssh") return "ssh";
     if (value === "ssh-root") return "ssh-root";
     if (value === "docker") return "docker";
+    if (value === "agent") return "agent";
     return "terminal";
 }
 
