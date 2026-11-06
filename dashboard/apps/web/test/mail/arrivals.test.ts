@@ -33,9 +33,7 @@ vi.mock("@polaris/db", () => ({
 
 let shelf: string | null = null;
 vi.mock("@/lib/mailbox/shelf", async () => {
-    const real = await vi.importActual<typeof import("@/lib/mailbox/shelf")>(
-        "@/lib/mailbox/shelf"
-    );
+    const real = await vi.importActual<typeof import("@/lib/mailbox/shelf")>("@/lib/mailbox/shelf");
     return { ...real, mailShelfFor: async () => shelf };
 });
 
