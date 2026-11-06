@@ -6,7 +6,9 @@
  * anything else is read.
  */
 
+import * as vpn from "@/lib/vpn/service";
 import { requireUser } from "@/lib/session";
+import { VpnNoAccess } from "../../no-access";
 import { authIdSchema } from "@/lib/vpn/settings";
 import { RegisterDevice } from "./register-device";
 
@@ -15,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function VpnRegisterPage({ params }: { params: Promise<{ authId: string }> }) {
     const user = await requireUser();
     const parsed = authIdSchema.safeParse((await params).authId);
+    if (!(await vpn.mayJoin(user))) return <VpnNoAccess />;
     return (
         <RegisterDevice
             authId={parsed.success ? parsed.data : null}

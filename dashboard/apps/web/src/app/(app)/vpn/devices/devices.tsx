@@ -21,7 +21,7 @@ import { deviceNameSchema } from "@/lib/vpn/settings";
 import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-type List = { devices: VpnDevice[] };
+type List = { devices: VpnDevice[]; mayJoin: boolean };
 
 export function VpnDevicesSection({ isAdmin }: { isAdmin: boolean }) {
     const t = useTranslations("vpn");
@@ -32,8 +32,11 @@ export function VpnDevicesSection({ isAdmin }: { isAdmin: boolean }) {
     const devices = read.data?.devices ?? null;
 
     function replace(next: VpnDevice): void {
-        if (!devices) return;
-        read.set({ devices: devices.map((device) => (device.id === next.id ? next : device)) });
+        if (!devices || !read.data) return;
+        read.set({
+            ...read.data,
+            devices: devices.map((device) => (device.id === next.id ? next : device))
+        });
     }
 
     /** Show `optimistic` now, keep what the server answers, and put the row
@@ -67,7 +70,8 @@ export function VpnDevicesSection({ isAdmin }: { isAdmin: boolean }) {
                 return;
             }
             setRemoving(null);
-            if (devices) read.set({ devices: devices.filter((one) => one.id !== device.id) });
+            if (devices && read.data)
+                read.set({ ...read.data, devices: devices.filter((one) => one.id !== device.id) });
         });
     }
 
@@ -77,10 +81,15 @@ export function VpnDevicesSection({ isAdmin }: { isAdmin: boolean }) {
                 <p className="text-sm text-muted-foreground">
                     {isAdmin ? t("devices.adminIntro") : t("devices.intro")}
                 </p>
-                <ui.Button asChild size="sm">
-                    <Link href="/vpn/add">{t("actions.addDevice")}</Link>
-                </ui.Button>
+                {read.data?.mayJoin ? (
+                    <ui.Button asChild size="sm">
+                        <Link href="/vpn/add">{t("actions.addDevice")}</Link>
+                    </ui.Button>
+                ) : null}
             </div>
+            {read.data?.mayJoin === false ? (
+                <p className="text-sm text-muted-foreground">{t("access.body")}</p>
+            ) : null}
             {error ? (
                 <p role="alert" className="text-sm text-danger">
                     {error}
@@ -108,11 +117,13 @@ export function VpnDevicesSection({ isAdmin }: { isAdmin: boolean }) {
             ) : devices.length === 0 ? (
                 <ui.EmptyState
                     title={t("devices.emptyTitle")}
-                    description={t("devices.emptyBody")}
+                    description={read.data?.mayJoin ? t("devices.emptyBody") : t("access.body")}
                     action={
-                        <ui.Button asChild size="sm">
-                            <Link href="/vpn/add">{t("actions.addDevice")}</Link>
-                        </ui.Button>
+                        read.data?.mayJoin ? (
+                            <ui.Button asChild size="sm">
+                                <Link href="/vpn/add">{t("actions.addDevice")}</Link>
+                            </ui.Button>
+                        ) : undefined
                     }
                 />
             ) : (

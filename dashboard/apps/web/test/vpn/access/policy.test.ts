@@ -25,8 +25,8 @@ interface Grant {
     ip: string[];
 }
 
-function parsed(admins: string[]) {
-    return JSON.parse(vpnPolicy(admins)) as {
+function parsed(admins: string[], members: string[] | null = null) {
+    return JSON.parse(vpnPolicy(admins, [], members)) as {
         groups: Record<string, string[]>;
         tagOwners: Record<string, string[]>;
         grants: Grant[];
@@ -34,7 +34,7 @@ function parsed(admins: string[]) {
 }
 
 describe("the VPN's access policy", () => {
-    it("keeps every user to their own devices, the Polaris servers and the exit nodes", () => {
+    it("keeps everybody, when the VPN is open to all, to their own devices, the servers and the exit nodes", () => {
         const { grants } = parsed([]);
         expect(grants).toEqual([
             { src: ["autogroup:member"], dst: ["autogroup:self"], ip: ["*"] },
@@ -56,8 +56,30 @@ describe("the VPN's access policy", () => {
         expect(vpnPolicy(["polaris-a", "polaris-b"])).toBe(vpnPolicy(["polaris-b", "polaris-a"]));
     });
 
+    it("lets in only the people the VPN was given to, and the administrators", () => {
+        const { groups, grants } = parsed(["polaris-a"], ["polaris-c"]);
+        expect(groups["group:vpn"]).toEqual(["polaris-a@", "polaris-c@"]);
+        expect(grants.some((grant) => grant.src.includes("autogroup:member"))).toBe(false);
+        expect(grants).toContainEqual({
+            src: ["group:vpn"],
+            dst: ["autogroup:internet"],
+            ip: ["*"]
+        });
+    });
+
+    it("gives somebody nobody granted it nothing at all - not even the exit nodes", () => {
+        const { grants } = parsed([], []);
+        expect(grants).toEqual([]);
+        const policy = JSON.parse(vpnPolicy([], ["10.9.0.0/24"], []));
+        expect(JSON.stringify(policy)).not.toContain("10.9.0.0/24");
+    });
+
+    it("is closed when nobody says it is open", () => {
+        expect(vpnPolicy(["polaris-a"])).toBe(vpnPolicy(["polaris-a"], [], []));
+    });
+
     it("writes no empty group when there is no administrator", () => {
-        const policy = parsed([]);
+        const policy = parsed([], []);
         expect(policy.groups).toEqual({});
         expect(policy.tagOwners[POLARIS_TAG]).toEqual([]);
     });

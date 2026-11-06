@@ -114,12 +114,12 @@ describe("a stored row", () => {
 });
 
 describe("the access policy", () => {
-    it("opens only shared networks to every user", () => {
+    it("opens only shared networks, and only to the people the VPN was given to", () => {
         const list = [NETWORK, { ...NETWORK, cidr: "10.77.1.0/24", access: "everyone" as const }];
         expect(networks.sharedCidrs(list)).toEqual(["10.77.1.0/24"]);
-        const policy = JSON.parse(vpnPolicy(["admin@"], networks.sharedCidrs(list)));
+        const policy = JSON.parse(vpnPolicy(["admin"], networks.sharedCidrs(list), ["member"]));
         expect(policy.grants).toContainEqual({
-            src: ["autogroup:member"],
+            src: ["group:vpn"],
             dst: ["10.77.1.0/24"],
             ip: ["*"]
         });

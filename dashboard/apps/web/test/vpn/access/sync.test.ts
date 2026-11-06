@@ -9,7 +9,17 @@ const db = vi.hoisted(() => ({
         status: string;
     } | null,
     accounts: [] as { id: string; bannedAt: Date | null; disabledAt: Date | null }[],
-    admins: [] as { id: string; name: string; email: string }[]
+    admins: [] as { id: string; name: string; email: string }[],
+    open: false,
+    grants: [] as {
+        userId: string;
+        nodes: string[];
+        deviceLimit: number;
+        dataLimitGb: number | null;
+        expiresAt: Date | null;
+        suspended: boolean;
+        usedBytes: bigint;
+    }[]
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -23,6 +33,18 @@ vi.mock("@polaris/db", () => ({
                 where.isAdmin
                     ? db.admins
                     : db.accounts.filter((account) => where.id?.in.includes(account.id))
+        },
+        setting: {
+            findUnique: async ({ where }: { where: { key: string } }) =>
+                where.key === "vpn.openAccess" && db.open ? { value: "true" } : null
+        },
+        vpnAccess: {
+            findMany: async ({ where }: { where: { userId?: { in: string[] } } }) =>
+                where.userId
+                    ? db.grants.filter((row) => where.userId?.in.includes(row.userId))
+                    : [],
+            findUnique: async ({ where }: { where: { userId: string } }) =>
+                db.grants.find((row) => row.userId === where.userId) ?? null
         }
     }
 }));
@@ -33,7 +55,7 @@ vi.mock("@/lib/tls/managed-certificates", () => ({
 vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "10.0.0.2" }));
 vi.mock("@/lib/deploy/host-port", () => ({ hostPortForApp: () => 41000 }));
 
-import { refreshVpnAccess } from "@/lib/vpn/service";
+import { mayJoin, refreshVpnAccess } from "@/lib/vpn/service";
 import { headscaleUserName, accountIdOf } from "@/lib/vpn/settings";
 
 const KEPT = "0190f1c2-0000-7000-8000-000000000001";
@@ -92,7 +114,29 @@ beforeEach(() => {
         { id: DISABLED, bannedAt: null, disabledAt: new Date("2026-10-29T10:00:00Z") }
     ];
     db.admins = [];
+    db.open = false;
+    db.grants = [];
 });
+
+function grant(userId: string, suspended: boolean) {
+    return {
+        userId,
+        nodes: [],
+        deviceLimit: 5,
+        dataLimitGb: null,
+        expiresAt: null,
+        suspended,
+        usedBytes: 0n
+    };
+}
+
+async function appliedPolicy() {
+    const put = vi
+        .mocked(fetch)
+        .mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
+    const { policy } = JSON.parse(String((put?.[1] as RequestInit).body)) as { policy: string };
+    return JSON.parse(policy) as { groups: Record<string, string[]>; grants: { src: string[] }[] };
+}
 
 describe("bringing the VPN in line with the accounts", () => {
     it("reads an account back from the Headscale user Polaris made for it", () => {
@@ -133,8 +177,10 @@ describe("bringing the VPN in line with the accounts", () => {
             .mocked(fetch)
             .mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
         const { policy } = JSON.parse(String((put?.[1] as RequestInit).body)) as { policy: string };
+        // Nobody granted and not open to all: the administrators are the whole VPN.
         expect(JSON.parse(policy).groups).toEqual({
-            "group:admins": [`${headscaleUserName(KEPT)}@`]
+            "group:admins": [`${headscaleUserName(KEPT)}@`],
+            "group:vpn": [`${headscaleUserName(KEPT)}@`]
         });
     });
 
@@ -158,8 +204,43 @@ describe("bringing the VPN in line with the accounts", () => {
             vi.fn(async () => new Response("down", { status: 502 }))
         );
         const error = vi.spyOn(console, "error").mockImplementation(() => {});
-        await expect(refreshVpnAccess()).resolves.toBeUndefined();
+        await expect(refreshVpnAccess()).resolves.toBe(false);
         expect(error).toHaveBeenCalled();
         error.mockRestore();
+    });
+
+    it("lets everybody in when open to all and nobody is held back", async () => {
+        db.open = true;
+        headscale();
+        await refreshVpnAccess();
+        const policy = await appliedPolicy();
+        expect(policy.grants.some((grant) => grant.src.includes("autogroup:member"))).toBe(true);
+    });
+
+    it("keeps a suspended grant out even when the VPN is open to all", async () => {
+        db.open = true;
+        db.grants = [grant(BANNED, true)];
+        headscale();
+        await refreshVpnAccess();
+        const policy = await appliedPolicy();
+        expect(policy.grants.some((grant) => grant.src.includes("autogroup:member"))).toBe(false);
+        expect(policy.groups["group:vpn"]).toContain(`${headscaleUserName(KEPT)}@`);
+        expect(policy.groups["group:vpn"]).not.toContain(`${headscaleUserName(BANNED)}@`);
+    });
+});
+
+describe("who may put a device on the VPN", () => {
+    it("asks somebody's own grant before open access", async () => {
+        db.open = true;
+        db.grants = [grant(BANNED, true)];
+        await expect(mayJoin({ id: BANNED, isAdmin: false })).resolves.toBe(false);
+        await expect(mayJoin({ id: KEPT, isAdmin: false })).resolves.toBe(true);
+    });
+
+    it("lets in only a grant in good standing when closed", async () => {
+        db.grants = [grant(KEPT, false)];
+        await expect(mayJoin({ id: KEPT, isAdmin: false })).resolves.toBe(true);
+        await expect(mayJoin({ id: GONE, isAdmin: false })).resolves.toBe(false);
+        await expect(mayJoin({ id: GONE, isAdmin: true })).resolves.toBe(true);
     });
 });

@@ -12,6 +12,7 @@
         "view": "Ver en Aplicaciones"
     },
     "errors": {
+        "noAccess": "No tienes acceso a la VPN. Pídeselo a un administrador.",
         "notInstalled": "La VPN no está instalada.",
         "notRunning": "La VPN está apagada. Un administrador puede encenderla en el resumen.",
         "noHostname": "Elige primero la dirección en la que responde la VPN.",
@@ -41,6 +42,11 @@
         "copy": "Copiar dirección",
         "keptHint": "Sus dispositivos se conservan. Vuelven a conectarse solos cuando la enciendas.",
         "askAdmin": "Un administrador enciende la VPN. Podrás añadir tus dispositivos cuando funcione."
+    },
+    "access": {
+        "title": "No tienes acceso a la VPN",
+        "body": "Un administrador puede dártelo en los ajustes de la VPN. Después podrás añadir tus dispositivos.",
+        "devices": "Dispositivos"
     },
     "state": {
         "off": "Apagada",

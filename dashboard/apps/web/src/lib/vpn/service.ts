@@ -16,6 +16,8 @@
  */
 
 import * as rules from "./settings";
+import * as wg from "./wireguard";
+import { openAccess } from "./wireguard-service";
 import { prisma } from "@polaris/db";
 import { syncVpnEdge } from "./edge";
 import { randomUUID } from "node:crypto";
@@ -59,7 +61,8 @@ export type VpnRefusalCode =
     | "tooMany"
     | "subnetTaken"
     | "noServer"
-    | "gatewayFailed";
+    | "gatewayFailed"
+    | "noAccess";
 
 export class VpnRefusal extends Error {
     constructor(readonly code: VpnRefusalCode) {
@@ -245,6 +248,83 @@ const EXPIRY_FLOOR = Date.UTC(2000, 0, 1);
 
 /** How many administrators the policy names at most. */
 const POLICY_ADMINS = 200;
+/** How many granted people one policy names. Past it the newest grants wait for a
+ *  policy with room, and the log says so. */
+const POLICY_MEMBERS = 5000;
+
+const STANDING_FIELDS = {
+    userId: true,
+    nodes: true,
+    deviceLimit: true,
+    dataLimitGb: true,
+    expiresAt: true,
+    suspended: true,
+    usedBytes: true
+} as const;
+
+/**
+ * The Headscale users the VPN was given to, or null when it is open to every
+ * account and nobody's own grant says otherwise. Only a grant in good standing
+ * counts: suspended, expired or over its data limit is out until an
+ * administrator or the next month says otherwise - open to all included.
+ */
+async function grantedMembers(known: ReadonlySet<string>): Promise<string[] | null> {
+    const now = new Date();
+    if (await openAccess()) return openMembers(known, now);
+    const rows = await prisma.vpnAccess.findMany({
+        where: { suspended: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        select: STANDING_FIELDS,
+        orderBy: { createdAt: "asc" },
+        take: POLICY_MEMBERS + 1
+    });
+    if (rows.length > POLICY_MEMBERS) {
+        console.error(
+            `polaris: more than ${POLICY_MEMBERS} VPN grants; the policy names the first ones`
+        );
+    }
+    return rows
+        .slice(0, POLICY_MEMBERS)
+        .filter((row) => wg.accessStanding(row, now) === "active")
+        .map((row) => rules.headscaleUserName(row.userId))
+        .filter((name) => known.has(name));
+}
+
+/** Open to all: every Headscale user Polaris made, less those whose own grant is
+ *  not in good standing. Null, `autogroup:member`, when nobody is held back. */
+async function openMembers(known: ReadonlySet<string>, now: Date): Promise<string[] | null> {
+    const accounts = [...known].flatMap((name) => {
+        const accountId = rules.accountIdOf(name);
+        return accountId ? [accountId] : [];
+    });
+    if (accounts.length === 0) return null;
+    const rows = await prisma.vpnAccess.findMany({
+        where: {
+            userId: { in: accounts },
+            OR: [{ suspended: true }, { expiresAt: { lte: now } }, { dataLimitGb: { not: null } }]
+        },
+        select: STANDING_FIELDS
+    });
+    const held = new Set(
+        rows.filter((row) => wg.accessStanding(row, now) !== "active").map((row) => row.userId)
+    );
+    if (held.size === 0) return null;
+    const members = accounts.filter((id) => !held.has(id)).sort();
+    if (members.length > POLICY_MEMBERS) {
+        console.error(
+            `polaris: more than ${POLICY_MEMBERS} VPN members; the policy names the first ones`
+        );
+    }
+    return members.slice(0, POLICY_MEMBERS).map((id) => rules.headscaleUserName(id));
+}
+
+/** Whether `account` may put devices on the VPN: the same grant the tunnels ask
+ *  for, their own grant first and open access only for somebody without one. */
+export async function mayJoin(account: { id: string; isAdmin: boolean }): Promise<boolean> {
+    if (account.isAdmin) return true;
+    const row = await prisma.vpnAccess.findUnique({ where: { userId: account.id } });
+    if (row) return wg.accessStanding(row, new Date()) === "active";
+    return openAccess();
+}
 
 /**
  * Write the access policy (`rules.vpnPolicy`): everybody kept to their own
@@ -271,7 +351,8 @@ async function applyPolicy(api: HeadscaleClient): Promise<void> {
     await api.setPolicy(
         rules.vpnPolicy(
             admins.map((admin) => rules.headscaleUserName(admin.id)),
-            sharedCidrs(readNetworks(settings.networks))
+            sharedCidrs(readNetworks(settings.networks)),
+            await grantedMembers(known)
         )
     );
 }
@@ -324,15 +405,17 @@ async function syncAccess(api: HeadscaleClient): Promise<void> {
  * the tailnet. Nothing when the VPN is not running; Turn on catches up then.
  * Never throws: the change itself has already been made and must stand.
  */
-export async function refreshVpnAccess(): Promise<void> {
+export async function refreshVpnAccess(): Promise<boolean> {
     try {
         const { settings } = await requireApp();
         const engine = await engineRow();
-        if (!engine || !settings.enabled) return;
+        if (!engine || !settings.enabled) return true;
         await syncAccess(await engineClient(engine, settings));
+        return true;
     } catch (error) {
-        if (error instanceof VpnRefusal) return;
+        if (error instanceof VpnRefusal) return true;
         console.error("polaris: the VPN's access was not brought up to date:", error);
+        return false;
     }
 }
 
@@ -626,8 +709,9 @@ async function ensureUser(api: HeadscaleClient, account: Account) {
 
 /** A one-time key that signs one device in as `account`, valid for an hour. */
 export async function createDeviceKey(
-    account: Account
+    account: Account & { isAdmin: boolean }
 ): Promise<{ key: string; expiresAt: string }> {
+    if (!(await mayJoin(account))) throw new VpnRefusal("noAccess");
     const api = await client();
     const user = await ensureUser(api, account);
     const expiration = new Date(Date.now() + PREAUTH_TTL_MS);
@@ -696,9 +780,13 @@ export async function removeGatewayNode(nodeId: string): Promise<void> {
 }
 
 /** Add the device waiting at `authId` to `account`'s devices. */
-export async function registerDevice(account: Account, authId: string): Promise<VpnDevice> {
+export async function registerDevice(
+    account: Account & { isAdmin: boolean },
+    authId: string
+): Promise<VpnDevice> {
     const parsed = rules.authIdSchema.safeParse(authId);
     if (!parsed.success) throw new VpnRefusal("badAuthId");
+    if (!(await mayJoin(account))) throw new VpnRefusal("noAccess");
     const api = await client();
     const user = await ensureUser(api, account);
     return deviceOf(await api.registerNode(user.name, parsed.data));

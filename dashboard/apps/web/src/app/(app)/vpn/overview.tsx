@@ -155,7 +155,7 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                         {t("actions.turnOff")}
                                     </ui.Button>
                                 ) : null}
-                                {status.state === "running" ? (
+                                {status.state === "running" && read.data?.mayJoin ? (
                                     <ui.Button
                                         asChild
                                         size="sm"
@@ -165,6 +165,9 @@ export function VpnOverviewSection({ isAdmin }: { isAdmin: boolean }) {
                                     </ui.Button>
                                 ) : null}
                             </div>
+                            {status.state === "running" && read.data?.mayJoin === false ? (
+                                <p className="text-sm text-muted-foreground">{t("access.body")}</p>
+                            ) : null}
                             {!isAdmin && status.state === "off" ? (
                                 <p className="text-sm text-muted-foreground">
                                     {t("overview.askAdmin")}

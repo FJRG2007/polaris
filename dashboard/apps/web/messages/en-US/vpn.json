@@ -12,6 +12,7 @@
         "view": "View it in Apps"
     },
     "errors": {
+        "noAccess": "You do not have access to the VPN. Ask an administrator.",
         "notInstalled": "The VPN is not installed.",
         "notRunning": "The VPN is off. An administrator can turn it on in the Overview.",
         "noHostname": "Choose the address the VPN answers on first.",
@@ -41,6 +42,11 @@
         "copy": "Copy the address",
         "keptHint": "Its devices are kept. They sign back in by themselves when you turn it on.",
         "askAdmin": "An administrator turns the VPN on. Your devices can be added once it runs."
+    },
+    "access": {
+        "title": "You do not have access to the VPN",
+        "body": "An administrator can give it to you in the VPN settings. Your devices can be added after that.",
+        "devices": "Your devices"
     },
     "state": {
         "off": "Turned off",

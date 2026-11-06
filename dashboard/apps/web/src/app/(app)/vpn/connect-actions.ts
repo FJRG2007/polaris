@@ -12,6 +12,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import * as service from "@/lib/vpn/wireguard-service";
 import { profilesOf } from "@/lib/vpn/profile-service";
 import { requireAdmin, requireUser } from "@/lib/session";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -192,7 +193,11 @@ export async function setVpnOpenAccessAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     const open = z.boolean().safeParse(input);
     if (!open.success) return failed(open.error);
-    return audited(user.id, "vpn.access.open", "instance", () => service.setOpenAccess(open.data));
+    // Who the private network lets in follows who may use the VPN, so every change
+    // to that rewrites its policy too.
+    return audited(user.id, "vpn.access.open", "instance", () =>
+        service.setOpenAccess(open.data).then(refreshVpnAccessLater)
+    );
 }
 
 const grantSchema = wg.accessInputSchema
@@ -208,7 +213,7 @@ export async function grantVpnAccessAction(input: unknown): Promise<Result> {
     const person = await prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (!person) return failed(new service.WireGuardRefusal("noSuchPerson"));
     return audited(user.id, "vpn.access.grant", person.id, () =>
-        service.grantAccess({ ...access, userId: person.id })
+        service.grantAccess({ ...access, userId: person.id }).then(refreshVpnAccessLater)
     );
 }
 
@@ -216,5 +221,7 @@ export async function revokeVpnAccessAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     const id = z.string().uuid().safeParse(input);
     if (!id.success) return failed(id.error);
-    return audited(user.id, "vpn.access.revoke", id.data, () => service.revokeAccess(id.data));
+    return audited(user.id, "vpn.access.revoke", id.data, () =>
+        service.revokeAccess(id.data).then(refreshVpnAccessLater)
+    );
 }
