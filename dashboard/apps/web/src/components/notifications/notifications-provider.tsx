@@ -21,6 +21,7 @@ import { arrivalsMayAlert } from "@polaris/core";
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
+import { noteSounder } from "@/lib/notifications/sounding-client";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
 import {
@@ -194,6 +195,10 @@ export function NotificationsProvider({
     useEffect(
         () =>
             subscribeSharedStream(notificationStreamPath(shelf), scope, ({ data }) => {
+                // Before anything below can skip the frame: which kind of client
+                // makes the sounds is not part of the feed, and a frame dropped
+                // here would leave it stale until the next change.
+                noteSounder(data);
                 if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
                 try {
                     const payload = JSON.parse(data) as {

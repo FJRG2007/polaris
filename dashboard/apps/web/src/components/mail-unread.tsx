@@ -21,6 +21,7 @@ import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { canNotify, closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { anotherClientSounds } from "@/lib/notifications/sounding-client";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import {
     createContext,
@@ -285,7 +286,10 @@ export function MailUnreadProvider({
                 // that took the frame off the wire raises one - five open tabs
                 // are one notice. And only when nobody is looking at Polaris:
                 // the list is already on screen for somebody who is.
-                if (owner && !tabIsWatched()) void announceArrivals(cursor, words.current);
+                // The desktop app, when it is the one the server elected, draws
+                // them instead of the browser - never both.
+                if (owner && !tabIsWatched() && !anotherClientSounds())
+                    void announceArrivals(cursor, words.current);
             }, SETTLE_MS);
         });
         return () => {

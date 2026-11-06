@@ -195,6 +195,27 @@ export function liveClientChimes(userId: string, id: string, now = Date.now()): 
     return elected === null || elected === id;
 }
 
+/**
+ * Which KIND of client the account's elected connection is, or null with nobody
+ * registered.
+ *
+ * The chime is not the only thing that belongs to one client. A message's sound,
+ * a call's ring and the notice the system draws for either are settled between
+ * the tabs of one browser by `device-once`, which the desktop app cannot see -
+ * so each of them is told which kind of client has it, and a client of the other
+ * kind leaves it alone. The kind rather than the connection, because the tabs of
+ * a browser already agree which of them acts, and a frozen tab that happens to
+ * hold the elected connection must not be able to silence its siblings.
+ */
+export function chimingKind(userId: string, now = Date.now()): LiveClientKind | null {
+    sweep(now);
+    const held = clients.get(userId);
+    if (!held || held.size === 0) return null;
+    const live = [...held.values()];
+    const elected = chimingClient(live);
+    return live.find((client) => client.id === elected)?.kind ?? null;
+}
+
 /** Drop everything. Exists for tests, which must not inherit each other's state. */
 export function resetLiveClients(): void {
     clients.clear();
