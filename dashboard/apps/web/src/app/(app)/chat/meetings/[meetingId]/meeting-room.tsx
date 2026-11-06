@@ -33,12 +33,11 @@ import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { SidePane } from "@/app/(app)/chat/side-pane";
 import { CALL_CHAT_PANE } from "@/app/(app)/chat/use-chat-pane";
 import { useRouter, useSearchParams } from "next/navigation";
-import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MeetingDetailsDialog } from "../meeting-details-dialog";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import { InvitationsDialog, useInvitationEdits } from "../invitations-dialog";
 import {
     ArrowLeft,
     Check,
@@ -58,7 +57,6 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DropdownMenu,
@@ -70,7 +68,6 @@ import {
 } from "@polaris/ui";
 import {
     endMeetingAction,
-    inviteToMeetingAction,
     removeFromMeetingAction,
     setMeetingOptionsAction,
     transferHostAction
@@ -118,6 +115,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     useEffect(() => {
         void load();
     }, [load]);
+
+    const invitations = useInvitationEdits(meetingId, setAbout, load, setError);
 
     // Who is in the room, kept current for somebody looking at it from outside.
     // A meeting belongs to no conversation, so nothing is announced to this
@@ -380,7 +379,13 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                         {!waiting && about && about.people.length > 0 && (
                             <CallRoster people={about.people} />
                         )}
-                        {host && about && <InvitedPeople meeting={about} />}
+                        {host && about && (
+                            <InvitedPeople
+                                meeting={about}
+                                onRemovePerson={(person) => void invitations.removePerson(person)}
+                                onRemoveEmail={(email) => void invitations.removeEmail(email)}
+                            />
+                        )}
                         <Button disabled={joining || waiting} onClick={() => void join()}>
                             {(joining || waiting) && <Loader2 className="size-4 animate-spin" />}
                             {waiting ? t("meetingRoom.waitingToBeLetIn") : t("meetingRoom.join")}
@@ -428,13 +433,15 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 onError={setError}
             />
 
-            <InviteDialog
-                open={inviting}
-                meetingId={meetingId}
-                onClose={() => setInviting(false)}
-                onInvited={load}
-                onError={setError}
-            />
+            {host && about && (
+                <InvitationsDialog
+                    open={inviting}
+                    meeting={about}
+                    viewerId={viewerId}
+                    edits={invitations}
+                    onClose={() => setInviting(false)}
+                />
+            )}
 
             <ConfirmDeleteDialog
                 open={removing !== null}
@@ -559,79 +566,6 @@ function MeetingDoors({
                 () => onChange({ requireAccount: !requireAccount })
             )}
         </>
-    );
-}
-
-/** Convene people who do have accounts. They are told through the bell: a
- *  meeting is usually for later, and ringing somebody about a room at four
- *  o'clock is the wrong instrument. */
-function InviteDialog({
-    open,
-    meetingId,
-    onClose,
-    onInvited,
-    onError
-}: {
-    open: boolean;
-    meetingId: string;
-    onClose: () => void;
-    onInvited: () => void | Promise<void>;
-    onError: (message: string) => void;
-}) {
-    const t = useTranslations("chat");
-    const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
-    const [busy, setBusy] = useState(false);
-
-    useEffect(() => {
-        if (open) setPicked([]);
-    }, [open]);
-
-    return (
-        <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{t("meetingRoom.invitePeople")}</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-2">
-                    <p className="text-xs text-muted-foreground">
-                        {t("meetingRoom.theyGetAnAlertWith")}
-                    </p>
-                    <PeoplePicker
-                        picked={picked}
-                        onChange={setPicked}
-                        search={(query) => searchPeopleAction(query)}
-                    />
-                </div>
-                <DialogFooter>
-                    <Button variant="secondary" size="sm" onClick={onClose}>
-                        {t("meetingRoom.cancel")}
-                    </Button>
-                    <Button
-                        size="sm"
-                        disabled={busy || picked.length === 0}
-                        onClick={async () => {
-                            setBusy(true);
-                            const result = await runAction(
-                                () =>
-                                    inviteToMeetingAction({
-                                        meetingId,
-                                        userIds: picked.map((person) => person.id)
-                                    }),
-                                onError
-                            );
-                            setBusy(false);
-                            if (!result?.error) {
-                                await onInvited();
-                                onClose();
-                            }
-                        }}
-                    >
-                        {busy && <Loader2 className="size-4 animate-spin" />}
-                        {t("meetingRoom.invite")}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
     );
 }
 

@@ -37,7 +37,12 @@ import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
 import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
-import { MOST_INVITED, meetingInvitesSchema } from "@/lib/chat/meeting-invites";
+import {
+    MOST_EMAILS,
+    MOST_INVITED,
+    inviteEmailSchema,
+    meetingInvitesSchema
+} from "@/lib/chat/meeting-invites";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 import { rememberDecline } from "@/lib/chat/declined-calls";
 
@@ -586,10 +591,13 @@ export async function joinMeetingAction(
     return result.error ? { error: result.error } : { admission: result.value!.admission };
 }
 
-const inviteMeetingSchema = z.object({
-    meetingId: z.string().uuid(),
-    userIds: z.array(z.string().uuid()).min(1).max(MOST_INVITED)
-});
+const inviteMeetingSchema = z
+    .object({
+        meetingId: z.string().uuid(),
+        userIds: z.array(z.string().uuid()).max(MOST_INVITED).default([]),
+        emails: z.array(inviteEmailSchema).max(MOST_EMAILS).default([])
+    })
+    .refine((input) => input.userIds.length + input.emails.length > 0);
 
 /**
  * Convene people who have accounts.
@@ -607,24 +615,77 @@ export async function inviteToMeetingAction(
     const parsed = inviteMeetingSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pickToInvite") };
 
-    const result = await guard(() =>
-        meetings.inviteToMeeting({ id: user.id }, parsed.data.meetingId, parsed.data.userIds)
-    );
+    const { meetingId, userIds, emails } = parsed.data;
+    // Addresses first: a meeting for accounts only refuses them, and that
+    // refusal should come before anybody has been alerted.
+    if (emails.length > 0) {
+        const recorded = await guard(() =>
+            meetings.inviteEmailsToMeeting({ id: user.id }, meetingId, emails)
+        );
+        if (recorded.error) return { error: recorded.error };
+    }
+    if (userIds.length === 0) return { invited: 0 };
+
+    const result = await guard(() => meetings.inviteToMeeting({ id: user.id }, meetingId, userIds));
     if (result.error || !result.value)
         return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
-    await tellInvited(user.name, parsed.data.meetingId, result.value.title, result.value.invited);
+    await tellInvited(user.name, meetingId, result.value.title, result.value.invited);
     return { invited: result.value.invited.length };
 }
 
+const uninviteMeetingSchema = z.object({
+    meetingId: z.string().uuid(),
+    userId: z.string().uuid()
+});
+
+/** Take back somebody's invitation: off their list, and the meeting's page stops
+ *  letting them in. The link, if they hold it, is the host's to shut. */
 export async function uninviteFromMeetingAction(
     meetingId: string,
     userId: string
 ): Promise<{ error?: string }> {
     const user = await requirePermission("chat.use");
+    const parsed = uninviteMeetingSchema.safeParse({ meetingId, userId });
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.didNotWork") };
     return guard(() =>
-        meetings.uninviteFromMeeting({ id: user.id }, String(meetingId), String(userId))
+        meetings.uninviteFromMeeting({ id: user.id }, parsed.data.meetingId, parsed.data.userId)
     );
+}
+
+const uninviteEmailSchema = z.object({
+    meetingId: z.string().uuid(),
+    email: inviteEmailSchema
+});
+
+/** Take an address off a meeting's list. */
+export async function uninviteEmailFromMeetingAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = uninviteEmailSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.didNotWork") };
+    return guard(() =>
+        meetings.uninviteEmailFromMeeting({ id: user.id }, parsed.data.meetingId, parsed.data.email)
+    );
+}
+
+const joinCodeSchema = z.object({
+    meetingId: z.string().uuid(),
+    /** True draws a new code, replacing any there was; false takes it away. */
+    on: z.boolean()
+});
+
+/** Draw a new join code for a meeting, or remove its code. The old code stops
+ *  working the moment this answers. */
+export async function setJoinCodeAction(
+    input: unknown
+): Promise<{ joinCode?: string | null; error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = joinCodeSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.didNotWork") };
+    const result = await guard(() =>
+        meetings.setJoinCode({ id: user.id }, parsed.data.meetingId, parsed.data.on)
+    );
+    return result.error ? { error: result.error } : { joinCode: result.value ?? null };
 }
 
 const meetingOptionsSchema = z.object({

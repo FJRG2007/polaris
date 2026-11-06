@@ -91,17 +91,12 @@ export function EmailInvitesField({
                                     <span className="min-w-0 truncate" title={email}>
                                         {email}
                                     </span>
-                                    <button
-                                        type="button"
-                                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                                        aria-label={t("meetingInvites.removeEmail", { email })}
-                                        title={t("meetingInvites.removeEmail", { email })}
+                                    <ChipRemove
+                                        label={t("meetingInvites.removeEmail", { email })}
                                         onClick={() =>
                                             onChange(emails.filter((other) => other !== email))
                                         }
-                                    >
-                                        <X className="size-3 shrink-0" />
-                                    </button>
+                                    />
                                 </li>
                             ))}
                         </ul>
@@ -236,8 +231,35 @@ export function JoinCodeBadge({ code }: { code: string }) {
     );
 }
 
-/** Who the host asked: people by name, then addresses, marked as invited. */
-export function InvitedPeople({ meeting }: { meeting: MeetingSummary }) {
+/** The small cross on a chip that takes it off a list. */
+function ChipRemove({ label, onClick }: { label: string; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+            aria-label={label}
+            title={label}
+            onClick={onClick}
+        >
+            <X className="size-3 shrink-0" />
+        </button>
+    );
+}
+
+/**
+ * Who the host asked: people by name, then addresses, marked as invited. With
+ * the remove callbacks, each chip carries the cross that takes the invitation
+ * back.
+ */
+export function InvitedPeople({
+    meeting,
+    onRemovePerson,
+    onRemoveEmail
+}: {
+    meeting: MeetingSummary;
+    onRemovePerson?: (person: { id: string; name: string }) => void;
+    onRemoveEmail?: (email: string) => void;
+}) {
     const t = useTranslations("chat");
     if (!meeting.mine || (meeting.invited.length === 0 && meeting.invitedEmails.length === 0))
         return null;
@@ -258,6 +280,12 @@ export function InvitedPeople({ meeting }: { meeting: MeetingSummary }) {
                         <span className="min-w-0 truncate" title={person.name}>
                             {person.name}
                         </span>
+                        {onRemovePerson && (
+                            <ChipRemove
+                                label={t("meetingInvites.removePerson", { name: person.name })}
+                                onClick={() => onRemovePerson(person)}
+                            />
+                        )}
                     </li>
                 ))}
                 {meeting.invitedEmails.map((email) => (
@@ -268,6 +296,12 @@ export function InvitedPeople({ meeting }: { meeting: MeetingSummary }) {
                     >
                         <Mail className="size-3 shrink-0 text-muted-foreground" />
                         <span className="min-w-0 truncate">{email}</span>
+                        {onRemoveEmail && (
+                            <ChipRemove
+                                label={t("meetingInvites.removeEmail", { email })}
+                                onClick={() => onRemoveEmail(email)}
+                            />
+                        )}
                     </li>
                 ))}
             </ul>

@@ -31,7 +31,12 @@ import { publishChatChange, type CallState, type CallGroup } from "./live";
 import { announcesCalls, callEndedBody } from "./notice-text";
 import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
-import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, inviteRefusal } from "./meeting-invites";
+import {
+    JOIN_CODE_ALPHABET,
+    JOIN_CODE_LENGTH,
+    MOST_EMAILS,
+    inviteRefusal
+} from "./meeting-invites";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
 import { chatWordsFor } from "./text";
@@ -1706,6 +1711,28 @@ export function generateJoinCode(): string {
 }
 
 /**
+ * Run a write that stores a freshly drawn join code, drawing again when the code
+ * is already another meeting's. The write is the only thing that can collide on
+ * the unique index, so a unique violation from it is a taken code; after
+ * JOIN_CODE_ATTEMPTS of those in a row the error is something else and is
+ * thrown. With `draw` false the write runs once with no code.
+ */
+async function withFreshJoinCode<T>(
+    draw: boolean,
+    write: (joinCode: string | null) => Promise<T>
+): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+        const joinCode = draw ? generateJoinCode() : null;
+        try {
+            return await write(joinCode);
+        } catch (caught) {
+            if (!joinCode || !isUniqueViolation(caught) || attempt + 1 >= JOIN_CODE_ATTEMPTS)
+                throw caught;
+        }
+    }
+}
+
+/**
  * Create one, and mint the link that is the whole point of it.
  *
  * The permission to do this is checked where the request arrives rather than
@@ -1743,36 +1770,28 @@ export async function createMeeting(
     const invited = real.map((person) => person.id);
 
     const guestToken = randomBytes(24).toString("base64url");
-    for (let attempt = 0; ; attempt++) {
-        const joinCode = input.joinCode ? generateJoinCode() : null;
-        try {
-            const meeting = await prisma.meeting.create({
-                data: {
-                    channelId: null,
-                    hostId: actor.id,
-                    title,
-                    guestToken,
-                    joinCode,
-                    approveGuests: input.approveGuests,
-                    requireAccount: input.requireAccount,
-                    scheduledAt: input.scheduledAt,
-                    invites: {
-                        create: invited.map((userId) => ({ userId, invitedById: actor.id }))
-                    },
-                    emailInvites: {
-                        create: emails.map((email) => ({ email, invitedById: actor.id }))
-                    }
+    return withFreshJoinCode(input.joinCode === true, async (joinCode) => {
+        const meeting = await prisma.meeting.create({
+            data: {
+                channelId: null,
+                hostId: actor.id,
+                title,
+                guestToken,
+                joinCode,
+                approveGuests: input.approveGuests,
+                requireAccount: input.requireAccount,
+                scheduledAt: input.scheduledAt,
+                invites: {
+                    create: invited.map((userId) => ({ userId, invitedById: actor.id }))
                 },
-                select: { id: true }
-            });
-            return { meetingId: meeting.id, guestToken, joinCode, title, invited };
-        } catch (caught) {
-            // Only the code is drawn at random here, so a unique violation is a
-            // code somebody else holds: draw another.
-            if (!joinCode || !isUniqueViolation(caught) || attempt + 1 >= JOIN_CODE_ATTEMPTS)
-                throw caught;
-        }
-    }
+                emailInvites: {
+                    create: emails.map((email) => ({ email, invitedById: actor.id }))
+                }
+            },
+            select: { id: true }
+        });
+        return { meetingId: meeting.id, guestToken, joinCode, title, invited };
+    });
 }
 
 /**
@@ -1804,10 +1823,17 @@ export async function guestTokenForJoinCode(code: string): Promise<string | null
  *
  * Somebody the host removed stays removed. It is the one thing a rejoin must not
  * undo, or being shown out of a meeting would mean nothing at all.
+ *
+ * By id alone - the meeting's own page, the bell alert - only the host, somebody
+ * invited, or somebody already holding a seat gets anywhere. An id is not a
+ * credential: it outlives an invitation in an old alert, and taking the
+ * invitation back has to take that door with it. Everybody else comes through
+ * the link (`onLink`), which is the credential and holds its own rules.
  */
 export async function joinMeeting(
     actor: ChatActor & { name: string },
-    meetingId: string
+    meetingId: string,
+    onLink = false
 ): Promise<MeetingSeat> {
     const meeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
@@ -1832,6 +1858,9 @@ export async function joinMeeting(
     if (shown) throw new ChatAccessError({ key: "errors.removedFromMeeting" });
 
     const known = meeting.hostId === actor.id || meeting.invites.length > 0;
+    if (!known && !onLink && !(await seatForUser(actor.id, meetingId))) {
+        throw new ChatAccessError({ key: "errors.meetingNotInvited" });
+    }
     return seatFor(meetingId, actor.id, actor.name, {
         admission: known || !meeting.approveGuests ? "admitted" : "waiting"
     });
@@ -1860,7 +1889,7 @@ export async function joinOnLink(
         select: { id: true, endedAt: true }
     });
     if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.meetingEnded" });
-    return joinMeeting(actor, meeting.id);
+    return joinMeeting(actor, meeting.id, true);
 }
 
 /**
@@ -1966,15 +1995,30 @@ export async function inviteToMeeting(
     });
     if (real.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToInvite" });
 
-    await prisma.meetingInvite.createMany({
-        data: real.map((person) => ({ meetingId, userId: person.id, invitedById: actor.id })),
-        skipDuplicates: true
+    // Somebody already asked is not asked again, and not alerted again either:
+    // only the people this call added are handed back to be told.
+    const already = await prisma.meetingInvite.findMany({
+        where: { meetingId, userId: { in: real.map((person) => person.id) } },
+        select: { userId: true }
     });
-    return { title: meeting.title, invited: real.map((person) => person.id) };
+    const held = new Set(already.map((invite) => invite.userId));
+    const fresh = real.map((person) => person.id).filter((id) => !held.has(id));
+    if (fresh.length > 0) {
+        await prisma.meetingInvite.createMany({
+            data: fresh.map((userId) => ({ meetingId, userId, invitedById: actor.id })),
+            skipDuplicates: true
+        });
+    }
+    return { title: meeting.title, invited: fresh };
 }
 
-/** Take back an invitation. Somebody already in the room stays in it - being
- *  asked and being here are different facts, and this is only the first. */
+/**
+ * Take back an invitation. The meeting leaves their list and its page stops
+ * letting them in (joinMeeting), so what is left to them is the link, like
+ * anybody else. Somebody already in the room stays in it - being asked and being
+ * here are different facts, and this is only the first; removing them is what
+ * shows them out.
+ */
 export async function uninviteFromMeeting(
     actor: ChatActor,
     meetingId: string,
@@ -1982,6 +2026,73 @@ export async function uninviteFromMeeting(
 ): Promise<void> {
     await requireHost(actor, meetingId);
     await prisma.meetingInvite.deleteMany({ where: { meetingId, userId } });
+}
+
+/**
+ * Record more addresses as asked. Nothing is sent - Polaris has no mail of its
+ * own - and a meeting only open to accounts takes none, for the reason it takes
+ * none when it is made (inviteRefusal). Already-recorded ones are left as they
+ * are. Returns how many were new.
+ */
+export async function inviteEmailsToMeeting(
+    actor: ChatActor,
+    meetingId: string,
+    emails: readonly string[]
+): Promise<number> {
+    const meeting = await requireHost(actor, meetingId);
+    const wanted = [...new Set(emails)];
+    const refusal = inviteRefusal({ requireAccount: meeting.requireAccount, emails: wanted });
+    if (refusal) throw new ChatAccessError({ key: refusal });
+    if (wanted.length === 0) return 0;
+
+    const held = await prisma.meetingEmailInvite.count({ where: { meetingId } });
+    const known = await prisma.meetingEmailInvite.findMany({
+        where: { meetingId, email: { in: wanted } },
+        select: { email: true }
+    });
+    const fresh = wanted.filter((email) => !known.some((row) => row.email === email));
+    if (held + fresh.length > MOST_EMAILS) {
+        throw new ChatAccessError({
+            key: "errors.meetingTooManyEmails",
+            params: { count: MOST_EMAILS }
+        });
+    }
+    if (fresh.length === 0) return 0;
+    await prisma.meetingEmailInvite.createMany({
+        data: fresh.map((email) => ({ meetingId, email, invitedById: actor.id })),
+        skipDuplicates: true
+    });
+    return fresh.length;
+}
+
+/** Take an address off the list. It never opened anything, so this is the
+ *  record and nothing else. */
+export async function uninviteEmailFromMeeting(
+    actor: ChatActor,
+    meetingId: string,
+    email: string
+): Promise<void> {
+    await requireHost(actor, meetingId);
+    await prisma.meetingEmailInvite.deleteMany({ where: { meetingId, email } });
+}
+
+/**
+ * Give the meeting a new join code, or take its code away.
+ *
+ * A new code replaces the old one in the same write, so the old one names
+ * nothing from that moment: it is looked up by value (guestTokenForJoinCode),
+ * and that value is no longer stored anywhere. Returns the code now in force.
+ */
+export async function setJoinCode(
+    actor: ChatActor,
+    meetingId: string,
+    on: boolean
+): Promise<string | null> {
+    await requireHost(actor, meetingId);
+    return withFreshJoinCode(on, async (joinCode) => {
+        await prisma.meeting.update({ where: { id: meetingId }, data: { joinCode } });
+        return joinCode;
+    });
 }
 
 /**
@@ -2091,16 +2202,16 @@ export async function endMeeting(actor: ChatActor, meetingId: string): Promise<v
 async function requireHost(
     actor: ChatActor,
     meetingId: string
-): Promise<{ title: string; hostId: string }> {
+): Promise<{ title: string; hostId: string; requireAccount: boolean }> {
     const meeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
-        select: { hostId: true, title: true, endedAt: true }
+        select: { hostId: true, title: true, endedAt: true, requireAccount: true }
     });
     if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.meetingEnded" });
     if (meeting.hostId !== actor.id) {
         throw new ChatAccessError({ key: "errors.meetingHostOnly" });
     }
-    return { title: meeting.title, hostId: meeting.hostId };
+    return { title: meeting.title, hostId: meeting.hostId, requireAccount: meeting.requireAccount };
 }
 
 /** What the missed-call alert says under its title: which group, for a group,

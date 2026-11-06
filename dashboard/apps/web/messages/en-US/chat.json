@@ -230,7 +230,9 @@
         "lockWrongCode": "That code is not right",
         "lockRequired": "This chat is locked. Enter your code to open it",
         "lockResetUnconfirmed": "Confirm it is you first",
-        "meetingEmailsNeedGuests": "Polaris accounts only: invite people by name instead of by email"
+        "meetingEmailsNeedGuests": "Polaris accounts only: invite people by name instead of by email",
+        "meetingNotInvited": "You are not invited to this meeting. Ask the host for the link",
+        "meetingTooManyEmails": "A meeting holds at most {count} email addresses"
     },
     "media": {
         "refused": {
@@ -537,9 +539,6 @@
         "removeThem": "Remove them?",
         "theyAreDroppedFromThe": "They are dropped from the meeting. Somebody with an account cannot come back in; a guest on the link comes back to the door.",
         "remove": "Remove",
-        "invitePeople": "Invite people",
-        "theyGetAnAlertWith": "They get an alert with the meeting on it and walk straight in when it starts. For anybody without an account, send the link instead.",
-        "cancel": "Cancel",
         "hostedBy": "{name} is hosting",
         "present": "{count} in the room.",
         "guestSuffix": " - guest",
@@ -2295,6 +2294,23 @@
         "people": "Invite people",
         "peopleSkipLobby": "They get an alert and walk in without waiting to be let in.",
         "peopleHint": "They get an alert with the meeting on it.",
-        "emailsNeedGuests": "Polaris accounts only: people without an account cannot get in, so invite them by name."
+        "emailsNeedGuests": "Polaris accounts only: people without an account cannot get in, so invite them by name.",
+        "manage": "Invitations",
+        "manageHint": "Add or remove people and manage the join code",
+        "removePerson": "Remove {name}'s invitation",
+        "nobodyYet": "Nobody invited yet",
+        "addPeople": "Add people",
+        "addPeopleHint": "Each person you add gets an alert, as when the meeting was made.",
+        "noCode": "No join code. Add one so people can type it at /m.",
+        "addCode": "Add a join code",
+        "newCode": "New code",
+        "removeCode": "Remove code",
+        "replaceCodeQuestion": "The current code stops working at once.",
+        "replaceCode": "Replace code",
+        "removeCodeQuestion": "The code stops working at once. The link still works.",
+        "confirmRemoveCode": "Remove it",
+        "back": "Keep it",
+        "done": "Done",
+        "add": "Add"
     }
 }
