@@ -18,6 +18,7 @@
 
 import { prisma } from "@polaris/db";
 import { getHostConnection } from "@/lib/host-service";
+import { terminalSessionCap } from "@/lib/terminal-session-cap";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { resolveDockerTransport, type DockerTransportTarget } from "@/lib/docker-service";
 
@@ -67,11 +68,17 @@ export interface SshTarget {
 }
 
 export interface RedeemedTicket {
+    /** Who minted it. The sidecar scopes a long-lived server shell to this user,
+     *  so one user can never attach to another's. */
+    userId: string;
     targetId: string;
+    /** For `ssh`/`ssh-root`: the session to return to, or empty for a new one. */
     containerRef: string;
     mode: TerminalMode;
     /** Present only for `ssh`, and only when the host still resolves. */
     ssh?: SshTarget;
+    /** For `ssh`/`ssh-root`: how many long-lived shells this user may hold. */
+    sessionCap?: number;
     /** Present only for `docker`, and only when the connection still resolves. */
     docker?: DockerTransportTarget;
 }
@@ -94,6 +101,7 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
     if (mode === "docker") {
         try {
             return {
+                userId: ticket.userId,
                 targetId: ticket.targetId,
                 containerRef: ticket.containerRef,
                 mode,
@@ -106,15 +114,22 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
         }
     }
     if (mode !== "ssh" && mode !== "ssh-root") {
-        return { targetId: ticket.targetId, containerRef: ticket.containerRef, mode };
+        return {
+            userId: ticket.userId,
+            targetId: ticket.targetId,
+            containerRef: ticket.containerRef,
+            mode
+        };
     }
 
     try {
         const connection = await getHostConnection(ticket.targetId, ticket.userId);
         return {
+            userId: ticket.userId,
             targetId: ticket.targetId,
             containerRef: ticket.containerRef,
             mode,
+            sessionCap: await terminalSessionCap(),
             ssh: {
                 host: connection.address,
                 port: connection.port,

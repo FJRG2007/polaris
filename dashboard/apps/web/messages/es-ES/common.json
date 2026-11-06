@@ -103,12 +103,32 @@
             "unreachable": "Nada respondió en la dirección de este servidor. Está apagado, o se movió a otra dirección.",
             "identity": "Algo respondió en la dirección de este servidor con otra clave, así que Polaris no inició sesión. Si el servidor se reinstaló, quítalo y vuelve a añadirlo en Servidores.",
             "login": "El servidor rechazó el inicio de sesión: la cuenta o la clave de Polaris en él cambió o se eliminó. Vuelve a añadir el servidor en Servidores.",
-            "shell": "El servidor aceptó el inicio de sesión pero no quiso abrir una shell."
+            "shell": "El servidor aceptó el inicio de sesión pero no quiso abrir una shell.",
+            "limit": "Has llegado al máximo de terminales que puedes tener abiertas. Cierra una para abrir otra.",
+            "ended": "Esta terminal ha terminado. Su shell salió, se cerró o estuvo sin uso demasiado tiempo.",
+            "elsewhere": "Esta terminal se abrió en otra ventana o pestaña, así que ahora está allí."
         },
         "looking": "Buscándolo en esta red...",
         "notFound": "Tampoco está en esta red.",
         "cannotLook": "Polaris no conoce su propia dirección en esta red, así que no pudo buscarlo.",
-        "lookForIt": "Buscarlo en esta red"
+        "lookForIt": "Buscarlo en esta red",
+        "sessions": {
+            "defaultName": "Shell {n}",
+            "root": "root",
+            "opening": "Abriendo...",
+            "newTab": "Nueva terminal",
+            "rename": "Renombrar",
+            "renameLabel": "Nombre",
+            "close": "Cerrar terminal",
+            "closeAsk": "¿Cerrar {name}? Lo que siga en marcha en ella se detiene.",
+            "closeConfirm": "Cerrar terminal",
+            "cancel": "Cancelar",
+            "limit": "Tienes {cap} terminales abiertas, el máximo permitido. Cierra una para abrir otra.",
+            "empty": "No hay terminales abiertas en este servidor.",
+            "loadFailed": "No se pudieron cargar tus terminales en este servidor.",
+            "changeFailed": "Ese cambio en la terminal no se guardó.",
+            "keepsRunning": "Las terminales siguen en marcha al cerrar esto y terminan tras {minutes} min sin nadie."
+        }
     },
     "storage": {
         "unreachable": "Ahora no se pueden guardar archivos: el almacenamiento {name} no responde.",

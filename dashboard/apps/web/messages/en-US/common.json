@@ -103,12 +103,32 @@
             "unreachable": "Nothing answered at this server's address. It is switched off, or it moved to another address.",
             "identity": "Something answered at this server's address with a different key, so Polaris did not sign in. If the server was reinstalled, remove it and add it again under Servers.",
             "login": "The server turned the sign-in away: Polaris's account or key on it was changed or removed. Add the server again under Servers.",
-            "shell": "The server accepted the sign-in but would not open a shell."
+            "shell": "The server accepted the sign-in but would not open a shell.",
+            "limit": "You have reached the most terminals you can keep open. Close one of them to open another.",
+            "ended": "This terminal has ended. Its shell exited, was closed, or sat unused for too long.",
+            "elsewhere": "This terminal was opened in another window or tab, so it was moved there."
         },
         "looking": "Looking for it on this network...",
         "notFound": "It is not on this network either.",
         "cannotLook": "Polaris does not know its own address on this network, so it could not look for it.",
-        "lookForIt": "Look for it on this network"
+        "lookForIt": "Look for it on this network",
+        "sessions": {
+            "defaultName": "Shell {n}",
+            "root": "root",
+            "opening": "Opening...",
+            "newTab": "New terminal",
+            "rename": "Rename",
+            "renameLabel": "Name",
+            "close": "Close terminal",
+            "closeAsk": "Close {name}? Anything still running in it stops.",
+            "closeConfirm": "Close terminal",
+            "cancel": "Cancel",
+            "limit": "You have {cap} terminals open, the most allowed. Close one to open another.",
+            "empty": "No terminals open on this server.",
+            "loadFailed": "Could not load your terminals on this server.",
+            "changeFailed": "That change to the terminal did not save.",
+            "keepsRunning": "Terminals keep running when you close this, and end after {minutes} min with nobody on them."
+        }
     },
     "storage": {
         "unreachable": "Files cannot be saved right now: the storage {name} is not reachable.",

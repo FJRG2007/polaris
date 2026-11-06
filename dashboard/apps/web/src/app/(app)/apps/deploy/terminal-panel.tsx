@@ -46,7 +46,16 @@ type Failure = { kind: "unreachable" } | { kind: "refused"; reason: string };
  * plain "disconnected" with nothing said and nothing to press.
  */
 type CloseReason =
-    "expired" | "noTerminal" | "gone" | "unreachable" | "identity" | "login" | "shell";
+    | "expired"
+    | "noTerminal"
+    | "gone"
+    | "unreachable"
+    | "identity"
+    | "login"
+    | "shell"
+    | "limit"
+    | "ended"
+    | "elsewhere";
 
 export const CLOSE_REASONS: Record<string, CloseReason | undefined> = {
     "invalid ticket": "expired",
@@ -56,10 +65,26 @@ export const CLOSE_REASONS: Record<string, CloseReason | undefined> = {
     "server unreachable": "unreachable",
     "server identity changed": "identity",
     "server refused the login": "login",
-    "could not open a shell on the server": "shell"
+    "could not open a shell on the server": "shell",
+    "session limit reached": "limit",
+    "session ended": "ended",
+    "session opened elsewhere": "elsewhere"
 };
 
-/** Close codes the sidecar uses for a session it refused (4001-4004). A close
+/** The control frame a server shell opens with, naming the long-lived session
+ *  the socket is attached to. Anything else is terminal output. Pure. */
+export function sessionFrame(data: unknown): { id: string; number: number } | null {
+    if (typeof data !== "string" || !data.startsWith('{"session"')) return null;
+    try {
+        const parsed = JSON.parse(data) as { session?: { id?: unknown; number?: unknown } };
+        const { id, number } = parsed.session ?? {};
+        return typeof id === "string" && typeof number === "number" ? { id, number } : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Close codes the sidecar uses for a session it refused or ended (4001-4007). A close
  *  in this range is a refusal even after the socket opened. */
 function isRefusal(code: number): boolean {
     return code >= 4000 && code < 5000;
@@ -128,10 +153,21 @@ type Status =
 export function TerminalPanel({
     target,
     label,
-    findServer
+    findServer,
+    resumeId,
+    onSession,
+    onClosed,
+    height = "h-80"
 }: {
     target: TerminalTarget;
     label: string;
+    /** For a server shell: the long-lived session to return to. Absent opens a
+     *  new one, whose id arrives through `onSession`. */
+    resumeId?: string;
+    onSession?: (id: string, number: number) => void;
+    /** The socket closed, for whatever reason. */
+    onClosed?: () => void;
+    height?: string;
     /** For a server shell: look for the server on the network after nothing
      *  answered at its recorded address, and move it there when found. */
     findServer?: () => Promise<FindServerResult>;
@@ -146,6 +182,10 @@ export function TerminalPanel({
     // The server is looked for on its own once per panel, not once per failure:
     // found and still refusing would otherwise go round for as long as it is open.
     const lookedForServer = useRef(false);
+    // A Retry returns to the session this panel was on, not a fresh one.
+    const sessionRef = useRef(resumeId);
+    const callbacks = useRef({ onSession, onClosed });
+    callbacks.current = { onSession, onClosed };
     // The object identity of `target` would restart the session on every parent
     // render; its contents are what actually decide the connection.
     const key =
@@ -188,7 +228,11 @@ export function TerminalPanel({
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(
                     target.kind === "host"
-                        ? { hostId: target.hostId, mode: target.asRoot ? "ssh-root" : "ssh" }
+                        ? {
+                              hostId: target.hostId,
+                              mode: target.asRoot ? "ssh-root" : "ssh",
+                              terminalSessionId: sessionRef.current
+                          }
                         : target.kind === "docker"
                           ? { connectionId: target.connectionId, containerRef: target.containerRef }
                           : target.kind === "agent"
@@ -224,6 +268,12 @@ export function TerminalPanel({
                 sendResize();
             };
             socket.onmessage = (event) => {
+                const frame = target.kind === "host" ? sessionFrame(event.data) : null;
+                if (frame) {
+                    sessionRef.current = frame.id;
+                    callbacks.current.onSession?.(frame.id, frame.number);
+                    return;
+                }
                 term.write(
                     event.data instanceof ArrayBuffer
                         ? new Uint8Array(event.data)
@@ -238,6 +288,7 @@ export function TerminalPanel({
                 const outcome = closeOutcome(opened, event.code, event.reason);
                 setStatus(outcome.status);
                 setFailure(outcome.failure);
+                if (!disposed) callbacks.current.onClosed?.();
             };
             // Fires before the close on a connection that never opened; the close
             // handler has the code and reason, so this only avoids a silent gap.
@@ -277,7 +328,7 @@ export function TerminalPanel({
             </div>
             <div
                 ref={mountRef}
-                className="h-80 w-full overflow-hidden rounded-md bg-[#0b0e14] p-2"
+                className={`${height} w-full overflow-hidden rounded-md bg-[#0b0e14] p-2`}
             />
             {failure ? (
                 <FailureNote
