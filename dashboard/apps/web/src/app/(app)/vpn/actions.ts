@@ -86,17 +86,20 @@ export interface VpnOverview {
     /** The zones a hostname may be taken in; empty for anybody but an
      *  administrator, who is the only one who can pick. */
     readonly zones: { label: string; host: string; primary: boolean }[];
+    /** Whether the reader may add devices: an administrator, a grant, or open access. */
+    readonly mayJoin: boolean;
 }
 
 /** Where the control server stands, asked after the first paint. */
 export async function vpnOverviewAction(): Promise<Result<VpnOverview>> {
     const user = await requireUser();
     try {
-        const [status, zones] = await Promise.all([
+        const [status, zones, mayJoin] = await Promise.all([
             vpn.vpnStatus(),
-            rules.mayOperate(viewerOf(user)) ? vpn.hostnameZones() : Promise.resolve([])
+            rules.mayOperate(viewerOf(user)) ? vpn.hostnameZones() : Promise.resolve([]),
+            vpn.mayJoin(user)
         ]);
-        return { status, zones };
+        return { status, zones, mayJoin };
     } catch (error) {
         return failed(error);
     }
@@ -179,10 +182,16 @@ export async function removeVpnAction(): Promise<Result> {
 }
 
 /** The devices the reader may see: all of them for an administrator. */
-export async function listVpnDevicesAction(): Promise<Result<{ devices: vpn.VpnDevice[] }>> {
+export async function listVpnDevicesAction(): Promise<
+    Result<{ devices: vpn.VpnDevice[]; mayJoin: boolean }>
+> {
     const user = await requireUser();
     try {
-        return { devices: await vpn.listDevices(viewerOf(user)) };
+        const [devices, mayJoin] = await Promise.all([
+            vpn.listDevices(viewerOf(user)),
+            vpn.mayJoin(user)
+        ]);
+        return { devices, mayJoin };
     } catch (error) {
         return failed(error);
     }
