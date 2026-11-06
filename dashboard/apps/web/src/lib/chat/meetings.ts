@@ -19,7 +19,7 @@
  */
 
 import * as core from "@polaris/core";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { blockersOf } from "@/lib/blocks";
 import { whoMissedTheCall } from "./missed-call";
 import { prisma, type Prisma } from "@polaris/db";
@@ -31,6 +31,7 @@ import { publishChatChange, type CallState, type CallGroup } from "./live";
 import { announcesCalls, callEndedBody } from "./notice-text";
 import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
+import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, inviteRefusal } from "./meeting-invites";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
 import { chatWordsFor } from "./text";
@@ -136,6 +137,10 @@ export interface MeetingSummary {
     readonly mine: boolean;
     /** Who has been convened, so the host can see who they asked. */
     readonly invited: readonly { readonly id: string; readonly name: string }[];
+    /** The addresses the host asked, and only ever to the host, like the link. */
+    readonly invitedEmails: readonly string[];
+    /** The code typed at /m, to the host alone for the same reason as the link. */
+    readonly joinCode: string | null;
 }
 
 /** Who this browser is in a call: its own participant row. */
@@ -1463,7 +1468,7 @@ async function closeMeeting(meetingId: string): Promise<void> {
     const [closed] = await prisma.$transaction([
         prisma.meeting.updateMany({
             where: { id: meetingId, endedAt: null },
-            data: { endedAt: new Date(), guestToken: null, liveKey: null }
+            data: { endedAt: new Date(), guestToken: null, joinCode: null, liveKey: null }
         }),
         prisma.meetingParticipant.updateMany({
             where: { meetingId, leftAt: null },
@@ -1679,6 +1684,25 @@ export interface NewMeeting {
     readonly approveGuests: boolean;
     /** Whether the link only opens for somebody signed in to Polaris. */
     readonly requireAccount: boolean;
+    /** People with accounts convened by name, who walk past the lobby. */
+    readonly userIds?: readonly string[];
+    /** Addresses asked, already normalized (meeting-invites). Recorded only. */
+    readonly emails?: readonly string[];
+    /** Whether to mint a join code beside the link. */
+    readonly joinCode?: boolean;
+}
+
+/** How many times a fresh join code is drawn before giving up. A collision in
+ *  2.6e13 codes is already unlikely; three in a row means something else. */
+const JOIN_CODE_ATTEMPTS = 3;
+
+/** A fresh code, uniformly drawn from the alphabet. */
+export function generateJoinCode(): string {
+    let code = "";
+    for (let i = 0; i < JOIN_CODE_LENGTH; i++) {
+        code += JOIN_CODE_ALPHABET[randomInt(JOIN_CODE_ALPHABET.length)];
+    }
+    return code;
 }
 
 /**
@@ -1691,29 +1715,82 @@ export interface NewMeeting {
 export async function createMeeting(
     actor: ChatActor,
     input: NewMeeting
-): Promise<{ meetingId: string; guestToken: string }> {
+): Promise<{
+    meetingId: string;
+    guestToken: string;
+    joinCode: string | null;
+    title: string;
+    invited: readonly string[];
+}> {
     const title = input.title.trim().slice(0, MAX_MEETING_TITLE);
     if (!title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
+    const emails = [...new Set(input.emails ?? [])];
+    const refusal = inviteRefusal({ requireAccount: input.requireAccount, emails });
+    if (refusal) throw new ChatAccessError({ key: refusal });
     if (input.scheduledAt) {
         const ahead = input.scheduledAt.getTime() - Date.now();
         if (ahead > MAX_SCHEDULE_AHEAD_MS)
             throw new ChatAccessError({ key: "errors.scheduleTooFar" });
     }
 
+    // Only people who exist, and never the host, so a bad id is a name that is
+    // not added rather than an invitation to nobody sitting here forever.
+    const wanted = [...new Set(input.userIds ?? [])].filter((id) => id !== actor.id);
+    const real =
+        wanted.length === 0
+            ? []
+            : await prisma.user.findMany({ where: { id: { in: wanted } }, select: { id: true } });
+    const invited = real.map((person) => person.id);
+
     const guestToken = randomBytes(24).toString("base64url");
-    const meeting = await prisma.meeting.create({
-        data: {
-            channelId: null,
-            hostId: actor.id,
-            title,
-            guestToken,
-            approveGuests: input.approveGuests,
-            requireAccount: input.requireAccount,
-            scheduledAt: input.scheduledAt
-        },
-        select: { id: true }
+    for (let attempt = 0; ; attempt++) {
+        const joinCode = input.joinCode ? generateJoinCode() : null;
+        try {
+            const meeting = await prisma.meeting.create({
+                data: {
+                    channelId: null,
+                    hostId: actor.id,
+                    title,
+                    guestToken,
+                    joinCode,
+                    approveGuests: input.approveGuests,
+                    requireAccount: input.requireAccount,
+                    scheduledAt: input.scheduledAt,
+                    invites: {
+                        create: invited.map((userId) => ({ userId, invitedById: actor.id }))
+                    },
+                    emailInvites: {
+                        create: emails.map((email) => ({ email, invitedById: actor.id }))
+                    }
+                },
+                select: { id: true }
+            });
+            return { meetingId: meeting.id, guestToken, joinCode, title, invited };
+        } catch (caught) {
+            // Only the code is drawn at random here, so a unique violation is a
+            // code somebody else holds: draw another.
+            if (!joinCode || !isUniqueViolation(caught) || attempt + 1 >= JOIN_CODE_ATTEMPTS)
+                throw caught;
+        }
+    }
+}
+
+/**
+ * The guest link a typed join code leads to, or null when it names nothing that
+ * is open - ended, link shut, or never a code - which the caller answers the
+ * same way for each, so the form cannot tell somebody which codes are real.
+ *
+ * It leads to the link rather than to a seat on purpose: the link already holds
+ * every rule about who gets in (its password and address limits, accounts only,
+ * the lobby), and a second door with its own copy of them is a door that drifts.
+ */
+export async function guestTokenForJoinCode(code: string): Promise<string | null> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { joinCode: code },
+        select: { endedAt: true, guestToken: true }
     });
-    return { meetingId: meeting.id, guestToken };
+    if (!meeting || meeting.endedAt) return null;
+    return meeting.guestToken;
 }
 
 /**
@@ -1811,7 +1888,9 @@ export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> 
             approveGuests: true,
             scheduledAt: true,
             startedAt: true,
+            joinCode: true,
             invites: { select: { userId: true } },
+            emailInvites: { orderBy: { createdAt: "asc" }, select: { email: true } },
             participants: {
                 where: {
                     leftAt: null,
@@ -1855,7 +1934,10 @@ export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> 
         invited: row.invites.map((invite) => ({
             id: invite.userId,
             name: named.get(invite.userId) ?? GONE_NAME
-        }))
+        })),
+        invitedEmails:
+            row.hostId === actor.id ? row.emailInvites.map((invite) => invite.email) : [],
+        joinCode: row.hostId === actor.id ? row.joinCode : null
     }));
 }
 

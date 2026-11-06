@@ -75,6 +75,7 @@ vi.mock("@polaris/db", () => ({
                         scheduledAt: null,
                         startedAt: new Date(),
                         invites: [],
+                        emailInvites: [],
                         participants: [
                             {
                                 id: "s1",

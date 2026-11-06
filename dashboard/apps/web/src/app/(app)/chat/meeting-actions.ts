@@ -37,6 +37,7 @@ import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
 import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
+import { MOST_INVITED, meetingInvitesSchema } from "@/lib/chat/meeting-invites";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 
 /**
@@ -472,15 +473,24 @@ export async function meetingsAllowedAction(): Promise<{ create: boolean }> {
     return { create: await can(user.id, "chat.meetings") };
 }
 
-const newMeetingSchema = z.object({
-    title: z.string().trim().min(1, "Give the meeting a name").max(MAX_MEETING_TITLE),
-    // The browser sends a moment, not a local time: what "half past two" means
-    // depends on where the reader is sitting, and the server is nowhere.
-    scheduledAt: z.string().datetime().nullish(),
-    approveGuests: z.boolean(),
-    requireAccount: z.boolean()
-});
+const newMeetingSchema = z
+    .object({
+        title: z.string().trim().min(1, "Give the meeting a name").max(MAX_MEETING_TITLE),
+        // The browser sends a moment, not a local time: what "half past two" means
+        // depends on where the reader is sitting, and the server is nowhere.
+        scheduledAt: z.string().datetime().nullish(),
+        approveGuests: z.boolean(),
+        requireAccount: z.boolean()
+    })
+    .merge(meetingInvitesSchema);
 
+/**
+ * Create a meeting, and convene whoever the host named while making it.
+ *
+ * People with accounts get the same bell alert an invitation made later does.
+ * Addresses are recorded and nothing is sent: Polaris has no mail of its own,
+ * so the host copies the invitation text and sends it themselves.
+ */
 export async function createMeetingAction(
     input: unknown
 ): Promise<{ meetingId?: string; error?: string }> {
@@ -505,11 +515,37 @@ export async function createMeetingAction(
                 title: parsed.data.title,
                 scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
                 approveGuests: parsed.data.approveGuests,
-                requireAccount: parsed.data.requireAccount
+                requireAccount: parsed.data.requireAccount,
+                userIds: parsed.data.userIds,
+                emails: parsed.data.emails,
+                joinCode: parsed.data.joinCode
             }
         )
     );
-    return result.error ? { error: result.error } : { meetingId: result.value!.meetingId };
+    if (result.error || !result.value) return { error: result.error };
+    const made = result.value;
+    await tellInvited(user.name, made.meetingId, made.title, made.invited);
+    return { meetingId: made.meetingId };
+}
+
+/** The bell alert somebody convened by name gets, in their own language. */
+async function tellInvited(
+    hostName: string,
+    meetingId: string,
+    title: string,
+    userIds: readonly string[]
+): Promise<void> {
+    for (const userId of userIds) {
+        // Written for whoever is invited, who reads it later, in their language.
+        const words = translatorFor(await getUserLocale(userId), "chat");
+        await createNotification({
+            userId,
+            type: "chat.meeting.invited",
+            title: words("meetingNotice.invitedTitle", { name: hostName, meeting: title }),
+            body: words("meetingNotice.invitedBody"),
+            href: `/chat/meetings/${meetingId}`
+        });
+    }
 }
 
 /** The meetings this account is hosting or has been asked to. */
@@ -539,10 +575,6 @@ export async function joinMeetingAction(
     return result.error ? { error: result.error } : { admission: result.value!.admission };
 }
 
-/** How many people one invitation may name. The room holds eight, and inviting
- *  a hundred people to a room that holds eight is a list nobody can act on. */
-const MOST_INVITED = 50;
-
 const inviteMeetingSchema = z.object({
     meetingId: z.string().uuid(),
     userIds: z.array(z.string().uuid()).min(1).max(MOST_INVITED)
@@ -570,20 +602,7 @@ export async function inviteToMeetingAction(
     if (result.error || !result.value)
         return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
-    for (const userId of result.value.invited) {
-        // Written for whoever is invited, who reads it later, in their language.
-        const words = translatorFor(await getUserLocale(userId), "chat");
-        await createNotification({
-            userId,
-            type: "chat.meeting.invited",
-            title: words("meetingNotice.invitedTitle", {
-                name: user.name,
-                meeting: result.value.title
-            }),
-            body: words("meetingNotice.invitedBody"),
-            href: `/chat/meetings/${parsed.data.meetingId}`
-        });
-    }
+    await tellInvited(user.name, parsed.data.meetingId, result.value.title, result.value.invited);
     return { invited: result.value.invited.length };
 }
 
