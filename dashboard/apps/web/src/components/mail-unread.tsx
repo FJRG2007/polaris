@@ -175,14 +175,25 @@ async function announceArrivals(
     // server what has arrived: the answer would only be thrown away.
     if (!since || !canNotify() || !noticeAllowed("mail")) return;
     const answer = await fetchArrivals(since);
-    if (!answer) return;
+    if (!answer) {
+        // Asked again shortly rather than on the next frame, which only comes
+        // when the mailbox changes again - possibly an hour later.
+        retryLater(() => {
+            if (!tabIsWatched()) void announceArrivals(cursor, t);
+        });
+        return;
+    }
     cursor.current = answer.cursor;
     keepSharedCursor(answer.cursor);
     for (const arrival of answer.named) {
         await notifyDesktop({
             // Says it is mail: a bare name over a subject read as a chat message
             // or anything else, and the system's notice centre gives no other clue.
-            title: t("mailUnread.from", { from: clipped(arrival.from) }),
+            // The sender is the title and "Email" the line under it where the
+            // notice draws one; the sentence where it does not.
+            title: clipped(arrival.from),
+            subtitle: t("mailUnread.kind"),
+            combined: t("mailUnread.from", { from: clipped(arrival.from) }),
             body: arrival.subject,
             tag: `mail:${arrival.threadId}`,
             href: `/mail/t/${arrival.threadId}`
@@ -196,6 +207,20 @@ async function announceArrivals(
             href: "/mail"
         });
     }
+}
+
+/** How long a failed ask waits before it is made again. */
+export const ARRIVALS_RETRY_MS = 30_000;
+
+let retry: ReturnType<typeof setTimeout> | null = null;
+
+/** One retry pending at a time, however many asks failed. */
+function retryLater(run: () => void): void {
+    if (retry) return;
+    retry = setTimeout(() => {
+        retry = null;
+        run();
+    }, ARRIVALS_RETRY_MS);
 }
 
 /**
@@ -327,8 +352,13 @@ export function MailUnreadProvider({
             } catch {
                 return;
             }
+            // The connection opened. On a reconnection - the cursor is already
+            // held - mail may have arrived while it was down and its frame is
+            // gone, so it is treated as one. The first opening is not: that
+            // would announce what was waiting before the page was opened.
+            if (kind === "ready" && !cursor.current) return;
             // A queued message changing state does not change what is unread.
-            if (kind !== "mail") return;
+            if (kind !== "mail" && kind !== "ready") return;
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(() => {
                 recount();

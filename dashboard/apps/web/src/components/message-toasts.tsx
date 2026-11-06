@@ -40,6 +40,7 @@ import * as core from "@polaris/core";
 import { BellOff, CheckCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/avatar-url";
 import { usePathname } from "next/navigation";
 import { playCallSound } from "@/lib/call-sounds";
 import { useToast, type Toast, type ToastLine } from "@polaris/ui";
@@ -388,7 +389,16 @@ export function MessageToasts() {
                     (mine) => {
                         if (!mine) return;
                         void notifyDesktop({
-                            title: who,
+                            // The sender as the title and the conversation under
+                            // it where the notice draws a second line; "Ana in
+                            // #general" where it does not.
+                            title: message.locked ? who : message.authorName,
+                            ...(message.inChannel && !message.locked
+                                ? { subtitle: message.conversation, combined: who }
+                                : {}),
+                            ...(message.authorId && !message.locked
+                                ? { icon: avatarUrl(message.authorId) }
+                                : {}),
                             body: message.excerpt,
                             tag: `${TAG}${message.channelId}`,
                             href: `/chat/c/${message.channelId}/${message.messageId}`,
