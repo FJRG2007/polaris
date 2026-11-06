@@ -216,6 +216,27 @@ describe("a table per machine", () => {
         expect(remoteTable("host-a")).toEqual({ "away.mc.example.com": "host.docker.internal:0" });
     });
 
+    it("a connected machine's retired name ages out, timed beside this machine's table", async () => {
+        const start = Date.UTC(2026, 10, 6, 12);
+        vi.useFakeTimers({ now: start, toFake: ["Date"] });
+        try {
+            const away = server("away", "t-a", 25571);
+            await syncMinecraftRoutes(away);
+            installs[0]!.status = "removed";
+            await syncMinecraftRoutes(away);
+            const since = JSON.parse(await readFile(join(dir, "mc-routes-retired-host-a.json"), "utf8"));
+            expect(since).toEqual({ "away.mc.example.com": start });
+            vi.setSystemTime(start + 30 * 60_000);
+            await syncMinecraftRoutes(away);
+            expect(remoteTable("host-a")).toEqual({ "away.mc.example.com": "host.docker.internal:0" });
+            vi.setSystemTime(start + 61 * 60_000);
+            await syncMinecraftRoutes(away);
+            expect(remoteTable("host-a")).toEqual({});
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("never touches a machine nobody routed anything on", async () => {
         server("away", "t-a", 25571, { routed: false });
         await syncMinecraftRoutes();
