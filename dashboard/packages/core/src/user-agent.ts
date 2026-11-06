@@ -141,7 +141,30 @@ const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonl
     { test: /\bSafari\//, name: "Safari", version: /\bVersion\/(\d{1,4})/ }
 ];
 
+/** What the Polaris desktop app is called wherever a device list names it. */
+export const POLARIS_DESKTOP = "Polaris Desktop";
+
+/**
+ * The Polaris desktop app's own claim. It is an Electron window, so its
+ * user-agent carries `Chrome/` like any Chromium - and without this a sign-in
+ * from the app reads as "Chrome on Windows", a browser its owner never opened.
+ * Electron writes the app's name and version (`Polaris/0.1.15`) and its own
+ * `Electron/` token; both are required, so a browser that merely mentions
+ * Polaris is not taken for the app. The version is the app's, in full: its
+ * major is 0 for now and says nothing on its own.
+ */
+const DESKTOP_APP = /\bPolaris\/(\d{1,4}(?:\.\d{1,4}){0,2})\b/;
+const ELECTRON = /\bElectron\/\d/;
+
+function desktopFromUserAgent(userAgent: string): { name: string; version: string | null } | null {
+    if (!ELECTRON.test(userAgent)) return null;
+    const version = userAgent.match(DESKTOP_APP)?.[1];
+    return version ? { name: POLARIS_DESKTOP, version } : null;
+}
+
 function browserFromUserAgent(userAgent: string): { name: string; version: string | null } {
+    const desktop = desktopFromUserAgent(userAgent);
+    if (desktop) return desktop;
     for (const entry of BROWSERS) {
         if (!entry.test.test(userAgent)) continue;
         return { name: entry.name, version: userAgent.match(entry.version)?.[1] ?? null };
@@ -235,7 +258,9 @@ export function describeClient(
     }
 
     const claimed = browserFromUserAgent(userAgent);
-    const hinted = brandFromHints(brands);
+    // The desktop app's hints name only the Chromium it embeds, so its own
+    // token wins over them the way a rebadged browser's hints win elsewhere.
+    const hinted = claimed.name === POLARIS_DESKTOP ? null : brandFromHints(brands);
     // The hints name the browser; the user-agent is the fallback. A rebadged
     // Chromium sends both, and its own `Brave/` token does not exist - so where
     // the hints named it and gave no number, the user-agent's Chrome version is

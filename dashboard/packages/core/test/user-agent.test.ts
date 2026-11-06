@@ -40,6 +40,25 @@ describe("describeClient", () => {
         });
     });
 
+    it("names the Polaris desktop app rather than the Chromium inside it", () => {
+        // Electron's default user-agent: the app's own name and version, then
+        // the engine's tokens.
+        const desktop =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Polaris/0.1.15 Chrome/134.0.6998.205 Electron/35.7.5 Safari/537.36";
+        const hints = '"Not:A-Brand";v="24", "Chromium";v="134"';
+        const reading = describeClient(desktop, hints, '"Windows"');
+        expect(reading.browser).toBe("Polaris Desktop");
+        expect(reading.browserVersion).toBe("0.1.15");
+        expect(reading.label).toBe("Polaris Desktop on Windows");
+        // Even a hint naming a browser does not rename the app.
+        expect(describeClient(desktop, '"Google Chrome";v="134"').browser).toBe("Polaris Desktop");
+        // Another Electron app, or a browser that only mentions Polaris, is not it.
+        expect(describeClient(desktop.replace("Polaris/0.1.15", "Slack/4.41.0")).browser).toBe(
+            "Chrome"
+        );
+        expect(describeClient(`${CHROME_WINDOWS} Polaris/1.0`).browser).toBe("Chrome");
+    });
+
     it("takes the major version only, which is the one anybody reads", () => {
         expect(describeClient(CHROME_WINDOWS).browserVersion).toBe("131");
         expect(describeClient(FIREFOX_LINUX).browserVersion).toBe("130");
