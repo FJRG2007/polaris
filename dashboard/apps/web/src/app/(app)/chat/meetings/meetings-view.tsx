@@ -26,6 +26,16 @@ import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { useDisplayFormat } from "@/components/display-format";
 import { MeetingDetailsDialog } from "./meeting-details-dialog";
 import { CallRoster } from "@/app/(app)/chat/call-roster";
+import { searchPeopleAction } from "@/app/(app)/chat/actions";
+import { MOST_EMAILS } from "@/lib/chat/meeting-invites";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import {
+    CopyInvitationButton,
+    EmailInvitesField,
+    InvitedPeople,
+    JoinCodeBadge,
+    withDraft
+} from "./meeting-invitation";
 import { ArrowLeft, Calendar, Link2, Loader2, Pencil, Plus, Users, Video } from "lucide-react";
 import { createMeetingAction, listMeetingsAction } from "@/app/(app)/chat/meeting-actions";
 import {
@@ -148,7 +158,15 @@ export function MeetingsView() {
                                                 {meeting.requireAccount && (
                                                     <span>{t("meetings.polarisAccountsOnly")}</span>
                                                 )}
+                                                {meeting.joinCode && (
+                                                    <JoinCodeBadge code={meeting.joinCode} />
+                                                )}
                                             </span>
+                                            {meeting.mine && (
+                                                <span className="mt-2 block">
+                                                    <InvitedPeople meeting={meeting} />
+                                                </span>
+                                            )}
                                             {meeting.people.length > 0 && (
                                                 <span className="mt-2 block">
                                                     <CallRoster people={meeting.people} />
@@ -175,6 +193,7 @@ export function MeetingsView() {
                                                     : t("meetings.copyLink")}
                                             </Button>
                                         )}
+                                        <CopyInvitationButton meeting={meeting} />
                                         {meeting.mine && (
                                             <Button
                                                 size="icon-xs"
@@ -254,6 +273,11 @@ function NewMeetingDialog({
     const [when, setWhen] = useState("");
     const [approveGuests, setApproveGuests] = useState(true);
     const [requireAccount, setRequireAccount] = useState(false);
+    const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
+    const [emails, setEmails] = useState<readonly string[]>([]);
+    const [emailDraft, setEmailDraft] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [joinCode, setJoinCode] = useState(false);
     const [busy, setBusy] = useState(false);
 
     // Emptied on the way in rather than on the way out, so a dialog reopened
@@ -264,9 +288,26 @@ function NewMeetingDialog({
         setWhen("");
         setApproveGuests(true);
         setRequireAccount(false);
+        setPicked([]);
+        setEmails([]);
+        setEmailDraft("");
+        setEmailError("");
+        setJoinCode(false);
     }, [open]);
 
     const create = async () => {
+        // Accounts only takes no addresses, and the field says so instead of
+        // offering itself; anything left over from before the switch is not sent.
+        const sending = requireAccount ? [] : withDraft(emails, emailDraft);
+        if (sending === null) {
+            setEmailError(t("meetingInvites.notAnEmail"));
+            return;
+        }
+        if (sending.length > MOST_EMAILS) {
+            setEmailError(t("meetingInvites.tooManyEmails", { count: MOST_EMAILS }));
+            return;
+        }
+        setEmailError("");
         setBusy(true);
         const result = await runAction(
             () =>
@@ -276,7 +317,10 @@ function NewMeetingDialog({
                     // is turned into a moment here, where the reader's clock is.
                     scheduledAt: when ? new Date(when).toISOString() : null,
                     approveGuests,
-                    requireAccount
+                    requireAccount,
+                    userIds: picked.map((person) => person.id),
+                    emails: sending,
+                    joinCode
                 }),
             onError
         );
@@ -329,6 +373,43 @@ function NewMeetingDialog({
                         checked={requireAccount}
                         onChange={setRequireAccount}
                     />
+                    <Setting
+                        label={t("meetingInvites.joinCode")}
+                        hint={t("meetingInvites.joinCodeHint")}
+                        checked={joinCode}
+                        onChange={setJoinCode}
+                    />
+
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium">{t("meetingInvites.people")}</span>
+                        <PeoplePicker
+                            picked={picked}
+                            onChange={setPicked}
+                            search={(query) => searchPeopleAction(query)}
+                        />
+                        <span className="text-[0.6875rem] text-muted-foreground">
+                            {approveGuests
+                                ? t("meetingInvites.peopleSkipLobby")
+                                : t("meetingInvites.peopleHint")}
+                        </span>
+                    </div>
+                    <EmailInvitesField
+                        emails={emails}
+                        onChange={setEmails}
+                        draft={emailDraft}
+                        onDraftChange={(next) => {
+                            setEmailDraft(next);
+                            setEmailError("");
+                        }}
+                        disabledReason={
+                            requireAccount ? t("meetingInvites.emailsNeedGuests") : undefined
+                        }
+                    />
+                    {emailError && (
+                        <p role="alert" className="text-[0.6875rem] text-danger">
+                            {emailError}
+                        </p>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="secondary" size="sm" onClick={onClose}>

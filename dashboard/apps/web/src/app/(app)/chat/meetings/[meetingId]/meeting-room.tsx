@@ -76,6 +76,7 @@ import {
     transferHostAction
 } from "@/app/(app)/chat/meeting-actions";
 import * as polls from "../../chat-reads";
+import { CopyInvitationButton, InvitedPeople, JoinCodeBadge } from "../meeting-invitation";
 
 export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewerId: string }) {
     const t = useTranslations("chat");
@@ -281,6 +282,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             {copied ? t("meetingRoom.copied") : t("meetingRoom.copyLink")}
                         </Button>
                     )}
+                    {host && about?.joinCode && <JoinCodeBadge code={about.joinCode} />}
+                    {host && about && <CopyInvitationButton meeting={about} />}
                     {host && about?.guestToken && (
                         <Button
                             size="icon-xs"
@@ -377,6 +380,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                         {!waiting && about && about.people.length > 0 && (
                             <CallRoster people={about.people} />
                         )}
+                        {host && about && <InvitedPeople meeting={about} />}
                         <Button disabled={joining || waiting} onClick={() => void join()}>
                             {(joining || waiting) && <Loader2 className="size-4 animate-spin" />}
                             {waiting ? t("meetingRoom.waitingToBeLetIn") : t("meetingRoom.join")}
