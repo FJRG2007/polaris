@@ -58,7 +58,7 @@ import { aggregateUsage, patchWorkflowRunFields } from "./utils/patchWorkflowRun
 import { resolveOutputSchema, resolvePayload, resolvePromptInput } from "./utils/payload.ts";
 import { runProxyResolution } from "./utils/proxy.ts";
 import { fetchPreviousSnapshot, persistSummary, seedSummaryFile } from "./utils/prSummary.ts";
-import { handleAgentResult } from "./utils/run.ts";
+import { handleAgentResult, requireSubmittedReview } from "./utils/run.ts";
 import { isActionPinnedToSha, resolveRunContextData } from "./utils/runContextData.ts";
 import { ossEffortFloor } from "./utils/runEffort.ts";
 import { renderRunError } from "./utils/runErrorRenderer.ts";
@@ -803,6 +803,7 @@ export async function main(): Promise<MainResult> {
     // rationale (notably: progress-comment deletion lives in
     // create_pull_request_review for review-mode runs, so deletion here
     // covers the non-review success paths).
+    result = requireSubmittedReview(result, toolState);
     await finalizeSuccessRun({ toolContext, toolState, result, repo: runContext.repo });
 
     return await handleAgentResult({
