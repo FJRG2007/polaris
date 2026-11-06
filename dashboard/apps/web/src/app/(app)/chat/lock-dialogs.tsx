@@ -25,8 +25,10 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    Select,
     Switch
 } from "@polaris/ui";
+import * as timing from "@/lib/chat/lock-timing";
 
 /** Same bounds as `lockCodeSchema`, so the box never offers what is refused. */
 const CODE_MIN = 4;
@@ -37,7 +39,23 @@ function codeReady(code: string): boolean {
     return length >= CODE_MIN && length <= CODE_MAX;
 }
 
-const NO_LOCK: ChatLockState = { hasCode: false, hideLocked: false };
+const NO_LOCK: ChatLockState = {
+    hasCode: false,
+    hideLocked: false,
+    unlockMinutes: timing.DEFAULT_UNLOCK_MINUTES,
+    codeLength: null
+};
+
+/** Each duration choice by its catalogue key. */
+const UNLOCK_LABELS = {
+    [timing.UNLOCK_IMMEDIATELY]: "lock.unlockImmediately",
+    1: "lock.unlock1",
+    5: "lock.unlock5",
+    15: "lock.unlock15",
+    30: "lock.unlock30",
+    60: "lock.unlock60",
+    [timing.UNLOCK_UNTIL_CLOSED]: "lock.unlockClosed"
+} as const satisfies Record<(typeof timing.CHAT_UNLOCK_CHOICES)[number], string>;
 
 /** "Forgot code?": confirm it is the account's owner, then the code goes and
  *  every chat it locked opens. */
@@ -246,6 +264,19 @@ export function LockSettingsDialog({
         }
     }
 
+    async function chooseUnlockFor(minutes: number): Promise<void> {
+        const before = state;
+        onChanged({ ...state, unlockMinutes: minutes });
+        const result = await runAction(
+            () => lockActions.setUnlockMinutesAction({ minutes }),
+            setError
+        );
+        if (!result || result.error) {
+            onChanged(before);
+            if (result?.error) setError(result.error);
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -323,6 +354,25 @@ export function LockSettingsDialog({
                             onChange={(checked) => void chooseHide(checked)}
                         />
                     </label>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                        <span className="flex min-w-0 flex-col">
+                            <span>{t("lock.unlockFor")}</span>
+                            <span className="text-xs text-foreground-subtle">
+                                {t("lock.unlockForHint")}
+                            </span>
+                        </span>
+                        <Select
+                            className="w-full sm:w-56"
+                            value={String(state.unlockMinutes)}
+                            disabled={!state.hasCode}
+                            aria-label={t("lock.unlockFor")}
+                            onValueChange={(value) => void chooseUnlockFor(Number(value))}
+                            options={timing.CHAT_UNLOCK_CHOICES.map((minutes) => ({
+                                value: String(minutes),
+                                label: t(UNLOCK_LABELS[minutes])
+                            }))}
+                        />
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
@@ -388,7 +438,7 @@ interface ChatLockContextValue {
 }
 
 const ChatLockContext = createContext<ChatLockContextValue>({
-    state: { hasCode: false, hideLocked: false },
+    state: NO_LOCK,
     setState: () => undefined,
     openSettings: () => undefined
 });

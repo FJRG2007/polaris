@@ -117,3 +117,23 @@ export async function openLockedChatsAction(
     const result = await guardChat(() => lock.unlockAll(me, parsed.data.code));
     return result.error ? { error: result.error } : { proofs: result.value };
 }
+
+/** How long locked chats stay open after the code. */
+export async function setUnlockMinutesAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = lock.unlockMinutesSchema.safeParse(input);
+    if (!parsed.success) return invalid();
+    const result = await guardChat(() => lock.setUnlockMinutes(me, parsed.data.minutes));
+    return result.error ? { error: result.error } : {};
+}
+
+/** The reader is using an open locked chat: push on the proofs this tab holds. */
+export async function renewUnlocksAction(
+    input: unknown
+): Promise<{ proofs?: Record<string, string>; error?: string }> {
+    const me = await actor();
+    const parsed = lock.renewSchema.safeParse(input);
+    if (!parsed.success) return invalid();
+    const result = await guardChat(() => lock.renewUnlocks(me, parsed.data.proofs));
+    return result.error ? { error: result.error } : { proofs: result.value };
+}

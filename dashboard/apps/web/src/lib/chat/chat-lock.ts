@@ -16,6 +16,8 @@
  * presented with every message read. The server refuses a locked conversation
  * without it, so a stale tab or a hand-made request reads nothing - and nothing
  * is stored server-side for an unlock, so closing the tab is the whole relock.
+ * The expiry is the reader's own choice (`lock-timing`), and using the open
+ * locked chat pushes it on.
  */
 
 import { z } from "zod";
@@ -27,6 +29,7 @@ import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { onShelf } from "@/app/(app)/chat/lock-shelf";
+import * as timing from "./lock-timing";
 
 /** Shortest and longest code accepted. Short is allowed on purpose: it guards a
  *  screen somebody is already signed in to, and guesses are throttled. */
@@ -39,8 +42,16 @@ const GUESS_WINDOW_MS = 15 * 60_000;
 
 export const lockCodeSchema = z.string().trim().min(LOCK_CODE_MIN).max(LOCK_CODE_MAX);
 
+/** A new code: 4, 6 or 8 digits, so its box can submit on the last one. Codes
+ *  set before this keep working through `lockCodeSchema`. */
+export const newLockCodeSchema = z
+    .string()
+    .trim()
+    .regex(/^\d+$/)
+    .refine((code) => (timing.LOCK_CODE_LENGTHS as readonly number[]).includes(code.length));
+
 export const setLockCodeSchema = z.object({
-    code: lockCodeSchema,
+    code: newLockCodeSchema,
     /** Required once a code exists: changing it asks the one it replaces. */
     current: lockCodeSchema.optional()
 });
@@ -50,18 +61,34 @@ export const channelFlagSchema = z.object({
     on: z.boolean()
 });
 
+export const unlockMinutesSchema = z.object({
+    minutes: z
+        .number()
+        .int()
+        .refine((minutes) => (timing.CHAT_UNLOCK_CHOICES as readonly number[]).includes(minutes))
+});
+
 /** The reader's lock as a screen may know it - never the hash. */
 export interface ChatLockState {
     readonly hasCode: boolean;
     readonly hideLocked: boolean;
+    /** How long locked chats stay open after the code - see `lock-timing`. */
+    readonly unlockMinutes: number;
+    /** Digits in the code, or null when the box has to wait for a button. */
+    readonly codeLength: number | null;
 }
 
 export async function lockState(userId: string): Promise<ChatLockState> {
     const row = await prisma.chatLock.findUnique({
         where: { userId },
-        select: { hideLocked: true }
+        select: { hideLocked: true, unlockMinutes: true, codeLength: true }
     });
-    return { hasCode: row !== null, hideLocked: row?.hideLocked ?? false };
+    return {
+        hasCode: row !== null,
+        hideLocked: row?.hideLocked ?? false,
+        unlockMinutes: timing.unlockMinutesOf(row?.unlockMinutes),
+        codeLength: timing.knownCodeLength(row?.codeLength)
+    };
 }
 
 export async function hashLockCode(code: string): Promise<string> {
@@ -98,11 +125,22 @@ export async function setLockCode(actor: ChatActor, code: string, current?: stri
             throw new ChatAccessError({ key: "errors.lockWrongCode" });
     }
     const codeHash = await hashLockCode(code);
+    const codeLength = timing.knownCodeLength(code.length);
     await prisma.chatLock.upsert({
         where: { userId: actor.id },
-        update: { codeHash },
-        create: { userId: actor.id, codeHash }
+        update: { codeHash, codeLength },
+        create: { userId: actor.id, codeHash, codeLength }
     });
+}
+
+/** How long locked chats stay open after the code. Proofs already handed out
+ *  keep the expiry they were minted with; the next one follows the choice. */
+export async function setUnlockMinutes(actor: ChatActor, minutes: number): Promise<void> {
+    const updated = await prisma.chatLock.updateMany({
+        where: { userId: actor.id },
+        data: { unlockMinutes: timing.unlockMinutesOf(minutes) }
+    });
+    if (updated.count === 0) throw new ChatAccessError({ key: "errors.lockNoCode" });
 }
 
 /** Take the code away, and with it every lock it guarded: the way back for a
@@ -194,9 +232,17 @@ export async function unhideOnMessage(
     });
 }
 
-/** How long an unlock proof answers. A tab session rarely outlives it, and one
- *  that does asks for the code again. */
-const PROOF_TTL_MS = 12 * 60 * 60_000;
+/** How long an unlock proof answers when nothing says otherwise. */
+const PROOF_TTL_MS = timing.proofTtlMs(timing.DEFAULT_UNLOCK_MINUTES);
+
+/** At most this many proofs renewed in one request: more than anybody locks. */
+export const RENEW_MAX = 500;
+
+export const renewSchema = z.object({
+    proofs: z
+        .record(z.string().uuid(), z.string().max(200))
+        .refine((proofs) => Object.keys(proofs).length <= RENEW_MAX)
+});
 
 export const unlockSchema = z.object({
     channelId: z.string().uuid(),
@@ -212,11 +258,16 @@ function signProof(userId: string, channelId: string, codeHash: string, expires:
 /** The reader's stored code hash, which every proof is bound to: a new code
  *  turns every proof handed out under the old one away. */
 export async function lockCodeHash(userId: string): Promise<string | null> {
+    return (await proofTerms(userId))?.codeHash ?? null;
+}
+
+/** What a proof is minted under: the code it is bound to and how long it lasts. */
+async function proofTerms(userId: string): Promise<{ codeHash: string; ttlMs: number } | null> {
     const row = await prisma.chatLock.findUnique({
         where: { userId },
-        select: { codeHash: true }
+        select: { codeHash: true, unlockMinutes: true }
     });
-    return row?.codeHash ?? null;
+    return row ? { codeHash: row.codeHash, ttlMs: timing.proofTtlMs(row.unlockMinutes) } : null;
 }
 
 /** A proof that this reader opened this conversation with their code. */
@@ -224,9 +275,10 @@ export function unlockProof(
     userId: string,
     channelId: string,
     codeHash: string,
-    now = Date.now()
+    now = Date.now(),
+    ttlMs = PROOF_TTL_MS
 ): string {
-    const expires = String(now + PROOF_TTL_MS);
+    const expires = String(now + ttlMs);
     return `${expires}.${signProof(userId, channelId, codeHash, expires)}`;
 }
 
@@ -272,9 +324,9 @@ export async function unlockChannel(
     await requireChannel(actor, channelId);
     if (!(await verifyLockCode(actor, code)))
         throw new ChatAccessError({ key: "errors.lockWrongCode" });
-    const codeHash = await lockCodeHash(actor.id);
-    if (!codeHash) throw new ChatAccessError({ key: "errors.lockNoCode" });
-    return unlockProof(actor.id, channelId, codeHash);
+    const terms = await proofTerms(actor.id);
+    if (!terms) throw new ChatAccessError({ key: "errors.lockNoCode" });
+    return unlockProof(actor.id, channelId, terms.codeHash, Date.now(), terms.ttlMs);
 }
 
 /** Open the "Locked chats" list with the code: a proof for each of them, so
@@ -282,17 +334,54 @@ export async function unlockChannel(
 export async function unlockAll(actor: ChatActor, code: string): Promise<Record<string, string>> {
     if (!(await verifyLockCode(actor, code)))
         throw new ChatAccessError({ key: "errors.lockWrongCode" });
-    const [rows, codeHash] = await Promise.all([
+    const [rows, terms] = await Promise.all([
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id, locked: true },
             select: { channelId: true }
         }),
-        lockCodeHash(actor.id)
+        proofTerms(actor.id)
     ]);
-    if (!codeHash) throw new ChatAccessError({ key: "errors.lockNoCode" });
+    if (!terms) throw new ChatAccessError({ key: "errors.lockNoCode" });
+    const now = Date.now();
     return Object.fromEntries(
-        rows.map((row) => [row.channelId, unlockProof(actor.id, row.channelId, codeHash)])
+        rows.map((row) => [
+            row.channelId,
+            unlockProof(actor.id, row.channelId, terms.codeHash, now, terms.ttlMs)
+        ])
     );
+}
+
+/**
+ * Push on the proofs the tab already holds, because the reader is using the
+ * open locked chat: the window slides instead of running out mid-conversation.
+ * Only a proof that still answers is renewed - an expired or forged one is left
+ * out, and the code is asked for again - and no code is needed, since the proof
+ * is the evidence the code was given.
+ */
+export function renewProofs(
+    userId: string,
+    proofs: Readonly<Record<string, string>>,
+    terms: { codeHash: string; ttlMs: number },
+    now = Date.now()
+): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(proofs)
+            .filter(([channelId, proof]) =>
+                readUnlockProof(proof, userId, channelId, terms.codeHash, now)
+            )
+            .map(([channelId]) => [
+                channelId,
+                unlockProof(userId, channelId, terms.codeHash, now, terms.ttlMs)
+            ])
+    );
+}
+
+export async function renewUnlocks(
+    actor: ChatActor,
+    proofs: Readonly<Record<string, string>>
+): Promise<Record<string, string>> {
+    const terms = await proofTerms(actor.id);
+    return terms ? renewProofs(actor.id, proofs, terms) : {};
 }
 
 /** What an alert about a locked conversation may say: that something arrived,

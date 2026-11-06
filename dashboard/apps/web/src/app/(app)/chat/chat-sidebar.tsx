@@ -63,7 +63,7 @@ import * as move from "./channel-move";
 import { joinMenuGroups } from "./menu-groups";
 import { onShelf, type LockShelf } from "./lock-shelf";
 import * as lockActions from "./lock-actions";
-import { ChatLockProvider, LockCodeDialog, LockShelfEntries, useChatLock } from "./lock-dialogs";
+import { LockCodeDialog, LockShelfEntries, useChatLock } from "./lock-dialogs";
 import {
     Ban,
     BellOff,
@@ -241,11 +241,8 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
 
 /** `onListView` hears the view picked from the list's menu, so the pane can fit it. */
 export function ChatSidebar({ onListView }: { onListView?: (view: ChatListView) => void }) {
-    return (
-        <ChatLockProvider>
-            <ChatSidebarList onListView={onListView} />
-        </ChatLockProvider>
-    );
+    // The lock provider sits in the shell, around this list and the conversation.
+    return <ChatSidebarList onListView={onListView} />;
 }
 
 function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => void }) {

@@ -9862,6 +9862,12 @@ model ChatLock {
     // scrypt, through the same helper as link passwords.
     codeHash   String
     hideLocked Boolean  @default(false)
+    // How long locked chats stay open after the code, in minutes: 0 right away,
+    // -1 until the browser closes (how it behaved before the choice existed).
+    unlockMinutes Int   @default(-1)
+    // How many digits the code has (4, 6 or 8), so the box submits on the last
+    // one. Not secret. Null for a code set before it was recorded.
+    codeLength Int?
     updatedAt  DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -93,8 +93,9 @@ import { Button, EmptyState, ResizeHandle, Skeleton, cn, useToast } from "@polar
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
-import { LockedGate } from "./lock-dialogs";
+import { LockedGate, useChatLock } from "./lock-dialogs";
 import { forgetUnlockProof, unlockProofFor } from "./lock-session";
+import { useUnlockKeepAlive } from "./lock-keepalive";
 import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
 import { usePolarContext } from "@/components/polar/polar-panel";
@@ -640,6 +641,21 @@ export function ChannelView({
             void load();
         }
     }, [lockedNow, needsCode, channelId, load, show]);
+
+    // Open behind the code: kept open while the reader uses it, for as long as
+    // they chose, and closed behind the gate again once that runs out.
+    const unlockMinutes = useChatLock().state.unlockMinutes;
+    useUnlockKeepAlive({
+        channelId,
+        open: lockedNow === true && !needsCode,
+        minutes: unlockMinutes,
+        onExpired: () => {
+            setNeedsCode(true);
+            setThread(null);
+            setSearching(false);
+            show([]);
+        }
+    });
 
     // After the messages, on purpose. A browser runs server actions one at a
     // time, in the order they were asked for, so whichever of these two
