@@ -678,7 +678,7 @@ async function createMinecraftServer(
     // Java servers go on the shared port by default, so the address costs no DNS
     // record of its own. The SRV record just written is the fallback, and stays
     // whenever routing cannot be had (see `routeNewServer`).
-    if (hostname && input.edition === "java") await routeNewServer(ownerId, install.installedAppId);
+    if (hostname && input.edition === "java") void routeNewServer(ownerId, install.installedAppId);
     return { installedAppId: install.installedAppId, hostname };
 }
 

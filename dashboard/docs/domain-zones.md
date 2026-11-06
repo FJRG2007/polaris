@@ -133,7 +133,14 @@ things shape when a server is routed:
   switched (`routed` absent) is adopted by the sweep in two passes: first it is added
   to the table as a candidate (`routeCandidate`) with its SRV record untouched, and
   on a later pass the router is asked for it by name with a status ping
-  (`routeAnswers`). Only a reply from the server itself switches it over. The sweep
+  (`routeAnswers`). Only a reply from the server itself counts: mc-router answers a
+  ping for a backend it cannot reach with its own asleep or loading text, and a reply
+  carrying either is rejected. The same ping is then sent to the public address (or
+  the relay's) on the router's port (`forwardAnswers`), so the record is only dropped
+  once the forward to that port is seen working; silence leaves the SRV record and is
+  asked again ten minutes later. A server switched over this way does not rewrite the
+  table on its own: its route was already there, and the sweep writes it once at its
+  end. Routing a new server runs after the create request returns. The sweep
   never starts the router for this. The table is written before a router is started:
   mc-router watches that file and exits at startup if it does not exist.
 
@@ -171,7 +178,10 @@ What mc-router does with the table, from its source (`server/routes_config_loade
   calls `Load`; only SIGHUP runs `Reload`, which resets). A name left out of the file
   stays routed to its old port. Polaris writes each dropped name with a backend on
   port 0 instead (`retiredRoutes`), so a reused port never takes an old name to
-  another server's world. Retired names stay in the file.
+  another server's world. A retired name stays in the file for an hour from when it
+  was retired (`mc-routes-retired.json` beside the table holds when), far past the
+  five seconds a running router takes to read it, and is then dropped: the router
+  that read it keeps it pointed nowhere, and one started since never had it.
 - The watch is on the file itself. A rename over it replaces the watched inode and
   stops every later reload, so the table is written in place, not with
   `writeDynamicFile`. A half-written file fails to parse and the router keeps the

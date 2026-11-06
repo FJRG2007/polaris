@@ -892,10 +892,7 @@ export async function listChannels(
         lastMessages(
             channels
                 .filter(
-                    (channel) =>
-                        !channel.spaceId ||
-                        (mine.get(channel.id)?.hiddenAt !== null &&
-                            mine.get(channel.id)?.hiddenAt !== undefined)
+                    (channel) => !channel.spaceId || Boolean(mine.get(channel.id)?.hiddenAt)
                 )
                 .map((channel) => channel.id)
         ).catch((caught: unknown) => {

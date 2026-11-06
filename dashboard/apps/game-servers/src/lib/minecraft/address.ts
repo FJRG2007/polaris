@@ -14,11 +14,16 @@
  */
 
 import { gameMessage } from "../game-message";
-import { routesByHostname } from "@polaris/core";
+import {
+    MINECRAFT_ROUTER_ASLEEP_MOTD,
+    MINECRAFT_ROUTER_LOADING_MOTD,
+    PROBE_TIMEOUT_MS,
+    routesByHostname
+} from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { normalizeZoneName } from "@polaris/deploy";
 import { connect } from "node:net";
-import { pingJava } from "./slp";
+import { readJavaStatus, statusDescription } from "./slp";
 import {
     ROUTE_CANDIDATE_KEY,
     minecraftRoutes,
@@ -34,6 +39,8 @@ const { provisionHostnameDns } = host.domainDns;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { loadCloudflareToken } = host.integrationsCloudflareAccountService;
 const { startRouter, stopRouter } = host.minecraftRouter;
+const { publicProbeHost } = host.netPortProbe;
+const { relayAddress } = host.appsPortAdvice;
 const { deleteDnsRecord, findDnsRecords, resolveZoneForHostname, upsertSrvRecord } =
     host.integrationsCloudflareApi;
 
@@ -232,7 +239,8 @@ export async function setGameHostname(
     ]);
     // The table names servers by hostname, so a rename has to reach it or the old
     // name keeps routing and the new one reaches nothing.
-    if (routed) await syncMinecraftRoutes().catch(() => undefined);
+    const candidate = readInstallConfig(install?.config)[ROUTE_CANDIDATE_KEY] === true;
+    if (routed || candidate) await syncMinecraftRoutes().catch(() => undefined);
     return address.hostname;
 }
 
@@ -298,15 +306,7 @@ export async function setGameRouted(
     // directions. Doing it the other way round leaves a window - however short - where
     // the address a player already has answers nowhere.
     if (routed) {
-        // The router answers on the default port, so the name alone is the address.
-        await patchInstallConfig(installedAppId, {
-            routed: true,
-            portless: true,
-            [ROUTE_CANDIDATE_KEY]: false
-        });
-        await syncMinecraftRoutes().catch(() => undefined);
-        if (hostname && port)
-            await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
+        await moveOntoRouter(ownerId, installedAppId, hostname, port, true);
         return;
     }
     const srvWritten =
@@ -327,6 +327,30 @@ export async function setGameRouted(
     if ((await minecraftRoutes().catch(() => [])).length === 0) {
         await stopRouter().catch(() => undefined);
     }
+}
+
+/**
+ * Mark a server routed and drop the SRV record that carried its port, in that
+ * order: the route is in the table before the record goes.
+ *
+ * `syncTable` is off only for a server whose route the table already holds (a
+ * candidate's), so a sweep switching many over writes the table once, at its end.
+ */
+async function moveOntoRouter(
+    ownerId: string,
+    installedAppId: string,
+    hostname: string,
+    port: number | null,
+    syncTable: boolean
+): Promise<void> {
+    // The router answers on the default port, so the name alone is the address.
+    await patchInstallConfig(installedAppId, {
+        routed: true,
+        portless: true,
+        [ROUTE_CANDIDATE_KEY]: false
+    });
+    if (syncTable) await syncMinecraftRoutes().catch(() => undefined);
+    if (hostname && port) await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
 }
 
 /** How long to give a router that has just been started, and how often to look. */
@@ -382,7 +406,63 @@ export async function routerListening(): Promise<boolean> {
  *  network - everything but the public forward to the port. */
 export async function routeAnswers(hostname: string): Promise<boolean> {
     const { host: name, port } = routerAddress();
-    return pingJava(name, port, ROUTER_PROBE_MS * 2, hostname);
+    return serverAnswersThrough(name, port, ROUTER_PROBE_MS * 2, hostname);
+}
+
+/** The texts the router answers a ping with itself, for a server it cannot reach:
+ *  Polaris's own, and whatever the compose profile was told to use instead. */
+function routerOwnMotds(): Set<string> {
+    return new Set(
+        [
+            MINECRAFT_ROUTER_ASLEEP_MOTD,
+            MINECRAFT_ROUTER_LOADING_MOTD,
+            process.env.POLARIS_MC_ASLEEP_MOTD,
+            process.env.POLARIS_MC_LOADING_MOTD
+        ]
+            .map((text) => text?.trim() ?? "")
+            .filter(Boolean)
+    );
+}
+
+/** Whether a status ping through the router, naming the server, was answered by
+ *  the server itself rather than by the router standing in for it. */
+async function serverAnswersThrough(
+    address: string,
+    port: number,
+    timeoutMs: number,
+    hostname: string
+): Promise<boolean> {
+    const status = await readJavaStatus(address, port, timeoutMs, hostname);
+    if (status === null) return false;
+    return !routerOwnMotds().has(statusDescription(status));
+}
+
+/** How long a public check that failed stands before it is asked again. A forward
+ *  is made once and left alone, so asking on every sweep only spends the timeout. */
+const FORWARD_RETRY_MS = 10 * 60_000;
+
+/** When each install's public check last failed. Per process: a rate limit, not a
+ *  record - a success is recorded by switching the server over. */
+const forwardFailedAt = new Map<string, number>();
+
+/**
+ * Whether the router's port answers for this name from outside: the same ping, to
+ * the address players arrive at, so it also proves the forward to the router's
+ * port. Only ever positive evidence - a router that will not loop its own address
+ * back inward is silent here too - so silence leaves the server on its SRV record,
+ * which keeps working.
+ */
+export async function forwardAnswers(installedAppId: string, hostname: string): Promise<boolean> {
+    const failed = forwardFailedAt.get(installedAppId);
+    if (failed !== undefined && Date.now() - failed < FORWARD_RETRY_MS) return false;
+    const address =
+        (await relayAddress().catch(() => null)) ?? (await publicProbeHost().catch(() => null));
+    const answered = address
+        ? await serverAnswersThrough(address, routerPort(), PROBE_TIMEOUT_MS, hostname)
+        : false;
+    if (answered) forwardFailedAt.delete(installedAppId);
+    else forwardFailedAt.set(installedAppId, Date.now());
+    return answered;
 }
 
 /** Whether routing would leave this server's player list meaning what it says. */
@@ -420,7 +500,8 @@ export async function routeNewServer(ownerId: string, installedAppId: string): P
  * has a name, nobody ever chose for it (`routed` absent - a server somebody took
  * off the router stays off), and routing keeps its player list intact. A candidate
  * is added to the table while its SRV record stays where it is; on a later pass the
- * router is asked for it by name, and only an answer from the server itself
+ * router is asked for it by name, and only an answer from the server itself - on
+ * this network and then from outside, through the forward to the router's port -
  * switches it over and drops the record. A router that is not running, a server
  * that is stopped, or a forward that is missing leaves it exactly as it was.
  *
@@ -434,7 +515,7 @@ export async function adoptRoutedAddress(
 ): Promise<boolean> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId },
-        select: { catalogId: true, config: true }
+        select: { applicationId: true, catalogId: true, config: true }
     });
     if (!install || !routesByHostname(install.catalogId)) return false;
     const config = readInstallConfig(install.config);
@@ -454,7 +535,14 @@ export async function adoptRoutedAddress(
         return false;
     }
     if (!(await routeAnswers(hostname))) return false;
-    await setGameRouted(ownerId, installedAppId, true);
+    // The SRV record carries players who dial the server's own forwarded port, so it
+    // only goes once the router's port answers for this name from outside as well.
+    // An install that never forwarded it keeps the addresses its players already use.
+    if (!(await forwardAnswers(installedAppId, hostname))) return false;
+    const port = install.applicationId ? await publishedPort(install.applicationId) : null;
+    // The route is already in the table, as a candidate's, so the sweep's own write
+    // at its end is the only one this needs.
+    await moveOntoRouter(ownerId, installedAppId, hostname, port, false);
     return true;
 }
 

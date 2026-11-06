@@ -164,3 +164,9 @@ const BEDROCK_CATALOG_ID = "minecraft-bedrock";
 export function routesByHostname(catalogId: string): boolean {
     return Boolean(gameOfServer(catalogId)?.srv) && catalogId !== BEDROCK_CATALOG_ID;
 }
+
+/** What the hostname router puts on a player's server list for a server that is
+ *  asleep, and for one that is coming up. The router answers these pings itself,
+ *  so a reply carrying either is the router speaking, not the server. */
+export const MINECRAFT_ROUTER_ASLEEP_MOTD = "Asleep - join to start it";
+export const MINECRAFT_ROUTER_LOADING_MOTD = "Starting up - join again in a moment";

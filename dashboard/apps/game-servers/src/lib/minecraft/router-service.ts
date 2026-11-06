@@ -57,6 +57,14 @@ export function routerAddress(): { host: string; port: number } {
  *  dial fails and the player is dropped. */
 const RETIRED_PORT = 0;
 
+/** When each retired name was retired, beside the table rather than in it: the
+ *  router reads only the table. */
+const RETIRED_FILE = "mc-routes-retired.json";
+
+/** How long a retired name stays in the table. The router reads a change after
+ *  five seconds of quiet, so this is far past the last moment it could miss one. */
+const RETIRED_FOR_MS = 60 * 60_000;
+
 /** Installs read per query when the table is built. */
 const PAGE_SIZE = 2000;
 
@@ -173,11 +181,16 @@ async function publishedPorts(applicationIds: readonly string[]): Promise<Map<st
  * takes it away.
  *
  * Carried forward from the file the router last read, so a name stays retired
- * however many writes after it was removed.
+ * however many writes after it was removed - for `RETIRED_FOR_MS` from when it was
+ * (`since`, by name), long enough for any running router to have read it. After
+ * that it is dropped: the router that read it keeps it pointed nowhere, and one
+ * started since never had it.
  */
 export function retiredRoutes(
     previous: string | null,
-    current: readonly MinecraftRoute[]
+    current: readonly MinecraftRoute[],
+    since: Readonly<Record<string, number>> = {},
+    now: number = Date.now()
 ): MinecraftRoute[] {
     if (!previous) return [];
     let mappings: unknown;
@@ -190,7 +203,36 @@ export function retiredRoutes(
     const live = new Set(current.map((route) => route.hostname));
     return Object.keys(mappings)
         .filter((hostname) => !live.has(hostname))
+        .filter((hostname) => now - (since[hostname] ?? now) < RETIRED_FOR_MS)
         .map((hostname) => ({ hostname, backend: `${dialHost()}:${RETIRED_PORT}` }));
+}
+
+/** When each retired name was retired, for the ones still in the table: kept from
+ *  `since`, or now for a name retired by this write. */
+export function retiredSince(
+    retired: readonly MinecraftRoute[],
+    since: Readonly<Record<string, number>>,
+    now: number = Date.now()
+): Record<string, number> {
+    const next: Record<string, number> = {};
+    for (const route of retired) next[route.hostname] = since[route.hostname] ?? now;
+    return next;
+}
+
+/** The retirement times as last written, or none when there are none to read. */
+function readRetiredSince(text: string | null): Record<string, number> {
+    if (!text) return {};
+    try {
+        const parsed = JSON.parse(text) as unknown;
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+        const since: Record<string, number> = {};
+        for (const [hostname, at] of Object.entries(parsed)) {
+            if (typeof at === "number" && Number.isFinite(at)) since[hostname] = at;
+        }
+        return since;
+    } catch {
+        return {};
+    }
 }
 
 /**
@@ -208,8 +250,14 @@ export async function syncMinecraftRoutes(): Promise<void> {
     const dir = routesDir();
     await mkdir(dir, { recursive: true });
     const file = join(dir, ROUTES_FILE);
+    const sinceFile = join(dir, RETIRED_FILE);
     const previous = await readFile(file, "utf8").catch(() => null);
-    const next = routesConfig([...routes, ...retiredRoutes(previous, routes)]);
+    const since = readRetiredSince(await readFile(sinceFile, "utf8").catch(() => null));
+    const now = Date.now();
+    const retired = retiredRoutes(previous, routes, since, now);
+    const nextSince = JSON.stringify(retiredSince(retired, since, now));
+    if (nextSince !== JSON.stringify(since)) await writeFile(sinceFile, `${nextSince}\n`, "utf8");
+    const next = routesConfig([...routes, ...retired]);
     if (next === previous) return;
     // Written in place, unlike the edge's dynamic files (`writeDynamicFile`). The
     // router watches this one file by name, and a rename over it replaces the inode

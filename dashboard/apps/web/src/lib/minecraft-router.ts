@@ -28,6 +28,7 @@ import { hostname } from "node:os";
 import type { ComposeSpec } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
+import { MINECRAFT_ROUTER_ASLEEP_MOTD, MINECRAFT_ROUTER_LOADING_MOTD } from "@polaris/core";
 
 /** Its own project, so it is started, stopped and updated on its own. */
 export const ROUTER_PROJECT = "polaris-mc-router";
@@ -47,8 +48,8 @@ const WAKE_URL = "http://web:3000/api/minecraft/wake";
 /** What a player's client shows for a server that is asleep, and for one that is
  *  coming up. Without the first, a ping for a sleeping server is answered with
  *  nothing and reads as the server being gone. */
-const ASLEEP_MOTD = "Asleep - join to start it";
-const LOADING_MOTD = "Starting up - join again in a moment";
+const ASLEEP_MOTD = MINECRAFT_ROUTER_ASLEEP_MOTD;
+const LOADING_MOTD = MINECRAFT_ROUTER_LOADING_MOTD;
 
 /** How long the router keeps waiting for a server it asked us to start. Longer
  *  than a cold Minecraft server takes to answer, and it costs nothing: the

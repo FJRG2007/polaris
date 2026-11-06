@@ -20,6 +20,7 @@
  */
 
 import { connect } from "node:net";
+import { stripMotd } from "./motd";
 
 /** The one id the whole status exchange uses: the handshake, the request and the
  *  reply are all packet `0x00`. */
@@ -120,6 +121,64 @@ function isStatusReply(buffer: Buffer): boolean | null {
 }
 
 /**
+ * The whole status reply once it has arrived, parsed, or null while it has not.
+ * Undefined when what arrived is not a status reply at all.
+ */
+function fullStatus(buffer: Buffer): unknown {
+    const shape = isStatusReply(buffer);
+    if (shape === false) return undefined;
+    if (shape === null) return null;
+    const length = readVarInt(buffer, 0);
+    const id = length && readVarInt(buffer, length.size);
+    const json = length && id && readVarInt(buffer, length.size + id.size);
+    if (!length || !id || !json) return null;
+    if (buffer.length < length.size + length.value) return null;
+    const at = length.size + id.size + json.size;
+    try {
+        return JSON.parse(buffer.subarray(at, at + json.value).toString("utf8")) as unknown;
+    } catch {
+        return undefined;
+    }
+}
+
+/** One status exchange, settled by `read` as soon as it can tell: a value, or
+ *  null to keep reading. Every way the exchange fails settles on `failed`. */
+function askStatus<T>(
+    host: string,
+    port: number,
+    timeoutMs: number,
+    serverAddress: string | undefined,
+    read: (received: Buffer) => T | null,
+    failed: T
+): Promise<T> {
+    return new Promise((resolve) => {
+        const socket = connect({ host, port, timeout: timeoutMs });
+        let received = Buffer.alloc(0);
+        let settled = false;
+        const settle = (answer: T): void => {
+            if (settled) return;
+            settled = true;
+            socket.destroy();
+            resolve(answer);
+        };
+
+        socket.once("connect", () => socket.write(statusRequest(serverAddress ?? host, port)));
+        socket.on("data", (chunk) => {
+            received = Buffer.concat([received, chunk]);
+            const answer = read(received);
+            if (answer !== null) settle(answer);
+            else if (received.length > MAX_REPLY) settle(failed);
+        });
+        // A port the engine holds for a container that is not listening yet accepts
+        // and then hangs up. Settling on the close is what makes that case cost
+        // milliseconds instead of the whole timeout.
+        socket.once("close", () => settle(failed));
+        socket.once("timeout", () => settle(failed));
+        socket.once("error", () => settle(failed));
+    });
+}
+
+/**
  * Ping a Java server's port and report whether the game answered.
  *
  * True is the game itself: the reply came back through whatever is between here
@@ -139,29 +198,53 @@ export function pingJava(
     timeoutMs: number,
     serverAddress?: string
 ): Promise<boolean> {
-    return new Promise((resolve) => {
-        const socket = connect({ host, port, timeout: timeoutMs });
-        let received = Buffer.alloc(0);
-        let settled = false;
-        const settle = (answered: boolean): void => {
-            if (settled) return;
-            settled = true;
-            socket.destroy();
-            resolve(answered);
-        };
+    return askStatus(host, port, timeoutMs, serverAddress, isStatusReply, false);
+}
 
-        socket.once("connect", () => socket.write(statusRequest(serverAddress ?? host, port)));
-        socket.on("data", (chunk) => {
-            received = Buffer.concat([received, chunk]);
-            const reply = isStatusReply(received);
-            if (reply !== null) settle(reply);
-            else if (received.length > MAX_REPLY) settle(false);
-        });
-        // A port the engine holds for a container that is not listening yet accepts
-        // and then hangs up. Settling on the close is what makes that case cost
-        // milliseconds instead of the whole timeout.
-        socket.once("close", () => settle(false));
-        socket.once("timeout", () => settle(false));
-        socket.once("error", () => settle(false));
-    });
+/**
+ * The status reply a Java port gives, parsed, or null when it gives none.
+ *
+ * For when who answered matters as well as whether anything did: a hostname
+ * router answers a ping itself for a server it cannot reach, and only what the
+ * reply says tells the two apart.
+ */
+export function readJavaStatus(
+    host: string,
+    port: number,
+    timeoutMs: number,
+    serverAddress?: string
+): Promise<unknown> {
+    return askStatus<unknown>(
+        host,
+        port,
+        timeoutMs,
+        serverAddress,
+        (received) => {
+            const status = fullStatus(received);
+            return status === undefined ? false : status;
+        },
+        false
+    ).then((status) => (status === false ? null : status));
+}
+
+/**
+ * The text a status reply puts on the server list, with its formatting dropped.
+ *
+ * The description is either a string or a chat component, whose text can be split
+ * across `extra` parts; both are read the same way here.
+ */
+export function statusDescription(status: unknown): string {
+    const text = (part: unknown): string => {
+        if (typeof part === "string") return part;
+        if (!part || typeof part !== "object") return "";
+        const component = part as { text?: unknown; extra?: unknown };
+        const own = typeof component.text === "string" ? component.text : "";
+        const extra = Array.isArray(component.extra) ? component.extra.map(text).join("") : "";
+        return own + extra;
+    };
+    const description =
+        status && typeof status === "object"
+            ? (status as { description?: unknown }).description
+            : undefined;
+    return stripMotd(text(description)).trim();
 }
