@@ -91,7 +91,15 @@ export default async function DownloadsPage() {
             repo={repo}
             serverUrl={serverUrl}
             webApp={<InstallAppOffer />}
-            tv={<TvOffer />}
+            tv={
+                <TvOffer
+                    download={
+                        <Suspense fallback={<FilesSkeleton />}>
+                            <DesktopFiles repo={repo} />
+                        </Suspense>
+                    }
+                />
+            }
             extensionFiles={
                 <Suspense fallback={<FilesSkeleton />}>
                     <ExtensionFiles repo={repo} />

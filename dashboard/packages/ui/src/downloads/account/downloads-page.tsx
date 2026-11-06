@@ -69,7 +69,10 @@ export function DownloadsPage({
                     {desktopFiles}
                     {/* The other way to have it in a window of its own: the
                         browser's install offer, which needs no download. */}
-                    <div id="app" className="flex min-w-0 flex-col gap-2 border-t border-border/60 pt-3">
+                    <div
+                        id="app"
+                        className="flex min-w-0 flex-col gap-2 border-t border-border/60 pt-3"
+                    >
                         <p className="text-xs font-medium text-muted-foreground">
                             {t("downloads.web.title")}
                         </p>
