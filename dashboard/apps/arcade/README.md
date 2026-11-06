@@ -15,9 +15,16 @@ load.
 
 ## Embed contract
 
-A game runs in a same-origin `<iframe>`. The game and the page that frames it
-talk over `window.postMessage`, with `location.origin` as the target origin on
-both sides. Each side ignores a message from another origin or another window.
+A game runs in an `<iframe>` sandboxed with `allow-scripts` only, so its page
+has an opaque origin and the browser can run it out of the dashboard's process:
+a same-origin frame shares the dashboard's main thread, and building the city
+froze the whole tab. The game and the page that frames it talk over
+`window.postMessage`. The game posts to `location.origin` (its URL's origin, the
+dashboard's) and accepts only messages from `parent` at that origin; the host
+posts with `"*"` to the frame's own window and accepts only messages whose
+`event.source` is that window, from origin `"null"` (or its own). Bundle files
+are served with `Access-Control-Allow-Origin: *`, since the page's module, data
+and fonts are cross-origin reads from an opaque origin.
 
 The host learns the game's window from `event.source` of the first message the
 game sends, or from `iframe.contentWindow`.

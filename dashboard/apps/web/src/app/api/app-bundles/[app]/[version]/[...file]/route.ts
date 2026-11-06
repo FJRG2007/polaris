@@ -11,8 +11,11 @@
  * so it never names files an update removed. The server half is never served:
  * it is the app's server code.
  *
- * A page (an app's game, say) runs same-origin in a frame, so it gets a
- * content policy that keeps it to files from here.
+ * A page (an app's game, say) runs in a sandboxed frame, so it gets a content
+ * policy that keeps it to files from here. The sandbox gives that page an
+ * origin of its own, and what it loads - its module, its data, its fonts - is
+ * then a cross-origin read: every file here is public and read without
+ * credentials, so any origin may read it.
  */
 
 import { join } from "node:path";
@@ -86,7 +89,8 @@ export async function GET(
                 : version !== "current" || HASHED.test(name)
                   ? FOREVER
                   : AN_HOUR,
-            "x-content-type-options": "nosniff"
+            "x-content-type-options": "nosniff",
+            "access-control-allow-origin": "*"
         };
         if (page) headers["content-security-policy"] = PAGE_POLICY;
         return new Response(new Uint8Array(bytes), { headers });

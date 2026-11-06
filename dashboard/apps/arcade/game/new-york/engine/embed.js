@@ -1,5 +1,6 @@
 // The page's side of the embed contract: what it tells the page that framed it
-// (Polaris, same origin only) and what it accepts from it. The contract itself is
+// (Polaris, at the origin of this page's URL: the frame is sandboxed, so the page's own origin is opaque) and
+// what it accepts from it. The contract itself is
 // written down in the app's README (`apps/arcade/README.md`).
 //
 // Out: polaris-game:hello                                      (once, as the page starts: asks for setup)

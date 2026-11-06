@@ -444,7 +444,14 @@ export interface CallStaging {
      *  the big place and the strip, so "make this bigger" made nothing bigger
      *  until a second person shared. */
     readonly enlarged: boolean;
+    /** The game being played in the call has its place on the stage. Off while
+     *  something else was asked for by name - the game is kept running out of
+     *  sight then, never closed, so it does not load again. */
+    readonly activity: boolean;
 }
+
+/** The key a game played in the call has among the stage's pictures. */
+export const ACTIVITY_KEY = "activity";
 
 /**
  * What the room is built around right now.
@@ -454,17 +461,30 @@ export interface CallStaging {
  * with the room: a face enlarged with nobody sharing got no more room, and a
  * screen hidden behind an enlarged face held room it was not using.
  *
+ * A game played in the call is one more picture on the stage, the way a shared
+ * screen is: it takes the big place with the faces a strip under it, it can be
+ * asked for by name (`ACTIVITY_KEY`) to take the panel whole, and it steps
+ * aside for a screen or a face asked for by name.
+ *
  * @param live The key somebody asked to see bigger, already checked against
  *  what is in the room. A key naming nothing leaves the room as it was.
+ * @param playing Whether this reader is playing a game in the call.
  */
-export function stagingOf(stages: readonly CallStage[], live: string | null): CallStaging {
+export function stagingOf(
+    stages: readonly CallStage[],
+    live: string | null,
+    playing = false
+): CallStaging {
     // A face and a screen take the same place, so only one of them can have it.
     const camera = live !== null && live.startsWith("camera:");
     const showing = camera ? [] : stages.filter((stage) => live === null || live === stage.key);
+    const activity = playing && !camera && (live === null || live === ACTIVITY_KEY);
+    const pictures = showing.length + (activity ? 1 : 0);
     return {
         showing,
-        staged: showing.length > 0 || camera,
-        enlarged: !camera && live !== null && showing.length > 0
+        staged: pictures > 0 || camera,
+        enlarged: !camera && live !== null && pictures > 0,
+        activity
     };
 }
 

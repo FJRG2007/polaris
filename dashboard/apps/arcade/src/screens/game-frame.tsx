@@ -13,10 +13,17 @@
  * has moved on to a field of the page meanwhile, and takes it back at the first
  * driving key pressed outside it.
  *
- * The frame and its page talk over `postMessage`, same origin only; the
- * messages are listed in the app's README ("Embed contract"). Inside a call,
- * the call is the host: it is told where the reader goes and hands back the
- * other players.
+ * The frame and its page talk over `postMessage`; the messages are listed in
+ * the app's README ("Embed contract"). Inside a call, the call is the host: it
+ * is told where the reader goes and hands back the other players.
+ *
+ * The frame is sandboxed without `allow-same-origin`, so its page has an origin
+ * of its own (`"null"`) rather than the dashboard's. A same-origin frame runs
+ * on the page's own main thread: building the city and drawing it every frame
+ * held that thread for seconds at a time, and the call around it - and the rest
+ * of the tab - froze with it. Cross-origin, the browser can run the game in a
+ * process of its own. Messages are therefore told apart by the window they come
+ * from, and sent to that one window only.
  */
 
 import { z } from "zod";
@@ -48,6 +55,20 @@ const fromGame = z.discriminatedUnion("type", [
     // Checked by the call before it goes anywhere.
     z.object({ type: z.literal("polaris-game:state") }).passthrough()
 ]);
+
+/** What the game's page may do: run its scripts, nothing else. Not
+ *  `allow-same-origin` - see the top of this file. */
+export const FRAME_SANDBOX = "allow-scripts";
+
+/** Whether a message came from this frame's page: its window, from the
+ *  sandbox's opaque origin (or this origin, for a browser without one). */
+export function fromFrame(
+    event: Pick<MessageEvent, "origin" | "source">,
+    frame: Window | null | undefined
+): boolean {
+    if (!frame || event.source !== frame) return false;
+    return event.origin === "null" || event.origin === window.location.origin;
+}
 
 /** A page that has said nothing this long after loading did not start. */
 const SILENT_MS = 30_000;
@@ -94,14 +115,15 @@ export function GameFrame({
                 messages: gameMessages(locale, game.id),
                 exit: canExit
             },
-            window.location.origin
+            // The sandboxed page's origin is opaque, so no origin names it: the
+            // message goes to that one window, whatever it is showing.
+            "*"
         );
 
     useEffect(() => {
         heard.current = false;
         const onMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) return;
-            if (event.source !== frame.current?.contentWindow) return;
+            if (!fromFrame(event, frame.current?.contentWindow)) return;
             const message = fromGame.safeParse(event.data);
             if (!message.success) return;
             heard.current = true;
@@ -150,8 +172,7 @@ export function GameFrame({
     useEffect(() => {
         const session = host.current;
         if (!ready || !seat || !session) return;
-        const post = (message: unknown) =>
-            frame.current?.contentWindow?.postMessage(message, window.location.origin);
+        const post = (message: unknown) => frame.current?.contentWindow?.postMessage(message, "*");
         post({ type: "polaris-game:join", self: session.self });
         const stop = session.onPlayers((players) =>
             post({ type: "polaris-game:players", players })
@@ -187,6 +208,7 @@ export function GameFrame({
                 src={gameFrameSrc(game)}
                 title={name}
                 allow="fullscreen; gamepad"
+                sandbox={FRAME_SANDBOX}
                 onLoad={onFrameLoad}
                 className="absolute inset-0 h-full w-full border-0"
             />

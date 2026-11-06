@@ -597,6 +597,20 @@ function refusal(
     return t("callGames.missing");
 }
 
+/** The game this reader is playing, when there is one to draw. */
+function playedGame(activity: CallActivity) {
+    const { session, playing, answer, host } = activity;
+    if (!session || !playing || !host || !answer?.ok) return null;
+    const offer = answer.games.find((entry) => entry.id === session.game);
+    return offer?.slot.bundle ? { session, host, offer } : null;
+}
+
+/** Whether the reader is playing a game the call can draw - what puts it on
+ *  the call's stage. */
+export function drawsGame(activity: CallActivity): boolean {
+    return playedGame(activity) !== null;
+}
+
 /**
  * The line that offers a running game to whoever is not in it, and the game
  * itself for whoever is.
@@ -612,70 +626,106 @@ export function CallGamesPanel({
     /** Instead of the plain Leave, for a lobby whose page goes back. */
     onLeave?: () => void;
 }) {
-    const t = useTranslations("chat");
-    const { session, playing, answer, host } = activity;
-    const [frame, setFrame] = useState<HTMLElement | null>(null);
-    if (!session) return null;
-    const game = activity.gameName(session.game) ?? t("callGames.someGame");
-    const offer = answer?.ok ? answer.games.find((entry) => entry.id === session.game) : undefined;
+    return drawsGame(activity) ? (
+        <CallGameView activity={activity} onInvite={onInvite} onLeave={onLeave} />
+    ) : (
+        <CallGameOffer activity={activity} />
+    );
+}
 
-    if (!playing || !host || !offer?.slot.bundle) {
-        const starter = activity.nameOf(session.startedBy) || t("callGames.someone");
-        return (
-            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <Joystick className="size-4 shrink-0 text-muted-foreground" />
-                <span
-                    className="min-w-0 flex-1 truncate"
-                    title={t("callGames.started", { name: starter, game })}
-                >
-                    {t("callGames.started", { name: starter, game })}
-                    <span className="text-muted-foreground">
-                        {" - "}
-                        {t("callGames.playing", { count: session.players.length })}
-                    </span>
+/** The line that offers a running game to whoever is not playing it. Nothing
+ *  while there is no game, or while the reader plays it. */
+export function CallGameOffer({ activity }: { activity: CallActivity }) {
+    const t = useTranslations("chat");
+    const { session, answer } = activity;
+    if (!session || drawsGame(activity)) return null;
+    const game = activity.gameName(session.game) ?? t("callGames.someGame");
+    const starter = activity.nameOf(session.startedBy) || t("callGames.someone");
+    return (
+        <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+            <Joystick className="size-4 shrink-0 text-muted-foreground" />
+            <span
+                className="min-w-0 flex-1 truncate"
+                title={t("callGames.started", { name: starter, game })}
+            >
+                {t("callGames.started", { name: starter, game })}
+                <span className="text-muted-foreground">
+                    {" - "}
+                    {t("callGames.playing", { count: session.players.length })}
                 </span>
-                <ul
-                    className="flex shrink-0 -space-x-1.5"
-                    aria-label={t("activityCard.whoIsPlaying")}
-                >
-                    {session.players.slice(0, 6).map((seat) => (
-                        <li
-                            key={seat}
-                            title={activity.nameOf(seat)}
-                            className="rounded-full ring-2 ring-background"
-                        >
-                            <Avatar
-                                person={{ id: seat, name: activity.nameOf(seat) || "?" }}
-                                size={20}
-                                status={false}
-                            />
-                        </li>
-                    ))}
-                </ul>
-                {answer === null ? null : answer.ok ? (
-                    <Button
-                        size="sm"
-                        disabled={activity.busy}
-                        onClick={() => activity.play(session.game)}
+            </span>
+            <ul className="flex shrink-0 -space-x-1.5" aria-label={t("activityCard.whoIsPlaying")}>
+                {session.players.slice(0, 6).map((seat) => (
+                    <li
+                        key={seat}
+                        title={activity.nameOf(seat)}
+                        className="rounded-full ring-2 ring-background"
                     >
-                        {t("callGames.join")}
-                    </Button>
-                ) : (
-                    <span className="min-w-0 text-xs text-muted-foreground">
-                        {refusal(t, answer.reason)}
-                    </span>
-                )}
-            </div>
-        );
-    }
+                        <Avatar
+                            person={{ id: seat, name: activity.nameOf(seat) || "?" }}
+                            size={20}
+                            status={false}
+                        />
+                    </li>
+                ))}
+            </ul>
+            {answer === null ? null : answer.ok ? (
+                <Button
+                    size="sm"
+                    disabled={activity.busy}
+                    onClick={() => activity.play(session.game)}
+                >
+                    {t("callGames.join")}
+                </Button>
+            ) : (
+                <span className="min-w-0 text-xs text-muted-foreground">
+                    {refusal(t, answer.reason)}
+                </span>
+            )}
+        </div>
+    );
+}
+
+/**
+ * The game, for whoever plays it: a bar with its name and its controls over
+ * the game's frame. A call puts it on its stage and says whether it has the
+ * stage to itself (`focused`); a lobby sizes it itself.
+ */
+export function CallGameView({
+    activity,
+    onInvite,
+    onLeave,
+    focused = activity.focused,
+    onFocus = () => activity.setFocused(!activity.focused),
+    away = false,
+    className
+}: {
+    activity: CallActivity;
+    onInvite?: () => void;
+    onLeave?: () => void;
+    focused?: boolean;
+    onFocus?: () => void;
+    /** Running out of sight while something else has the stage: nothing in it
+     *  can be reached, so a key pressed for the page never lands in the game. */
+    away?: boolean;
+    /** Its size where it is drawn; a column of its own by default. */
+    className?: string;
+}) {
+    const t = useTranslations("chat");
+    const [frame, setFrame] = useState<HTMLElement | null>(null);
+    const played = playedGame(activity);
+    if (!played) return null;
+    const { session, host, offer } = played;
+    const game = activity.gameName(session.game) ?? t("callGames.someGame");
 
     return (
         <section
             ref={setFrame}
             aria-label={game}
+            inert={away || undefined}
             className={cn(
-                "flex min-h-[16rem] min-w-0 flex-col overflow-hidden rounded-md border bg-background",
-                activity.focused ? "flex-[6]" : "flex-[2]"
+                "flex min-w-0 flex-col overflow-hidden rounded-md border bg-background",
+                className ?? cn("min-h-[16rem]", focused ? "flex-[6]" : "flex-[2]")
             )}
         >
             <div className="flex min-w-0 shrink-0 items-center gap-2 border-b px-3 py-1.5 text-sm">
@@ -688,17 +738,13 @@ export function CallGamesPanel({
                 </span>
                 <button
                     type="button"
-                    onClick={() => activity.setFocused(!activity.focused)}
-                    aria-pressed={activity.focused}
-                    aria-label={activity.focused ? t("callGames.unfocus") : t("callGames.focus")}
-                    title={activity.focused ? t("callGames.unfocus") : t("callGames.focus")}
+                    onClick={onFocus}
+                    aria-pressed={focused}
+                    aria-label={focused ? t("callGames.unfocus") : t("callGames.focus")}
+                    title={focused ? t("callGames.unfocus") : t("callGames.focus")}
                     className="hidden shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:block"
                 >
-                    {activity.focused ? (
-                        <Minimize2 className="size-4" />
-                    ) : (
-                        <Maximize2 className="size-4" />
-                    )}
+                    {focused ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                 </button>
                 <FullscreenButton target={frame} />
                 {onInvite && (
@@ -726,11 +772,22 @@ export function CallGamesPanel({
     );
 }
 
-/** Whether this element is what the browser is showing full screen. */
+/**
+ * Whether the browser is showing this element full screen - or something inside
+ * it, which is the game's own frame when the game asked for it from its menu.
+ * Either way the call is out of sight and the button's next press is a way
+ * out, never a second request on top of the first.
+ */
+export function showsFullscreen(target: Element | null, current: Element | null): boolean {
+    return target !== null && current !== null && (current === target || target.contains(current));
+}
+
+/** Whether this element is what the browser is showing full screen, followed
+ *  through every way in and out - the button, Escape, the game's own menu. */
 function useFullscreen(target: HTMLElement | null): boolean {
     const [on, setOn] = useState(false);
     useEffect(() => {
-        const read = () => setOn(target !== null && document.fullscreenElement === target);
+        const read = () => setOn(showsFullscreen(target, document.fullscreenElement));
         read();
         document.addEventListener("fullscreenchange", read);
         return () => document.removeEventListener("fullscreenchange", read);
@@ -738,19 +795,27 @@ function useFullscreen(target: HTMLElement | null): boolean {
     return on;
 }
 
-/** Full screen for the game, and back. Escape leaves it too, as the browser
- *  always allows; hidden where the browser offers no full screen. */
-function FullscreenButton({ target }: { target: HTMLElement | null }) {
+/**
+ * Full screen for the game, and back. Escape leaves it too, as the browser
+ * always allows; hidden where the browser offers no full screen.
+ *
+ * The keyboard goes back to the game either way: left on this button, the
+ * game's Space pressed it, and the game left full screen at the first jump.
+ */
+export function FullscreenButton({ target }: { target: HTMLElement | null }) {
     const t = useTranslations("chat");
     const on = useFullscreen(target);
     if (!target || typeof document === "undefined" || !document.fullscreenEnabled) return null;
     const label = on ? t("callGames.exitFullscreen") : t("callGames.fullscreen");
+    const toGame = () => target.querySelector("iframe")?.focus();
     return (
         <button
             type="button"
             onClick={() => {
-                if (on) void document.exitFullscreen().catch(() => undefined);
-                else void target.requestFullscreen().catch(() => undefined);
+                const change = showsFullscreen(target, document.fullscreenElement)
+                    ? document.exitFullscreen()
+                    : target.requestFullscreen();
+                void change.then(toGame, () => undefined);
             }}
             aria-pressed={on}
             aria-label={label}
