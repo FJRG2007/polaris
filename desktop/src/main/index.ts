@@ -484,7 +484,9 @@ function start(): void {
                 });
             },
             openApiKeys: () => showPolaris("/account/api-keys"),
-            installOnTv: openTvInstall,
+            // In the dashboard's own dialog when there is a Polaris to show it,
+            // in a window of its own when there is not.
+            installOnTv: () => (current ? showPolaris("/account/downloads?tv=install") : openTvInstall()),
             openInBrowser: () => {
                 if (current) void shell.openExternal(current);
             }

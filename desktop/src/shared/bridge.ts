@@ -97,6 +97,8 @@ export interface PolarisDesktop {
     installTool(input: InstallRequest): Promise<InstallResult>;
     /** Opens the window that installs Polaris TV on a set on this network. */
     openTvInstall(): Promise<boolean>;
+    /** The same install, driven from a dialog on the page instead of a window. */
+    readonly tv: TvInstallBridge;
     /** The system's default browser, by a name of ours, or null. */
     defaultBrowser(): Promise<string | null>;
     /** Whether somebody is at this computer: `idle` once nothing has been
@@ -261,15 +263,20 @@ export interface PolarisLocal {
         openService(): Promise<void>;
         onEvent(listener: (event: PushEvent) => void): () => void;
     };
-    readonly tv: {
-        state(): Promise<TvInstallState>;
-        find(): Promise<TvInstallState>;
-        start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
-        onState(listener: (state: TvInstallState) => void): () => void;
-    };
+    readonly tv: TvInstallBridge;
     readonly overlay: {
         onStroke(listener: (stroke: StrokeInput) => void): () => void;
     };
+}
+
+/** Installing on a TV, as the TV window and the dashboard's dialog both drive it. */
+export interface TvInstallBridge {
+    state(): Promise<TvInstallState>;
+    find(): Promise<TvInstallState>;
+    /** Stops a search; an install already under way runs to its end. */
+    cancel(): Promise<TvInstallState>;
+    start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
+    onState(listener: (state: TvInstallState) => void): () => void;
 }
 
 /** Where installing on a TV has got to. */
@@ -400,6 +407,7 @@ export const CHANNELS = {
     tvState: "local:tv-state",
     tvFind: "local:tv-find",
     tvStart: "local:tv-start",
+    tvCancel: "local:tv-cancel",
     tvEvent: "local:tv-event"
 } as const;
 

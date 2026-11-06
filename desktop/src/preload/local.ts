@@ -47,6 +47,7 @@ const bridge: PolarisLocal = {
     tv: {
         state: () => ipcRenderer.invoke(CHANNELS.tvState),
         find: () => ipcRenderer.invoke(CHANNELS.tvFind),
+        cancel: () => ipcRenderer.invoke(CHANNELS.tvCancel),
         start: (input) => ipcRenderer.invoke(CHANNELS.tvStart, input),
         onState: (listener) => {
             const handler = (_event: IpcRendererEvent, state: TvInstallState) => listener(state);

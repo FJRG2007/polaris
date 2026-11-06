@@ -338,7 +338,7 @@ export function registerIpc(host: IpcHost): void {
     });
 
     // Takes a name from a list and nothing else; see `install-tools`.
-    registerTvInstall();
+    registerTvInstall((event) => kindOf(event.sender) === "tv" || fromPolaris(event));
     ipcMain.handle(CHANNELS.tvOpen, (event): boolean => {
         if (!fromPolaris(event)) return false;
         openTvInstall();
