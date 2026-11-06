@@ -4536,6 +4536,38 @@ model GameServerPref {
     @@index([installedAppId])
 }
 
+// A DNS record Polaris wrote at the operator's provider for one game server - its
+// name's A record when no wildcard already covered it, and the SRV record that
+// carries a Java server's port.
+//
+// Kept so deleting or renaming the server removes exactly what was written for it
+// and nothing else in the zone. A row whose release was asked for and failed (the
+// provider unreachable, a revoked token) stays with `releaseRequestedAt` set, and
+// the hourly sweep tries it again; `releaseError` is what the games list shows the
+// owner meanwhile. Bare ids, per the InstalledApp precedent: the server's row is
+// only marked removed, and these must outlive it until the record is gone.
+model GameDnsRecord {
+    id                 String    @id @default(uuid(7)) @db.Uuid
+    ownerId            String    @db.Uuid
+    installedAppId     String    @db.Uuid
+    // The provider's own ids, which is what a delete names.
+    zoneId             String
+    recordId           String
+    // "A" or "SRV", and the full name, for the list and the logs.
+    type               String
+    name               String
+    createdAt          DateTime  @default(now())
+    // Set when the record is to go; cleared only by the row going with it.
+    releaseRequestedAt DateTime?
+    // Why the last attempt to remove it failed, when it did.
+    releaseError       String?
+
+    @@unique([zoneId, recordId])
+    @@index([installedAppId])
+    @@index([releaseRequestedAt])
+    @@index([ownerId, releaseRequestedAt])
+}
+
 // A password a player set on a Minecraft server that runs Polaris's login mod.
 //
 // The mod keeps nothing: it asks Polaris on every join, so the passwords live

@@ -20,6 +20,7 @@ import { normalizeZoneName } from "@polaris/deploy";
 import { probeListening } from "./reach";
 import { minecraftRoutes, syncMinecraftRoutes } from "./router-service";
 import { host } from "@polaris/app-host";
+import { MINECRAFT_SRV_PREFIX, releaseGameDns, rememberGameDnsRecord } from "../game-dns";
 
 const { getPublicIp } = host.domainService;
 const { getDomainZones } = host.domainZones;
@@ -74,10 +75,28 @@ export async function hostnameTaken(ownerId: string, hostname: string, exceptIns
  * already pointing somewhere else is left alone rather than taken over. The SRV
  * record is what removes the port from what a player has to type, and it is only
  * written once the A record it targets exists.
+ *
+ * Every record actually written is remembered against the server, so deleting it
+ * removes exactly those. A name a wildcard already answered for wrote nothing, and
+ * there is nothing to remember.
  */
-export async function provisionGameDns(hostname: string, port: number, srv: boolean): Promise<GameAddress> {
+export async function provisionGameDns(
+    hostname: string,
+    port: number,
+    srv: boolean,
+    owner: { ownerId: string; installedAppId: string }
+): Promise<GameAddress> {
     const result = await provisionHostnameDns(hostname);
     if (result.status === "conflict" || result.status === "manual") return { hostname: null, portless: false };
+    if (result.status === "created" && result.recordId && result.zoneId) {
+        await rememberGameDnsRecord({
+            ...owner,
+            zoneId: result.zoneId,
+            recordId: result.recordId,
+            type: "A",
+            name: hostname
+        }).catch(() => undefined);
+    }
     // Only a Minecraft: Java client looks a SRV record up. Bedrock does not, and
     // neither does ARK - there the name is still worth having, it just carries its
     // port the way it always did.
@@ -86,7 +105,15 @@ export async function provisionGameDns(hostname: string, port: number, srv: bool
         const token = await loadCloudflareToken();
         if (!token) return { hostname, portless: false };
         const zone = await resolveZoneForHostname(token, hostname);
-        await upsertSrvRecord(token, zone.id, `_minecraft._tcp.${hostname}`, hostname, port);
+        const name = `${MINECRAFT_SRV_PREFIX}${hostname}`;
+        const recordId = await upsertSrvRecord(token, zone.id, name, hostname, port);
+        await rememberGameDnsRecord({
+            ...owner,
+            zoneId: zone.id,
+            recordId,
+            type: "SRV",
+            name
+        }).catch(() => undefined);
         return { hostname, portless: true };
     } catch {
         // The name resolves either way; only the port stays part of the address.
@@ -167,12 +194,18 @@ export async function setGameHostname(
     // Asking for one anyway would write a record per server, which is the thing
     // routing exists to stop.
     const routed = readInstallConfig(install?.config).routed === true;
-    const address = await provisionGameDns(wanted, port, input.srv && !routed);
+    const address = await provisionGameDns(wanted, port, input.srv && !routed, { ownerId, installedAppId });
     if (!address.hostname) return null;
     await patchInstallConfig(installedAppId, {
         hostname: address.hostname,
         portless: routed || address.portless
     });
+    // A rename leaves the old name's records pointing at a server that no longer
+    // answers to it: only the new name's survive, and the SRV only if it was written.
+    await releaseGameDns(installedAppId, [
+        address.hostname,
+        ...(address.portless ? [`${MINECRAFT_SRV_PREFIX}${address.hostname}`] : [])
+    ]);
     // The table names servers by hostname, so a rename has to reach it or the old
     // name keeps routing and the new one reaches nothing.
     if (routed) await syncMinecraftRoutes().catch(() => undefined);
@@ -241,10 +274,10 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
         // The router answers on the default port, so the name alone is the address.
         await patchInstallConfig(installedAppId, { routed: true, portless: true });
         await syncMinecraftRoutes().catch(() => undefined);
-        if (hostname && port) await setSrvRecord(hostname, port, false);
+        if (hostname && port) await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
         return;
     }
-    const srvWritten = hostname && port ? await setSrvRecord(hostname, port, true) : false;
+    const srvWritten = hostname && port ? await setSrvRecord(hostname, port, true, { ownerId, installedAppId }) : false;
     // Off the router, the port is out of the address only if that record was actually
     // written - otherwise it goes back to carrying it, which is what a player needs.
     await patchInstallConfig(installedAppId, { routed: false, portless: srvWritten });
@@ -296,19 +329,31 @@ export async function routerListening(): Promise<boolean> {
  * Best effort on purpose: the name resolves either way, so a zone this token cannot
  * reach costs the port being part of the address rather than the address itself.
  */
-async function setSrvRecord(hostname: string, port: number, wanted: boolean): Promise<boolean> {
+async function setSrvRecord(
+    hostname: string,
+    port: number,
+    wanted: boolean,
+    owner: { ownerId: string; installedAppId: string }
+): Promise<boolean> {
     try {
         const token = await loadCloudflareToken();
         if (!token) return false;
         const zone = await resolveZoneForHostname(token, hostname);
-        const name = `_minecraft._tcp.${hostname}`;
+        const name = `${MINECRAFT_SRV_PREFIX}${hostname}`;
         if (wanted) {
-            await upsertSrvRecord(token, zone.id, name, hostname, port);
+            const recordId = await upsertSrvRecord(token, zone.id, name, hostname, port);
+            await rememberGameDnsRecord({ ...owner, zoneId: zone.id, recordId, type: "SRV", name }).catch(
+                () => undefined
+            );
             return true;
         }
         for (const record of await findDnsRecords(token, zone.id, "SRV", name)) {
             await deleteDnsRecord(token, zone.id, record.id);
         }
+        // Gone by name, so whatever remembered it has nothing left to remove.
+        await prisma.gameDnsRecord
+            .deleteMany({ where: { installedAppId: owner.installedAppId, name: name.toLowerCase() } })
+            .catch(() => undefined);
         return false;
     } catch {
         return false;
