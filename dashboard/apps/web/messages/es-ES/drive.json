@@ -169,11 +169,6 @@
             "searchingRecursive": "Buscando en esta carpeta y en todas sus subcarpetas...",
             "results": "{count, plural, one {# resultado} other {# resultados}} en las subcarpetas{truncated, select, yes { (solo las primeras coincidencias - afina la búsqueda)} other {}}"
         },
-        "view": {
-            "list": "Lista",
-            "grid": "Cuadrícula",
-            "photos": "Fotos"
-        },
         "filters": {
             "button": "Filtros",
             "showAll": "Mostrar todo",

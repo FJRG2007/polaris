@@ -10991,6 +10991,10 @@ model Meeting {
     // then the link still names the meeting and the only way through it is
     // signing in.
     requireAccount Boolean  @default(false)
+    // A short code typed at /m as the other way through the same door as the
+    // link: it leads to the guest link and every rule on it. Null when the host
+    // did not ask for one.
+    joinCode          String?  @unique
     /// The guest link's password and address rules (lib/link-guards). Null or
     /// an empty list means no restriction.
     linkPasswordHash  String?
@@ -11016,6 +11020,7 @@ model Meeting {
     channel      ChatChannel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
     participants MeetingParticipant[]
     invites      MeetingInvite[]
+    emailInvites MeetingEmailInvite[]
     messages     MeetingMessage[]
 
     @@index([channelId, endedAt])
@@ -11041,6 +11046,25 @@ model MeetingInvite {
 
     @@unique([meetingId, userId])
     @@index([userId])
+}
+
+// Somebody without an account, asked to a meeting by address.
+//
+// Polaris sends no mail, so this is only the record that they were asked: it is
+// drawn on the host's list as invited, and the invitation is text the host
+// copies and sends themselves. It walks nobody past the lobby - whoever arrives
+// on the link is a guest like any other.
+model MeetingEmailInvite {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    meetingId   String   @db.Uuid
+    // Trimmed and lowercased, so one address is one row.
+    email       String
+    invitedById String   @db.Uuid
+    createdAt   DateTime @default(now())
+
+    meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+    @@unique([meetingId, email])
 }
 
 // What was said in a meeting's own chat.

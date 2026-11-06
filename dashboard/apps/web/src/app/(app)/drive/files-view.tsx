@@ -19,7 +19,6 @@ import { originalFolder, type TrashRow } from "./trash/trash-listing";
 import { FolderTree } from "./folder-tree";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import { ListingError } from "./listing-error";
-import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
 import { flushSync } from "react-dom";
 import { formatBytes } from "@polaris/core";
@@ -27,7 +26,8 @@ import { searchItems } from "@polaris/core/search-text";
 import type { DriveAbilities } from "@/lib/drive-authz";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
-import { EntryThumbnail } from "./entry-thumbnail";
+import { EntryIcon, GridIcon } from "./grid-icon";
+import { ViewModeToggle } from "./view-toggle";
 import { crumbEntry } from "./crumb-entry";
 import { PhotoGrid, type PhotoGridHandle } from "./photo-grid";
 import { ViewerStepper, useSwipeToStep } from "./viewer-stepper";
@@ -39,7 +39,6 @@ import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
-import { drawsItsOwnFrame, thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { matchShortcut, SHORTCUT_IDS } from "./shortcuts";
 import { pastedItems } from "./pasted-files";
 import { asFiles } from "@/components/file-picker/as-files";
@@ -57,7 +56,7 @@ import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
 import * as targetRules from "./menu-targets";
 import { plainTap } from "@/lib/plain-tap";
 import { filesToItems, gatherDropItems, type UploadItem } from "@/lib/drop-items";
-import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
+import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass } from "./item-icons";
 import {
     FILE_CATEGORIES,
     categoryOfExtension,
@@ -136,10 +135,7 @@ import {
     Inbox,
     Info,
     KeyRound,
-    LayoutGrid,
-    Images,
     Link2,
-    List,
     Lock,
     Palette,
     Pencil,
@@ -2532,54 +2528,17 @@ export function FilesView({
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : null}
-                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                        <button
-                            type="button"
-                            onClick={() => chooseView("list")}
-                            aria-label={t("filesView.view.list")}
-                            title={t("filesView.view.list")}
-                            className={cn(
-                                "rounded p-1 transition-colors hover:bg-muted",
-                                viewMode === "list"
-                                    ? "bg-muted text-foreground"
-                                    : "text-muted-foreground"
-                            )}
-                        >
-                            <List className="size-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => chooseView("grid")}
-                            aria-label={t("filesView.view.grid")}
-                            title={t("filesView.view.grid")}
-                            className={cn(
-                                "rounded p-1 transition-colors hover:bg-muted",
-                                viewMode === "grid"
-                                    ? "bg-muted text-foreground"
-                                    : "text-muted-foreground"
-                            )}
-                        >
-                            <LayoutGrid className="size-4" />
-                        </button>
-                        {/* Offered where it means something - a folder of
-                            photos - and kept while it is the one in use. */}
-                        {mediaFolder || viewMode === "photos" ? (
-                            <button
-                                type="button"
-                                onClick={() => chooseView("photos")}
-                                aria-label={t("filesView.view.photos")}
-                                title={t("filesView.view.photos")}
-                                className={cn(
-                                    "rounded p-1 transition-colors hover:bg-muted",
-                                    viewMode === "photos"
-                                        ? "bg-muted text-foreground"
-                                        : "text-muted-foreground"
-                                )}
-                            >
-                                <Images className="size-4" />
-                            </button>
-                        ) : null}
-                    </div>
+                    {/* Photos is offered where it means something - a folder of
+                        photos - and kept while it is the one in use. */}
+                    <ViewModeToggle
+                        mode={viewMode}
+                        modes={
+                            mediaFolder || viewMode === "photos"
+                                ? ["list", "grid", "photos"]
+                                : ["list", "grid"]
+                        }
+                        onChoose={chooseView}
+                    />
                     <Button
                         size="sm"
                         variant={hasFilters ? "secondary" : "ghost"}
@@ -4194,69 +4153,11 @@ export function FilesView({
     );
 }
 
-/** The box a tile's picture or icon sits in. One value, because the two are
- *  interchangeable inside a grid and a grid whose rows differ by file type is
- *  one nobody can read down. */
-const THUMBNAIL_BOX = "size-14";
-
-/**
- * A tile's picture, or its icon.
- *
- * Only a file whose name could produce one is wrapped at all, so a folder or a
- * spreadsheet costs nothing to decide - not a request, not an observer, not an
- * element. Both branches occupy the same box, so a grid of documents lines up
- * with a grid of photographs and nothing reflows when a picture arrives after
- * the icon it replaces.
- */
-function GridIcon({
-    connectionId,
-    entry,
-    path,
-    className = THUMBNAIL_BOX,
-    iconClassName = "size-10"
-}: {
-    connectionId: string;
-    entry: DriveEntry;
-    /** Where the file actually is, when that is not `entry.path` (a binned item). */
-    path?: string;
-    /** How much room the picture gets. A tile in the grid and the details panel
-     *  want different amounts of it and nothing else about them differs. */
-    className?: string;
-    iconClassName?: string;
-}) {
-    const icon = <EntryIcon entry={entry} className={iconClassName} />;
-    // A picture the server draws, or a frame the browser draws for itself.
-    const moving = entry.kind === "file" && drawsItsOwnFrame(entry.name);
-    if (entry.kind !== "file" || (!thumbnailKind(entry.name) && !moving)) {
-        return <span className={cn(className, "flex items-center justify-center")}>{icon}</span>;
-    }
-    return (
-        <EntryThumbnail
-            connectionId={connectionId}
-            path={path ?? entry.path}
-            version={`${entry.modifiedAt}-${entry.size}`}
-            moving={moving}
-            className={className}
-        >
-            {icon}
-        </EntryThumbnail>
-    );
-}
-
 /** A file's picture on screen right now - its tile in the grid or the one in the
  *  details panel - for its preview to grow out of and shrink back into. Drive's
  *  thumbnails have their own address, so it is found by path, not by picture. */
 function thumbnailFor(path: string): Element | null {
     return flying.thumbnailBy("data-drive-thumbnail", path, "img:not([data-pending])");
-}
-
-/** The icon for an entry: a user-set one, else the folder mark or the file type's. */
-function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; className?: string }) {
-    const Custom = iconComponent(entry.icon);
-    if (Custom) return <Custom className={cn(className, iconColorClass(entry.iconColor))} />;
-    if (entry.kind === "dir") return <Folder className={cn(className, "text-primary")} />;
-    const { icon: Icon, className: color } = fileIconFor(entry.name);
-    return <Icon className={cn(className, color)} />;
 }
 
 /**

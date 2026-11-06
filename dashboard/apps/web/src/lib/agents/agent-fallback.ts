@@ -26,6 +26,8 @@ import { providersFor } from "@/lib/agents/model-keys";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
 import { providerForModel } from "@/lib/agents/agent-providers";
 import { inheritedFallback } from "@/lib/agents/agent-defaults-service";
+import { noticeRunsPausedForCredit } from "@/lib/agents/agent-notices";
+import { CREDIT_FAILURE_KINDS, pauseAgentRuns, readAgentPause } from "@/lib/agents/agent-pause";
 import { failureIsWorthRetrying, resolveModelChain, type AgentTrigger } from "@polaris/core";
 
 /** What a decision to fall back produced, for the caller that wanted to know. */
@@ -35,6 +37,8 @@ export interface FallbackOutcome {
     /** Why nothing was, in the words the run row already carries. Absent when a
      *  run started, and when there was simply nothing left to try. */
     reason?: string;
+    /** Every model in the chain has been tried or has no usable provider key. */
+    exhausted?: boolean;
 }
 
 /**
@@ -46,6 +50,30 @@ export interface FallbackOutcome {
  * case and costs one read.
  */
 export async function considerFallback(runId: string): Promise<FallbackOutcome> {
+    const run = await prisma.agentRun.findUnique({
+        where: { id: runId },
+        select: { state: true, failureKind: true, repo: { select: { ownerId: true } } }
+    });
+    const outcome = await fallBack(runId);
+    // Out of credit with nowhere left to fall back to: every run after this one
+    // would fail the same way, so the account's automatic runs stop until
+    // somebody resumes them.
+    if (
+        run?.state === "failed" &&
+        run.repo &&
+        CREDIT_FAILURE_KINDS.includes(run.failureKind ?? "") &&
+        outcome.exhausted
+    ) {
+        const held = await readAgentPause(run.repo.ownerId);
+        if (!held) {
+            await pauseAgentRuns(run.repo.ownerId, "credits");
+            await noticeRunsPausedForCredit(run.repo.ownerId, runId);
+        }
+    }
+    return outcome;
+}
+
+async function fallBack(runId: string): Promise<FallbackOutcome> {
     const run = await prisma.agentRun.findUnique({
         where: { id: runId },
         select: {
@@ -82,7 +110,7 @@ export async function considerFallback(runId: string): Promise<FallbackOutcome> 
     // The chain starts at the repository's own model, so attempt 1 used index 0.
     // Anything past the end means every candidate has now refused.
     const remaining = chain.slice(run.attempt);
-    if (remaining.length === 0) return {};
+    if (remaining.length === 0) return { exhausted: true };
 
     const reachable = new Set(await providersFor(run.repo.ownerId));
     const next = remaining.find((candidate) => {
@@ -92,7 +120,10 @@ export async function considerFallback(runId: string): Promise<FallbackOutcome> 
         return !provider || reachable.has(provider.slug);
     });
     if (!next) {
-        return { reason: "No model left in the fallback list has a provider key this account can use." };
+        return {
+            reason: "No model left in the fallback list has a provider key this account can use.",
+            exhausted: true
+        };
     }
 
     const result = await dispatchRun({
@@ -115,7 +146,11 @@ export async function considerFallback(runId: string): Promise<FallbackOutcome> 
 }
 
 /** The models to try for this repository, most preferred first. */
-export async function modelChainFor(ownerId: string, repoFullName: string, model: string): Promise<string[]> {
+export async function modelChainFor(
+    ownerId: string,
+    repoFullName: string,
+    model: string
+): Promise<string[]> {
     const tiers = await inheritedFallback(ownerId, repoFullName);
     return resolveModelChain(model, ...tiers);
 }

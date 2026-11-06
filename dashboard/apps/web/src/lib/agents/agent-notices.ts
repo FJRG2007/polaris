@@ -226,3 +226,22 @@ export async function noticeRunFinished(
         quietly(`run ${runId}`, error);
     }
 }
+
+/** The account's automatic runs were paused because the provider ran out of credit. */
+export async function noticeRunsPausedForCredit(ownerId: string, runId: string): Promise<void> {
+    try {
+        const t = await wordsFor(ownerId, "notices");
+        await notify({
+            userId: ownerId,
+            event: "agent.run",
+            title: t("agents.pausedCreditsTitle"),
+            body: t("agents.pausedCreditsBody"),
+            href: "/apps/agents/runs",
+            level: "danger",
+            actionRequired: true,
+            metadata: { runId, paused: "credits" }
+        });
+    } catch (error) {
+        quietly(`credit pause after run ${runId}`, error);
+    }
+}

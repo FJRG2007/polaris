@@ -126,6 +126,7 @@
         "typeSomething": "Type something",
         "tooLongForCode": "That is longer than a code",
         "limitStopped": "A usage limit stopped this run.",
+        "pausedStopped": "Automatic runs are paused.",
         "cancelled": "Canceled from Polaris.",
         "stoppedReporting": "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.",
         "workflowWrite": "Could not write the workflow file",
@@ -460,6 +461,14 @@
         "state": "State",
         "openJob": "Open the job that ran this",
         "stop": "Stop this run",
+        "paused": {
+            "title": "Automatic runs are paused",
+            "manual": "Pull requests, issues, mentions and automations start nothing until you resume. Runs you start here still run.",
+            "credits": "Your model provider ran out of credit, so Polaris paused them. Add credit or change the provider, then resume.",
+            "resume": "Resume",
+            "pause": "Pause automatic runs",
+            "pauseHint": "Stop pull requests, issues, mentions and automations from starting runs"
+        },
         "gate": {
             "verify": "Verification",
             "review": "Review, tests and docs"

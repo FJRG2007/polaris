@@ -169,11 +169,6 @@
             "searchingRecursive": "Searching this folder and all subfolders...",
             "results": "{count, plural, one {# result} other {# results}} across subfolders{truncated, select, yes { (first matches only - narrow your search)} other {}}"
         },
-        "view": {
-            "list": "List view",
-            "grid": "Grid view",
-            "photos": "Photo view"
-        },
         "filters": {
             "button": "Filters",
             "showAll": "Show all items",

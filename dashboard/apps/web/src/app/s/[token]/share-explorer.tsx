@@ -16,6 +16,7 @@
 import { saveFile, sendFile } from "@/components/transfers/move-file";
 import * as flying from "@polaris/ui/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { ViewModeToggle } from "@/app/(app)/drive/view-toggle";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TransfersView } from "@/components/transfers/transfers-view";
 import { baseName, formatBytes } from "@polaris/core";
@@ -69,10 +70,7 @@ import {
     FolderOpen,
     FolderPlus,
     FolderTree,
-    Images,
     Info,
-    LayoutGrid,
-    List,
     Loader2,
     Pencil,
     Search,
@@ -1081,54 +1079,17 @@ export function ShareExplorer({
                         )}
                     </button>
                 </div>
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                    <button
-                        type="button"
-                        onClick={() => chooseView("list")}
-                        aria-label={td("filesView.view.list")}
-                        title={td("filesView.view.list")}
-                        className={cn(
-                            "rounded p-1 transition-colors hover:bg-muted",
-                            viewMode === "list"
-                                ? "bg-muted text-foreground"
-                                : "text-muted-foreground"
-                        )}
-                    >
-                        <List className="size-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => chooseView("grid")}
-                        aria-label={td("filesView.view.grid")}
-                        title={td("filesView.view.grid")}
-                        className={cn(
-                            "rounded p-1 transition-colors hover:bg-muted",
-                            viewMode === "grid"
-                                ? "bg-muted text-foreground"
-                                : "text-muted-foreground"
-                        )}
-                    >
-                        <LayoutGrid className="size-4" />
-                    </button>
-                    {/* Offered where it means something - a folder of photos -
-                        and kept while it is the one in use. */}
-                    {mediaFolder || viewMode === "photos" ? (
-                        <button
-                            type="button"
-                            onClick={() => chooseView("photos")}
-                            aria-label={td("filesView.view.photos")}
-                            title={td("filesView.view.photos")}
-                            className={cn(
-                                "rounded p-1 transition-colors hover:bg-muted",
-                                viewMode === "photos"
-                                    ? "bg-muted text-foreground"
-                                    : "text-muted-foreground"
-                            )}
-                        >
-                            <Images className="size-4" />
-                        </button>
-                    ) : null}
-                </div>
+                {/* Photos is offered where it means something - a folder of
+                    photos - and kept while it is the one in use. */}
+                <ViewModeToggle
+                    mode={viewMode}
+                    modes={
+                        mediaFolder || viewMode === "photos"
+                            ? ["list", "grid", "photos"]
+                            : ["list", "grid"]
+                    }
+                    onChoose={chooseView}
+                />
                 <Button
                     size="sm"
                     variant={hasFilters ? "secondary" : "ghost"}

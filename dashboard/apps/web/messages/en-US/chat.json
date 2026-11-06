@@ -229,7 +229,8 @@
         "lockTooMany": "Too many tries. Wait a few minutes",
         "lockWrongCode": "That code is not right",
         "lockRequired": "This chat is locked. Enter your code to open it",
-        "lockResetUnconfirmed": "Confirm it is you first"
+        "lockResetUnconfirmed": "Confirm it is you first",
+        "meetingEmailsNeedGuests": "Polaris accounts only: invite people by name instead of by email"
     },
     "media": {
         "refused": {
@@ -2260,5 +2261,40 @@
         "digits4": "4 digits",
         "digits6": "6 digits",
         "digits8": "8 digits"
+    },
+    "meetingCode": {
+        "title": "Join a meeting",
+        "label": "Meeting code",
+        "hint": "The code from your invitation, with or without the dashes.",
+        "join": "Continue",
+        "tooMany": "Too many tries. Wait a few minutes and try again.",
+        "notFound": "That code does not open a meeting. Check it and try again."
+    },
+    "meetingInvites": {
+        "tooManyEmails": "At most {count} email addresses",
+        "notAnEmail": "That is not an email address",
+        "byEmail": "Invite by email",
+        "removeEmail": "Remove {email}",
+        "emailPlaceholder": "name@example.com",
+        "emailHint": "Nothing is sent. Copy the invitation and send it yourself.",
+        "textTitle": "You are invited to {meeting}.",
+        "textWhen": "When: {when}",
+        "textLink": "Join: {link}",
+        "textCode": "Or open {page} and type the code {code}",
+        "textAccount": "You need a Polaris account to get in.",
+        "copyInvitationHint": "Copy the invitation text with the link and code",
+        "copied": "Copied",
+        "copyInvitation": "Copy invitation",
+        "copyCode": "Copy the join code",
+        "copyCodeNamed": "Copy join code {code}",
+        "code": "Code {code}",
+        "invited": "{count, plural, one {1 invited} other {{count} invited}}",
+        "emailNotSent": "Invited by email. Nothing was sent from here.",
+        "joinCode": "Join code",
+        "joinCodeHint": "A short code people can type at /m instead of opening the link.",
+        "people": "Invite people",
+        "peopleSkipLobby": "They get an alert and walk in without waiting to be let in.",
+        "peopleHint": "They get an alert with the meeting on it.",
+        "emailsNeedGuests": "Polaris accounts only: people without an account cannot get in, so invite them by name."
     }
 }

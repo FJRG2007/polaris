@@ -188,7 +188,10 @@ export function InstallAppOffer() {
         }
     };
 
-    if (desktop) return <UsingDesktop version={desktop.version} />;
+    // The desktop card above already says which version this is and offers its
+    // update; saying it again here drew the same block twice on one page.
+    if (desktop)
+        return <p className="text-sm text-muted-foreground">{t("installApp.desktopHasWindow")}</p>;
     if (installed) return <p className="text-sm">{t("installApp.installed")}</p>;
     if (prompt)
         return (

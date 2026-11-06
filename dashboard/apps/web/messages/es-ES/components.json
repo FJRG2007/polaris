@@ -425,6 +425,11 @@
             "media": "Audio y vídeo",
             "archive": "Comprimidos"
         },
+        "view": {
+            "list": "Lista",
+            "grid": "Cuadrícula",
+            "photos": "Fotos"
+        },
         "title": "Adjuntar archivo",
         "addressHint": "Lo descarga Polaris, no tu navegador, así que el sitio del que viene no sabe nada de ti.",
         "chosen": "{count, plural, one {# archivo elegido} other {# archivos elegidos}}",
@@ -1114,6 +1119,7 @@
         "title": "App de escritorio",
         "usingDesktop": "Estás usando la app de escritorio de Polaris.",
         "usingDesktopVersion": "Estás usando la app de escritorio de Polaris, versión {version}.",
+        "desktopHasWindow": "La app de escritorio ya da a Polaris su propia ventana, así que aquí no hay nada que instalar.",
         "intro": "Abre Polaris en su propia ventana, con su propio icono, como cualquier otra app. Se mantiene al día por sí solo.",
         "installed": "Estás usando la app instalada.",
         "install": "Instalar Polaris",

@@ -20,6 +20,14 @@ import { DropZone } from "@/components/drop-zone";
 import { CameraCapture } from "./camera-capture";
 import { cameraAvailable, cameraKinds } from "./camera-kinds";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { GridIcon, type TileEntry } from "@/app/(app)/drive/grid-icon";
+import { ViewModeToggle } from "@/app/(app)/drive/view-toggle";
+import {
+    PICKER_VIEW_MODES,
+    rememberViewMode,
+    rememberedViewMode,
+    type DriveViewMode
+} from "@/app/(app)/drive/view-mode";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn, Button, Dialog, DialogContent, EmptyState, Input, Select } from "@polaris/ui";
 import {
@@ -54,7 +62,7 @@ const TABS: readonly { id: FilePickerTab; icon: typeof Clock }[] = [
 interface Entry {
     readonly name: string;
     readonly path: string;
-    readonly kind: string;
+    readonly kind: TileEntry["kind"];
     readonly size: string;
     readonly modifiedAt: string;
 }
@@ -65,6 +73,18 @@ interface Source {
     readonly name: string;
     readonly shared: boolean;
     readonly rootPath: string;
+}
+
+/** The layouts the picker offers. Drive's photo view is for looking through a
+ *  folder of pictures, not for choosing one. */
+const VIEWS: readonly DriveViewMode[] = ["list", "grid"];
+
+/** Columns in a grid, counted from where its tiles wrap. */
+function columnsOf(list: HTMLElement | null): number {
+    const tiles = list ? [...list.children] : [];
+    const top = (tiles[0] as HTMLElement | undefined)?.offsetTop;
+    const first = tiles.findIndex((one) => (one as HTMLElement).offsetTop !== top);
+    return Math.max(1, first < 0 ? tiles.length : first);
 }
 
 /** The kinds worth filtering by. Named for what somebody is looking for rather
@@ -134,7 +154,9 @@ export function FilePickerDialog({
     const [kind, setKind] = useState("");
     const [chosen, setChosen] = useState<Record<string, Entry>>({});
     const [address, setAddress] = useState("");
+    const [view, setView] = useState<DriveViewMode>("list");
     const file = useRef<HTMLInputElement | null>(null);
+    const listing = useRef<HTMLUListElement | null>(null);
     // The camera is offered only to a screen that takes pictures or video, and
     // only on a device that has one; until that is known the tab stays hidden.
     const kinds = useMemo(() => cameraKinds(accept, storageOnly), [accept, storageOnly]);
@@ -216,6 +238,40 @@ export function FilePickerDialog({
         return () => clearTimeout(timer);
     }, [browsing, tab, active, path, query]);
 
+    // Each folder opens in the layout it was last left in here, the way Drive
+    // remembers its own; one never chosen keeps the layout already on screen.
+    const folder = `${tab}:${path}`;
+    useEffect(() => {
+        if (!active) return;
+        const remembered = rememberedViewMode(active, folder, PICKER_VIEW_MODES);
+        if (remembered && VIEWS.includes(remembered)) setView(remembered);
+    }, [active, folder]);
+
+    function chooseView(mode: DriveViewMode): void {
+        setView(mode);
+        if (active) rememberViewMode(active, folder, mode, PICKER_VIEW_MODES);
+    }
+
+    /** Arrow keys move between entries: one at a time in the list, by row and
+     *  column in the grid. Enter and Space press the focused one as usual. */
+    function onEntryKeys(event: React.KeyboardEvent<HTMLUListElement>): void {
+        const across = columnsOf(listing.current);
+        const steps: Record<string, number> =
+            view === "grid"
+                ? { ArrowRight: 1, ArrowLeft: -1, ArrowDown: across, ArrowUp: -across }
+                : { ArrowDown: 1, ArrowUp: -1 };
+        const step = steps[event.key];
+        if (!step) return;
+        const buttons = [
+            ...(listing.current?.querySelectorAll<HTMLButtonElement>("[data-picker-entry]") ?? [])
+        ];
+        const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = buttons[at < 0 ? 0 : Math.min(buttons.length - 1, Math.max(0, at + step))];
+        if (!next) return;
+        event.preventDefault();
+        next.focus();
+    }
+
     /** Whether one name is something the screen asked for. Nothing when it asked
      *  for anything, which is most screens. */
     const takes = useMemo(() => {
@@ -291,8 +347,11 @@ export function FilePickerDialog({
                         {heading}
                     </h2>
 
-                    <div className="flex min-h-0 flex-1 gap-3">
-                        <nav className="w-40 shrink-0 space-y-0.5" aria-label={t("files.where")}>
+                    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
+                        <nav
+                            className="flex shrink-0 gap-0.5 overflow-x-auto sm:block sm:w-40 sm:space-y-0.5 sm:overflow-visible"
+                            aria-label={t("files.where")}
+                        >
                             {TABS.filter(
                                 (entry) =>
                                     (!storageOnly ||
@@ -303,7 +362,7 @@ export function FilePickerDialog({
                                     key={entry.id}
                                     type="button"
                                     className={cn(
-                                        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]",
+                                        "flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] sm:w-full",
                                         tab === entry.id
                                             ? "bg-card text-foreground"
                                             : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
@@ -335,7 +394,7 @@ export function FilePickerDialog({
                                             <Select
                                                 value={active}
                                                 aria-label={t("files.storage")}
-                                                className="h-7 w-40 shrink-0 text-[12px]"
+                                                className="h-7 w-full text-[12px] sm:w-40 sm:shrink-0"
                                                 options={forTab.map((one) => ({
                                                     value: one.id,
                                                     label: one.name
@@ -346,7 +405,7 @@ export function FilePickerDialog({
                                                 }}
                                             />
                                         ) : null}
-                                        <div className="relative min-w-0 flex-1">
+                                        <div className="relative min-w-0 flex-1 basis-32">
                                             <Search
                                                 className="pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2 text-foreground-subtle"
                                                 aria-hidden
@@ -362,7 +421,7 @@ export function FilePickerDialog({
                                         <Select
                                             value={kind}
                                             aria-label={t("files.onlyShow")}
-                                            className="h-7 w-36 shrink-0 text-[12px]"
+                                            className="h-7 w-36 min-w-0 shrink text-[12px]"
                                             options={[
                                                 { value: "", label: t("files.everything") },
                                                 ...KINDS.map((one) => ({
@@ -371,6 +430,11 @@ export function FilePickerDialog({
                                                 }))
                                             ]}
                                             onValueChange={setKind}
+                                        />
+                                        <ViewModeToggle
+                                            mode={view}
+                                            modes={VIEWS}
+                                            onChoose={chooseView}
                                         />
                                     </div>
 
@@ -387,7 +451,17 @@ export function FilePickerDialog({
                                         </button>
                                     ) : null}
 
-                                    <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
+                                    <ul
+                                        ref={listing}
+                                        onKeyDown={onEntryKeys}
+                                        className={cn(
+                                            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-1",
+                                            view === "grid" &&
+                                                !loading &&
+                                                shown.length > 0 &&
+                                                "grid auto-rows-min grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] content-start gap-1"
+                                        )}
+                                    >
                                         {loading ? (
                                             <li className="flex items-center justify-center py-8 text-muted-foreground">
                                                 <Loader2
@@ -416,27 +490,69 @@ export function FilePickerDialog({
                                             shown.map((entry) => {
                                                 const key = `${active}:${entry.path}`;
                                                 const isDir = entry.kind === "dir";
+                                                const isChosen = Boolean(chosen[key]);
+                                                const press = {
+                                                    type: "button" as const,
+                                                    "data-picker-entry": "",
+                                                    "aria-pressed": isDir ? undefined : isChosen,
+                                                    title: entry.name,
+                                                    onDoubleClick: () => {
+                                                        if (isDir) setPath(entry.path);
+                                                    },
+                                                    onClick: () => {
+                                                        if (isDir) {
+                                                            setPath(entry.path);
+                                                            setQuery("");
+                                                            return;
+                                                        }
+                                                        toggle(entry);
+                                                    }
+                                                };
+                                                const size = isDir
+                                                    ? null
+                                                    : readableSize(Number(entry.size) || 0);
+                                                if (view === "grid") {
+                                                    return (
+                                                        <li key={key} className="min-w-0">
+                                                            <button
+                                                                {...press}
+                                                                className={cn(
+                                                                    "relative flex w-full min-w-0 flex-col items-center gap-1 rounded-lg border p-2 text-center",
+                                                                    isChosen
+                                                                        ? "border-primary/40 bg-primary/5"
+                                                                        : "border-transparent hover:bg-card/60"
+                                                                )}
+                                                            >
+                                                                <GridIcon
+                                                                    connectionId={active}
+                                                                    entry={entry}
+                                                                />
+                                                                <span className="w-full min-w-0 truncate text-[12px]">
+                                                                    {entry.name}
+                                                                </span>
+                                                                <span className="h-4 text-[11px] text-foreground-subtle">
+                                                                    {size}
+                                                                </span>
+                                                                {isChosen ? (
+                                                                    <Check
+                                                                        className="absolute right-1.5 top-1.5 size-3.5 shrink-0 text-primary"
+                                                                        aria-hidden
+                                                                    />
+                                                                ) : null}
+                                                            </button>
+                                                        </li>
+                                                    );
+                                                }
                                                 return (
                                                     <li key={key}>
                                                         <button
-                                                            type="button"
+                                                            {...press}
                                                             className={cn(
                                                                 "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[13px]",
-                                                                chosen[key]
+                                                                isChosen
                                                                     ? "bg-card text-foreground"
                                                                     : "hover:bg-card/60"
                                                             )}
-                                                            onDoubleClick={() => {
-                                                                if (isDir) setPath(entry.path);
-                                                            }}
-                                                            onClick={() => {
-                                                                if (isDir) {
-                                                                    setPath(entry.path);
-                                                                    setQuery("");
-                                                                    return;
-                                                                }
-                                                                toggle(entry);
-                                                            }}
                                                         >
                                                             {isDir ? (
                                                                 <Folder
@@ -452,14 +568,12 @@ export function FilePickerDialog({
                                                             <span className="min-w-0 flex-1 truncate">
                                                                 {entry.name}
                                                             </span>
-                                                            {isDir ? null : (
+                                                            {size === null ? null : (
                                                                 <span className="shrink-0 text-[11px] text-foreground-subtle">
-                                                                    {readableSize(
-                                                                        Number(entry.size) || 0
-                                                                    )}
+                                                                    {size}
                                                                 </span>
                                                             )}
-                                                            {chosen[key] ? (
+                                                            {isChosen ? (
                                                                 <Check
                                                                     className="size-3.5 shrink-0 text-primary"
                                                                     aria-hidden

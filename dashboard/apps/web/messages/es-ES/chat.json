@@ -229,7 +229,8 @@
         "lockTooMany": "Demasiados intentos. Espera unos minutos",
         "lockWrongCode": "Ese código no es correcto",
         "lockRequired": "Este chat está bloqueado. Escribe tu código para abrirlo",
-        "lockResetUnconfirmed": "Confirma primero que eres tú"
+        "lockResetUnconfirmed": "Confirma primero que eres tú",
+        "meetingEmailsNeedGuests": "Solo cuentas Polaris: invita a la gente por nombre, no por correo"
     },
     "media": {
         "refused": {
@@ -2260,5 +2261,40 @@
         "digits4": "4 dígitos",
         "digits6": "6 dígitos",
         "digits8": "8 dígitos"
+    },
+    "meetingCode": {
+        "title": "Unirse a reunión",
+        "label": "Código de sala",
+        "hint": "El código de tu invitación, con o sin los guiones.",
+        "join": "Continuar",
+        "tooMany": "Demasiados intentos. Espera unos minutos y reintenta.",
+        "notFound": "Ese código no abre ninguna reunión. Revísalo y reintenta."
+    },
+    "meetingInvites": {
+        "tooManyEmails": "Como mucho {count} direcciones de correo",
+        "notAnEmail": "Eso no es una dirección de correo",
+        "byEmail": "Invitar por correo",
+        "removeEmail": "Quitar {email}",
+        "emailPlaceholder": "nombre@ejemplo.com",
+        "emailHint": "No se envía nada. Copia la invitación y envíala tú.",
+        "textTitle": "Te invitan a {meeting}.",
+        "textWhen": "Cuándo: {when}",
+        "textLink": "Entra: {link}",
+        "textCode": "O abre {page} y escribe el código {code}",
+        "textAccount": "Necesitas una cuenta Polaris para entrar.",
+        "copyInvitationHint": "Copiar la invitación con el enlace y el código",
+        "copied": "Copiado",
+        "copyInvitation": "Copiar invitación",
+        "copyCode": "Copiar el código",
+        "copyCodeNamed": "Copiar el código {code}",
+        "code": "Código {code}",
+        "invited": "{count, plural, one {1 invitado} other {{count} invitados}}",
+        "emailNotSent": "Invitado por correo. No se envió nada desde aquí.",
+        "joinCode": "Código",
+        "joinCodeHint": "Un código corto que se escribe en /m en vez de abrir el enlace.",
+        "people": "Invitar personas",
+        "peopleSkipLobby": "Reciben un aviso y entran sin esperar a que les dejes pasar.",
+        "peopleHint": "Reciben un aviso con la reunión.",
+        "emailsNeedGuests": "Solo cuentas Polaris: quien no tiene cuenta no puede entrar, así que invítale por nombre."
     }
 }
