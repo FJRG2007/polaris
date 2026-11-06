@@ -3541,6 +3541,14 @@
             "unknownPolicy": "Unknown policy.",
             "notCapability": "That is not a capability.",
             "unknownAccess": "Unknown access."
+        },
+        "nav": {
+            "label": "Account sections",
+            "overview": "Overview",
+            "security": "Sign-in & security",
+            "sessions": "Sessions",
+            "access": "Access",
+            "danger": "Danger zone"
         }
     },
     "usersInvite": {

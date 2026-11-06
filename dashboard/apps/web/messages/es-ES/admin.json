@@ -3541,6 +3541,14 @@
             "unknownPolicy": "Política desconocida.",
             "notCapability": "Eso no es una capacidad.",
             "unknownAccess": "Acceso desconocido."
+        },
+        "nav": {
+            "label": "Secciones",
+            "overview": "Resumen",
+            "security": "Acceso y seguridad",
+            "sessions": "Sesiones",
+            "access": "Permisos",
+            "danger": "Zona de riesgo"
         }
     },
     "usersInvite": {
