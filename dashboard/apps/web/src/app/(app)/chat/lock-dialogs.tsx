@@ -252,74 +252,78 @@ export function LockSettingsDialog({
                 <DialogHeader>
                     <DialogTitle>{t("lock.settings")}</DialogTitle>
                 </DialogHeader>
-                <p className="text-xs text-muted-foreground">{t("lock.settingsHint")}</p>
-                <form
-                    className="flex flex-col gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        void save();
-                    }}
-                >
-                    {state.hasCode && (
-                        <Input
-                            type="password"
-                            autoComplete="off"
-                            value={current}
-                            maxLength={CODE_MAX}
-                            aria-label={t("lock.currentCode")}
-                            placeholder={t("lock.currentCode")}
-                            onChange={(event) => {
-                                setCurrent(event.target.value);
-                                setError("");
-                            }}
-                        />
-                    )}
-                    {state.hasCode && (
-                        <ForgotCode
-                            onReset={() => {
-                                setCurrent("");
-                                onChanged(NO_LOCK);
-                            }}
-                        />
-                    )}
-                    {/* enigma:allow-no-breach-check enigma:allow-identity-password - a
+                <div className="flex flex-col gap-4">
+                    <p className="text-xs text-muted-foreground">{t("lock.settingsHint")}</p>
+                    <form
+                        className="flex flex-col gap-2"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void save();
+                        }}
+                    >
+                        {state.hasCode && (
+                            <Input
+                                type="password"
+                                autoComplete="off"
+                                value={current}
+                                maxLength={CODE_MAX}
+                                aria-label={t("lock.currentCode")}
+                                placeholder={t("lock.currentCode")}
+                                onChange={(event) => {
+                                    setCurrent(event.target.value);
+                                    setError("");
+                                }}
+                            />
+                        )}
+                        {state.hasCode && (
+                            <ForgotCode
+                                onReset={() => {
+                                    setCurrent("");
+                                    onChanged(NO_LOCK);
+                                }}
+                            />
+                        )}
+                        {/* enigma:allow-no-breach-check enigma:allow-identity-password - a
                         chat lock code is a short PIN over a session that is already
                         signed in, not an account password: it opens nothing on its
                         own, guesses are throttled server-side, and a breach list
                         would refuse every four-digit code. */}
-                    <Input
-                        type="password"
-                        autoComplete="new-password"
-                        value={code}
-                        maxLength={CODE_MAX}
-                        aria-label={t("lock.newCode")}
-                        placeholder={t("lock.newCode")}
-                        onChange={(event) => {
-                            setCode(event.target.value);
-                            setError("");
-                        }}
-                    />
-                    <p className="text-xs text-foreground-subtle">{t("lock.codeHint")}</p>
-                    {error ? (
-                        <p role="alert" className="text-xs text-danger">
-                            {error}
-                        </p>
-                    ) : null}
-                    <div className="flex justify-end">
-                        <Button type="submit" size="sm" disabled={!ready}>
-                            {state.hasCode ? t("lock.changeCode") : t("lock.setCode")}
-                        </Button>
-                    </div>
-                </form>
-                <label className="flex items-center justify-between gap-3 text-sm">
-                    <span className="min-w-0">{t("lock.hideLocked")}</span>
-                    <Switch
-                        checked={state.hideLocked}
-                        disabled={!state.hasCode}
-                        aria-label={t("lock.hideLocked")}
-                        onChange={(checked) => void chooseHide(checked)}
-                    />
-                </label>
+                        <Input
+                            type="password"
+                            autoComplete="new-password"
+                            value={code}
+                            maxLength={CODE_MAX}
+                            aria-label={t("lock.newCode")}
+                            placeholder={t("lock.newCode")}
+                            onChange={(event) => {
+                                setCode(event.target.value);
+                                setError("");
+                            }}
+                        />
+                        <p className="text-xs text-foreground-subtle">{t("lock.codeHint")}</p>
+                        {error ? (
+                            <p role="alert" className="text-xs text-danger">
+                                {error}
+                            </p>
+                        ) : null}
+                        <div className="flex justify-end">
+                            <Button type="submit" size="sm" disabled={!ready}>
+                                {state.hasCode ? t("lock.changeCode") : t("lock.setCode")}
+                            </Button>
+                        </div>
+                    </form>
+                    {/* Its own row under a rule: the switch is a setting of its own, not
+                    part of the code form above it. */}
+                    <label className="flex items-center justify-between gap-3 border-t border-border pt-4 text-sm">
+                        <span className="min-w-0">{t("lock.hideLocked")}</span>
+                        <Switch
+                            checked={state.hideLocked}
+                            disabled={!state.hasCode}
+                            aria-label={t("lock.hideLocked")}
+                            onChange={(checked) => void chooseHide(checked)}
+                        />
+                    </label>
+                </div>
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         {t("lock.cancel")}

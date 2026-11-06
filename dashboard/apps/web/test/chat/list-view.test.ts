@@ -1,7 +1,15 @@
 /** The detailed conversation list: when it is drawn, and how it says when. */
 
 import { describe, expect, it } from "vitest";
-import { DETAILED_FROM, drawsDetailed, isChatListView, listTime } from "@/app/(app)/chat/list-view";
+import {
+    COMPACT_PANE,
+    DETAILED_FROM,
+    DETAILED_PANE,
+    drawsDetailed,
+    isChatListView,
+    listTime,
+    paneWidthFor
+} from "@/app/(app)/chat/list-view";
 
 const now = new Date(2026, 10, 5, 15, 30);
 const at = (days: number, hour = 9, minute = 5) =>
@@ -41,5 +49,19 @@ describe("listTime", () => {
 
     it("is the date from a week back", () => {
         expect(listTime(at(7), now, "en-US", "Yesterday")).toBe("10/29/26");
+    });
+});
+
+describe("paneWidthFor", () => {
+    it("widens a narrow pane for the detailed rows, held to the window", () => {
+        expect(paneWidthFor("detailed", 256, 560)).toBe(DETAILED_PANE);
+        expect(paneWidthFor("detailed", 256, 300)).toBe(300);
+        expect(paneWidthFor("detailed", 400, 560)).toBeNull();
+    });
+
+    it("gives the room back for compact rows and leaves auto alone", () => {
+        expect(paneWidthFor("compact", 400, 560)).toBe(COMPACT_PANE);
+        expect(paneWidthFor("compact", 220, 560)).toBeNull();
+        expect(paneWidthFor("auto", 220, 560)).toBeNull();
     });
 });

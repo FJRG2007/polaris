@@ -21,6 +21,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
 import { useChatPane } from "./use-chat-pane";
+import { paneWidthFor } from "./list-view";
 import { useChatStream } from "./use-chat-stream";
 import { resetPaneLayout } from "./pane-preferences";
 import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
@@ -157,7 +158,12 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 style={{ "--chat-list": `${drawn}px` } as CSSProperties}
                 className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-r border-border md:w-[var(--chat-list)] md:flex-none`}
             >
-                <ChatSidebar />
+                <ChatSidebar
+                    onListView={(view) => {
+                        const width = paneWidthFor(view, drawn, ceiling);
+                        if (width !== null) resize(width);
+                    }}
+                />
             </div>
             {/* Only where there are two columns to divide. On a phone one of them
                 is always the whole screen, so there is no line to move. */}

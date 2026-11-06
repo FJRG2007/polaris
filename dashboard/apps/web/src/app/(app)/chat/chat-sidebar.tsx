@@ -239,15 +239,16 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
     );
 }
 
-export function ChatSidebar() {
+/** `onListView` hears the view picked from the list's menu, so the pane can fit it. */
+export function ChatSidebar({ onListView }: { onListView?: (view: ChatListView) => void }) {
     return (
         <ChatLockProvider>
-            <ChatSidebarList />
+            <ChatSidebarList onListView={onListView} />
         </ChatLockProvider>
     );
 }
 
-function ChatSidebarList() {
+function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => void }) {
     const {
         channels,
         spaces,
@@ -667,7 +668,15 @@ function ChatSidebarList() {
                         }
                         folded={folded.includes("dm")}
                         onToggle={() => toggle("dm")}
-                        action={<ListViewMenu view={listView} onChoose={chooseListView} />}
+                        action={
+                            <ListViewMenu
+                                view={listView}
+                                onChoose={(next) => {
+                                    chooseListView(next);
+                                    onListView?.(next);
+                                }}
+                            />
+                        }
                     >
                         <div ref={directList} className="flex flex-col gap-px">
                             {directs.length === 0 ? (
