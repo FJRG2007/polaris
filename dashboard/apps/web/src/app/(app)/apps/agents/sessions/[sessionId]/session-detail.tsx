@@ -201,7 +201,6 @@ export function SessionDetail({
         );
         setPending((queue) => queue.filter((one) => !said.has(one.body)));
         // Only when the server's list changes; `pending` is read, never depended on.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [messages]);
 
     const send = () => {

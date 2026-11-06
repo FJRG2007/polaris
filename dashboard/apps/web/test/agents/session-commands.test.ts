@@ -97,7 +97,6 @@ describe("the boot script", () => {
             expect(argv[0]).toBe("sh");
             expect(argv[1]).toBe("-c");
             for (const arg of argv) {
-                // eslint-disable-next-line no-control-regex
                 expect(/[\u0000-\u001f\u007f]/.test(arg), arg).toBe(false);
             }
         }

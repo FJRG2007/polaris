@@ -72,7 +72,9 @@ describe("signinSlug", () => {
     });
 
     it("folds a variable to lower case and hyphens", () => {
-        expect(signinSlug("CLAUDE_CODE_OAUTH_TOKEN")).toBe(`${SIGNIN_PREFIX}claude-code-oauth-token`);
+        expect(signinSlug("CLAUDE_CODE_OAUTH_TOKEN")).toBe(
+            `${SIGNIN_PREFIX}claude-code-oauth-token`
+        );
     });
 
     it("cannot collide with a model provider", () => {
