@@ -333,3 +333,37 @@ describe("an app connecting", () => {
         ).rejects.toMatchObject({ code: "notFound" });
     });
 });
+
+describe("when the private network's policy is written again", () => {
+    const now = new Date("2026-11-06T12:00:00Z");
+    const row = (
+        userId: string,
+        change: Partial<{ suspended: boolean; expiresAt: Date }> = {}
+    ) => ({
+        userId,
+        nodes: [],
+        deviceLimit: 5,
+        dataLimitGb: null,
+        expiresAt: null,
+        suspended: false,
+        usedBytes: 0n,
+        ...change
+    });
+
+    it("stays the same while nobody's standing changed, in any order", () => {
+        expect(service.standingDigest([row("a"), row("b", { suspended: true })], now)).toBe(
+            service.standingDigest([row("b", { suspended: true }), row("a")], now)
+        );
+        expect(service.standingDigest([row("a")], now)).toBe(service.standingDigest([], now));
+    });
+
+    it("changes when a grant expires or is suspended", () => {
+        const before = service.standingDigest([row("a"), row("b")], now);
+        expect(
+            service.standingDigest([row("a", { expiresAt: new Date("2026-11-01") }), row("b")], now)
+        ).not.toBe(before);
+        expect(service.standingDigest([row("a"), row("b", { suspended: true })], now)).not.toBe(
+            before
+        );
+    });
+});

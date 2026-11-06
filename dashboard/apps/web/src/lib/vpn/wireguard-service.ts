@@ -6,6 +6,7 @@
  */
 
 import { lookup } from "node:dns/promises";
+import { createHash } from "node:crypto";
 import { resolveGeo } from "@/lib/geo-service";
 import * as wg from "./wireguard";
 import { prisma } from "@polaris/db";
@@ -19,7 +20,6 @@ import { remoteClearScript, remoteWriteScript } from "@/lib/deploy/router-remote
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 import { getHostConnectionUnscoped, type HostConnection } from "@/lib/host-service";
 
 /** Whether somebody with no access of their own may connect, and with how many devices. */
@@ -574,9 +574,47 @@ export async function runVpnPass(): Promise<void> {
             console.error("polaris: a VPN node could not be read:", error);
         }
     }
-    // A grant that expired or ran out of data since the last pass leaves the
-    // private network too, not only the tunnels.
-    refreshVpnAccessLater();
+    void refreshOnStandingChange().catch((error: unknown) =>
+        console.error("polaris: the VPN's access was not brought up to date:", error)
+    );
+}
+
+const STANDING_KEY = "vpn.policyStanding";
+
+/** Which grants are not in good standing now, as one digest. Pure; exported for tests. */
+export function standingDigest(
+    rows: readonly (wg.VpnAccess & { userId: string })[],
+    now: Date
+): string {
+    const held = rows
+        .filter((row) => wg.accessStanding(row, now) !== "active")
+        .map((row) => row.userId)
+        .sort();
+    return createHash("sha256").update(held.join(",")).digest("hex");
+}
+
+/**
+ * A grant that expired, ran out of data or got a new month since the policy was
+ * last written leaves or rejoins the private network too, not only the tunnels.
+ * The policy is only written again when that set of grants changed, and the set
+ * is only remembered once it was written.
+ */
+async function refreshOnStandingChange(): Promise<void> {
+    const rows = await prisma.vpnAccess.findMany({
+        select: {
+            userId: true,
+            nodes: true,
+            deviceLimit: true,
+            dataLimitGb: true,
+            expiresAt: true,
+            suspended: true,
+            usedBytes: true
+        }
+    });
+    const digest = standingDigest(rows, new Date());
+    if ((await getSetting(STANDING_KEY)) === digest) return;
+    const vpn = await import("./service");
+    if (await vpn.refreshVpnAccess()) await setSetting(STANDING_KEY, digest);
 }
 
 async function recordProxyUsage(nodeId: string, output: string): Promise<void> {
