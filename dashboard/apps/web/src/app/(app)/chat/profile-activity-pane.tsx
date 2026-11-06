@@ -22,25 +22,34 @@ import { GameLogo } from "@/components/game-logo";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import { usePresence } from "@/components/presence-store";
 import { RelativeTime } from "@/components/relative-time";
-import { FriendRows, SpaceRows } from "./profile-details";
+import { FriendRows, SpaceRows, type MutualTab } from "./profile-details";
 import { ActivityCards } from "@/components/activity-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
 import type { RecentActivityView } from "@/lib/presence-activity/recent";
 
-type Tab = "activity" | "friends" | "spaces";
+type Tab = "activity" | MutualTab;
 
 export function ProfileActivityPane({
     personId,
+    name,
     profile,
-    loading
+    loading,
+    initialTab = "activity",
+    messageAction
 }: {
     personId: string;
+    /** What they are called here, for the line said when there is nothing. */
+    name: string;
     profile: ChatProfile | null;
     loading: boolean;
+    /** The tab it opens on - a count in the column opens its own list. */
+    initialTab?: Tab;
+    /** The way to talk to them, offered when there is nothing to show. */
+    messageAction?: React.ReactNode;
 }) {
     const t = useTranslations("chat");
-    const [tab, setTab] = useState<Tab>("activity");
+    const [tab, setTab] = useState<Tab>(initialTab);
     // Nothing in common is never a tab, and neither is anything a reader
     // outside the profile audience was not told.
     const mutual = profile && !profile.restricted ? profile.mutual : null;
@@ -77,10 +86,18 @@ export function ProfileActivityPane({
                 onValueChange={setTab}
                 options={options}
                 size="sm"
-                className="self-start max-w-full overflow-x-auto"
+                // Clear of the dialog's close in the corner, without pushing
+                // everything under the tabs off centre.
+                className="self-start max-w-full overflow-x-auto md:max-w-[calc(100%-2.75rem)]"
             />
             {shown === "activity" ? (
-                <ActivityTab personId={personId} profile={profile} loading={loading} />
+                <ActivityTab
+                    personId={personId}
+                    name={name}
+                    profile={profile}
+                    loading={loading}
+                    messageAction={messageAction}
+                />
             ) : shown === "friends" && friends ? (
                 <MutualList more={friends.total - friends.people.length}>
                     <FriendRows people={friends.people} />
@@ -96,12 +113,16 @@ export function ProfileActivityPane({
 
 function ActivityTab({
     personId,
+    name,
     profile,
-    loading
+    loading,
+    messageAction
 }: {
     personId: string;
+    name: string;
     profile: ChatProfile | null;
     loading: boolean;
+    messageAction?: React.ReactNode;
 }) {
     const t = useTranslations("chat");
     const current = usePresence(personId)?.activity ?? [];
@@ -110,11 +131,14 @@ function ActivityTab({
 
     if (!waiting && current.length === 0 && recent.length === 0) {
         return (
+            // As Discord says it: who has nothing to share, and a way to start
+            // something instead of a dead end.
             <EmptyState
                 bare
-                icon={<Gamepad2 className="size-5 shrink-0" />}
-                title={t("profilePane.emptyTitle")}
+                className="py-10"
+                title={t("profilePane.emptyTitle", { name })}
                 description={t("profilePane.emptyHint")}
+                action={messageAction}
             />
         );
     }

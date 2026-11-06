@@ -96,7 +96,8 @@ export function ProfileDetails({
     actions,
     onAvatar,
     bannerActions,
-    footer
+    footer,
+    onMutual
 }: {
     person: ProfilePerson;
     profile: ChatProfile | null;
@@ -116,13 +117,16 @@ export function ProfileDetails({
     /** What closes the profile off at the bottom - the column's way to the
      *  larger view. */
     footer?: ReactNode;
+    /** Opens the larger view on what the two of them have in common. Given, the
+     *  column draws Discord's one line of counts under the name instead of the
+     *  lists that open in place. */
+    onMutual?: (tab: MutualTab) => void;
 }) {
     const t = useTranslations("chat");
     const where = usePresence(person.id);
     const name = profile?.name || person.name;
     const full = size === "full";
     const panel = size === "panel";
-    const locale = useLocale();
 
     return (
         <div className="flex flex-col">
@@ -235,6 +239,12 @@ export function ProfileDetails({
                     ) : null}
                 </div>
 
+                {/* Discord's line of counts under the name, each the way to
+                    that tab of the larger view. */}
+                {panel && onMutual && profile?.mutual && !profile.restricted ? (
+                    <MutualLine mutual={profile.mutual} onOpen={onMutual} />
+                ) : null}
+
                 {actions}
 
                 {/* What they are showing, and only that. Where they are is
@@ -257,7 +267,7 @@ export function ProfileDetails({
                     profile page draws it from. Not on the card: a glance is the
                     name, the face and what they said, and this is the part of a
                     profile somebody reads when they have sat down with it. */}
-                {panel && profile?.mutual && !profile.restricted ? (
+                {panel && !onMutual && profile?.mutual && !profile.restricted ? (
                     <MutualSections mutual={profile.mutual} />
                 ) : null}
 
@@ -285,21 +295,20 @@ export function ProfileDetails({
                 )}
 
                 {size !== "card" && profile?.memberSince ? (
-                    <div className="w-full text-left">
-                        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                            {t("profileDetails.memberSince")}
-                        </p>
-                        <p
-                            className={cn(
-                                "mt-1 text-muted-foreground",
-                                full ? "text-sm" : "text-xs"
-                            )}
-                        >
-                            {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
-                                new Date(profile.memberSince)
-                            )}
-                        </p>
-                    </div>
+                    <SinceRow
+                        label={t("profileDetails.memberSince")}
+                        iso={profile.memberSince}
+                        large={full}
+                    />
+                ) : null}
+
+                {/* Under it in the larger view, and only between friends. */}
+                {full && profile?.friendsSince ? (
+                    <SinceRow
+                        label={t("profileDetails.friendsSince")}
+                        iso={profile.friendsSince}
+                        large
+                    />
                 ) : null}
 
                 {profile?.restricted ? (
@@ -311,6 +320,21 @@ export function ProfileDetails({
 
                 {footer}
             </div>
+        </div>
+    );
+}
+
+/** A date under a small heading: when they joined, when you became friends. */
+function SinceRow({ label, iso, large }: { label: string; iso: string; large: boolean }) {
+    const locale = useLocale();
+    return (
+        <div className="w-full text-left">
+            <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                {label}
+            </p>
+            <p className={cn("mt-1 text-muted-foreground", large ? "text-sm" : "text-xs")}>
+                {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso))}
+            </p>
         </div>
     );
 }
@@ -374,6 +398,62 @@ export function ClampedBio({ text }: { text: string }) {
 
 /** The two halves of what you have in common, as the column draws them. */
 type Shared = ChatProfile["mutual"];
+
+/** The tabs of the larger view that list what two people have in common. */
+export type MutualTab = "friends" | "spaces";
+
+/**
+ * Discord's line under a name in the column: a few faces and "1 friend in
+ * common", a dot, "6 spaces in common". Each half opens the larger view on its
+ * own tab rather than unfolding a list in a narrow column. Nothing is drawn for
+ * a half with nobody in it.
+ */
+export function MutualLine({
+    mutual,
+    onOpen
+}: {
+    mutual: Shared;
+    onOpen: (tab: MutualTab) => void;
+}) {
+    const t = useTranslations("chat");
+    const friends = mutual.friends.total;
+    const spaces = mutual.spaces.total;
+    if (friends === 0 && spaces === 0) return null;
+    const link =
+        "flex min-w-0 items-center gap-1.5 rounded text-left hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+    return (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+            {friends > 0 ? (
+                <button type="button" onClick={() => onOpen("friends")} className={link}>
+                    <span aria-hidden className="flex shrink-0 -space-x-1">
+                        {mutual.friends.people.slice(0, 3).map((person) => (
+                            <Avatar
+                                key={person.id}
+                                person={person}
+                                size={16}
+                                className="ring-2 ring-background"
+                            />
+                        ))}
+                    </span>
+                    <span className="min-w-0 truncate">
+                        {t("profileDetails.mutualFriends", { count: friends })}
+                    </span>
+                </button>
+            ) : null}
+            {friends > 0 && spaces > 0 ? (
+                <span aria-hidden className="size-1 shrink-0 rounded-full bg-muted-foreground/60" />
+            ) : null}
+            {spaces > 0 ? (
+                <button type="button" onClick={() => onOpen("spaces")} className={link}>
+                    <span className="min-w-0 truncate">
+                        {t("profileDetails.mutualServers", { count: spaces })}
+                    </span>
+                </button>
+            ) : null}
+        </div>
+    );
+}
 
 /**
  * Discord's two rows under a profile: "3 mutual friends", "2 mutual servers",

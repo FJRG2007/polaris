@@ -263,6 +263,24 @@ describe("the larger view", () => {
         expect(link.getAttribute("href")).toBe("/u/grace");
     });
 
+    it("says since when you are friends, and offers a message when there is nothing to show", async () => {
+        Object.assign(profiles[GRACE] as object, {
+            memberSince: "2021-03-04T10:00:00.000Z",
+            friendsSince: "2024-06-01T10:00:00.000Z",
+            friendship: "friends",
+            recent: []
+        });
+        const user = userEvent.setup();
+        conversation();
+        await user.click(screen.getByRole("button", { name: "Grace Hopper" }));
+        const card = await openCard();
+        await user.click(within(card).getByRole("button", { name: "View full profile" }));
+        expect(await screen.findByText("Friends since")).toBeDefined();
+        expect(screen.getByText("Jun 1, 2024")).toBeDefined();
+        expect(await screen.findByText("Grace Hopper has no activity to share here")).toBeDefined();
+        expect(screen.getAllByRole("button", { name: "Message" }).length).toBeGreaterThan(0);
+    });
+
     it("offers no page for somebody without an address", async () => {
         (profiles[GRACE] as { username: string }).username = "";
         const user = userEvent.setup();

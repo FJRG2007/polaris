@@ -62,7 +62,7 @@ import { MemberMenu, type MenuPerson } from "./member-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import { Button, Dialog, DialogContent, DialogTitle } from "@polaris/ui";
-import { ProfileDetails, useChatProfile } from "./profile-details";
+import { ProfileDetails, useChatProfile, type MutualTab } from "./profile-details";
 
 /** Somebody, as this panel draws them. */
 export interface DirectPerson {
@@ -237,8 +237,9 @@ export function DirectProfile({
      *  appears. */
     const [naming, setNaming] = useState<MenuPerson | null>(null);
     const [error, setError] = useState("");
-    /** The larger view, opened from the button at the bottom. */
-    const [expanded, setExpanded] = useState(false);
+    /** The larger view, and the tab it opens on: activity from the button at
+     *  the bottom, a list of what you share from its count. */
+    const [expanded, setExpanded] = useState<"activity" | MutualTab | null>(null);
     if (!person || !open) return null;
 
     const bannerActions = (
@@ -276,22 +277,27 @@ export function DirectProfile({
         </p>
     ) : null;
 
+    const fullProfile = (
+        <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={() => setExpanded("activity")}
+        >
+            {t("personCard.viewFullProfile")}
+        </Button>
+    );
+
     const details = (
         <ProfileDetails
             person={person}
             profile={profile}
             loading={loading}
             bannerActions={bannerActions}
-            footer={
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setExpanded(true)}
-                >
-                    {t("personCard.viewFullProfile")}
-                </Button>
-            }
+            onMutual={setExpanded}
+            // The column keeps it at its foot, below the scroll, as Discord
+            // does; the phone's dialog ends with it.
+            footer={wide ? undefined : fullProfile}
         />
     );
 
@@ -310,7 +316,8 @@ export function DirectProfile({
                     viewerId={viewerId}
                     onMention={onMention}
                     onNickname={setNaming}
-                    onClose={() => setExpanded(false)}
+                    onClose={() => setExpanded(null)}
+                    initialTab={expanded}
                 />
             ) : null}
         </>
@@ -352,6 +359,7 @@ export function DirectProfile({
                 {refusal}
                 {details}
             </div>
+            <div className="shrink-0 p-3">{fullProfile}</div>
             {extras}
         </SidePane>
     );
