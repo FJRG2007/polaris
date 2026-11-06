@@ -147,6 +147,25 @@ describe("the page", () => {
         expect(source).toContain('className="lg:col-span-2"');
     });
 
+    it("installs from the browser as a row of the desktop card, with the TV card next", async () => {
+        const layout = await readFile(
+            `${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`,
+            "utf8"
+        );
+        const desktop = layout.indexOf('id="desktop"');
+        const app = layout.indexOf('id="app"');
+        const tv = layout.indexOf("{tv ?? (");
+        // Inside the desktop card, before it closes.
+        expect(app).toBeGreaterThan(desktop);
+        expect(app).toBeLessThan(layout.indexOf("</DownloadCard>", desktop));
+        expect(layout.slice(app, tv)).toContain("<DownloadRow");
+        // The place it freed goes to the TV, ahead of every other card.
+        expect(tv).toBeGreaterThan(app);
+        expect(tv).toBeLessThan(layout.indexOf("<ExtensionCard"));
+        // A page with no TV slot, the public site, still draws the card.
+        expect(layout.slice(tv)).toContain('id="tv"');
+    });
+
     it("offers no download for a phone, only the plain fact that it is planned", async () => {
         const source =
             await // The page and the shared layout it renders, which the public site draws too.

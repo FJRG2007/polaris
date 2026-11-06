@@ -14,7 +14,7 @@ import { SystemMark } from "./client-marks";
 import { useTranslations } from "../../i18n";
 import { ExtensionCard } from "./extension-card";
 import { AssistantsCard } from "./assistants-card";
-import { Monitor, Smartphone } from "lucide-react";
+import { Globe, Monitor, Smartphone, Tv } from "lucide-react";
 import { DownloadCard, DownloadRow, DownloadRows } from "../download-card";
 import { DesktopPreview, PhonePreview } from "./download-previews";
 
@@ -34,13 +34,19 @@ export function DownloadsPage({
     repo: string;
     /** The address the CLI signs in to, or null for the one the page is on. */
     serverUrl: string | null;
-    /** The browser's install offer, drawn in the desktop card as the other way. */
-    webApp: ReactNode;
+    /**
+     * The browser's install offer, drawn as a row of the desktop card. Without
+     * one, the row names where the browser keeps its own install entry.
+     */
+    webApp?: ReactNode;
     extensionFiles: ReactNode;
     /** The Stream Deck card. */
     deck: ReactNode;
     desktopFiles: ReactNode;
-    /** The TV card, where this page can offer it. */
+    /**
+     * The TV card, where this page can offer its install. Without one, the card
+     * still says what Polaris TV is and what installing it takes.
+     */
     tv?: ReactNode;
 }) {
     const t = useTranslations("account");
@@ -68,18 +74,44 @@ export function DownloadsPage({
                 >
                     {desktopFiles}
                     {/* The other way to have it in a window of its own: the
-                        browser's install offer, which needs no download. */}
-                    <div
-                        id="app"
-                        className="flex min-w-0 flex-col gap-2 border-t border-border/60 pt-3"
-                    >
-                        <p className="text-xs font-medium text-muted-foreground">
-                            {t("downloads.web.title")}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{tc("installApp.intro")}</p>
-                        {webApp}
+                        browser's install offer, which needs no download - a row
+                        of this card rather than a card of its own. */}
+                    <div id="app" className="min-w-0 scroll-mt-4">
+                        <DownloadRows label={t("downloads.web.title")}>
+                            <DownloadRow
+                                mark={<Globe className="size-4 shrink-0" />}
+                                name={t("downloads.web.name")}
+                                detail={tc("installApp.intro")}
+                            >
+                                {webApp ?? (
+                                    <p className="text-sm text-muted-foreground">
+                                        {tc("installApp.fromMenu")}
+                                    </p>
+                                )}
+                            </DownloadRow>
+                        </DownloadRows>
                     </div>
                 </DownloadCard>
+
+                {/* Beside the desktop app, since installing on a set goes through
+                    it. Where the page cannot drive that install, the card still
+                    says what it is and what it takes, with nothing to press. */}
+                {tv ?? (
+                    <DownloadCard
+                        id="tv"
+                        tint="sky"
+                        icon={<Tv className="size-4 shrink-0" />}
+                        title={t("downloads.tv.title")}
+                        description={t("downloads.tv.description")}
+                    >
+                        <p className="text-sm text-muted-foreground">
+                            {t("downloads.tv.needsApp")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("downloads.tv.supported")}
+                        </p>
+                    </DownloadCard>
+                )}
 
                 <ExtensionCard repo={repo} files={extensionFiles} />
 
@@ -88,8 +120,6 @@ export function DownloadsPage({
                 <CliSection repo={repo} serverUrl={serverUrl} />
 
                 <AssistantsCard />
-
-                {tv}
 
                 {/* Present, unlinked and honest. A real plan with nothing built,
                     and saying so is the only thing that can be said about it - a

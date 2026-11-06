@@ -4,15 +4,17 @@
  * The dashboard's Downloads page, the same components, fed with what the site
  * build read: the dashboard's own catalogs and the same release lookup. With
  * no signed-in reader, each slot shows what the dashboard shows somebody who
- * has nothing yet - no connected decks, the browser's own install menu - and
- * links to screens inside Polaris are drawn as words.
+ * has nothing yet - no connected decks, the browser's own install menu, a TV
+ * card with nothing to press - and links to screens inside Polaris are drawn
+ * as words. The install menu and the TV card are the shared page's own
+ * defaults, drawn when no slot is passed.
  */
 
 import type { ReactNode } from "react";
 import type { DownloadsData } from "@/data/builders";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
 import type { Locale, Namespaces } from "@polaris/core";
-import { I18nContext, useTranslations } from "@polaris/ui/i18n";
+import { I18nContext } from "@polaris/ui/i18n";
 import { AppHrefProvider } from "@polaris/ui/account-downloads/app-link";
 import { DeckCard, DeckFile } from "@polaris/ui/account-downloads/deck-card";
 import { DownloadsPage } from "@polaris/ui/account-downloads/downloads-page";
@@ -22,11 +24,6 @@ import {
 } from "@polaris/ui/account-downloads/app-download-offers";
 
 const nowhere = () => null;
-
-function BrowserInstall() {
-    const t = useTranslations("components");
-    return <p className="text-sm text-muted-foreground">{t("installApp.fromMenu")}</p>;
-}
 
 function Messages({
     locale,
@@ -59,7 +56,6 @@ export function SiteDownloads({
                 <DownloadsPage
                     repo={repo}
                     serverUrl={EXAMPLE_ORIGIN}
-                    webApp={<BrowserInstall />}
                     extensionFiles={<ExtensionFilesOffer download={files.extension} />}
                     deck={
                         <DeckCard
