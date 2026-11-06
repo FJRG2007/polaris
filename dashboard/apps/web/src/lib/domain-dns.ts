@@ -480,6 +480,11 @@ export interface HostnameDnsResult {
     /** Nothing was written because no address takes visitors right now: a backup
      *  tunnel holds the records and the line is behind a carrier. */
     noWayIn?: boolean;
+    /** The record written, for `created`, so whoever asked for it can remove exactly
+     *  that record when the name is no longer needed. */
+    recordId?: string;
+    /** The zone that record is in, for `created`. */
+    zoneId?: string;
 }
 
 /** What a served-by-its-own-server domain sits on, as the decision below reads it. */
@@ -627,7 +632,7 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
         await borrowRelayName(zone.id, name, ip);
         const recordId = await upsertARecord(token, zone.id, name, ip);
         await pruneDnsRecords(token, zone.id, recordId, existing);
-        return { status: "created", ip };
+        return { status: "created", ip, recordId, zoneId: zone.id };
     } catch (caught) {
         return {
             status: "manual",

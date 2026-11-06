@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { POLARIS_APP_CATALOG, findApp } from "@/lib/apps/catalog";
 import {
+    INSTALL_OUTLIVING_MODELS,
     INSTALL_SCOPED_MODELS,
     installFootprint,
     keptResources,
@@ -111,7 +112,9 @@ describe("install-scoped tables", () => {
             .filter(([, , body]) => /^\s*installedAppId\s+String/m.test(body!))
             .map(([, name]) => name!.charAt(0).toLowerCase() + name!.slice(1));
         expect(models.length).toBeGreaterThan(0);
-        expect([...INSTALL_SCOPED_MODELS].sort()).toEqual(models.sort());
+        expect([...INSTALL_SCOPED_MODELS, ...INSTALL_OUTLIVING_MODELS].sort()).toEqual(
+            models.sort()
+        );
     });
 
     it("knows every column under an install that points at a stored file", () => {

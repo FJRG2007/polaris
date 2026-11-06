@@ -271,8 +271,28 @@ async function runWorldTrims(): Promise<{ done: number; servers: number }> {
     return { done, servers };
 }
 
+/** Remove the DNS records deleted servers left behind. See `game-dns`. */
+async function runGameDnsSweep(): Promise<{
+    released: number;
+    failed: number;
+    legacyRemoved: number;
+}> {
+    const { sweepGameDns } = await import("./game-dns");
+    return sweepGameDns();
+}
+
 export function gameJobTable(): readonly AppJob[] {
     return [
+        {
+            key: "game-dns-sweep",
+            // Hourly: what it removes is a record nobody is using, so the only cost
+            // of waiting is an untidy zone, and each pass is a bounded slice of it.
+            everyMs: Number(process.env.POLARIS_GAME_DNS_SWEEP_MS) || 60 * MINUTE,
+            // Leased so two runners do not walk the same zone and race each other's
+            // deletes, and for longer than the gap so a slow pass is never overtaken.
+            leaseMs: 90 * MINUTE,
+            run: runGameDnsSweep
+        },
         {
             key: "game-firewall",
             everyMs: Number(process.env.POLARIS_GAME_FIREWALL_MS) || 2 * MINUTE,

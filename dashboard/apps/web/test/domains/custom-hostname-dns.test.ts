@@ -180,7 +180,9 @@ describe("provisionHostnameDns", () => {
     it("creates the record for a name on the operator's own domain", async () => {
         expect(await provisionHostnameDns("storefront.example.com")).toEqual({
             status: "created",
-            ip: "5.6.7.8"
+            ip: "5.6.7.8",
+            recordId: "record-1",
+            zoneId: "zone-1"
         });
         expect(upsertARecord).toHaveBeenCalledWith(
             "cf-token",
@@ -264,7 +266,9 @@ describe("provisionHostnameDns", () => {
 
             expect(await provisionHostnameDns("api.example.com")).toEqual({
                 status: "created",
-                ip: "54.0.0.10"
+                ip: "54.0.0.10",
+                recordId: "record-1",
+                zoneId: "zone-1"
             });
             expect(upsertARecord).toHaveBeenCalledWith(
                 "cf-token",

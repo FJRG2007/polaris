@@ -29,6 +29,7 @@ import { clearSounds } from "../lib/minecraft/sounds-service";
 import { clearAnticheatFlags } from "../lib/minecraft/polaris-anticheat-service";
 import { clearSanctions } from "../lib/sanctions-service";
 import { prisma } from "@polaris/db";
+import * as gameDns from "../lib/game-dns";
 import { gameServerCatalogIds } from "../lib/game-catalog";
 import { isTemplateName, type ServerTemplateView } from "../lib/game-templates";
 import { adoptGameServersApp, installGameServersApp } from "../lib/game-install";
@@ -427,6 +428,32 @@ export async function redeployGameServerAction(
     }
 }
 
+/** DNS records of deleted servers the provider has not let go of yet, for the
+ *  notice on the list. Null when there are none. The provider's reason is only
+ *  an administrator's to read. */
+export async function gameDnsLeftoversAction(): Promise<{
+    count: number;
+    noToken: boolean;
+    reason: string | null;
+} | null> {
+    const user = await requirePermission("games.manage");
+    const { count, reason } = await gameDns.gameDnsLeftovers(user.id);
+    if (count === 0) return null;
+    const noToken = reason === gameDns.NO_TOKEN;
+    return { count, noToken, reason: noToken || !user.isAdmin ? null : reason };
+}
+
+/** Try removing those records again now, rather than at the next sweep. */
+export async function retryGameDnsLeftoversAction(): Promise<{
+    count: number;
+    noToken: boolean;
+    reason: string | null;
+} | null> {
+    const user = await requirePermission("games.manage");
+    await gameDns.retryGameDnsLeftovers(user.id);
+    return gameDnsLeftoversAction();
+}
+
 /**
  * Delete a server: its container, and the install that listed it.
  *
@@ -438,6 +465,10 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
     try {
         const { user, access } = await requireGameServerOwner(installedAppId);
         await uninstallApp(access.ownerId, installedAppId);
+        // The records written for its name go with it. Never in the way of the
+        // delete: one the provider would not remove stays marked, the list says so,
+        // and the hourly sweep tries it again.
+        await gameDns.releaseGameDns(installedAppId);
         // The server is gone, so the access people were given to it is too. An
         // orphan grant reaches nothing, but leaving it would show up on their page
         // as access to a thing that no longer exists.

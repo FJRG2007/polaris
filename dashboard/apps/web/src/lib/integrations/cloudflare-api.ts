@@ -20,9 +20,13 @@ interface CfEnvelope<T> {
 /** What Cloudflare said when it refused a request, or that it could not be
  *  reached - sentences about the request, safe to show whoever made it. */
 export class CloudflareApiError extends Error {
-    constructor(message: string) {
+    /** The HTTP status Cloudflare answered with, when it answered at all. */
+    readonly status: number | null;
+
+    constructor(message: string, status: number | null = null) {
         super(message);
         this.name = "CloudflareApiError";
+        this.status = status;
     }
 }
 
@@ -52,7 +56,10 @@ async function cf<T>(token: string, method: string, path: string, body?: unknown
             ?.map((error) => error.message)
             .filter(Boolean)
             .join("; ");
-        throw new CloudflareApiError(detail || `Cloudflare API error (HTTP ${res.status})`);
+        throw new CloudflareApiError(
+            detail || `Cloudflare API error (HTTP ${res.status})`,
+            res.status
+        );
     }
     return payload.result;
 }
@@ -721,6 +728,81 @@ export async function deleteDnsRecord(
     recordId: string
 ): Promise<void> {
     await cf(token, "DELETE", `/zones/${zoneId}/dns_records/${recordId}`);
+}
+
+/**
+ * Delete a record that may already be gone, and say which it was.
+ *
+ * A 404 is the outcome the caller wanted, so it is not an error here; anything
+ * else (no answer, a refused token) throws, because then nobody knows whether the
+ * record is still there and the caller has to try again later.
+ */
+export async function deleteDnsRecordIfPresent(
+    token: string,
+    zoneId: string,
+    recordId: string
+): Promise<"deleted" | "absent"> {
+    try {
+        await cf(token, "DELETE", `/zones/${zoneId}/dns_records/${recordId}`);
+        return "deleted";
+    } catch (caught) {
+        if (caught instanceof CloudflareApiError && caught.status === 404) return "absent";
+        throw caught;
+    }
+}
+
+/** One record of a page of service records, with the fields a sweep compares. */
+export interface CfSrvRecord {
+    readonly id: string;
+    readonly name: string;
+    readonly target: string;
+    readonly port: number;
+}
+
+/** The most records one page of a sweep reads. */
+const SRV_PAGE_SIZE = 100;
+
+/**
+ * One page of the SRV records whose name starts and ends as given, so a sweep can
+ * walk a zone of any size a bounded page at a time. `more` is whether another page
+ * may follow; the filters narrow what Cloudflare sends, and a caller still checks
+ * every name itself before it acts on one.
+ */
+export async function listSrvRecordsPage(
+    token: string,
+    zoneId: string,
+    filter: { startsWith: string; endsWith: string },
+    page: number
+): Promise<{ records: CfSrvRecord[]; more: boolean }> {
+    const query = new URLSearchParams({
+        type: "SRV",
+        "name.startswith": filter.startsWith,
+        "name.endswith": filter.endsWith,
+        per_page: String(SRV_PAGE_SIZE),
+        page: String(page)
+    });
+    const rows = await cf<Array<Record<string, unknown>>>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?${query.toString()}`
+    );
+    if (!Array.isArray(rows)) return { records: [], more: false };
+    const records = rows.flatMap((row) => {
+        if (typeof row.id !== "string" || typeof row.name !== "string") return [];
+        const data = (row.data ?? {}) as Record<string, unknown>;
+        return [
+            {
+                id: row.id,
+                name: row.name.toLowerCase(),
+                target:
+                    typeof data.target === "string"
+                        ? data.target.toLowerCase().replace(/\.$/, "")
+                        : "",
+                port: typeof data.port === "number" ? data.port : 0
+            }
+        ];
+    });
+    return { records, more: rows.length >= SRV_PAGE_SIZE };
 }
 
 /** Best-effort deletion of a tunnel (only succeeds once its connector has stopped). */

@@ -478,7 +478,9 @@ export const serverHost = {
     },
     integrationsCloudflareApi: {
         deleteDnsRecord: later(load.integrationsCloudflareApi, "deleteDnsRecord"),
+        deleteDnsRecordIfPresent: later(load.integrationsCloudflareApi, "deleteDnsRecordIfPresent"),
         findDnsRecords: later(load.integrationsCloudflareApi, "findDnsRecords"),
+        listSrvRecordsPage: later(load.integrationsCloudflareApi, "listSrvRecordsPage"),
         resolveZoneForHostname: later(load.integrationsCloudflareApi, "resolveZoneForHostname"),
         upsertSrvRecord: later(load.integrationsCloudflareApi, "upsertSrvRecord")
     },
