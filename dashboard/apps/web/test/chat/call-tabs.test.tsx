@@ -74,9 +74,13 @@ vi.mock("@/lib/call-sounds", () => ({
 /** Where this account's seat is, as the server would answer. Null is the usual
  *  case - nobody has picked the call up anywhere. */
 let seatElsewhere: { meetingId: string } | null = null;
+/** The calls this account declined on another device, as the server would
+ *  answer. */
+let declinedElsewhere: string[] = [];
 
 vi.mock("@/lib/chat/call-elsewhere-request", () => ({
-    askCallElsewhere: async () => seatElsewhere
+    askCallElsewhere: async () => seatElsewhere,
+    askRingState: async () => ({ call: seatElsewhere, declined: declinedElsewhere })
 }));
 
 /** A call coming in, as the stream announces one. */
@@ -96,6 +100,7 @@ beforeEach(() => {
     posted = [];
     session = null;
     seatElsewhere = null;
+    declinedElsewhere = [];
 });
 
 afterEach(() => {
@@ -171,6 +176,22 @@ describe("a call ringing in several tabs", () => {
         await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull(), {
             timeout: 8_000
         });
+    });
+
+    it("stops when the call was hung up on another device whose frame never arrived", async () => {
+        // Declined on the desktop while this browser's stream was reconnecting:
+        // the `call-settled` frame went out and was gone, so only the next ask
+        // can say so.
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        onFrame?.(ring("m1"), { owner: true });
+        expect(await screen.findByText("Grace is calling")).toBeTruthy();
+
+        declinedElsewhere = ["m1"];
+
+        await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull(), {
+            timeout: 8_000
+        });
+        expect(posted).toContainEqual({ kind: "settled", meetingId: "m1" });
     });
 
     it("tells the others when the call was answered anywhere in Polaris", async () => {

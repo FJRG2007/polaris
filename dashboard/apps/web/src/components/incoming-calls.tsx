@@ -36,6 +36,7 @@
 import { whereLine } from "@/lib/chat/call-place";
 import Link from "next/link";
 import { Avatar } from "./avatar";
+import { avatarUrl } from "@/lib/avatar-url";
 import { Button } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useSessionScope } from "./session-scope";
@@ -49,6 +50,7 @@ import {
     answersMissedCall,
     leavesMissedCall,
     ringDecision,
+    ringsToStop,
     roomAfter,
     type RingRoom
 } from "@/lib/chat/ring-decision";
@@ -59,7 +61,7 @@ import {
     tabIsWatched,
     type NoticeStanding
 } from "@/lib/desktop-notify";
-import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
+import { askRingState } from "@/lib/chat/call-elsewhere-request";
 import { declineCall } from "@/app/(app)/chat/call-requests";
 import { publishCardRings, shownStages, stageShown, subscribeStages } from "@/lib/chat/call-stage";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
@@ -340,9 +342,11 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         let stopped = false;
 
         async function ask(): Promise<void> {
-            const elsewhere = await askCallElsewhere();
-            if (stopped || !elsewhere) return;
-            settle(elsewhere.meetingId);
+            const state = await askRingState();
+            if (stopped || !state) return;
+            // Answered on another device, or declined on one whose frame this
+            // tab never heard: either way it stops ringing here.
+            for (const meetingId of ringsToStop(state, live.current)) settle(meetingId);
         }
 
         function onVisible(): void {
@@ -554,6 +558,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         : t("calls.answerHere"),
                     tag: `call:${entry.meetingId}`,
                     href: `/chat/c/${entry.channelId}`,
+                    ...(entry.userId ? { icon: avatarUrl(entry.userId) } : {}),
                     insistent: true,
                     // The one notice in Polaris that may ring - and only where
                     // the ring itself cannot be heard, which is the whole reason
