@@ -936,15 +936,17 @@ export function ChannelView({
      * does not put the bar back over an empty box.
      */
     const quoting = params.get("quote");
+    const quotedFrom = params.get("from");
     const quoted = useRef<string | null>(null);
     useEffect(() => {
         if (!quoting || quoted.current === quoting) return;
         quoted.current = quoting;
         router.replace(`/chat/c/${channelId}`, { scroll: false });
-        void runAction(() => polls.carriedMessage(quoting), setError).then((result) => {
+        const proof = quotedFrom ? unlockProofFor(quotedFrom) : null;
+        void runAction(() => polls.carriedMessage(quoting, proof), setError).then((result) => {
             if (result?.carried) setCarried(result.carried);
         });
-    }, [channelId, quoting, router]);
+    }, [channelId, quoting, quotedFrom, router]);
 
     // Leaving the conversation drops it. What is on the bar is about this box in
     // this room; carrying it to the next one would offer to answer a stranger's
@@ -1069,7 +1071,11 @@ export function ChannelView({
             if (asked.length === 0) return;
             const results = await Promise.all(
                 inBatches(asked, MAX_REREAD).map((messageIds) =>
-                    actions.rereadAction({ channelId, messageIds })
+                    actions.rereadAction({
+                        channelId,
+                        messageIds,
+                        proof: unlockProofFor(channelId)
+                    })
                 )
             );
             const fresh: ChatMessageView[] = [];
@@ -1209,7 +1215,7 @@ export function ChannelView({
             // privately ends up looking exactly like answering anything else, which
             // is the whole point: a dialog with a box of its own was a second way to
             // write a message, and people already know the first one.
-            router.push(`/chat/c/${result.id}?quote=${message.id}`);
+            router.push(`/chat/c/${result.id}?quote=${message.id}&from=${message.channelId}`);
         },
         [router]
     );
@@ -1848,7 +1854,7 @@ export function ChannelView({
         // to the conversation its parent is in - so it goes the way forwarding
         // goes: quoted, with what was typed as the note on top. The bar above the
         // box reads as a reply either way, which is the only part anybody sees.
-        const elsewhere = !replyingTo && carried ? carried.message.id : null;
+        const elsewhere = !replyingTo && carried ? carried.message : null;
         // Cleared before the round trip: the bar is about what is being written,
         // and the message has left.
         setReplyingTo(null);
@@ -1857,12 +1863,15 @@ export function ChannelView({
         const result = await runAction(
             () =>
                 elsewhere
-                    ? actions.forwardAction({
-                          messageId: elsewhere,
-                          channelId,
-                          note: body,
-                          translation
-                      })
+                    ? actions.forwardAction(
+                          {
+                              messageId: elsewhere.id,
+                              channelId,
+                              note: body,
+                              translation
+                          },
+                          unlockProofFor(elsewhere.channelId)
+                      )
                     : actions.sendAction({ channelId, body, replyToId: answering, translation }),
             setError
         );
@@ -2408,6 +2417,12 @@ export function ChannelView({
             channelId={channelId}
             onUnlocked={() => {
                 setNeedsCode(false);
+                setError("");
+                void load();
+                void pins.reload();
+            }}
+            onReset={() => {
+                refresh();
                 setError("");
                 void load();
                 void pins.reload();

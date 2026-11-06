@@ -20,7 +20,7 @@ import { reachableChannelIds } from "./access";
 import { ageClearedWhere } from "./age-gate";
 import { decorateMessages, type ChatMessageView } from "./messages";
 import * as history from "./history-visibility";
-import { concealedFor, readUnlockProof } from "./chat-lock";
+import { concealedFor, lockCodeHash, readUnlockProof } from "./chat-lock";
 
 /** One result, with enough about where it was said to be worth clicking. */
 export interface ChatSearchHit {
@@ -53,7 +53,8 @@ export async function searchMessages(
     const asked = input.channelId;
     const within = asked
         ? reachable.has(asked) &&
-          (!concealed.locked.has(asked) || readUnlockProof(proof, actor.id, asked))
+          (!concealed.locked.has(asked) ||
+              readUnlockProof(proof, actor.id, asked, await lockCodeHash(actor.id)))
             ? [asked]
             : []
         : [...reachable].filter((id) => !concealed.hidden.has(id) && !concealed.locked.has(id));

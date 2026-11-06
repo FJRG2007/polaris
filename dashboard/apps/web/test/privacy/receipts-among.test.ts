@@ -22,14 +22,34 @@ vi.mock("@polaris/db", () => ({
                     .map((userId) => ({ userId, readReceipts: stored.get(userId) })),
             findUnique
         },
-        privacyFieldList: { findMany: async () => [] },
-        privacyListMember: { findMany: async () => [] },
+        privacyFieldList: {
+            findMany: async () => [],
+            findUnique: async ({ where }: { where: { userId_field: { userId: string } } }) =>
+                where.userId_field.userId === "me" && listMembers.length > 0
+                    ? { listId: "list-1" }
+                    : null
+        },
+        privacyListMember: {
+            findMany: async ({ where }: { where: { userId: string | { in: string[] } } }) =>
+                typeof where.userId === "object"
+                    ? listMembers
+                          .filter((userId) =>
+                              (where.userId as { in: string[] }).in.includes(userId)
+                          )
+                          .map((userId) => ({ userId }))
+                    : []
+        },
         follow: { findMany: async () => [] },
         friendship: { findMany: async () => [] }
     }
 }));
 
-vi.mock("@/lib/friends-service", () => ({ friendIds: async () => new Set<string>() }));
+/** Who the viewer's own list names, and who their friends are. */
+let listMembers: string[] = [];
+let friendsOf = new Map<string, string[]>();
+const friendIds = vi.fn(async (userId: string) => new Set(friendsOf.get(userId) ?? []));
+
+vi.mock("@/lib/friends-service", () => ({ friendIds: (userId: string) => friendIds(userId) }));
 
 const { receiptsAmong } = await import("@/lib/privacy-service");
 
@@ -37,7 +57,10 @@ const viewer = { id: "me", isAdmin: false };
 
 beforeEach(() => {
     stored = new Map();
+    listMembers = [];
+    friendsOf = new Map();
     findUnique.mockClear();
+    friendIds.mockClear();
 });
 
 describe("receiptsAmong", () => {
@@ -58,6 +81,29 @@ describe("receiptsAmong", () => {
             ["a", "everyone"]
         ]);
         expect(await receiptsAmong(viewer, ["a"])).toEqual(new Set());
+    });
+
+    it("settles a friends-only viewer from one read of their friends, not one per row", async () => {
+        stored = new Map([
+            ["me", "friends"],
+            ["a", "everyone"],
+            ["b", "everyone"],
+            ["c", "everyone"]
+        ]);
+        friendsOf = new Map([["me", ["a", "c"]]]);
+        expect(await receiptsAmong(viewer, ["a", "b", "c"])).toEqual(new Set(["a", "c"]));
+        expect(friendIds).toHaveBeenCalledTimes(1);
+        expect(friendIds).toHaveBeenCalledWith("me");
+    });
+
+    it("reads the viewer's own list once for an audience that names people", async () => {
+        stored = new Map([
+            ["me", "only"],
+            ["a", "everyone"],
+            ["b", "everyone"]
+        ]);
+        listMembers = ["b"];
+        expect(await receiptsAmong(viewer, ["a", "b"])).toEqual(new Set(["b"]));
     });
 
     it("lets an administrator see them all", async () => {

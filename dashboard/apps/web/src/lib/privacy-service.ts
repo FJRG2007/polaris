@@ -700,10 +700,73 @@ export async function receiptsAmong(
     const audience = core.storedAudience("readReceipts", row?.readReceipts ?? null);
     if (audience === "nobody") return new Set();
     if (audience === "everyone") return new Set(candidates);
-    const mine = await Promise.all(
-        candidates.map((id) => maySee(viewer.id, "readReceipts", { id, isAdmin: false }))
+    return admittedBy(viewer.id, "readReceipts", audience, candidates);
+}
+
+/**
+ * `allowedBy` turned round: which of these viewers one subject's audience lets
+ * in. The same reads, each asked once for the whole set, so a list of people
+ * asking about one account costs what one of them would.
+ */
+async function admittedBy(
+    subjectId: string,
+    field: keyof core.PrivacySettings,
+    audience: core.PrivacyAudience,
+    viewerIds: readonly string[]
+): Promise<Set<string>> {
+    const ids = [...new Set(viewerIds)].filter((id) => id !== "" && id !== subjectId);
+    const reaching = core.audienceNeedsReach(audience);
+    const needsFriends =
+        audience === "friends" ||
+        audience === "friendsExcept" ||
+        audience === "friendsOfFriends" ||
+        core.audienceNeedsSpaces(audience);
+    const [listed, friends, reach, shared, rooms] = await Promise.all([
+        core.audienceNeedsList(audience)
+            ? listedBy(subjectId, field, ids)
+            : Promise.resolve(new Set<string>()),
+        needsFriends && ids.length > 0 ? friendIds(subjectId) : Promise.resolve(new Set<string>()),
+        reachBetween(subjectId, reaching && audience !== "friendsOfFriends" ? ids : []),
+        sharingAFriend(subjectId, reaching && audience === "friendsOfFriends" ? ids : []),
+        sharingASpace(subjectId, core.audienceNeedsSpaces(audience) ? ids : [])
+    ]);
+    // Asked from the subject's side, so each direction of following reads the
+    // other way round: the subject is the one `reachBetween` calls the viewer.
+    return new Set(
+        viewerIds.filter((viewerId) =>
+            core.audienceAllows(audience, {
+                self: viewerId === subjectId,
+                friends: friends.has(viewerId),
+                viewerIsAdmin: false,
+                inList: listed.has(viewerId),
+                subjectFollowsViewer: reach.viewerFollows.has(viewerId),
+                viewerFollowsSubject: reach.subjectFollows.has(viewerId),
+                sharesAFriend: shared.has(viewerId),
+                sharesSpace: rooms.any.has(viewerId),
+                sharesSmallSpace: rooms.small.has(viewerId)
+            })
+        )
     );
-    return new Set(candidates.filter((_, index) => mine[index]));
+}
+
+/** Which of these viewers are on the list one subject's rule names. Two reads,
+ *  whatever the number of viewers. */
+async function listedBy(
+    subjectId: string,
+    field: keyof core.PrivacySettings,
+    viewerIds: readonly string[]
+): Promise<Set<string>> {
+    if (viewerIds.length === 0) return new Set();
+    const link = await prisma.privacyFieldList.findUnique({
+        where: { userId_field: { userId: subjectId, field } },
+        select: { listId: true }
+    });
+    if (!link) return new Set();
+    const rows = await prisma.privacyListMember.findMany({
+        where: { listId: link.listId, userId: { in: [...viewerIds] } },
+        select: { userId: true }
+    });
+    return new Set(rows.map((row) => row.userId));
 }
 
 // ---------------------------------------------------------------------------

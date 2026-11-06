@@ -67,6 +67,7 @@ vi.mock("@/app/(app)/chat/emoji-actions", () => ({
 vi.mock("@/app/(app)/chat/lock-actions", () => ({
     lockStateAction: async () => ({ hasCode: false, hideLocked: false })
 }));
+vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
     // The conversation asks what this reader has waiting the moment it
     // opens. Nothing, here - but the module is mocked, so it has to be

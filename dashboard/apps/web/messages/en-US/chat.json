@@ -228,7 +228,8 @@
         "lockNoCode": "Set a chat lock code first",
         "lockTooMany": "Too many tries. Wait a few minutes",
         "lockWrongCode": "That code is not right",
-        "lockRequired": "This chat is locked. Enter your code to open it"
+        "lockRequired": "This chat is locked. Enter your code to open it",
+        "lockResetUnconfirmed": "Confirm it is you first"
     },
     "media": {
         "refused": {
@@ -2227,6 +2228,9 @@
         "settingsHint": "One code opens every chat you lock",
         "manage": "Chat lock settings",
         "back": "All chats",
-        "removeLockAsk": "Enter your code to remove the lock"
+        "removeLockAsk": "Enter your code to remove the lock",
+        "forgot": "Forgot code?",
+        "resetTitle": "Remove chat lock",
+        "resetHint": "Confirm it is you to remove the code. Your locked chats open again"
     }
 }

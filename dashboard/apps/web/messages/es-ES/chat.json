@@ -228,7 +228,8 @@
         "lockNoCode": "Primero crea un código de bloqueo",
         "lockTooMany": "Demasiados intentos. Espera unos minutos",
         "lockWrongCode": "Ese código no es correcto",
-        "lockRequired": "Este chat está bloqueado. Escribe tu código para abrirlo"
+        "lockRequired": "Este chat está bloqueado. Escribe tu código para abrirlo",
+        "lockResetUnconfirmed": "Confirma primero que eres tú"
     },
     "media": {
         "refused": {
@@ -2227,6 +2228,9 @@
         "settingsHint": "Un solo código abre todos los chats que bloquees",
         "manage": "Ajustes de bloqueo",
         "back": "Ver todos",
-        "removeLockAsk": "Escribe tu código para quitar el bloqueo"
+        "removeLockAsk": "Escribe tu código para quitar el bloqueo",
+        "forgot": "¿Has olvidado el código?",
+        "resetTitle": "Quitar el bloqueo",
+        "resetHint": "Confirma que eres tú para quitar el código. Tus chats bloqueados vuelven a abrirse"
     }
 }

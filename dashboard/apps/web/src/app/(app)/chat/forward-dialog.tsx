@@ -31,6 +31,7 @@ import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { forwardAction } from "./actions";
+import { unlockProofFor } from "./lock-session";
 import { fitsLength, sentRecord } from "./outgoing-translation";
 import { runAction } from "@/lib/run-action";
 import { plainText } from "@/components/rich-text/excerpt";
@@ -283,7 +284,11 @@ export function ForwardDialog({
         for (const id of going) {
             const words = noteFor(note, languageOf(id), translations);
             const result = await runAction(
-                () => forwardAction({ messageId: message.id, channelId: id, ...words }),
+                () =>
+                    forwardAction(
+                        { messageId: message.id, channelId: id, ...words },
+                        unlockProofFor(message.channelId)
+                    ),
                 () => undefined
             );
             if (!result || result.error) refused.push(id);

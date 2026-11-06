@@ -32,6 +32,7 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
 vi.mock("@/app/(app)/chat/lock-actions", () => ({
     lockStateAction: async () => ({ hasCode: false, hideLocked: false })
 }));
+vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
     voicePresenceAction: async () => ({ inRoom: {} }),
     markChannelsReadAction: async (input: { channelIds: string[] }) => {

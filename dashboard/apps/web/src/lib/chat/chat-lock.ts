@@ -105,6 +105,20 @@ export async function setLockCode(actor: ChatActor, code: string, current?: stri
     });
 }
 
+/** Take the code away, and with it every lock it guarded: the way back for a
+ *  reader who forgot it, once they have proved who they are. */
+export async function resetLockCode(actor: ChatActor): Promise<void> {
+    await prisma.$transaction([
+        prisma.chatChannelMember.updateMany({
+            where: { userId: actor.id, locked: true },
+            data: { locked: false }
+        }),
+        prisma.chatLock.deleteMany({ where: { userId: actor.id } })
+    ]);
+    await resetRateLimit(`chat-lock:${actor.id}`);
+    publishChatChange({ kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
 export async function setHideLocked(actor: ChatActor, hide: boolean): Promise<void> {
     const updated = await prisma.chatLock.updateMany({
         where: { userId: actor.id },
@@ -189,31 +203,47 @@ export const unlockSchema = z.object({
     code: lockCodeSchema
 });
 
-function signProof(userId: string, channelId: string, expires: string): string {
+function signProof(userId: string, channelId: string, codeHash: string, expires: string): string {
     return createHmac("sha256", loadEnv().POLARIS_AUTH_SECRET)
-        .update(`chat-lock:${userId}:${channelId}:${expires}`)
+        .update(`chat-lock:${userId}:${channelId}:${expires}:${codeHash}`)
         .digest("base64url");
 }
 
-/** A proof that this reader opened this conversation with their code. */
-export function unlockProof(userId: string, channelId: string, now = Date.now()): string {
-    const expires = String(now + PROOF_TTL_MS);
-    return `${expires}.${signProof(userId, channelId, expires)}`;
+/** The reader's stored code hash, which every proof is bound to: a new code
+ *  turns every proof handed out under the old one away. */
+export async function lockCodeHash(userId: string): Promise<string | null> {
+    const row = await prisma.chatLock.findUnique({
+        where: { userId },
+        select: { codeHash: true }
+    });
+    return row?.codeHash ?? null;
 }
 
-/** Whether a proof was minted for exactly this reader and conversation, and is
- *  still good. */
+/** A proof that this reader opened this conversation with their code. */
+export function unlockProof(
+    userId: string,
+    channelId: string,
+    codeHash: string,
+    now = Date.now()
+): string {
+    const expires = String(now + PROOF_TTL_MS);
+    return `${expires}.${signProof(userId, channelId, codeHash, expires)}`;
+}
+
+/** Whether a proof was minted for exactly this reader and conversation, under
+ *  the code they have now, and is still good. */
 export function readUnlockProof(
     proof: string | null | undefined,
     userId: string,
     channelId: string,
+    codeHash: string | null,
     now = Date.now()
 ): boolean {
-    if (!proof) return false;
+    if (!proof || !codeHash) return false;
     const [expires, signature] = proof.split(".");
     if (!expires || !signature || !/^\d{10,16}$/.test(expires)) return false;
     if (Number(expires) < now) return false;
-    const expected = Buffer.from(signProof(userId, channelId, expires), "utf8");
+    const expected = Buffer.from(signProof(userId, channelId, codeHash, expires), "utf8");
     const given = Buffer.from(signature, "utf8");
     return expected.length === given.length && timingSafeEqual(expected, given);
 }
@@ -229,7 +259,7 @@ export async function requireUnlocked(
         select: { locked: true }
     });
     if (!row?.locked) return;
-    if (!readUnlockProof(proof, actor.id, channelId))
+    if (!readUnlockProof(proof, actor.id, channelId, await lockCodeHash(actor.id)))
         throw new ChatAccessError({ key: "errors.lockRequired" });
 }
 
@@ -242,7 +272,9 @@ export async function unlockChannel(
     await requireChannel(actor, channelId);
     if (!(await verifyLockCode(actor, code)))
         throw new ChatAccessError({ key: "errors.lockWrongCode" });
-    return unlockProof(actor.id, channelId);
+    const codeHash = await lockCodeHash(actor.id);
+    if (!codeHash) throw new ChatAccessError({ key: "errors.lockNoCode" });
+    return unlockProof(actor.id, channelId, codeHash);
 }
 
 /** Open the "Locked chats" list with the code: a proof for each of them, so
@@ -250,12 +282,16 @@ export async function unlockChannel(
 export async function unlockAll(actor: ChatActor, code: string): Promise<Record<string, string>> {
     if (!(await verifyLockCode(actor, code)))
         throw new ChatAccessError({ key: "errors.lockWrongCode" });
-    const rows = await prisma.chatChannelMember.findMany({
-        where: { userId: actor.id, locked: true },
-        select: { channelId: true }
-    });
+    const [rows, codeHash] = await Promise.all([
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id, locked: true },
+            select: { channelId: true }
+        }),
+        lockCodeHash(actor.id)
+    ]);
+    if (!codeHash) throw new ChatAccessError({ key: "errors.lockNoCode" });
     return Object.fromEntries(
-        rows.map((row) => [row.channelId, unlockProof(actor.id, row.channelId)])
+        rows.map((row) => [row.channelId, unlockProof(actor.id, row.channelId, codeHash)])
     );
 }
 

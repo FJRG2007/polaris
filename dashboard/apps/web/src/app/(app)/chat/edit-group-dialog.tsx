@@ -394,7 +394,7 @@ function GifGrid({
                 aria-label={t("editGroup.searchGifs")}
                 onChange={(event) => setQuery(event.target.value)}
             />
-            <div className="grid max-h-80 grid-cols-3 gap-1.5 overflow-y-auto">
+            <div className="grid max-h-80 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain">
                 {shown.map((gif) => (
                     <button
                         key={gif.id}

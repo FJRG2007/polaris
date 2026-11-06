@@ -27,14 +27,23 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         chatLock: {
             findUnique: async () => fake.lock,
+            deleteMany: async () => {
+                fake.lock = null;
+                return { count: 1 };
+            },
             upsert: async (args: { update: { codeHash: string } }) => {
                 fake.upserts.push(args);
                 fake.lock = { codeHash: args.update.codeHash, hideLocked: false };
             }
         },
         chatChannelMember: {
-            findUnique: async () => ({ locked: fake.locked })
-        }
+            findUnique: async () => ({ locked: fake.locked }),
+            updateMany: async () => {
+                fake.locked = false;
+                return { count: 1 };
+            }
+        },
+        $transaction: async (steps: Promise<unknown>[]) => Promise.all(steps)
     }
 }));
 
@@ -100,13 +109,27 @@ describe("guesses", () => {
 describe("unlock proof", () => {
     it("opens exactly this reader's conversation until it runs out", () => {
         const now = 1_800_000_000_000;
-        const proof = lock.unlockProof("ada", channelId, now);
-        expect(lock.readUnlockProof(proof, "ada", channelId, now)).toBe(true);
-        expect(lock.readUnlockProof(proof, "bob", channelId, now)).toBe(false);
-        expect(lock.readUnlockProof(proof, "ada", "other", now)).toBe(false);
-        expect(lock.readUnlockProof(proof, "ada", channelId, now + 13 * 3_600_000)).toBe(false);
-        expect(lock.readUnlockProof(`${proof}x`, "ada", channelId, now)).toBe(false);
-        expect(lock.readUnlockProof(null, "ada", channelId, now)).toBe(false);
+        const hash = "hash-1";
+        const proof = lock.unlockProof("ada", channelId, hash, now);
+        expect(lock.readUnlockProof(proof, "ada", channelId, hash, now)).toBe(true);
+        expect(lock.readUnlockProof(proof, "bob", channelId, hash, now)).toBe(false);
+        expect(lock.readUnlockProof(proof, "ada", "other", hash, now)).toBe(false);
+        expect(lock.readUnlockProof(proof, "ada", channelId, hash, now + 13 * 3_600_000)).toBe(
+            false
+        );
+        expect(lock.readUnlockProof(`${proof}x`, "ada", channelId, hash, now)).toBe(false);
+        expect(lock.readUnlockProof(null, "ada", channelId, hash, now)).toBe(false);
+    });
+
+    it("a new code turns away every proof handed out under the old one", async () => {
+        fake.locked = true;
+        const proof = await lock.unlockChannel(ada, channelId, "1234");
+        await expect(lock.requireUnlocked(ada, channelId, proof)).resolves.toBeUndefined();
+        await lock.setLockCode(ada, "5678", "1234");
+        await expect(lock.requireUnlocked(ada, channelId, proof)).rejects.toMatchObject({
+            text: { key: "errors.lockRequired" }
+        });
+        expect(lock.readUnlockProof(proof, "ada", channelId, null)).toBe(false);
     });
 
     it("refuses a locked conversation's messages without one", async () => {
@@ -115,9 +138,26 @@ describe("unlock proof", () => {
             text: { key: "errors.lockRequired" }
         });
         await expect(
-            lock.requireUnlocked(ada, channelId, lock.unlockProof("ada", channelId))
+            lock.requireUnlocked(
+                ada,
+                channelId,
+                lock.unlockProof("ada", channelId, fake.lock?.codeHash ?? "")
+            )
         ).resolves.toBeUndefined();
         fake.locked = false;
+        await expect(lock.requireUnlocked(ada, channelId, null)).resolves.toBeUndefined();
+    });
+});
+
+describe("forgotten code", () => {
+    it("reset takes the code and every lock away, and the guesses with them", async () => {
+        fake.locked = true;
+        fake.counts.set("chat-lock:ada", 8);
+        await lock.resetLockCode(ada);
+        expect(fake.lock).toBeNull();
+        expect(fake.locked).toBe(false);
+        expect(fake.counts.has("chat-lock:ada")).toBe(false);
+        expect(await lock.lockState("ada")).toEqual({ hasCode: false, hideLocked: false });
         await expect(lock.requireUnlocked(ada, channelId, null)).resolves.toBeUndefined();
     });
 });

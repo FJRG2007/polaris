@@ -9,8 +9,10 @@
 
 import type { LockShelf } from "./lock-shelf";
 import { ArrowLeft, EyeOff, Lock, Settings } from "lucide-react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { keepUnlockProofs } from "./lock-session";
+import { useChatStream } from "./use-chat-stream";
+import { StepUpDialog } from "@/components/step-up-dialog";
 import { runAction } from "@/lib/run-action";
 import type { ChatLockState } from "@/lib/chat/chat-lock";
 import * as lockActions from "./lock-actions";
@@ -35,19 +37,73 @@ function codeReady(code: string): boolean {
     return length >= CODE_MIN && length <= CODE_MAX;
 }
 
+const NO_LOCK: ChatLockState = { hasCode: false, hideLocked: false };
+
+/** "Forgot code?": confirm it is the account's owner, then the code goes and
+ *  every chat it locked opens. */
+function ForgotCode({ onReset }: { onReset: () => void }) {
+    const t = useTranslations("chat");
+    const [confirming, setConfirming] = useState(false);
+    const [error, setError] = useState("");
+    return (
+        <>
+            <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="self-start"
+                onClick={() => {
+                    setError("");
+                    setConfirming(true);
+                }}
+            >
+                {t("lock.forgot")}
+            </Button>
+            {error ? (
+                <p role="alert" className="text-xs text-danger">
+                    {error}
+                </p>
+            ) : null}
+            <StepUpDialog
+                open={confirming}
+                purpose="chat-lock-reset"
+                title={t("lock.resetTitle")}
+                description={t("lock.resetHint")}
+                onOpenChange={setConfirming}
+                onProved={async () => {
+                    const result = await runAction(
+                        () => lockActions.resetLockCodeAction(),
+                        setError
+                    );
+                    if (!result) return;
+                    if (result.error) {
+                        setError(result.error);
+                        return;
+                    }
+                    onReset();
+                }}
+            />
+        </>
+    );
+}
+
 /** Asks for the code. `submit` answers with a refusal, or nothing when it took. */
 export function LockCodeDialog({
     open,
     onOpenChange,
     title,
-    submit
+    submit,
+    onReset
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     title: string;
     submit: (code: string) => Promise<string | undefined>;
+    /** After a forgotten code was taken away: nothing is locked any more. */
+    onReset?: () => void;
 }) {
     const t = useTranslations("chat");
+    const lock = useChatLock();
     const [code, setCode] = useState("");
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -104,6 +160,13 @@ export function LockCodeDialog({
                             {error}
                         </p>
                     ) : null}
+                    <ForgotCode
+                        onReset={() => {
+                            lock.setState(NO_LOCK);
+                            onOpenChange(false);
+                            onReset?.();
+                        }}
+                    />
                     <DialogFooter>
                         <Button
                             type="button"
@@ -211,6 +274,14 @@ export function LockSettingsDialog({
                             }}
                         />
                     )}
+                    {state.hasCode && (
+                        <ForgotCode
+                            onReset={() => {
+                                setCurrent("");
+                                onChanged(NO_LOCK);
+                            }}
+                        />
+                    )}
                     {/* enigma:allow-no-breach-check enigma:allow-identity-password - a
                         chat lock code is a short PIN over a session that is already
                         signed in, not an account password: it opens nothing on its
@@ -265,10 +336,13 @@ export function LockSettingsDialog({
  */
 export function LockedGate({
     channelId,
-    onUnlocked
+    onUnlocked,
+    onReset
 }: {
     channelId: string;
     onUnlocked: () => void;
+    /** After a forgotten code was taken away: the conversation is not locked. */
+    onReset?: () => void;
 }) {
     const t = useTranslations("chat");
     const [asking, setAsking] = useState(true);
@@ -289,6 +363,7 @@ export function LockedGate({
                 open={asking}
                 onOpenChange={setAsking}
                 title={t("lock.enterCode")}
+                onReset={onReset ?? onUnlocked}
                 submit={async (code) => {
                     const result = await lockActions.unlockChannelAction({ channelId, code });
                     if (result.error || !result.proof) return result.error ?? t("lock.failed");
@@ -321,8 +396,9 @@ export function useChatLock(): ChatLockContextValue {
 /** The reader's lock state for the sidebar and its row menus, with the
  *  settings dialog they open. */
 export function ChatLockProvider({ children }: { children: React.ReactNode }) {
-    const [state, setState] = useState<ChatLockState>({ hasCode: false, hideLocked: false });
+    const [state, setState] = useState<ChatLockState>(NO_LOCK);
     const [settings, setSettings] = useState(false);
+    const [asked, setAsked] = useState(0);
     useEffect(() => {
         let live = true;
         void runAction(
@@ -334,7 +410,13 @@ export function ChatLockProvider({ children }: { children: React.ReactNode }) {
         return () => {
             live = false;
         };
-    }, []);
+    }, [asked]);
+    // A code taken away from the open conversation, or from another tab.
+    useChatStream(
+        useCallback((frame) => {
+            if (frame.kind === "channels") setAsked((count) => count + 1);
+        }, [])
+    );
     const value = useMemo(
         () => ({ state, setState, openSettings: () => setSettings(true) }),
         [state]

@@ -13,19 +13,20 @@ import { revalidatePath } from "next/cache";
 import * as lock from "@/lib/chat/chat-lock";
 import { guardChat } from "@/lib/chat/chat-guard";
 import { requirePermission } from "@/lib/session";
+import { stepUpGranted } from "@/lib/step-up-grant";
 import { getTranslations } from "@/lib/i18n/request";
 
 const CHAT_PATH = "/chat";
 
-async function actor(): Promise<{ id: string; name: string }> {
+async function actor(): Promise<{ id: string; name: string; sessionId: string }> {
     const user = await requirePermission("chat.use");
-    return { id: user.id, name: user.name };
+    return { id: user.id, name: user.name, sessionId: user.sessionId };
 }
 
 /** A refusal for input that did not parse, in the reader's language: a code
  *  that cannot be one is a wrong code, anything else a request that did not go. */
 async function invalid(
-    key: "errors.lockWrongCode" | "lock.failed" = "lock.failed"
+    key: "errors.lockWrongCode" | "errors.lockResetUnconfirmed" | "lock.failed" = "lock.failed"
 ): Promise<{ error: string }> {
     const t = await getTranslations("chat");
     return { error: t(key) };
@@ -48,6 +49,17 @@ export async function setLockCodeAction(input: unknown): Promise<{ error?: strin
     const result = await guardChat(() =>
         lock.setLockCode(me, parsed.data.code, parsed.data.current)
     );
+    return result.error ? { error: result.error } : {};
+}
+
+/** Forgot the code: once this session has just confirmed it is the account's
+ *  owner, the code goes and every chat it locked opens. */
+export async function resetLockCodeAction(): Promise<{ error?: string }> {
+    const me = await actor();
+    if (!(await stepUpGranted(me.id, me.sessionId, "chat-lock-reset")))
+        return invalid("errors.lockResetUnconfirmed");
+    const result = await guardChat(() => lock.resetLockCode(me));
+    if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : {};
 }
 

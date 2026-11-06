@@ -37,6 +37,7 @@ let concealed = { hidden: new Set<string>(), locked: new Set<string>(), hideLock
 const GOOD_PROOF = "good-proof";
 vi.mock("@/lib/chat/chat-lock", () => ({
     concealedFor: async () => concealed,
+    lockCodeHash: async () => "hash",
     readUnlockProof: (proof: string | null | undefined) => proof === GOOD_PROOF
 }));
 
