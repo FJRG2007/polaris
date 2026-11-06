@@ -55,7 +55,15 @@ describe("the sidecar's close reasons", () => {
     const source = readFileSync(new URL("../../ws-server.mjs", import.meta.url), "utf8");
     // Every literal reason a `ws.close(4xxx, "...")` sends, plus the words the
     // ssh failure kinds close with.
-    const literal = [...source.matchAll(/ws\.close\(4\d{3},\s*"([^"]+)"\)/g)].map((m) => m[1]);
+    // The session registry (terminal-sessions.mjs) closes viewers through a
+    // sink and its own `end`, with reasons the panel has to know too.
+    const sessions = readFileSync(new URL("../../terminal-sessions.mjs", import.meta.url), "utf8");
+    const literal = [
+        ...[...source.matchAll(/ws\.close\(4\d{3},\s*"([^"]+)"\)/g)].map((m) => m[1]),
+        ...[...sessions.matchAll(/(?:close|end)\((?:session, )?4\d{3},\s*"([^"]+)"\)/g)].map(
+            (m) => m[1]
+        )
+    ];
     const sshBlock = source.match(/const SSH_CLOSE_REASONS = \{([\s\S]*?)\};/)?.[1] ?? "";
     const ssh = [...sshBlock.matchAll(/:\s*"([^"]+)"/g)].map((m) => m[1]);
     const reasons = [...literal, ...ssh];

@@ -34,7 +34,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
 import { useFindServer } from "../use-find-server";
 import { useLiveResource } from "@/components/use-live-resource";
-import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
+import { ServerTerminals } from "@/app/(app)/apps/servers/server-terminals";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "../types";
 import { EnvironmentDialog, type EnvironmentTarget } from "../environment-dialog";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
@@ -432,10 +432,12 @@ export function ServerDetail({
                         </DialogFooter>
                     ) : null}
                     {shellOpen ? (
-                        <TerminalPanel
+                        <ServerTerminals
                             key={asRoot ? "root" : "login"}
-                            target={{ kind: "host", hostId: server.hostId ?? server.id, asRoot }}
-                            label={`${asRoot ? "root" : server.detail}@${server.address}`}
+                            hostId={server.hostId ?? server.id}
+                            asRoot={asRoot}
+                            login={server.detail}
+                            address={server.address}
                             findServer={() => findServer(server.hostId ?? server.id)}
                         />
                     ) : null}

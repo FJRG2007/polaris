@@ -12,6 +12,8 @@ import { readerWords } from "@/lib/i18n/reader-words";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Mint a one-shot terminal ticket for a container on a deploy target, a shell on
  * a registered server, or a container on a Containers connection.
@@ -31,6 +33,8 @@ export async function POST(request: Request): Promise<Response> {
         connectionId?: string;
         containerRef?: string;
         mode?: string;
+        /** For a server shell: the long-lived session to return to. */
+        terminalSessionId?: string;
     } | null;
 
     if (body?.connectionId) return mintContainersTicket(body.connectionId, body.containerRef ?? "");
@@ -56,11 +60,20 @@ export async function POST(request: Request): Promise<Response> {
         if (!(await canOpenHostShell(user.id, body.hostId, asRoot))) {
             // One answer for "no such server" and "that server never granted root",
             // since the caller has no business telling the two apart.
-            return NextResponse.json({ error: (await readerWords("api"))("errors.serverNotFound") }, { status: 404 });
+            return NextResponse.json(
+                { error: (await readerWords("api"))("errors.serverNotFound") },
+                { status: 404 }
+            );
         }
+        // The sidecar only finds the session if this same user opened it on this
+        // same server in this mode, so the id is a pointer, never an authority.
+        const resume =
+            typeof body.terminalSessionId === "string" && UUID.test(body.terminalSessionId)
+                ? body.terminalSessionId
+                : "";
         const token = await mintTerminalTicket(user.id, {
             targetId: body.hostId,
-            containerRef: "",
+            containerRef: resume,
             mode: asRoot ? "ssh-root" : "ssh"
         });
         return NextResponse.json({ token });
@@ -98,7 +111,11 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
         },
         select: { containerId: true, place: true, state: true }
     });
-    if (!session) return NextResponse.json({ error: (await readerWords("api"))("errors.sessionNotFound") }, { status: 404 });
+    if (!session)
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.sessionNotFound") },
+            { status: 404 }
+        );
     if (session.place !== "local" || !session.containerId) {
         return NextResponse.json(
             {
@@ -108,7 +125,10 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
         );
     }
     if (session.state === "stopped" || session.state === "failed") {
-        return NextResponse.json({ error: (await readerWords("api"))("errors.sessionEnded") }, { status: 409 });
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.sessionEnded") },
+            { status: 409 }
+        );
     }
     const token = await mintTerminalTicket(user.id, {
         targetId: sessionId,
@@ -143,7 +163,10 @@ async function mintServiceTicket(
             mode === "logs" ? "logs.read" : "console.use"
         );
     } catch {
-        return NextResponse.json({ error: (await readerWords("api"))("errors.serviceMissing") }, { status: 404 });
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.serviceMissing") },
+            { status: 404 }
+        );
     }
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
@@ -155,7 +178,11 @@ async function mintServiceTicket(
             environment: { select: { project: { select: { slug: true } } } }
         }
     });
-    if (!app) return NextResponse.json({ error: (await readerWords("api"))("errors.serviceMissing") }, { status: 404 });
+    if (!app)
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.serviceMissing") },
+            { status: 404 }
+        );
     const serving = await currentReleaseRef(app);
     const token = await mintTerminalTicket(userId, {
         targetId: app.targetId,
@@ -179,14 +206,22 @@ async function mintContainersTicket(connectionId: string, containerRef: string):
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
     if (!containerRef || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(containerRef)) {
-        return NextResponse.json({ error: (await readerWords("api"))("errors.containerRequired") }, { status: 400 });
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.containerRequired") },
+            { status: 400 }
+        );
     }
     if (accessFor(connectionId) !== "hostd") {
         try {
             await resolveDockerTransport(connectionId, user.id);
         } catch (caught) {
             return NextResponse.json(
-                { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.connectionNotFound") },
+                {
+                    error:
+                        caught instanceof Error
+                            ? caught.message
+                            : (await readerWords("api"))("errors.connectionNotFound")
+                },
                 { status: 404 }
             );
         }

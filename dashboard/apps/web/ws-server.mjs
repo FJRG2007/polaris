@@ -17,6 +17,7 @@
  * call, since only the web app can decrypt them.
  */
 
+import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
 import {
@@ -33,21 +34,49 @@ import {
     streamRpc,
     tcpTransport
 } from "@polaris/docker";
+import {
+    DEFAULT_IDLE_MINUTES,
+    DEFAULT_SCROLLBACK_BYTES,
+    attachServerShell,
+    createSessionRegistry,
+    positiveInt,
+    sessionsRequest
+} from "./terminal-sessions.mjs";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
 const internalKey = process.env.POLARIS_AUTH_SECRET || "";
 
+/**
+ * Server shells outlive their socket (see terminal-sessions.mjs). The limits
+ * have defaults here because an existing install never gets new variables; the
+ * per-user cap is an administrator setting the web app sends with each ticket.
+ */
+const sessions = createSessionRegistry({
+    idleMs: positiveInt(process.env.POLARIS_TERMINAL_IDLE_MINUTES, DEFAULT_IDLE_MINUTES) * 60_000,
+    scrollbackBytes: positiveInt(
+        process.env.POLARIS_TERMINAL_SCROLLBACK_BYTES,
+        DEFAULT_SCROLLBACK_BYTES
+    )
+});
+setInterval(() => sessions.sweep(), 60_000).unref();
+
+// The same port also answers the web app's loopback calls that list, rename and
+// close a user's sessions - the sidecar is the only process holding them.
+const server = createServer((req, res) => void handleInternal(req, res));
+server.listen(port);
+
 const wss = new WebSocketServer({
-    port,
+    server,
     path: "/api/deploy/ws",
     // Accept and echo the offered subprotocol (the ticket token).
     handleProtocols: (protocols) => [...protocols][0] ?? false
 });
 
-wss.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`));
+server.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`));
 
 wss.on("connection", async (ws, req) => {
+    ws.on("error", (err) => console.error(`polaris ws: socket error - ${err?.message ?? err}`));
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
     const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent"];
@@ -59,12 +88,15 @@ wss.on("connection", async (ws, req) => {
         return;
     }
 
+    if (ticket.mode === "ssh" || ticket.mode === "ssh-root") {
+        await attachServerShell(sessions, openSshSession, ticket, ws);
+        return;
+    }
+
     const session =
-        ticket.mode === "ssh" || ticket.mode === "ssh-root"
-            ? await openSshSession(ticket, ws)
-            : ticket.mode === "docker"
-              ? await openDockerSession(ticket, ws)
-              : await openContainerSession(ticket, ws, ticket.mode === "agent");
+        ticket.mode === "docker"
+            ? await openDockerSession(ticket, ws)
+            : await openContainerSession(ticket, ws, ticket.mode === "agent");
     if (!session) return;
 
     session.stream.on("data", (chunk) => {
@@ -92,6 +124,36 @@ wss.on("connection", async (ws, req) => {
 
     ws.on("close", () => session.close());
 });
+
+/** The web app's loopback calls on a user's sessions (see `sessionsRequest`). */
+async function handleInternal(req, res) {
+    const { status, body } = await sessionsRequest(sessions, internalKey, {
+        method: req.method,
+        url: new URL(req.url ?? "/", "http://sidecar"),
+        key: String(req.headers["x-internal-key"] ?? ""),
+        readBody: () => readBody(req)
+    });
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(JSON.stringify(body));
+}
+
+function readBody(req) {
+    return new Promise((resolve, reject) => {
+        let size = 0;
+        const parts = [];
+        req.on("data", (chunk) => {
+            size += chunk.length;
+            if (size > 16 * 1024) {
+                reject(new Error("body too large"));
+                req.destroy();
+                return;
+            }
+            parts.push(chunk);
+        });
+        req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
+        req.on("error", reject);
+    });
+}
 
 /**
  * A container terminal, opened through the host daemon on the local box.

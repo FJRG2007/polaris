@@ -6,8 +6,10 @@ import { getTranslations } from "@/lib/i18n/request";
 import { SettingsView } from "./settings-view";
 import { TransferCard } from "./transfer-card";
 import { SeasonalAdminCard } from "./seasonal-card";
+import { TerminalSessionsCard } from "./terminal-card";
 import { AppUpdatesCard } from "@/components/app-bundles/app-updates-card";
 import { seasonsAllowed } from "@/lib/seasonal-service";
+import { MAX_TERMINAL_SESSION_CAP, terminalSessionCap } from "@/lib/terminal-session-cap";
 import { getUpdateSource } from "@/lib/update-source";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
 import { getLegalContact, publicUrls } from "@/lib/legal/service";
@@ -29,14 +31,15 @@ export default async function SettingsPage() {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
     const env = loadEnv();
-    const [policy, source, contact, publicPages, seasons] = await Promise.all([
+    const [policy, source, contact, publicPages, seasons, terminalCap] = await Promise.all([
         getAutoUpdatePolicy(),
         getUpdateSource(),
         // The public pages, which are the only part of this deployment an outside
         // review desk can read - and the one line on them an operator writes.
         getLegalContact(),
         publicUrls(),
-        seasonsAllowed()
+        seasonsAllowed(),
+        terminalSessionCap()
     ]);
 
     return (
@@ -63,6 +66,7 @@ export default async function SettingsPage() {
             />
             <AppUpdatesCard />
             <SeasonalAdminCard initial={seasons} />
+            <TerminalSessionsCard cap={terminalCap} max={MAX_TERMINAL_SESSION_CAP} />
             <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>
     );

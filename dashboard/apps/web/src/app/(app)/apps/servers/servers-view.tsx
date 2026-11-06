@@ -30,7 +30,7 @@ import { ServerGroups } from "./server-groups";
 import { ENVIRONMENT_META, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
-import { TerminalPanel } from "../deploy/terminal-panel";
+import { ServerTerminals } from "./server-terminals";
 import { RemoveServerDialog } from "./remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import type { RemoveServerResult } from "@/lib/server-removal-service";
@@ -841,10 +841,12 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                 ) : null}
 
                 {server ? (
-                    <TerminalPanel
+                    <ServerTerminals
                         key={asRoot ? "root" : "login"}
-                        target={{ kind: "host", hostId: server.hostId ?? server.id, asRoot }}
-                        label={`${asRoot ? "root" : server.detail}@${server.address}`}
+                        hostId={server.hostId ?? server.id}
+                        asRoot={asRoot}
+                        login={server.detail}
+                        address={server.address}
                         findServer={() => findServer(server.hostId ?? server.id)}
                     />
                 ) : null}

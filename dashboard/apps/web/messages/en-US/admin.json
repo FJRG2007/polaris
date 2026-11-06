@@ -3792,6 +3792,15 @@
             "confirmReplace": "Confirm that everything here is replaced",
             "uploadExpired": "That upload has expired. Upload the file again."
         },
+        "terminal": {
+            "title": "SSH terminals",
+            "body": "Terminals keep running after their tab is closed, until they are left unused for too long. This is how many each person can keep open across all servers.",
+            "label": "Terminals per person",
+            "hint": "From 1 to {max}.",
+            "invalid": "Enter a whole number from 1 to {max}.",
+            "saved": "Saved.",
+            "notSaved": "The change could not be saved. Try again in a moment."
+        },
         "seasonal": {
             "title": "Seasonal themes",
             "body": "Decorations and a sound pack around Halloween, the winter holidays, New Year and the Lunar New Year, on the same dates as Discord. Each person can turn off the sound pack in force.",
