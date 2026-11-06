@@ -39,7 +39,18 @@ import type { UpdateReadyState } from "./update-ready";
 import type { UpdateCheck } from "@/shared/update-check";
 import { readServerAddress } from "@/shared/server-address";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
-import { app, BrowserWindow, dialog, ipcMain, powerMonitor, type IpcMainInvokeEvent, type WebContents } from "electron";
+import {
+    app,
+    BrowserWindow,
+    dialog,
+    ipcMain,
+    nativeImage,
+    powerMonitor,
+    type IpcMainInvokeEvent,
+    type NativeImage,
+    type WebContents
+} from "electron";
+import { iconAcceptable } from "./notice-layout";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -80,7 +91,9 @@ const submitSchema = z.union([z.string(), z.object({ address: z.string(), name: 
 
 const noticeSchema = z.object({
     title: z.string().trim().min(1).max(200),
+    subtitle: z.string().trim().max(200).optional(),
     body: z.string().max(1000).optional(),
+    icon: z.string().max(2048).optional(),
     tag: z.string().min(1).max(200),
     href: z.string().max(2048).optional(),
     insistent: z.boolean().optional(),
@@ -91,6 +104,29 @@ const noticeSchema = z.object({
         .max(2)
         .optional()
 });
+
+/** How long a notice waits for its picture before it is drawn with the app's. */
+const ICON_WAIT_MS = 3_000;
+
+/**
+ * The picture a page named for its notice, read with the page's own session so
+ * an avatar behind sign-in is readable. Only a path on the Polaris, only a PNG
+ * or JPEG of avatar size; anything else is no picture, never a failed notice.
+ */
+async function noticeIcon(contents: WebContents, path: string | undefined, origin: string | null): Promise<NativeImage | null> {
+    const url = path && origin ? serverPath(path, origin) : null;
+    if (!url) return null;
+    try {
+        const answer = await contents.session.fetch(url, { signal: AbortSignal.timeout(ICON_WAIT_MS), cache: "force-cache" });
+        if (!answer.ok) return null;
+        const bytes = Buffer.from(await answer.arrayBuffer());
+        if (!iconAcceptable(answer.headers.get("content-type"), bytes.length)) return null;
+        const image = nativeImage.createFromBuffer(bytes);
+        return image.isEmpty() ? null : image;
+    } catch {
+        return null;
+    }
+}
 
 /** A control character: the dashboard refuses a name with one, so a report
  *  carrying it would be dropped. */
@@ -162,15 +198,19 @@ export function registerIpc(host: IpcHost): void {
     };
     const from = (event: IpcMainInvokeEvent, kind: WindowKind): boolean => kindOf(event.sender) === kind;
 
-    ipcMain.handle(CHANNELS.notify, (event, raw: unknown): boolean => {
+    ipcMain.handle(CHANNELS.notify, async (event, raw: unknown): Promise<boolean> => {
         if (!fromPolaris(event)) return false;
         const input = noticeSchema.safeParse(raw);
         if (!input.success) return false;
         const window = BrowserWindow.fromWebContents(event.sender);
         const { href } = input.data;
+        const icon = await noticeIcon(event.sender, input.data.icon, host.server());
+        if (event.sender.isDestroyed()) return false;
         return showNotice({
             title: input.data.title,
+            subtitle: input.data.subtitle,
             body: input.data.body,
+            icon,
             tag: input.data.tag,
             insistent: input.data.insistent,
             // The page plays its own sound for what it announces - except where

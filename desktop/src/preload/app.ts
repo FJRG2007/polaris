@@ -29,6 +29,7 @@ let updateListeners = 0;
 const bridge: PolarisDesktop = {
     version,
     platform: process.platform,
+    noticeFeatures: ["subtitle", "icon"],
     notify: (input) => ipcRenderer.invoke(CHANNELS.notify, input),
     closeNotice: (tag) => ipcRenderer.invoke(CHANNELS.closeNotice, tag),
     onNoticeReply: (listener) => {
