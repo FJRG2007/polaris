@@ -1341,7 +1341,8 @@
             }
         },
         "web": {
-            "title": "Or as an app, from your browser"
+            "title": "Or as an app, from your browser",
+            "name": "No download needed"
         },
         "desktop": {
             "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window."

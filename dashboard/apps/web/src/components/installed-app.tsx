@@ -9,12 +9,12 @@
  * `beforeinstallprompt`. That event is held here so the offer can be shown where
  * somebody looks for it, instead of in a bar the browser draws when it likes.
  * Browsers without the event (Safari, Firefox) install from their own menu, and
- * the card says where.
+ * the row says where.
  *
- * The native desktop app (`desktop/` in the repository) is offered beside it on
- * the downloads page. Whether there is one to download is a question for GitHub,
- * so that list streams in behind a boundary of its own and nothing here waits on
- * it. Inside that app the offer says so instead of offering to install anything.
+ * On the downloads page the offer is a row of the desktop card, under the native
+ * desktop app's (`desktop/` in the repository) own downloads. Whether there is
+ * one to download is a question for GitHub, so that list streams in behind a
+ * boundary of its own and nothing here waits on it. Inside that app the offer says so instead of offering to install anything.
  */
 
 import { Download } from "lucide-react";
@@ -165,7 +165,7 @@ export function NativeAppOffer({ children }: { children: ReactNode }) {
  * The offer to install Polaris as an app, or what is true instead: that this is
  * the desktop app, that it is installed already, or where the browser keeps its
  * own install entry. Nothing in it waits on the network, so it draws with the
- * page; the native builds are listed by the downloads page beside it.
+ * page; the native builds are listed above it, in the same card.
  */
 export function InstallAppOffer() {
     const t = useTranslations("components");

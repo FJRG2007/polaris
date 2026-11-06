@@ -1341,7 +1341,8 @@
             }
         },
         "web": {
-            "title": "O como app, desde el navegador"
+            "title": "O como app, desde el navegador",
+            "name": "Sin nada que descargar"
         },
         "desktop": {
             "description": "Polaris en tu ordenador, para Windows, macOS y Linux. Despliega desde tu propia máquina y vigila tus servicios en su propia ventana."
