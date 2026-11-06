@@ -1,6 +1,7 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { grantedSubjects } from "@/lib/access/grants";
-import { requireUser, sessionCan } from "@/lib/session";
+import { homePathForUser, requireUser, sessionCan, sessionCanAny } from "@/lib/session";
 import { PageHeader, Skeleton } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import * as machines from "@/lib/machines/machines-service";
@@ -26,6 +27,9 @@ export default async function MachinesPage() {
     ]);
     const borrows = lentServers.size > 0 || lentDomains.size > 0;
     if (!owns && !borrows) {
+        // Neither machines nor Places: this screen was not given to them.
+        if (!(await sessionCanAny(user, "home.read")))
+            redirect(`${await homePathForUser(user)}?denied=1`);
         return (
             <div className="flex flex-col gap-6">
                 <PageHeader title={t("machines.heading")} description={t("machines.intro")} />

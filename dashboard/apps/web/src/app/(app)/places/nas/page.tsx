@@ -4,7 +4,7 @@ import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { grantedSubjects } from "@/lib/access/grants";
 import { getTranslations } from "@/lib/i18n/request";
-import { homePathForUser, requireUser } from "@/lib/session";
+import { homePathForUser, requireUser, sessionCanAny } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,11 @@ export default async function NasListPage() {
             take: 100
         })
     ]);
-    if (rows.length === 0 && lent.length > 0) redirect(`${await homePathForUser(user)}?denied=1`);
+    // Nothing of their own and nothing lent: Places was not given to them, so
+    // neither is an empty page of it.
+    const refused =
+        rows.length === 0 && (lent.length > 0 || !(await sessionCanAny(user, "home.read")));
+    if (refused) redirect(`${await homePathForUser(user)}?denied=1`);
     if (rows.length === 1) redirect(`/places/nas/${rows[0]!.id}`);
     return (
         <>
