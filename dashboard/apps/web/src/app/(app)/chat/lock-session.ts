@@ -41,12 +41,6 @@ export function unlockProofFor(channelId: string): string | null {
     return proof && proofLive(proof) ? proof : null;
 }
 
-/** Every proof this tab holds that still answers - what a renewal sends. */
-export function heldUnlockProofs(): Record<string, string> {
-    if (typeof window === "undefined") return {};
-    return Object.fromEntries(Object.entries(readAll()).filter(([, proof]) => proofLive(proof)));
-}
-
 export function keepUnlockProofs(proofs: Record<string, string>): void {
     // Expired ones are dropped on the way, so the store never grows without end.
     const live = Object.entries(readAll()).filter(([, proof]) => proofLive(proof));

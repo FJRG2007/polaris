@@ -297,7 +297,7 @@ function ChangeIconDialog({
                         <button
                             type="button"
                             onClick={() => setPicking(true)}
-                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted p-3 text-sm font-medium hover:bg-muted"
+                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm font-medium hover:bg-muted"
                         >
                             <ImagePlus className="size-8 shrink-0 text-muted-foreground" />
                             <span className="truncate">{t("editGroup.uploadImage")}</span>
@@ -307,7 +307,7 @@ function ChangeIconDialog({
                             disabled={gifsReady !== true}
                             title={gifsReady === false ? t("editGroup.gifsOff") : undefined}
                             onClick={() => setStep("gif")}
-                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted p-3 text-sm font-medium hover:bg-muted disabled:opacity-50"
+                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm font-medium enabled:hover:bg-muted disabled:opacity-50"
                         >
                             <span className="grid size-20 grid-cols-2 gap-0.5 overflow-hidden rounded-md bg-muted">
                                 {trending.slice(0, 4).map((gif) => (
