@@ -434,7 +434,7 @@ export function TvOffer({
             <p className="text-xs text-muted-foreground">{t("downloads.tv.supported")}</p>
 
             <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
-                <DialogContent className="flex max-h-[85vh] max-w-md flex-col overflow-y-auto">
+                <DialogContent className="flex max-h-[85vh] max-w-md flex-col overflow-y-auto overscroll-contain">
                     <DialogHeader>
                         <DialogTitle>{t("downloads.tv.dialog.title")}</DialogTitle>
                         <DialogDescription>
