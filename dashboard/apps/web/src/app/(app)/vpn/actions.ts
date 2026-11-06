@@ -252,7 +252,12 @@ export async function setVpnDeviceRoutesAction(
 export async function createVpnKeyAction(): Promise<Result<{ key: string; expiresAt: string }>> {
     const user = await requireUser();
     try {
-        return await vpn.createDeviceKey({ id: user.id, name: user.name, email: user.email });
+        return await vpn.createDeviceKey({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            isAdmin: user.isAdmin
+        });
     } catch (error) {
         return failed(error);
     }
@@ -266,7 +271,7 @@ export async function registerVpnDeviceAction(
     try {
         const { authId } = z.object({ authId: rules.authIdSchema }).parse(input);
         const device = await vpn.registerDevice(
-            { id: user.id, name: user.name, email: user.email },
+            { id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin },
             authId
         );
         await recordAudit({

@@ -12,6 +12,7 @@
         "view": "View it in Apps"
     },
     "errors": {
+        "noAccess": "You do not have access to the VPN. Ask an administrator.",
         "notInstalled": "The VPN is not installed.",
         "notRunning": "The VPN is off. An administrator can turn it on in the Overview.",
         "noHostname": "Choose the address the VPN answers on first.",

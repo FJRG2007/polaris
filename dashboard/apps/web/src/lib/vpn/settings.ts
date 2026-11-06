@@ -146,7 +146,12 @@ export const POLARIS_TAG = "tag:polaris";
  * plain JSON is a subset). Pure, so what each person reaches is asserted in a
  * test rather than found out on a device.
  *
- * - every user reaches their own devices (`autogroup:self`) and nobody else's;
+ * Only the people the VPN was given to are in it (`members`): an administrator,
+ * somebody an administrator granted it to, or every account when it is open to
+ * all (`null`). Anybody else may still have a Headscale user from before, and
+ * reaches nothing - not their own devices, not a server, not the internet.
+ *
+ * - every member reaches their own devices (`autogroup:self`) and nobody else's;
  * - administrators reach every device and every approved subnet route;
  * - a Polaris server (tagged `tag:polaris`) is reachable by everybody;
  * - an exit node an administrator approved is usable by everybody
@@ -160,21 +165,31 @@ export const POLARIS_TAG = "tag:polaris";
  */
 export function vpnPolicy(
     adminUsers: readonly string[],
-    sharedCidrs: readonly string[] = []
+    sharedCidrs: readonly string[] = [],
+    members: readonly string[] | null = []
 ): string {
     const admins = [...new Set(adminUsers)].sort();
-    const everyone = ["autogroup:member"];
-    const grants: { src: string[]; dst: string[]; ip: string[] }[] = [
-        { src: everyone, dst: ["autogroup:self"], ip: ["*"] },
-        { src: everyone, dst: [POLARIS_TAG], ip: ["*"] },
-        { src: everyone, dst: ["autogroup:internet"], ip: ["*"] }
-    ];
-    if (sharedCidrs.length > 0) grants.push({ src: everyone, dst: [...sharedCidrs], ip: ["*"] });
+    const granted = members === null ? null : [...new Set([...admins, ...members])].sort();
+    const groups: Record<string, string[]> = {};
+    if (admins.length > 0) groups["group:admins"] = admins.map((name) => `${name}@`);
+    if (granted && granted.length > 0) groups["group:vpn"] = granted.map((name) => `${name}@`);
+    const everyone =
+        granted === null ? ["autogroup:member"] : granted.length > 0 ? ["group:vpn"] : [];
+    const grants: { src: string[]; dst: string[]; ip: string[] }[] = [];
+    if (everyone.length > 0) {
+        grants.push(
+            { src: everyone, dst: ["autogroup:self"], ip: ["*"] },
+            { src: everyone, dst: [POLARIS_TAG], ip: ["*"] },
+            { src: everyone, dst: ["autogroup:internet"], ip: ["*"] }
+        );
+        if (sharedCidrs.length > 0)
+            grants.push({ src: everyone, dst: [...sharedCidrs], ip: ["*"] });
+    }
     if (admins.length > 0) grants.push({ src: ["group:admins"], dst: ["*"], ip: ["*"] });
     const owners = admins.length > 0 ? ["group:admins"] : [];
     return JSON.stringify(
         {
-            groups: admins.length > 0 ? { "group:admins": admins.map((name) => `${name}@`) } : {},
+            groups,
             tagOwners: { [POLARIS_TAG]: owners },
             grants
         },

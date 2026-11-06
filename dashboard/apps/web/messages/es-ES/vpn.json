@@ -12,6 +12,7 @@
         "view": "Ver en Aplicaciones"
     },
     "errors": {
+        "noAccess": "No tienes acceso a la VPN. Pídeselo a un administrador.",
         "notInstalled": "La VPN no está instalada.",
         "notRunning": "La VPN está apagada. Un administrador puede encenderla en el resumen.",
         "noHostname": "Elige primero la dirección en la que responde la VPN.",

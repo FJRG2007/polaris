@@ -19,6 +19,7 @@ import { remoteClearScript, remoteWriteScript } from "@/lib/deploy/router-remote
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 import { getHostConnectionUnscoped, type HostConnection } from "@/lib/host-service";
 
 /** Whether somebody with no access of their own may connect, and with how many devices. */
@@ -573,6 +574,9 @@ export async function runVpnPass(): Promise<void> {
             console.error("polaris: a VPN node could not be read:", error);
         }
     }
+    // A grant that expired or ran out of data since the last pass leaves the
+    // private network too, not only the tunnels.
+    refreshVpnAccessLater();
 }
 
 async function recordProxyUsage(nodeId: string, output: string): Promise<void> {

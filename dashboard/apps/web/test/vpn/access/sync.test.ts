@@ -23,7 +23,10 @@ vi.mock("@polaris/db", () => ({
                 where.isAdmin
                     ? db.admins
                     : db.accounts.filter((account) => where.id?.in.includes(account.id))
-        }
+        },
+        // Closed to all and nobody granted: only the administrators are in it.
+        setting: { findUnique: async () => null },
+        vpnAccess: { findMany: async () => [] }
     }
 }));
 vi.mock("@/lib/tls/managed-certificates", () => ({
@@ -133,8 +136,10 @@ describe("bringing the VPN in line with the accounts", () => {
             .mocked(fetch)
             .mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
         const { policy } = JSON.parse(String((put?.[1] as RequestInit).body)) as { policy: string };
+        // Nobody granted and not open to all: the administrators are the whole VPN.
         expect(JSON.parse(policy).groups).toEqual({
-            "group:admins": [`${headscaleUserName(KEPT)}@`]
+            "group:admins": [`${headscaleUserName(KEPT)}@`],
+            "group:vpn": [`${headscaleUserName(KEPT)}@`]
         });
     });
 

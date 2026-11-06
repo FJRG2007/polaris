@@ -16,6 +16,8 @@
  */
 
 import * as rules from "./settings";
+import * as wg from "./wireguard";
+import { openAccess } from "./wireguard-service";
 import { prisma } from "@polaris/db";
 import { syncVpnEdge } from "./edge";
 import { randomUUID } from "node:crypto";
@@ -59,7 +61,8 @@ export type VpnRefusalCode =
     | "tooMany"
     | "subnetTaken"
     | "noServer"
-    | "gatewayFailed";
+    | "gatewayFailed"
+    | "noAccess";
 
 export class VpnRefusal extends Error {
     constructor(readonly code: VpnRefusalCode) {
@@ -245,6 +248,50 @@ const EXPIRY_FLOOR = Date.UTC(2000, 0, 1);
 
 /** How many administrators the policy names at most. */
 const POLICY_ADMINS = 200;
+/** How many granted people one policy names. Past it the newest grants wait for a
+ *  policy with room, and the log says so. */
+const POLICY_MEMBERS = 5000;
+
+/**
+ * The Headscale users the VPN was given to, or null when it is open to every
+ * account. Only a grant in good standing counts: suspended, expired or over its
+ * data limit is out until an administrator or the next month says otherwise.
+ */
+async function grantedMembers(known: ReadonlySet<string>): Promise<string[] | null> {
+    if (await openAccess()) return null;
+    const now = new Date();
+    const rows = await prisma.vpnAccess.findMany({
+        where: { suspended: false, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        select: {
+            userId: true,
+            nodes: true,
+            deviceLimit: true,
+            dataLimitGb: true,
+            expiresAt: true,
+            suspended: true,
+            usedBytes: true
+        },
+        orderBy: { userId: "asc" },
+        take: POLICY_MEMBERS + 1
+    });
+    if (rows.length > POLICY_MEMBERS) {
+        console.error(
+            `polaris: more than ${POLICY_MEMBERS} VPN grants; the policy names the first ones`
+        );
+    }
+    return rows
+        .slice(0, POLICY_MEMBERS)
+        .filter((row) => wg.accessStanding(row, now) === "active")
+        .map((row) => rules.headscaleUserName(row.userId))
+        .filter((name) => known.has(name));
+}
+
+/** Whether `account` may put devices on the VPN: the same grant the tunnels ask for. */
+export async function mayJoin(account: { id: string; isAdmin: boolean }): Promise<boolean> {
+    if (account.isAdmin || (await openAccess())) return true;
+    const row = await prisma.vpnAccess.findUnique({ where: { userId: account.id } });
+    return row !== null && wg.accessStanding(row, new Date()) === "active";
+}
 
 /**
  * Write the access policy (`rules.vpnPolicy`): everybody kept to their own
@@ -271,7 +318,8 @@ async function applyPolicy(api: HeadscaleClient): Promise<void> {
     await api.setPolicy(
         rules.vpnPolicy(
             admins.map((admin) => rules.headscaleUserName(admin.id)),
-            sharedCidrs(readNetworks(settings.networks))
+            sharedCidrs(readNetworks(settings.networks)),
+            await grantedMembers(known)
         )
     );
 }
@@ -626,8 +674,9 @@ async function ensureUser(api: HeadscaleClient, account: Account) {
 
 /** A one-time key that signs one device in as `account`, valid for an hour. */
 export async function createDeviceKey(
-    account: Account
+    account: Account & { isAdmin: boolean }
 ): Promise<{ key: string; expiresAt: string }> {
+    if (!(await mayJoin(account))) throw new VpnRefusal("noAccess");
     const api = await client();
     const user = await ensureUser(api, account);
     const expiration = new Date(Date.now() + PREAUTH_TTL_MS);
@@ -696,9 +745,13 @@ export async function removeGatewayNode(nodeId: string): Promise<void> {
 }
 
 /** Add the device waiting at `authId` to `account`'s devices. */
-export async function registerDevice(account: Account, authId: string): Promise<VpnDevice> {
+export async function registerDevice(
+    account: Account & { isAdmin: boolean },
+    authId: string
+): Promise<VpnDevice> {
     const parsed = rules.authIdSchema.safeParse(authId);
     if (!parsed.success) throw new VpnRefusal("badAuthId");
+    if (!(await mayJoin(account))) throw new VpnRefusal("noAccess");
     const api = await client();
     const user = await ensureUser(api, account);
     return deviceOf(await api.registerNode(user.name, parsed.data));
