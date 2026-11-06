@@ -107,9 +107,14 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "You already have a workspace session open, and it is the same directory this one would use. Stop that session and this will start.":
         "text.ownWorkspaceTaken",
     "its agent never opened a terminal to type into": "text.noTerminal",
+    "The machine running this session stopped reporting.": "text.machineSilent",
+    "The container running this session was deleted.": "text.containerDeleted",
+    "The server restarted, so Polaris reopened this session on its checkout.":
+        "text.serverReopened",
     "Preparing your machine": "boot.workspace",
     "Fetching the repository": "boot.fetch",
     "Opening your workspace": "boot.opening",
+    "Reopening the checkout": "boot.reopening",
     "Installing Enigma": "boot.enigma",
     "Installing the agent": "boot.agent",
     "The agent is already here": "boot.agentHere",
@@ -153,6 +158,21 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
         /^Polaris has no GitHub App installation for (.+), so it cannot check the repository out\. Connect it again under Agents settings\.$/,
         "text.noInstallationSession",
         ["owner"]
+    ],
+    [
+        /^Polaris cannot read (.+) as a GitHub repository name\.$/,
+        "text.badRepositoryName",
+        ["repo"]
+    ],
+    [
+        /^The GitHub App installed on (.+?) does not reach (.+)\. The administrators have to add it to the installation\.$/,
+        "text.installationMissesRepository",
+        ["owner", "repo"]
+    ],
+    [
+        /^GitHub did not hand Polaris a token for (.+)\. Try again in a moment\.$/,
+        "text.cloneTokenFailed",
+        ["repo"]
     ],
     [
         /^You already have (\d+) sessions running, which is the most one account may have at once\. Stop one and this will start\.$/,
@@ -251,6 +271,8 @@ export const SESSION_EVENT_KEYS: Readonly<Record<string, NamespaceKey<"agents">>
     "subagent.end": "session.events.subagentEnd",
     compact: "session.events.compact",
     "turn.end": "session.events.turnEnd",
+    "turn.failed": "session.events.turnFailed",
+    "session.clear": "session.events.sessionClear",
     "session.end": "session.events.sessionEnd",
     error: "session.events.error"
 };

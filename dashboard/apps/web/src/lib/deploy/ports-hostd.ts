@@ -195,6 +195,27 @@ export class HostdPorts implements RuntimePorts {
         return JSON.parse(response.body);
     }
 
+    /**
+     * Whether a container is running, exists but is stopped, or does not exist.
+     *
+     * Separate from `inspect` because "not there" is an answer here rather than
+     * a failure: a session whose container was deleted has nothing to wait for,
+     * while one whose daemon is briefly out of reach does. Anything other than a
+     * clean answer or a 404 still throws.
+     */
+    public async containerState(ref: string): Promise<"running" | "stopped" | "gone"> {
+        const response = await this.client.dockerRequest(
+            "GET",
+            `/containers/${encodeURIComponent(ref)}/json`
+        );
+        if (response.status === 404) return "gone";
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`inspect ${ref} failed (${response.status})`);
+        }
+        const body = JSON.parse(response.body) as { State?: { Running?: boolean } };
+        return body.State?.Running ? "running" : "stopped";
+    }
+
     public async ensureMount(spec: MountTarget): Promise<boolean> {
         // The daemon confines the target under its mount root, so we pass the bare
         // connection id as the subdir. Idempotent: a live mount returns success.

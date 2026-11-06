@@ -55,7 +55,7 @@ vi.mock("@polaris/db", () => {
     const table = (rows: Map<string, Record<string, unknown>>) => ({
         findUnique: async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null,
         findMany: async ({ where }: { where: Record<string, unknown> }) => {
-            const { OR: _or, createdAt: _created, ...rest } = where;
+            const { OR: _or, AND: _and, createdAt: _created, ...rest } = where;
             return [...rows.values()].filter((row) => matches(row, rest));
         },
         update: async ({
@@ -108,7 +108,13 @@ vi.mock("@polaris/db", () => {
                     return { count };
                 }
             },
-            $transaction: async (calls: Promise<unknown>[]) => Promise.all(calls)
+            // Both forms: a list of calls, and an interactive callback.
+            $transaction: async function transaction(
+                calls: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>)
+            ): Promise<unknown> {
+                if (typeof calls === "function") return calls(this);
+                return Promise.all(calls);
+            }
         }
     };
 });
@@ -128,13 +134,17 @@ vi.mock("@/lib/notifications/notice-words", () => ({
 const daemon = vi.hoisted(() => ({
     runIn: vi.fn(async (_container: string, _argv: string[]) => ({ code: 0, output: "" })),
     writeFile: vi.fn(async () => undefined),
-    composeDown: vi.fn(async () => undefined)
+    composeDown: vi.fn(async () => undefined),
+    containerState: vi.fn(async (_ref: string) => "running" as "running" | "stopped" | "gone"),
+    container: vi.fn(async (_ref: string, _action: string) => undefined)
 }));
 vi.mock("@/lib/deploy/ports-hostd", () => ({
     HostdPorts: class {
         runIn = daemon.runIn;
         writeFile = daemon.writeFile;
         composeDown = daemon.composeDown;
+        containerState = daemon.containerState;
+        container = daemon.container;
     }
 }));
 vi.mock("@/lib/github-service", () => ({
@@ -199,6 +209,9 @@ beforeEach(() => {
     daemon.runIn.mockResolvedValue({ code: 0, output: "" });
     daemon.writeFile.mockClear();
     daemon.composeDown.mockClear();
+    daemon.containerState.mockReset();
+    daemon.containerState.mockResolvedValue("running");
+    daemon.container.mockClear();
 });
 
 describe("an agent that needs you", () => {
@@ -380,10 +393,23 @@ describe("stopping a session never loses its work", () => {
 });
 
 describe("the sweep of silent sessions", () => {
+    it("leaves a quiet session alone while its terminal answers", async () => {
+        session({ id: "s1", lastEventAt: new Date(0) });
+        expect(await runtime.sweepSilentSessions(1)).toBe(0);
+        expect(db.sessions.get("s1")).toMatchObject({ state: "working" });
+        expect(db.sessions.get("s1")?.lastAliveAt).toBeInstanceOf(Date);
+        expect(daemon.composeDown).not.toHaveBeenCalled();
+    });
+
     it("takes the same path as Stop: push first, keep on failure", async () => {
         session({ id: "s1", lastEventAt: new Date(0) });
         session({ id: "s2", containerId: "polaris-session-s2", lastEventAt: new Date(0) });
+        // Each is probed first, and only a terminal that is gone is failed.
+        daemon.runIn.mockResolvedValueOnce({ code: 1, output: "" });
         said("polaris-work: pushed 1 polaris/fix-login");
+        // The checkout on the box goes with the container whose work was saved.
+        said("");
+        daemon.runIn.mockResolvedValueOnce({ code: 1, output: "" });
         said("polaris-work: noauth 4 polaris/fix-login");
 
         expect(await runtime.sweepSilentSessions(1)).toBe(2);
@@ -399,5 +425,63 @@ describe("the sweep of silent sessions", () => {
         const events = notify.mock.calls.map(([input]) => input.event);
         expect(events.filter((event) => event === "agent.ended")).toHaveLength(2);
         expect(events.filter((event) => event === "agent.work")).toHaveLength(1);
+        // The saved one took its checkout with it; the kept one kept it.
+        const removed = daemon.runIn.mock.calls.filter(([, argv]) =>
+            argv.join(" ").includes("rm -rf /session/repo /session/polaris")
+        );
+        expect(removed.map(([container]) => container)).toEqual(["polaris-session-s1"]);
+        // The kept one restarts with the box, so it is told not to start its agent again.
+        const ended = daemon.runIn.mock.calls.filter(([, argv]) =>
+            argv.join(" ").includes(": > /session/polaris/ended")
+        );
+        expect(ended.map(([container]) => container)).toEqual(["polaris-session-s2"]);
+    });
+
+    it("fails one whose container was deleted at once, with that as the reason", async () => {
+        const HOUR = 60 * 60 * 1000;
+        session({ id: "s1", lastEventAt: new Date(Date.now() - 2 * HOUR) });
+        daemon.runIn.mockRejectedValueOnce(new Error("no such container"));
+        daemon.containerState.mockResolvedValueOnce("gone");
+
+        expect(await runtime.sweepSilentSessions(HOUR)).toBe(1);
+
+        expect(db.sessions.get("s1")).toMatchObject({
+            state: "failed",
+            error: "The container running this session was deleted."
+        });
+        // Nothing to save or take down: there is no container left to ask.
+        expect(daemon.composeDown).not.toHaveBeenCalled();
+        expect(daemon.runIn).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits out one whose machine cannot be asked, for four allowances", async () => {
+        const HOUR = 60 * 60 * 1000;
+        session({ id: "s1", lastEventAt: new Date(Date.now() - 2 * HOUR) });
+        daemon.runIn.mockRejectedValue(new Error("daemon unreachable"));
+        daemon.containerState.mockRejectedValue(new Error("daemon unreachable"));
+
+        expect(await runtime.sweepSilentSessions(HOUR)).toBe(0);
+        expect(db.sessions.get("s1")).toMatchObject({ state: "working" });
+        // Asked, so it waits its turn behind everything not asked yet.
+        expect(db.sessions.get("s1")?.lastProbedAt).toBeInstanceOf(Date);
+        expect(db.sessions.get("s1")?.lastAliveAt ?? null).toBeNull();
+
+        db.sessions.get("s1")!.lastEventAt = new Date(Date.now() - 5 * HOUR);
+        expect(await runtime.sweepSilentSessions(HOUR)).toBe(1);
+        expect(db.sessions.get("s1")).toMatchObject({
+            state: "failed",
+            error: "The machine running this session stopped reporting."
+        });
+    });
+
+    it("starts a stopped container again rather than failing it", async () => {
+        const HOUR = 60 * 60 * 1000;
+        session({ id: "s1", lastEventAt: new Date(Date.now() - 2 * HOUR) });
+        daemon.runIn.mockRejectedValueOnce(new Error("container is not running"));
+        daemon.containerState.mockResolvedValueOnce("stopped");
+
+        expect(await runtime.sweepSilentSessions(HOUR)).toBe(0);
+        expect(daemon.container).toHaveBeenCalledWith("polaris-session-s1", "start");
+        expect(db.sessions.get("s1")).toMatchObject({ state: "working" });
     });
 });

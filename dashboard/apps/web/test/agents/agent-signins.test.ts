@@ -33,9 +33,6 @@ describe("agentSignins", () => {
         const served = new Set(MODEL_PROVIDERS.map((provider) => provider.envVar));
         for (const signin of agentSignins()) {
             expect(served.has(signin.env), signin.env).toBe(false);
-            // The session exports this one itself, from the installation token
-            // that checked the repository out.
-            expect(signin.env).not.toBe("GH_TOKEN");
         }
     });
 
@@ -75,7 +72,9 @@ describe("signinSlug", () => {
     });
 
     it("folds a variable to lower case and hyphens", () => {
-        expect(signinSlug("CLAUDE_CODE_OAUTH_TOKEN")).toBe(`${SIGNIN_PREFIX}claude-code-oauth-token`);
+        expect(signinSlug("CLAUDE_CODE_OAUTH_TOKEN")).toBe(
+            `${SIGNIN_PREFIX}claude-code-oauth-token`
+        );
     });
 
     it("cannot collide with a model provider", () => {

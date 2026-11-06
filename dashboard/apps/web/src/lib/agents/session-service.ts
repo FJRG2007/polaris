@@ -11,7 +11,7 @@
  * second answer to "may I" here that could drift from the first.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
@@ -421,6 +421,31 @@ export async function createSession(
 }
 
 /**
+ * A session that is still live, with a fresh reporting token, for Polaris to
+ * bring its machine back up under - or null once it has ended.
+ *
+ * Only the token's hash is ever stored, so reopening a session on a server that
+ * restarted means issuing a new one; the old one is worthless from this moment,
+ * which is also the right thing for a token that sat in a file on a machine that
+ * went away. Unscoped: the sweep asks, not a person.
+ */
+export async function reissueSessionToken(
+    sessionId: string
+): Promise<{ session: SessionView; token: string } | null> {
+    const token = generateToken();
+    const updated = await prisma.agentSession.updateMany({
+        where: { id: sessionId, state: { notIn: ["stopped", "failed"] } },
+        data: { tokenHash: hashToken(token) }
+    });
+    if (updated.count === 0) return null;
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: VIEW_SELECT
+    });
+    return record ? { session: toView(record as unknown as SessionRecord), token } : null;
+}
+
+/**
  * The session a reporting token belongs to, or null.
  *
  * A token stops working the moment its session is over, which is what stops a
@@ -439,6 +464,16 @@ export async function sessionForToken(
     const state = readState(record.state);
     if (core.isSessionOver(state)) return null;
     return { id: record.id, state, taskId: record.taskId };
+}
+
+/** The repository a session works in, as `owner/name`, or null for a workspace
+ *  or a session that no longer exists. */
+export async function sessionRepository(sessionId: string): Promise<string | null> {
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { repo: { select: { repoFullName: true } } }
+    });
+    return record?.repo?.repoFullName ?? null;
 }
 
 /** Whose work a session is doing: the account that owns the repository it runs
@@ -463,40 +498,101 @@ export async function sessionOwner(sessionId: string): Promise<string | null> {
  */
 export async function recordSessionEvents(
     sessionId: string,
-    events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
+    events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[],
+    /** When the hook ran on the machine; see `core.applySessionEvents`. */
+    seq: bigint | null = null
 ): Promise<core.AgentSessionState | null> {
     if (events.length === 0) return null;
-    const current = await prisma.agentSession.findUnique({
-        where: { id: sessionId },
-        select: { state: true }
-    });
-    if (!current) return null;
-
-    const before = readState(current.state);
-    const state = core.replaySessionState(events, before);
-    const spoken = [...events].reverse().find((event) => event.detail !== "");
-
-    await prisma.$transaction([
-        prisma.agentSessionEvent.createMany({
-            data: events.map((event) => ({
-                sessionId,
-                kind: event.kind,
-                detail: event.detail,
-                subject: event.subject
-            }))
-        }),
-        prisma.agentSession.update({
+    // Compare-and-set rather than read-then-write: two hooks posted at once
+    // used to both read the same state and the slower write won, whatever
+    // order the events happened in. The update only lands if the row is still
+    // where this read it, and a lost race reads again.
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const current = await prisma.agentSession.findUnique({
             where: { id: sessionId },
-            data: {
-                state,
-                lastEventAt: new Date(),
-                ...(spoken ? { detail: spoken.detail } : {}),
-                ...(core.isSessionOver(state) ? { finishedAt: new Date() } : {})
-            }
-        })
-    ]);
-    await tellOwner(sessionId, before, state);
-    return state;
+            select: { state: true, lastEventSeq: true }
+        });
+        if (!current) return null;
+
+        const before = readState(current.state);
+        const next = core.applySessionEvents(
+            { state: before, seq: current.lastEventSeq },
+            events,
+            seq
+        );
+        const spoken = next.stale
+            ? undefined
+            : [...events].reverse().find((event) => event.detail !== "");
+
+        const applied = await prisma.$transaction(async (tx) => {
+            const moved = await tx.agentSession.updateMany({
+                where: { id: sessionId, state: current.state, lastEventSeq: current.lastEventSeq },
+                data: {
+                    state: next.state,
+                    lastEventSeq: next.seq,
+                    lastEventAt: new Date(),
+                    ...(spoken ? { detail: spoken.detail } : {}),
+                    ...(core.isSessionOver(next.state) && !core.isSessionOver(before)
+                        ? { finishedAt: new Date() }
+                        : {})
+                }
+            });
+            if (moved.count === 0) return false;
+            await tx.agentSessionEvent.createMany({
+                data: events.map((event) => ({
+                    sessionId,
+                    kind: event.kind,
+                    detail: event.detail,
+                    subject: event.subject
+                }))
+            });
+            return true;
+        });
+        if (!applied) continue;
+        if (!next.stale) await tellOwner(sessionId, before, next.state);
+        return next.state;
+    }
+    console.error(`[agent-session] ${sessionId}: gave up recording events after repeated races`);
+    return null;
+}
+
+/**
+ * Keep the agent's own conversation id and transcript path, as a hook reported
+ * them (already checked by `hookConversation`).
+ *
+ * Every hook carries them, so this runs on the agent's hot path: the update only
+ * matches a row whose values differ, and a session already holding them is one
+ * indexed read with nothing written. Latest wins - a cleared conversation is a
+ * new id, and that is the one a Resume should reopen.
+ */
+export async function recordSessionConversation(
+    sessionId: string,
+    conversation: { vendorSessionId: string | null; transcriptPath: string | null }
+): Promise<void> {
+    const { vendorSessionId, transcriptPath } = conversation;
+    if (vendorSessionId === null && transcriptPath === null) return;
+    const differs: Prisma.AgentSessionWhereInput[] = [];
+    if (vendorSessionId !== null)
+        differs.push({ vendorSessionId: null }, { vendorSessionId: { not: vendorSessionId } });
+    if (transcriptPath !== null)
+        differs.push({ transcriptPath: null }, { transcriptPath: { not: transcriptPath } });
+    await prisma.agentSession.updateMany({
+        where: { id: sessionId, OR: differs },
+        data: {
+            ...(vendorSessionId !== null ? { vendorSessionId } : {}),
+            ...(transcriptPath !== null ? { transcriptPath } : {})
+        }
+    });
+}
+
+/** The agent's own id for the session's conversation, or null for none known. */
+export async function sessionVendorId(sessionId: string): Promise<string | null> {
+    const row = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { vendorSessionId: true }
+    });
+    // Checked again on the way out: the column is older than any one build.
+    return row && core.isVendorSessionId(row.vendorSessionId) ? row.vendorSessionId : null;
 }
 
 /**

@@ -62,13 +62,11 @@ export function signinEnv(slug: string): string | null {
 /**
  * Variables a session is handed without anybody linking anything.
  *
- * `GH_TOKEN` is the interesting one: every session is checked out with a GitHub
- * App installation token which is exported under that name for the agent's own
- * git and GitHub tools, so the one tool that signs in with it - Copilot CLI - is
- * already signed in by the time it starts. Asking somebody to link a GitHub
- * account for it would be asking for something they already gave.
+ * None any more: the GitHub installation token is no longer exported to the
+ * agent as `GH_TOKEN` (see `gitCredentialScript`), so a tool that signs in with
+ * a GitHub token - Copilot CLI - is asked for one like any other credential.
  */
-const SUPPLIED_BY_THE_SESSION = new Set(["GH_TOKEN", "GITHUB_TOKEN"]);
+const SUPPLIED_BY_THE_SESSION = new Set<string>();
 
 /** Variables the model key store already fills, from the providers a person may
  *  hold a key for. Derived rather than restated: a provider added there stops

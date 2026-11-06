@@ -18,7 +18,7 @@
 import { prisma } from "@polaris/db";
 import { HostdClient } from "@polaris/hostd-client";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
-import { endContainerSession } from "./session-work";
+import { endContainerSession, releaseContainer } from "./session-work";
 
 /** How long after its end a container is left alone: the teardown that ended it
  *  may still be running. A container with no row at all gets the same time from
@@ -156,6 +156,12 @@ export async function reapLeftoverContainers(now = new Date()): Promise<number> 
                     return null;
                 });
                 if (outcome && outcome.kind !== "kept") reaped += 1;
+                continue;
+            }
+            // A session takes its checkout with it. See `releaseContainer`.
+            if (kind === "session") {
+                await releaseContainer(project);
+                reaped += 1;
                 continue;
             }
             await new HostdPorts()

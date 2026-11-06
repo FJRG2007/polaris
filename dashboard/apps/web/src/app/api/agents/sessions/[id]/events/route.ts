@@ -17,9 +17,14 @@
  * somebody's agent to change what it was doing.
  */
 
-import { hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
-import { recordSessionEvents, sessionForToken } from "@/lib/agents/session-service";
+import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
+import {
+    recordSessionConversation,
+    recordSessionEvents,
+    sessionForToken
+} from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { parseHookSequence } from "@polaris/core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +55,10 @@ export async function POST(
     // The token names a session; the URL names one too. They have to be the same
     // one, or a token would be a way to write into any session on the instance.
     if (!session || session.id !== id)
-        return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
 
     const body = await request.text();
     if (body.length > MAX_BODY) return acknowledged();
@@ -62,6 +70,13 @@ export async function POST(
         return acknowledged();
     }
 
+    // Before the event is read: every hook carries the conversation, including
+    // the ones that say nothing about the state. Best effort - a write that
+    // failed here is a Resume that waits for the next hook, never a lost event.
+    await recordSessionConversation(id, hookConversation(payload)).catch((error) =>
+        console.error(`[agent-session] ${id}: could not keep the conversation id`, error)
+    );
+
     const event = normalizeHookEvent(payload);
     // An event this build cannot place says nothing, and moving the session for a
     // reason no screen could explain is worse than missing it.
@@ -71,6 +86,10 @@ export async function POST(
     // outcome is in what the tool answered.
     const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
 
-    await recordSessionEvents(id, [{ kind, detail: event.detail, subject: event.subject }]);
+    await recordSessionEvents(
+        id,
+        [{ kind, detail: event.detail, subject: event.subject }],
+        parseHookSequence(request.headers.get("x-polaris-seq"))
+    );
     return acknowledged();
 }

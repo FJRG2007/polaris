@@ -38,6 +38,13 @@ const MARK = "polaris-work:";
  *  the daemon returns, so the status line after it is never what gets cut. */
 const TAIL_BYTES = 800;
 
+/** Paths an older build of Polaris wrote into a checkout. See `saveWorkScript`. */
+export const POLARIS_FILES = [
+    ".mcp.json",
+    ".claude/settings.local.json",
+    ".claude/polaris-hook.sh"
+] as const;
+
 const WIP_MESSAGE = "WIP: work left in the session when it stopped";
 
 export interface SaveWorkInput {
@@ -96,7 +103,17 @@ export function saveWorkScript(input: SaveWorkInput): string {
         "    export GIT_AUTHOR_NAME=Polaris GIT_COMMITTER_NAME=Polaris",
         "    export GIT_AUTHOR_EMAIL=agent@polaris.invalid GIT_COMMITTER_EMAIL=agent@polaris.invalid",
         "  fi",
-        `  g add -A >/dev/null 2>&1 && g commit -q --no-verify -m ${shellQuote(input.message ?? WIP_MESSAGE)} >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }`,
+        `  g add -A >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }`,
+        // Never a file Polaris wrote. Sessions started before Polaris kept its
+        // files outside the checkout wrote them into it - one of them over a
+        // `.mcp.json` the repository may track - and two of them carry the
+        // session's token. Taken back out of the index by what is IN them, so an
+        // agent's own legitimate edit to the same path is still committed.
+        ...POLARIS_FILES.map(
+            (file) =>
+                `  if g show :${shellQuote(file)} 2>/dev/null | grep -q -e 'Bearer ' -e 'polaris-hook.sh' -e 'Written by Polaris'; then g reset -q -- ${shellQuote(file)} >/dev/null 2>&1 || g rm -q --cached -- ${shellQuote(file)} >/dev/null 2>&1 || true; fi`
+        ),
+        `  if ! g diff --cached --quiet 2>/dev/null; then g commit -q --no-verify -m ${shellQuote(input.message ?? WIP_MESSAGE)} >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }; fi`,
         "fi",
         "count=$(ahead)",
         `policy=${shellQuote(input.policy)}`,
@@ -330,6 +347,43 @@ async function recordOutcome(sessionId: string, outcome: SaveOutcome): Promise<v
 }
 
 /**
+ * Take a session's container down, and its checkout with it.
+ *
+ * The checkout lives on the box rather than in the container (see
+ * `sessionCheckoutSource`), so removing the container no longer removes the
+ * work - which is the point while the session runs, and a directory left behind
+ * for every session ever run once it has ended. Emptied from inside, while the
+ * container still has it mounted, because the daemon reaches nothing on the box
+ * outside a container. Best effort: a container that will not answer leaves an
+ * empty-able directory behind, never a running container.
+ */
+export async function releaseContainer(containerId: string): Promise<void> {
+    const ports = new HostdPorts();
+    await ports
+        .runIn(containerId, [
+            "sh",
+            "-c",
+            `rm -rf ${commands.SESSION_ROOT}/repo ${commands.SESSION_ROOT}/polaris`
+        ])
+        .catch(() => undefined);
+    await ports.composeDown(containerId).catch(() => undefined);
+}
+
+/** The container stays for its work, and restarts with the box, but its agent
+ *  is not launched again on a session that is over. */
+async function markContainerEnded(containerId: string): Promise<void> {
+    await new HostdPorts()
+        .runIn(containerId, [
+            "sh",
+            "-c",
+            `: > ${commands.SESSION_ROOT}/polaris/${commands.SESSION_ENDED_FILE}`
+        ])
+        .catch((error) => {
+            console.error(`polaris: could not mark container ${containerId} as ended:`, error);
+        });
+}
+
+/**
  * Save the work, then take the container down - or keep it, when the work
  * could not be saved. The one path Stop, the sweep, Try again and the reaper of
  * leftover containers all take, so none of them can remove a container the
@@ -350,12 +404,12 @@ export async function endContainerSession(sessionId: string): Promise<SaveOutcom
         );
     });
     if (outcome.kind === "kept") {
+        if (row?.containerId) await markContainerEnded(row.containerId);
         await noticeWorkKept(sessionId, outcome.branch);
         return outcome;
     }
     await clearWorkKept(sessionId);
-    if (row?.containerId)
-        await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
+    if (row?.containerId) await releaseContainer(row.containerId);
     return outcome;
 }
 
@@ -370,6 +424,5 @@ export async function discardSessionWork(sessionId: string): Promise<void> {
         data: { workState: "discarded", workError: null }
     });
     await clearWorkKept(sessionId);
-    if (row?.containerId)
-        await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
+    if (row?.containerId) await releaseContainer(row.containerId);
 }

@@ -10,7 +10,13 @@
 import { describe, expect, it } from "vitest";
 import { recommendExecution } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
-import { agentText, AGENT_WORD_GROUPS, agentWord, sessionStateWord, type AgentWordGroup } from "@/lib/agents/words";
+import {
+    agentText,
+    AGENT_WORD_GROUPS,
+    agentWord,
+    sessionStateWord,
+    type AgentWordGroup
+} from "@/lib/agents/words";
 
 const english = translatorFor("en-US", "agents");
 const spanish = translatorFor("es-ES", "agents");
@@ -29,7 +35,12 @@ describe("the English core writes", () => {
             for (const serverCapable of [true, false]) {
                 for (const servingPool of [true, false]) {
                     for (const isPrivate of [true, false]) {
-                        const advice = recommendExecution({ publiclyReachable, serverCapable, servingPool, isPrivate });
+                        const advice = recommendExecution({
+                            publiclyReachable,
+                            serverCapable,
+                            servingPool,
+                            isPrivate
+                        });
                         expect(agentText(english, advice.reason)).toBe(advice.reason);
                         for (const reason of Object.values(advice.unavailable)) {
                             expect(agentText(english, reason ?? "")).toBe(reason);
@@ -59,10 +70,35 @@ describe("in Spanish", () => {
 
     it("reads a limit and a run that was stopped", () => {
         expect(
-            agentText(spanish, "This account has used 3 of the 10 tokens allowed in 30 days. An administrator sets these under Admin > Agents.")
-        ).toBe("Esta cuenta ha usado 3 de 10 tokens permitidos en 30 días. Un administrador los define en Admin > Agentes.");
+            agentText(
+                spanish,
+                "This account has used 3 of the 10 tokens allowed in 30 days. An administrator sets these under Admin > Agents."
+            )
+        ).toBe(
+            "Esta cuenta ha usado 3 de 10 tokens permitidos en 30 días. Un administrador los define en Admin > Agentes."
+        );
         expect(agentText(spanish, "Canceled from Polaris.")).toBe("Cancelada desde Polaris.");
         expect(agentText(spanish, "Cancelled from Polaris.")).toBe("Cancelada desde Polaris.");
-        expect(agentText(spanish, "GitHub returned 422 starting the workflow")).toBe("GitHub devolvió 422 al iniciar el workflow");
+        expect(agentText(spanish, "GitHub returned 422 starting the workflow")).toBe(
+            "GitHub devolvió 422 al iniciar el workflow"
+        );
+    });
+});
+
+describe("a session that cannot check its repository out", () => {
+    const refusals = [
+        "Polaris cannot read acme as a GitHub repository name.",
+        "The GitHub App installed on acme does not reach acme/web. The administrators have to add it to the installation.",
+        "GitHub did not hand Polaris a token for acme/web. Try again in a moment.",
+        "Polaris has no GitHub App installation for acme. An administrator connects one under Integrations."
+    ];
+
+    it("is said back in English as it went in", () => {
+        for (const refusal of refusals) expect(agentText(english, refusal)).toBe(refusal);
+    });
+
+    it("is said in Spanish", () => {
+        for (const refusal of refusals) expect(agentText(spanish, refusal)).not.toBe(refusal);
+        expect(agentText(spanish, refusals[1]!)).toContain("acme/web");
     });
 });

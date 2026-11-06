@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/deploy/ports-hostd", () => ({ HostdPorts: class {} }));
@@ -187,6 +187,47 @@ describe("the save-work script", () => {
         const { root, work } = checkout();
         writeFileSync(join(work, "g.txt"), "g\n");
         expect(run(work, root, "enabled", false)).toMatchObject({ status: "noauth", commits: 1 });
+    });
+
+    it("never commits the files an older Polaris wrote into the checkout", () => {
+        const { root, work, remote } = checkout();
+        // The repository tracks its own .mcp.json, which an older session overwrote.
+        writeFileSync(join(work, ".mcp.json"), '{"mcpServers":{}}\n');
+        git(work, "add", "-A");
+        git(work, "commit", "-q", "-m", "repo mcp");
+        mkdirSync(join(work, ".claude"), { recursive: true });
+        writeFileSync(
+            join(work, ".mcp.json"),
+            '{"mcpServers":{"polaris":{"headers":{"Authorization":"Bearer s3cr3t"}}}}\n'
+        );
+        writeFileSync(join(work, ".claude/polaris-hook.sh"), "#!/bin/sh\n# Written by Polaris.\n");
+        writeFileSync(
+            join(work, ".claude/settings.local.json"),
+            '{"command":"/w/.claude/polaris-hook.sh"}\n'
+        );
+        writeFileSync(join(work, "real.txt"), "work\n");
+
+        expect(run(work, root)).toMatchObject({ status: "pushed", branch: "polaris/fix" });
+        expect(git(remote, "show", "polaris/fix:.mcp.json")).toBe('{"mcpServers":{}}');
+        const files = git(remote, "ls-tree", "-r", "--name-only", "polaris/fix");
+        expect(files).toContain("real.txt");
+        expect(files).not.toContain("polaris-hook.sh");
+        expect(files).not.toContain("settings.local.json");
+        expect(git(remote, "log", "-p", "polaris/fix")).not.toContain("s3cr3t");
+    });
+
+    it("still commits the agent's own edit to a path Polaris used to write", () => {
+        const { root, work, remote } = checkout();
+        writeFileSync(join(work, ".mcp.json"), '{"mcpServers":{"docs":{}}}\n');
+        expect(run(work, root)).toMatchObject({ status: "pushed" });
+        expect(git(remote, "show", "polaris/fix:.mcp.json")).toContain("docs");
+    });
+
+    it("commits nothing when the only change is a file Polaris wrote", () => {
+        const { root, work } = checkout();
+        mkdirSync(join(work, ".claude"), { recursive: true });
+        writeFileSync(join(work, ".claude/polaris-hook.sh"), "#!/bin/sh\n# Written by Polaris.\n");
+        expect(run(work, root)).toMatchObject({ commits: 0 });
     });
 
     it("reads only its own last status line", () => {
