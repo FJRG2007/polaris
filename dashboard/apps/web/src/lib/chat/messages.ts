@@ -594,12 +594,17 @@ export async function send(
         // this their own message would light their own badge.
         await tx.chatChannelMember.upsert({
             where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
-            update: { lastReadMessageId: message.id, lastReadAt: message.createdAt },
+            update: {
+                lastReadMessageId: message.id,
+                lastReadAt: message.createdAt,
+                lastSeenAt: message.createdAt
+            },
             create: {
                 channelId: input.channelId,
                 userId: actor.id,
                 lastReadMessageId: message.id,
-                lastReadAt: message.createdAt
+                lastReadAt: message.createdAt,
+                lastSeenAt: message.createdAt
             }
         });
         return message.id;
@@ -1300,18 +1305,24 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
 
     const current = await prisma.chatChannelMember.findUnique({
         where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
-        select: { lastReadAt: true }
+        select: { lastReadAt: true, lastSeenAt: true }
     });
     if (current?.lastReadAt && current.lastReadAt >= message.createdAt) return;
 
+    const seen = current?.lastSeenAt;
     await prisma.chatChannelMember.upsert({
         where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
-        update: { lastReadMessageId: input.messageId, lastReadAt: message.createdAt },
+        update: {
+            lastReadMessageId: input.messageId,
+            lastReadAt: message.createdAt,
+            ...(seen && seen >= message.createdAt ? {} : { lastSeenAt: message.createdAt })
+        },
         create: {
             channelId: input.channelId,
             userId: actor.id,
             lastReadMessageId: input.messageId,
-            lastReadAt: message.createdAt
+            lastReadAt: message.createdAt,
+            lastSeenAt: message.createdAt
         }
     });
 
@@ -1376,14 +1387,14 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
  * Marking a conversation unread that has nothing in it to read is not an error;
  * it writes nothing and says so by leaving the badge alone.
  *
- * The ticks are deliberately left alone. `readAt` on a message records the
- * moment somebody actually saw it, and they did; retracting that would tell the
+ * The ticks are deliberately left alone. `readAt` on a message and the
+ * member's `lastSeenAt` record that somebody actually saw it, and they did; retracting that would tell the
  * other person their message went back to unseen, which is not true and is not
  * this reader's to say. What changes is only where this reader is picking the
  * conversation up.
  */
 export async function markUnread(actor: ChatActor, input: core.ChatMarkUnreadInput): Promise<void> {
-    const channel = await requireChannel(actor, input.channelId);
+    await requireChannel(actor, input.channelId);
 
     /** What is countable here, and therefore what a boundary may be picked from. */
     const countable = {
@@ -1441,12 +1452,13 @@ export async function markUnread(actor: ChatActor, input: core.ChatMarkUnreadInp
     // rail on the desktop they left open, and this tab's own badge. Said to be
     // the backwards one, because a conversation somebody has just put back to
     // unread must not have its notice withdrawn as though they had read it.
+    // Theirs alone: `lastSeenAt` stays put, so nobody else's ticks move.
     publishChatChange({
         channelId: input.channelId,
         kind: "read",
         unread: true,
         actorId: actor.id,
-        audience: await readAudience(actor, channel)
+        audience: [actor.id]
     });
 }
 
@@ -2176,7 +2188,7 @@ async function receiptStateIn(actor: ChatActor, channelId: string): Promise<Rece
     // all of it.
     const others = await prisma.chatChannelMember.findMany({
         where: { channelId, userId: { not: actor.id } },
-        select: { userId: true, lastReadAt: true, lastDeliveredAt: true },
+        select: { userId: true, lastReadAt: true, lastSeenAt: true, lastDeliveredAt: true },
         orderBy: { userId: "asc" },
         take: groupReceipts.GROUP_RECEIPT_MAX_MEMBERS
     });
@@ -2192,7 +2204,7 @@ async function receiptStateIn(actor: ChatActor, channelId: string): Promise<Rece
 
     const marks = others.map((other) => ({
         userId: other.userId,
-        readAt: other.lastReadAt,
+        readAt: groupReceipts.seenAt(other),
         deliveredAt: other.lastDeliveredAt,
         allowed: allowed.has(other.userId)
     }));

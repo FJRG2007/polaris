@@ -33,6 +33,21 @@ export interface MemberMark {
 /** Where one member stands with one message. */
 export type MemberReceipt = core.MessageReceipt | "unknown";
 
+/**
+ * How far somebody has read, as far as the ticks are concerned: the furthest
+ * they have ever got. Marking a conversation unread moves `lastReadAt` back and
+ * leaves `lastSeenAt` where it was; a row from before `lastSeenAt` existed has
+ * only the first.
+ */
+export function seenAt(member: {
+    readonly lastReadAt: Date | null;
+    readonly lastSeenAt: Date | null;
+}): Date | null {
+    const { lastReadAt: read, lastSeenAt: seen } = member;
+    if (!read || !seen) return seen ?? read;
+    return seen > read ? seen : read;
+}
+
 /** One member's standing with one message. */
 export function memberReceiptAt(mark: MemberMark, createdAt: Date): MemberReceipt {
     if (!mark.allowed) return "unknown";
@@ -44,15 +59,16 @@ export function memberReceiptAt(mark: MemberMark, createdAt: Date): MemberReceip
 /**
  * The tick under a message: the least any other member has got to. Read only
  * once every one of them has read it, delivered once every one has it. A member
- * whose ticks are withheld holds it at sent, because "everyone has read this"
- * would otherwise be a claim about somebody who chose not to say.
+ * whose ticks are withheld holds it at delivered, because "everyone has read
+ * this" would otherwise be a claim about somebody who chose not to say - and
+ * holding it lower would say the message never reached the others.
  */
 export function receiptAmong(marks: readonly MemberMark[], createdAt: Date): core.MessageReceipt {
     let least: core.MessageReceipt = "read";
     for (const mark of marks) {
         const state = memberReceiptAt(mark, createdAt);
-        if (state === "unknown" || state === "sent") return "sent";
-        if (state === "delivered") least = "delivered";
+        if (state === "sent") return "sent";
+        if (state === "unknown" || state === "delivered") least = "delivered";
     }
     return marks.length === 0 ? "sent" : least;
 }

@@ -26,7 +26,8 @@ import { paneWidthFor } from "./list-view";
 import { useChatStream } from "./use-chat-stream";
 import { resetPaneLayout } from "./pane-preferences";
 import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
-import { useCallback, type CSSProperties, type ReactNode } from "react";
+import type { ChatChannelView } from "@/lib/chat/chat-service";
+import { useRef, useCallback, type CSSProperties, type ReactNode } from "react";
 import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
 
 /**
@@ -38,6 +39,17 @@ import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
  * screen this list is drawn on at all.
  */
 const LIST_PANE = { min: 208, max: 560, fallback: 256 };
+
+/**
+ * Whether somebody else catching up in this conversation can change its row:
+ * only while the row ends on the reader's own message, with ticks, not yet read.
+ * A conversation not in the list yet is asked for, since nothing says otherwise.
+ */
+export function tickMayMove(channels: readonly ChatChannelView[], channelId: string): boolean {
+    const row = channels.find((channel) => channel.id === channelId);
+    if (!row) return true;
+    return Boolean(row.last?.receipts && !row.last.read);
+}
 
 /**
  * Whether this address is a conversation, which on a phone takes the whole
@@ -92,7 +104,10 @@ export function ChatShell({
 function ChatColumns({ children }: { children: ReactNode }) {
     const t = useTranslations("chat");
     const pathname = usePathname();
-    const { refresh, refreshChannels, viewerId } = useChat();
+    const { channels, refresh, refreshChannels, viewerId } = useChat();
+    // Read from the frame handler without re-subscribing on every list change.
+    const rows = useRef(channels);
+    rows.current = channels;
     // Written as it moves, not on release: a drag that ends by closing the tab
     // is still a decision somebody made. The window can spare less than the
     // list may be, and a width remembered from a wide screen arrives on a
@@ -124,11 +139,13 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // before this they stayed up until the page was reloaded. The one
                 // trigger on purpose: the screen that performed the read is told
                 // by this frame like every other, so it does not ask for the list
-                // again on its own. Somebody else catching up moves the tick on
-                // this reader's last message in that row, and is only ever
-                // announced to the people whose ticks it moves - the other side
-                // of a one-to-one, or the members of a group who may see them.
-                if (frame.kind === "read") refreshChannels();
+                // again on its own. Somebody else catching up can only move the
+                // tick on this reader's own last message in that row, so it is
+                // asked for only while that row has a tick still short of read.
+                if (frame.kind === "read") {
+                    if (frame.userId === viewerId) refreshChannels();
+                    else if (tickMayMove(rows.current, frame.channelId)) refreshChannels();
+                }
             },
             [refresh, refreshChannels, viewerId]
         )

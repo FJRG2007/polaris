@@ -2,8 +2,8 @@
  * The tick under a group message, worked out from its members' read marks.
  *
  * Read only when every other member has read it; a member whose ticks are
- * withheld is unknown and never counted as having read anything; and past the
- * cap there are no ticks at all.
+ * withheld is unknown, never counted as having read anything, and holds the
+ * tick at delivered rather than sent; and past the cap there are no ticks at all.
  */
 
 import { describe, expect, it } from "vitest";
@@ -12,6 +12,7 @@ import {
     memberReceiptAt,
     readersAt,
     receiptAmong,
+    seenAt,
     ticksShown,
     type MemberMark
 } from "@/lib/chat/group-receipts";
@@ -41,13 +42,32 @@ describe("receiptAmong", () => {
 
     it("never turns read on behalf of a member whose ticks are withheld", () => {
         expect(receiptAmong([mark("a", AFTER, AFTER), mark("b", AFTER, AFTER, false)], SENT)).toBe(
-            "sent"
+            "delivered"
         );
         expect(memberReceiptAt(mark("b", AFTER, AFTER, false), SENT)).toBe("unknown");
     });
 
+    it("holds a withheld member at delivered, not sent, once the others have it", () => {
+        expect(receiptAmong([mark("a", null, AFTER), mark("b", null, null, false)], SENT)).toBe(
+            "delivered"
+        );
+        expect(receiptAmong([mark("a", null, BEFORE), mark("b", null, null, false)], SENT)).toBe(
+            "sent"
+        );
+    });
+
     it("is sent for nobody at all", () => {
         expect(receiptAmong([], SENT)).toBe("sent");
+    });
+});
+
+describe("seenAt", () => {
+    it("is the furthest of the two marks, so marking unread takes nothing back", () => {
+        expect(seenAt({ lastReadAt: BEFORE, lastSeenAt: AFTER })).toEqual(AFTER);
+        expect(seenAt({ lastReadAt: AFTER, lastSeenAt: BEFORE })).toEqual(AFTER);
+        expect(seenAt({ lastReadAt: null, lastSeenAt: AFTER })).toEqual(AFTER);
+        expect(seenAt({ lastReadAt: SENT, lastSeenAt: null })).toEqual(SENT);
+        expect(seenAt({ lastReadAt: null, lastSeenAt: null })).toBeNull();
     });
 });
 

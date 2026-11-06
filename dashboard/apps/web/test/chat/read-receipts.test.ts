@@ -33,6 +33,7 @@ let mark: { lastReadAt: Date | null; lastDeliveredAt: Date | null } | null = nul
 interface MemberRow {
     userId: string;
     lastReadAt: Date | null;
+    lastSeenAt?: Date | null;
     lastDeliveredAt: Date | null;
 }
 /** The other people in the conversation, as the membership table has them. */
@@ -272,13 +273,20 @@ describe("in a group", () => {
         others[0]!.lastReadAt = at(1);
         others[1]!.lastReadAt = at(1);
         hidden = new Set(["linus"]);
-        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "sent" });
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "delivered" });
 
         const delivery = await deliveryOf(ada, "m2");
         expect(delivery?.readers).toEqual([
             { id: "grace", name: "Grace", state: "read" },
             { id: "linus", name: "Linus", state: "unknown" }
         ]);
+    });
+
+    it("keeps a read tick when a member puts the conversation back to unread", async () => {
+        others[0]!.lastReadAt = at(0);
+        others[0]!.lastSeenAt = at(2);
+        others[1]!.lastReadAt = at(2);
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "read" });
     });
 
     it("shows nothing to a reader who withholds their own", async () => {

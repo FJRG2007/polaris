@@ -820,6 +820,7 @@ export async function listChannels(
                 select: {
                     userId: true,
                     lastReadAt: true,
+                    lastSeenAt: true,
                     lastDeliveredAt: true,
                     user: { select: { name: true } }
                 }
@@ -915,7 +916,7 @@ export async function listChannels(
     for (const [channelId, { kind, others }] of ticked) {
         const marks = others.map((member) => ({
             userId: member.userId,
-            readAt: member.lastReadAt,
+            readAt: groupReceipts.seenAt(member),
             deliveredAt: member.lastDeliveredAt,
             allowed: allowed.has(member.userId)
         }));
