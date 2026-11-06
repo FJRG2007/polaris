@@ -10,13 +10,13 @@ import type { TvInstallState, TvOutcome, TvPhase } from "@/shared/bridge";
 const STEPS: Partial<Record<TvPhase, string>> = {
     searching: "Looking for TVs on this network...",
     connecting: "Connecting to the TV...",
-    allow: "On the TV, choose Allow on the debugging prompt.",
+    allow: "On the TV, choose Allow when it asks to allow USB debugging.",
     checking: "Checking the TV...",
     backup: "Saving a backup of the TV's settings...",
     download: "Downloading Polaris TV...",
     install: "Installing...",
     home: "Making it the Home screen...",
-    closing: "Closing network debugging on the TV..."
+    closing: "Turning off debugging on the TV..."
 };
 
 const OUTCOMES: Record<TvOutcome, string> = {
@@ -27,7 +27,7 @@ const OUTCOMES: Record<TvOutcome, string> = {
     "installed-home-unknown":
         "Polaris TV is installed, but the connection was lost before Home was confirmed. Press Home on the TV to see which screen opens.",
     "adb-off":
-        "The TV refused the connection. On the TV, open Settings, About, press Build 7 times, then turn on USB debugging and Network debugging in Developer options.",
+        "The TV refused the connection. On the TV, open Settings, About, press Build 7 times, then turn on USB debugging and Network debugging in Developer options. Or use the USB cable tab.",
     "not-allowed": "Nobody answered on the TV. Try again and choose Allow on the TV's prompt.",
     unreachable: "Nothing answered at that address. Check that the TV is on and on this network.",
     "not-android-tv":
@@ -42,7 +42,10 @@ const OUTCOMES: Record<TvOutcome, string> = {
     "sideload-refused": "This TV refuses apps that do not come from its store. Nothing changed on it.",
     "install-failed": "The TV could not install it. Nothing else changed on it.",
     "install-interrupted":
-        "The connection was lost during the install, so it may not have finished. Look for Polaris TV among the TV's apps, or try again."
+        "The connection was lost during the install, so it may not have finished. Look for Polaris TV among the TV's apps, or try again.",
+    "usb-busy":
+        "The TV is plugged in, but another program is using its USB debugging. Close adb, Android Studio or scrcpy and try again. On Windows, the TV may also need the Google USB Driver.",
+    "usb-gone": "The TV is no longer connected by USB. Check the cable and try again."
 };
 
 const NOT_AN_ADDRESS = "Type the TV's address on this network, like 192.168.1.50.";
@@ -59,14 +62,31 @@ const step = byId<HTMLParagraphElement>("step");
 const result = byId<HTMLParagraphElement>("result");
 const backup = byId<HTMLParagraphElement>("backup");
 const closed = byId<HTMLParagraphElement>("closed");
+const tabNetwork = byId<HTMLButtonElement>("tab-network");
+const tabUsb = byId<HTMLButtonElement>("tab-usb");
+const networkPanel = byId<HTMLDivElement>("network");
+const usbPanel = byId<HTMLDivElement>("usb");
+const findUsb = byId<HTMLButtonElement>("find-usb");
+const usbFound = byId<HTMLDivElement>("usb-found");
+const usbNone = byId<HTMLParagraphElement>("usb-none");
 
 const IDLE = new Set<TvPhase>(["ready", "done", "failed"]);
 const bridge = window.polarisLocal.tv;
 
 let notStarted = false;
+let overUsb = false;
+/** The USB TV picked from the list, by id. */
+let chosen: string | null = null;
 
 function validAddress(): boolean {
     return readTvAddress(address.value) !== null;
+}
+
+/** The USB TV to install on: the one picked, or the only one plugged in. */
+function usbTarget(state: TvInstallState): string | null {
+    const listed = state.usb ?? [];
+    if (chosen && listed.some((one) => one.id === chosen)) return chosen;
+    return listed.length === 1 ? (listed[0]?.id ?? null) : null;
 }
 
 function addressProblem(): string | null {
@@ -83,8 +103,29 @@ function render(state: TvInstallState): void {
     const searching = state.phase === "searching";
     available(find, idle || searching);
     find.textContent = searching ? "Stop search" : "Find TVs";
-    available(start, idle && validAddress());
-    say(addressError, addressProblem());
+    available(start, idle && (overUsb ? usbTarget(state) !== null : validAddress()));
+    say(addressError, overUsb ? null : addressProblem());
+    tabNetwork.setAttribute("aria-selected", String(!overUsb));
+    tabUsb.setAttribute("aria-selected", String(overUsb));
+    networkPanel.hidden = overUsb;
+    usbPanel.hidden = !overUsb;
+    available(findUsb, idle);
+    usbNone.hidden = !(state.usb && state.usb.length === 0);
+    const picked = usbTarget(state);
+    usbFound.replaceChildren(
+        ...(state.usb ?? []).map((device) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = device.name;
+            button.title = device.id;
+            button.setAttribute("aria-pressed", String(device.id === picked));
+            button.addEventListener("click", () => {
+                chosen = device.id;
+                render(state);
+            });
+            return button;
+        })
+    );
     say(step, STEPS[state.phase] ?? null);
     say(result, state.outcome ? OUTCOMES[state.outcome] : null);
     heading.textContent = state.phase === "done" ? "Installed" : "Install on a TV";
@@ -94,8 +135,8 @@ function render(state: TvInstallState): void {
         state.closed === null
             ? null
             : state.closed
-              ? "Network debugging is closed on the TV."
-              : "Network debugging is still open on this TV. Turn it off in Developer options on the TV."
+              ? "Debugging is turned off on the TV."
+              : "Debugging may still be on on this TV. Turn it off in Developer options on the TV."
     );
     found.replaceChildren(
         ...state.found.map((host) => {
@@ -124,9 +165,23 @@ find.addEventListener("click", () => {
     if (find.getAttribute("aria-disabled") === "true") return;
     void (latest?.phase === "searching" ? bridge.cancel() : bridge.find());
 });
+function showTab(usb: boolean): void {
+    overUsb = usb;
+    if (latest) render(latest);
+    // The first look happens on its own, so a plugged-in TV is listed at once.
+    if (usb && latest && latest.usb === null && IDLE.has(latest.phase)) void bridge.findUsb();
+}
+tabNetwork.addEventListener("click", () => showTab(false));
+tabUsb.addEventListener("click", () => showTab(true));
+findUsb.addEventListener("click", () => {
+    if (findUsb.getAttribute("aria-disabled") === "true") return;
+    void bridge.findUsb();
+});
 start.addEventListener("click", () => {
     if (start.getAttribute("aria-disabled") === "true") return;
-    void bridge.start({ host: address.value.trim(), home: home.checked }).then((started) => {
+    const usb = latest && overUsb ? usbTarget(latest) : null;
+    const input = usb ? { usb, home: home.checked } : { host: address.value.trim(), home: home.checked };
+    void bridge.start(input).then((started) => {
         notStarted = !started;
         if (latest) render(latest);
     });

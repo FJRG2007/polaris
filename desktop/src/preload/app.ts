@@ -64,6 +64,7 @@ const bridge: PolarisDesktop = {
     tv: {
         state: () => ipcRenderer.invoke(CHANNELS.tvState),
         find: () => ipcRenderer.invoke(CHANNELS.tvFind),
+        findUsb: () => ipcRenderer.invoke(CHANNELS.tvFindUsb),
         cancel: () => ipcRenderer.invoke(CHANNELS.tvCancel),
         start: (input) => ipcRenderer.invoke(CHANNELS.tvStart, input),
         onState: (listener) => {

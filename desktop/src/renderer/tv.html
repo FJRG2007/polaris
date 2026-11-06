@@ -14,21 +14,42 @@
             <div>
                 <h1 id="title">Install on a TV</h1>
                 <p class="hint">
-                    For Android TV and Google TV on this network. Network debugging must be on: on the TV,
-                    open Settings, About, press Build 7 times, then turn on USB debugging and Network
-                    debugging in Developer options.
+                    For Android TV and Google TV. On the TV, open Settings, About, press Build 7 times, then
+                    turn on USB debugging in Developer options, and Network debugging to install over the
+                    network.
                 </p>
             </div>
 
-            <label>
-                TV address
-                <input id="address" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" />
-            </label>
-            <p id="address-error" class="hint" role="alert" hidden></p>
+            <nav class="tabs" role="tablist" aria-label="Connection">
+                <button id="tab-network" type="button" role="tab" aria-selected="true">Network</button>
+                <button id="tab-usb" type="button" role="tab" aria-selected="false">USB cable</button>
+            </nav>
 
-            <div class="row">
-                <button id="find" type="button">Find TVs</button>
-                <div id="found" class="row"></div>
+            <div id="network" class="stack">
+                <label>
+                    TV address
+                    <input id="address" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" />
+                </label>
+                <p id="address-error" class="hint" role="alert" hidden></p>
+
+                <div class="row">
+                    <button id="find" type="button">Find TVs</button>
+                    <div id="found" class="row"></div>
+                </div>
+            </div>
+
+            <div id="usb" class="stack" hidden>
+                <p class="hint">
+                    Connect the TV to this computer with a USB cable. Close adb, Android Studio or scrcpy if
+                    they are open.
+                </p>
+                <div class="row">
+                    <button id="find-usb" type="button">Find TVs</button>
+                    <div id="usb-found" class="row"></div>
+                </div>
+                <p id="usb-none" class="hint" role="status" hidden>
+                    No TV found on this computer's USB ports. Check the cable and that USB debugging is on.
+                </p>
             </div>
 
             <label class="row">
@@ -38,7 +59,7 @@
 
             <p class="hint">
                 A backup of the TV's settings is saved here first. Nothing is uninstalled or disabled, and
-                network debugging is turned off when it finishes.
+                debugging is turned off when it finishes.
             </p>
 
             <p id="step" class="hint" hidden></p>

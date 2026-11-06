@@ -313,6 +313,10 @@ h2 {
     padding: 6px 10px;
 }
 
+#usb-found button[aria-pressed="true"] {
+    border-color: var(--accent);
+}
+
 .tabs button[aria-selected="true"] {
     border-bottom-color: var(--accent);
     color: var(--text);

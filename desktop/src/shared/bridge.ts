@@ -299,9 +299,12 @@ export interface PolarisLocal {
 export interface TvInstallBridge {
     state(): Promise<TvInstallState>;
     find(): Promise<TvInstallState>;
+    /** Lists the TVs plugged into this computer by USB with USB debugging on. */
+    findUsb(): Promise<TvInstallState>;
     /** Stops a search; an install already under way runs to its end. */
     cancel(): Promise<TvInstallState>;
-    start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
+    /** `host` for a TV on the network, `usb` for one from `TvInstallState.usb`. */
+    start(input: { readonly host: string; readonly home: boolean } | { readonly usb: string; readonly home: boolean }): Promise<boolean>;
     onState(listener: (state: TvInstallState) => void): () => void;
 }
 
@@ -338,17 +341,51 @@ export type TvOutcome =
     | "backup-failed"
     | "sideload-refused"
     | "install-failed"
-    | "install-interrupted";
+    | "install-interrupted"
+    | "usb-busy"
+    | "usb-gone";
+
+/** A TV plugged in by USB that offers ADB. */
+export interface TvUsbDevice {
+    readonly id: string;
+    readonly name: string;
+}
 
 export interface TvInstallState {
     readonly phase: TvPhase;
     /** Addresses on this network that answer on the ADB port. */
     readonly found: readonly string[];
+    /** TVs plugged in by USB; null until somebody looked. Present only on apps that install over USB. */
+    readonly usb: readonly TvUsbDevice[] | null;
     readonly outcome: TvOutcome | null;
     /** The folder the TV's backup was written to. */
     readonly backup: string | null;
     /** Whether the port refused afterwards; null until that was checked. */
     readonly closed: boolean | null;
+}
+
+/** What the main process asks of the hidden page that holds a TV's USB connection. */
+export type UsbRequest =
+    | { readonly id: number; readonly op: "list"; }
+    | { readonly id: number; readonly op: "open"; readonly device: string; }
+    | { readonly id: number; readonly op: "close"; };
+
+/** Its answer. `busy`: another program holds the device, or Windows has no driver
+ *  for it; `gone`: it is no longer plugged in. */
+export type UsbReply =
+    | { readonly id: number; readonly ok: true; readonly devices?: readonly TvUsbDevice[]; }
+    | { readonly id: number; readonly ok: false; readonly error: "busy" | "gone"; };
+
+/** `window.polarisUsb`, on that page only. */
+export interface UsbBridge {
+    onRequest(listener: (request: UsbRequest) => void): void;
+    reply(reply: UsbReply): void;
+    /** One packet to send: header and payload, as two transfers. */
+    onOut(listener: (header: Uint8Array, data: Uint8Array) => void): void;
+    /** One packet read from the TV, header and payload together. */
+    received(bytes: Uint8Array): void;
+    /** The open device went away. */
+    lost(): void;
 }
 
 /** A button on a notice. */
@@ -436,6 +473,12 @@ export const CHANNELS = {
     tvFind: "local:tv-find",
     tvStart: "local:tv-start",
     tvCancel: "local:tv-cancel",
+    tvFindUsb: "local:tv-find-usb",
+    usbRequest: "usb:request",
+    usbReply: "usb:reply",
+    usbOut: "usb:out",
+    usbIn: "usb:in",
+    usbLost: "usb:lost",
     tvEvent: "local:tv-event"
 } as const;
 
