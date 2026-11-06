@@ -46,6 +46,12 @@ async function runFirewall(): Promise<{
         kicked += result.kicked;
         allowed += result.allowed;
     }
+    // The routing tables, rebuilt from what exists right now, once for every owner: they
+    // are per machine, not per owner. A server that was removed or repointed leaves a
+    // route behind otherwise, and a route to a port nothing holds is a name that fails
+    // for a player with nothing anywhere saying why.
+    const { syncMinecraftRoutes } = await import("./minecraft/router-service");
+    await syncMinecraftRoutes().catch(() => undefined);
     return { servers, banned, kicked, allowed };
 }
 

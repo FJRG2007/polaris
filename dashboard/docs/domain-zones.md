@@ -193,15 +193,67 @@ What mc-router does with the table, from its source (`server/routes_config_loade
 On the Polaris side the table is built a page of installs at a time, with one
 application query per page, and is only written when it changed.
 
-That holds for a single host. Every route dials `POLARIS_APP_DIAL_HOST` by its
-published port, so one router only serves the servers on its own host, and the servers
-on one host are bounded by its own published ports. By estimate (about 70 bytes a
-mapping), a few hundred thousand names is a file of tens of megabytes, re-read in
-full on every change; this was not measured against a running router. Two million servers
-is not one table: it is many hosts, each with its own router and its own table of
-its own servers - sharding by host, the same way the edge is per host. Running the
-router on each server host is not built yet. Today the router runs beside the
-dashboard and routes the servers on that host.
+That holds for one machine, and one machine is all a router serves: see below.
+
+### One router per machine
+
+Every route dials a published port on the router's own machine, so a router can only
+ever serve the servers beside it. Each machine that runs Java servers therefore gets a
+router and a table of its own, holding only that machine's routes
+(`router-service.ts`, `shardOf`): this machine's `local` shard, plus one per connected
+server, keyed by its Host id.
+
+- **A single-machine install has one shard and nothing to configure.** The router
+  above is the only one, written and started exactly as before.
+- **A connected server's router** is deployed over the same SSH the deploy pipeline
+  uses, as the same `polaris-mc-router` project through `SshPorts.composeUp`
+  (`lib/minecraft-router.ts`, `remoteRouterSpec`). Its table is
+  `/var/lib/polaris/volumes/polaris-mc-router/mc-routes.json` on that machine, bind
+  mounted into the router, written in place from stdin (one argument to the remote
+  shell stops at 128 KiB). It reaches its servers through the host gateway
+  (`host.docker.internal:host-gateway`). Waking a sleeping server on join is off
+  there: the knock goes to `web:3000`, which only the dashboard's network resolves.
+- **Repair is idempotent.** The sweep rebuilds every machine's table and, for a
+  machine with servers routed for good, deploys the router again when its project has
+  no running container. `compose up -d` leaves a running one alone. A machine whose
+  routes are only candidates is written but never given a router by the sweep, and a
+  machine nobody routed anything on gets no file at all.
+- **Switching a server** starts the router on the machine that server runs on, waits
+  for it there (its engine is asked for the project, so a Minecraft server holding the
+  port never reads as the router), and stops that machine's router when its last
+  server leaves. The adoption ping goes to the connected server's own address on the
+  shared port.
+
+DNS: the game's wildcard (`*.mc.<domain>`) names this machine, which is still right for
+every server here. A server on a connected machine gets one A record of its own,
+pointing at that machine's public address (`provisionHostnameDns` with the serving
+target, the same rule a deployed service's domain follows); a specific record outranks
+the wildcard. Never a SRV record. Before this, such a server's name pointed at this
+machine, where nothing published its port.
+
+### Writes are bounded per machine
+
+A change rebuilds and writes only its own machine's table (`syncMinecraftRoutes(install)`
+reads only that machine's deploy targets' installs), and only when the table changed.
+mc-router cannot split it further: checked at the pinned tag (v1.46.2) and the current
+one (v1.54.2), `RoutesConfig` is one `Config` path and one `ConfigWatch` switch, the
+loader reads that single file and the watch is `watcher.Add` on that file. There is no
+directory or multi-file option, and a second router on the same machine would need a
+second port, which is the thing routing removes. So the ceiling is per machine: a
+machine's table is re-read whole on each change to that machine, at about 70 bytes a
+mapping (estimated, not measured). A machine is bounded by its own published ports
+long before that matters - 65,535 at most, a table of a few megabytes.
+
+The scaling path is therefore more machines, not a bigger table: two million servers
+is thousands of machines with a few hundred each, every change costing one machine's
+table. What still grows with the fleet:
+
+- The sweep reads every install a page at a time and opens one SSH session per
+  connected machine that ever ran a game server, to compare its table. Hourly, and only
+  a changed table is written.
+- One A record per server on a connected machine. A per-machine label
+  (`<name>.<machine>.mc.<domain>` under one wildcard each) would make that one record
+  per machine; it changes the names players already have, so it is not done here.
 
 ## Per-server wildcards
 

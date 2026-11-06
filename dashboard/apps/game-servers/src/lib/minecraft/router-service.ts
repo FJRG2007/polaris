@@ -27,8 +27,10 @@ import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { host } from "@polaris/app-host";
+import { gameServerCatalogIds } from "../game-catalog";
 
 const { readInstallConfig } = host.appsInstallConfig;
+const { readHostTable, routerRunningOn, startRouterOn, writeHostTable } = host.minecraftRouter;
 
 /** Where the table is written for the router to read. */
 function routesDir(): string {
@@ -96,30 +98,98 @@ export function routesConfig(routes: readonly MinecraftRoute[]): string {
     return `${JSON.stringify({ mappings }, null, 2)}\n`;
 }
 /**
- * The routes the current installs call for: every Java server that has been given a
- * name, has a published port to send traffic to, and is either routed or waiting to
- * be (`ROUTE_CANDIDATE_KEY`).
+ * The machine a server's routes live on: the Host id of a connected server, or
+ * `LOCAL_SHARD` for the one Polaris runs on.
+ *
+ * Each machine that runs Java servers has a router and a table of its own, holding
+ * only that machine's servers - a route dials a published port on the router's own
+ * machine, so no router can serve another's. A change rewrites one machine's table,
+ * never the fleet's, and a single-machine install has exactly one shard: this one.
+ */
+export const LOCAL_SHARD = "local";
+
+/** Which shard a deploy target's servers belong to. Pure. */
+export function shardOf(
+    target: { kind: string; hostId: string | null } | null | undefined
+): string {
+    return target && target.kind !== "local" && target.hostId ? target.hostId : LOCAL_SHARD;
+}
+
+/** How a connected server's router reaches the servers beside it: the host gateway,
+ *  which its compose file maps to this name. */
+const REMOTE_DIAL_HOST = "host.docker.internal";
+
+/** A route, with the shard it belongs to and whether its server is routed for good
+ *  (rather than a candidate the sweep is still checking). */
+export interface ShardRoute extends MinecraftRoute {
+    readonly shard: string;
+    readonly routed: boolean;
+}
+
+/**
+ * Routes grouped by machine, one table each. Pure.
+ *
+ * Two servers claiming one name on a machine would make which world a player reaches
+ * depend on install order. The first wins and the second is left unrouted, which shows
+ * up as a server that still needs its port - a visible state, unlike a silent swap.
+ */
+export function routesByShard(routes: readonly ShardRoute[]): Map<string, ShardRoute[]> {
+    const shards = new Map<string, ShardRoute[]>();
+    const seen = new Map<string, Set<string>>();
+    for (const route of routes) {
+        const names = seen.get(route.shard) ?? new Set<string>();
+        seen.set(route.shard, names);
+        if (names.has(route.hostname)) continue;
+        names.add(route.hostname);
+        const list = shards.get(route.shard) ?? [];
+        list.push(route);
+        shards.set(route.shard, list);
+    }
+    return shards;
+}
+
+/** The deploy targets on one machine. Few per machine, one indexed query. */
+async function shardTargets(shard: string): Promise<string[]> {
+    const targets = await prisma.deployTarget.findMany({
+        where:
+            shard === LOCAL_SHARD
+                ? { OR: [{ kind: "local" }, { hostId: null }] }
+                : { hostId: shard },
+        select: { id: true }
+    });
+    return targets.map((target) => target.id);
+}
+
+/**
+ * Every route the current installs call for, on one machine or on all of them: every
+ * Java server that has been given a name, has a published port to send traffic to,
+ * and is either routed or waiting to be (`ROUTE_CANDIDATE_KEY`).
  *
  * A server whose player list is bound to addresses is never either: connections
  * arrive from the router, so the address half of that list cannot be enforced
- * through it (see `addressesSurviveRouting`). A server that was working yesterday
- * must not quietly lose that today.
+ * through it (see `addressesSurviveRouting`).
  *
- * Read a page at a time, with one application lookup per page, so the table costs
- * a number of round trips that grows with pages rather than with servers.
+ * Read a page at a time, with one application lookup per page, so the table costs a
+ * number of round trips that grows with pages rather than with servers. Narrowed to
+ * one machine, it reads only that machine's installs.
  */
-export async function minecraftRoutes(): Promise<MinecraftRoute[]> {
-    const routes: MinecraftRoute[] = [];
+export async function shardRoutes(shard?: string): Promise<ShardRoute[]> {
+    const targetIds = shard === undefined ? undefined : await shardTargets(shard);
+    if (targetIds && targetIds.length === 0) return [];
+    const routes: ShardRoute[] = [];
     let cursor: string | undefined;
     for (;;) {
         const installs = await prisma.installedApp.findMany({
-            where: { status: { not: "removed" } },
+            where: {
+                status: { not: "removed" },
+                ...(targetIds ? { targetId: { in: targetIds } } : {})
+            },
             select: { id: true, catalogId: true, config: true, applicationId: true },
             orderBy: { id: "asc" },
             take: PAGE_SIZE,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
         });
-        const wanted: { hostname: string; applicationId: string }[] = [];
+        const wanted: { hostname: string; applicationId: string; routed: boolean }[] = [];
         for (const install of installs) {
             // Only a client that names the address it dialled can be routed by it. ARK
             // and Bedrock are UDP and carry no such field, so they keep their port.
@@ -128,45 +198,77 @@ export async function minecraftRoutes(): Promise<MinecraftRoute[]> {
             if (config.routed !== true && config[ROUTE_CANDIDATE_KEY] !== true) continue;
             const hostname =
                 typeof config.hostname === "string" ? config.hostname.trim().toLowerCase() : "";
-            if (hostname) wanted.push({ hostname, applicationId: install.applicationId });
+            if (hostname)
+                wanted.push({
+                    hostname,
+                    applicationId: install.applicationId,
+                    routed: config.routed === true
+                });
         }
-        const ports = await publishedPorts(wanted.map((entry) => entry.applicationId));
+        const placed = await publishedPorts(wanted.map((entry) => entry.applicationId));
         for (const entry of wanted) {
-            const port = ports.get(entry.applicationId);
-            if (port) routes.push({ hostname: entry.hostname, backend: `${dialHost()}:${port}` });
+            const found = placed.get(entry.applicationId);
+            if (!found) continue;
+            const where = shardOf(found.target);
+            if (shard !== undefined && where !== shard) continue;
+            const dial = where === LOCAL_SHARD ? dialHost() : REMOTE_DIAL_HOST;
+            routes.push({
+                hostname: entry.hostname,
+                backend: `${dial}:${found.port}`,
+                shard: where,
+                routed: entry.routed
+            });
         }
         if (installs.length < PAGE_SIZE) break;
         cursor = installs[installs.length - 1]?.id;
     }
-    // Two servers claiming one name would make which world a player reaches depend on
-    // install order. The first wins and the second is left unrouted, which shows up as
-    // a server that still needs its port - a visible state, unlike a silent swap.
-    const seen = new Set<string>();
-    return routes.filter((route) => {
-        if (seen.has(route.hostname)) return false;
-        seen.add(route.hostname);
-        return true;
-    });
+    return routes;
 }
 
-/** The host port each install pinned, which is what the router has to dial. One
- *  query for a page of servers rather than one per server. */
-async function publishedPorts(applicationIds: readonly string[]): Promise<Map<string, number>> {
-    const ports = new Map<string, number>();
+/** The routes one machine's table holds, or every machine's, in the router's shape. */
+export async function minecraftRoutes(shard?: string): Promise<MinecraftRoute[]> {
+    const shards = routesByShard(await shardRoutes(shard));
+    return [...shards.values()].flat().map(({ hostname, backend }) => ({ hostname, backend }));
+}
+
+/** The host port each install pinned, and the machine it runs on, which is what the
+ *  router has to dial and whose router does. One query for a page of servers. */
+async function publishedPorts(
+    applicationIds: readonly string[]
+): Promise<Map<string, { port: number; target: { kind: string; hostId: string | null } | null }>> {
+    const ports = new Map<
+        string,
+        { port: number; target: { kind: string; hostId: string | null } | null }
+    >();
     if (applicationIds.length === 0) return ports;
     const apps = await prisma.application.findMany({
         where: { id: { in: [...applicationIds] } },
-        select: { id: true, sourceConfig: true }
+        select: { id: true, sourceConfig: true, target: { select: { kind: true, hostId: true } } }
     });
     for (const app of apps) {
         try {
             const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
-            if (typeof config.hostPort === "number") ports.set(app.id, config.hostPort);
+            if (typeof config.hostPort === "number")
+                ports.set(app.id, { port: config.hostPort, target: app.target ?? null });
         } catch {
             // A source config that cannot be read has no port to route to.
         }
     }
     return ports;
+}
+
+/** The machine an install runs on, for a change that only touches its own table. */
+export async function installShard(installedAppId: string): Promise<string> {
+    const install = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { targetId: true }
+    });
+    if (!install?.targetId) return LOCAL_SHARD;
+    const target = await prisma.deployTarget.findUnique({
+        where: { id: install.targetId },
+        select: { kind: true, hostId: true }
+    });
+    return shardOf(target);
 }
 
 /**
@@ -236,34 +338,166 @@ function readRetiredSince(text: string | null): Record<string, number> {
 }
 
 /**
- * Write the table out. Called whenever something that appears in it changes - a
- * server's name, its routing, its removal - and safe to call when nothing did: an
- * unchanged table is not written at all, since every write makes the router read
- * and register the whole of it again.
- *
- * Best effort by design. The routes directory only exists where the router is
- * running, so on an instance without it this fails and that is the correct outcome:
- * nothing is routed, every server keeps the address it already had.
+ * The table a machine should hold next, or null when what it holds is already that.
+ * Pure. A machine that has no table and nothing to route is left alone (null): a
+ * connected server nobody routed anything to never gets a file or a router.
  */
-export async function syncMinecraftRoutes(): Promise<void> {
-    const routes = await minecraftRoutes();
+export function nextTable(
+    previous: string | null,
+    routes: readonly MinecraftRoute[],
+    always: boolean,
+    since: Readonly<Record<string, number>> = {},
+    now: number = Date.now()
+): string | null {
+    if (previous === null && routes.length === 0 && !always) return null;
+    const next = routesConfig([...routes, ...retiredRoutes(previous, routes, since, now)]);
+    return next === previous ? null : next;
+}
+
+async function readTable(shard: string): Promise<string | null> {
+    if (shard !== LOCAL_SHARD) return readHostTable(shard);
+    return readFile(join(routesDir(), ROUTES_FILE), "utf8").catch(() => null);
+}
+
+async function writeTable(shard: string, table: string): Promise<void> {
+    if (shard !== LOCAL_SHARD) return writeHostTable(shard, table);
     const dir = routesDir();
     await mkdir(dir, { recursive: true });
-    const file = join(dir, ROUTES_FILE);
-    const sinceFile = join(dir, RETIRED_FILE);
-    const previous = await readFile(file, "utf8").catch(() => null);
-    const since = readRetiredSince(await readFile(sinceFile, "utf8").catch(() => null));
-    const now = Date.now();
-    const retired = retiredRoutes(previous, routes, since, now);
-    const nextSince = JSON.stringify(retiredSince(retired, since, now));
-    if (nextSince !== JSON.stringify(since)) await writeFile(sinceFile, `${nextSince}\n`, "utf8");
-    const next = routesConfig([...routes, ...retired]);
-    if (next === previous) return;
     // Written in place, unlike the edge's dynamic files (`writeDynamicFile`). The
     // router watches this one file by name, and a rename over it replaces the inode
     // the watch is on, so no reload after the first would ever happen. A reader
     // catching it half-written is harmless: mc-router waits five seconds of quiet
     // before reading, and a table it cannot parse is logged while the routes it
     // already has are kept.
-    await writeFile(file, next, "utf8");
+    await writeFile(join(dir, ROUTES_FILE), table, "utf8");
+}
+
+/** One machine's table, written only when it changed. This machine's is always
+ *  written, empty included, because its router exits at startup without one - and so
+ *  is a connected server's when `always` says its router is about to be started. */
+async function syncShard(
+    shard: string,
+    routes: readonly MinecraftRoute[],
+    always = false
+): Promise<void> {
+    const previous = await readTable(shard);
+    const since = await readSince(shard);
+    const now = Date.now();
+    const nextSince = retiredSince(retiredRoutes(previous, routes, since, now), since, now);
+    if (JSON.stringify(nextSince) !== JSON.stringify(since))
+        await writeSince(shard, nextSince).catch(() => undefined);
+    const next = nextTable(previous, routes, always || shard === LOCAL_SHARD, since, now);
+    if (next !== null) await writeTable(shard, next);
+}
+
+/** Where a machine's retirement times are kept: beside this machine's table, since
+ *  only the dashboard reads them - a connected server's router never needs them. */
+function sinceFile(shard: string): string {
+    const name =
+        shard === LOCAL_SHARD
+            ? RETIRED_FILE
+            : `mc-routes-retired-${shard.replace(/[^A-Za-z0-9_-]/g, "_")}.json`;
+    return join(routesDir(), name);
+}
+
+async function readSince(shard: string): Promise<Record<string, number>> {
+    return readRetiredSince(await readFile(sinceFile(shard), "utf8").catch(() => null));
+}
+
+/** Best effort: a time that could not be kept only means the name is retired for
+ *  longer, never that a route goes missing. */
+async function writeSince(shard: string, since: Record<string, number>): Promise<void> {
+    await mkdir(routesDir(), { recursive: true });
+    await writeFile(sinceFile(shard), `${JSON.stringify(since)}\n`, "utf8");
+}
+
+/** Connected servers that have ever run a Java server here, removed ones included,
+ *  so a machine whose last routed server went away still has its names retired. Few
+ *  targets, and one grouped query over the installs on them. */
+async function knownRemoteShards(): Promise<string[]> {
+    const targets = await prisma.deployTarget.findMany({
+        where: { hostId: { not: null } },
+        select: { id: true, kind: true, hostId: true }
+    });
+    if (targets.length === 0) return [];
+    const used = await prisma.installedApp.groupBy({
+        by: ["targetId"],
+        where: {
+            targetId: { in: targets.map((target) => target.id) },
+            catalogId: { in: gameServerCatalogIds().filter(routesByHostname) }
+        }
+    });
+    const usedIds = new Set(used.map((row) => row.targetId));
+    return [
+        ...new Set(
+            targets
+                .filter((target) => usedIds.has(target.id))
+                .map((target) => shardOf(target))
+                .filter((shard) => shard !== LOCAL_SHARD)
+        )
+    ];
+}
+
+/**
+ * Write the tables out. Called whenever something that appears in them changes - a
+ * server's name, its routing, its removal - and safe to call when nothing did: an
+ * unchanged table is not written at all, since every write makes the router read and
+ * register the whole of it again.
+ *
+ * Given the install that changed, only its machine's table is rebuilt and written, so
+ * a change costs that machine's servers and nothing more. Without one (the sweep)
+ * every machine's table is rebuilt from one pass over the installs, and a connected
+ * server with servers routed for good gets its router repaired: deployed again if it
+ * is not running, which `compose up -d` makes a no-op when it is.
+ *
+ * `always` writes the install's machine's table even when it would hold nothing,
+ * which is what has to happen just before that machine's router is started.
+ *
+ * Best effort by design. The routes directory only exists where the router is
+ * running, so on an instance without it this fails and that is the correct outcome:
+ * nothing is routed, every server keeps the address it already had. Machines are
+ * synced side by side, so one that cannot be reached neither stops nor delays the
+ * others' tables.
+ */
+export async function syncMinecraftRoutes(
+    installedAppId?: string,
+    options: { always?: boolean } = {}
+): Promise<void> {
+    if (installedAppId) {
+        const shard = await installShard(installedAppId);
+        await syncShard(shard, await minecraftRoutes(shard), options.always === true);
+        return;
+    }
+    const shards = routesByShard(await shardRoutes());
+    for (const shard of [LOCAL_SHARD, ...(await knownRemoteShards().catch(() => []))]) {
+        if (!shards.has(shard)) shards.set(shard, []);
+    }
+    await Promise.all(
+        [...shards].map(async ([shard, routes]) => {
+            const table = routes.map(({ hostname, backend }) => ({ hostname, backend }));
+            const written = await syncShard(shard, table).then(
+                () => true,
+                () => false
+            );
+            if (!written || shard === LOCAL_SHARD || !routes.some((route) => route.routed)) return;
+            await repairRouterOn(shard).catch(() => undefined);
+        })
+    );
+}
+
+/** Deploy a connected server's router again when it is not running. Only for a
+ *  machine with servers routed for good: a candidate's SRV record still answers, and
+ *  the sweep never claims a port on a machine nobody routed anything on. */
+async function repairRouterOn(shard: string): Promise<void> {
+    if (await routerRunningOn(shard)) return;
+    await startRouterOn(shard, routerPort());
+}
+
+/** The port the hostname router answers on, which is the default Minecraft port
+ *  unless the operator moved it. The same on every machine. */
+export function routerPort(): number {
+    const configured = Number(process.env.POLARIS_MC_ROUTER_PORT);
+    return Number.isInteger(configured) && configured > 0 && configured < 65536
+        ? configured
+        : 25565;
 }

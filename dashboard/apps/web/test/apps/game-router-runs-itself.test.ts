@@ -40,9 +40,15 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
     }
 }));
 
-const { ROUTER_IMAGE, ROUTER_PROJECT, routerPlacement, routerSpec, startRouter } = await import(
-    "@/lib/minecraft-router"
-);
+const {
+    ROUTER_IMAGE,
+    ROUTER_PROJECT,
+    remoteRouterSpec,
+    remoteTableWriteScript,
+    routerPlacement,
+    routerSpec,
+    startRouter
+} = await import("@/lib/minecraft-router");
 
 /** What the daemon says about the dashboard's own container. */
 const SELF = JSON.stringify({
@@ -73,7 +79,9 @@ describe("where the router has to be", () => {
         // reaches nothing.
         docker.answer = JSON.stringify({
             NetworkSettings: { Networks: { "polaris-hub": {}, polaris_default: {} } },
-            Mounts: [{ Type: "volume", Name: "polaris_polaris-mc-routes", Destination: "/mc-routes" }]
+            Mounts: [
+                { Type: "volume", Name: "polaris_polaris-mc-routes", Destination: "/mc-routes" }
+            ]
         });
         expect((await routerPlacement())?.network).toBe("polaris_default");
     });
@@ -96,12 +104,17 @@ describe("where the router has to be", () => {
 
 describe("the project Polaris deploys", () => {
     const spec = () =>
-        routerSpec({ network: "polaris_default", routesVolume: "polaris_polaris-mc-routes" }, 25565);
+        routerSpec(
+            { network: "polaris_default", routesVolume: "polaris_polaris-mc-routes" },
+            25565
+        );
 
     it("is one service on the port players connect to", () => {
         expect(spec().project).toBe(ROUTER_PROJECT);
         expect(spec().services[0]?.image).toBe(ROUTER_IMAGE);
-        expect(spec().services[0]?.ports).toEqual([{ host: 25565, container: 25565, protocol: "tcp" }]);
+        expect(spec().services[0]?.ports).toEqual([
+            { host: 25565, container: 25565, protocol: "tcp" }
+        ]);
     });
 
     it("mounts the dashboard's table and never owns it", () => {
@@ -145,5 +158,34 @@ describe("starting it", () => {
         expect(failure).toBeTruthy();
         expect(failure).not.toMatch(/COMPOSE_PROFILES|docker |\.env/);
         expect(composed).toEqual([]);
+    });
+});
+
+describe("on a connected server", () => {
+    it("is the same project, rendered the same way every time, so deploying it again changes nothing", () => {
+        expect(remoteRouterSpec(25565)).toEqual(remoteRouterSpec(25565));
+        const [service] = remoteRouterSpec(25565).services;
+        expect(remoteRouterSpec(25565).project).toBe(ROUTER_PROJECT);
+        expect(service?.image).toBe(ROUTER_IMAGE);
+    });
+
+    it("reads its own table and dials the servers beside it", () => {
+        const spec = remoteRouterSpec(25565);
+        const [service] = spec.services;
+        // A bind under the remote volume root: nothing of the dashboard's exists there.
+        expect(service?.volumes).toEqual([
+            { source: ROUTER_PROJECT, target: "/mc-routes", kind: "bind" }
+        ]);
+        expect(service?.extraHosts).toEqual(["host.docker.internal:host-gateway"]);
+        expect(service?.networks).toEqual([]);
+        expect(spec.externalVolumes).toBeUndefined();
+        // The knock goes to web:3000, which no network on that machine resolves.
+        expect(service?.env).not.toHaveProperty("AUTO_SCALE_WEBHOOK_URL");
+    });
+
+    it("writes the table in place from stdin, never renamed over the watched file", () => {
+        const script = remoteTableWriteScript();
+        expect(script).toContain("cat > /var/lib/polaris/volumes/polaris-mc-router/mc-routes.json");
+        expect(script).not.toContain("mv ");
     });
 });

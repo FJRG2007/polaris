@@ -25,9 +25,12 @@ import { normalizeZoneName } from "@polaris/deploy";
 import { connect } from "node:net";
 import { readJavaStatus, statusDescription } from "./slp";
 import {
+    LOCAL_SHARD,
     ROUTE_CANDIDATE_KEY,
+    installShard,
     minecraftRoutes,
     routerAddress,
+    routerPort,
     syncMinecraftRoutes
 } from "./router-service";
 import { host } from "@polaris/app-host";
@@ -38,7 +41,8 @@ const { getDomainZones } = host.domainZones;
 const { provisionHostnameDns } = host.domainDns;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { loadCloudflareToken } = host.integrationsCloudflareAccountService;
-const { startRouter, stopRouter } = host.minecraftRouter;
+const { routerRunningOn, startRouter, startRouterOn, stopRouter, stopRouterOn } =
+    host.minecraftRouter;
 const { publicProbeHost } = host.netPortProbe;
 const { relayAddress } = host.appsPortAdvice;
 const { deleteDnsRecord, findDnsRecords, resolveZoneForHostname, upsertSrvRecord } =
@@ -106,9 +110,14 @@ export async function provisionGameDns(
     hostname: string,
     port: number,
     srv: boolean,
-    owner: { ownerId: string; installedAppId: string }
+    owner: { ownerId: string; installedAppId: string },
+    /** The connected server it runs on, when that is not this one. */
+    serving?: { kind: string; host: { name: string; address: string } | null }
 ): Promise<GameAddress> {
-    const result = await provisionHostnameDns(hostname);
+    // A server on this machine is covered by the game's wildcard and writes nothing.
+    // One on a connected server gets an A record of its own pointing at that machine,
+    // whose router answers for it - the one case a name differs from the wildcard.
+    const result = await provisionHostnameDns(hostname, serving);
     if (result.status === "conflict" || result.status === "manual")
         return { hostname: null, portless: false };
     if (result.status === "created" && result.recordId && result.zoneId) {
@@ -217,15 +226,21 @@ export async function setGameHostname(
     });
     const port = install?.applicationId ? await publishedPort(install.applicationId) : null;
     if (!port) return null;
+    const serving = install?.applicationId
+        ? await servingMachine(install.applicationId)
+        : undefined;
     // A routed server needs no SRV record: the router answers on the default port and
     // reads the name out of the handshake, so the port was never part of the address.
     // Asking for one anyway would write a record per server, which is the thing
     // routing exists to stop.
     const routed = readInstallConfig(install?.config).routed === true;
-    const address = await provisionGameDns(wanted, port, input.srv && !routed, {
-        ownerId,
-        installedAppId
-    });
+    const address = await provisionGameDns(
+        wanted,
+        port,
+        input.srv && !routed,
+        { ownerId, installedAppId },
+        serving
+    );
     if (!address.hostname) return null;
     await patchInstallConfig(installedAppId, {
         hostname: address.hostname,
@@ -240,7 +255,7 @@ export async function setGameHostname(
     // The table names servers by hostname, so a rename has to reach it or the old
     // name keeps routing and the new one reaches nothing.
     const candidate = readInstallConfig(install?.config)[ROUTE_CANDIDATE_KEY] === true;
-    if (routed || candidate) await syncMinecraftRoutes().catch(() => undefined);
+    if (routed || candidate) await syncMinecraftRoutes(installedAppId).catch(() => undefined);
     return address.hostname;
 }
 
@@ -288,14 +303,21 @@ export async function setGameRouted(
     //
     // The table is written first, empty or not: the router watches that file, and a
     // watch on a file that does not exist kills it at startup.
-    if (routed && !(await routerListening())) {
-        await syncMinecraftRoutes().catch(() => undefined);
-        const failed = await startRouter(routerPort());
+    //
+    // The router is the one on the machine the server runs on: each machine routes
+    // only its own servers, from a table of its own.
+    const shard = await installShard(installedAppId);
+    if (routed && !(await routerUp(shard))) {
+        await syncMinecraftRoutes(installedAppId, { always: true }).catch(() => undefined);
+        const failed =
+            shard === LOCAL_SHARD
+                ? await startRouter(routerPort())
+                : await startRouterOn(shard, routerPort());
         if (failed) throw new Error(failed);
         // It binds a second or so after the container starts, and the caller is a
         // person waiting on a switch: waiting here is the difference between this
         // working and this asking them to press it again.
-        if (!(await waitForRouter())) {
+        if (!(await waitForRouter(shard))) {
             throw new Error(gameMessage("games", "lib.routerSilent", { port: routerPort() }));
         }
     }
@@ -306,7 +328,7 @@ export async function setGameRouted(
     // directions. Doing it the other way round leaves a window - however short - where
     // the address a player already has answers nowhere.
     if (routed) {
-        await moveOntoRouter(ownerId, installedAppId, hostname, port, true);
+        await moveOntoRouter(ownerId, installedAppId, hostname, port, install.applicationId, true);
         return;
     }
     const srvWritten =
@@ -320,18 +342,20 @@ export async function setGameRouted(
         portless: srvWritten,
         [ROUTE_CANDIDATE_KEY]: false
     });
-    await syncMinecraftRoutes().catch(() => undefined);
+    await syncMinecraftRoutes(installedAppId).catch(() => undefined);
     // The last server off the router leaves it holding a port for an empty table.
     // Only ever the one Polaris started: an install running the router from its
     // compose profile has a project this does not name, and keeps it.
-    if ((await minecraftRoutes().catch(() => [])).length === 0) {
-        await stopRouter().catch(() => undefined);
+    if ((await minecraftRoutes(shard).catch(() => [null])).length === 0) {
+        await (shard === LOCAL_SHARD ? stopRouter() : stopRouterOn(shard)).catch(() => undefined);
     }
 }
 
 /**
  * Mark a server routed and drop the SRV record that carried its port, in that
- * order: the route is in the table before the record goes.
+ * order: the route is in the table before the record goes. A server on a connected
+ * machine keeps the record until its name points at that machine, whose router holds
+ * the route - a name still answered by the wildcard reaches this machine's instead.
  *
  * `syncTable` is off only for a server whose route the table already holds (a
  * candidate's), so a sweep switching many over writes the table once, at its end.
@@ -341,6 +365,7 @@ async function moveOntoRouter(
     installedAppId: string,
     hostname: string,
     port: number | null,
+    applicationId: string | null,
     syncTable: boolean
 ): Promise<void> {
     // The router answers on the default port, so the name alone is the address.
@@ -349,31 +374,60 @@ async function moveOntoRouter(
         portless: true,
         [ROUTE_CANDIDATE_KEY]: false
     });
-    if (syncTable) await syncMinecraftRoutes().catch(() => undefined);
-    if (hostname && port) await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
+    if (syncTable) await syncMinecraftRoutes(installedAppId).catch(() => undefined);
+    if (!hostname || !port) return;
+    if (!(await nameReachesServingMachine(ownerId, installedAppId, hostname, port, applicationId)))
+        return;
+    await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
+}
+
+/**
+ * Whether a server's name leads to the machine it runs on, writing the A record that
+ * makes it so for one on a connected machine. A server here is covered by the game's
+ * wildcard. A name given before connected machines had records of their own is moved
+ * over here, the first time its server is put on the router.
+ */
+async function nameReachesServingMachine(
+    ownerId: string,
+    installedAppId: string,
+    hostname: string,
+    port: number,
+    applicationId: string | null
+): Promise<boolean> {
+    if (!applicationId) return false;
+    const serving = await servingMachine(applicationId);
+    if (!serving) return true;
+    const address = await provisionGameDns(
+        hostname,
+        port,
+        false,
+        { ownerId, installedAppId },
+        serving
+    ).catch(() => null);
+    return Boolean(address?.hostname);
 }
 
 /** How long to give a router that has just been started, and how often to look. */
 const ROUTER_WAIT_TRIES = 6;
 const ROUTER_WAIT_MS = 1000;
 
+/** Whether a machine's router is up: this one's by its service name, a connected
+ *  server's by asking its engine for the project Polaris deployed there. */
+async function routerUp(shard: string): Promise<boolean> {
+    if (shard === LOCAL_SHARD) return routerListening();
+    return routerRunningOn(shard).catch(() => false);
+}
+
 /** Whether it came up, waiting the few seconds a container takes to bind. */
-async function waitForRouter(): Promise<boolean> {
+async function waitForRouter(shard: string): Promise<boolean> {
     for (let attempt = 0; attempt < ROUTER_WAIT_TRIES; attempt += 1) {
-        if (await routerListening()) return true;
+        if (await routerUp(shard)) return true;
         await new Promise((wake) => setTimeout(wake, ROUTER_WAIT_MS));
     }
     return false;
 }
 
-/** The port the hostname router answers on, which is the default Minecraft port
- *  unless the operator moved it. */
-export function routerPort(): number {
-    const configured = Number(process.env.POLARIS_MC_ROUTER_PORT);
-    return Number.isInteger(configured) && configured > 0 && configured < 65536
-        ? configured
-        : 25565;
-}
+export { routerPort };
 
 /** How long a check on the router waits before calling it silent. */
 const ROUTER_PROBE_MS = 1500;
@@ -404,8 +458,12 @@ export async function routerListening(): Promise<boolean> {
 /** Whether the router answers for this name: a status ping through it, naming the
  *  server, that the server itself replies to. The route proven end to end on this
  *  network - everything but the public forward to the port. */
-export async function routeAnswers(hostname: string): Promise<boolean> {
-    const { host: name, port } = routerAddress();
+export async function routeAnswers(
+    hostname: string,
+    shard: string = LOCAL_SHARD
+): Promise<boolean> {
+    const { host: name, port } = await routerFor(shard);
+    if (!name) return false;
     return serverAnswersThrough(name, port, ROUTER_PROBE_MS * 2, hostname);
 }
 
@@ -450,19 +508,38 @@ const forwardFailedAt = new Map<string, number>();
  * the address players arrive at, so it also proves the forward to the router's
  * port. Only ever positive evidence - a router that will not loop its own address
  * back inward is silent here too - so silence leaves the server on its SRV record,
- * which keeps working.
+ * which keeps working. A connected machine's players arrive at that machine's own
+ * address, so that is where its router is asked.
  */
-export async function forwardAnswers(installedAppId: string, hostname: string): Promise<boolean> {
+export async function forwardAnswers(
+    installedAppId: string,
+    hostname: string,
+    shard: string = LOCAL_SHARD
+): Promise<boolean> {
     const failed = forwardFailedAt.get(installedAppId);
     if (failed !== undefined && Date.now() - failed < FORWARD_RETRY_MS) return false;
     const address =
-        (await relayAddress().catch(() => null)) ?? (await publicProbeHost().catch(() => null));
+        shard === LOCAL_SHARD
+            ? ((await relayAddress().catch(() => null)) ??
+              (await publicProbeHost().catch(() => null)))
+            : (await routerFor(shard)).host;
     const answered = address
         ? await serverAnswersThrough(address, routerPort(), PROBE_TIMEOUT_MS, hostname)
         : false;
     if (answered) forwardFailedAt.delete(installedAppId);
     else forwardFailedAt.set(installedAppId, Date.now());
     return answered;
+}
+
+/** Where a machine's router is dialled from here: this one's by its service name, a
+ *  connected server's at that server's own address on the shared port - the route a
+ *  player takes, short of DNS. */
+async function routerFor(shard: string): Promise<{ host: string | null; port: number }> {
+    if (shard === LOCAL_SHARD) return routerAddress();
+    const machine = await prisma.host
+        .findUnique({ where: { id: shard }, select: { address: true } })
+        .catch(() => null);
+    return { host: machine?.address.trim() || null, port: routerPort() };
 }
 
 /** Whether routing would leave this server's player list meaning what it says. */
@@ -534,15 +611,27 @@ export async function adoptRoutedAddress(
         await patchInstallConfig(installedAppId, { [ROUTE_CANDIDATE_KEY]: true });
         return false;
     }
-    if (!(await routeAnswers(hostname))) return false;
+    const shard = await installShard(installedAppId);
+    if (!(await routeAnswers(hostname, shard))) return false;
     // The SRV record carries players who dial the server's own forwarded port, so it
     // only goes once the router's port answers for this name from outside as well.
     // An install that never forwarded it keeps the addresses its players already use.
-    if (!(await forwardAnswers(installedAppId, hostname))) return false;
+    if (!(await forwardAnswers(installedAppId, hostname, shard))) return false;
     const port = install.applicationId ? await publishedPort(install.applicationId) : null;
+    if (!port) return false;
+    if (
+        !(await nameReachesServingMachine(
+            ownerId,
+            installedAppId,
+            hostname,
+            port,
+            install.applicationId
+        ))
+    )
+        return false;
     // The route is already in the table, as a candidate's, so the sweep's own write
     // at its end is the only one this needs.
-    await moveOntoRouter(ownerId, installedAppId, hostname, port, false);
+    await moveOntoRouter(ownerId, installedAppId, hostname, port, install.applicationId, false);
     return true;
 }
 
@@ -604,6 +693,23 @@ async function publishedPort(applicationId: string): Promise<number | null> {
     } catch {
         return null;
     }
+}
+
+/** The connected server an application runs on, for its name to point at; undefined
+ *  for one on this machine, which the game's wildcard already covers. */
+async function servingMachine(
+    applicationId: string
+): Promise<{ kind: string; host: { name: string; address: string } | null } | undefined> {
+    const app = await prisma.application
+        .findUnique({
+            where: { id: applicationId },
+            select: {
+                target: { select: { kind: true, host: { select: { name: true, address: true } } } }
+            }
+        })
+        .catch(() => null);
+    const target = app?.target;
+    return target && target.kind !== "local" && target.host ? target : undefined;
 }
 
 /** The suffix every game server's name ends in on this Polaris (".mc.example.com"),

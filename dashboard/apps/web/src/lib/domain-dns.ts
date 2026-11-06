@@ -586,9 +586,18 @@ async function tunnelServes(name: string): Promise<boolean> {
  * throws - the domain is added either way, and DNS that is not there yet only delays
  * the certificate.
  */
-export async function provisionHostnameDns(hostname: string): Promise<HostnameDnsResult> {
+export async function provisionHostnameDns(
+    hostname: string,
+    serving?: { kind: string; host: { name: string; address: string } | null }
+): Promise<HostnameDnsResult> {
     const name = hostname.trim().toLowerCase();
-    const [token, target] = await Promise.all([loadCloudflareToken(), dnsTargetFor(name)]);
+    // A name with no domain row of its own (a game server's) says which machine
+    // serves it through `serving`, so it points at that machine rather than at this
+    // one - the wildcard already answers for every name served here.
+    const [token, target] = await Promise.all([
+        loadCloudflareToken(),
+        serving ? serviceDnsTarget(serving, "server") : dnsTargetFor(name)
+    ]);
     const ip = target.ip;
     if (!ip) {
         if (!target.server && (await backupRecordsTarget())?.kind === "tunnel") {
