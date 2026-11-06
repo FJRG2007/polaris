@@ -57,6 +57,11 @@ export function measureVoice(track: MediaStreamTrack): VoiceLevel | null {
     analyser.fftSize = 1024;
     analyser.smoothingTimeConstant = 0.4;
     source.connect(analyser);
+    // Created after the permission prompt has been answered, not in the click
+    // that asked for it, so a browser may hand it over suspended - and a
+    // suspended graph reads as perfect silence, which is a microphone that
+    // never hears anybody. Resuming a running one does nothing.
+    void context.resume().catch(() => undefined);
 
     const samples = new Float32Array(analyser.fftSize);
     let stopped = false;

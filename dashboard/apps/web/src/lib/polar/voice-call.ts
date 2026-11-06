@@ -164,6 +164,10 @@ export type CallPhase =
 /** A failure the call shows, as a code the screen has words for. */
 export type CallError =
     | "mic_denied"
+    /** The microphone opened but has produced nothing at all. */
+    | "no_sound"
+    /** This browser can open a microphone but not record or measure it. */
+    | "cannot_record"
     | "no_voice_provider"
     | "no_speech_provider"
     | "transcribe_failed"

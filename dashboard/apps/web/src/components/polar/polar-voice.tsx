@@ -16,6 +16,7 @@ import { transcribeAudio, type TranscribeError } from "@/lib/polar/transcribe-au
 import type { ChatStatus, UIMessage } from "ai";
 import { isWebTool, webStepOf } from "@/lib/polar/web-sources";
 import { micConstraints } from "@/app/(app)/chat/mic-cleanup";
+import { voiceSettings } from "@/app/(app)/chat/voice-settings";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { VoiceOrb, type OrbState } from "@/components/polar/voice-orb";
 import { browserCanSpeak, speakInBrowser } from "@/lib/polar/browser-voice";
@@ -395,11 +396,21 @@ export function VoiceModeButton({
     );
 }
 
-/** Level (0-100) at which the gate opens while Polar is quiet. */
-const OPEN_AT = 18;
+/**
+ * Level (0-100) at which the gate opens while Polar is quiet: the same
+ * threshold a call's voice-activity microphone opens at, which is the one this
+ * person set against their own level in their devices. A number of its own
+ * here was a second, higher bar that a normal voice never crossed.
+ */
+function openAt(): number {
+    return voiceSettings().activityThreshold;
+}
 /** While Polar talks the bar is higher, so its own voice leaking past echo
  *  cancellation does not count as you talking over it. */
-const OPEN_AT_WHILE_SPEAKING = 30;
+const WHILE_SPEAKING = 5 / 3;
+/** How long an open microphone may produce nothing at all before the call
+ *  says so, rather than sitting on "Listening" forever. */
+const NO_SOUND_AFTER_MS = 4000;
 /** How long a sound has to last to be speech rather than a cough or a click. */
 const MIN_SPEECH_MS = 250;
 /** How long a pause has to last before what you said is sent. */
@@ -488,6 +499,9 @@ export function VoiceCall(props: VoiceCallProps) {
     /** Where this call's replies start in the thread, set at each send. */
     const baseline = useRef<number | null>(null);
     const spokenUpTo = useRef(0);
+    /** The answer being read out. One to something typed during the call
+     *  stays on screen only: it was not asked out loud. */
+    const spokenId = useRef<string | null>(null);
     /** Sentences fetched ahead, in the order they are to be said. */
     const queue = useRef<Array<Promise<Spoken>>>([]);
     const playing = useRef(false);
@@ -686,6 +700,11 @@ export function VoiceCall(props: VoiceCallProps) {
         if (phase !== "thinking" && phase !== "speaking" && phase !== "approval") return;
         const last = props.messages.at(-1);
         if (props.messages.length > baseline.current && last?.role === "assistant") {
+            spokenId.current ??= last.id;
+            if (last.id !== spokenId.current) {
+                finishIfDone();
+                return;
+            }
             const text = replyText(last);
             if (waitingParts(last).length > 0) {
                 dispatch({ type: "approval" });
@@ -779,6 +798,7 @@ export function VoiceCall(props: VoiceCallProps) {
                     if (!result.text.trim()) return;
                     baseline.current = latest.current.messages.length;
                     spokenUpTo.current = 0;
+                    spokenId.current = null;
                     latest.current.onSend(result.text.trim());
                 });
             };
@@ -794,14 +814,28 @@ export function VoiceCall(props: VoiceCallProps) {
                 }
                 stream.current = opened;
                 const track = opened.getAudioTracks()[0];
-                meter = track ? measureVoice(track) : null;
-                if (!meter) {
+                if (!type) {
+                    // Heard, but nothing here can record what is heard.
+                    dispatch({ type: "failed", error: "cannot_record" });
+                    return;
+                }
+                if (!track) {
                     dispatch({ type: "failed", error: "mic_denied" });
+                    return;
+                }
+                meter = measureVoice(track);
+                if (!meter) {
+                    // Opened, but nothing here can tell when somebody speaks.
+                    dispatch({ type: "failed", error: "cannot_record" });
                     return;
                 }
                 let gate = false;
                 let voicedMs = 0;
                 let lastVoice = 0;
+                /** Time the microphone has been listened to without a single
+                 *  sample: a muted device, or one the system gives nothing. */
+                let soundless = 0;
+                let heard = false;
                 ticker = setInterval(() => {
                     const now = Date.now();
                     const current = live.current;
@@ -814,8 +848,14 @@ export function VoiceCall(props: VoiceCallProps) {
                     }
                     const level = meter?.read() ?? 0;
                     micLevel.current = level;
+                    if (!heard) {
+                        if (level > 0 || (meter?.peak() ?? 0) > 0) heard = true;
+                        else if ((soundless += TICK_MS) === NO_SOUND_AFTER_MS) {
+                            dispatch({ type: "failed", error: "no_sound" });
+                        }
+                    }
                     const threshold =
-                        current.phase === "speaking" ? OPEN_AT_WHILE_SPEAKING : OPEN_AT;
+                        current.phase === "speaking" ? openAt() * WHILE_SPEAKING : openAt();
                     gate = speaking(level, threshold, gate);
                     if (gate) {
                         lastVoice = now;
@@ -898,9 +938,13 @@ export function VoiceCall(props: VoiceCallProps) {
     const errorText =
         state.error === "mic_denied"
             ? t("voice.micDenied")
-            : state.error
-              ? t(`voice.errors.${state.error}`)
-              : null;
+            : state.error === "no_sound"
+              ? t("voice.silent")
+              : state.error === "cannot_record"
+                ? t("voice.cannotRecord")
+                : state.error
+                  ? t(`voice.errors.${state.error}`)
+                  : null;
     const orb: OrbState = state.muted
         ? "muted"
         : state.error && state.phase === "listening"
@@ -911,7 +955,7 @@ export function VoiceCall(props: VoiceCallProps) {
         <section
             aria-label={t("voice.callTitle")}
             data-voice-call=""
-            className="flex w-full min-w-0 flex-col items-center gap-3 rounded-xl border border-border bg-card px-3 py-4 shadow-sm"
+            className="mb-2 flex w-full min-w-0 flex-col items-center gap-3 rounded-xl border border-border bg-card px-3 py-4 shadow-sm"
             onKeyDown={(event) => {
                 if (
                     event.key.toLowerCase() === "m" &&

@@ -412,3 +412,63 @@ describe("the voice call", () => {
         expect(fetched.filter((url) => url === "/api/polar/speak")).toHaveLength(2);
     }, 10_000);
 });
+
+describe("the voice call's microphone", () => {
+    const props = () => ({
+        messages: [],
+        status: "ready" as const,
+        speech: true,
+        tools: {},
+        onSend: vi.fn(),
+        onStop: vi.fn(),
+        onApprove: vi.fn(),
+        onEnd: vi.fn()
+    });
+    const orb = () => document.querySelector("[data-state]")!.getAttribute("data-state");
+
+    it("hears a voice at the threshold a call opens at, not a higher one of its own", async () => {
+        openMicrophone();
+        render(<VoiceCall {...props()} />, { wrapper: MessagesWrapper });
+        // Above the calls' default of 12 and below the 18 Polar used to want.
+        micLevel = 13;
+        await waitFor(() => expect(orb()).toBe("hearing"), { timeout: 2000 });
+    });
+
+    it("says so when the microphone opens but gives nothing at all", async () => {
+        openMicrophone();
+        render(<VoiceCall {...props()} />, { wrapper: MessagesWrapper });
+        expect((await screen.findByRole("alert", undefined, { timeout: 6000 })).textContent).toBe(
+            "Polar can't hear anything. Check your microphone."
+        );
+        expect(orb()).toBe("error");
+    }, 10_000);
+
+    it("says the browser cannot record rather than listening forever", async () => {
+        openMicrophone();
+        recordType = null;
+        render(<VoiceCall {...props()} />, { wrapper: MessagesWrapper });
+        expect((await screen.findByRole("alert")).textContent).toBe(
+            "This browser can't record audio."
+        );
+    });
+
+    it("lets the microphone go when it is unmounted", async () => {
+        openMicrophone();
+        const stop = vi.fn();
+        const track = { stop };
+        Object.defineProperty(navigator, "mediaDevices", {
+            configurable: true,
+            value: {
+                getUserMedia: vi.fn(async () => ({
+                    getAudioTracks: () => [track],
+                    getTracks: () => [track]
+                }))
+            }
+        });
+        const view = render(<VoiceCall {...props()} />, { wrapper: MessagesWrapper });
+        await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1));
+        await act(async () => undefined);
+        view.unmount();
+        expect(stop).toHaveBeenCalled();
+    });
+});

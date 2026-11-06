@@ -2121,7 +2121,11 @@ export function PolarChat({
             setSlashDismissed(true);
         }
     };
-    const welcome = fullPage && !noKeys && chat.messages.length === 0;
+    // Not during a call: the composer, and the call with it, are drawn in a
+    // different place on the welcome screen, and the first thing said would
+    // otherwise move them - ending that call mid-answer and starting another
+    // that never says the answer.
+    const welcome = fullPage && !noKeys && chat.messages.length === 0 && !inCall;
     const suggestions = (
         <Suggestions>
             {(["page", "summary", "tools"] as const)
@@ -2219,7 +2223,7 @@ export function PolarChat({
 
     const composer = (
         <div className="relative">
-            {slashOpen && !inCall ? (
+            {slashOpen ? (
                 <SuggestionList
                     id={ids.slash}
                     label={t("slash.title")}
@@ -2243,12 +2247,36 @@ export function PolarChat({
                     onClear={() => void clearGoal()}
                 />
             ) : null}
+            {inCall ? (
+                // Above the box, which stays in use under it.
+                <VoiceCall
+                    messages={chat.messages}
+                    status={chat.status}
+                    speech={voice.speech}
+                    payer={choice?.payer}
+                    transcriber={voice.transcriber}
+                    transcribers={voice.transcribers}
+                    onTranscriber={chooseTranscriber}
+                    tools={tools}
+                    onSend={(text) => void sendSpoken(text)}
+                    onStop={stopTurn}
+                    onApprove={(id, approved) => {
+                        setLastApproved(approved);
+                        void chat.addToolApprovalResponse({ id, approved });
+                    }}
+                    onEnd={() => {
+                        setInCall(false);
+                        // Back to the box, which stayed in place for the call.
+                        requestAnimationFrame(() => textarea.current?.focus());
+                    }}
+                />
+            ) : null}
             <PolarComposer
                 kit={voiceKit}
                 notice={voiceNotice}
                 onNotice={setVoiceNotice}
                 streaming={chat.status === "streaming"}
-                hidden={inCall}
+                inCall={inCall}
                 highlighted={dragging}
                 inputId={ids.input}
                 label={t("composer.label")}
@@ -2376,29 +2404,6 @@ export function PolarChat({
                     onStop: stopTurn
                 }}
             />
-            {inCall ? (
-                <VoiceCall
-                    messages={chat.messages}
-                    status={chat.status}
-                    speech={voice.speech}
-                    payer={choice?.payer}
-                    transcriber={voice.transcriber}
-                    transcribers={voice.transcribers}
-                    onTranscriber={chooseTranscriber}
-                    tools={tools}
-                    onSend={(text) => void sendSpoken(text)}
-                    onStop={stopTurn}
-                    onApprove={(id, approved) => {
-                        setLastApproved(approved);
-                        void chat.addToolApprovalResponse({ id, approved });
-                    }}
-                    onEnd={() => {
-                        setInCall(false);
-                        // Once the composer is shown again.
-                        requestAnimationFrame(() => textarea.current?.focus());
-                    }}
-                />
-            ) : null}
         </div>
     );
 

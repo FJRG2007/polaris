@@ -98,7 +98,7 @@ describe("voice in the composer", () => {
         expect(screen.getAllByRole("button", { name: UNAVAILABLE })).toHaveLength(2);
     });
 
-    it("opens voice mode in the composer's place, not over the thread, and ends it", async () => {
+    it("opens voice mode above the composer, which stays usable, and gives the box back", async () => {
         models = {
             providers: PROVIDERS,
             tools: {},
@@ -123,12 +123,33 @@ describe("voice in the composer", () => {
         fireEvent.click(screen.getByRole("button", { name: "Voice mode" }));
         expect(await screen.findByRole("region", { name: "Voice mode" })).toBeTruthy();
         expect(screen.queryByRole("dialog")).toBeNull();
-        // The composer is put away for the call, its draft kept.
-        expect(screen.getByRole("textbox").closest(".hidden")).not.toBeNull();
+        // A refused microphone says so, and leaves nothing stuck.
+        expect((await screen.findAllByRole("alert")).map((node) => node.textContent)).toContain(
+            "Polar can't use your microphone. Allow it for this site in your browser, then try again."
+        );
+        // The composer stays for the call: type, attach, and send meanwhile.
+        const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+        expect(box.closest(".hidden")).toBeNull();
+        expect(box.disabled).toBe(false);
+        fireEvent.change(box, { target: { value: "Typed during the call" } });
+        expect(box.value).toBe("Typed during the call");
+        const attach = screen.getByRole("button", { name: "Attach files" }) as HTMLButtonElement;
+        expect(attach.disabled).toBe(false);
+        expect(screen.getByRole("button", { name: "Send (Enter)" })).toBeTruthy();
+        // Only a second microphone rests while the call has one.
+        expect(
+            (screen.getByRole("button", { name: "Dictate" }) as HTMLButtonElement).disabled
+        ).toBe(true);
         fireEvent.click(screen.getByRole("button", { name: "End call" }));
         await waitFor(() =>
             expect(screen.queryByRole("region", { name: "Voice mode" })).toBeNull()
         );
-        expect(screen.getByRole("textbox").closest(".hidden")).toBeNull();
+        expect(box.isConnected).toBe(true);
+        expect(box.disabled).toBe(false);
+        expect(box.value).toBe("Typed during the call");
+        await waitFor(() => expect(document.activeElement).toBe(box));
+        expect(
+            (screen.getByRole("button", { name: "Dictate" }) as HTMLButtonElement).disabled
+        ).toBe(false);
     });
 });
