@@ -107,10 +107,15 @@ export const linkPreview = (messageId: string, proof?: string | null, signal?: A
         signal
     );
 
-export const chatProfile = (channelId: string, userId: string, signal?: AbortSignal) =>
+export const chatProfile = (
+    channelId: string,
+    userId: string,
+    signal?: AbortSignal,
+    options: { recent?: boolean } = {}
+) =>
     readPoll<Answer<typeof actionsModule.profileAction>>(
         "/api/chat/profile",
-        { channelId, userId },
+        options.recent ? { channelId, userId, recent: "1" } : { channelId, userId },
         signal
     );
 

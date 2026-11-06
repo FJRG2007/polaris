@@ -946,16 +946,18 @@ export async function setNicknameAction(
  */
 export async function profileAction(
     channelId: string,
-    userId: string
+    userId: string,
+    recent = false
 ): Promise<{ profile?: ChatProfile }> {
     const me = await actor();
-    const parsed = z.object({ channelId: z.string().uuid(), userId: z.string().uuid() }).safeParse({
-        channelId,
-        userId
-    });
+    const parsed = z
+        .object({ channelId: z.string().uuid(), userId: z.string().uuid(), recent: z.boolean() })
+        .safeParse({ channelId, userId, recent });
     if (!parsed.success) return {};
 
-    const profile = await chatProfile(me, parsed.data.channelId, parsed.data.userId);
+    const profile = await chatProfile(me, parsed.data.channelId, parsed.data.userId, {
+        recent: parsed.data.recent
+    });
     return profile ? { profile } : {};
 }
 

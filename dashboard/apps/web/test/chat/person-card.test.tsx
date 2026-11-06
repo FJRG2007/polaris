@@ -118,7 +118,8 @@ beforeEach(() => {
             headline: "Rear admiral",
             pronouns: "she/her",
             mutual: { friends: { people: [], total: 0 }, spaces: { spaces: [], total: 0 } },
-            role: "owner"
+            role: "owner",
+            badges: []
         },
         [ADA]: {
             name: "Ada",
@@ -128,7 +129,8 @@ beforeEach(() => {
             headline: "",
             pronouns: "",
             mutual: { friends: { people: [], total: 0 }, spaces: { spaces: [], total: 0 } },
-            role: null
+            role: null,
+            badges: []
         }
     };
 });

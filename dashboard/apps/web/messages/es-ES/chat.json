@@ -1675,6 +1675,14 @@
         "mutualServers": "{count, plural, one {# espacio en común} other {# espacios en común}}",
         "andMore": "y {count} más"
     },
+    "profilePane": {
+        "activity": "Actividad",
+        "sections": "Secciones del perfil",
+        "current": "Ahora",
+        "recent": "Actividad reciente",
+        "emptyTitle": "Nada que mostrar",
+        "emptyHint": "Sus partidas aquí salen si las comparte contigo."
+    },
     "notifyMenu": {
         "notifications": "Avisos",
         "levels": {
