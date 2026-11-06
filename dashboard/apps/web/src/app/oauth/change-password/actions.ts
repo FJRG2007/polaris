@@ -17,7 +17,12 @@ export async function replaceTemporaryPasswordAction(input: unknown): Promise<{ 
     if (!session) return { error: (await getTranslations("auth"))("changePassword.signedOut") };
     const parsed = newPasswordSchema.safeParse(input);
     const tv = await getTranslations("validation");
-    if (!parsed.success) return { error: validationMessage(tv, parsed.error.issues[0]?.message ?? "") };
-    const result = await replaceTemporaryPassword(session.id, session.sessionId, parsed.data.newPassword);
+    if (!parsed.success)
+        return { error: validationMessage(tv, parsed.error.issues[0]?.message ?? "") };
+    const result = await replaceTemporaryPassword(
+        session.id,
+        session.sessionId,
+        parsed.data.newPassword
+    );
     return result.error ? { error: validationMessage(tv, result.error) } : {};
 }

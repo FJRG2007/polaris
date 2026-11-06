@@ -44,8 +44,12 @@ export default async function UserRecordLayout({
                 description={account.email}
                 actions={
                     <>
-                        {account.isAdmin ? <Badge variant="primary">{t("usersDetail.badges.admin")}</Badge> : null}
-                        {account.banned ? <Badge variant="danger">{t("usersDetail.badges.banned")}</Badge> : null}
+                        {account.isAdmin ? (
+                            <Badge variant="primary">{t("usersDetail.badges.admin")}</Badge>
+                        ) : null}
+                        {account.banned ? (
+                            <Badge variant="danger">{t("usersDetail.badges.banned")}</Badge>
+                        ) : null}
                     </>
                 }
             />

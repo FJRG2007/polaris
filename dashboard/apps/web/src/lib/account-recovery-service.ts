@@ -108,7 +108,10 @@ export async function accountRecoveryQuestions(
         rateLimit(`recovery-lookup-ip:${ip ?? "unknown"}`, LOOKUP_LIMIT * 3, LOOKUP_WINDOW_MS)
     ]);
     if (!byAccount.ok || !byNetwork.ok) {
-        return { questions: [], retryAfterMs: Math.max(byAccount.retryAfterMs, byNetwork.retryAfterMs) };
+        return {
+            questions: [],
+            retryAfterMs: Math.max(byAccount.retryAfterMs, byNetwork.retryAfterMs)
+        };
     }
     const account = await findAccount(identifier);
     if (!account) return { questions: [], retryAfterMs: 0 };
@@ -133,11 +136,18 @@ export async function requestAccountRecovery(input: {
     const key = input.identifier.trim().toLowerCase();
     const [byAccount, byNetwork] = await Promise.all([
         rateLimit(`recovery-request:${key}`, REQUEST_LIMIT, REQUEST_WINDOW_MS),
-        rateLimit(`recovery-request-ip:${input.ip ?? "unknown"}`, REQUEST_LIMIT * 3, REQUEST_WINDOW_MS)
+        rateLimit(
+            `recovery-request-ip:${input.ip ?? "unknown"}`,
+            REQUEST_LIMIT * 3,
+            REQUEST_WINDOW_MS
+        )
     ]);
     if (!byAccount.ok || !byNetwork.ok) {
         const wait = Math.ceil(Math.max(byAccount.retryAfterMs, byNetwork.retryAfterMs) / 60000);
-        return { ticket: "", error: (await readerWords("auth"))("recover.errors.tooMany", { minutes: wait }) };
+        return {
+            ticket: "",
+            error: (await readerWords("auth"))("recover.errors.tooMany", { minutes: wait })
+        };
     }
 
     const ticket = generateToken();
@@ -221,12 +231,22 @@ export async function accountRecoveryStatus(ticket: string): Promise<AccountReco
  * The breach check runs on both sides - the client's is for the person typing,
  * this one is the one that decides.
  */
-export async function unacceptablePassword(userId: string, password: string): Promise<string | null> {
+export async function unacceptablePassword(
+    userId: string,
+    password: string
+): Promise<string | null> {
     const account = await prisma.user.findUnique({
         where: { id: userId },
         select: { name: true, email: true, username: true }
     });
-    if (passwordMatchesIdentity(password, [account?.name, account?.email, account?.username, "polaris"])) {
+    if (
+        passwordMatchesIdentity(password, [
+            account?.name,
+            account?.email,
+            account?.username,
+            "polaris"
+        ])
+    ) {
         return IDENTITY_PASSWORD_MESSAGE;
     }
     return (await passwordIsBreached(password)) ? BREACHED_PASSWORD_MESSAGE : null;
@@ -241,8 +261,11 @@ export async function completeAccountRecovery(
     ticket: string,
     newPassword: string
 ): Promise<{ error?: string }> {
-    const row = await prisma.accountRecovery.findUnique({ where: { tokenHash: hashToken(ticket) } });
-    if (!row || row.status !== "approved") return { error: (await readerWords("auth"))("recover.errors.notApproved") };
+    const row = await prisma.accountRecovery.findUnique({
+        where: { tokenHash: hashToken(ticket) }
+    });
+    if (!row || row.status !== "approved")
+        return { error: (await readerWords("auth"))("recover.errors.notApproved") };
     if (row.expiresAt.getTime() < Date.now()) {
         await prisma.accountRecovery.update({ where: { id: row.id }, data: { status: "expired" } });
         return { error: (await readerWords("auth"))("recover.errors.expired") };
@@ -262,12 +285,18 @@ export async function completeAccountRecovery(
     const result = await resetUserPassword(auth, row.userId, newPassword);
     if (result.error) {
         // Nothing was written, so the request is still there to be spent.
-        await prisma.accountRecovery.updateMany({ where: { id: row.id }, data: { status: "approved" } });
+        await prisma.accountRecovery.updateMany({
+            where: { id: row.id },
+            data: { status: "approved" }
+        });
         return result;
     }
     // A password they chose themselves answers a temporary one an administrator
     // handed out, so the change-password hold ends here too.
-    await prisma.user.update({ where: { id: row.userId }, data: { passwordChangeRequired: false } });
+    await prisma.user.update({
+        where: { id: row.userId },
+        data: { passwordChangeRequired: false }
+    });
     await revokeUserSessions(row.userId, row.userId);
     await recordAudit({
         actorId: row.userId,
@@ -317,10 +346,18 @@ export async function decideRecoveryRequest(
 ): Promise<{ error?: string }> {
     const decided = await prisma.accountRecovery.updateMany({
         where: { id, status: "pending" },
-        data: { status: approve ? "approved" : "denied", decidedById: adminId, decidedAt: new Date() }
+        data: {
+            status: approve ? "approved" : "denied",
+            decidedById: adminId,
+            decidedAt: new Date()
+        }
     });
-    if (decided.count === 0) return { error: (await readerWords("admin"))("users.errors.alreadyDecided") };
-    const row = await prisma.accountRecovery.findUnique({ where: { id }, select: { userId: true } });
+    if (decided.count === 0)
+        return { error: (await readerWords("admin"))("users.errors.alreadyDecided") };
+    const row = await prisma.accountRecovery.findUnique({
+        where: { id },
+        select: { userId: true }
+    });
     await recordAudit({
         actorId: adminId,
         action: approve ? "account.recovery.approved" : "account.recovery.denied",

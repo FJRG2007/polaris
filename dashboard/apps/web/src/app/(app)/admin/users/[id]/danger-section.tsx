@@ -41,7 +41,9 @@ export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: b
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-danger">{t("usersDetail.account.danger.title")}</h2>
+                <h2 className="text-sm font-medium text-danger">
+                    {t("usersDetail.account.danger.title")}
+                </h2>
                 {user.banned ? (
                     <div className="flex items-center justify-between gap-3">
                         <p className="min-w-0 text-xs text-muted-foreground">
@@ -53,7 +55,12 @@ export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: b
                                 reason: user.banReason ?? ""
                             })}
                         </p>
-                        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => unbanUserAction(user.id))}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => void run(() => unbanUserAction(user.id))}
+                        >
                             <Undo2 className="size-4" />
                             {t("usersDetail.account.danger.liftBan")}
                         </Button>
@@ -80,18 +87,31 @@ export function DangerSection({ user, isSelf }: { user: DirectoryUser; isSelf: b
                                 size="sm"
                                 variant="danger"
                                 disabled={busy || isSelf}
-                                onClick={() => void run(() => banUserAction(user.id, banReason, Number(banFor) || 0))}
+                                onClick={() =>
+                                    void run(() =>
+                                        banUserAction(user.id, banReason, Number(banFor) || 0)
+                                    )
+                                }
                             >
                                 <Ban className="size-4" />
                                 {Number(banFor) > 0 ? t("users.ban.suspend") : t("users.ban.ban")}
                             </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">{t("usersDetail.account.danger.hint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("usersDetail.account.danger.hint")}
+                        </p>
                     </div>
                 )}
                 <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 text-xs text-muted-foreground">{t("usersDetail.account.danger.deleteHint")}</p>
-                    <Button size="sm" variant="danger" disabled={busy || isSelf} onClick={() => void onDelete()}>
+                    <p className="min-w-0 text-xs text-muted-foreground">
+                        {t("usersDetail.account.danger.deleteHint")}
+                    </p>
+                    <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busy || isSelf}
+                        onClick={() => void onDelete()}
+                    >
                         <Trash2 className="size-4" />
                         {t("usersDetail.account.danger.delete")}
                     </Button>

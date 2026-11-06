@@ -54,7 +54,9 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
 
     useEffect(() => {
         if (isSelf) return;
-        void credentialOptionsAction(user.id).then((result) => setOptions("error" in result ? null : result));
+        void credentialOptionsAction(user.id).then((result) =>
+            setOptions("error" in result ? null : result)
+        );
     }, [user.id, isSelf]);
 
     /** Run an action; a refusal that wants a proof opens the dialog and retries. */
@@ -89,7 +91,8 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
         void guarded(
             async () => {
                 const result = await issueResetLinkAction(user.id);
-                if (result.url && result.expiresAt) setLink({ url: result.url, expiresAt: result.expiresAt });
+                if (result.url && result.expiresAt)
+                    setLink({ url: result.url, expiresAt: result.expiresAt });
                 return result;
             },
             () => undefined
@@ -128,7 +131,9 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
         return (
             <Card>
                 <CardBody>
-                    <p className="text-sm text-muted-foreground">{t("usersDetail.credentials.self")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {t("usersDetail.credentials.self")}
+                    </p>
                 </CardBody>
             </Card>
         );
@@ -139,7 +144,9 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
             <CardBody className="flex flex-col gap-5">
                 <section className="flex flex-col gap-3">
                     <div>
-                        <h2 className="text-sm font-medium">{t("usersDetail.credentials.title")}</h2>
+                        <h2 className="text-sm font-medium">
+                            {t("usersDetail.credentials.title")}
+                        </h2>
                         <p className="text-xs text-muted-foreground">
                             {t("usersDetail.credentials.hint", { name: user.name })}
                         </p>
@@ -150,7 +157,9 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                                 <Link2 className="size-4 shrink-0 text-muted-foreground" />
                                 {t("usersDetail.credentials.link.title")}
                             </p>
-                            <p className="text-xs text-muted-foreground">{t("usersDetail.credentials.link.hint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("usersDetail.credentials.link.hint")}
+                            </p>
                         </div>
                         <Button size="sm" variant="ghost" disabled={busy} onClick={onIssueLink}>
                             {t("usersDetail.credentials.link.create")}
@@ -162,10 +171,15 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                                 <code className="min-w-0 flex-1 truncate text-xs" title={link.url}>
                                     {link.url}
                                 </code>
-                                <CopyButton value={link.url} label={t("usersDetail.credentials.link.copy")} />
+                                <CopyButton
+                                    value={link.url}
+                                    label={t("usersDetail.credentials.link.copy")}
+                                />
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                {t("usersDetail.credentials.link.once", { time: format.dateTime(link.expiresAt) })}
+                                {t("usersDetail.credentials.link.once", {
+                                    time: format.dateTime(link.expiresAt)
+                                })}
                             </p>
                         </div>
                     ) : null}
@@ -176,7 +190,8 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                                 {t("usersDetail.credentials.mail.title")}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                                {mailReason ?? t("usersDetail.credentials.mail.hint", { email: user.email })}
+                                {mailReason ??
+                                    t("usersDetail.credentials.mail.hint", { email: user.email })}
                             </p>
                         </div>
                         <Button
@@ -194,7 +209,9 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                             <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                             {t("usersDetail.credentials.temporary.title")}
                         </p>
-                        <p className="text-xs text-muted-foreground">{t("usersDetail.credentials.temporary.hint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("usersDetail.credentials.temporary.hint")}
+                        </p>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             {/* enigma:allow-identity-password - an administrator types this for
                                 somebody else, so there is no identity on this side to compare;
@@ -220,18 +237,32 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                                 <Wand2 className="size-4" />
                             </Button>
                             {password ? (
-                                <CopyButton value={password} label={t("usersDetail.credentials.temporary.copy")} />
+                                <CopyButton
+                                    value={password}
+                                    label={t("usersDetail.credentials.temporary.copy")}
+                                />
                             ) : null}
-                            <Button type="submit" size="sm" disabled={busy} aria-disabled={!passwordCheck.success}>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={busy}
+                                aria-disabled={!passwordCheck.success}
+                            >
                                 {t("usersDetail.credentials.temporary.set")}
                             </Button>
                         </div>
                     </form>
                 </section>
 
-                <form onSubmit={onEmail} noValidate className="flex flex-col gap-2 border-t border-border pt-4">
+                <form
+                    onSubmit={onEmail}
+                    noValidate
+                    className="flex flex-col gap-2 border-t border-border pt-4"
+                >
                     <div>
-                        <h2 className="text-sm font-medium">{t("usersDetail.credentials.email.title")}</h2>
+                        <h2 className="text-sm font-medium">
+                            {t("usersDetail.credentials.email.title")}
+                        </h2>
                         <p className="text-xs text-muted-foreground">
                             {t("usersDetail.credentials.email.hint", { email: user.email })}
                         </p>
@@ -257,14 +288,22 @@ export function CredentialsSection({ user, isSelf }: { user: DirectoryUser; isSe
                         </Button>
                     </div>
                     {email.trim() && !emailCheck.success ? (
-                        <p className="text-xs text-danger">{t("usersDetail.credentials.email.invalid")}</p>
+                        <p className="text-xs text-danger">
+                            {t("usersDetail.credentials.email.invalid")}
+                        </p>
                     ) : null}
                     <label className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={verified} onChange={(event) => setVerified(event.target.checked)} />
+                        <Checkbox
+                            checked={verified}
+                            onChange={(event) => setVerified(event.target.checked)}
+                        />
                         {t("usersDetail.credentials.email.verified")}
                     </label>
                     <label className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={keepOld} onChange={(event) => setKeepOld(event.target.checked)} />
+                        <Checkbox
+                            checked={keepOld}
+                            onChange={(event) => setKeepOld(event.target.checked)}
+                        />
                         {t("usersDetail.credentials.email.keepOld", { email: user.email })}
                     </label>
                 </form>

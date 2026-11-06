@@ -20,11 +20,17 @@ export default async function UserAccessPage({ params }: { params: Promise<{ id:
     const [account, roles, groups, memberships, policies, attachments] = await Promise.all([
         loadUserRecord(id),
         listRoleOptions(),
-        prisma.group.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, description: true } }),
+        prisma.group.findMany({
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, description: true }
+        }),
         // The directory carries group NAMES, which is what a row shows. The editor
         // needs the ids it checks boxes against.
         prisma.groupMember.findMany({ where: { userId: id }, select: { groupId: true } }),
-        prisma.policy.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, description: true } }),
+        prisma.policy.findMany({
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, description: true }
+        }),
         prisma.policyAttachment.findMany({
             where: { principalType: "user", principalId: id },
             select: { policyId: true }

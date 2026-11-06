@@ -17,8 +17,16 @@ let accounts: AccountRow[] = [];
 
 const prisma = {
     account: {
-        updateMany: async ({ where, data }: { where: { userId: string; providerId: string }; data: { password: string } }) => {
-            const rows = accounts.filter((row) => row.userId === where.userId && row.providerId === where.providerId);
+        updateMany: async ({
+            where,
+            data
+        }: {
+            where: { userId: string; providerId: string };
+            data: { password: string };
+        }) => {
+            const rows = accounts.filter(
+                (row) => row.userId === where.userId && row.providerId === where.providerId
+            );
             for (const row of rows) row.password = data.password;
             return { count: rows.length };
         }
@@ -44,16 +52,35 @@ beforeEach(() => {
 
 describe("resetUserPassword", () => {
     it("replaces the password an account already has", async () => {
-        accounts = [{ userId: "user-1", providerId: "credential", accountId: "user-1", password: "hashed:old" }];
+        accounts = [
+            {
+                userId: "user-1",
+                providerId: "credential",
+                accountId: "user-1",
+                password: "hashed:old"
+            }
+        ];
         expect(await resetUserPassword(auth, "user-1", "a long new secret")).toEqual({});
-        expect(accounts).toEqual([{ userId: "user-1", providerId: "credential", accountId: "user-1", password: "hashed:a long new secret" }]);
+        expect(accounts).toEqual([
+            {
+                userId: "user-1",
+                providerId: "credential",
+                accountId: "user-1",
+                password: "hashed:a long new secret"
+            }
+        ]);
         expect(linkAccount).not.toHaveBeenCalled();
     });
 
     it("gives a provider-only account a password sign-in", async () => {
         accounts = [{ userId: "user-1", providerId: "github", accountId: "gh-1", password: null }];
         expect(await resetUserPassword(auth, "user-1", "a long new secret")).toEqual({});
-        expect(accounts).toContainEqual({ userId: "user-1", providerId: "credential", accountId: "user-1", password: "hashed:a long new secret" });
+        expect(accounts).toContainEqual({
+            userId: "user-1",
+            providerId: "credential",
+            accountId: "user-1",
+            password: "hashed:a long new secret"
+        });
         expect(accounts.find((row) => row.providerId === "github")?.password).toBeNull();
     });
 

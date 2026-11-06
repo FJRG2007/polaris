@@ -17,7 +17,13 @@ import {
     type AccessRulesValue
 } from "@/components/access-rules-editor";
 
-export function LimitsSection({ user, groups }: { user: DirectoryUser; groups: AccessGroupOption[] }) {
+export function LimitsSection({
+    user,
+    groups
+}: {
+    user: DirectoryUser;
+    groups: AccessGroupOption[];
+}) {
     const t = useTranslations("admin");
     const { busy, error, run } = useAccountAction();
     const [limits, setLimits] = useState<AccessRulesValue>(user.enforced);
@@ -27,7 +33,9 @@ export function LimitsSection({ user, groups }: { user: DirectoryUser; groups: A
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">{t("usersDetail.account.limits.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("usersDetail.account.limits.hint")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("usersDetail.account.limits.hint")}
+                    </p>
                 </div>
                 <AccessRulesEditor value={limits} groups={groups} onChange={setLimits} />
                 <div className="flex items-center justify-between gap-2">

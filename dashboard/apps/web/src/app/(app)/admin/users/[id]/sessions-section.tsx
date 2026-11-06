@@ -48,7 +48,9 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">{t("usersDetail.account.sessions.title")}</h2>
+                        <h2 className="text-sm font-medium">
+                            {t("usersDetail.account.sessions.title")}
+                        </h2>
                         <p className="text-xs text-muted-foreground">
                             {t("usersDetail.account.sessions.hint", { name: user.name })}
                         </p>
@@ -57,7 +59,9 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                         size="sm"
                         variant="ghost"
                         disabled={busy || (sessions?.length === 0 && cliSessions.length === 0)}
-                        onClick={() => void run(() => revokeUserSessionsAction(user.id), loadSessions)}
+                        onClick={() =>
+                            void run(() => revokeUserSessionsAction(user.id), loadSessions)
+                        }
                     >
                         <LogOut className="size-4" />
                         {t("usersDetail.account.sessions.signOutAll")}
@@ -70,11 +74,17 @@ export function SessionsSection({ user }: { user: DirectoryUser }) {
                         busyId={busy ? "all" : null}
                         emptyLabel={t("usersDetail.account.sessions.empty")}
                         onRevoke={(session) =>
-                            void run(() => revokeUserSessionAction(user.id, session.id), loadSessions)
+                            void run(
+                                () => revokeUserSessionAction(user.id, session.id),
+                                loadSessions
+                            )
                         }
                         cliSessions={cliSessions}
                         onSignOutCli={(session) =>
-                            void run(() => revokeUserCliSessionAction(user.id, session.id), loadSessions)
+                            void run(
+                                () => revokeUserCliSessionAction(user.id, session.id),
+                                loadSessions
+                            )
                         }
                     />
                 ) : (

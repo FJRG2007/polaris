@@ -19,9 +19,14 @@ export function UserSectionNav({ userId }: { userId: string }) {
     const pathname = usePathname();
     const t = useTranslations("admin");
     return (
-        <nav className="mb-4 flex flex-wrap gap-1 border-b border-border pb-2" aria-label={t("usersDetail.nav.label")}>
+        <nav
+            className="mb-4 flex flex-wrap gap-1 border-b border-border pb-2"
+            aria-label={t("usersDetail.nav.label")}
+        >
             {SECTIONS.map((section) => {
-                const href = section ? `/admin/users/${userId}/${section}` : `/admin/users/${userId}`;
+                const href = section
+                    ? `/admin/users/${userId}/${section}`
+                    : `/admin/users/${userId}`;
                 const current = pathname === href;
                 return (
                     <Link

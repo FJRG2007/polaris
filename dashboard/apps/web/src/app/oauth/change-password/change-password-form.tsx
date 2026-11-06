@@ -56,7 +56,13 @@ export function ChangePasswordForm({ account, name }: { account: string; name: s
                 <CardBody>
                     <p className="text-sm text-muted-foreground">{t("changePassword.intro")}</p>
                     <form onSubmit={onSubmit} noValidate className="mt-3 flex flex-col gap-3">
-                        <input type="text" autoComplete="username" value={account} readOnly hidden />
+                        <input
+                            type="text"
+                            autoComplete="username"
+                            value={account}
+                            readOnly
+                            hidden
+                        />
                         {/* enigma:allow-identity-password - the refusal is usePasswordSafety above,
                             fed the account's email, its local part and name; the server refuses
                             the same in unacceptablePassword. */}
@@ -82,7 +88,9 @@ export function ChangePasswordForm({ account, name }: { account: string; name: s
                             onChange={(event) => setConfirm(event.target.value)}
                             aria-invalid={mismatch ? true : undefined}
                         />
-                        {mismatch ? <p className="text-sm text-danger">{t("changePassword.mismatch")}</p> : null}
+                        {mismatch ? (
+                            <p className="text-sm text-danger">{t("changePassword.mismatch")}</p>
+                        ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending} aria-disabled={!ready}>
                             {pending ? t("changePassword.saving") : t("changePassword.save")}

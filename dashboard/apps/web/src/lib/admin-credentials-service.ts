@@ -80,7 +80,11 @@ async function guard(
     const limited = !byActor.ok ? byActor : !byTarget.ok ? byTarget : null;
     if (limited) {
         const t = await readerWords("admin");
-        return { error: t("usersDetail.errors.tooMany", { minutes: Math.max(1, Math.ceil(limited.retryAfterMs / 60000)) }) };
+        return {
+            error: t("usersDetail.errors.tooMany", {
+                minutes: Math.max(1, Math.ceil(limited.retryAfterMs / 60000))
+            })
+        };
     }
     return { target };
 }
@@ -96,7 +100,10 @@ export async function credentialOptions(userId: string): Promise<CredentialOptio
 }
 
 /** Retire every link the account still holds and write a new one. */
-async function writeTicket(actorId: string, userId: string): Promise<{ url: string; expiresAt: Date }> {
+async function writeTicket(
+    actorId: string,
+    userId: string
+): Promise<{ url: string; expiresAt: Date }> {
     const ticket = generateToken();
     const expiresAt = new Date(Date.now() + RESET_LINK_TTL_MINUTES * 60_000);
     await prisma.$transaction([
@@ -116,7 +123,10 @@ async function writeTicket(actorId: string, userId: string): Promise<{ url: stri
             }
         })
     ]);
-    return { url: `${await appBaseUrl()}/oauth/recover?ticket=${encodeURIComponent(ticket)}`, expiresAt };
+    return {
+        url: `${await appBaseUrl()}/oauth/recover?ticket=${encodeURIComponent(ticket)}`,
+        expiresAt
+    };
 }
 
 /** A one-time link for the account to set its own password. Shown once, to the
@@ -143,7 +153,8 @@ export async function mailResetLink(actorId: string, userId: string): Promise<{ 
     const checked = await guard(actorId, userId);
     if ("error" in checked) return checked;
     const { mailBlocker } = await credentialOptions(userId);
-    if (mailBlocker) return refusal(mailBlocker === "noChannel" ? "mailNoChannel" : "mailUnverified");
+    if (mailBlocker)
+        return refusal(mailBlocker === "noChannel" ? "mailNoChannel" : "mailUnverified");
     const { url } = await writeTicket(actorId, userId);
     const t = await wordsFor(userId, "notices");
     const sent = await sendAuthEmail({
@@ -179,7 +190,12 @@ export async function setTemporaryPassword(
     await prisma.user.update({ where: { id: userId }, data: { passwordChangeRequired: true } });
     await revokeUserSessions(actorId, userId);
     await revokeStepUpGrants(userId);
-    await recordAudit({ actorId, action: "user.password.temporary", targetType: "user", targetId: userId });
+    await recordAudit({
+        actorId,
+        action: "user.password.temporary",
+        targetType: "user",
+        targetId: userId
+    });
     return {};
 }
 
@@ -205,8 +221,13 @@ export async function changeAccountEmail(
     if (await emailOwner(to)) return refusal("emailTaken");
 
     await prisma.$transaction([
-        prisma.user.update({ where: { id: userId }, data: { email: to, emailVerified: input.verified } }),
-        ...(input.keepOld ? [prisma.userEmail.create({ data: { userId, email: from, verifiedAt: null } })] : [])
+        prisma.user.update({
+            where: { id: userId },
+            data: { email: to, emailVerified: input.verified }
+        }),
+        ...(input.keepOld
+            ? [prisma.userEmail.create({ data: { userId, email: from, verifiedAt: null } })]
+            : [])
     ]);
     await revokeStepUpGrants(userId);
 
@@ -241,7 +262,10 @@ export async function changeAccountEmail(
 
 /** Whether this account is still held on the change-password step. */
 export async function owesPasswordChange(userId: string): Promise<boolean> {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: { passwordChangeRequired: true } });
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordChangeRequired: true }
+    });
     return row?.passwordChangeRequired === true;
 }
 
@@ -263,6 +287,11 @@ export async function replaceTemporaryPassword(
     await prisma.user.update({ where: { id: userId }, data: { passwordChangeRequired: false } });
     await revokeOtherSessions(userId, sessionId);
     await revokeStepUpGrants(userId);
-    await recordAudit({ actorId: userId, action: "account.password.replaced-temporary", targetType: "user", targetId: userId });
+    await recordAudit({
+        actorId: userId,
+        action: "account.password.replaced-temporary",
+        targetType: "user",
+        targetId: userId
+    });
     return {};
 }

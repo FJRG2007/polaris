@@ -14,7 +14,13 @@ export const temporaryPasswordSchema = z.object({
 });
 
 export const accountEmailSchema = z.object({
-    email: z.string().trim().toLowerCase().min(1, "Email is required").max(254).email("Enter a valid email"),
+    email: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .min(1, "Email is required")
+        .max(254)
+        .email("Enter a valid email"),
     verified: z.boolean(),
     keepOld: z.boolean()
 });

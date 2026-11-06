@@ -53,16 +53,24 @@ export function OverviewControls({
         <Card>
             <CardBody className="flex flex-col gap-5">
                 <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <Fact label={t("usersDetail.account.facts.username")}>{user.username ?? "-"}</Fact>
-                    <Fact label={t("usersDetail.account.facts.company")}>{user.company ?? "-"}</Fact>
-                    <Fact label={t("usersDetail.account.facts.joined")}>{format.date(user.createdAt)}</Fact>
+                    <Fact label={t("usersDetail.account.facts.username")}>
+                        {user.username ?? "-"}
+                    </Fact>
+                    <Fact label={t("usersDetail.account.facts.company")}>
+                        {user.company ?? "-"}
+                    </Fact>
+                    <Fact label={t("usersDetail.account.facts.joined")}>
+                        {format.date(user.createdAt)}
+                    </Fact>
                     <Fact label={t("usersDetail.account.facts.email")}>
                         {user.emailVerified
                             ? t("usersDetail.account.facts.verified")
                             : t("usersDetail.account.facts.unverified")}
                     </Fact>
                     <Fact label={t("usersDetail.account.facts.twoFactor")}>
-                        {user.twoFactorEnabled ? t("usersDetail.account.facts.on") : t("usersDetail.account.facts.off")}
+                        {user.twoFactorEnabled
+                            ? t("usersDetail.account.facts.on")
+                            : t("usersDetail.account.facts.off")}
                     </Fact>
                     <Fact label={t("usersDetail.account.facts.groups")}>
                         {user.groups.length > 0 ? user.groups.join(", ") : "-"}
@@ -74,16 +82,25 @@ export function OverviewControls({
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                             <p className="text-sm">{t("usersDetail.account.access.role")}</p>
-                            <p className="text-xs text-muted-foreground">{t("usersDetail.account.access.roleHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("usersDetail.account.access.roleHint")}
+                            </p>
                         </div>
                         <Select
                             className="w-40"
-                            aria-label={t("usersDetail.account.access.roleLabel", { name: user.name })}
+                            aria-label={t("usersDetail.account.access.roleLabel", {
+                                name: user.name
+                            })}
                             value={role}
                             placeholder={t("usersDetail.account.access.noRole")}
                             disabled={busy}
-                            onValueChange={(next) => void run(() => setUserRoleAction(user.id, next))}
-                            options={roles.map((option) => ({ value: option.name, label: option.name }))}
+                            onValueChange={(next) =>
+                                void run(() => setUserRoleAction(user.id, next))
+                            }
+                            options={roles.map((option) => ({
+                                value: option.name,
+                                label: option.name
+                            }))}
                         />
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -96,7 +113,12 @@ export function OverviewControls({
                                 {t("usersDetail.account.access.openHint", { name: user.name })}
                             </p>
                         </div>
-                        <Button size="sm" variant="ghost" disabled={busy || isSelf} onClick={() => void onViewAs()}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy || isSelf}
+                            onClick={() => void onViewAs()}
+                        >
                             <Eye className="size-4" />
                             {t("usersDetail.account.access.open")}
                         </Button>
@@ -107,13 +129,19 @@ export function OverviewControls({
                                 <Shield className="size-4 shrink-0 text-muted-foreground" />
                                 {t("usersDetail.account.access.admin")}
                             </p>
-                            <p className="text-xs text-muted-foreground">{t("usersDetail.account.access.adminHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("usersDetail.account.access.adminHint")}
+                            </p>
                         </div>
                         <Switch
                             checked={user.isAdmin}
                             disabled={busy || isSelf}
-                            aria-label={t("usersDetail.account.access.adminLabel", { name: user.name })}
-                            onChange={(checked) => void run(() => setAdminAccessAction(user.id, checked))}
+                            aria-label={t("usersDetail.account.access.adminLabel", {
+                                name: user.name
+                            })}
+                            onChange={(checked) =>
+                                void run(() => setAdminAccessAction(user.id, checked))
+                            }
                         />
                     </div>
                 </section>

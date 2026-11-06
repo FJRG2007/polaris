@@ -37,20 +37,37 @@ const revokeOthers = vi.fn(async () => 1);
 vi.mock("@polaris/db", () => ({
     prisma: {
         user: {
-            findUnique: vi.fn(async ({ where }: { where: { id: string } }) => users.find((u) => u.id === where.id) ?? null),
-            update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<UserRow> }) => {
-                const user = users.find((u) => u.id === where.id)!;
-                Object.assign(user, data);
-                return user;
-            })
+            findUnique: vi.fn(
+                async ({ where }: { where: { id: string } }) =>
+                    users.find((u) => u.id === where.id) ?? null
+            ),
+            update: vi.fn(
+                async ({ where, data }: { where: { id: string }; data: Partial<UserRow> }) => {
+                    const user = users.find((u) => u.id === where.id)!;
+                    Object.assign(user, data);
+                    return user;
+                }
+            )
         },
         accountRecovery: {
-            updateMany: vi.fn(async ({ where, data }: { where: { userId: string }; data: { status: string } }) => {
-                for (const row of tickets) {
-                    if (row.userId === where.userId && ["pending", "approved"].includes(row.status)) row.status = data.status;
+            updateMany: vi.fn(
+                async ({
+                    where,
+                    data
+                }: {
+                    where: { userId: string };
+                    data: { status: string };
+                }) => {
+                    for (const row of tickets) {
+                        if (
+                            row.userId === where.userId &&
+                            ["pending", "approved"].includes(row.status)
+                        )
+                            row.status = data.status;
+                    }
+                    return { count: 0 };
                 }
-                return { count: 0 };
-            }),
+            ),
             create: vi.fn(async ({ data }: { data: (typeof tickets)[number] }) => {
                 tickets.push({ ...data });
                 return data;
@@ -66,18 +83,28 @@ vi.mock("@polaris/auth", () => ({
     emailOwner: async () => takenBy
 }));
 vi.mock("@/lib/audit-service", () => ({
-    recordAudit: async (entry: { action: string; metadata?: Record<string, unknown> }) => void audits.push(entry)
+    recordAudit: async (entry: { action: string; metadata?: Record<string, unknown> }) =>
+        void audits.push(entry)
 }));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example" }));
 vi.mock("@/lib/rate-limit-service", () => ({
-    rateLimit: async () => (limited ? { ok: false, retryAfterMs: 120_000 } : { ok: true, retryAfterMs: 0 })
+    rateLimit: async () =>
+        limited ? { ok: false, retryAfterMs: 120_000 } : { ok: true, retryAfterMs: 0 }
 }));
-vi.mock("@/lib/step-up-grant", () => ({ revokeStepUpGrants: (...args: unknown[]) => revokeGrants(...(args as [])) }));
+vi.mock("@/lib/step-up-grant", () => ({
+    revokeStepUpGrants: (...args: unknown[]) => revokeGrants(...(args as []))
+}));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
-vi.mock("@/lib/notification-service", () => ({ createNotification: (...args: unknown[]) => notify(...(args as [])) }));
-vi.mock("@/lib/session-directory", () => ({ revokeOtherSessions: (...args: unknown[]) => revokeOthers(...(args as [])) }));
-vi.mock("@/lib/user-admin-service", () => ({ revokeUserSessions: (...args: unknown[]) => revokeSessions(...(args as [])) }));
+vi.mock("@/lib/notification-service", () => ({
+    createNotification: (...args: unknown[]) => notify(...(args as []))
+}));
+vi.mock("@/lib/session-directory", () => ({
+    revokeOtherSessions: (...args: unknown[]) => revokeOthers(...(args as []))
+}));
+vi.mock("@/lib/user-admin-service", () => ({
+    revokeUserSessions: (...args: unknown[]) => revokeSessions(...(args as []))
+}));
 vi.mock("@/lib/auth-mail", () => ({
     getAuthMailStatus: async () => ({ channelId: mailChannel }),
     sendAuthEmail: (...args: unknown[]) => sendMail(...(args as []))
@@ -88,9 +115,30 @@ const service = await import("@/lib/admin-credentials-service");
 
 beforeEach(() => {
     users = [
-        { id: "admin-1", isAdmin: true, email: "root@example.com", emailVerified: true, name: "Root", passwordChangeRequired: false },
-        { id: "admin-2", isAdmin: true, email: "ops@example.com", emailVerified: true, name: "Ops", passwordChangeRequired: false },
-        { id: "user-1", isAdmin: false, email: "ada@example.com", emailVerified: true, name: "Ada", passwordChangeRequired: false }
+        {
+            id: "admin-1",
+            isAdmin: true,
+            email: "root@example.com",
+            emailVerified: true,
+            name: "Root",
+            passwordChangeRequired: false
+        },
+        {
+            id: "admin-2",
+            isAdmin: true,
+            email: "ops@example.com",
+            emailVerified: true,
+            name: "Ops",
+            passwordChangeRequired: false
+        },
+        {
+            id: "user-1",
+            isAdmin: false,
+            email: "ada@example.com",
+            emailVerified: true,
+            name: "Ada",
+            passwordChangeRequired: false
+        }
     ];
     tickets = [];
     limited = false;
@@ -126,14 +174,20 @@ describe("reset link", () => {
 
     it("refuses the caller's own account and one above theirs", async () => {
         users.find((u) => u.id === "admin-1")!.isAdmin = false;
-        expect(await service.issueResetLink("admin-1", "admin-1")).toEqual({ error: "usersDetail.errors.credentialsSelf" });
-        expect(await service.issueResetLink("admin-1", "admin-2")).toEqual({ error: "usersDetail.errors.outranked" });
+        expect(await service.issueResetLink("admin-1", "admin-1")).toEqual({
+            error: "usersDetail.errors.credentialsSelf"
+        });
+        expect(await service.issueResetLink("admin-1", "admin-2")).toEqual({
+            error: "usersDetail.errors.outranked"
+        });
         expect(tickets).toHaveLength(0);
     });
 
     it("stops once the attempts run out", async () => {
         limited = true;
-        expect(await service.issueResetLink("admin-1", "user-1")).toEqual({ error: "usersDetail.errors.tooMany" });
+        expect(await service.issueResetLink("admin-1", "user-1")).toEqual({
+            error: "usersDetail.errors.tooMany"
+        });
         expect(tickets).toHaveLength(0);
     });
 });
@@ -141,7 +195,9 @@ describe("reset link", () => {
 describe("reset email", () => {
     it("is not offered, and refused, without an account mail channel", async () => {
         expect(await service.credentialOptions("user-1")).toEqual({ mailBlocker: "noChannel" });
-        expect(await service.mailResetLink("admin-1", "user-1")).toEqual({ error: "usersDetail.errors.mailNoChannel" });
+        expect(await service.mailResetLink("admin-1", "user-1")).toEqual({
+            error: "usersDetail.errors.mailNoChannel"
+        });
         expect(sendMail).not.toHaveBeenCalled();
     });
 
@@ -149,12 +205,18 @@ describe("reset email", () => {
         mailChannel = "channel-1";
         users.find((u) => u.id === "user-1")!.emailVerified = false;
         expect(await service.credentialOptions("user-1")).toEqual({ mailBlocker: "unverified" });
-        expect(await service.mailResetLink("admin-1", "user-1")).toEqual({ error: "usersDetail.errors.mailUnverified" });
+        expect(await service.mailResetLink("admin-1", "user-1")).toEqual({
+            error: "usersDetail.errors.mailUnverified"
+        });
     });
 
     it("names the account refusal before the mail one", async () => {
-        expect(await service.mailResetLink("admin-1", "missing")).toEqual({ error: "usersDetail.errors.unknownAccount" });
-        expect(await service.mailResetLink("admin-1", "admin-1")).toEqual({ error: "usersDetail.errors.credentialsSelf" });
+        expect(await service.mailResetLink("admin-1", "missing")).toEqual({
+            error: "usersDetail.errors.unknownAccount"
+        });
+        expect(await service.mailResetLink("admin-1", "admin-1")).toEqual({
+            error: "usersDetail.errors.credentialsSelf"
+        });
     });
 
     it("mails the link to the account's own address when it can", async () => {
@@ -167,7 +229,9 @@ describe("reset email", () => {
 
 describe("temporary password", () => {
     it("holds the account on the change step and ends every session", async () => {
-        expect(await service.setTemporaryPassword("admin-1", "user-1", "correct horse battery")).toEqual({});
+        expect(
+            await service.setTemporaryPassword("admin-1", "user-1", "correct horse battery")
+        ).toEqual({});
         expect(resetPassword).toHaveBeenCalledWith({}, "user-1", "correct horse battery");
         expect(users.find((u) => u.id === "user-1")!.passwordChangeRequired).toBe(true);
         expect(revokeSessions).toHaveBeenCalledWith("admin-1", "user-1");
@@ -177,20 +241,26 @@ describe("temporary password", () => {
 
     it("refuses an unsafe password before writing anything", async () => {
         unsafe = "Pick a password that has not appeared in a data breach";
-        expect(await service.setTemporaryPassword("admin-1", "user-1", "password123")).toEqual({ error: unsafe });
+        expect(await service.setTemporaryPassword("admin-1", "user-1", "password123")).toEqual({
+            error: unsafe
+        });
         expect(resetPassword).not.toHaveBeenCalled();
     });
 
     it("is replaced by the account's own, which clears the hold and other sessions", async () => {
         await service.setTemporaryPassword("admin-1", "user-1", "correct horse battery");
         expect(await service.owesPasswordChange("user-1")).toBe(true);
-        expect(await service.replaceTemporaryPassword("user-1", "session-9", "another long secret")).toEqual({});
+        expect(
+            await service.replaceTemporaryPassword("user-1", "session-9", "another long secret")
+        ).toEqual({});
         expect(await service.owesPasswordChange("user-1")).toBe(false);
         expect(revokeOthers).toHaveBeenCalledWith("user-1", "session-9");
     });
 
     it("does nothing for an account that owes no change", async () => {
-        expect(await service.replaceTemporaryPassword("user-1", "session-9", "another long secret")).toEqual({});
+        expect(
+            await service.replaceTemporaryPassword("user-1", "session-9", "another long secret")
+        ).toEqual({});
         expect(resetPassword).not.toHaveBeenCalled();
     });
 });
@@ -198,20 +268,36 @@ describe("temporary password", () => {
 describe("change email", () => {
     it("refuses the address it already has and one another account holds", async () => {
         const input = { email: "ada@example.com", verified: false, keepOld: true };
-        expect(await service.changeAccountEmail("admin-1", "user-1", input)).toEqual({ error: "usersDetail.errors.emailUnchanged" });
+        expect(await service.changeAccountEmail("admin-1", "user-1", input)).toEqual({
+            error: "usersDetail.errors.emailUnchanged"
+        });
         takenBy = "admin-2";
-        expect(await service.changeAccountEmail("admin-1", "user-1", { ...input, email: "ops@example.com" })).toEqual({
+        expect(
+            await service.changeAccountEmail("admin-1", "user-1", {
+                ...input,
+                email: "ops@example.com"
+            })
+        ).toEqual({
             error: "usersDetail.errors.emailTaken"
         });
     });
 
     it("moves the account, tells it in the bell, and records both addresses", async () => {
-        const result = await service.changeAccountEmail("admin-1", "user-1", { email: "ada@new.example", verified: false, keepOld: false });
+        const result = await service.changeAccountEmail("admin-1", "user-1", {
+            email: "ada@new.example",
+            verified: false,
+            keepOld: false
+        });
         expect(result).toEqual({});
         const user = users.find((u) => u.id === "user-1")!;
         expect(user.email).toBe("ada@new.example");
         expect(user.emailVerified).toBe(false);
-        expect(notify).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", type: "account.email-changed" }));
-        expect(audits[0]).toMatchObject({ action: "user.email.change", metadata: { from: "ada@example.com", to: "ada@new.example" } });
+        expect(notify).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: "user-1", type: "account.email-changed" })
+        );
+        expect(audits[0]).toMatchObject({
+            action: "user.email.change",
+            metadata: { from: "ada@example.com", to: "ada@new.example" }
+        });
     });
 });

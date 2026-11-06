@@ -33,9 +33,15 @@ type Refused = { error: string; stepUp?: boolean };
 
 /** The administrator, once their step-up proof for this is confirmed. Each
  *  action calls requireAdmin itself first, so the guard is visible where it runs. */
-async function provedAdmin(admin: { id: string; sessionId: string }): Promise<{ id: string } | Refused> {
+async function provedAdmin(admin: {
+    id: string;
+    sessionId: string;
+}): Promise<{ id: string } | Refused> {
     if (!(await stepUpGranted(admin.id, admin.sessionId, "admin-credentials"))) {
-        return { error: (await getTranslations("admin"))("usersDetail.errors.confirmFirst"), stepUp: true };
+        return {
+            error: (await getTranslations("admin"))("usersDetail.errors.confirmFirst"),
+            stepUp: true
+        };
     }
     return { id: admin.id };
 }
@@ -45,7 +51,9 @@ async function unknownAccount(): Promise<{ error: string }> {
 }
 
 /** What the section can offer, read after the paint. */
-export async function credentialOptionsAction(userId: unknown): Promise<CredentialOptions | { error: string }> {
+export async function credentialOptionsAction(
+    userId: unknown
+): Promise<CredentialOptions | { error: string }> {
     await requireAdmin();
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success) return unknownAccount();
@@ -62,7 +70,9 @@ export async function issueResetLinkAction(
     return issueResetLink(admin.id, parsed.data);
 }
 
-export async function mailResetLinkAction(userId: unknown): Promise<{ error?: string; stepUp?: boolean }> {
+export async function mailResetLinkAction(
+    userId: unknown
+): Promise<{ error?: string; stepUp?: boolean }> {
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success) return unknownAccount();
     const admin = await provedAdmin(await requireAdmin());
@@ -70,12 +80,16 @@ export async function mailResetLinkAction(userId: unknown): Promise<{ error?: st
     return mailResetLink(admin.id, parsed.data);
 }
 
-export async function setTemporaryPasswordAction(userId: unknown, input: unknown): Promise<{ error?: string; stepUp?: boolean }> {
+export async function setTemporaryPasswordAction(
+    userId: unknown,
+    input: unknown
+): Promise<{ error?: string; stepUp?: boolean }> {
     const target = idSchema.safeParse(userId);
     if (!target.success) return unknownAccount();
     const parsed = temporaryPasswordSchema.safeParse(input);
     const tv = await getTranslations("validation");
-    if (!parsed.success) return { error: validationMessage(tv, parsed.error.issues[0]?.message ?? "") };
+    if (!parsed.success)
+        return { error: validationMessage(tv, parsed.error.issues[0]?.message ?? "") };
     const admin = await provedAdmin(await requireAdmin());
     if ("error" in admin) return admin;
     const result = await setTemporaryPassword(admin.id, target.data, parsed.data.password);
@@ -85,12 +99,20 @@ export async function setTemporaryPasswordAction(userId: unknown, input: unknown
     return {};
 }
 
-export async function changeAccountEmailAction(userId: unknown, input: unknown): Promise<{ error?: string; stepUp?: boolean }> {
+export async function changeAccountEmailAction(
+    userId: unknown,
+    input: unknown
+): Promise<{ error?: string; stepUp?: boolean }> {
     const target = idSchema.safeParse(userId);
     if (!target.success) return unknownAccount();
     const parsed = accountEmailSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: validationMessage(await getTranslations("validation"), parsed.error.issues[0]?.message ?? "") };
+        return {
+            error: validationMessage(
+                await getTranslations("validation"),
+                parsed.error.issues[0]?.message ?? ""
+            )
+        };
     }
     const admin = await provedAdmin(await requireAdmin());
     if ("error" in admin) return admin;

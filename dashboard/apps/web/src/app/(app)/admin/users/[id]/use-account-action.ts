@@ -15,7 +15,10 @@ export function useAccountAction() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function run(action: () => Promise<{ error?: string }>, after?: () => Promise<void>): Promise<boolean> {
+    async function run(
+        action: () => Promise<{ error?: string }>,
+        after?: () => Promise<void>
+    ): Promise<boolean> {
         setBusy(true);
         setError(null);
         const result = await action();
