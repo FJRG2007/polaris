@@ -193,7 +193,7 @@ function GroupReaders({ sentAt, readers }: { sentAt: string; readers: readonly M
             </p>
             <ul
                 aria-label={t("messageInfo.readers")}
-                className="flex max-h-72 flex-col gap-1.5 overflow-y-auto"
+                className="flex max-h-72 flex-col gap-1.5 overflow-y-auto overscroll-contain"
             >
                 {readers.map((reader) => (
                     <li key={reader.id} className="flex min-w-0 items-center gap-3 text-sm">
