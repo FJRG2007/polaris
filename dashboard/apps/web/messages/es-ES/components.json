@@ -1114,6 +1114,7 @@
         "title": "App de escritorio",
         "usingDesktop": "Estás usando la app de escritorio de Polaris.",
         "usingDesktopVersion": "Estás usando la app de escritorio de Polaris, versión {version}.",
+        "desktopHasWindow": "La app de escritorio ya da a Polaris su propia ventana, así que aquí no hay nada que instalar.",
         "intro": "Abre Polaris en su propia ventana, con su propio icono, como cualquier otra app. Se mantiene al día por sí solo.",
         "installed": "Estás usando la app instalada.",
         "install": "Instalar Polaris",
