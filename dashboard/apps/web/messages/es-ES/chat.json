@@ -2192,12 +2192,12 @@
         "from": "{sender}: {text}",
         "deleted": "Mensaje eliminado",
         "call": "Llamada",
-        "poll": "Sondeo",
+        "poll": "Encuesta",
         "attachment": "Adjunto",
         "read": "Leído",
         "delivered": "Entregado",
         "sent": "Enviado",
-        "muted": "Silencio"
+        "muted": "Silenciado"
     },
     "lock": {
         "lock": "Bloquear",
@@ -2213,9 +2213,9 @@
         "cancel": "Cancelar",
         "save": "Guardar",
         "settings": "Bloqueo",
-        "setCode": "Activar",
+        "setCode": "Crear código",
         "changeCode": "Cambiar código",
-        "newCode": "Clave nueva",
+        "newCode": "Código nuevo",
         "currentCode": "Código actual",
         "codeHint": "Al menos 4 caracteres",
         "hideLocked": "Ocultar chats bloqueados de la lista",
