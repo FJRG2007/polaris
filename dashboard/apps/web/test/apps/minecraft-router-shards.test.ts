@@ -30,6 +30,7 @@ const { installs, applications, targets, remote } = vi.hoisted(() => ({
     remote: {
         tables: new Map<string, string>(),
         writes: [] as string[],
+        reads: [] as string[],
         running: new Set<string>(),
         started: [] as string[]
     }
@@ -38,16 +39,18 @@ const { installs, applications, targets, remote } = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
+            groupBy: async ({ where }: { where: { targetId: { in: string[] }; catalogId: { in: string[] } } }) => {
+                const rows = installs.filter(
+                    (row) =>
+                        where.targetId.in.includes(row.targetId ?? "") && where.catalogId.in.includes(row.catalogId)
+                );
+                return [...new Set(rows.map((row) => row.targetId))].map((targetId) => ({ targetId }));
+            },
             findMany: async (args: {
-                where: { targetId?: { in?: string[]; not?: null }; status?: unknown };
+                where: { targetId?: { in?: string[] }; status?: unknown };
                 take?: number;
                 cursor?: { id: string };
-                distinct?: string[];
             }) => {
-                if (args.distinct) {
-                    const ids = [...new Set(installs.map((row) => row.targetId).filter(Boolean))];
-                    return ids.map((targetId) => ({ targetId }));
-                }
                 const within = args.where.targetId?.in;
                 const rows = installs.filter(
                     (row) => row.status !== "removed" && (!within || within.includes(row.targetId ?? ""))
@@ -72,7 +75,7 @@ vi.mock("@polaris/db", () => ({
                 [...targets.entries()]
                     .filter(([id, target]) => {
                         if ("OR" in where) return target.kind === "local" || target.hostId === null;
-                        if ("id" in where) return (where.id as { in: string[] }).in.includes(id) && target.hostId !== null;
+                        if (where.hostId && typeof where.hostId === "object") return target.hostId !== null;
                         return target.hostId === where.hostId;
                     })
                     .map(([id, target]) => ({ id, ...target })),
@@ -82,7 +85,10 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/minecraft-router", () => ({
-    readHostTable: async (hostId: string) => remote.tables.get(hostId) ?? null,
+    readHostTable: async (hostId: string) => {
+        remote.reads.push(hostId);
+        return remote.tables.get(hostId) ?? null;
+    },
     writeHostTable: async (hostId: string, table: string) => {
         remote.tables.set(hostId, table);
         remote.writes.push(hostId);
@@ -102,12 +108,18 @@ const { LOCAL_SHARD, installShard, minecraftRoutes, nextTable, routesByShard, sh
     await import("@polaris-app/game-servers/src/lib/minecraft/router-service");
 
 /** A Java server named `name`, on `targetId`, published on `port`. */
-function server(name: string, targetId: string, port: number, config: Record<string, unknown> = { routed: true }): string {
+function server(
+    name: string,
+    targetId: string,
+    port: number,
+    config: Record<string, unknown> = { routed: true },
+    catalogId = "minecraft"
+): string {
     const id = `install-${String(installs.length).padStart(6, "0")}`;
     applications.set(`app-${id}`, { sourceConfig: JSON.stringify({ hostPort: port }), targetId });
     installs.push({
         id,
-        catalogId: "minecraft",
+        catalogId,
         config: JSON.stringify({ hostname: `${name}.mc.example.com`, ...config }),
         applicationId: `app-${id}`,
         targetId,
@@ -124,6 +136,7 @@ beforeEach(async () => {
     targets.clear();
     remote.tables.clear();
     remote.writes.length = 0;
+    remote.reads.length = 0;
     remote.running.clear();
     remote.started.length = 0;
     targets.set("t-local", { kind: "local", hostId: null });
@@ -235,6 +248,26 @@ describe("a table per machine", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it("the sweep only visits machines that ever ran a Java server", async () => {
+        server("bedrock", "t-a", 19132, { routed: true }, "minecraft-bedrock");
+        server("far", "t-b", 25572);
+        installs[1]!.status = "removed";
+        await syncMinecraftRoutes();
+        await syncMinecraftRoutes();
+        expect(remote.reads).toEqual(["host-b", "host-b"]);
+    });
+
+    it("writes a connected machine's empty table when its router is about to start", async () => {
+        // The first server routed there is not routed yet when the router starts, and
+        // mc-router exits at startup when the table it watches is missing.
+        const away = server("away", "t-a", 25571, {});
+        await syncMinecraftRoutes(away);
+        expect(remote.writes).toEqual([]);
+        await syncMinecraftRoutes(away, { always: true });
+        expect(remote.writes).toEqual(["host-a"]);
+        expect(remoteTable("host-a")).toEqual({});
     });
 
     it("never touches a machine nobody routed anything on", async () => {

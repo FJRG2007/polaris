@@ -26,10 +26,11 @@
 
 import { hostname } from "node:os";
 import { SshPorts } from "@/lib/deploy/ports-ssh";
+import { borrowSsh } from "@/lib/connection-pool";
 import { HostdClient } from "@polaris/hostd-client";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { MINECRAFT_ROUTER_ASLEEP_MOTD, MINECRAFT_ROUTER_LOADING_MOTD } from "@polaris/core";
-import { execCommand, openSshClient } from "@polaris/ssh";
+import { execCommand } from "@polaris/ssh";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { quoteArg, type ComposeSpec } from "@polaris/deploy";
 
@@ -252,24 +253,31 @@ export function remoteTableReadScript(): string {
 
 type HostConnection = Awaited<ReturnType<typeof getHostConnectionUnscoped>>;
 
+/** How long a connected server gets to answer before its table is left for the next
+ *  pass. Every machine is synced side by side, so this bounds the whole sweep. */
+const HOST_READY_TIMEOUT_MS = 8_000;
+
+/** A short command on a connected server, over a borrowed connection: the sweep asks
+ *  every machine on every pass, and a handshake each time is most of what that costs. */
 async function onHost(hostId: string, script: string, input?: string): Promise<{ code: number; out: string }> {
     const connection = await getHostConnectionUnscoped(hostId);
-    const client = await openSshClient({
+    const lease = await borrowSsh("exec", hostId, {
         host: connection.address,
         port: connection.port,
         username: connection.username,
         auth: connection.auth,
-        pinnedHostKey: connection.hostKey
+        pinnedHostKey: connection.hostKey ?? [],
+        readyTimeoutMs: HOST_READY_TIMEOUT_MS
     });
     try {
         const chunks: Buffer[] = [];
-        const result = await execCommand(client, script, {
+        const result = await execCommand(lease.client, script, {
             input,
             onStdout: (chunk) => chunks.push(chunk)
         });
         return { code: result.code, out: Buffer.concat(chunks).toString("utf8") };
     } finally {
-        client.end();
+        lease.release();
     }
 }
 

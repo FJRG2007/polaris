@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { host } from "@polaris/app-host";
+import { gameServerCatalogIds } from "../game-catalog";
 
 const { readInstallConfig } = host.appsInstallConfig;
 const { readHostTable, routerRunningOn, startRouterOn, writeHostTable } = host.minecraftRouter;
@@ -360,15 +361,16 @@ async function writeTable(shard: string, table: string): Promise<void> {
 }
 
 /** One machine's table, written only when it changed. This machine's is always
- *  written, empty included, because its router exits at startup without one. */
-async function syncShard(shard: string, routes: readonly MinecraftRoute[]): Promise<void> {
+ *  written, empty included, because its router exits at startup without one - and so
+ *  is a connected server's when `always` says its router is about to be started. */
+async function syncShard(shard: string, routes: readonly MinecraftRoute[], always = false): Promise<void> {
     const previous = await readTable(shard);
     const since = await readSince(shard);
     const now = Date.now();
     const nextSince = retiredSince(retiredRoutes(previous, routes, since, now), since, now);
     if (JSON.stringify(nextSince) !== JSON.stringify(since))
         await writeSince(shard, nextSince).catch(() => undefined);
-    const next = nextTable(previous, routes, shard === LOCAL_SHARD, since, now);
+    const next = nextTable(previous, routes, always || shard === LOCAL_SHARD, since, now);
     if (next !== null) await writeTable(shard, next);
 }
 
@@ -393,21 +395,31 @@ async function writeSince(shard: string, since: Record<string, number>): Promise
     await writeFile(sinceFile(shard), `${JSON.stringify(since)}\n`, "utf8");
 }
 
-/** Connected servers that have ever run a game server here, removed ones included,
- *  so a machine whose last routed server went away still has its names retired. */
+/** Connected servers that have ever run a Java server here, removed ones included,
+ *  so a machine whose last routed server went away still has its names retired. Few
+ *  targets, and one grouped query over the installs on them. */
 async function knownRemoteShards(): Promise<string[]> {
-    const used = await prisma.installedApp.findMany({
-        where: { targetId: { not: null } },
-        distinct: ["targetId"],
-        select: { targetId: true }
-    });
-    const targetIds = used.flatMap((row) => (row.targetId ? [row.targetId] : []));
-    if (targetIds.length === 0) return [];
     const targets = await prisma.deployTarget.findMany({
-        where: { id: { in: targetIds }, hostId: { not: null } },
-        select: { kind: true, hostId: true }
+        where: { hostId: { not: null } },
+        select: { id: true, kind: true, hostId: true }
     });
-    return [...new Set(targets.map((target) => shardOf(target)).filter((shard) => shard !== LOCAL_SHARD))];
+    if (targets.length === 0) return [];
+    const used = await prisma.installedApp.groupBy({
+        by: ["targetId"],
+        where: {
+            targetId: { in: targets.map((target) => target.id) },
+            catalogId: { in: gameServerCatalogIds().filter(routesByHostname) }
+        }
+    });
+    const usedIds = new Set(used.map((row) => row.targetId));
+    return [
+        ...new Set(
+            targets
+                .filter((target) => usedIds.has(target.id))
+                .map((target) => shardOf(target))
+                .filter((shard) => shard !== LOCAL_SHARD)
+        )
+    ];
 }
 
 /**
@@ -422,30 +434,39 @@ async function knownRemoteShards(): Promise<string[]> {
  * server with servers routed for good gets its router repaired: deployed again if it
  * is not running, which `compose up -d` makes a no-op when it is.
  *
+ * `always` writes the install's machine's table even when it would hold nothing,
+ * which is what has to happen just before that machine's router is started.
+ *
  * Best effort by design. The routes directory only exists where the router is
  * running, so on an instance without it this fails and that is the correct outcome:
- * nothing is routed, every server keeps the address it already had. One machine that
- * cannot be reached never stops the others' tables.
+ * nothing is routed, every server keeps the address it already had. Machines are
+ * synced side by side, so one that cannot be reached neither stops nor delays the
+ * others' tables.
  */
-export async function syncMinecraftRoutes(installedAppId?: string): Promise<void> {
+export async function syncMinecraftRoutes(
+    installedAppId?: string,
+    options: { always?: boolean } = {}
+): Promise<void> {
     if (installedAppId) {
         const shard = await installShard(installedAppId);
-        await syncShard(shard, await minecraftRoutes(shard));
+        await syncShard(shard, await minecraftRoutes(shard), options.always === true);
         return;
     }
     const shards = routesByShard(await shardRoutes());
     for (const shard of [LOCAL_SHARD, ...(await knownRemoteShards().catch(() => []))]) {
         if (!shards.has(shard)) shards.set(shard, []);
     }
-    for (const [shard, routes] of shards) {
-        const table = routes.map(({ hostname, backend }) => ({ hostname, backend }));
-        const written = await syncShard(shard, table).then(
-            () => true,
-            () => false
-        );
-        if (!written || shard === LOCAL_SHARD || !routes.some((route) => route.routed)) continue;
-        await repairRouterOn(shard).catch(() => undefined);
-    }
+    await Promise.all(
+        [...shards].map(async ([shard, routes]) => {
+            const table = routes.map(({ hostname, backend }) => ({ hostname, backend }));
+            const written = await syncShard(shard, table).then(
+                () => true,
+                () => false
+            );
+            if (!written || shard === LOCAL_SHARD || !routes.some((route) => route.routed)) return;
+            await repairRouterOn(shard).catch(() => undefined);
+        })
+    );
 }
 
 /** Deploy a connected server's router again when it is not running. Only for a

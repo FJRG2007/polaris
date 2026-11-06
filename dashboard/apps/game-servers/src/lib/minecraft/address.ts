@@ -306,7 +306,7 @@ export async function setGameRouted(
     // only its own servers, from a table of its own.
     const shard = await installShard(installedAppId);
     if (routed && !(await routerUp(shard))) {
-        await syncMinecraftRoutes(installedAppId).catch(() => undefined);
+        await syncMinecraftRoutes(installedAppId, { always: true }).catch(() => undefined);
         const failed =
             shard === LOCAL_SHARD
                 ? await startRouter(routerPort())
@@ -326,7 +326,7 @@ export async function setGameRouted(
     // directions. Doing it the other way round leaves a window - however short - where
     // the address a player already has answers nowhere.
     if (routed) {
-        await moveOntoRouter(ownerId, installedAppId, hostname, port, true);
+        await moveOntoRouter(ownerId, installedAppId, hostname, port, install.applicationId, true);
         return;
     }
     const srvWritten =
@@ -351,7 +351,9 @@ export async function setGameRouted(
 
 /**
  * Mark a server routed and drop the SRV record that carried its port, in that
- * order: the route is in the table before the record goes.
+ * order: the route is in the table before the record goes. A server on a connected
+ * machine keeps the record until its name points at that machine, whose router holds
+ * the route - a name still answered by the wildcard reaches this machine's instead.
  *
  * `syncTable` is off only for a server whose route the table already holds (a
  * candidate's), so a sweep switching many over writes the table once, at its end.
@@ -361,6 +363,7 @@ async function moveOntoRouter(
     installedAppId: string,
     hostname: string,
     port: number | null,
+    applicationId: string | null,
     syncTable: boolean
 ): Promise<void> {
     // The router answers on the default port, so the name alone is the address.
@@ -370,7 +373,31 @@ async function moveOntoRouter(
         [ROUTE_CANDIDATE_KEY]: false
     });
     if (syncTable) await syncMinecraftRoutes(installedAppId).catch(() => undefined);
-    if (hostname && port) await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
+    if (!hostname || !port) return;
+    if (!(await nameReachesServingMachine(ownerId, installedAppId, hostname, port, applicationId))) return;
+    await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
+}
+
+/**
+ * Whether a server's name leads to the machine it runs on, writing the A record that
+ * makes it so for one on a connected machine. A server here is covered by the game's
+ * wildcard. A name given before connected machines had records of their own is moved
+ * over here, the first time its server is put on the router.
+ */
+async function nameReachesServingMachine(
+    ownerId: string,
+    installedAppId: string,
+    hostname: string,
+    port: number,
+    applicationId: string | null
+): Promise<boolean> {
+    if (!applicationId) return false;
+    const serving = await servingMachine(applicationId);
+    if (!serving) return true;
+    const address = await provisionGameDns(hostname, port, false, { ownerId, installedAppId }, serving).catch(
+        () => null
+    );
+    return Boolean(address?.hostname);
 }
 
 /** How long to give a router that has just been started, and how often to look. */
@@ -581,9 +608,12 @@ export async function adoptRoutedAddress(
     // An install that never forwarded it keeps the addresses its players already use.
     if (!(await forwardAnswers(installedAppId, hostname, shard))) return false;
     const port = install.applicationId ? await publishedPort(install.applicationId) : null;
+    if (!port) return false;
+    if (!(await nameReachesServingMachine(ownerId, installedAppId, hostname, port, install.applicationId)))
+        return false;
     // The route is already in the table, as a candidate's, so the sweep's own write
     // at its end is the only one this needs.
-    await moveOntoRouter(ownerId, installedAppId, hostname, port, false);
+    await moveOntoRouter(ownerId, installedAppId, hostname, port, install.applicationId, false);
     return true;
 }
 
