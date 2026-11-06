@@ -65,4 +65,29 @@ describe("ProfileBanner memory", () => {
         const again = render(<ProfileBanner person={PERSON} />);
         expect(again.container.querySelector("img")).toBeNull();
     });
+
+    it("asks again for a failed picture once a minute has passed", () => {
+        vi.useFakeTimers();
+        try {
+            const first = render(<ProfileBanner person={PERSON} />);
+            fireEvent.error(first.container.querySelector("img") as HTMLImageElement);
+            first.unmount();
+
+            vi.advanceTimersByTime(61_000);
+            const again = render(<ProfileBanner person={PERSON} />);
+            expect(again.container.querySelector("img")).not.toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("asks again for a failed picture once the connection comes back", () => {
+        const first = render(<ProfileBanner person={PERSON} />);
+        fireEvent.error(first.container.querySelector("img") as HTMLImageElement);
+        first.unmount();
+
+        window.dispatchEvent(new Event("online"));
+        const again = render(<ProfileBanner person={PERSON} />);
+        expect(again.container.querySelector("img")).not.toBeNull();
+    });
 });

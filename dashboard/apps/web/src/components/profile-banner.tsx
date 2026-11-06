@@ -36,11 +36,23 @@ import { useProfileStyle } from "@/components/profile-style-store";
  * start again from what a new mount knows: no answer from the appearance store
  * yet, so the colour from their face, then the one they chose a moment later.
  * That was the flash. The last colour this page already drew for them stands in
- * until the store answers, and a picture that already failed is not asked for
- * again only to fail a second time.
+ * until the store answers, and a picture that just failed is not asked for
+ * again only to fail a second time - for a minute, or until the connection
+ * comes back, since a dropped request is not a missing picture.
  */
 const drawnFill = new Map<string, BannerFill | null>();
-const failedPictures = new Set<string>();
+const failedPictures = new Map<string, number>();
+const FAILED_PICTURE_TTL_MS = 60_000;
+
+function pictureFailedRecently(src: string): boolean {
+    const at = failedPictures.get(src);
+    if (at === undefined) return false;
+    if (Date.now() - at < FAILED_PICTURE_TTL_MS) return true;
+    failedPictures.delete(src);
+    return false;
+}
+
+if (typeof window !== "undefined") window.addEventListener("online", () => failedPictures.clear());
 
 /** Forget what the page kept - for tests, which start every case clean. */
 export function resetProfileBannerMemory(): void {
@@ -99,7 +111,7 @@ export function ProfileBanner({
           ? accentGradient(accent)
           : tintFor(person.id);
     const src = kind === "org" ? orgBannerUrl(person.id) : bannerUrl(person.id);
-    const [failed, setFailed] = useState(() => failedPictures.has(src));
+    const [failed, setFailed] = useState(() => pictureFailedRecently(src));
 
     return (
         <div className={cn("relative w-full overflow-hidden", className)} style={{ background }}>
@@ -109,7 +121,7 @@ export function ProfileBanner({
                     src={src}
                     alt=""
                     onError={() => {
-                        failedPictures.add(src);
+                        failedPictures.set(src, Date.now());
                         setFailed(true);
                     }}
                     className="absolute inset-0 size-full object-cover"

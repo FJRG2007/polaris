@@ -9,7 +9,7 @@ import { defineScene } from "../runtime/scene";
 import { ChatScreen, chatActions, chatApi } from "./chat";
 import { label, pressMatching, scrollTo } from "../runtime/interact";
 import { ChannelSettings } from "@/app/(app)/chat/channel-settings";
-import { ChatRulesView } from "@/app/(app)/admin/chat/chat-rules-view";
+import { ChatRulesView } from "@/app/(app)/admin/apps/[appId]/settings/_chat/chat-rules-view";
 import { PrivacyView } from "@/app/(app)/account/privacy/privacy-view";
 import { CHAT_RULE_SCOPES, DEFAULT_CHAT_RULES, DEFAULT_PRIVACY } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
@@ -71,7 +71,7 @@ export const chatChannelSettings = defineScene({
 
 export const chatRules = defineScene({
     id: "chat-rules",
-    path: "/admin/chat",
+    path: "/admin/apps/chat/settings",
     render: (ctx) => (
         <Chrome>
             <div className="mx-auto flex w-full max-w-2xl flex-col">
