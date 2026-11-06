@@ -4,7 +4,10 @@
  * The two dialogs of the chat lock: asking for the code, and setting it.
  *
  * The code box is the shared password input, so it has its show/hide toggle.
- * Both stay open on a refusal with the reason under the box.
+ * Both stay open on a refusal with the reason under the box. A code set with a
+ * known number of digits is typed into the digits-only box, which opens the
+ * chat the moment the last one lands; an older code of another shape keeps its
+ * button.
  */
 
 import type { LockShelf } from "./lock-shelf";
@@ -29,14 +32,18 @@ import {
     Switch
 } from "@polaris/ui";
 import * as timing from "@/lib/chat/lock-timing";
+import { CodeInput } from "@/components/code-input";
 
 /** Same bounds as `lockCodeSchema`, so the box never offers what is refused. */
 const CODE_MIN = 4;
 const CODE_MAX = 64;
 
-function codeReady(code: string): boolean {
-    const length = code.trim().length;
-    return length >= CODE_MIN && length <= CODE_MAX;
+/** Whether a typed code is worth sending: exactly its digits when the length is
+ *  known, anything within the bounds when it is not. */
+export function codeReady(code: string, length: number | null = null): boolean {
+    if (length !== null) return code.length === length;
+    const typed = code.trim().length;
+    return typed >= CODE_MIN && typed <= CODE_MAX;
 }
 
 const NO_LOCK: ChatLockState = {
@@ -45,6 +52,13 @@ const NO_LOCK: ChatLockState = {
     unlockMinutes: timing.DEFAULT_UNLOCK_MINUTES,
     codeLength: null
 };
+
+/** Each code length by its catalogue key. */
+const DIGIT_LABELS = {
+    4: "lock.digits4",
+    6: "lock.digits6",
+    8: "lock.digits8"
+} as const satisfies Record<(typeof timing.LOCK_CODE_LENGTHS)[number], string>;
 
 /** Each duration choice by its catalogue key. */
 const UNLOCK_LABELS = {
@@ -122,6 +136,7 @@ export function LockCodeDialog({
 }) {
     const t = useTranslations("chat");
     const lock = useChatLock();
+    const length = lock.state.codeLength;
     const [code, setCode] = useState("");
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -134,13 +149,15 @@ export function LockCodeDialog({
     }, [open]);
 
     async function send(): Promise<void> {
-        if (!codeReady(code) || busy) return;
+        if (!codeReady(code, length) || busy) return;
         setBusy(true);
         const refused = await runAction(() => submit(code), setError);
         setBusy(false);
         if (refused === null) return;
         if (refused) {
             setError(refused);
+            // Emptied, so typing it again submits on the last digit again.
+            if (length !== null) setCode("");
             return;
         }
         onOpenChange(false);
@@ -159,20 +176,37 @@ export function LockCodeDialog({
                         void send();
                     }}
                 >
-                    <Input
-                        type="password"
-                        autoFocus
-                        autoComplete="off"
-                        value={code}
-                        maxLength={CODE_MAX}
-                        aria-label={t("lock.code")}
-                        placeholder={t("lock.code")}
-                        aria-invalid={error ? true : undefined}
-                        onChange={(event) => {
-                            setCode(event.target.value);
-                            setError("");
-                        }}
-                    />
+                    {length !== null ? (
+                        <CodeInput
+                            masked
+                            autoFocus
+                            autoSubmit
+                            length={length}
+                            value={code}
+                            readOnly={busy}
+                            aria-label={t("lock.code")}
+                            aria-invalid={error ? true : undefined}
+                            onValueChange={(next) => {
+                                setCode(next);
+                                setError("");
+                            }}
+                        />
+                    ) : (
+                        <Input
+                            type="password"
+                            autoFocus
+                            autoComplete="off"
+                            value={code}
+                            maxLength={CODE_MAX}
+                            aria-label={t("lock.code")}
+                            placeholder={t("lock.code")}
+                            aria-invalid={error ? true : undefined}
+                            onChange={(event) => {
+                                setCode(event.target.value);
+                                setError("");
+                            }}
+                        />
+                    )}
                     {error ? (
                         <p role="alert" className="text-xs text-danger">
                             {error}
@@ -194,7 +228,7 @@ export function LockCodeDialog({
                         >
                             {t("lock.cancel")}
                         </Button>
-                        <Button type="submit" size="sm" disabled={!codeReady(code) || busy}>
+                        <Button type="submit" size="sm" disabled={!codeReady(code, length) || busy}>
                             {t("lock.open")}
                         </Button>
                     </DialogFooter>
@@ -219,18 +253,22 @@ export function LockSettingsDialog({
     const t = useTranslations("chat");
     const [current, setCurrent] = useState("");
     const [code, setCode] = useState("");
+    const [length, setLength] = useState<number>(timing.DEFAULT_LOCK_CODE_LENGTH);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const knownLength = state.codeLength;
 
     useEffect(() => {
         if (open) {
             setCurrent("");
             setCode("");
+            setLength(knownLength ?? timing.DEFAULT_LOCK_CODE_LENGTH);
             setError("");
         }
-    }, [open]);
+    }, [open, knownLength]);
 
-    const ready = codeReady(code) && (!state.hasCode || codeReady(current)) && !busy;
+    const ready =
+        codeReady(code, length) && (!state.hasCode || codeReady(current, knownLength)) && !busy;
 
     async function save(): Promise<void> {
         if (!ready) return;
@@ -239,6 +277,7 @@ export function LockSettingsDialog({
             () =>
                 lockActions.setLockCodeAction({
                     code,
+                    length,
                     current: state.hasCode ? current : undefined
                 }),
             setError
@@ -249,7 +288,7 @@ export function LockSettingsDialog({
             setError(result.error);
             return;
         }
-        onChanged({ ...state, hasCode: true });
+        onChanged({ ...state, hasCode: true, codeLength: length });
         onOpenChange(false);
     }
 
@@ -292,7 +331,19 @@ export function LockSettingsDialog({
                             void save();
                         }}
                     >
-                        {state.hasCode && (
+                        {state.hasCode && knownLength !== null ? (
+                            <CodeInput
+                                masked
+                                length={knownLength}
+                                value={current}
+                                aria-label={t("lock.currentCode")}
+                                placeholder={t("lock.currentCode")}
+                                onValueChange={(next) => {
+                                    setCurrent(next);
+                                    setError("");
+                                }}
+                            />
+                        ) : state.hasCode ? (
                             <Input
                                 type="password"
                                 autoComplete="off"
@@ -305,7 +356,7 @@ export function LockSettingsDialog({
                                     setError("");
                                 }}
                             />
-                        )}
+                        ) : null}
                         {state.hasCode && (
                             <ForgotCode
                                 onReset={() => {
@@ -319,18 +370,35 @@ export function LockSettingsDialog({
                         signed in, not an account password: it opens nothing on its
                         own, guesses are throttled server-side, and a breach list
                         would refuse every four-digit code. */}
-                        <Input
-                            type="password"
-                            autoComplete="new-password"
-                            value={code}
-                            maxLength={CODE_MAX}
-                            aria-label={t("lock.newCode")}
-                            placeholder={t("lock.newCode")}
-                            onChange={(event) => {
-                                setCode(event.target.value);
-                                setError("");
-                            }}
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Select
+                                className="w-full sm:w-32"
+                                value={String(length)}
+                                aria-label={t("lock.codeLength")}
+                                onValueChange={(value) => {
+                                    const next = Number(value);
+                                    setLength(next);
+                                    setCode((typed) => typed.slice(0, next));
+                                }}
+                                options={timing.LOCK_CODE_LENGTHS.map((digits) => ({
+                                    value: String(digits),
+                                    label: t(DIGIT_LABELS[digits])
+                                }))}
+                            />
+                            <CodeInput
+                                masked
+                                className="min-w-0 flex-1"
+                                autoComplete="new-password"
+                                length={length}
+                                value={code}
+                                aria-label={t("lock.newCode")}
+                                placeholder={t("lock.newCode")}
+                                onValueChange={(next) => {
+                                    setCode(next);
+                                    setError("");
+                                }}
+                            />
+                        </div>
                         <p className="text-xs text-foreground-subtle">{t("lock.codeHint")}</p>
                         {error ? (
                             <p role="alert" className="text-xs text-danger">
