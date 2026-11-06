@@ -180,6 +180,7 @@ let window: BrowserWindow | null = null;
 /** The pages that asked for the state - the TV window, a dashboard's dialog - and so hear every change. */
 const pages = new Set<WebContents>();
 let busy = false;
+let searcher: WebContents | null = null;
 let state: TvInstallState = { phase: "ready", found: [], outcome: null, backup: null, closed: null };
 
 function publish(next: Partial<TvInstallState>): void {
@@ -292,8 +293,9 @@ async function finish(adb: AdbConnection, host: string, outcome: TvOutcome): Pro
 }
 
 /** Stops a search under way; an install is never stopped part way. */
-function stopSearch(): void {
-    if (state.phase !== "searching") return;
+function stopSearch(by?: WebContents): void {
+    if (state.phase !== "searching" || (by && searcher !== by)) return;
+    searcher = null;
     search += 1;
     busy = false;
     publish({ phase: "ready" });
@@ -307,10 +309,11 @@ export function openTvInstall(): void {
         return;
     }
     window = openLocalWindow("tv", { title: "Install on a TV - Polaris", width: 560, height: 620 });
+    const contents = window.webContents;
     window.on("closed", () => {
         window = null;
-        // Closing stops a search, as closing the dashboard dialog does.
-        stopSearch();
+        // Closing stops a search it started, as closing the dashboard dialog does.
+        stopSearch(contents);
     });
 }
 
@@ -340,12 +343,14 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         if (busy) return state;
         busy = true;
         search += 1;
+        searcher = event.sender;
         const run = search;
         publish({ phase: "searching", found: [] });
         const found = await findTvs(run).catch(() => []);
         // A cancelled search has already handed the controls back.
         if (run !== search) return state;
         busy = false;
+        searcher = null;
         publish({ phase: "ready", found });
         return state;
     });

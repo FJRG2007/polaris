@@ -278,30 +278,47 @@ function OpenInApp({ download, onClose }: { download: ReactNode; onClose: () => 
     const [step, setStep] = useState<"idle" | "opening" | "opened" | "missing">("idle");
     const [phone, setPhone] = useState(false);
     const timer = useRef<number | null>(null);
+    const detach = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         setPhone(isPhone());
         return () => {
             if (timer.current !== null) window.clearTimeout(timer.current);
+            detach.current?.();
         };
     }, []);
 
     const open = () => {
         // The app taking over blurs this window or hides this tab; a browser with
         // no handler for the link does neither.
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        detach.current?.();
         let left = false;
-        const away = () => {
+        let waited = false;
+        function stop() {
+            window.removeEventListener("blur", away);
+            document.removeEventListener("visibilitychange", hidden);
+            if (detach.current === stop) detach.current = null;
+        }
+        function away() {
             left = true;
-        };
-        const hidden = () => document.visibilityState === "hidden" && away();
-        window.addEventListener("blur", away, { once: true });
+            if (!waited) return;
+            stop();
+            setStep("opened");
+        }
+        function hidden() {
+            if (document.visibilityState === "hidden") away();
+        }
+        window.addEventListener("blur", away);
         document.addEventListener("visibilitychange", hidden);
+        detach.current = stop;
         setStep("opening");
         const path = `/account/downloads?${OPEN_PARAM}=${OPEN_VALUE}`;
         window.location.href = `polaris://open?server=${encodeURIComponent(window.location.origin)}&path=${encodeURIComponent(path)}`;
         timer.current = window.setTimeout(() => {
-            window.removeEventListener("blur", away);
-            document.removeEventListener("visibilitychange", hidden);
+            timer.current = null;
+            waited = true;
+            if (left) stop();
             setStep(left ? "opened" : "missing");
         }, OPEN_WAIT_MS);
     };

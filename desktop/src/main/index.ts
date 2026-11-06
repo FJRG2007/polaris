@@ -469,7 +469,8 @@ function start(): void {
             },
             relaunch: () => {
                 if (pushRunning()) return { ok: false, error: "A push is still running. Restart once it finishes." };
-                app.relaunch();
+                const appImage = process.env.APPIMAGE;
+                app.relaunch(appImage ? { execPath: appImage, args: process.argv.slice(1) } : undefined);
                 app.exit(0);
                 return { ok: true };
             },
@@ -510,7 +511,7 @@ function start(): void {
             openApiKeys: () => showPolaris("/account/api-keys"),
             // In the dashboard's own dialog when there is a Polaris to show it,
             // in a window of its own when there is not.
-            installOnTv: () => (current ? showPolaris("/account/downloads?tv=install") : openTvInstall()),
+            installOnTv: () => (current && !loadError ? showPolaris("/account/downloads?tv=install") : openTvInstall()),
             openInBrowser: () => {
                 if (current) void shell.openExternal(current);
             }
