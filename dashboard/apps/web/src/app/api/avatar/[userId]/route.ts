@@ -95,7 +95,10 @@ async function whoIsAsking(subjectId: string): Promise<{ id: string; isAdmin: bo
     return null;
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ userId: string }> }
+): Promise<Response> {
     const { userId } = await params;
     const viewer = await whoIsAsking(userId);
     if (!viewer) return new Response("Unauthorized", { status: 401 });
@@ -130,7 +133,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     // Answered before the bytes are fetched, which is the point of the split:
     // most requests for a face are a browser checking the one it already has.
     if (request.headers.get("if-none-match") === etag) {
-        return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": CACHE, Vary: "Accept" } });
+        return new Response(null, {
+            status: 304,
+            headers: { ETag: etag, "Cache-Control": CACHE, Vary: "Accept" }
+        });
     }
 
     const stored = await picture.load();

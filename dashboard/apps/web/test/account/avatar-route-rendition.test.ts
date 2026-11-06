@@ -53,7 +53,10 @@ describe("the avatar route and a reader that draws only PNG and JPEG", () => {
     });
 
     it("answers the PNG's own tag with a 304", async () => {
-        const answer = await ask({ accept: "image/png, image/jpeg", "if-none-match": '"face-png"' });
+        const answer = await ask({
+            accept: "image/png, image/jpeg",
+            "if-none-match": '"face-png"'
+        });
         expect(answer.status).toBe(304);
     });
 

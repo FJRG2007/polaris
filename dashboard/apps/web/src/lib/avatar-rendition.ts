@@ -48,7 +48,8 @@ async function toPng(bytes: Uint8Array): Promise<Uint8Array | null> {
 export function avatarRendition(accept: string | null, storedMime: string): AvatarRendition | null {
     if (!accept) return null;
     const types = acceptedTypes(accept);
-    if (types.some((type) => type === storedMime || type === "image/*" || type === "*/*")) return null;
+    if (types.some((type) => type === storedMime || type === "image/*" || type === "*/*"))
+        return null;
     if (!types.includes("image/png")) return null;
     return { mime: "image/png", suffix: "png", convert: toPng };
 }
