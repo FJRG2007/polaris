@@ -31,7 +31,7 @@ interface ZoneRecord {
 
 const state = vi.hoisted(() => ({
     rows: [] as Row[],
-    installs: [] as Array<{ id: string; status: string; config: string }>,
+    installs: [] as Array<{ id: string; ownerId: string; status: string; config: string }>,
     zone: [] as ZoneRecord[],
     token: "token" as string | null,
     failDeletes: false,
@@ -213,7 +213,7 @@ const { setGameHostname } = await import("@polaris-app/game-servers/src/lib/mine
 const OWNER = "owner-1";
 
 function install(id: string, config: Record<string, unknown> = {}, status = "running"): void {
-    state.installs.push({ id, status, config: JSON.stringify(config) });
+    state.installs.push({ id, ownerId: OWNER, status, config: JSON.stringify(config) });
 }
 
 /** A SRV record exactly as a server created before this fix left it. */
@@ -270,6 +270,7 @@ describe("deleting a server", () => {
         install("srv-2");
         await setGameHostname(OWNER, "srv-1", { name: "bed-wars", srv: true });
         await setGameHostname(OWNER, "srv-2", { name: "parkour", srv: true });
+        state.installs[0]!.status = "removed";
         expect(await gameDns.releaseGameDns("srv-1")).toEqual({ released: 2, failed: 0 });
         expect(state.zone.map((record) => record.name).sort()).toEqual([
             "_minecraft._tcp.parkour.mc.example.com",
@@ -278,10 +279,36 @@ describe("deleting a server", () => {
         expect(await gameDns.releaseGameDns("srv-1")).toEqual({ released: 0, failed: 0 });
     });
 
+    it("hands a record another live server answers to over to it instead of removing it", async () => {
+        install("srv-1");
+        install("srv-2");
+        await setGameHostname(OWNER, "srv-1", { name: "lobby", srv: true });
+        // Another owner's server of the same name shares the provider's records.
+        state.installs[1]!.ownerId = "owner-2";
+        await setGameHostname("owner-2", "srv-2", { name: "lobby", srv: true });
+        state.installs[0]!.status = "removed";
+        expect(await gameDns.releaseGameDns("srv-1")).toEqual({ released: 0, failed: 0 });
+        expect(state.deletes).toEqual([]);
+        expect(state.zone.map((record) => record.name).sort()).toEqual([
+            "_minecraft._tcp.lobby.mc.example.com",
+            "lobby.mc.example.com",
+            "lobby.mc.example.com"
+        ]);
+        expect(
+            state.rows.every(
+                (row) =>
+                    row.installedAppId === "srv-2" &&
+                    row.ownerId === "owner-2" &&
+                    row.releaseRequestedAt === null
+            )
+        ).toBe(true);
+    });
+
     it("drops the row when the record is already gone at the provider", async () => {
         install("srv-1");
         await setGameHostname(OWNER, "srv-1", { name: "demo", srv: true });
         state.zone = [];
+        state.installs[0]!.status = "removed";
         expect(await gameDns.releaseGameDns("srv-1")).toEqual({ released: 2, failed: 0 });
         expect(state.rows).toEqual([]);
     });
@@ -312,6 +339,7 @@ describe("deleting a server", () => {
         install("srv-1");
         await setGameHostname(OWNER, "srv-1", { name: "lucky-blocks", srv: true });
         state.token = null;
+        state.installs[0]!.status = "removed";
         await gameDns.releaseGameDns("srv-1");
         expect(await gameDns.gameDnsLeftovers(OWNER)).toEqual({
             count: 2,

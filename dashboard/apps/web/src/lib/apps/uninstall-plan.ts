@@ -115,6 +115,14 @@ export const INSTALL_SCOPED_MODELS = [
 
 export type InstallScopedModel = (typeof INSTALL_SCOPED_MODELS)[number];
 
+/**
+ * Models that keep rows under an install id and must outlive its purge.
+ * `gameDnsRecord` names the provider records still to be removed: purging it would
+ * leave those records in the operator's zone with nothing left to find them by,
+ * so the game DNS sweep releases them and drops each row once its record is gone.
+ */
+export const INSTALL_OUTLIVING_MODELS = ["gameDnsRecord"] as const;
+
 /** Everything installing this app creates, read off its manifest the way `installApp` does. */
 export function installFootprint(app: AppManifest): InstallResource[] {
     const shared: InstallResource[] = [

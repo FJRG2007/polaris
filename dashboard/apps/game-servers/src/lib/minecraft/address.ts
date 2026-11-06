@@ -194,7 +194,10 @@ export async function setGameHostname(
     // Asking for one anyway would write a record per server, which is the thing
     // routing exists to stop.
     const routed = readInstallConfig(install?.config).routed === true;
-    const address = await provisionGameDns(wanted, port, input.srv && !routed, { ownerId, installedAppId });
+    const address = await provisionGameDns(wanted, port, input.srv && !routed, {
+        ownerId,
+        installedAppId
+    });
     if (!address.hostname) return null;
     await patchInstallConfig(installedAppId, {
         hostname: address.hostname,
@@ -274,10 +277,14 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
         // The router answers on the default port, so the name alone is the address.
         await patchInstallConfig(installedAppId, { routed: true, portless: true });
         await syncMinecraftRoutes().catch(() => undefined);
-        if (hostname && port) await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
+        if (hostname && port)
+            await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
         return;
     }
-    const srvWritten = hostname && port ? await setSrvRecord(hostname, port, true, { ownerId, installedAppId }) : false;
+    const srvWritten =
+        hostname && port
+            ? await setSrvRecord(hostname, port, true, { ownerId, installedAppId })
+            : false;
     // Off the router, the port is out of the address only if that record was actually
     // written - otherwise it goes back to carrying it, which is what a player needs.
     await patchInstallConfig(installedAppId, { routed: false, portless: srvWritten });
@@ -342,9 +349,13 @@ async function setSrvRecord(
         const name = `${MINECRAFT_SRV_PREFIX}${hostname}`;
         if (wanted) {
             const recordId = await upsertSrvRecord(token, zone.id, name, hostname, port);
-            await rememberGameDnsRecord({ ...owner, zoneId: zone.id, recordId, type: "SRV", name }).catch(
-                () => undefined
-            );
+            await rememberGameDnsRecord({
+                ...owner,
+                zoneId: zone.id,
+                recordId,
+                type: "SRV",
+                name
+            }).catch(() => undefined);
             return true;
         }
         for (const record of await findDnsRecords(token, zone.id, "SRV", name)) {
@@ -352,7 +363,9 @@ async function setSrvRecord(
         }
         // Gone by name, so whatever remembered it has nothing left to remove.
         await prisma.gameDnsRecord
-            .deleteMany({ where: { installedAppId: owner.installedAppId, name: name.toLowerCase() } })
+            .deleteMany({
+                where: { installedAppId: owner.installedAppId, name: name.toLowerCase() }
+            })
             .catch(() => undefined);
         return false;
     } catch {

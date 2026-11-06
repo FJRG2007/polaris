@@ -72,6 +72,16 @@ interface ReleaseRow {
     readonly id: string;
     readonly zoneId: string;
     readonly recordId: string;
+    readonly name: string;
+}
+
+/** What a row is read with when it is about to be released. */
+const RELEASE_SELECT = { id: true, zoneId: true, recordId: true, name: true } as const;
+
+/** The hostname a remembered record answers for: its own name, or the name a SRV
+ *  record carries the port of. */
+function recordHostname(name: string): string {
+    return name.startsWith(MINECRAFT_SRV_PREFIX) ? name.slice(MINECRAFT_SRV_PREFIX.length) : name;
 }
 
 /** What one round of removals came to. */
@@ -100,7 +110,7 @@ export async function releaseGameDns(
         });
         const rows = await prisma.gameDnsRecord.findMany({
             where: { ...where, releaseRequestedAt: { not: null } },
-            select: { id: true, zoneId: true, recordId: true },
+            select: RELEASE_SELECT,
             take: SWEEP_BATCH
         });
         return await settle(rows);
@@ -111,8 +121,31 @@ export async function releaseGameDns(
 }
 
 /** Try to remove each marked record: gone (or already gone) drops the row, anything
- *  else writes down why and leaves it for the next pass. */
-async function settle(rows: readonly ReleaseRow[]): Promise<ReleaseOutcome> {
+ *  else writes down why and leaves it for the next pass. A record whose name a live
+ *  server still answers to - another owner's server of the same name, which the
+ *  provider shares between them - is handed to that server instead of removed. */
+async function settle(candidates: readonly ReleaseRow[]): Promise<ReleaseOutcome> {
+    if (candidates.length === 0) return { released: 0, failed: 0 };
+    const holders = await liveHolders([
+        ...new Set(candidates.map((row) => recordHostname(row.name)))
+    ]);
+    const rows: ReleaseRow[] = [];
+    for (const row of candidates) {
+        const holder = holders.get(recordHostname(row.name));
+        if (!holder) {
+            rows.push(row);
+            continue;
+        }
+        await prisma.gameDnsRecord.updateMany({
+            where: { id: row.id },
+            data: {
+                ownerId: holder.ownerId,
+                installedAppId: holder.id,
+                releaseRequestedAt: null,
+                releaseError: null
+            }
+        });
+    }
     if (rows.length === 0) return { released: 0, failed: 0 };
     const token = await loadCloudflareToken().catch(() => null);
     if (!token) {
@@ -164,7 +197,7 @@ export async function gameDnsLeftovers(
 export async function retryGameDnsLeftovers(ownerId: string): Promise<ReleaseOutcome> {
     const rows = await prisma.gameDnsRecord.findMany({
         where: { ownerId, releaseRequestedAt: { not: null } },
-        select: { id: true, zoneId: true, recordId: true },
+        select: RELEASE_SELECT,
         orderBy: { releaseRequestedAt: "asc" },
         take: SWEEP_BATCH
     });
@@ -187,23 +220,27 @@ export function legacyGameSrvHostname(
     return record.target.toLowerCase().replace(/\.$/, "") === hostname ? hostname : null;
 }
 
-/** The hostnames among these that a live server still holds. */
-async function liveHostnames(hostnames: readonly string[]): Promise<Set<string>> {
-    if (hostnames.length === 0) return new Set();
+/** The live server holding each of these hostnames, for those a live one holds. */
+async function liveHolders(
+    hostnames: readonly string[]
+): Promise<Map<string, { id: string; ownerId: string }>> {
+    const live = new Map<string, { id: string; ownerId: string }>();
+    if (hostnames.length === 0) return live;
     const rows = await prisma.installedApp.findMany({
         where: {
             status: { not: "removed" },
-            OR: hostnames.map((hostname) => ({ config: { contains: hostname } }))
+            OR: hostnames.map((hostname) => ({
+                config: { contains: hostname, mode: "insensitive" as const }
+            }))
         },
-        select: { config: true }
+        select: { id: true, ownerId: true, config: true }
     });
-    const wanted = new Set(hostnames);
-    const live = new Set<string>();
+    const wanted = new Set(hostnames.map((hostname) => hostname.toLowerCase()));
     for (const row of rows) {
         try {
             const value = (JSON.parse(row.config) as { hostname?: unknown }).hostname;
             if (typeof value === "string" && wanted.has(value.toLowerCase()))
-                live.add(value.toLowerCase());
+                live.set(value.toLowerCase(), { id: row.id, ownerId: row.ownerId });
         } catch {
             // A config that does not parse names nothing.
         }
@@ -243,7 +280,7 @@ export async function sweepGameDns(): Promise<GameDnsSweep> {
     }
     const due = await prisma.gameDnsRecord.findMany({
         where: { releaseRequestedAt: { not: null } },
-        select: { id: true, zoneId: true, recordId: true },
+        select: RELEASE_SELECT,
         orderBy: { releaseRequestedAt: "asc" },
         take: SWEEP_BATCH
     });
@@ -283,7 +320,7 @@ export async function sweepLegacySrv(): Promise<number> {
             return hostname ? [{ id: record.id, hostname }] : [];
         });
         const [live, known] = await Promise.all([
-            liveHostnames([...new Set(candidates.map((candidate) => candidate.hostname))]),
+            liveHolders([...new Set(candidates.map((candidate) => candidate.hostname))]),
             prisma.gameDnsRecord.findMany({
                 where: {
                     zoneId: zone.id,
