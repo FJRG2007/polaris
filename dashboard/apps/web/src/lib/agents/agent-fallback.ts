@@ -146,7 +146,11 @@ async function fallBack(runId: string): Promise<FallbackOutcome> {
 }
 
 /** The models to try for this repository, most preferred first. */
-export async function modelChainFor(ownerId: string, repoFullName: string, model: string): Promise<string[]> {
+export async function modelChainFor(
+    ownerId: string,
+    repoFullName: string,
+    model: string
+): Promise<string[]> {
     const tiers = await inheritedFallback(ownerId, repoFullName);
     return resolveModelChain(model, ...tiers);
 }

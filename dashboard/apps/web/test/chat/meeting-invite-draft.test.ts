@@ -20,8 +20,12 @@ describe("withDraft", () => {
     });
 
     it("splits a draft on spaces, commas and semicolons", () => {
-        expect(withDraft(["ada@example.com"], " sam@example.com  ross@example.com,ada@example.com; Tess@Example.com "))
-            .toEqual(["ada@example.com", "sam@example.com", "ross@example.com", "tess@example.com"]);
+        expect(
+            withDraft(
+                ["ada@example.com"],
+                " sam@example.com  ross@example.com,ada@example.com; Tess@Example.com "
+            )
+        ).toEqual(["ada@example.com", "sam@example.com", "ross@example.com", "tess@example.com"]);
     });
 
     it("returns the chips unchanged for an empty draft", () => {

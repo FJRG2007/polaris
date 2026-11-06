@@ -82,7 +82,10 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
     // happened, and opening one to close it out immediately would put a failure
     // on the screen for something that was correctly prevented. A deployment
     // with no ceilings set pays one read of an empty table.
-    const verdict = await checkUsageLimits({ ownerId: input.repo.ownerId, repoFullName: input.repo.repoFullName });
+    const verdict = await checkUsageLimits({
+        ownerId: input.repo.ownerId,
+        repoFullName: input.repo.repoFullName
+    });
     // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
     if (!verdict.allowed) return { error: verdict.reason ?? "A usage limit stopped this run." };
 
@@ -102,7 +105,12 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
 
     try {
         if (execution === "server") {
-            await startServerRun({ runId, runToken: token, repoFullName: input.repo.repoFullName, prompt: input.prompt });
+            await startServerRun({
+                runId,
+                runToken: token,
+                repoFullName: input.repo.repoFullName,
+                prompt: input.prompt
+            });
         } else {
             await dispatchWorkflow({ ...input, runId, execution });
         }
@@ -110,7 +118,9 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
     } catch (caught) {
         const message = caught instanceof Error ? caught.message : "The run could not be started";
         await finishAgentRun(runId, { state: "failed", error: message });
-        await prisma.agentRepo.update({ where: { id: input.repo.id }, data: { error: message } }).catch(() => undefined);
+        await prisma.agentRepo
+            .update({ where: { id: input.repo.id }, data: { error: message } })
+            .catch(() => undefined);
         return { runId, error: message };
     }
 }
@@ -138,7 +148,11 @@ async function dispatchWorkflow(
     const runsOn = await resolveRunsOn(input.execution, input.repo.poolId);
     const content = renderWorkflow({ apiUrl, runsOn, timeoutMinutes: TIMEOUT_MINUTES });
 
-    const { changed } = await installWorkflow({ token, repoFullName: input.repo.repoFullName, content });
+    const { changed } = await installWorkflow({
+        token,
+        repoFullName: input.repo.repoFullName,
+        content
+    });
     if (changed) {
         await prisma.agentRepo.update({
             where: { id: input.repo.id },

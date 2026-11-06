@@ -20,10 +20,7 @@ export default async function AgentRunsPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("pages.runsTitle")}
-                description={t("pages.runs")}
-            />
+            <PageHeader title={t("pages.runsTitle")} description={t("pages.runs")} />
             <RunsView
                 runs={runs}
                 repos={repos.filter((repo) => repo.enabled).map((repo) => repo.repoFullName)}
