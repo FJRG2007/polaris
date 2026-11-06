@@ -521,5 +521,15 @@
             "app-tunnel-quick": "Túnel rápido de servicio",
             "app-tunnel-ngrok": "ngrok de un servicio"
         }
+    },
+    "accountAdmin": {
+        "resetMail": {
+            "subject": "Cambia tu contraseña de Polaris",
+            "body": "Un administrador te envió este enlace para elegir otra contraseña:\n\n{url}\n\nSirve una vez y caduca en {minutes} minutos. Si no lo pediste, ignora este correo."
+        },
+        "emailChanged": {
+            "title": "Cambió tu correo de acceso",
+            "body": "Un administrador cambió tu correo de acceso de {from} a {to}."
+        }
     }
 }

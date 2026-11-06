@@ -27,8 +27,20 @@ interface RecoveryRow {
 }
 
 const users = [
-    { id: "user-1", email: "ada@example.com", username: "ada", name: "Ada Lovelace", bannedAt: null as Date | null },
-    { id: "user-2", email: "banned@example.com", username: "gone", name: "Gone Away", bannedAt: new Date() }
+    {
+        id: "user-1",
+        email: "ada@example.com",
+        username: "ada",
+        name: "Ada Lovelace",
+        bannedAt: null as Date | null
+    },
+    {
+        id: "user-2",
+        email: "banned@example.com",
+        username: "gone",
+        name: "Gone Away",
+        bannedAt: new Date()
+    }
 ];
 
 let rows: RecoveryRow[] = [];
@@ -57,11 +69,16 @@ function matches(row: RecoveryRow, where: Record<string, unknown>): boolean {
 }
 
 const accountRecovery = {
-    findUnique: vi.fn(async ({ where }: { where: { tokenHash?: string; id?: string } }) =>
-        rows.find((row) => (where.tokenHash ? row.tokenHash === where.tokenHash : row.id === where.id)) ?? null
+    findUnique: vi.fn(
+        async ({ where }: { where: { tokenHash?: string; id?: string } }) =>
+            rows.find((row) =>
+                where.tokenHash ? row.tokenHash === where.tokenHash : row.id === where.id
+            ) ?? null
     ),
     findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
-        rows.filter((row) => matches(row, where)).map((row) => ({ ...row, user: users.find((u) => u.id === row.userId) }))
+        rows
+            .filter((row) => matches(row, where))
+            .map((row) => ({ ...row, user: users.find((u) => u.id === row.userId) }))
     ),
     create: vi.fn(async ({ data }: { data: Partial<RecoveryRow> }) => {
         const row: RecoveryRow = {
@@ -82,28 +99,37 @@ const accountRecovery = {
         rows = rows.filter((row) => !matches(row, where));
         return { count: before - rows.length };
     }),
-    update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<RecoveryRow> }) => {
-        const row = rows.find((entry) => entry.id === where.id);
-        if (row) Object.assign(row, data);
-        return row;
-    }),
-    updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Partial<RecoveryRow> }) => {
-        const hit = rows.filter((row) => matches(row, where));
-        for (const row of hit) Object.assign(row, data);
-        return { count: hit.length };
-    })
+    update: vi.fn(
+        async ({ where, data }: { where: { id: string }; data: Partial<RecoveryRow> }) => {
+            const row = rows.find((entry) => entry.id === where.id);
+            if (row) Object.assign(row, data);
+            return row;
+        }
+    ),
+    updateMany: vi.fn(
+        async ({ where, data }: { where: Record<string, unknown>; data: Partial<RecoveryRow> }) => {
+            const hit = rows.filter((row) => matches(row, where));
+            for (const row of hit) Object.assign(row, data);
+            return { count: hit.length };
+        }
+    )
 };
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         accountRecovery,
         user: {
-            findFirst: vi.fn(async ({ where }: { where: { email?: string; username?: string } }) =>
-                users.find((user) => (where.email ? user.email === where.email : user.username === where.username)) ?? null
+            findFirst: vi.fn(
+                async ({ where }: { where: { email?: string; username?: string } }) =>
+                    users.find((user) =>
+                        where.email ? user.email === where.email : user.username === where.username
+                    ) ?? null
             ),
-            findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
-                users.find((user) => user.id === where.id) ?? null
-            )
+            findUnique: vi.fn(
+                async ({ where }: { where: { id: string } }) =>
+                    users.find((user) => user.id === where.id) ?? null
+            ),
+            update: vi.fn(async () => ({}))
         },
         $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations))
     }
@@ -111,19 +137,28 @@ vi.mock("@polaris/db", () => ({
 
 vi.mock("@polaris/auth", () => ({
     listSecurityQuestions: async (userId: string) =>
-        (correctAnswers[userId] ?? []).map((_, index) => ({ id: `q-${index}`, question: `Question ${index + 1}?` })),
+        (correctAnswers[userId] ?? []).map((_, index) => ({
+            id: `q-${index}`,
+            question: `Question ${index + 1}?`
+        })),
     verifySecurityAnswers: async (_auth: unknown, userId: string, answers: string[]) => {
         const expected = correctAnswers[userId];
         return Boolean(expected) && expected.every((answer, index) => answer === answers[index]);
     },
-    resetUserPassword: (...args: unknown[]) => resetPassword(...(args as [])),
+    resetUserPassword: (...args: unknown[]) => resetPassword(...(args as []))
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => {} }));
-vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) }));
-vi.mock("@/lib/notifications/operators", () => ({ notifyOperators: (input: unknown) => notify(input as never) }));
-vi.mock("@/lib/user-admin-service", () => ({ revokeUserSessions: (...args: unknown[]) => revokeSessions(...(args as [])) }));
+vi.mock("@/lib/rate-limit-service", () => ({
+    rateLimit: async () => ({ ok: true, retryAfterMs: 0 })
+}));
+vi.mock("@/lib/notifications/operators", () => ({
+    notifyOperators: (input: unknown) => notify(input as never)
+}));
+vi.mock("@/lib/user-admin-service", () => ({
+    revokeUserSessions: (...args: unknown[]) => revokeSessions(...(args as []))
+}));
 vi.mock("@/lib/pwned-passwords", () => ({ passwordIsBreached: async () => breached }));
 
 const {
@@ -182,7 +217,10 @@ describe("raising a request", () => {
         await raise("ada@example.com", ["blue", "paris", "ada"]);
         expect(rows[0]?.verified).toBe(true);
         expect(notify).toHaveBeenCalledTimes(1);
-        expect(notify.mock.calls[0]?.[0]).toMatchObject({ event: "account.recovery", actionRequired: true });
+        expect(notify.mock.calls[0]?.[0]).toMatchObject({
+            event: "account.recovery",
+            actionRequired: true
+        });
     });
 
     it("still raises the request when nothing could be verified", async () => {
@@ -242,7 +280,9 @@ describe("redeeming a request", () => {
         const { ticket } = await raise("ada@example.com");
         await decideRecoveryRequest("admin-1", rows[0]!.id, true);
         await completeAccountRecovery(ticket, NEW_PASSWORD);
-        expect(await completeAccountRecovery(ticket, "another-unrelated-one")).toHaveProperty("error");
+        expect(await completeAccountRecovery(ticket, "another-unrelated-one")).toHaveProperty(
+            "error"
+        );
         expect(resetPassword).toHaveBeenCalledTimes(1);
     });
 

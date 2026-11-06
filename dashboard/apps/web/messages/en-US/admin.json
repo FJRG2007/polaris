@@ -3540,7 +3540,69 @@
             "unknownGroup": "Unknown group.",
             "unknownPolicy": "Unknown policy.",
             "notCapability": "That is not a capability.",
-            "unknownAccess": "Unknown access."
+            "unknownAccess": "Unknown access.",
+            "confirmFirst": "Confirm it is you first.",
+            "credentialsSelf": "Change your own sign-in from your security page.",
+            "outranked": "This account is above yours.",
+            "tooMany": "Too many attempts. Try again in {minutes} min.",
+            "mailNoChannel": "Account email is not set up on this server.",
+            "mailUnverified": "Their address is not confirmed.",
+            "mailFailed": "The email could not be sent. Try again.",
+            "emailUnchanged": "That is already their address.",
+            "emailTaken": "Another account uses that address."
+        },
+        "nav": {
+            "label": "Account sections",
+            "overview": "Overview",
+            "security": "Sign-in & security",
+            "sessions": "Sessions",
+            "access": "Access",
+            "danger": "Danger zone"
+        },
+        "credentials": {
+            "self": "This is your account. Change your password and address from your security page.",
+            "title": "Password recovery",
+            "hint": "Help {name} back into the account.",
+            "link": {
+                "title": "One-time reset link",
+                "hint": "They open it and set a new password. It works once.",
+                "create": "Create link",
+                "copy": "Copy link",
+                "once": "Shown only now. Expires {time}."
+            },
+            "mail": {
+                "title": "Email a reset link",
+                "hint": "Sent to {email}.",
+                "send": "Send email",
+                "sent": "Reset link sent to {email}.",
+                "noChannel": "Account email is not set up on this server.",
+                "unverified": "Their address is not confirmed, so no link is sent."
+            },
+            "temporary": {
+                "title": "Temporary password",
+                "hint": "Tell them this password. They must change it when they next sign in, and every device is signed out.",
+                "label": "Temporary password",
+                "placeholder": "At least 10 characters",
+                "generate": "Generate password",
+                "copy": "Copy password",
+                "set": "Set password",
+                "done": "{name} must change it at next sign-in."
+            },
+            "email": {
+                "title": "Sign-in email",
+                "hint": "Now {email}.",
+                "label": "New email",
+                "placeholder": "name@example.com",
+                "save": "Change email",
+                "invalid": "Enter a valid email",
+                "verified": "I confirmed this address",
+                "keepOld": "Keep {email} as an extra address",
+                "done": "Email changed. They were told in their notifications."
+            },
+            "stepUp": {
+                "title": "Confirm it is you",
+                "description": "You are about to change how {name} signs in."
+            }
         }
     },
     "usersInvite": {

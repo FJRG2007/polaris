@@ -128,7 +128,10 @@ export async function verifySecret(auth: Auth, hash: string, value: string): Pro
 export async function getUserSecurity(userId: string): Promise<UserSecuritySettings> {
     const [row, bindings] = await Promise.all([
         prisma.userSecurity.findUnique({ where: { userId } }),
-        prisma.userAccessGroup.findMany({ where: { userId, enforced: false }, select: { groupId: true } })
+        prisma.userAccessGroup.findMany({
+            where: { userId, enforced: false },
+            select: { groupId: true }
+        })
     ]);
     const groupIds = bindings.map((binding) => binding.groupId);
     if (!row) return { ...DEFAULTS, groupIds };
@@ -190,7 +193,10 @@ export async function setLoginApprovalRequired(userId: string, required: boolean
  * holding the session could not already do - they are signed in - and the
  * instance's own demand is read separately, so this cannot drop that.
  */
-export async function setConnectionSignInChallenge(userId: string, challenge: boolean): Promise<void> {
+export async function setConnectionSignInChallenge(
+    userId: string,
+    challenge: boolean
+): Promise<void> {
     await upsertSecurity(userId, { challengeConnectionSignIn: challenge });
 }
 
@@ -257,7 +263,9 @@ export async function emailLinkSignInAllowed(email: string): Promise<boolean> {
 /** Read the stored method list, dropping anything this build no longer knows. */
 function parseDeliveryMethods(stored: string): TwoFactorDeliveryMethod[] {
     const known: readonly string[] = TWO_FACTOR_DELIVERY_METHODS;
-    return parseStringList(stored).filter((value): value is TwoFactorDeliveryMethod => known.includes(value));
+    return parseStringList(stored).filter((value): value is TwoFactorDeliveryMethod =>
+        known.includes(value)
+    );
 }
 
 /** An unknown or absent preference falls back to the authenticator, which is the
@@ -409,7 +417,10 @@ export async function setQuickPin(
     if (!(await verifyPassword(auth, userId, currentPassword))) {
         return { error: "Current password is incorrect." };
     }
-    await upsertSecurity(userId, { pinHash: await hashSecret(auth, pin), pinUpdatedAt: new Date() });
+    await upsertSecurity(userId, {
+        pinHash: await hashSecret(auth, pin),
+        pinUpdatedAt: new Date()
+    });
     return {};
 }
 
@@ -432,7 +443,10 @@ export async function clearQuickPin(
  * the caller's responsibility - a 4-digit secret needs it.
  */
 export async function verifyQuickPin(auth: Auth, userId: string, pin: string): Promise<boolean> {
-    const row = await prisma.userSecurity.findUnique({ where: { userId }, select: { pinHash: true } });
+    const row = await prisma.userSecurity.findUnique({
+        where: { userId },
+        select: { pinHash: true }
+    });
     if (!row?.pinHash) return false;
     const ctx = await auth.$context;
     return ctx.password.verify({ hash: row.pinHash, password: pin });
@@ -440,7 +454,11 @@ export async function verifyQuickPin(auth: Auth, userId: string, pin: string): P
 
 /** Whether the account password matches - the fallback unlock and the gate on
  *  every setting below. Exported so the lock screen can offer both factors. */
-export async function verifyAccountPassword(auth: Auth, userId: string, password: string): Promise<boolean> {
+export async function verifyAccountPassword(
+    auth: Auth,
+    userId: string,
+    password: string
+): Promise<boolean> {
     return verifyPassword(auth, userId, password);
 }
 
@@ -455,7 +473,9 @@ function normalizeAnswer(answer: string): string {
 }
 
 /** The questions a user has set, in a stable order. Never returns the answers. */
-export async function listSecurityQuestions(userId: string): Promise<Array<{ id: string; question: string }>> {
+export async function listSecurityQuestions(
+    userId: string
+): Promise<Array<{ id: string; question: string }>> {
     return prisma.securityQuestion.findMany({
         where: { userId },
         orderBy: { createdAt: "asc" },
@@ -534,7 +554,9 @@ export async function verifySecurityAnswers(
  * Write a new password without knowing the old one. The caller MUST have proven
  * identity another way first (recovery questions or a verified authenticator
  * code) - this function performs no check of its own. Every other session is
- * revoked, since a password change is also how a user evicts an intruder.
+ * revoked, since a password change is also how a user evicts an intruder. An
+ * account that signs in only through a provider or a passkey is given a password
+ * sign-in here, so the password written is always one that can be used.
  */
 export async function resetUserPassword(
     auth: Auth,
@@ -547,7 +569,18 @@ export async function resetUserPassword(
     }
     const ctx = await auth.$context;
     const hash = await ctx.password.hash(newPassword);
-    await prisma.account.updateMany({ where: { userId, providerId: "credential" }, data: { password: hash } });
+    const { count } = await prisma.account.updateMany({
+        where: { userId, providerId: "credential" },
+        data: { password: hash }
+    });
+    if (count === 0) {
+        await ctx.internalAdapter.linkAccount({
+            userId,
+            providerId: "credential",
+            accountId: userId,
+            password: hash
+        });
+    }
     return {};
 }
 
@@ -634,7 +667,10 @@ export async function getEnforcedRules(userId: string): Promise<AccessRulesInput
             where: { userId },
             select: { adminCidrs: true, adminCountries: true, adminContinents: true }
         }),
-        prisma.userAccessGroup.findMany({ where: { userId, enforced: true }, select: { groupId: true } })
+        prisma.userAccessGroup.findMany({
+            where: { userId, enforced: true },
+            select: { groupId: true }
+        })
     ]);
     return {
         groupIds: bindings.map((binding) => binding.groupId),

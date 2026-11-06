@@ -220,6 +220,9 @@ model User {
     autoPresence  String   @default("")
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
+    // Set when an administrator hands out a temporary password; the account is
+    // held on the change-password step until it picks its own.
+    passwordChangeRequired Boolean @default(false)
     // When set, the account is banned: sign-in is refused and sessions are void.
     bannedAt      DateTime?
     banReason     String?
