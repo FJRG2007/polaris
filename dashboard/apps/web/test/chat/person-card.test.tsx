@@ -277,8 +277,8 @@ describe("the larger view", () => {
         await user.click(within(card).getByRole("button", { name: "View full profile" }));
         expect(await screen.findByText("Friends since")).toBeDefined();
         expect(screen.getByText("Jun 1, 2024")).toBeDefined();
-        expect(await screen.findByText("Grace Hopper has no activity to share here")).toBeDefined();
-        expect(screen.getAllByRole("button", { name: "Message" }).length).toBeGreaterThan(0);
+        const empty = await screen.findByText("Grace Hopper has no activity to share here");
+        expect(within(empty.parentElement!).getByRole("button", { name: "Message" })).toBeDefined();
     });
 
     it("offers no page for somebody without an address", async () => {
