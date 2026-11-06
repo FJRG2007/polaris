@@ -136,10 +136,10 @@ describe("voice in the composer", () => {
         const attach = screen.getByRole("button", { name: "Attach files" }) as HTMLButtonElement;
         expect(attach.disabled).toBe(false);
         expect(screen.getByRole("button", { name: "Send (Enter)" })).toBeTruthy();
-        // Only a second microphone rests while the call has one.
-        expect(
-            (screen.getByRole("button", { name: "Dictate" }) as HTMLButtonElement).disabled
-        ).toBe(true);
+        // Only a second microphone rests while the call has one, and says why.
+        const resting = screen.getByRole("button", { name: "The call is using the microphone" });
+        expect(resting.getAttribute("aria-disabled")).toBe("true");
+        expect(screen.queryByRole("button", { name: "Dictate" })).toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "End call" }));
         await waitFor(() =>
             expect(screen.queryByRole("region", { name: "Voice mode" })).toBeNull()
