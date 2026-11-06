@@ -28,6 +28,15 @@ export interface VpnNode {
     readonly exit: string;
     /** False while the server has no address a browser can reach it by. */
     readonly browser: boolean;
+    /** Why not, while `browser` is false; null when the host did not say, as one
+     *  older than this reason does. */
+    readonly browserIssue: VpnBrowserIssue | null;
+}
+
+export type VpnBrowserIssue = "edge" | "address" | "failed";
+
+function browserIssueOf(value: unknown): VpnBrowserIssue | null {
+    return value === "edge" || value === "address" || value === "failed" ? value : null;
 }
 
 export interface VpnRoute {
@@ -173,7 +182,8 @@ export function readNodes(value: unknown): VpnNode[] {
                       id: node.id,
                       name: node.name,
                       exit: node.exit === "tor" ? "tor" : "direct",
-                      browser: node.browser === true
+                      browser: node.browser === true,
+                      browserIssue: node.browser === true ? null : browserIssueOf(node.browserIssue)
                   }
               ]
             : []

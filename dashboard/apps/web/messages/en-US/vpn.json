@@ -357,7 +357,17 @@
         "removeKind": "server",
         "removeBody": "Its devices stop working and are removed.",
         "removeAnyway": "Remove anyway",
-        "unreachableBody": "That machine did not answer, so it may keep running the VPN and letting its devices in until it is reinstalled."
+        "unreachableBody": "That machine did not answer, so it may keep running the VPN and letting its devices in until it is reinstalled.",
+        "browser": {
+            "title": "Not for browsers yet",
+            "edge": "This machine has no edge that takes routes from Polaris. Set it up on the machine's page.",
+            "address": "This server has no public address a browser can reach. Give it one in its settings.",
+            "failed": "Polaris could not set this server up for browsers. Try again.",
+            "setUpEdge": "Set up edge",
+            "editAddress": "Change address",
+            "retry": "Try again",
+            "retrying": "Trying..."
+        }
     },
     "people": {
         "title": "People",
@@ -385,5 +395,24 @@
     "mesh": {
         "title": "Private networks",
         "hint": "Optional: lets devices reach each other and a home network. Normal VPN use does not need it."
+    },
+    "place": {
+        "set": "Set where this server is",
+        "unknown": "Place unknown",
+        "unreachable": "The place search did not answer. Try again in a moment.",
+        "title": "Where {name} is",
+        "now": {
+            "auto": "Now at {place}, read from its address.",
+            "manual": "Now at {place}, set by hand.",
+            "none": "Its place is not known yet."
+        },
+        "search": "Town or coordinates",
+        "searchHint": "Barcelona, or 41.38, 2.17",
+        "find": "Find",
+        "finding": "Finding...",
+        "noMatch": "Nothing found with that name.",
+        "mapHint": "Or press a country on the map.",
+        "automatic": "Use its address",
+        "close": "Close"
     }
 }

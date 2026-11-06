@@ -26,6 +26,15 @@ interface WorldMapData {
     }[];
 }
 
+/** A country code in the reader's language, or the code where the browser has no name. */
+export function countryName(code: string, locale: string): string {
+    try {
+        return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
+    } catch {
+        return code;
+    }
+}
+
 export interface MapPlace {
     readonly id: string;
     readonly country: string;
@@ -36,12 +45,15 @@ export function WorldMap({
     places,
     selected,
     active,
-    onSelect
+    onSelect,
+    onPickCountry
 }: {
     places: readonly MapPlace[];
     selected: string | null;
     active: string | null;
     onSelect: (id: string) => void;
+    /** When given, every country can be pressed, to place something there. */
+    onPickCountry?: (code: string) => void;
 }) {
     const [map, setMap] = useState<WorldMapData | null>(null);
 
@@ -75,8 +87,10 @@ export function WorldMap({
                     d={d}
                     className={cn(
                         "stroke-background [stroke-width:0.5]",
-                        byCountry.has(id) ? "fill-primary/30" : "fill-muted"
+                        byCountry.has(id) ? "fill-primary/30" : "fill-muted",
+                        onPickCountry && "cursor-pointer hover:fill-primary/50"
                     )}
+                    onClick={onPickCountry ? () => onPickCountry(id) : undefined}
                 />
             ))}
             {marked.map(({ id, x, y }) => {
@@ -93,11 +107,12 @@ export function WorldMap({
                         aria-label={here.map((place) => place.label).join(", ")}
                         aria-pressed={isSelected}
                         className="cursor-pointer outline-none"
-                        onClick={() => onSelect(first.id)}
+                        onClick={() => (onPickCountry ? onPickCountry(id) : onSelect(first.id))}
                         onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
                             event.preventDefault();
-                            onSelect(first.id);
+                            if (onPickCountry) onPickCountry(id);
+                            else onSelect(first.id);
                         }}
                     >
                         <title>{here.map((place) => place.label).join(", ")}</title>

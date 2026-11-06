@@ -50,6 +50,11 @@ export function VpnRow(): React.JSX.Element | null {
     const { active } = state;
     const label = (node: VpnNode): string =>
         node.exit === "tor" ? t("vpn.throughTor", { name: node.name }) : node.name;
+    /** Why a server cannot be picked, as the host said; the old sentence where it did not. */
+    const notForBrowsers = (node: VpnNode): string =>
+        node.browserIssue
+            ? t(`vpn.browserIssue.${node.browserIssue}`, { name: node.name })
+            : t("vpn.noBrowserRoute");
 
     return (
         <li className="section-row">
@@ -80,15 +85,22 @@ export function VpnRow(): React.JSX.Element | null {
                         <button
                             key={node.id}
                             disabled={busy || !node.browser || node.id === active?.nodeId}
-                            title={node.browser ? undefined : t("vpn.noBrowserRoute")}
+                            title={node.browser ? undefined : notForBrowsers(node)}
                             onClick={() => connect(node.id)}
                         >
                             {label(node)}
                         </button>
                     ))}
-                    {state.nodes.some((node) => !node.browser) ? (
+                    {state.nodes.some((node) => !node.browser && !node.browserIssue) ? (
                         <span className="muted small">{t("vpn.noBrowserRoute")}</span>
                     ) : null}
+                    {state.nodes
+                        .filter((node) => !node.browser && node.browserIssue)
+                        .map((node) => (
+                            <span key={node.id} className="muted small">
+                                {notForBrowsers(node)}
+                            </span>
+                        ))}
                     {error ? (
                         <span role="alert" className="small">
                             {error}

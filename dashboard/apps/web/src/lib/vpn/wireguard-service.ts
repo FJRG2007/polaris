@@ -8,6 +8,9 @@
 import { lookup } from "node:dns/promises";
 import { createHash } from "node:crypto";
 import { resolveGeo } from "@/lib/geo-service";
+import { dymoPlace } from "@/lib/dymo-service";
+import { deployBase } from "@/lib/domain-service";
+import { proxyNameFor } from "./proxy-name";
 import * as wg from "./wireguard";
 import { prisma } from "@polaris/db";
 import { edgeHostnameTaken } from "@/lib/app-edge";
@@ -190,7 +193,7 @@ async function deployNode(node: NodeRow): Promise<NodeRow> {
         data: {
             publicKey,
             ...(proxyKey ? sealedProxyKey(proxyKey) : {}),
-            proxyHost: await publishProxy(connection, node.endpoint)
+            ...(await publishProxy(connection, node.endpoint))
         }
     });
 }
@@ -206,30 +209,83 @@ function sealedProxyKey(key: string) {
 
 /**
  * Hand the edge the proxy's route, or take it back where it cannot be held. A browser
- * only accepts a certificate for a name, so a node reached by bare address has none; a
- * name something else already answers on would lose its site to this route, which
- * outranks it; and a machine with no edge has nothing to carry it. In all three the
- * tunnel still works from the desktop app, and the extension's row says why it cannot
- * be picked.
+ * only accepts a certificate for a name, so a node reached by bare address - or by a
+ * name something else already answers on, which this route would take over - goes by
+ * a free wildcard-DNS name of its public address instead (`proxyNameFor`). A machine
+ * with no edge that takes pushed routes has nothing to carry it. Whatever stops it is
+ * kept as `proxyIssue`, so the screens say which and offer the fix; the tunnel still
+ * works from the desktop app meanwhile.
  */
-async function publishProxy(connection: HostConnection, endpoint: string): Promise<string | null> {
+async function publishProxy(
+    connection: HostConnection,
+    endpoint: string
+): Promise<{ proxyHost: string | null; proxyIssue: proxy.ProxyIssue | null }> {
     try {
-        const usable =
-            !isIP(endpoint) &&
-            !(await edgeHostnameTaken(endpoint)) &&
-            proxy.edgeIsReady(await runAsRoot(connection, proxy.PROXY_EDGE_PROBE));
-        if (usable) {
+        const named = isIP(endpoint) === 0;
+        const taken = named && (await edgeHostnameTaken(endpoint));
+        const address = !named
+            ? endpoint
+            : taken
+              ? await lookup(endpoint).then(
+                    ({ address: found }) => found,
+                    () => null
+                )
+              : null;
+        const hostname = proxyNameFor({ endpoint, address, taken, base: await deployBase() });
+        const issue: proxy.ProxyIssue | null = !hostname
+            ? "address"
+            : !proxy.edgeIsReady(await runAsRoot(connection, proxy.PROXY_EDGE_PROBE))
+              ? "edge"
+              : null;
+        if (hostname && !issue) {
             await runAsRoot(
                 connection,
-                remoteWriteScript(proxy.renderProxyEdge(endpoint), undefined, PROXY_EDGE_FILE)
+                remoteWriteScript(proxy.renderProxyEdge(hostname), undefined, PROXY_EDGE_FILE)
             );
-            return endpoint;
+            return { proxyHost: hostname, proxyIssue: null };
         }
         await runAsRoot(connection, remoteClearScript(PROXY_EDGE_FILE));
+        return { proxyHost: null, proxyIssue: issue };
     } catch (error) {
         console.error("polaris: the VPN proxy route could not be published:", error);
+        return { proxyHost: null, proxyIssue: "failed" };
     }
-    return null;
+}
+
+/** Nodes this process already set up again for browsers, so a machine that keeps
+ *  failing is not reinstalled on every pass. A restart - which every update is -
+ *  tries once more, and the screen's button always does. */
+const repairTried = new Set<string>();
+
+/**
+ * Give a node its browser route where it has none. A node set up before browsers
+ * could connect never got the proxy at all, and nothing set it up again until
+ * somebody edited it: that takes a full set-up, which also installs the proxy. One
+ * that has the proxy only needs its route published again, which is cheap.
+ */
+async function repairBrowserRoute(node: NodeRow, force: boolean): Promise<void> {
+    if (node.proxyHost && !force) return;
+    if (!node.encryptedProxyKey) {
+        if (!force && repairTried.has(node.id)) return;
+        repairTried.add(node.id);
+        await deployNode(node).catch(async (error: unknown) => {
+            await prisma.vpnNode.update({ where: { id: node.id }, data: { proxyIssue: "failed" } });
+            throw error;
+        });
+        return;
+    }
+    const connection = await connectionOf(node.hostId);
+    await prisma.vpnNode.update({
+        where: { id: node.id },
+        data: await publishProxy(connection, node.endpoint)
+    });
+}
+
+/** The screen's "try again": set the node up for browsers now. */
+export async function retryBrowserRoute(nodeId: string): Promise<void> {
+    const node = await nodeRow(nodeId);
+    if (!node) throw new WireGuardRefusal("notFound");
+    await repairBrowserRoute(node, true);
 }
 
 /** A login for the extension. It lasts an hour; the extension asks again before that. */
@@ -270,6 +326,11 @@ export async function listNodes() {
             port: true,
             exit: true,
             publicKey: true,
+            proxyHost: true,
+            proxyIssue: true,
+            country: true,
+            city: true,
+            placedBy: true,
             _count: { select: { peers: true } }
         }
     });
@@ -398,11 +459,24 @@ export async function nodesFor(user: { id: string; isAdmin: boolean }) {
         where: { publicKey: { not: null } },
         orderBy: { name: "asc" },
         take: wg.MAX_NODES,
-        select: { id: true, name: true, exit: true, proxyHost: true, country: true, city: true }
+        select: {
+            id: true,
+            name: true,
+            exit: true,
+            proxyHost: true,
+            proxyIssue: true,
+            country: true,
+            city: true
+        }
     });
     return nodes
         .filter(({ id }) => wg.mayUseNode(access, id))
-        .map(({ proxyHost, ...node }) => ({ ...node, browser: proxyHost !== null }));
+        .map(({ proxyHost, proxyIssue, ...node }) => ({
+            ...node,
+            browser: proxyHost !== null,
+            // Why not, while `browser` is false; null where nobody recorded a reason.
+            browserIssue: proxyHost === null ? proxyIssue : null
+        }));
 }
 
 export async function devicesOf(userId: string) {
@@ -532,20 +606,64 @@ function monthPassed(start: Date, now: Date): boolean {
  * Read every node's counters, add what grew to each person's month, and take out the
  * devices of anybody who ran out. On a schedule: run again it adds nothing new.
  */
+/** Nodes this process already asked Dymo about, so an answer with no place in it
+ *  is not bought again every five minutes. */
+const preciseTried = new Set<string>();
+
 /**
  * Where a server's traffic comes out, for the map. Asked of its own address, so
- * nobody has to say and servers that predate the map fill in by themselves. A
- * Tor exit changes all the time, so it has no place.
+ * nobody has to say and servers that predate the map fill in by themselves: Dymo
+ * when the operator gave it a key, which also says the spot, else the free
+ * providers, which say the country and usually the city. A place somebody set by
+ * hand is never replaced. A Tor exit changes all the time, so it has no place.
  */
 async function placeNode(node: NodeRow): Promise<void> {
-    if (node.country || node.exit === "tor") return;
+    if (node.exit === "tor" || node.placedBy === "manual" || node.placedBy === "dymo") return;
+    if (node.country && preciseTried.has(node.id)) return;
     const ip = isIP(node.endpoint) ? node.endpoint : (await lookup(node.endpoint)).address;
+    if (!preciseTried.has(node.id)) {
+        preciseTried.add(node.id);
+        const precise = await dymoPlace(ip);
+        if (precise) {
+            await prisma.vpnNode.update({
+                where: { id: node.id },
+                data: {
+                    country: precise.countryCode,
+                    city: precise.city,
+                    latitude: precise.latitude,
+                    longitude: precise.longitude,
+                    placedBy: "dymo"
+                }
+            });
+            return;
+        }
+    }
+    if (node.country) return;
     const { countryCode, city } = await resolveGeo(ip);
     if (!countryCode) return;
     await prisma.vpnNode.update({
         where: { id: node.id },
-        data: { country: countryCode, city }
+        data: { country: countryCode, city, latitude: null, longitude: null, placedBy: "ip" }
     });
+}
+
+/** A place set by hand, or null to go back to reading it from the address. */
+export async function placeNodeByHand(nodeId: string, place: wg.NodePlace | null): Promise<void> {
+    const node = await nodeRow(nodeId);
+    if (!node) throw new WireGuardRefusal("notFound");
+    if (place) {
+        await prisma.vpnNode.update({
+            where: { id: nodeId },
+            data: { ...place, placedBy: "manual" }
+        });
+        return;
+    }
+    const cleared = await prisma.vpnNode.update({
+        where: { id: nodeId },
+        data: { country: null, city: null, latitude: null, longitude: null, placedBy: null }
+    });
+    preciseTried.delete(nodeId);
+    await placeNode(cleared).catch(() => undefined);
 }
 
 export async function runVpnPass(): Promise<void> {
@@ -573,6 +691,9 @@ export async function runVpnPass(): Promise<void> {
         } catch (error) {
             console.error("polaris: a VPN node could not be read:", error);
         }
+        await repairBrowserRoute(node, false).catch((error: unknown) =>
+            console.error("polaris: a VPN node could not be set up for browsers:", error)
+        );
     }
     void refreshOnStandingChange().catch((error: unknown) =>
         console.error("polaris: the VPN's access was not brought up to date:", error)

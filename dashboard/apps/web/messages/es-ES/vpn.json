@@ -357,7 +357,17 @@
         "removeKind": "servidor",
         "removeBody": "Sus dispositivos dejan de funcionar y se eliminan.",
         "removeAnyway": "Quitar igualmente",
-        "unreachableBody": "Esa máquina no responde, así que puede seguir con la VPN y dejando entrar a sus dispositivos hasta reinstalarla."
+        "unreachableBody": "Esa máquina no responde, así que puede seguir con la VPN y dejando entrar a sus dispositivos hasta reinstalarla.",
+        "browser": {
+            "title": "Sin navegadores aún",
+            "edge": "Esta máquina no tiene un borde que acepte rutas de Polaris. Configúralo en su página.",
+            "address": "Este servidor no tiene dirección pública que un navegador alcance. Dale una en sus ajustes.",
+            "failed": "Polaris no pudo preparar este servidor para navegadores. Reinténtalo.",
+            "setUpEdge": "Crear borde",
+            "editAddress": "Cambiar dirección",
+            "retry": "Reintentar",
+            "retrying": "Probando..."
+        }
     },
     "people": {
         "title": "Personas",
@@ -385,5 +395,24 @@
     "mesh": {
         "title": "Redes privadas",
         "hint": "Opcional: permite que los dispositivos se vean entre sí y lleguen a una red de casa. Para el uso normal no hace falta."
+    },
+    "place": {
+        "set": "Indicar dónde está",
+        "unknown": "Lugar desconocido",
+        "unreachable": "La búsqueda de lugares no respondió. Reinténtalo en un momento.",
+        "title": "Dónde está {name}",
+        "now": {
+            "auto": "Ahora en {place}, según su dirección.",
+            "manual": "Ahora en {place}, puesto a mano.",
+            "none": "Aún no se sabe su lugar."
+        },
+        "search": "Ciudad o coordenadas",
+        "searchHint": "Barcelona, o 41.38, 2.17",
+        "find": "Buscar",
+        "finding": "Buscando...",
+        "noMatch": "Nada con ese nombre.",
+        "mapHint": "O pulsa un país en el mapa.",
+        "automatic": "Usar su dirección",
+        "close": "Cerrar"
     }
 }

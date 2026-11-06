@@ -113,6 +113,46 @@ export function verifyIp(
     return whileServing(PROVIDER, NAME, () => askIp(apiKey, ip, deny));
 }
 
+/** Where an address is, out of the same verdict call: only the fields read, each
+ *  optional, so an answer without them is a place nobody knows rather than an error. */
+const IP_PLACE = z.object({
+    response: z
+        .object({
+            countryCode: z.string().optional(),
+            city: z.string().optional(),
+            lat: z.number().finite().min(-90).max(90).optional(),
+            lon: z.number().finite().min(-180).max(180).optional()
+        })
+        .optional()
+});
+
+export interface IpPlace {
+    readonly countryCode: string;
+    readonly city: string | null;
+    readonly latitude: number | null;
+    readonly longitude: number | null;
+}
+
+/** Where an IP is, as precisely as the service says; null when it names no country. */
+export function locateIp(apiKey: string, ip: string): Promise<IpPlace | null> {
+    return whileServing(PROVIDER, NAME, async () => {
+        const answer = IP_PLACE.parse(
+            await clientFor(apiKey).isValidIP(ip, { deny: ["FRAUD"] as NegativeIPRules[] })
+        );
+        const place = answer.response;
+        const countryCode = place?.countryCode?.trim().toUpperCase() ?? "";
+        if (!/^[A-Z]{2}$/.test(countryCode)) return null;
+        const city = place?.city?.trim().slice(0, 80) || null;
+        const known = place?.lat !== undefined && place.lon !== undefined;
+        return {
+            countryCode,
+            city,
+            latitude: known ? (place?.lat ?? null) : null,
+            longitude: known ? (place?.lon ?? null) : null
+        };
+    });
+}
+
 /** Try a key that may be new, so it ignores any pause; a bad key throws. */
 export async function testKey(apiKey: string): Promise<void> {
     await askIp(apiKey, "8.8.8.8", ["FRAUD"]);

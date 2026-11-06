@@ -8,7 +8,8 @@ import { serverOptionsWhere } from "@/lib/server-options";
 import { prisma } from "@polaris/db";
 import * as wg from "@/lib/vpn/wireguard";
 import { recordAudit } from "@/lib/audit-service";
-import { getTranslations } from "@/lib/i18n/request";
+import * as places from "@/lib/vpn/place-search";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
 import * as service from "@/lib/vpn/wireguard-service";
 import { profilesOf } from "@/lib/vpn/profile-service";
 import { requireAdmin, requireUser } from "@/lib/session";
@@ -187,6 +188,60 @@ export async function removeVpnNodeAction(
         const cut = error instanceof service.WireGuardRefusal && error.code === "unreachable";
         return cut ? { ...answer, unreachable: true } : answer;
     }
+}
+
+const nodeIdSchema = z.object({ id: z.string().uuid() });
+
+/** Set a server up for browsers again: the button beside the reason it cannot. */
+export async function retryVpnBrowserAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = nodeIdSchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    if (!(await service.ownsNode(parsed.data.id, user.id)))
+        return failed(new service.WireGuardRefusal("notFound"));
+    return audited(user.id, "vpn.node.browser", parsed.data.id, () =>
+        service.retryBrowserRoute(parsed.data.id)
+    );
+}
+
+const placeQuerySchema = z.union([
+    z.object({ query: z.string().trim().min(2).max(80) }),
+    z.object({
+        latitude: z.number().finite().min(-90).max(90),
+        longitude: z.number().finite().min(-180).max(180)
+    })
+]);
+
+/** Towns by name, or what is at a pair of coordinates, for placing a server by hand. */
+export async function findVpnPlaceAction(
+    input: unknown
+): Promise<Result<{ matches: places.PlaceMatch[] }>> {
+    await requireAdmin();
+    const parsed = placeQuerySchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    const t = await getTranslations("vpn");
+    const language = (await getLocale()).slice(0, 2);
+    if ("query" in parsed.data) {
+        const matches = await places.searchPlaces(parsed.data.query, language);
+        return matches ? { matches } : { error: t("place.unreachable") };
+    }
+    const { latitude, longitude } = parsed.data;
+    const found = await places.placeOfPoint(latitude, longitude, language);
+    if (found === undefined) return { error: t("place.unreachable") };
+    return { matches: found ? [found] : [] };
+}
+
+const placeChangeSchema = z.object({ id: z.string().uuid(), place: wg.nodePlaceSchema.nullable() });
+
+/** Put a server where somebody said it is, or back to where its address says. */
+export async function placeVpnNodeAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = placeChangeSchema.safeParse(input);
+    if (!parsed.success) return failed(parsed.error);
+    const { id, place } = parsed.data;
+    if (!(await service.ownsNode(id, user.id)))
+        return failed(new service.WireGuardRefusal("notFound"));
+    return audited(user.id, "vpn.node.place", id, () => service.placeNodeByHand(id, place));
 }
 
 export async function setVpnOpenAccessAction(input: unknown): Promise<Result> {

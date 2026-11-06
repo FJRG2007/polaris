@@ -129,8 +129,21 @@ describe("readNodes", () => {
             readNodes({
                 nodes: [{ id: "a", name: "A", exit: "x", browser: true }, { id: 1 }, null]
             })
-        ).toEqual([{ id: "a", name: "A", exit: "direct", browser: true }]);
+        ).toEqual([{ id: "a", name: "A", exit: "direct", browser: true, browserIssue: null }]);
         expect(readNodes(null)).toEqual([]);
+    });
+
+    it("keeps why a server is not for browsers, and nothing it does not know", () => {
+        expect(
+            readNodes({
+                nodes: [
+                    { id: "a", name: "A", browser: false, browserIssue: "edge" },
+                    { id: "b", name: "B", browser: false, browserIssue: "other" },
+                    { id: "c", name: "C", browser: false },
+                    { id: "d", name: "D", browser: true, browserIssue: "address" }
+                ]
+            }).map((node) => node.browserIssue)
+        ).toEqual(["edge", null, null, null]);
     });
 });
 
