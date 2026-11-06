@@ -36,6 +36,7 @@ import type {
     LegacyRunRow,
     GameSanction,
     GameServerSummary,
+    PlayedRecently,
     PlayingNow,
     RelayedChannelMessage,
     RelayedChatMessage,
@@ -55,6 +56,7 @@ export type {
     ExtensionInstall,
     GameSanction,
     GameServerSummary,
+    PlayedRecently,
     PlayingNow,
     RelayedChannelMessage,
     RelayedChatMessage,
@@ -491,6 +493,28 @@ export async function playingNowFor(userIds: readonly string[]): Promise<Map<str
         }
     }
     return found;
+}
+
+/**
+ * The servers an installed app runs that one account played on lately, newest
+ * first. One app failing is that app saying nothing, as with `playingNowFor`.
+ */
+export async function playedRecentlyFor(
+    userId: string,
+    since: Date,
+    limit: number
+): Promise<PlayedRecently[]> {
+    const found: PlayedRecently[] = [];
+    for (const extension of await installedWith("playedRecently")) {
+        const played = await extension.playedRecently!(userId, since, limit).catch(
+            (caught: unknown) => {
+                console.error(`polaris: ${extension.id} could not say who played lately:`, caught);
+                return [];
+            }
+        );
+        found.push(...played);
+    }
+    return found.sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime()).slice(0, limit);
 }
 
 /** The installed apps that have a say about this hook. */

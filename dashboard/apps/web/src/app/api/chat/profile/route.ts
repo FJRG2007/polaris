@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 export const GET = pollRoute(
     z.object({
         channelId: z.string().trim().min(1).max(200),
-        userId: z.string().trim().min(1).max(200)
+        userId: z.string().trim().min(1).max(200),
+        // The larger view also asks what they did lately.
+        recent: z.enum(["1"]).optional()
     }),
-    ({ channelId, userId }) => profileAction(channelId, userId)
+    ({ channelId, userId, recent }) => profileAction(channelId, userId, recent === "1")
 );

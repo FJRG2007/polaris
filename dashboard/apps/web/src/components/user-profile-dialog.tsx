@@ -26,6 +26,7 @@ import {
     type UserProfile
 } from "@/app/(app)/drive/activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { BadgeStrip } from "@/components/badges/badges-dialog";
 import * as polls from "./shared-polls";
 
 export function UserProfileDialog({
@@ -126,6 +127,7 @@ export function UserProfileDialog({
                                         <Badge variant="danger">{t("userProfile.banned")}</Badge>
                                     ) : null}
                                 </p>
+                                <BadgeStrip badges={profile.badges} className="mt-1" />
                                 {profile.email ? (
                                     <p className="truncate text-sm text-muted-foreground">
                                         {profile.email}

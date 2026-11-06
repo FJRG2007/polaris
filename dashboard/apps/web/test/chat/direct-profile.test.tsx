@@ -46,7 +46,8 @@ vi.mock("@/app/(app)/chat/actions", () => ({
             name: "Grace Hopper",
             fullName: "Grace Hopper",
             username: "grace",
-            description: "Compilers."
+            description: "Compilers.",
+            badges: []
         }
     }),
     openDirectAction: async () => ({ id: "d1" }),

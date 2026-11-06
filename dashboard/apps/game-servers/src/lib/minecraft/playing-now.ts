@@ -39,7 +39,19 @@ export interface MinecraftVisit {
     readonly imageUrl: string;
 }
 
-export async function playingMinecraftNow(userIds: readonly string[]): Promise<MinecraftVisit[]> {
+/** A player-to-account link this rule lets speak for the account, with its server. */
+interface AgreedLink {
+    readonly userId: string;
+    readonly player: string;
+    readonly install: { id: string; ownerId: string; catalogId: string; name: string };
+}
+
+/**
+ * The links of these accounts to players on a Minecraft server here that the
+ * account agrees with - see the top of this file. Shared by "playing now" and
+ * "played lately", so the two can never disagree about who somebody is.
+ */
+async function agreedMinecraftLinks(userIds: readonly string[]): Promise<AgreedLink[]> {
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return [];
     const links = await prisma.gamePlayerLink.findMany({
@@ -65,16 +77,23 @@ export async function playingMinecraftNow(userIds: readonly string[]): Promise<M
     );
     if (minecraft.size === 0) return [];
 
-    const agreed = links.filter((link) => {
+    const agreed: AgreedLink[] = [];
+    for (const link of links) {
         const install = minecraft.get(link.installedAppId);
-        if (!install) return false;
-        return accountAgrees(link, { ownerId: install.ownerId, minecraft: true }, ownNames);
-    });
+        if (!install) continue;
+        if (!accountAgrees(link, { ownerId: install.ownerId, minecraft: true }, ownNames)) continue;
+        agreed.push({ userId: link.userId, player: link.player, install });
+    }
+    return agreed;
+}
+
+export async function playingMinecraftNow(userIds: readonly string[]): Promise<MinecraftVisit[]> {
+    const agreed = await agreedMinecraftLinks(userIds);
     if (agreed.length === 0) return [];
 
     const open = await prisma.gamePlayerSession.findMany({
         where: {
-            installedAppId: { in: [...new Set(agreed.map((link) => link.installedAppId))] },
+            installedAppId: { in: [...new Set(agreed.map((link) => link.install.id))] },
             leftAt: null
         },
         select: { installedAppId: true, name: true, joinedAt: true },
@@ -86,11 +105,11 @@ export async function playingMinecraftNow(userIds: readonly string[]): Promise<M
     for (const link of agreed) {
         const visit = open.find(
             (row) =>
-                row.installedAppId === link.installedAppId &&
+                row.installedAppId === link.install.id &&
                 row.name.toLowerCase() === link.player.toLowerCase()
         );
         if (!visit) continue;
-        const install = minecraft.get(link.installedAppId)!;
+        const install = link.install;
         visits.push({
             userId: link.userId,
             game: gameOfServer(install.catalogId)?.name ?? "Minecraft",
@@ -100,6 +119,67 @@ export async function playingMinecraftNow(userIds: readonly string[]): Promise<M
             gameId: gameOfServer(install.catalogId)?.id ?? "minecraft",
             imageUrl: `/api/apps/installed/${install.id}/minecraft/card-icon`
         });
+    }
+    return visits;
+}
+
+/** The most ended visits read to find the servers somebody played on lately:
+ *  enough to cover several servers when one of them holds most of the visits. */
+const MOST_ENDED_VISITS = 100;
+
+/** One server somebody played on lately, as "Recent activity" draws it. */
+export interface MinecraftPastVisit {
+    readonly game: string;
+    readonly server: string;
+    readonly endedAt: Date;
+    readonly installedAppId: string;
+    readonly gameId: string;
+    readonly imageUrl: string;
+}
+
+/**
+ * The Minecraft servers here one account played on since `since`, newest
+ * first, one entry per server: the last visit to each that has ended. Only the
+ * links the account agrees with count, as for "playing now", and the read is
+ * one indexed query bounded by `MOST_ENDED_VISITS`.
+ */
+export async function playedMinecraftRecently(
+    userId: string,
+    since: Date,
+    limit: number
+): Promise<MinecraftPastVisit[]> {
+    if (limit <= 0) return [];
+    const agreed = await agreedMinecraftLinks([userId]);
+    if (agreed.length === 0) return [];
+    const ended = await prisma.gamePlayerSession.findMany({
+        where: {
+            OR: agreed.map((link) => ({
+                installedAppId: link.install.id,
+                name: { equals: link.player, mode: "insensitive" as const }
+            })),
+            leftAt: { gte: since }
+        },
+        select: { installedAppId: true, leftAt: true },
+        orderBy: { leftAt: "desc" },
+        take: MOST_ENDED_VISITS
+    });
+    const installs = new Map(agreed.map((link) => [link.install.id, link.install]));
+    const visits: MinecraftPastVisit[] = [];
+    const seen = new Set<string>();
+    for (const row of ended) {
+        if (!row.leftAt || seen.has(row.installedAppId)) continue;
+        const install = installs.get(row.installedAppId);
+        if (!install) continue;
+        seen.add(row.installedAppId);
+        visits.push({
+            game: gameOfServer(install.catalogId)?.name ?? "Minecraft",
+            server: install.name,
+            endedAt: row.leftAt,
+            installedAppId: install.id,
+            gameId: gameOfServer(install.catalogId)?.id ?? "minecraft",
+            imageUrl: `/api/apps/installed/${install.id}/minecraft/card-icon`
+        });
+        if (visits.length >= limit) break;
     }
     return visits;
 }

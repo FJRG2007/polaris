@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { banUser, unbanUser } from "@/lib/user-admin-service";
+import { badgesBesideName, type BadgeView } from "@/lib/badges/badge-service";
 
 export interface UserProfile {
     id: string;
@@ -25,6 +26,8 @@ export interface UserProfile {
     banned: boolean;
     /** Only populated for admin viewers. */
     banReason: string | null;
+    /** The badges beside their name that this viewer may see. */
+    badges: BadgeView[];
     /** True when the profile is the viewer's own account. */
     self: boolean;
     /** Whether the viewer may ban/unban. */
@@ -49,6 +52,7 @@ export async function getUserProfileAction(
     if (!user) return { error: (await getTranslations("drive"))("errors.userNotFound") };
     const admin = viewer.isAdmin;
     const self = user.id === viewer.id;
+    const badges = await badgesBesideName(user.id, { id: viewer.id, isAdmin: viewer.isAdmin });
     return {
         profile: {
             id: user.id,
@@ -57,6 +61,7 @@ export async function getUserProfileAction(
             isAdmin: admin || self ? user.isAdmin : false,
             banned: admin ? user.bannedAt !== null : false,
             banReason: admin ? user.banReason : null,
+            badges,
             self,
             viewerIsAdmin: admin
         }

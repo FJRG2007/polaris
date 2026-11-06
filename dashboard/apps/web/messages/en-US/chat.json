@@ -1675,6 +1675,14 @@
         "mutualServers": "{count, plural, one {# space in common} other {# spaces in common}}",
         "andMore": "and {count} more"
     },
+    "profilePane": {
+        "activity": "Activity",
+        "sections": "Profile sections",
+        "current": "Now",
+        "recent": "Recent activity",
+        "emptyTitle": "Nothing to show",
+        "emptyHint": "Games they play here show up when they share them with you."
+    },
     "notifyMenu": {
         "notifications": "Notifications",
         "levels": {

@@ -30,10 +30,10 @@ import { ProfileLink } from "@/components/profile-link";
 import { useRouter } from "next/navigation";
 import { useChat } from "./chat-context";
 import type { ChatProfile } from "@/lib/chat/profiles";
-import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import { ProfileBanner } from "@/components/profile-banner";
+import { BadgeStrip } from "@/components/badges/badges-dialog";
 import * as polls from "./chat-reads";
 
 /** Somebody, as far as the screen already knows them. */
@@ -51,7 +51,9 @@ export interface ProfilePerson {
  */
 export function useChatProfile(
     channelId: string,
-    userId: string | null
+    userId: string | null,
+    /** Also what they did lately - only the larger view has a place for it. */
+    recent = false
 ): { profile: ChatProfile | null; loading: boolean } {
     const [profile, setProfile] = useState<ChatProfile | null>(null);
     const [loading, setLoading] = useState(false);
@@ -65,7 +67,7 @@ export function useChatProfile(
         setLoading(true);
         setProfile(null);
         void polls
-            .chatProfile(channelId, userId)
+            .chatProfile(channelId, userId, undefined, { recent })
             .then((result) => {
                 if (live) setProfile(result.profile ?? null);
             })
@@ -76,7 +78,7 @@ export function useChatProfile(
         return () => {
             live = false;
         };
-    }, [channelId, userId]);
+    }, [channelId, userId, recent]);
 
     return { profile, loading };
 }
@@ -189,19 +191,28 @@ export function ProfileDetails({
                     </p>
                     {loading && !profile ? (
                         <Skeleton className="h-3 w-24" />
-                    ) : (
-                        profile?.username && (
-                            // The handle is the address of their own page, so it
-                            // is the way to it.
-                            <Link
-                                href={`/u/${profile.username}`}
-                                className="flex items-center gap-0.5 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
-                            >
-                                <AtSign className="size-3 shrink-0" />
-                                {profile.username}
-                            </Link>
-                        )
-                    )}
+                    ) : profile?.username || profile?.badges.length ? (
+                        // The handle, and the badges in a row beside it - the
+                        // same strip the profile page draws.
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                            {profile.username ? (
+                                // The handle is the address of their own page,
+                                // so it is the way to it.
+                                <Link
+                                    href={`/u/${profile.username}`}
+                                    title={profile.username}
+                                    className="flex min-w-0 items-center gap-0.5 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                >
+                                    <AtSign className="size-3 shrink-0" />
+                                    <span className="min-w-0 truncate">{profile.username}</span>
+                                </Link>
+                            ) : null}
+                            <BadgeStrip
+                                badges={profile.badges}
+                                className="rounded-md bg-muted/40 px-0.5"
+                            />
+                        </div>
+                    ) : null}
                     {/* Their name, when it is not already what they are called
                         here and they allow this reader to see it. */}
                     {profile?.fullName && profile.fullName !== name && (
@@ -238,7 +249,9 @@ export function ProfileDetails({
                 {/* What they are playing or listening to, when they share it
                     with this reader - under what they said, which is theirs and
                     wins the top spot. */}
-                <ActivityCards personId={person.id} />
+                {/* The larger view has a pane of its own for this, beside the
+                    profile rather than under it - see ProfileActivityPane. */}
+                {full ? null : <ActivityCards personId={person.id} />}
 
                 {/* What the two of them have in common, from the same module the
                     profile page draws it from. Not on the card: a glance is the
@@ -246,15 +259,6 @@ export function ProfileDetails({
                     profile somebody reads when they have sat down with it. */}
                 {panel && profile?.mutual && !profile.restricted ? (
                     <MutualSections mutual={profile.mutual} />
-                ) : null}
-                {full && profile?.mutual && !profile.restricted ? (
-                    <div className="w-full text-left">
-                        <MutualPanel
-                            compact={!full}
-                            friends={profile.mutual.friends}
-                            spaces={profile.mutual.spaces}
-                        />
-                    </div>
                 ) : null}
 
                 {profile?.description && (
@@ -379,9 +383,57 @@ type Shared = ChatProfile["mutual"];
  */
 export function MutualSections({ mutual }: { mutual: Shared }) {
     const t = useTranslations("chat");
+    if (mutual.friends.total === 0 && mutual.spaces.total === 0) return null;
+
+    return (
+        <div className="flex w-full flex-col gap-1 border-t border-border pt-3">
+            {mutual.friends.total > 0 ? (
+                <Section
+                    label={t("profileDetails.mutualFriends", { count: mutual.friends.total })}
+                    more={mutual.friends.total - mutual.friends.people.length}
+                >
+                    <FriendRows people={mutual.friends.people} />
+                </Section>
+            ) : null}
+            {mutual.spaces.total > 0 ? (
+                <Section
+                    label={t("profileDetails.mutualServers", { count: mutual.spaces.total })}
+                    more={mutual.spaces.total - mutual.spaces.spaces.length}
+                >
+                    <SpaceRows spaces={mutual.spaces.spaces} />
+                </Section>
+            ) : null}
+        </div>
+    );
+}
+
+/** The friends you have in common, each the way to their page. Items of a list
+ *  the caller draws. */
+export function FriendRows({ people }: { people: Shared["friends"]["people"] }) {
+    return (
+        <>
+            {people.map((person) => (
+                <li key={person.id}>
+                    <ProfileLink
+                        href={`/u/${person.username}`}
+                        className="flex min-w-0 items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors hover:bg-muted"
+                    >
+                        <Avatar person={person} size={20} />
+                        <span className="min-w-0 flex-1 truncate" title={person.name}>
+                            <PersonName id={person.id} name={person.name} />
+                        </span>
+                    </ProfileLink>
+                </li>
+            ))}
+        </>
+    );
+}
+
+/** The spaces you are both in, each opening in the chat. Items of a list the
+ *  caller draws. */
+export function SpaceRows({ spaces }: { spaces: Shared["spaces"]["spaces"] }) {
     const router = useRouter();
     const { channels, setActiveSpaceId } = useChat();
-    if (mutual.friends.total === 0 && mutual.spaces.total === 0) return null;
 
     /** A space opens where its first channel is, the way picking it on the
      *  rail does. */
@@ -395,53 +447,26 @@ export function MutualSections({ mutual }: { mutual: Shared }) {
     };
 
     return (
-        <div className="flex w-full flex-col gap-1 border-t border-border pt-3">
-            {mutual.friends.total > 0 ? (
-                <Section
-                    label={t("profileDetails.mutualFriends", { count: mutual.friends.total })}
-                    more={mutual.friends.total - mutual.friends.people.length}
-                >
-                    {mutual.friends.people.map((person) => (
-                        <li key={person.id}>
-                            <ProfileLink
-                                href={`/u/${person.username}`}
-                                className="flex min-w-0 items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors hover:bg-muted"
-                            >
-                                <Avatar person={person} size={20} />
-                                <span className="min-w-0 flex-1 truncate" title={person.name}>
-                                    <PersonName id={person.id} name={person.name} />
-                                </span>
-                            </ProfileLink>
-                        </li>
-                    ))}
-                </Section>
-            ) : null}
-            {mutual.spaces.total > 0 ? (
-                <Section
-                    label={t("profileDetails.mutualServers", { count: mutual.spaces.total })}
-                    more={mutual.spaces.total - mutual.spaces.spaces.length}
-                >
-                    {mutual.spaces.spaces.map((space) => (
-                        <li key={space.id}>
-                            <button
-                                type="button"
-                                onClick={() => openSpace(space.id)}
-                                className="flex w-full min-w-0 items-center gap-2 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-muted"
-                            >
-                                <span
-                                    aria-hidden
-                                    className="size-2 shrink-0 rounded-full"
-                                    style={{ background: space.color }}
-                                />
-                                <span className="min-w-0 flex-1 truncate" title={space.name}>
-                                    {space.name}
-                                </span>
-                            </button>
-                        </li>
-                    ))}
-                </Section>
-            ) : null}
-        </div>
+        <>
+            {spaces.map((space) => (
+                <li key={space.id}>
+                    <button
+                        type="button"
+                        onClick={() => openSpace(space.id)}
+                        className="flex w-full min-w-0 items-center gap-2 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-muted"
+                    >
+                        <span
+                            aria-hidden
+                            className="size-2 shrink-0 rounded-full"
+                            style={{ background: space.color }}
+                        />
+                        <span className="min-w-0 flex-1 truncate" title={space.name}>
+                            {space.name}
+                        </span>
+                    </button>
+                </li>
+            ))}
+        </>
     );
 }
 

@@ -34,6 +34,7 @@ import { MemberMenu, type MenuPerson } from "./member-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { PersonPressContext, type PersonPress } from "@/components/person-press";
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { ProfileActivityPane } from "./profile-activity-pane";
 import { ProfileDetails, useChatProfile, type ProfilePerson } from "./profile-details";
 import { Button, Dialog, DialogContent, DialogFloating, DialogTitle } from "@polaris/ui";
 import { ArrowUpRight, MessageSquare, MoreHorizontal, Pencil } from "lucide-react";
@@ -345,8 +346,10 @@ function PersonCard({
 }
 
 /**
- * The same profile with room: everything the card had, what the two of you
- * have in common, the whole of what they wrote, and the way to their own page.
+ * The same profile with room: everything the card had, the whole of what they
+ * wrote and the way to their own page on the left; on the right, what they are
+ * doing and did lately and what the two of you have in common. Side by side
+ * where there is room, one under the other on a phone.
  */
 export function PersonProfileDialog({
     person,
@@ -366,41 +369,49 @@ export function PersonProfileDialog({
     const t = useTranslations("chat");
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
-    const { profile, loading } = useChatProfile(channelId, person.id);
+    const { profile, loading } = useChatProfile(channelId, person.id, true);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent aria-describedby={undefined} className="max-w-md overflow-x-hidden p-0">
+            <DialogContent
+                aria-describedby={undefined}
+                className="max-h-[90dvh] w-[min(52rem,95vw)] max-w-[min(52rem,95vw)] overflow-y-auto overflow-x-hidden overscroll-contain p-0 md:grid md:grid-cols-[22rem_minmax(0,1fr)] md:overflow-hidden"
+            >
                 <DialogTitle className="sr-only">{profile?.name || person.name}</DialogTitle>
-                <ProfileDetails
-                    size="full"
-                    person={person}
-                    profile={profile}
-                    loading={loading}
-                    role={roleWords(profile?.role, channel)}
-                    actions={
-                        <PersonActions
-                            person={person}
-                            channel={channel}
-                            viewerId={viewerId}
-                            onMention={onMention}
-                            onNickname={onNickname}
-                            onDone={onClose}
-                            extra={
-                                // Only for somebody who has an address to go to:
-                                // an account with no handle has no page.
-                                profile?.username ? (
-                                    <Button asChild size="sm" variant="secondary">
-                                        <Link href={`/u/${profile.username}`} onClick={onClose}>
-                                            <ArrowUpRight className="size-4" />
-                                            {t("personCard.openProfilePage")}
-                                        </Link>
-                                    </Button>
-                                ) : null
-                            }
-                        />
-                    }
-                />
+                <div className="min-w-0 md:overflow-y-auto md:overscroll-contain">
+                    <ProfileDetails
+                        size="full"
+                        person={person}
+                        profile={profile}
+                        loading={loading}
+                        role={roleWords(profile?.role, channel)}
+                        actions={
+                            <PersonActions
+                                person={person}
+                                channel={channel}
+                                viewerId={viewerId}
+                                onMention={onMention}
+                                onNickname={onNickname}
+                                onDone={onClose}
+                                extra={
+                                    // Only for somebody who has an address to go to:
+                                    // an account with no handle has no page.
+                                    profile?.username ? (
+                                        <Button asChild size="sm" variant="secondary">
+                                            <Link href={`/u/${profile.username}`} onClick={onClose}>
+                                                <ArrowUpRight className="size-4" />
+                                                {t("personCard.openProfilePage")}
+                                            </Link>
+                                        </Button>
+                                    ) : null
+                                }
+                            />
+                        }
+                    />
+                </div>
+                <div className="min-w-0 border-t border-border p-5 md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0 md:pr-14">
+                    <ProfileActivityPane personId={person.id} profile={profile} loading={loading} />
+                </div>
             </DialogContent>
         </Dialog>
     );

@@ -132,6 +132,10 @@ export const gameServersExtension: AppExtension = {
     playingNow: async (userIds) =>
         (await import("./minecraft/playing-now")).playingMinecraftNow(userIds),
 
+    // "Recent activity" on a profile, from the same visits and the same rule.
+    playedRecently: async (userId, since, limit) =>
+        (await import("./minecraft/playing-now")).playedMinecraftRecently(userId, since, limit),
+
     // The chat a Minecraft server is linked to: the badge on it, the commands
     // answered in it, and its messages shown to everybody playing.
     chatGameLinks: async (channelIds) =>

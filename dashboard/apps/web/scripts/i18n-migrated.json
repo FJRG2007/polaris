@@ -937,6 +937,7 @@
         "web/src/app/(app)/chat/picture-dialog.tsx",
         "web/src/app/(app)/chat/poll-card.tsx",
         "web/src/app/(app)/chat/poll-dialog.tsx",
+        "web/src/app/(app)/chat/profile-activity-pane.tsx",
         "web/src/app/(app)/chat/profile-details.tsx",
         "web/src/app/(app)/chat/quiet-mic-notice.tsx",
         "web/src/app/(app)/chat/recording-panel.tsx",

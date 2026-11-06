@@ -59,11 +59,37 @@ let blocked = new Set<string>();
 let namesOpen = new Set<string>();
 /** Whether the reader and grace are friends already. */
 let friendsWithGrace = false;
+/** Whose profile audience leaves the reader out. Nobody's by default. */
+let profileClosed = new Set<string>();
+/** Who asked about whose badges, so a refusal can be shown never to ask. */
+let badgeReads: string[] = [];
+/** Who asked about whose recent activity and whose things in common. */
+let recentReads: string[] = [];
+let mutualReads: string[] = [];
 
 vi.mock("@/lib/privacy-service", () => ({
     // The profile itself is open, as it is for every account that never chose.
     maySee: async (subjectId: string, field: string) =>
-        field === "profile" || namesOpen.has(subjectId)
+        (field === "profile" && !profileClosed.has(subjectId)) || namesOpen.has(subjectId)
+}));
+
+// The badges a viewer may see are the badge service's to decide (its own
+// audience, each badge's rule, the hidden ones); the profile only carries them.
+vi.mock("@/lib/badges/badge-service", () => ({
+    badgesBesideName: async (subjectId: string) => {
+        badgeReads.push(subjectId);
+        return subjectId === "grace" ? [{ key: "calls", icon: "calls", kind: "ladder" }] : [];
+    }
+}));
+
+// What they did lately is its own module and its own test (the activity
+// audience, the sharing switches, invisible); here it only has to be asked for
+// the larger view, and never for a reader outside the profile audience.
+vi.mock("@/lib/presence-activity/recent", () => ({
+    recentActivityFor: async (_viewer: { id: string }, personId: string) => {
+        recentReads.push(personId);
+        return [{ source: "minecraft", key: "server:mc1", name: "Minecraft" }];
+    }
 }));
 
 vi.mock("@/lib/blocks", () => ({
@@ -78,10 +104,10 @@ vi.mock("@/lib/blocks", () => ({
 // is stubbed empty, so what this file asserts stays "who may be shown to whom"
 // rather than quietly also testing the intersection.
 vi.mock("@/lib/mutuals", () => ({
-    mutualsBetween: async () => ({
-        friends: { people: [], total: 0 },
-        spaces: { spaces: [], total: 0 }
-    })
+    mutualsBetween: async (_viewerId: string, subjectId: string) => {
+        mutualReads.push(subjectId);
+        return { friends: { people: [], total: 0 }, spaces: { spaces: [], total: 0 } };
+    }
 }));
 
 vi.mock("@/lib/chat/access", () => ({
@@ -136,6 +162,58 @@ beforeEach(() => {
     spaceOwner = "grace";
     spaceAdmins = new Set();
     friendsWithGrace = false;
+    profileClosed = new Set();
+    badgeReads = [];
+    recentReads = [];
+    mutualReads = [];
+});
+
+describe("recent activity and things in common", () => {
+    it("are read for the larger view only, and null where nobody asked", async () => {
+        expect((await chatProfile({ id: "ada" }, "d1", "grace"))?.recent).toBeNull();
+        expect(recentReads).toEqual([]);
+
+        const full = await chatProfile({ id: "ada" }, "d1", "grace", { recent: true });
+        expect(full?.recent?.map((entry) => entry.key)).toEqual(["server:mc1"]);
+        expect(recentReads).toEqual(["grace"]);
+        expect(mutualReads).toEqual(["grace", "grace"]);
+    });
+
+    it("are empty, and never read, for a reader outside the profile audience", async () => {
+        profileClosed = new Set(["grace"]);
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace", { recent: true });
+        expect(profile?.restricted).toBe(true);
+        expect(profile?.recent).toEqual([]);
+        expect(profile?.mutual.friends.total).toBe(0);
+        expect(profile?.mutual.spaces.total).toBe(0);
+        expect(recentReads).toEqual([]);
+        expect(mutualReads).toEqual([]);
+    });
+
+    it("are not read at all for somebody the reader may not be shown", async () => {
+        expect(await chatProfile({ id: "ada" }, "d1", "alan", { recent: true })).toBeNull();
+        expect([...recentReads, ...mutualReads]).toEqual([]);
+    });
+});
+
+describe("the badges beside the name", () => {
+    it("are the ones the badge service lets this reader see", async () => {
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace");
+        expect(profile?.badges.map((badge) => badge.key)).toEqual(["calls"]);
+    });
+
+    it("are none, and never read, for a reader outside the profile audience", async () => {
+        profileClosed = new Set(["grace"]);
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace");
+        expect(profile?.restricted).toBe(true);
+        expect(profile?.badges).toEqual([]);
+        expect(badgeReads).toEqual([]);
+    });
+
+    it("are not read at all for somebody the reader may not be shown", async () => {
+        expect(await chatProfile({ id: "ada" }, "d1", "alan")).toBeNull();
+        expect(badgeReads).toEqual([]);
+    });
 });
 
 describe("what the panel needs beside the profile", () => {

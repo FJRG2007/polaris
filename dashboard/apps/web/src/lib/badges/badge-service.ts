@@ -518,6 +518,25 @@ export async function badgesFor(
 }
 
 /**
+ * The badges drawn in a row beside somebody's name, on every profile surface
+ * that is not the owner's own page: what `badgesFor` lets this viewer see,
+ * minus the ones the owner hid - which the owner's own answer still carries,
+ * and pressing your own name is how you check what everybody else is shown. A
+ * failure is no badges, never no profile.
+ */
+export async function badgesBesideName(
+    subjectId: string,
+    viewer: PrivacyViewer | null
+): Promise<BadgeView[]> {
+    const answer = await badgesFor(subjectId, viewer).catch(() => null);
+    if (!answer) return [];
+    const hidden = new Set(
+        (answer.arrangement ?? []).filter((row) => row.hidden).map((row) => row.badge)
+    );
+    return answer.shown.filter((badge) => !hidden.has(badge.key));
+}
+
+/**
  * Replace one person's arrangement. The order of the list is the order on the
  * profile. A saved list named by a badge must be theirs; people are kept as
  * given, as a privacy list's are.

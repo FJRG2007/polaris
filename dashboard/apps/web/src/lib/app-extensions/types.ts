@@ -385,6 +385,17 @@ export interface AppExtension {
     readonly playingNow?: (userIds: readonly string[]) => Promise<readonly PlayingNow[]>;
 
     /**
+     * The servers of this app one account played on lately, newest first and
+     * one entry per server, by the same rule `playingNow` uses for which player
+     * is which account. Visits that ended at or after `since`, at most `limit`.
+     */
+    readonly playedRecently?: (
+        userId: string,
+        since: Date,
+        limit: number
+    ) => Promise<readonly PlayedRecently[]>;
+
+    /**
      * Which of these Chat conversations one of its things is linked to - a game
      * server whose operator chose the group or the channels it talks through.
      * Chat draws a badge on each, and offers the commands it lists.
@@ -527,6 +538,20 @@ export interface PlayingNow {
     /** The game catalog's id (`minecraft`), for its mark. */
     readonly gameId?: string;
     /** Where the server's own picture is served from, when it can have one. */
+    readonly imageUrl?: string | null;
+}
+
+/** A visit that has ended, as a profile's "Recent activity" draws it. */
+export interface PlayedRecently {
+    /** The game, as people call it: "Minecraft". */
+    readonly game: string;
+    /** The server, as its owner named it. */
+    readonly server: string;
+    /** When the visit ended. */
+    readonly endedAt: Date;
+    readonly installedAppId: string;
+    /** The game catalog's id (`minecraft`), for its mark. */
+    readonly gameId?: string;
     readonly imageUrl?: string | null;
 }
 

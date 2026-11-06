@@ -34,6 +34,8 @@ import { prisma, VISIBLE_USER } from "@polaris/db";
 import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
 import { mutualsBetween } from "@/lib/mutuals";
+import type { BadgeView } from "@/lib/badges/badge-service";
+import { recentActivityFor, type RecentActivityView } from "@/lib/presence-activity/recent";
 import { channelAccess, type ChatActor } from "./access";
 
 /** Somebody, as a profile panel draws them. */
@@ -82,6 +84,19 @@ export interface ChatProfile {
      * nothing they wrote or share with anybody.
      */
     readonly restricted: boolean;
+    /**
+     * The badges this reader may see, in their owner's order - the same answer
+     * the profile page draws, so a badge is beside the name everywhere or
+     * nowhere. Empty outside the profile audience and for a hidden badge, which
+     * is hidden from its owner's own preview too.
+     */
+    readonly badges: BadgeView[];
+    /**
+     * What they did lately, as their activity settings let this reader see it
+     * (`recentActivityFor`). Only read for the larger view, which has a place
+     * for it - null everywhere else, which is "not asked", not "nothing".
+     */
+    readonly recent: RecentActivityView[] | null;
     /** When the account was made, ISO. Empty outside the profile audience. */
     readonly memberSince: string;
     /**
@@ -117,7 +132,8 @@ const NOTHING_SHARED: ChatProfile["mutual"] = {
 export async function chatProfile(
     actor: ChatActor,
     channelId: string,
-    userId: string
+    userId: string,
+    options: { recent?: boolean } = {}
 ): Promise<ChatProfile | null> {
     const self = userId === actor.id;
 
@@ -161,10 +177,24 @@ export async function chatProfile(
     // Asked after the reach above rather than beside it: there is no point
     // working out what two people have in common before it is settled that this
     // one may be shown the other at all.
-    const [mutual, role, friendship] = await Promise.all([
+    const [mutual, role, friendship, badges, recent] = await Promise.all([
         self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
         roleIn(together, person.id),
-        self ? ("self" as const) : standing(actor.id, person.id)
+        self ? ("self" as const) : standing(actor.id, person.id),
+        // Loaded on use: the badge service records audits, which reads the
+        // server's auth setup - nothing a profile read needs on import.
+        mayReadProfile
+            ? import("@/lib/badges/badge-service").then((badges) =>
+                  badges.badgesBesideName(person.id, reader)
+              )
+            : [],
+        // Outside the profile audience a reader is told nothing somebody shares.
+        options.recent && mayReadProfile
+            ? recentActivityFor(reader, person.id).catch((caught: unknown) => {
+                  console.error("polaris: could not read what somebody did lately:", caught);
+                  return [];
+              })
+            : null
     ]);
 
     // Outside the profile audience: what the roster beside this conversation
@@ -180,6 +210,8 @@ export async function chatProfile(
             mutual,
             role,
             restricted: true,
+            badges: [],
+            recent: options.recent ? [] : null,
             memberSince: "",
             friendship
         };
@@ -197,6 +229,8 @@ export async function chatProfile(
         mutual,
         role,
         restricted: false,
+        badges,
+        recent,
         memberSince: person.createdAt.toISOString(),
         friendship
     };
