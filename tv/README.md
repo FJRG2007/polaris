@@ -445,6 +445,4 @@ the reasons a change most often comes back.
 ## Licence
 
 Polaris TV is part of Polaris and is covered by its licence: [`LICENSE`](../LICENSE) and
-[`NOTICE.md`](../NOTICE.md). Code that came under the MIT licence keeps its notice in
-[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md). The Outfit typeface is under the SIL Open Font
-License.
+[`NOTICE.md`](../NOTICE.md). The Outfit typeface is under the SIL Open Font License.
