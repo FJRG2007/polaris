@@ -1440,6 +1440,7 @@
                 "phone": "Instalar en una TV requiere un ordenador en la red de la TV. Aún no hay app para móvil, así que abre esta página en ese ordenador.",
                 "steps": {
                     "searching": "Buscando TVs en esta red...",
+                    "usbListing": "Buscando TVs conectadas por USB...",
                     "connecting": "Conectando con la TV...",
                     "allow": "En la TV, elige Permitir cuando pida permitir la depuración USB.",
                     "checking": "Comprobando la TV...",

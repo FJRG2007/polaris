@@ -357,6 +357,8 @@ export interface TvInstallState {
     readonly found: readonly string[];
     /** TVs plugged in by USB; null until somebody looked. Present only on apps that install over USB. */
     readonly usb: readonly TvUsbDevice[] | null;
+    /** Whether the USB list is being read now. */
+    readonly usbListing: boolean;
     readonly outcome: TvOutcome | null;
     /** The folder the TV's backup was written to. */
     readonly backup: string | null;

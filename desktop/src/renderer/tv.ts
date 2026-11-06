@@ -96,7 +96,7 @@ function addressProblem(): string | null {
 }
 
 function render(state: TvInstallState): void {
-    const idle = IDLE.has(state.phase);
+    const idle = IDLE.has(state.phase) && !state.usbListing;
     address.disabled = !idle;
     home.disabled = !idle;
     // A search can be stopped from the same button that started it.
@@ -110,7 +110,7 @@ function render(state: TvInstallState): void {
     networkPanel.hidden = overUsb;
     usbPanel.hidden = !overUsb;
     available(findUsb, idle);
-    usbNone.hidden = !(state.usb && state.usb.length === 0);
+    usbNone.hidden = state.usbListing || !(state.usb && state.usb.length === 0);
     const picked = usbTarget(state);
     usbFound.replaceChildren(
         ...(state.usb ?? []).map((device) => {
@@ -126,7 +126,7 @@ function render(state: TvInstallState): void {
             return button;
         })
     );
-    say(step, STEPS[state.phase] ?? null);
+    say(step, state.usbListing ? "Looking for TVs plugged in by USB..." : (STEPS[state.phase] ?? null));
     say(result, state.outcome ? OUTCOMES[state.outcome] : null);
     heading.textContent = state.phase === "done" ? "Installed" : "Install on a TV";
     say(backup, state.backup ? `Backup kept on this computer: ${state.backup}` : null);

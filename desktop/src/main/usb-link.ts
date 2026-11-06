@@ -41,6 +41,7 @@ let listener: AdbLinkEvents | null = null;
 let registered = false;
 
 let worker: BrowserWindow | null = null;
+let asking = 0;
 
 function fromPage(event: IpcMainEvent): boolean {
     return worker !== null && !worker.isDestroyed() && event.sender === worker.webContents;
@@ -73,7 +74,13 @@ function register(): void {
         const heard = listener;
         listener = null;
         heard?.lost(new Error("The TV closed the connection."));
+        release();
     });
+}
+
+function release(): void {
+    if (listener !== null || asking > 0 || !worker || worker.isDestroyed()) return;
+    worker.destroy();
 }
 
 function contents(): Promise<WebContents> {
@@ -95,17 +102,21 @@ function contents(): Promise<WebContents> {
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.on("closed", () => {
-        if (worker === window) {
-            worker = null;
-            page = null;
-        }
+        if (worker !== window) return;
+        worker = null;
+        page = null;
+        for (const [id, answer] of waiting) answer({ id, ok: false, error: "gone" });
+        waiting.clear();
+        const heard = listener;
+        listener = null;
+        heard?.lost(new Error("The TV closed the connection."));
     });
     page = window
         .loadFile(join(__dirname, "..", "renderer", "usb.html"))
         .then(() => window.webContents)
         .catch((caught: unknown) => {
             page = null;
-            window.destroy();
+            if (!window.isDestroyed()) window.destroy();
             throw caught;
         });
     return page;
@@ -114,6 +125,15 @@ function contents(): Promise<WebContents> {
 type Ask = { readonly op: "list"; } | { readonly op: "open"; readonly device: string; } | { readonly op: "close"; };
 
 async function ask(request: Ask): Promise<Reply> {
+    asking += 1;
+    try {
+        return await sent(request);
+    } finally {
+        asking -= 1;
+    }
+}
+
+async function sent(request: Ask): Promise<Reply> {
     const target = await contents();
     const id = nextId;
     nextId += 1;
@@ -133,17 +153,27 @@ async function ask(request: Ask): Promise<Reply> {
 
 /** The TVs plugged in now that offer ADB. */
 export async function usbDevices(): Promise<TvUsbDevice[]> {
-    const reply = await ask({ op: "list" });
-    return reply.ok ? [...(reply.devices ?? [])] : [];
+    try {
+        const reply = await ask({ op: "list" });
+        return reply.ok ? [...(reply.devices ?? [])] : [];
+    } finally {
+        release();
+    }
 }
 
 /** The link to the device `id` from `usbDevices`. */
 export function usbLink(id: string): AdbLinkOpener {
     return async (events) => {
-        const reply = await ask({ op: "open", device: id });
-        if (!reply.ok) throw usbError(reply.error);
-        const target = await contents();
+        const reply = await ask({ op: "open", device: id }).catch((caught: unknown) => {
+            release();
+            throw caught;
+        });
+        if (!reply.ok) {
+            release();
+            throw usbError(reply.error);
+        }
         listener = events;
+        const target = await contents();
         return {
             send: (header, data) => {
                 if (listener === events) target.send(CHANNELS.usbOut, new Uint8Array(header), new Uint8Array(data));
@@ -151,7 +181,9 @@ export function usbLink(id: string): AdbLinkOpener {
             close: () => {
                 if (listener !== events) return;
                 listener = null;
-                void ask({ op: "close" }).catch(() => undefined);
+                void ask({ op: "close" })
+                    .catch(() => undefined)
+                    .finally(release);
             }
         };
     };

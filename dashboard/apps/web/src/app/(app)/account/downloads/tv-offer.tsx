@@ -137,7 +137,8 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     }
     if (!state) return <TvLoader label={t("downloads.tv.dialog.connectingApp")} />;
 
-    const idle = IDLE.has(state.phase);
+    const usbListing = state.usbListing === true;
+    const idle = IDLE.has(state.phase) && !usbListing;
     const searching = state.phase === "searching";
     const valid = validAddress(address);
     const addressError = address.trim() && !valid ? t("downloads.tv.dialog.addressInvalid") : null;
@@ -145,7 +146,11 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     // Only an app that installs over USB sends the field and answers findUsb.
     const findUsb = Array.isArray(state.usb) || state.usb === null ? tv.findUsb : undefined;
     const usbListed = state.usb ?? [];
-    const usbPicked = usbListed.some((one) => one.id === usbId) ? usbId : null;
+    const usbPicked = usbListed.some((one) => one.id === usbId)
+        ? usbId
+        : usbListed.length === 1 && !address.trim()
+          ? (usbListed[0]?.id ?? null)
+          : null;
 
     return (
         <>
@@ -272,7 +277,9 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                     {t("downloads.tv.dialog.backupNote")}
                 </p>
 
-                {STEPS.has(state.phase) ? (
+                {usbListing ? (
+                    <TvLoader label={t("downloads.tv.dialog.steps.usbListing")} />
+                ) : STEPS.has(state.phase) ? (
                     <TvLoader label={t(`downloads.tv.dialog.steps.${state.phase}` as never)} />
                 ) : null}
                 {outcome ? (

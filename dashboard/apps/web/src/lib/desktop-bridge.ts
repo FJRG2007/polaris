@@ -50,6 +50,8 @@ export interface DesktopTvState {
     readonly found: readonly string[];
     /** TVs plugged into the computer by USB; null until listed. Absent on an app older than that. */
     readonly usb?: readonly { readonly id: string; readonly name: string }[] | null;
+    /** Whether the USB list is being read now. Absent on an app older than that. */
+    readonly usbListing?: boolean;
     /** How it ended; an app newer than this page may name one it does not know. */
     readonly outcome: string | null;
     /** The folder on the computer the TV's backup was written to. */

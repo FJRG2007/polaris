@@ -38,15 +38,21 @@ usb?.addEventListener("disconnect", (event) => {
 
 bridge.onOut((header, data) => pipe?.pipe.send(header, data));
 
+async function refresh(): Promise<ReturnType<typeof describeDevices>> {
+    const described = describeDevices(usb ? await usb.getDevices() : []);
+    known = new Map(described.map((one) => [one.id, one.device]));
+    return described;
+}
+
 bridge.onRequest((request) => {
     void (async (): Promise<UsbReply> => {
         if (request.op === "list") {
-            const described = describeDevices(usb ? await usb.getDevices() : []);
-            known = new Map(described.map((one) => [one.id, one.device]));
+            const described = await refresh();
             return { id: request.id, ok: true, devices: described.map((one) => one.info) };
         }
         await shut();
         if (request.op === "close") return { id: request.id, ok: true };
+        if (!known.has(request.device)) await refresh();
         const device = known.get(request.device);
         if (!device) return { id: request.id, ok: false, error: "gone" };
         try {

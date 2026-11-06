@@ -195,7 +195,7 @@ let window: BrowserWindow | null = null;
 const pages = new Set<WebContents>();
 let busy = false;
 let searcher: WebContents | null = null;
-let state: TvInstallState = { phase: "ready", found: [], usb: null, outcome: null, backup: null, closed: null };
+let state: TvInstallState = { phase: "ready", found: [], usb: null, usbListing: false, outcome: null, backup: null, closed: null };
 
 function publish(next: Partial<TvInstallState>): void {
     state = { ...state, ...next };
@@ -381,12 +381,13 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         if (!fromTv(event)) return null;
         if (busy) return state;
         busy = true;
+        publish({ usbListing: true });
         const usb = await usbDevices().catch((caught: unknown) => {
             console.error("[tv]", caught);
             return [];
         });
         busy = false;
-        publish({ usb, outcome: null });
+        publish({ usb, usbListing: false, outcome: null });
         return state;
     });
     ipcMain.handle(CHANNELS.tvStart, async (event, raw: unknown) => {

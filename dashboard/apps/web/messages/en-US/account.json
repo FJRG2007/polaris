@@ -1440,6 +1440,7 @@
                 "phone": "Installing on a TV takes a computer on the TV's network. There is no phone app yet, so open this page on that computer.",
                 "steps": {
                     "searching": "Looking for TVs on this network...",
+                    "usbListing": "Looking for TVs plugged in by USB...",
                     "connecting": "Connecting to the TV...",
                     "allow": "On the TV, choose Allow when it asks to allow USB debugging.",
                     "checking": "Checking the TV...",
