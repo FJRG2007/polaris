@@ -50,11 +50,22 @@ export const newLockCodeSchema = z
     .regex(/^\d+$/)
     .refine((code) => (timing.LOCK_CODE_LENGTHS as readonly number[]).includes(code.length));
 
-export const setLockCodeSchema = z.object({
-    code: newLockCodeSchema,
-    /** Required once a code exists: changing it asks the one it replaces. */
-    current: lockCodeSchema.optional()
-});
+/** The digits a new code was chosen with - not a secret, it only tells the box
+ *  when the code is whole. */
+export const lockCodeLengthSchema = z.union([z.literal(4), z.literal(6), z.literal(8)]);
+
+export const setLockCodeSchema = z
+    .object({
+        code: newLockCodeSchema,
+        /** The length picked in the dialog; the code has to be exactly that long.
+         *  Optional only for a tab opened before the picker existed. */
+        length: lockCodeLengthSchema.optional(),
+        /** Required once a code exists: changing it asks the one it replaces. */
+        current: lockCodeSchema.optional()
+    })
+    .refine((input) => input.length === undefined || input.code.length === input.length, {
+        path: ["code"]
+    });
 
 export const channelFlagSchema = z.object({
     channelId: z.string().uuid(),

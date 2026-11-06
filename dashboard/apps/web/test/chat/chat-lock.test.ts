@@ -81,6 +81,17 @@ describe("lock code hashing", () => {
             expect(lock.newLockCodeSchema.safeParse(code).success).toBe(false);
     });
 
+    it("takes a chosen length only as 4, 6 or 8, and only with a code that long", () => {
+        const parse = (input: unknown) => lock.setLockCodeSchema.safeParse(input).success;
+        expect(parse({ code: "123456", length: 6 })).toBe(true);
+        expect(parse({ code: "1234", length: 4, current: "hunter2" })).toBe(true);
+        // A tab from before the picker sends no length.
+        expect(parse({ code: "12345678" })).toBe(true);
+        expect(parse({ code: "1234", length: 6 })).toBe(false);
+        expect(parse({ code: "12345", length: 5 })).toBe(false);
+        expect(parse({ code: "123456", length: "6" })).toBe(false);
+    });
+
     it("records how many digits a new code has", async () => {
         fake.lock = null;
         await lock.setLockCode(ada, "12345678");
