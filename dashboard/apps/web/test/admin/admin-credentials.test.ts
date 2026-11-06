@@ -32,7 +32,7 @@ const revokeSessions = vi.fn(async () => ({}));
 const revokeGrants = vi.fn(async () => {});
 const sendMail = vi.fn(async () => ({}) as { error?: string });
 const notify = vi.fn(async () => {});
-const sessionDelete = vi.fn(async () => ({ count: 1 }));
+const revokeOthers = vi.fn(async () => 1);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -57,7 +57,6 @@ vi.mock("@polaris/db", () => ({
             })
         },
         userEmail: { create: vi.fn(async () => ({})) },
-        session: { deleteMany: (...args: unknown[]) => sessionDelete(...(args as [])) },
         $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations))
     }
 }));
@@ -77,6 +76,7 @@ vi.mock("@/lib/step-up-grant", () => ({ revokeStepUpGrants: (...args: unknown[])
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/notification-service", () => ({ createNotification: (...args: unknown[]) => notify(...(args as [])) }));
+vi.mock("@/lib/session-directory", () => ({ revokeOtherSessions: (...args: unknown[]) => revokeOthers(...(args as [])) }));
 vi.mock("@/lib/user-admin-service", () => ({ revokeUserSessions: (...args: unknown[]) => revokeSessions(...(args as [])) }));
 vi.mock("@/lib/auth-mail", () => ({
     getAuthMailStatus: async () => ({ channelId: mailChannel }),
@@ -152,6 +152,11 @@ describe("reset email", () => {
         expect(await service.mailResetLink("admin-1", "user-1")).toEqual({ error: "usersDetail.errors.mailUnverified" });
     });
 
+    it("names the account refusal before the mail one", async () => {
+        expect(await service.mailResetLink("admin-1", "missing")).toEqual({ error: "usersDetail.errors.unknownAccount" });
+        expect(await service.mailResetLink("admin-1", "admin-1")).toEqual({ error: "usersDetail.errors.credentialsSelf" });
+    });
+
     it("mails the link to the account's own address when it can", async () => {
         mailChannel = "channel-1";
         expect(await service.mailResetLink("admin-1", "user-1")).toEqual({});
@@ -181,7 +186,7 @@ describe("temporary password", () => {
         expect(await service.owesPasswordChange("user-1")).toBe(true);
         expect(await service.replaceTemporaryPassword("user-1", "session-9", "another long secret")).toEqual({});
         expect(await service.owesPasswordChange("user-1")).toBe(false);
-        expect(sessionDelete).toHaveBeenCalledWith({ where: { userId: "user-1", id: { not: "session-9" } } });
+        expect(revokeOthers).toHaveBeenCalledWith("user-1", "session-9");
     });
 
     it("does nothing for an account that owes no change", async () => {

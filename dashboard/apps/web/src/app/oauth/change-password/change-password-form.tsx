@@ -6,6 +6,7 @@
  */
 
 import { useState, type FormEvent } from "react";
+import { signOut } from "@/lib/auth-client";
 import { replaceTemporaryPasswordAction } from "./actions";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -37,6 +38,12 @@ export function ChangePasswordForm({ account, name }: { account: string; name: s
         }
         // A full navigation, so the guard reads the cleared hold on a fresh request.
         window.location.assign("/");
+    }
+
+    async function onSignOut() {
+        setError(null);
+        const refused = await signOut();
+        if (refused) setError(refused);
     }
 
     return (
@@ -80,12 +87,13 @@ export function ChangePasswordForm({ account, name }: { account: string; name: s
                         <Button type="submit" disabled={pending} aria-disabled={!ready}>
                             {pending ? t("changePassword.saving") : t("changePassword.save")}
                         </Button>
-                        <a
-                            href="/oauth/reset"
+                        <button
+                            type="button"
                             className="text-center text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                            onClick={() => void onSignOut()}
                         >
                             {t("changePassword.signOut")}
-                        </a>
+                        </button>
                     </form>
                 </CardBody>
             </Card>

@@ -534,7 +534,9 @@ export async function verifySecurityAnswers(
  * Write a new password without knowing the old one. The caller MUST have proven
  * identity another way first (recovery questions or a verified authenticator
  * code) - this function performs no check of its own. Every other session is
- * revoked, since a password change is also how a user evicts an intruder.
+ * revoked, since a password change is also how a user evicts an intruder. An
+ * account that signs in only through a provider or a passkey is given a password
+ * sign-in here, so the password written is always one that can be used.
  */
 export async function resetUserPassword(
     auth: Auth,
@@ -547,7 +549,13 @@ export async function resetUserPassword(
     }
     const ctx = await auth.$context;
     const hash = await ctx.password.hash(newPassword);
-    await prisma.account.updateMany({ where: { userId, providerId: "credential" }, data: { password: hash } });
+    const { count } = await prisma.account.updateMany({
+        where: { userId, providerId: "credential" },
+        data: { password: hash }
+    });
+    if (count === 0) {
+        await ctx.internalAdapter.linkAccount({ userId, providerId: "credential", accountId: userId, password: hash });
+    }
     return {};
 }
 

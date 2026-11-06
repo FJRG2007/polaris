@@ -25,6 +25,7 @@ import { appBaseUrl } from "./domain-service";
 import { rateLimit } from "./rate-limit-service";
 import { revokeStepUpGrants } from "./step-up-grant";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { revokeOtherSessions } from "./session-directory";
 import { revokeUserSessions } from "./user-admin-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { createNotification } from "./notification-service";
@@ -139,10 +140,10 @@ export async function issueResetLink(
 
 /** The same link, mailed to the account's own confirmed address instead of shown. */
 export async function mailResetLink(actorId: string, userId: string): Promise<{ error?: string }> {
-    const { mailBlocker } = await credentialOptions(userId);
-    if (mailBlocker) return refusal(mailBlocker === "noChannel" ? "mailNoChannel" : "mailUnverified");
     const checked = await guard(actorId, userId);
     if ("error" in checked) return checked;
+    const { mailBlocker } = await credentialOptions(userId);
+    if (mailBlocker) return refusal(mailBlocker === "noChannel" ? "mailNoChannel" : "mailUnverified");
     const { url } = await writeTicket(actorId, userId);
     const t = await wordsFor(userId, "notices");
     const sent = await sendAuthEmail({
@@ -260,7 +261,7 @@ export async function replaceTemporaryPassword(
     const written = await resetUserPassword(auth, userId, password);
     if (written.error) return written;
     await prisma.user.update({ where: { id: userId }, data: { passwordChangeRequired: false } });
-    await prisma.session.deleteMany({ where: { userId, id: { not: sessionId } } });
+    await revokeOtherSessions(userId, sessionId);
     await revokeStepUpGrants(userId);
     await recordAudit({ actorId: userId, action: "account.password.replaced-temporary", targetType: "user", targetId: userId });
     return {};
