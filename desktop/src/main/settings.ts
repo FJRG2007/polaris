@@ -44,7 +44,10 @@ const settingsSchema = z.object({
     updateAttempted: z.string().max(64).nullable().catch(null),
     windowPlace: placeSchema.nullable().catch(null),
     // On unless somebody turned it off, which reaches installs from before it existed.
-    openAtLogin: z.boolean().catch(true)
+    openAtLogin: z.boolean().catch(true),
+    // On unless somebody turned it off: a file without it, or with anything but a
+    // boolean, keeps the graphics card in use.
+    hardwareAcceleration: z.boolean().catch(true)
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -55,7 +58,8 @@ const EMPTY: Settings = {
     pushes: {},
     updateAttempted: null,
     windowPlace: null,
-    openAtLogin: true
+    openAtLogin: true,
+    hardwareAcceleration: true
 };
 
 function file(): string {
@@ -133,6 +137,18 @@ export function openAtLogin(): boolean {
 
 export function rememberOpenAtLogin(open: boolean): void {
     save({ ...load(), openAtLogin: open });
+}
+
+/**
+ * Whether Chromium may use the graphics card. Read once at start, before the app
+ * is ready, since that is the only moment Electron takes it.
+ */
+export function hardwareAcceleration(): boolean {
+    return load().hardwareAcceleration;
+}
+
+export function rememberHardwareAcceleration(on: boolean): void {
+    save({ ...load(), hardwareAcceleration: on });
 }
 
 /** What was used the last time this service was pushed from here. */

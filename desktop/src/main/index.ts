@@ -408,12 +408,18 @@ function refreshMenu(): void {
     installTray(appItems(menuActions, menuUpdate, servers()), () => showPolaris());
 }
 
+/** Whether this run uses the graphics card, as read when it started. */
+let accelerated = true;
+
 function start(): void {
     // Windows reports a window behind a full-screen game as gone, and Chromium then
     // starves it, along with the call inside.
     app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
     app.commandLine.appendSwitch("disable-renderer-backgrounding");
     app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+    // Electron takes this only before the app is ready, so a change waits for a restart.
+    accelerated = settings.hardwareAcceleration();
+    if (!accelerated) app.disableHardwareAcceleration();
     current = serverAddress();
 
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
@@ -443,11 +449,29 @@ function start(): void {
             isReporter: (sender) => Boolean(main && !main.isDestroyed() && main.webContents === sender),
             setCustomGames: (list) => games.setCustomGames(list),
             connectState: () => ({ address: current, error: loadError, servers: servers() }),
-            preferences: () => ({ openAtLogin: settings.openAtLogin(), version: app.getVersion() }),
+            preferences: () => {
+                const hardwareAcceleration = settings.hardwareAcceleration();
+                return {
+                    openAtLogin: settings.openAtLogin(),
+                    hardwareAcceleration,
+                    restartPending: hardwareAcceleration !== accelerated,
+                    version: app.getVersion()
+                };
+            },
             setOpenAtLogin: (open) => {
                 if (!setOpenAtLogin(open)) return false;
                 settings.rememberOpenAtLogin(open);
                 return true;
+            },
+            setHardwareAcceleration: (on) => {
+                settings.rememberHardwareAcceleration(on);
+                return true;
+            },
+            relaunch: () => {
+                if (pushRunning()) return { ok: false, error: "A push is still running. Restart once it finishes." };
+                app.relaunch();
+                app.exit(0);
+                return { ok: true };
             },
             connectSubmit,
             connectCheck,

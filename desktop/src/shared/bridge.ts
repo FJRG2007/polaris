@@ -222,6 +222,16 @@ export type PushEvent =
     | { readonly kind: "progress"; readonly sent: number; readonly total: number; }
     | { readonly kind: "result"; readonly ok: boolean; readonly message: string; };
 
+/** The program's own settings, as the settings window shows them. */
+export interface Preferences {
+    readonly openAtLogin: boolean;
+    /** The choice kept, which is the one the next start uses. */
+    readonly hardwareAcceleration: boolean;
+    /** True when the kept choice differs from the one this run started with. */
+    readonly restartPending: boolean;
+    readonly version: string;
+}
+
 export interface PolarisLocal {
     readonly connect: {
         /** The address in use, why it could not be opened if it could not, and
@@ -236,9 +246,13 @@ export interface PolarisLocal {
         rename(origin: string, name: string): Promise<Outcome>;
         remove(origin: string): Promise<Outcome>;
         /** The program's own settings, kept with the servers. */
-        preferences(): Promise<{ readonly openAtLogin: boolean; readonly version: string; } | null>;
+        preferences(): Promise<Preferences | null>;
         /** Whether it took: the switch goes back when it did not. */
         setOpenAtLogin(open: boolean): Promise<boolean>;
+        /** Keep whether the graphics card is used. It applies from the next start. */
+        setHardwareAcceleration(on: boolean): Promise<boolean>;
+        /** Close and open the app again, so a setting read at start applies. */
+        relaunch(): Promise<Outcome>;
         /** Put the settings away. */
         close(): Promise<void>;
         /** Ask for a newer version of this app now and say what was found. */
@@ -385,6 +399,8 @@ export const CHANNELS = {
     connectSubmit: "local:connect-submit",
     connectPreferences: "local:connect-preferences",
     connectOpenAtLogin: "local:connect-open-at-login",
+    connectHardwareAcceleration: "local:connect-hardware-acceleration",
+    connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
     connectRemove: "local:connect-remove",

@@ -31,6 +31,7 @@ import {
     type GameActivity,
     type Outcome,
     type PickedFolder,
+    type Preferences,
     type SystemIdle
 } from "@/shared/bridge";
 import type { ServerRow } from "@/shared/servers";
@@ -47,8 +48,12 @@ export interface IpcHost extends PushHost {
     readonly isReporter: (sender: WebContents) => boolean;
     readonly setCustomGames: (games: readonly CustomGameInput[]) => void;
     /** The address form's state: the address in use and why it failed to open. */
-    readonly preferences: () => { openAtLogin: boolean; version: string };
+    readonly preferences: () => Preferences;
     readonly setOpenAtLogin: (open: boolean) => boolean;
+    /** Keep whether the graphics card is used from the next start. */
+    readonly setHardwareAcceleration: (on: boolean) => boolean;
+    /** Close and open the app again, unless something running would be lost. */
+    readonly relaunch: () => Outcome;
     readonly connectState: () => { address: string | null; error: string | null; servers: ServerRow[]; };
     readonly connectSubmit: (raw: unknown, name?: string) => Promise<Outcome>;
     readonly connectCheck: (raw: unknown) => Promise<AddressCheck>;
@@ -455,6 +460,12 @@ export function registerIpc(host: IpcHost): void {
         const open = z.boolean().safeParse(raw);
         return from(event, "connect") && open.success && host.setOpenAtLogin(open.data);
     });
+    ipcMain.handle(CHANNELS.connectHardwareAcceleration, (event, raw: unknown): boolean => {
+        const on = z.boolean().safeParse(raw);
+        return from(event, "connect") && on.success && host.setHardwareAcceleration(on.data);
+    });
+    // Takes nothing from the page.
+    ipcMain.handle(CHANNELS.connectRelaunch, (event) => (from(event, "connect") ? host.relaunch() : REFUSED));
     ipcMain.handle(CHANNELS.connectCheckUpdates, (event) => (from(event, "connect") ? host.checkUpdates() : null));
     // Takes nothing, as from the page: only into what the app installed itself.
     ipcMain.handle(CHANNELS.connectRestart, (event) => (from(event, "connect") ? host.updates.install() : REFUSED));

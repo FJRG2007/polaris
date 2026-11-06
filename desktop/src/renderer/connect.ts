@@ -30,11 +30,16 @@ const title = byId<HTMLHeadingElement>("title");
 const tabs = byId<HTMLElement>("tabs");
 const serversPage = byId<HTMLElement>("servers-page");
 const generalPage = byId<HTMLElement>("general-page");
+const advancedPage = byId<HTMLElement>("advanced-page");
 const showAdd = byId<HTMLButtonElement>("show-add");
 const hideAdd = byId<HTMLButtonElement>("hide-add");
 const removeDialog = byId<HTMLDialogElement>("confirm-remove");
 const removeTitle = byId<HTMLParagraphElement>("remove-title");
 const openAtLogin = byId<HTMLInputElement>("open-at-login");
+const hardwareAcceleration = byId<HTMLInputElement>("hardware-acceleration");
+const restartDialog = byId<HTMLDialogElement>("confirm-restart");
+const restartFailure = byId<HTMLParagraphElement>("restart-failure");
+const restartPending = byId<HTMLElement>("restart-pending");
 const hint = note.textContent ?? "";
 
 let busy = false;
@@ -240,11 +245,15 @@ function showForm(shown: boolean): void {
     if (shown) input.focus();
 }
 
-function showPage(general: boolean): void {
-    serversPage.hidden = general;
-    generalPage.hidden = !general;
-    byId("tab-servers").setAttribute("aria-selected", String(!general));
-    byId("tab-general").setAttribute("aria-selected", String(general));
+type Page = "servers" | "general" | "advanced";
+
+const PAGES: Record<Page, HTMLElement> = { servers: serversPage, general: generalPage, advanced: advancedPage };
+
+function showPage(shown: Page): void {
+    for (const [page, element] of Object.entries(PAGES)) {
+        element.hidden = page !== shown;
+        byId(`tab-${page}`).setAttribute("aria-selected", String(page === shown));
+    }
 }
 
 function draw(servers: readonly ServerRow[]): void {
@@ -283,7 +292,7 @@ if (new URLSearchParams(location.search).has("sheet")) {
     cross.hidden = false;
     cross.addEventListener("click", closeSheet);
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !event.defaultPrevented && !removeDialog.open) closeSheet();
+        if (event.key === "Escape" && !event.defaultPrevented && !removeDialog.open && !restartDialog.open) closeSheet();
     });
     document.body.addEventListener("mousedown", (event) => {
         if (event.target === document.body) closeSheet();
@@ -292,8 +301,9 @@ if (new URLSearchParams(location.search).has("sheet")) {
 
 showAdd.addEventListener("click", () => showForm(true));
 hideAdd.addEventListener("click", () => showForm(false));
-byId("tab-servers").addEventListener("click", () => showPage(false));
-byId("tab-general").addEventListener("click", () => showPage(true));
+byId("tab-servers").addEventListener("click", () => showPage("servers"));
+byId("tab-general").addEventListener("click", () => showPage("general"));
+byId("tab-advanced").addEventListener("click", () => showPage("advanced"));
 byId("remove-cancel").addEventListener("click", () => removeDialog.close());
 byId("remove-confirm").addEventListener("click", () => {
     const server = removing;
@@ -312,9 +322,47 @@ openAtLogin.addEventListener("change", () => {
             say(failure, "Polaris could not change this on this computer.");
         });
 });
+/** Close and open the app again; on a refusal, say why where the press was. */
+function relaunch(): void {
+    say(restartFailure, null);
+    void window.polarisLocal.connect
+        .relaunch()
+        .catch(() => ({ ok: false, error: "Polaris could not restart. Close it and open it again." }) as const)
+        .then((outcome) => {
+            if (outcome.ok) return;
+            if (restartDialog.open) say(restartFailure, outcome.error);
+            else say(failure, outcome.error);
+        });
+}
+hardwareAcceleration.addEventListener("change", () => {
+    const wanted = hardwareAcceleration.checked;
+    say(failure, null);
+    void window.polarisLocal.connect
+        .setHardwareAcceleration(wanted)
+        .catch(() => false)
+        .then(async (kept) => {
+            if (!kept) {
+                hardwareAcceleration.checked = !wanted;
+                say(failure, "Polaris could not save this setting. Try again.");
+                return;
+            }
+            const preferences = await window.polarisLocal.connect.preferences().catch(() => null);
+            const pending = preferences?.restartPending ?? true;
+            restartPending.hidden = !pending;
+            // Turned back to what this run already uses: nothing to restart for.
+            if (!pending) return;
+            say(restartFailure, null);
+            restartDialog.showModal();
+        });
+});
+byId("restart-later").addEventListener("click", () => restartDialog.close());
+byId("restart-now").addEventListener("click", relaunch);
+byId("restart-pending-now").addEventListener("click", relaunch);
 void window.polarisLocal.connect.preferences().catch(() => null).then((preferences) => {
     if (!preferences) return;
     openAtLogin.checked = preferences.openAtLogin;
+    hardwareAcceleration.checked = preferences.hardwareAcceleration;
+    restartPending.hidden = !preferences.restartPending;
     byId("version").textContent = `Polaris ${preferences.version}`;
 });
 
