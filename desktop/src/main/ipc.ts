@@ -108,6 +108,9 @@ const noticeSchema = z.object({
 /** How long a notice waits for its picture before it is drawn with the app's. */
 const ICON_WAIT_MS = 3_000;
 
+/** Smaller than this is a placeholder, not a face. */
+const ICON_MIN_PX = 16;
+
 /**
  * The picture a page named for its notice, read with the page's own session so
  * an avatar behind sign-in is readable. Only a path on the Polaris, only a PNG
@@ -122,7 +125,9 @@ async function noticeIcon(contents: WebContents, path: string | undefined, origi
         const bytes = Buffer.from(await answer.arrayBuffer());
         if (!iconAcceptable(answer.headers.get("content-type"), bytes.length)) return null;
         const image = nativeImage.createFromBuffer(bytes);
-        return image.isEmpty() ? null : image;
+        // A person with no picture is answered a transparent pixel, which the
+        // page draws initials over; on a notice it is a blank tile.
+        return image.isEmpty() || image.getSize().width < ICON_MIN_PX ? null : image;
     } catch {
         return null;
     }
