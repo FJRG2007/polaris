@@ -379,7 +379,7 @@ export function SessionDetail({
                                 are wanted: the bar is "how much longer", the list is
                                 "what is it doing", and the second is what makes a
                                 stuck step legible instead of a bar that stopped. */}
-                            <div className="bg-surface-sunken h-1.5 w-full overflow-hidden rounded-full">
+                            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
                                 <div
                                     className="bg-primary h-full rounded-full transition-all duration-500"
                                     style={{
@@ -468,7 +468,7 @@ export function SessionDetail({
                         <CardBody>
                             <pre
                                 ref={screenRef}
-                                className="max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
+                                className="max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs leading-relaxed"
                             >
                                 {screen || t("session.screenEmpty")}
                             </pre>

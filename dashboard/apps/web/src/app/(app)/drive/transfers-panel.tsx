@@ -79,7 +79,7 @@ export function TransfersPanel() {
                 {(waiting ?? []).map((offer) => (
                     <div
                         key={offer.id}
-                        className="flex flex-wrap items-center gap-3 rounded-md bg-surface-sunken p-3"
+                        className="flex flex-wrap items-center gap-3 rounded-md bg-muted p-3"
                     >
                         {offer.isFolder ? (
                             <Folder className="size-5 shrink-0 text-primary" />

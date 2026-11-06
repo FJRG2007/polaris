@@ -634,7 +634,7 @@ export function ShareDialog({
                                 {staged.map((one) => (
                                     <span
                                         key={`${one.type}:${one.id}`}
-                                        className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-surface-hover py-0.5 pl-1 pr-1.5 text-[12px] text-foreground"
+                                        className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-muted py-0.5 pl-1 pr-1.5 text-[12px] text-foreground"
                                     >
                                         <TargetFace target={one} size={18} />
                                         <span className="min-w-0 truncate" title={one.name}>
@@ -710,7 +710,7 @@ export function ShareDialog({
                                             id="share-add-list"
                                             role="listbox"
                                             style={listAt}
-                                            className="pointer-events-auto fixed z-[60] overflow-y-auto overscroll-contain rounded-md border border-border bg-surface-raised p-1 shadow-lg"
+                                            className="pointer-events-auto fixed z-[60] overflow-y-auto overscroll-contain rounded-md border border-border bg-elevated p-1 shadow-popover"
                                         >
                                             {found.map((one, index) => (
                                                 <li
@@ -723,7 +723,7 @@ export function ShareDialog({
                                                     onMouseEnter={() => setActive(index)}
                                                     className={cn(
                                                         "flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5",
-                                                        index === active && "bg-surface-hover"
+                                                        index === active && "bg-muted"
                                                     )}
                                                 >
                                                     <TargetFace target={one} size={24} />
@@ -1048,7 +1048,7 @@ export function ShareDialog({
                                                         key={grant.id}
                                                         className="flex min-w-0 items-start gap-3 px-1 py-1"
                                                     >
-                                                        <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
+                                                        <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground-subtle">
                                                             <Icon
                                                                 className="size-4 shrink-0"
                                                                 aria-hidden
@@ -1113,7 +1113,7 @@ export function ShareDialog({
                                             })}
                                             {links.length === 0 && !draftAudience ? (
                                                 <div className="flex min-w-0 items-start gap-3 px-1 py-1">
-                                                    <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
+                                                    <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground-subtle">
                                                         <Lock
                                                             className="size-4 shrink-0"
                                                             aria-hidden
@@ -1321,7 +1321,7 @@ function TargetFace({ target, size }: { target: ShareTarget; size: number }) {
     const Icon = target.type === "team" ? Users : Shield;
     return (
         <span
-            className="flex shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle"
+            className="flex shrink-0 items-center justify-center rounded-full bg-muted text-foreground-subtle"
             style={{ width: size, height: size }}
         >
             <Icon className="size-3.5 shrink-0" aria-hidden />
@@ -1344,7 +1344,7 @@ function PrincipalFace({ grant }: { grant: GrantView }) {
     }
     const Icon = grant.principalType === "team" ? Users : Shield;
     return (
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-subtle">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground-subtle">
             <Icon className="size-4 shrink-0" aria-hidden />
         </span>
     );

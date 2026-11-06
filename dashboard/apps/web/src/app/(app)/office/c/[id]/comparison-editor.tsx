@@ -347,7 +347,7 @@ function CellBox({
                 onClick={onOpen}
                 className={cn(
                     "w-full rounded-md px-2 py-1.5 text-left transition-colors",
-                    editable && "hover:bg-surface-hover",
+                    editable && "hover:bg-muted",
                     !editable && "cursor-default"
                 )}
             >

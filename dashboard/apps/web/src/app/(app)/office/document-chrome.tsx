@@ -109,7 +109,7 @@ export function DocumentChrome({
                         value={title}
                         readOnly={!editable}
                         aria-label={t("chrome.nameOfThisDocument")}
-                        className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[15px] font-medium text-foreground outline-none focus:bg-surface-hover read-only:cursor-default"
+                        className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[15px] font-medium text-foreground outline-none focus:bg-muted read-only:cursor-default"
                         onChange={(event) => setTitle(event.target.value)}
                         onBlur={() => void rename()}
                         onKeyDown={(event) => {

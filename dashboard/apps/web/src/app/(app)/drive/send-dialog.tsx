@@ -191,7 +191,7 @@ export function SendDialog({
                                     disabled={!candidate.allowed}
                                     aria-pressed={picked}
                                     className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
-                                        picked ? "bg-primary/10" : "hover:bg-surface-sunken"
+                                        picked ? "bg-primary/10" : "hover:bg-muted"
                                     } ${candidate.allowed ? "" : "opacity-50"}`}
                                 >
                                     {candidate.isOrg ? (
