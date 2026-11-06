@@ -147,7 +147,7 @@ export function EmailInvitesField({
  */
 export function withDraft(emails: readonly string[], draft: string): string[] | null {
     const next = [...emails];
-    for (const part of draft.split(/[s,;]+/).filter(Boolean)) {
+    for (const part of draft.split(/[\s,;]+/).filter(Boolean)) {
         const parsed = inviteEmailSchema.safeParse(part);
         if (!parsed.success) return null;
         if (!next.includes(parsed.data)) next.push(parsed.data);

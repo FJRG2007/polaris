@@ -463,6 +463,8 @@
         "runFailedTitle": "Agent run on {repo} has failed",
         "runSucceededBody": "The run finished without errors. Open it to see what it did.",
         "runFailedBody": "The run did not finish. Open it to see what went wrong.",
+        "pausedCreditsTitle": "Automatic agent runs are paused",
+        "pausedCreditsBody": "Your model provider ran out of credit and no fallback model is left. Add credit or change the provider, then resume them from Runs.",
         "endedTitle": "{session} has ended",
         "failedBody": "The session failed. Open it to read the last thing it reported.",
         "silentBody": "The machine running this session stopped reporting, so Polaris closed it.",

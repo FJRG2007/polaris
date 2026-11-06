@@ -71,10 +71,6 @@ export interface DispatchResult {
 export async function dispatchRun(input: DispatchInput): Promise<DispatchResult> {
     const execution = input.repo.execution as AgentExecution;
 
-    // Before the row, not after: a run refused for a usage ceiling never
-    // happened, and opening one to close it out immediately would put a failure
-    // on the screen for something that was correctly prevented. A deployment
-    // with no ceilings set pays one read of an empty table.
     // A paused account starts nothing on its own (`agent-pause.ts`); like a
     // ceiling, it is a run correctly prevented rather than one that failed.
     if (pauseStops(input.trigger) && (await readAgentPause(input.repo.ownerId))) {
@@ -82,6 +78,10 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
         return { error: "Automatic runs are paused." };
     }
 
+    // Before the row, not after: a run refused for a usage ceiling never
+    // happened, and opening one to close it out immediately would put a failure
+    // on the screen for something that was correctly prevented. A deployment
+    // with no ceilings set pays one read of an empty table.
     const verdict = await checkUsageLimits({ ownerId: input.repo.ownerId, repoFullName: input.repo.repoFullName });
     // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
     if (!verdict.allowed) return { error: verdict.reason ?? "A usage limit stopped this run." };

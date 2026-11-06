@@ -463,6 +463,8 @@
         "runFailedTitle": "Falló la ejecución en {repo}",
         "runSucceededBody": "Terminó sin errores. Ábrela para ver qué hizo.",
         "runFailedBody": "No terminó. Ábrela para ver qué salió mal.",
+        "pausedCreditsTitle": "Ejecuciones automáticas en pausa",
+        "pausedCreditsBody": "Tu proveedor de modelos se quedó sin crédito y no queda ningún modelo de respaldo. Añade crédito o cambia de proveedor y reanúdalas desde Ejecuciones.",
         "endedTitle": "{session} terminó",
         "failedBody": "La sesión falló. Ábrela para leer lo último que informó.",
         "silentBody": "La máquina de esta sesión dejó de informar y Polaris la cerró.",
