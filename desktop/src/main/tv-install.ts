@@ -18,9 +18,9 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { connect as tcp } from "node:net";
 import { networkInterfaces } from "node:os";
-import { kindOf, openLocalWindow } from "./windows";
+import { openLocalWindow } from "./windows";
 import { repository } from "../../package.json";
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
 import { AdbConnection, newAdbKey } from "./adb-client";
 import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -89,12 +89,15 @@ function answersOn(host: string, port: number, timeoutMs: number): Promise<"open
     });
 }
 
-async function findTvs(): Promise<string[]> {
+/** Bumped by a cancel, so a search started before it stops taking addresses. */
+let search = 0;
+
+async function findTvs(run: number): Promise<string[]> {
     const queue = neighbours();
     const open: string[] = [];
     await Promise.all(
         Array.from({ length: SCAN_WIDTH }, async () => {
-            for (let host = queue.pop(); host; host = queue.pop()) {
+            for (let host = queue.pop(); host && run === search; host = queue.pop()) {
                 if ((await answersOn(host, ADB_PORT, SCAN_MS)) === "open") open.push(host);
             }
         })
@@ -174,12 +177,15 @@ async function backUp(adb: AdbConnection, host: string): Promise<string> {
 }
 
 let window: BrowserWindow | null = null;
+/** The pages that asked for the state - the TV window, a dashboard's dialog - and so hear every change. */
+const pages = new Set<WebContents>();
 let busy = false;
+let searcher: WebContents | null = null;
 let state: TvInstallState = { phase: "ready", found: [], outcome: null, backup: null, closed: null };
 
 function publish(next: Partial<TvInstallState>): void {
     state = { ...state, ...next };
-    window?.webContents.send(CHANNELS.tvEvent, state);
+    for (const page of pages) if (!page.isDestroyed()) page.send(CHANNELS.tvEvent, state);
 }
 
 async function closeAdb(adb: AdbConnection, host: string): Promise<boolean> {
@@ -286,6 +292,15 @@ async function finish(adb: AdbConnection, host: string, outcome: TvOutcome): Pro
     publish({ phase: outcome.startsWith("installed") ? "done" : "failed", outcome, closed });
 }
 
+/** Stops a search under way; an install is never stopped part way. */
+function stopSearch(by?: WebContents): void {
+    if (state.phase !== "searching" || (by && searcher !== by)) return;
+    searcher = null;
+    search += 1;
+    busy = false;
+    publish({ phase: "ready" });
+}
+
 /** The window. One at a time: a second click brings it forward. */
 export function openTvInstall(): void {
     if (window && !window.isDestroyed()) {
@@ -294,8 +309,11 @@ export function openTvInstall(): void {
         return;
     }
     window = openLocalWindow("tv", { title: "Install on a TV - Polaris", width: 560, height: 620 });
+    const contents = window.webContents;
     window.on("closed", () => {
         window = null;
+        // Closing stops a search it started, as closing the dashboard dialog does.
+        stopSearch(contents);
     });
 }
 
@@ -304,16 +322,35 @@ const startSchema = z.object({
     home: z.boolean()
 });
 
-export function registerTvInstall(): void {
-    const fromTv = (event: IpcMainInvokeEvent): boolean => kindOf(event.sender) === "tv";
-    ipcMain.handle(CHANNELS.tvState, (event) => (fromTv(event) ? state : null));
+/** `fromTv` accepts the TV window and a Polaris window on its own Polaris. */
+export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean): void {
+    ipcMain.handle(CHANNELS.tvState, (event) => {
+        if (!fromTv(event)) return null;
+        const page = event.sender;
+        if (!pages.has(page)) {
+            pages.add(page);
+            page.once("destroyed", () => pages.delete(page));
+        }
+        return state;
+    });
+    ipcMain.handle(CHANNELS.tvCancel, (event) => {
+        if (!fromTv(event)) return null;
+        stopSearch();
+        return state;
+    });
     ipcMain.handle(CHANNELS.tvFind, async (event) => {
         if (!fromTv(event)) return null;
         if (busy) return state;
         busy = true;
-        publish({ phase: "searching" });
-        const found = await findTvs().catch(() => []);
+        search += 1;
+        searcher = event.sender;
+        const run = search;
+        publish({ phase: "searching", found: [] });
+        const found = await findTvs(run).catch(() => []);
+        // A cancelled search has already handed the controls back.
+        if (run !== search) return state;
         busy = false;
+        searcher = null;
         publish({ phase: "ready", found });
         return state;
     });

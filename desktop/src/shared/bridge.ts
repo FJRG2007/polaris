@@ -97,6 +97,8 @@ export interface PolarisDesktop {
     installTool(input: InstallRequest): Promise<InstallResult>;
     /** Opens the window that installs Polaris TV on a set on this network. */
     openTvInstall(): Promise<boolean>;
+    /** The same install, driven from a dialog on the page instead of a window. */
+    readonly tv: TvInstallBridge;
     /** The system's default browser, by a name of ours, or null. */
     defaultBrowser(): Promise<string | null>;
     /** Whether somebody is at this computer: `idle` once nothing has been
@@ -220,6 +222,16 @@ export type PushEvent =
     | { readonly kind: "progress"; readonly sent: number; readonly total: number; }
     | { readonly kind: "result"; readonly ok: boolean; readonly message: string; };
 
+/** The program's own settings, as the settings window shows them. */
+export interface Preferences {
+    readonly openAtLogin: boolean;
+    /** The choice kept, which is the one the next start uses. */
+    readonly hardwareAcceleration: boolean;
+    /** True when the kept choice differs from the one this run started with. */
+    readonly restartPending: boolean;
+    readonly version: string;
+}
+
 export interface PolarisLocal {
     readonly connect: {
         /** The address in use, why it could not be opened if it could not, and
@@ -234,9 +246,13 @@ export interface PolarisLocal {
         rename(origin: string, name: string): Promise<Outcome>;
         remove(origin: string): Promise<Outcome>;
         /** The program's own settings, kept with the servers. */
-        preferences(): Promise<{ readonly openAtLogin: boolean; readonly version: string; } | null>;
+        preferences(): Promise<Preferences | null>;
         /** Whether it took: the switch goes back when it did not. */
         setOpenAtLogin(open: boolean): Promise<boolean>;
+        /** Keep whether the graphics card is used. It applies from the next start. */
+        setHardwareAcceleration(on: boolean): Promise<boolean>;
+        /** Close and open the app again, so a setting read at start applies. */
+        relaunch(): Promise<Outcome>;
         /** Put the settings away. */
         close(): Promise<void>;
         /** Ask for a newer version of this app now and say what was found. */
@@ -261,15 +277,20 @@ export interface PolarisLocal {
         openService(): Promise<void>;
         onEvent(listener: (event: PushEvent) => void): () => void;
     };
-    readonly tv: {
-        state(): Promise<TvInstallState>;
-        find(): Promise<TvInstallState>;
-        start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
-        onState(listener: (state: TvInstallState) => void): () => void;
-    };
+    readonly tv: TvInstallBridge;
     readonly overlay: {
         onStroke(listener: (stroke: StrokeInput) => void): () => void;
     };
+}
+
+/** Installing on a TV, as the TV window and the dashboard's dialog both drive it. */
+export interface TvInstallBridge {
+    state(): Promise<TvInstallState>;
+    find(): Promise<TvInstallState>;
+    /** Stops a search; an install already under way runs to its end. */
+    cancel(): Promise<TvInstallState>;
+    start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
+    onState(listener: (state: TvInstallState) => void): () => void;
 }
 
 /** Where installing on a TV has got to. */
@@ -378,6 +399,8 @@ export const CHANNELS = {
     connectSubmit: "local:connect-submit",
     connectPreferences: "local:connect-preferences",
     connectOpenAtLogin: "local:connect-open-at-login",
+    connectHardwareAcceleration: "local:connect-hardware-acceleration",
+    connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",
     connectRemove: "local:connect-remove",
@@ -400,6 +423,7 @@ export const CHANNELS = {
     tvState: "local:tv-state",
     tvFind: "local:tv-find",
     tvStart: "local:tv-start",
+    tvCancel: "local:tv-cancel",
     tvEvent: "local:tv-event"
 } as const;
 

@@ -4,10 +4,12 @@ import {
     DESKTOP_TAG_PREFIX,
     EXTENSION_TAG_PREFIX,
     STREAMDECK_TAG_PREFIX,
+    TV_TAG_PREFIX,
     desktopDownload,
     extensionDownload,
     pickFile,
     pickRelease,
+    tvInstallable,
     type AppFile,
     type ReleaseListing
 } from "../../src/lib/app-releases";
@@ -418,5 +420,51 @@ describe("appDownload", () => {
                 vi.useRealTimers();
             }
         });
+    });
+});
+
+/**
+ * The TV card offers an install only when the desktop app would find something
+ * to install: the newest `tv-v` release with the APK and the checksums it
+ * verifies against. Until then the card says it is not published yet.
+ */
+describe("tvInstallable", () => {
+    const tv = (assets: readonly string[]): ReleaseListing => ({
+        tag_name: "tv-v1.0.0",
+        html_url: "https://github.com/acme/polaris/releases/tag/tv-v1.0.0",
+        published_at: "2026-01-01T00:00:00Z",
+        assets: assets.map((name) => ({
+            name,
+            browser_download_url: `https://example.test/${name}`
+        }))
+    });
+
+    it("is false with no TV release at all", () => {
+        const others: ReleaseListing[] = [
+            { ...tv(["polaris-tv.apk", "SHA256SUMS"]), tag_name: "desktop-v1.0.0" }
+        ];
+        expect(tvInstallable(pickRelease(others, TV_TAG_PREFIX))).toBe(false);
+        expect(tvInstallable(null)).toBe(false);
+    });
+
+    it("is false for a release missing the APK or its checksums", () => {
+        expect(tvInstallable(pickRelease([tv(["SHA256SUMS"])], TV_TAG_PREFIX))).toBe(false);
+        expect(tvInstallable(pickRelease([tv(["polaris-tv.apk"])], TV_TAG_PREFIX))).toBe(false);
+    });
+
+    it("is true for a published release with both", () => {
+        expect(
+            tvInstallable(pickRelease([tv(["polaris-tv.apk", "SHA256SUMS"])], TV_TAG_PREFIX))
+        ).toBe(true);
+    });
+
+    it("ignores a draft or a prerelease", () => {
+        const both = ["polaris-tv.apk", "SHA256SUMS"];
+        expect(tvInstallable(pickRelease([{ ...tv(both), draft: true }], TV_TAG_PREFIX))).toBe(
+            false
+        );
+        expect(tvInstallable(pickRelease([{ ...tv(both), prerelease: true }], TV_TAG_PREFIX))).toBe(
+            false
+        );
     });
 });

@@ -29,10 +29,49 @@ export interface DesktopVpnStatus {
     readonly nodeId: string | null;
 }
 
+/** Where installing on a TV has got to, as `desktop/src/shared/bridge.ts` names it. */
+export type DesktopTvPhase =
+    | "ready"
+    | "searching"
+    | "connecting"
+    | "allow"
+    | "checking"
+    | "backup"
+    | "download"
+    | "install"
+    | "home"
+    | "closing"
+    | "done"
+    | "failed";
+
+export interface DesktopTvState {
+    readonly phase: DesktopTvPhase;
+    /** Addresses on the computer's network that answer on the ADB port. */
+    readonly found: readonly string[];
+    /** How it ended; an app newer than this page may name one it does not know. */
+    readonly outcome: string | null;
+    /** The folder on the computer the TV's backup was written to. */
+    readonly backup: string | null;
+    /** Whether network debugging refused afterwards; null until checked. */
+    readonly closed: boolean | null;
+}
+
+/** Installing on a TV from a dialog on this page, through the app. */
+export interface DesktopTv {
+    state(): Promise<DesktopTvState | null>;
+    find(): Promise<DesktopTvState | null>;
+    /** Stops a search; an install under way runs to its end. */
+    cancel(): Promise<DesktopTvState | null>;
+    start(input: { readonly host: string; readonly home: boolean }): Promise<boolean>;
+    onState(listener: (state: DesktopTvState) => void): () => void;
+}
+
 export interface PolarisDesktop {
     readonly version: string;
     /** Absent on an app older than Polaris TV. */
     openTvInstall?(): Promise<boolean>;
+    /** The install driven from a dialog. Absent on an app older than that. */
+    readonly tv?: DesktopTv;
     readonly platform: string;
     /** This computer's VPN. Absent from an app older than the feature. */
     readonly vpn?: {

@@ -1341,7 +1341,7 @@
             }
         },
         "web": {
-            "title": "Polaris como app"
+            "title": "O como app, desde el navegador"
         },
         "desktop": {
             "description": "Polaris en tu ordenador, para Windows, macOS y Linux. Despliega desde tu propia máquina y vigila tus servicios en su propia ventana."
@@ -1411,7 +1411,64 @@
             "install": "Instalar en una TV",
             "needsApp": "Para instalarla hace falta la app de escritorio de Polaris en un equipo de la misma red que la TV.",
             "updateApp": "Actualiza esta app para instalar en una TV.",
-            "supported": "Solo Android TV y Google TV. Las TV Samsung, LG, Roku, Vizio y VIDAA no pueden usarla."
+            "supported": "Solo Android TV y Google TV. Las TV Samsung, LG, Roku, Vizio y VIDAA no pueden usarla.",
+            "openApp": "Abrir Polaris Desktop",
+            "notReleased": "Polaris TV aún no se ha publicado. Podrás instalarla desde aquí cuando lo esté.",
+            "dialog": {
+                "title": "Instalar Polaris TV",
+                "intro": "Para Android TV y Google TV de esta red. En la TV, activa las opciones de desarrollador y luego la depuración USB y la de red.",
+                "connectingApp": "Consultando la app de escritorio...",
+                "refused": "La app de escritorio no dejó instalar desde esta página. Usa \"Install on a TV\" en su menú.",
+                "address": "IP de la TV",
+                "addressInvalid": "Escribe la dirección de la TV en esta red, como 192.168.1.50.",
+                "find": "Buscar TVs",
+                "stopSearch": "Parar búsqueda",
+                "noneFound": "Ninguna TV respondió en esta red. Escribe su dirección.",
+                "makeHome": "Hacerla la pantalla de inicio. La de la TV sigue instalada.",
+                "backupNote": "Primero se guarda en este equipo una copia de los ajustes de la TV. No se desinstala nada y la depuración de red se apaga al final.",
+                "notStarted": "No se pudo iniciar la instalación. Revisa la dirección y vuelve a intentarlo.",
+                "start": "Instalar",
+                "cancel": "Cancelar",
+                "close": "Cerrar",
+                "keepsGoing": "Si cierras esto, la instalación sigue en la app de escritorio.",
+                "debugClosed": "La depuración de red está cerrada en la TV.",
+                "debugOpen": "La depuración de red sigue activa. Apágala en las opciones de desarrollador de la TV.",
+                "backupKept": "Copia guardada en este equipo: {path}",
+                "opening": "Abriendo Polaris Desktop...",
+                "opened": "Sigue en Polaris Desktop. Esta página se abre allí con el instalador.",
+                "notOpened": "Polaris Desktop no se abrió. Si no está en este equipo, descárgalo aquí:",
+                "phone": "Instalar en una TV requiere un ordenador en la red de la TV. Aún no hay app para móvil, así que abre esta página en ese ordenador.",
+                "steps": {
+                    "searching": "Buscando TVs en esta red...",
+                    "connecting": "Conectando con la TV...",
+                    "allow": "En la TV, elige Permitir en el aviso de depuración.",
+                    "checking": "Comprobando la TV...",
+                    "backup": "Guardando una copia de los ajustes de la TV...",
+                    "download": "Descargando Polaris TV...",
+                    "install": "Instalando...",
+                    "home": "Haciéndola la pantalla de inicio...",
+                    "closing": "Cerrando la depuración de red en la TV..."
+                },
+                "outcomes": {
+                    "installed": "Polaris TV está instalada. Búscala entre las apps de la TV.",
+                    "installed-home": "Polaris TV está instalada y ya es la pantalla de inicio.",
+                    "installed-home-refused": "Polaris TV está instalada, pero la TV mantuvo su pantalla de inicio. Ábrela desde sus apps.",
+                    "installed-home-unknown": "Polaris TV está instalada, pero la conexión se cortó antes de confirmar el inicio. Pulsa Inicio en la TV.",
+                    "adb-off": "La TV rechazó la conexión. Activa la depuración USB y la de red en sus opciones de desarrollador.",
+                    "not-allowed": "Nadie respondió en la TV. Vuelve a intentarlo y elige Permitir en su aviso.",
+                    "unreachable": "Nada respondió en esa dirección. Comprueba que la TV está encendida y en esta red.",
+                    "not-android-tv": "No es una Android TV ni una Google TV, así que no puede usar Polaris TV.",
+                    "too-old": "Esta TV usa un Android anterior a 8.0, que Polaris TV no admite.",
+                    "not-released": "Polaris TV aún no se ha publicado, así que no hay nada que instalar. La TV no cambió.",
+                    "download-failed": "No se pudo descargar Polaris TV. La TV no cambió. Revisa la conexión de este equipo.",
+                    "key-failed": "Polaris no pudo guardar su clave en este equipo, así que no contactó con la TV. Reinténtalo.",
+                    "connection-lost": "La conexión con la TV se cortó antes de instalar nada. Vuelve a intentarlo.",
+                    "backup-failed": "No se pudo guardar la copia, así que no se instaló nada. Revisa el espacio libre del equipo.",
+                    "sideload-refused": "Esta TV rechaza apps que no vienen de su tienda. No cambió nada en ella.",
+                    "install-failed": "La TV no pudo instalarla. No cambió nada más en ella.",
+                    "install-interrupted": "La conexión se cortó durante la instalación. Busca Polaris TV entre las apps de la TV o reinténtalo."
+                }
+            }
         }
     },
     "cli": {

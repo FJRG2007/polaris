@@ -32,7 +32,12 @@ import { requireUser } from "@/lib/session";
 import { publicAppUrl } from "@/lib/domain-service";
 import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
-import { companionDownload, streamDeckDownload } from "@/lib/app-releases";
+import {
+    companionDownload,
+    streamDeckDownload,
+    tvDownload,
+    tvInstallable
+} from "@/lib/app-releases";
 import { DeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +96,18 @@ export default async function DownloadsPage() {
             repo={repo}
             serverUrl={serverUrl}
             webApp={<InstallAppOffer />}
-            tv={<TvOffer />}
+            tv={
+                <TvOffer
+                    // Not awaited: the card draws now and learns whether there is
+                    // anything to install when GitHub answers.
+                    released={tvDownload(repo).then(tvInstallable)}
+                    download={
+                        <Suspense fallback={<FilesSkeleton />}>
+                            <DesktopFiles repo={repo} />
+                        </Suspense>
+                    }
+                />
+            }
             extensionFiles={
                 <Suspense fallback={<FilesSkeleton />}>
                     <ExtensionFiles repo={repo} />

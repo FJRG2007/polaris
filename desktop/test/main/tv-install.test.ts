@@ -191,15 +191,29 @@ describe("what it agrees to touch", () => {
 });
 
 describe("who may use the window's channels", () => {
-    registerTvInstall();
+    // The TV window here; ipc.ts also lets a Polaris window on its own Polaris in.
+    registerTvInstall((event) => (event.sender as unknown as { kind: string }).kind === "tv");
+    const sent: unknown[] = [];
+    const sender = (kind: string) => ({
+        kind,
+        once: () => undefined,
+        isDestroyed: () => false,
+        send: (_channel: string, state: unknown) => sent.push(state)
+    });
     const call = (channel: string, kind: string, raw?: unknown) =>
-        handlers.get(channel)?.({ sender: { kind } }, raw);
+        handlers.get(channel)?.({ sender: sender(kind) }, raw);
 
     it("answers only the TV window", async () => {
         expect(await call(CHANNELS.tvState, "polaris")).toBeNull();
         expect(await call(CHANNELS.tvFind, "connect")).toBeNull();
         expect(await call(CHANNELS.tvStart, "polaris", { host: "192.168.1.50", home: true })).toBe(false);
         expect(await call(CHANNELS.tvState, "tv")).toMatchObject({ phase: "ready" });
+        expect(await call(CHANNELS.tvCancel, "polaris")).toBeNull();
+    });
+
+    it("cancels only a search, and leaves anything else as it was", async () => {
+        expect(await call(CHANNELS.tvCancel, "tv")).toMatchObject({ phase: "ready" });
+        expect(sent).toEqual([]);
     });
 
     it("refuses what is not a private address, or not the right shape", async () => {

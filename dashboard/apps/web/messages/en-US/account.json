@@ -1341,7 +1341,7 @@
             }
         },
         "web": {
-            "title": "Polaris as an app"
+            "title": "Or as an app, from your browser"
         },
         "desktop": {
             "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window."
@@ -1411,7 +1411,64 @@
             "install": "Install on a TV",
             "needsApp": "Installing takes the Polaris desktop app on a computer on the same network as the TV.",
             "updateApp": "Update this app to install on a TV.",
-            "supported": "Android TV and Google TV only. Samsung, LG, Roku, Vizio and VIDAA sets cannot run it."
+            "supported": "Android TV and Google TV only. Samsung, LG, Roku, Vizio and VIDAA sets cannot run it.",
+            "openApp": "Open Polaris Desktop",
+            "notReleased": "Polaris TV has not been published yet. It can be installed from here once it is.",
+            "dialog": {
+                "title": "Install Polaris TV",
+                "intro": "For Android TV and Google TV on this network. On the TV, turn on Developer options, then USB debugging and Network debugging.",
+                "connectingApp": "Asking the desktop app...",
+                "refused": "The desktop app did not let this page install. Use \"Install on a TV\" in its menu instead.",
+                "address": "TV address",
+                "addressInvalid": "Type the TV's address on this network, like 192.168.1.50.",
+                "find": "Find TVs",
+                "stopSearch": "Stop search",
+                "noneFound": "No TV answered on this network. Type its address instead.",
+                "makeHome": "Make it the Home screen. The TV's own stays installed.",
+                "backupNote": "A backup of the TV's settings is saved on this computer first. Nothing is uninstalled, and network debugging is turned off at the end.",
+                "notStarted": "The install could not start. Check the address and try again.",
+                "start": "Install",
+                "cancel": "Cancel",
+                "close": "Close",
+                "keepsGoing": "Closing this leaves the install running in the desktop app.",
+                "debugClosed": "Network debugging is closed on the TV.",
+                "debugOpen": "Network debugging is still on. Turn it off in the TV's Developer options.",
+                "backupKept": "Backup kept on this computer: {path}",
+                "opening": "Opening Polaris Desktop...",
+                "opened": "Carry on in Polaris Desktop. This page opens there with the installer.",
+                "notOpened": "Polaris Desktop did not open. If it is not on this computer, download it here:",
+                "phone": "Installing on a TV takes a computer on the TV's network. There is no phone app yet, so open this page on that computer.",
+                "steps": {
+                    "searching": "Looking for TVs on this network...",
+                    "connecting": "Connecting to the TV...",
+                    "allow": "On the TV, choose Allow on the debugging prompt.",
+                    "checking": "Checking the TV...",
+                    "backup": "Saving a backup of the TV's settings...",
+                    "download": "Downloading Polaris TV...",
+                    "install": "Installing...",
+                    "home": "Making it the Home screen...",
+                    "closing": "Closing network debugging on the TV..."
+                },
+                "outcomes": {
+                    "installed": "Polaris TV is installed. Find it among the TV's apps.",
+                    "installed-home": "Polaris TV is installed and is now the Home screen.",
+                    "installed-home-refused": "Polaris TV is installed, but the TV kept its own Home screen. Open it from the TV's apps.",
+                    "installed-home-unknown": "Polaris TV is installed, but the connection dropped before Home was confirmed. Press Home on the TV to check.",
+                    "adb-off": "The TV refused the connection. Turn on USB debugging and Network debugging in its Developer options.",
+                    "not-allowed": "Nobody answered on the TV. Try again and choose Allow on its prompt.",
+                    "unreachable": "Nothing answered at that address. Check that the TV is on and on this network.",
+                    "not-android-tv": "This is not an Android TV or Google TV, so it cannot run Polaris TV.",
+                    "too-old": "This TV runs Android older than 8.0, which Polaris TV does not support.",
+                    "not-released": "Polaris TV has not been published yet, so there is nothing to install. Nothing changed on the TV.",
+                    "download-failed": "Polaris TV could not be downloaded. Nothing changed on the TV. Check this computer's connection.",
+                    "key-failed": "Polaris could not save its key on this computer, so it did not contact the TV. Try again.",
+                    "connection-lost": "The connection to the TV dropped before anything was installed. Try again.",
+                    "backup-failed": "The backup could not be saved, so nothing was installed. Check this computer's free space.",
+                    "sideload-refused": "This TV refuses apps that do not come from its store. Nothing changed on it.",
+                    "install-failed": "The TV could not install it. Nothing else changed on it.",
+                    "install-interrupted": "The connection dropped during the install. Look for Polaris TV among the TV's apps, or try again."
+                }
+            }
         }
     },
     "cli": {

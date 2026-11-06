@@ -17,7 +17,8 @@ import {
     type GameActivity,
     type NoticeAction,
     type NoticeReply,
-    type PolarisDesktop
+    type PolarisDesktop,
+    type TvInstallState
 } from "@/shared/bridge";
 
 const version = process.argv.find((arg) => arg.startsWith(VERSION_ARGUMENT))?.slice(VERSION_ARGUMENT.length) ?? "";
@@ -59,6 +60,19 @@ const bridge: PolarisDesktop = {
     runningPrograms: () => ipcRenderer.invoke(CHANNELS.gamePrograms),
     installTool: (input) => ipcRenderer.invoke(CHANNELS.installTool, input),
     openTvInstall: () => ipcRenderer.invoke(CHANNELS.tvOpen),
+    tv: {
+        state: () => ipcRenderer.invoke(CHANNELS.tvState),
+        find: () => ipcRenderer.invoke(CHANNELS.tvFind),
+        cancel: () => ipcRenderer.invoke(CHANNELS.tvCancel),
+        start: (input) => ipcRenderer.invoke(CHANNELS.tvStart, input),
+        onState: (listener) => {
+            const heard = (_event: unknown, state: TvInstallState) => listener(state);
+            ipcRenderer.on(CHANNELS.tvEvent, heard);
+            return () => {
+                ipcRenderer.removeListener(CHANNELS.tvEvent, heard);
+            };
+        }
+    },
     defaultBrowser: () => ipcRenderer.invoke(CHANNELS.defaultBrowser),
     systemIdle: () => ipcRenderer.invoke(CHANNELS.systemIdle),
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),

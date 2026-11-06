@@ -57,57 +57,6 @@ function TitleBar({ children }: { children?: ReactNode }) {
     );
 }
 
-/** Polaris in a window of its own: the rail, a header, three figures and a chart. */
-export function WebAppPreview() {
-    return (
-        <Frame className="max-w-xl">
-            <TitleBar>
-                <Line className="mx-auto w-24" />
-            </TitleBar>
-            <div className="flex h-full">
-                <div className="flex w-12 shrink-0 flex-col items-center gap-2.5 border-r border-border bg-surface py-3">
-                    <span className="size-5 rounded-md bg-primary/80" />
-                    {[0, 1, 2, 3, 4].map((key) => (
-                        <span key={key} className="size-4 rounded bg-foreground-subtle/20" />
-                    ))}
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-3 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <Line className="w-28 bg-foreground/30" />
-                        <span className="h-4 w-14 shrink-0 rounded bg-primary/70" />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                        {[0, 1, 2].map((key) => (
-                            <div
-                                key={key}
-                                className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-card p-2"
-                            >
-                                <Line className="w-3/5" />
-                                <Line className="h-2.5 w-4/5 bg-foreground/30" />
-                            </div>
-                        ))}
-                    </div>
-                    <div className="rounded-md border border-border bg-card p-2">
-                        <svg
-                            viewBox="0 0 200 48"
-                            className="h-12 w-full"
-                            preserveAspectRatio="none"
-                        >
-                            <polyline
-                                points="0,40 20,34 40,36 60,24 80,28 100,16 120,20 140,10 160,14 180,6 200,8"
-                                fill="none"
-                                strokeWidth="2"
-                                className="stroke-primary"
-                                vectorEffect="non-scaling-stroke"
-                            />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        </Frame>
-    );
-}
-
 /** A sign-in form with the extension's offer to fill it. */
 export function ExtensionPreview() {
     const t = useTranslations("account");

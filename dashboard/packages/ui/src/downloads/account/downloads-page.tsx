@@ -16,7 +16,7 @@ import { ExtensionCard } from "./extension-card";
 import { AssistantsCard } from "./assistants-card";
 import { Monitor, Smartphone } from "lucide-react";
 import { DownloadCard, DownloadRow, DownloadRows } from "../download-card";
-import { DesktopPreview, PhonePreview, WebAppPreview } from "./download-previews";
+import { DesktopPreview, PhonePreview } from "./download-previews";
 
 /** The phone systems the mobile card names; product names, the same in every language. */
 // i18n-ignore systems' names
@@ -34,7 +34,7 @@ export function DownloadsPage({
     repo: string;
     /** The address the CLI signs in to, or null for the one the page is on. */
     serverUrl: string | null;
-    /** The web app card's body: the browser's install offer. */
+    /** The browser's install offer, drawn in the desktop card as the other way. */
     webApp: ReactNode;
     extensionFiles: ReactNode;
     /** The Stream Deck card. */
@@ -67,9 +67,19 @@ export function DownloadsPage({
                     side={<DesktopPreview />}
                 >
                     {desktopFiles}
+                    {/* The other way to have it in a window of its own: the
+                        browser's install offer, which needs no download. */}
+                    <div
+                        id="app"
+                        className="flex min-w-0 flex-col gap-2 border-t border-border/60 pt-3"
+                    >
+                        <p className="text-xs font-medium text-muted-foreground">
+                            {t("downloads.web.title")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{tc("installApp.intro")}</p>
+                        {webApp}
+                    </div>
                 </DownloadCard>
-
-                {tv}
 
                 <ExtensionCard repo={repo} files={extensionFiles} />
 
@@ -79,17 +89,7 @@ export function DownloadsPage({
 
                 <AssistantsCard />
 
-                {/* The browser's own install offer. Nothing in it waits. */}
-                <DownloadCard
-                    id="app"
-                    tint="violet"
-                    icon={<Monitor className="size-4 shrink-0" />}
-                    title={t("downloads.web.title")}
-                    description={tc("installApp.intro")}
-                    preview={<WebAppPreview />}
-                >
-                    {webApp}
-                </DownloadCard>
+                {tv}
 
                 {/* Present, unlinked and honest. A real plan with nothing built,
                     and saying so is the only thing that can be said about it - a
