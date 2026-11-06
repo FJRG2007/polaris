@@ -21,6 +21,7 @@ import { arrivalsMayAlert } from "@polaris/core";
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
+import { noteStreamConnection, reportDesktopAttention } from "@/lib/notifications/attention-report";
 import { noteSounder } from "@/lib/notifications/sounding-client";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
@@ -185,6 +186,11 @@ export function NotificationsProvider({
      * address for it; two spellings alive at once would be two connections with
      * only one of them elected. See `notifications/stream-path`.
      */
+    // Inside the desktop app, say whether anybody is at this computer, so the
+    // sounds go to a browser somebody is using while the desk sits empty. See
+    // `notifications/attention-report`.
+    useEffect(() => reportDesktopAttention(), []);
+
     const [soundChanged, setSoundChanged] = useState(0);
     useEffect(() => {
         const moved = () => setSoundChanged((was) => was + 1);
@@ -194,11 +200,12 @@ export function NotificationsProvider({
 
     useEffect(
         () =>
-            subscribeSharedStream(notificationStreamPath(shelf), scope, ({ data }) => {
+            subscribeSharedStream(notificationStreamPath(shelf), scope, ({ data, owner }) => {
                 // Before anything below can skip the frame: which kind of client
                 // makes the sounds is not part of the feed, and a frame dropped
                 // here would leave it stale until the next change.
                 noteSounder(data);
+                noteStreamConnection(data, owner);
                 if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
                 try {
                     const payload = JSON.parse(data) as {

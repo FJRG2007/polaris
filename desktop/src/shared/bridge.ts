@@ -99,6 +99,11 @@ export interface PolarisDesktop {
     openTvInstall(): Promise<boolean>;
     /** The system's default browser, by a name of ours, or null. */
     defaultBrowser(): Promise<string | null>;
+    /** Whether somebody is at this computer: `idle` once nothing has been
+     *  typed or moved for a couple of minutes, `locked` behind the lock
+     *  screen. The dashboard lets a browser elsewhere make the sounds while
+     *  nobody is here. */
+    systemIdle(): Promise<SystemIdle>;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
     /** Show what is waiting on the app's own icon - the taskbar button, the
@@ -331,6 +336,9 @@ export interface NoticeReply {
     readonly text: string;
 }
 
+/** What `powerMonitor.getSystemIdleState` answers. */
+export type SystemIdle = "active" | "idle" | "locked" | "unknown";
+
 export const CHANNELS = {
     notify: "desktop:notify",
     noticeReply: "desktop:notice-reply",
@@ -345,6 +353,7 @@ export const CHANNELS = {
     gamePrograms: "desktop:game-programs",
     installTool: "desktop:install-tool",
     defaultBrowser: "desktop:default-browser",
+    systemIdle: "desktop:system-idle",
     openServers: "desktop:open-servers",
     appBadge: "desktop:app-badge",
     shareSources: "desktop:share-sources",

@@ -125,6 +125,10 @@ export async function GET(request: Request): Promise<Response> {
                         // both make. Null for a connection that did not declare
                         // itself, which does not read it.
                         sounder: kind === null ? null : chimingKind(userId),
+                        // This connection's name, so the client holding it can say
+                        // whether anybody is at its computer (`../attention`). Only
+                        // for a connection that takes part in the election.
+                        connection: kind === null ? null : connection,
                         // Do not disturb, as the server works it out. The client
                         // stays silent for anything but a critical arrival while
                         // it is on, so a tab that missed the change cannot ring.

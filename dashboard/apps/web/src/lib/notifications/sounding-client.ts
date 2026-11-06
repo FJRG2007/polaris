@@ -11,8 +11,9 @@
  * kind yields: the desktop app wins whenever it is open and willing to ring.
  *
  * The server cannot tell which computer a connection comes from, so the app open
- * on one machine also quiets a browser on another. That is the trade taken: a
- * sound that plays on the desk somebody is at, rather than on every desk.
+ * on one machine also quiets a browser on another - but only while somebody is at
+ * the app's machine. The app reports when its computer sits untouched
+ * (`attention-report`), and then the browser being used elsewhere sounds instead.
  *
  * Nothing here can make Polaris silent. Until a frame says otherwise - a server
  * that predates this, a page without the stream - nobody yields.
