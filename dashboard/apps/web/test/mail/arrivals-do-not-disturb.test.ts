@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let quiet: boolean | Error = false;
 
 vi.mock("@/lib/api-session", () => ({ apiPermission: async () => ({ id: "ada" }) }));
+vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/mailbox/arrivals", () => ({
     arrivalsSince: async (_user: string, since: Date | null) => ({
         cursor: "2026-10-21T10:00:00.000Z",

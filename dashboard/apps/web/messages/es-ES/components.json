@@ -94,6 +94,9 @@
     },
     "mailUnread": {
         "title": "Correo nuevo",
+        "from": "Correo nuevo de {from}",
+        "somebody": "Alguien",
+        "noSubject": "(sin asunto)",
         "more": "{count, plural, one {# mensaje más} other {# mensajes más}} en tu bandeja de entrada"
     },
     "picture": {

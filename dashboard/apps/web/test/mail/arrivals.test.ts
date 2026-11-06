@@ -91,6 +91,21 @@ describe("what is worth announcing", () => {
         ]);
         expect(answer.more).toBe(5);
     });
+
+    it("fills a missing sender and subject in the reader's words", async () => {
+        rows = [{ threadId: "t1", subject: " ", fromJson: [] }];
+        total = 1;
+        const since = new Date("2026-09-10T10:00:00Z");
+        const words = { somebody: "Alguien", noSubject: "(sin asunto)" };
+        const answer = await arrivalsSince("u1", since, words);
+        expect(answer.named).toEqual([
+            { threadId: "t1", from: "Alguien", subject: "(sin asunto)" }
+        ]);
+        const fallback = await arrivalsSince("u1", since);
+        expect(fallback.named).toEqual([
+            { threadId: "t1", from: "Someone", subject: "(no subject)" }
+        ]);
+    });
 });
 
 describe("which mailboxes are announced", () => {

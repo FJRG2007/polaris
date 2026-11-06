@@ -124,6 +124,35 @@ function laterOf(left: string | null, right: string | null): string | null {
     return a >= b ? left : right;
 }
 
+/** Long enough for any real name; the desktop app refuses a title over 200. */
+const SENDER_MAX = 120;
+
+function clipped(from: string): string {
+    return from.length > SENDER_MAX ? `${from.slice(0, SENDER_MAX - 3)}...` : from;
+}
+
+/**
+ * Move the cursor to now without announcing anything: what arrived while
+ * somebody was looking at Polaris was on their screen.
+ *
+ * Frames used to be acted on only while nobody was looking, so the cursor
+ * stood still for as long as Polaris had their attention. The first frame after
+ * they looked away - and a pass sends one every twenty seconds - then announced
+ * every unread message since, which is how mail that came in an hour earlier
+ * arrived as a notice an hour late.
+ *
+ * Moved on a frame seen while watched rather than on leaving the tab: a frame
+ * still settling when somebody looks away is mail they never saw, and a cursor
+ * moved past it on the way out would drop it without a notice.
+ */
+async function catchUp(cursor: { current: string | null }): Promise<void> {
+    if (!canNotify() || !noticeAllowed("mail")) return;
+    const answer = await fetchArrivals(null);
+    if (!answer) return;
+    cursor.current = laterOf(cursor.current, answer.cursor);
+    keepSharedCursor(laterOf(sharedCursor(), answer.cursor) ?? answer.cursor);
+}
+
 /**
  * Tell the system about mail that arrived while Polaris was out of sight.
  *
@@ -151,7 +180,9 @@ async function announceArrivals(
     keepSharedCursor(answer.cursor);
     for (const arrival of answer.named) {
         await notifyDesktop({
-            title: arrival.from,
+            // Says it is mail: a bare name over a subject read as a chat message
+            // or anything else, and the system's notice centre gives no other clue.
+            title: t("mailUnread.from", { from: clipped(arrival.from) }),
             body: arrival.subject,
             tag: `mail:${arrival.threadId}`,
             href: `/mail/t/${arrival.threadId}`
@@ -165,6 +196,25 @@ async function announceArrivals(
             href: "/mail"
         });
     }
+}
+
+/**
+ * What a settled mail frame does about notices.
+ *
+ * Watched, the mail is on screen and the cursor moves past it. Not watched, the
+ * tab that took the frame off the wire announces it - five open tabs are one
+ * notice. Another tab of the device being the watched one moves the cursor all
+ * of them read, so its owner does not announce what was looked at.
+ */
+export async function noticeMailFrame(
+    cursor: { current: string | null },
+    owner: boolean,
+    t: NamespaceTranslator<"components">
+): Promise<void> {
+    // The desktop app, when it is the one the server elected, draws mail notices
+    // instead of the browser - never both - and this tab keeps its cursor level.
+    if (tabIsWatched() || anotherClientSounds()) return catchUp(cursor);
+    if (owner) return announceArrivals(cursor, t);
 }
 
 /**
@@ -282,14 +332,7 @@ export function MailUnreadProvider({
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(() => {
                 recount();
-                // A notice belongs to the device, not the tab, so only the tab
-                // that took the frame off the wire raises one - five open tabs
-                // are one notice. And only when nobody is looking at Polaris:
-                // the list is already on screen for somebody who is.
-                // The desktop app, when it is the one the server elected, draws
-                // them instead of the browser - never both.
-                if (owner && !tabIsWatched() && !anotherClientSounds())
-                    void announceArrivals(cursor, words.current);
+                void noticeMailFrame(cursor, owner, words.current);
             }, SETTLE_MS);
         });
         return () => {
