@@ -379,6 +379,7 @@ jobs:
       # than the one the published image carries.
       - name: Save the layer cache
         if: env.PUBLISH == 'true'
+        continue-on-error: true
         uses: docker/build-push-action@v7
         with:
           context: dashboard
