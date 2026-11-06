@@ -28,7 +28,6 @@ export function TvOffer() {
         <DownloadCard
             id="tv"
             tint="sky"
-            className="lg:col-span-2"
             icon={<Tv className="size-4 shrink-0" />}
             title={t("downloads.tv.title")}
             description={t("downloads.tv.description")}
