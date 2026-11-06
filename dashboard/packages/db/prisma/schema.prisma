@@ -8889,6 +8889,11 @@ model AgentSession {
     // hooks - is probed rather than failed, and not probed again until it has
     // been quiet for another stretch.
     lastAliveAt DateTime?
+    // The agent's own id for its conversation and where it keeps the transcript,
+    // as its hooks last reported them. What the Resume button reopens. Null until
+    // a hook sends a value that passes the checks in the events route.
+    vendorSessionId String?
+    transcriptPath  String?
     startedAt   DateTime?
     finishedAt  DateTime?
     // When the owner was told this session needs them, for the waiting episode

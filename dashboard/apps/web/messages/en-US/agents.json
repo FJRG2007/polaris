@@ -190,7 +190,9 @@
             "saySomething": "Say something",
             "gone": "That session no longer exists.",
             "ended": "That session has ended.",
-            "noAnswer": "The machine running this session did not answer."
+            "noAnswer": "The machine running this session did not answer.",
+            "notResumable": "There is no conversation to reopen for this session yet.",
+            "stillRunning": "The agent is still running, so there is nothing to resume."
         },
         "taskNote": "Handed to an agent. It is working on `{branch}` in {repo}: [the session]({href}).",
         "start": "Start a session",
@@ -263,6 +265,8 @@
         "attach": "Take the terminal",
         "look": "See its screen",
         "interrupt": "Interrupt",
+        "resume": "Resume",
+        "resumeHint": "The agent exited. Reopen it on the same conversation.",
         "gettingReady": "Getting the machine ready.",
         "installsOnce": "The installs happen once. This machine keeps its home, so your next session skips them and starts in seconds.",
         "terminal": "The agent's terminal",

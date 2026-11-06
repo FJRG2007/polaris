@@ -19,7 +19,7 @@
  * slow one is felt as the agent being slow.
  */
 
-import type { AgentSessionEventKind } from "@polaris/core";
+import { isTranscriptPath, isVendorSessionId, type AgentSessionEventKind } from "@polaris/core";
 
 /**
  * The events Polaris asks Claude Code to report.
@@ -328,4 +328,27 @@ export function hookEventFailed(payload: unknown): boolean {
     if (!response || typeof response !== "object") return false;
     const record = response as Record<string, unknown>;
     return record.success === false || typeof record.error === "string";
+}
+
+/** What a hook said about the conversation itself, rather than about a turn. */
+export interface HookConversation {
+    readonly vendorSessionId: string | null;
+    readonly transcriptPath: string | null;
+}
+
+/**
+ * The agent's own id for its conversation and where it keeps the transcript.
+ *
+ * Every Claude hook carries both, whatever the event. Each is kept only if it
+ * passes its check - the id ends up typed into a shell by the Resume button - and
+ * one that does not is read as absent rather than as a reason to drop the event.
+ */
+export function hookConversation(payload: unknown): HookConversation {
+    if (!payload || typeof payload !== "object")
+        return { vendorSessionId: null, transcriptPath: null };
+    const record = payload as Record<string, unknown>;
+    return {
+        vendorSessionId: isVendorSessionId(record.session_id) ? record.session_id : null,
+        transcriptPath: isTranscriptPath(record.transcript_path) ? record.transcript_path : null
+    };
 }

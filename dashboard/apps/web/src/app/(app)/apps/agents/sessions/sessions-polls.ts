@@ -33,3 +33,10 @@ export const sessionChanges = (
         { input: JSON.stringify(input) },
         signal
     );
+
+export const sessionResumable = (sessionId: string, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.sessionResumableAction>>(
+        "/api/agents/sessions/resumable",
+        { sessionId },
+        signal
+    );

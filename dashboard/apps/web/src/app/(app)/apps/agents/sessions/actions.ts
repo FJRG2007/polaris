@@ -569,3 +569,54 @@ export async function openSessionPullRequestAction(
         }
     };
 }
+
+// ---------------------------------------------------------------------------
+// Resume
+//
+// An agent that exited leaves its window at a shell, with the session still
+// alive around it. Resume types the launch line back in on the conversation its
+// hooks last reported. For whoever may steer the session, like every control
+// above, and only once the terminal itself says the agent is gone - typed into a
+// running agent, the line would be a prompt.
+// ---------------------------------------------------------------------------
+
+const resumeInputSchema = z.object({ sessionId: sessionIdSchema }).strict();
+
+/** The conversation a session's agent could be reopened on, or null. */
+async function resumableConversation(session: sessions.SessionView): Promise<string | null> {
+    if (core.agentResumeStyle(session.cli) === "") return null;
+    return sessions.sessionVendorId(session.id);
+}
+
+/** Whether the Resume button belongs on the screen right now. */
+export async function sessionResumableAction(sessionId: string): Promise<{ resumable: boolean }> {
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { resumable: false };
+    const session = await controlledSession(parsed.data);
+    if (!session || core.isSessionOver(session.state) || session.state === "starting")
+        return { resumable: false };
+    if (!(await resumableConversation(session))) return { resumable: false };
+    return { resumable: await runtime.agentHasExited(session.id) };
+}
+
+export async function resumeSessionAction(input: unknown): Promise<{ error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = resumeInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
+    const conversation = await resumableConversation(session);
+    if (!conversation) return { error: t("sessions.errors.notResumable") };
+    // Asked again rather than trusted from the screen: the button was drawn up to
+    // a poll ago, and somebody may have started the agent by hand since.
+    if (!(await runtime.agentHasExited(session.id)))
+        return { error: t("sessions.errors.stillRunning") };
+    try {
+        await runtime.resumeAgent(session.id, conversation);
+    } catch (error) {
+        return { error: agentText(t, sessions.readableFailure(error, `resuming ${session.id}`)) };
+    }
+    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
+    return {};
+}

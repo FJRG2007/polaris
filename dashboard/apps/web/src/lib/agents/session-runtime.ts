@@ -770,6 +770,27 @@ export async function interruptSession(sessionId: string): Promise<void> {
     );
 }
 
+/**
+ * Whether the session's agent has exited and left its window at the shell.
+ *
+ * A machine that does not answer is "no": the button this feeds types into the
+ * terminal, and typing on a guess is how a launch line ends up as a prompt.
+ */
+export async function agentHasExited(sessionId: string): Promise<boolean> {
+    const result = await runInSession(sessionId, commands.agentExitedCommand()).catch(() => null);
+    return result?.code === 0;
+}
+
+/** Bring the agent back on its conversation, typed into the shell it left. */
+export async function resumeAgent(sessionId: string, vendorSessionId: string): Promise<void> {
+    await steer(
+        sessionId,
+        commands.resumeCommand(vendorSessionId),
+        "The session's terminal did not take the resume"
+    );
+    await steer(sessionId, commands.submitCommand(), "The resume was typed but not submitted");
+}
+
 /** What the agent's terminal currently shows. */
 export async function captureSession(sessionId: string, lines = 200): Promise<string> {
     const result = await runInSession(sessionId, commands.captureCommand(lines));

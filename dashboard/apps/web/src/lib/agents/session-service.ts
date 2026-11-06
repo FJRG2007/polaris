@@ -11,7 +11,7 @@
  * second answer to "may I" here that could drift from the first.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
@@ -554,6 +554,45 @@ export async function recordSessionEvents(
     }
     console.error(`[agent-session] ${sessionId}: gave up recording events after repeated races`);
     return null;
+}
+
+/**
+ * Keep the agent's own conversation id and transcript path, as a hook reported
+ * them (already checked by `hookConversation`).
+ *
+ * Every hook carries them, so this runs on the agent's hot path: the update only
+ * matches a row whose values differ, and a session already holding them is one
+ * indexed read with nothing written. Latest wins - a cleared conversation is a
+ * new id, and that is the one a Resume should reopen.
+ */
+export async function recordSessionConversation(
+    sessionId: string,
+    conversation: { vendorSessionId: string | null; transcriptPath: string | null }
+): Promise<void> {
+    const { vendorSessionId, transcriptPath } = conversation;
+    if (vendorSessionId === null && transcriptPath === null) return;
+    const differs: Prisma.AgentSessionWhereInput[] = [];
+    if (vendorSessionId !== null)
+        differs.push({ vendorSessionId: null }, { vendorSessionId: { not: vendorSessionId } });
+    if (transcriptPath !== null)
+        differs.push({ transcriptPath: null }, { transcriptPath: { not: transcriptPath } });
+    await prisma.agentSession.updateMany({
+        where: { id: sessionId, OR: differs },
+        data: {
+            ...(vendorSessionId !== null ? { vendorSessionId } : {}),
+            ...(transcriptPath !== null ? { transcriptPath } : {})
+        }
+    });
+}
+
+/** The agent's own id for the session's conversation, or null for none known. */
+export async function sessionVendorId(sessionId: string): Promise<string | null> {
+    const row = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { vendorSessionId: true }
+    });
+    // Checked again on the way out: the column is older than any one build.
+    return row && core.isVendorSessionId(row.vendorSessionId) ? row.vendorSessionId : null;
 }
 
 /**

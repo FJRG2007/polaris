@@ -386,3 +386,28 @@ export function agentResumeStyle(cliId: string): "flag" | "subcommand" | "" {
     if (cliId === "codex") return "subcommand";
     return "";
 }
+
+/**
+ * An agent's own id for one of its conversations, as its hooks report it.
+ *
+ * Narrow on purpose: the id comes from a payload the agent's machine sent and
+ * ends up typed into a shell by the Resume button, so anything but the letters,
+ * digits and dashes these ids are made of is refused rather than quoted.
+ */
+export function isVendorSessionId(value: unknown): value is string {
+    return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+/**
+ * Where an agent says it keeps a conversation's transcript, as its hooks report it.
+ *
+ * Only stored, never opened or typed anywhere today, but it is still text from
+ * the agent's machine: an absolute path of printable characters with no `..`
+ * segment, short enough for a column, or nothing.
+ */
+export function isTranscriptPath(value: unknown): value is string {
+    if (typeof value !== "string" || value.length > 1024 || !value.startsWith("/")) return false;
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000-\u001f\u007f]/.test(value)) return false;
+    return !value.split("/").includes("..");
+}

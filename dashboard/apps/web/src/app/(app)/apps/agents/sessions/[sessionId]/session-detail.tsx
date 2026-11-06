@@ -19,7 +19,16 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import * as polls from "../sessions-polls";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { bootProgress, type BootStep } from "@/lib/agents/boot-progress";
-import { Check, CircleDot, GitBranch, Loader2, Send, Square, TriangleAlert } from "lucide-react";
+import {
+    Check,
+    CircleDot,
+    GitBranch,
+    Loader2,
+    Play,
+    Send,
+    Square,
+    TriangleAlert
+} from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { SessionChanges, ShipPullRequest } from "./session-changes";
 import {
@@ -37,6 +46,7 @@ import {
     interruptSessionAction,
     promptSessionAction,
     discardSessionWorkAction,
+    resumeSessionAction,
     retrySessionPushAction,
     stopSessionAction
 } from "../actions";
@@ -45,6 +55,10 @@ import { agentText, SESSION_EVENT_KEYS as EVENT_KEYS, sessionStateWord } from "@
 
 /** Fast while something is happening. A session that has finished polls nothing. */
 const REFRESH_MS = 3000;
+
+/** How often an open session asks whether its agent has exited. Slower than the
+ *  page itself: each ask runs a command on the session's machine. */
+const RESUMABLE_MS = 15000;
 
 const TONE: Record<core.AgentSessionState, string> = {
     starting: "text-muted-foreground",
@@ -107,6 +121,35 @@ export function SessionDetail({
     const bottom = useRef<HTMLDivElement>(null);
 
     const over = core.isSessionOver(session.state);
+    /** Whether the agent exited and can be reopened on its conversation. Asked
+     *  of the machine, only for somebody who may steer the session. */
+    const [resumable, setResumable] = useState(false);
+    const watchExit = canControl && !shared && !over && session.state !== "starting";
+
+    useEffect(() => {
+        if (!watchExit) {
+            setResumable(false);
+            return;
+        }
+        let stopped = false;
+        const controller = new AbortController();
+        const read = () => {
+            void polls
+                .sessionResumable(session.id, controller.signal)
+                .then((result) => {
+                    if (!stopped) setResumable(result?.resumable === true);
+                })
+                // A machine that did not answer offers nothing to resume.
+                .catch(() => undefined);
+        };
+        read();
+        const stopPolling = pollWhileVisible(read, RESUMABLE_MS);
+        return () => {
+            stopped = true;
+            controller.abort();
+            stopPolling();
+        };
+    }, [session.id, watchExit]);
 
     useEffect(() => {
         if (over) return;
@@ -198,6 +241,23 @@ export function SessionDetail({
         });
     };
 
+    const resume = () => {
+        startTransition(() => {
+            void runAction(() => resumeSessionAction({ sessionId: session.id }), setError).then(
+                (result) => {
+                    if (result?.error) {
+                        setError(result.error);
+                        return;
+                    }
+                    // Gone at once: the agent is starting, and a second press
+                    // would type the launch line into it.
+                    setResumable(false);
+                    router.refresh();
+                }
+            );
+        });
+    };
+
     const stop = () => {
         startTransition(() => {
             void runAction(() => stopSessionAction(session.id), setError).then((result) => {
@@ -268,6 +328,18 @@ export function SessionDetail({
                         <Button size="sm" variant="ghost" onClick={look} disabled={busy}>
                             {t("session.look")}
                         </Button>
+                        {resumable ? (
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={resume}
+                                disabled={busy}
+                                title={t("session.resumeHint")}
+                            >
+                                <Play className="size-4 shrink-0" />
+                                {t("session.resume")}
+                            </Button>
+                        ) : null}
                         <Button size="sm" variant="ghost" onClick={interrupt} disabled={busy}>
                             {t("session.interrupt")}
                         </Button>

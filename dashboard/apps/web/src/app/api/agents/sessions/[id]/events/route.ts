@@ -17,8 +17,12 @@
  * somebody's agent to change what it was doing.
  */
 
-import { hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
-import { recordSessionEvents, sessionForToken } from "@/lib/agents/session-service";
+import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
+import {
+    recordSessionConversation,
+    recordSessionEvents,
+    sessionForToken
+} from "@/lib/agents/session-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { parseHookSequence } from "@polaris/core";
 
@@ -62,6 +66,13 @@ export async function POST(
     } catch {
         return acknowledged();
     }
+
+    // Before the event is read: every hook carries the conversation, including
+    // the ones that say nothing about the state. Best effort - a write that
+    // failed here is a Resume that waits for the next hook, never a lost event.
+    await recordSessionConversation(id, hookConversation(payload)).catch((error) =>
+        console.error(`[agent-session] ${id}: could not keep the conversation id`, error)
+    );
 
     const event = normalizeHookEvent(payload);
     // An event this build cannot place says nothing, and moving the session for a

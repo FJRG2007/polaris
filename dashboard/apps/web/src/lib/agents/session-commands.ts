@@ -29,6 +29,7 @@
 import { shellQuote } from "./session-hooks";
 import {
     FIRST_RUN_WORKDIR,
+    isVendorSessionId,
     promptSubmitDelayMs,
     sanitizeAgentPrompt,
     type AgentFirstRunAnswer
@@ -469,6 +470,36 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
     const raw = `stty -F "${tty}" -a 2>/dev/null | grep -q -- -icanon`;
     const settled = `[ -n "$(find ${AGENT_READY_FLAG} -mmin +${AGENT_SETTLED_MINUTES} 2>/dev/null)" ]`;
     return `test -f ${AGENT_READY_FLAG} && { ${raw} || ${settled}; }`;
+}
+
+/**
+ * Whether the agent has exited and its window is back at the shell.
+ *
+ * The inverse of the question `agentReadyCommand` asks: a full-screen tool
+ * takes the pane out of canonical mode, and the `sh` the window falls back to
+ * leaves it in. So a pane in canonical mode is a shell waiting for a line, which
+ * is the only moment typing a launch into it does what the button says.
+ */
+export function agentExitedCommand(session = TMUX_SESSION): string {
+    const tty = `$(tmux display-message -p -t ${shellQuote(session)} '#{pane_tty}' 2>/dev/null)`;
+    // The flag first: during the boot the pane is the setup script, which is in
+    // canonical mode too and is not an agent that has exited.
+    return `test -f ${AGENT_READY_FLAG} && stty -F "${tty}" -a 2>/dev/null | tr ' ' '\\n' | grep -qx icanon`;
+}
+
+/**
+ * The line typed into that shell to bring the agent back on a conversation.
+ *
+ * The id is checked here and again by the launch script, because it came from a
+ * hook payload - text the agent's machine sent - and it is about to be typed
+ * into a shell. Literal keys rather than a paste: a shell does not ask for
+ * bracketed paste, and the line has no newline to protect.
+ */
+export function resumeCommand(vendorSessionId: string, session = TMUX_SESSION): string {
+    if (!isVendorSessionId(vendorSessionId))
+        throw new Error("That is not a conversation Polaris can reopen.");
+    const line = `sh "$POLARIS_STATE_DIR/launch.sh" ${vendorSessionId}`;
+    return `tmux send-keys -t ${shellQuote(session)} -l ${shellQuote(line)}`;
 }
 
 /**

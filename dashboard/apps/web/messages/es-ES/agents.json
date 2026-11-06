@@ -190,7 +190,9 @@
             "saySomething": "Escribe algo",
             "gone": "Esa sesión ya no existe.",
             "ended": "Esa sesión ha terminado.",
-            "noAnswer": "La máquina que ejecuta esta sesión no respondió."
+            "noAnswer": "La máquina que ejecuta esta sesión no respondió.",
+            "notResumable": "Esta sesión aún no tiene una conversación que reabrir.",
+            "stillRunning": "El agente sigue en marcha, así que no hay nada que reanudar."
         },
         "taskNote": "Entregada a un agente. Está trabajando en `{branch}` en {repo}: [la sesión]({href}).",
         "start": "Iniciar una sesión",
@@ -263,6 +265,8 @@
         "attach": "Tomar el terminal",
         "look": "Ver su pantalla",
         "interrupt": "Interrumpir",
+        "resume": "Reanudar",
+        "resumeHint": "El agente se cerró. Reábrelo en la misma conversación.",
         "gettingReady": "Preparando la máquina.",
         "installsOnce": "Las instalaciones se hacen una vez. Esta máquina conserva su carpeta personal, así que tu próxima sesión se las salta y arranca en segundos.",
         "terminal": "El terminal del agente",
