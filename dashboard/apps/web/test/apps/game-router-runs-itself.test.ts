@@ -40,7 +40,15 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
     }
 }));
 
-const { ROUTER_IMAGE, ROUTER_PROJECT, routerPlacement, routerSpec, startRouter } = await import(
+const {
+    ROUTER_IMAGE,
+    ROUTER_PROJECT,
+    remoteRouterSpec,
+    remoteTableWriteScript,
+    routerPlacement,
+    routerSpec,
+    startRouter
+} = await import(
     "@/lib/minecraft-router"
 );
 
@@ -145,5 +153,32 @@ describe("starting it", () => {
         expect(failure).toBeTruthy();
         expect(failure).not.toMatch(/COMPOSE_PROFILES|docker |\.env/);
         expect(composed).toEqual([]);
+    });
+});
+
+describe("on a connected server", () => {
+    it("is the same project, rendered the same way every time, so deploying it again changes nothing", () => {
+        expect(remoteRouterSpec(25565)).toEqual(remoteRouterSpec(25565));
+        const [service] = remoteRouterSpec(25565).services;
+        expect(remoteRouterSpec(25565).project).toBe(ROUTER_PROJECT);
+        expect(service?.image).toBe(ROUTER_IMAGE);
+    });
+
+    it("reads its own table and dials the servers beside it", () => {
+        const spec = remoteRouterSpec(25565);
+        const [service] = spec.services;
+        // A bind under the remote volume root: nothing of the dashboard's exists there.
+        expect(service?.volumes).toEqual([{ source: ROUTER_PROJECT, target: "/mc-routes", kind: "bind" }]);
+        expect(service?.extraHosts).toEqual(["host.docker.internal:host-gateway"]);
+        expect(service?.networks).toEqual([]);
+        expect(spec.externalVolumes).toBeUndefined();
+        // The knock goes to web:3000, which no network on that machine resolves.
+        expect(service?.env).not.toHaveProperty("AUTO_SCALE_WEBHOOK_URL");
+    });
+
+    it("writes the table in place from stdin, never renamed over the watched file", () => {
+        const script = remoteTableWriteScript();
+        expect(script).toContain("cat > /var/lib/polaris/volumes/polaris-mc-router/mc-routes.json");
+        expect(script).not.toContain("mv ");
     });
 });

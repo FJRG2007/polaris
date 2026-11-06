@@ -504,7 +504,12 @@ export const serverHost = {
     },
     minecraftRouter: {
         startRouter: later(load.minecraftRouter, "startRouter"),
-        stopRouter: later(load.minecraftRouter, "stopRouter")
+        stopRouter: later(load.minecraftRouter, "stopRouter"),
+        readHostTable: later(load.minecraftRouter, "readHostTable"),
+        writeHostTable: later(load.minecraftRouter, "writeHostTable"),
+        routerRunningOn: later(load.minecraftRouter, "routerRunningOn"),
+        startRouterOn: later(load.minecraftRouter, "startRouterOn"),
+        stopRouterOn: later(load.minecraftRouter, "stopRouterOn")
     },
     netPortProbe: {
         probeTcpPort: later(load.netPortProbe, "probeTcpPort"),
