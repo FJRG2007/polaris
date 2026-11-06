@@ -73,12 +73,7 @@ export function claudeHookSettings(scriptPath: string): Record<string, unknown> 
     for (const { event, matcher } of CLAUDE_HOOK_EVENTS) {
         hooks[event] = [matcher ? { matcher, hooks: [hook] } : { hooks: [hook] }];
     }
-    // The tools below are registered in the worktree, and a project's MCP servers
-    // normally wait for somebody to approve them. Nobody is there: this is a
-    // worktree Polaris made, in a container Polaris started, holding one server
-    // Polaris wrote. Waiting for an approval that cannot arrive is just an agent
-    // that never gets its tools.
-    return { hooks, enableAllProjectMcpServers: true };
+    return { hooks };
 }
 
 /**
@@ -151,14 +146,23 @@ export function hookScript(ingestUrl: string, token: string): string {
  * contents and nothing else, so a token an agent is talked into printing is
  * worth an hour on one repository rather than every repository of the
  * installation. Only `get` is answered: git's `store` and `erase` have nothing
- * to keep here.
+ * to keep here. And only for https://github.com: a remote or submodule pointed
+ * anywhere else is handed nothing.
  */
 export function gitCredentialScript(url: string, token: string): string {
     return [
         "#!/bin/sh",
         "# Written by Polaris. Hands git a short-lived token for this session's repository.",
         '[ "$1" = "get" ] || exit 0',
-        "cat >/dev/null",
+        'protocol=""',
+        'host=""',
+        'while IFS= read -r line && [ -n "$line" ]; do',
+        '    case "$line" in',
+        '        protocol=*) protocol="${line#protocol=}" ;;',
+        '        host=*) host="${line#host=}" ;;',
+        "    esac",
+        "done",
+        '[ "$protocol" = "https" ] && [ "$host" = "github.com" ] || exit 0',
         `curl -sS -f -m 15 -X POST ${shellQuote(url)} \\`,
         `  -H ${shellQuote(`Authorization: Bearer ${token}`)} 2>/dev/null`,
         "exit 0",

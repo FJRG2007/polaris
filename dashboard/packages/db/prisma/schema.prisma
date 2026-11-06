@@ -8889,6 +8889,10 @@ model AgentSession {
     // hooks - is probed rather than failed, and not probed again until it has
     // been quiet for another stretch.
     lastAliveAt DateTime?
+    // When the silence sweep last probed the session, whatever the answer. A
+    // machine that could not be reached is asked again after another stretch,
+    // not on every pass ahead of everything else that is quiet.
+    lastProbedAt DateTime?
     // The agent's own id for its conversation and where it keeps the transcript,
     // as its hooks last reported them. What the Resume button reopens. Null until
     // a hook sends a value that passes the checks in the events route.

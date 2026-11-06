@@ -74,7 +74,7 @@ describe("what a session's token may reach", () => {
 
 describe("the credential helper", () => {
     /** Runs the helper with a fake curl that prints what it was asked. */
-    function helper(action: string): string {
+    function helper(action: string, input = "protocol=https\nhost=github.com\n\n"): string {
         const dir = mkdtempSync(join(tmpdir(), "polaris-cred-"));
         dirs.push(dir);
         writeFileSync(join(dir, "curl"), '#!/bin/sh\nprintf "curl %s\n" "$*"\n');
@@ -88,7 +88,7 @@ describe("the credential helper", () => {
             )
         );
         const result = spawnSync("sh", [script.replace(/\\/g, "/"), action], {
-            input: "protocol=https\nhost=github.com\n\n",
+            input,
             encoding: "utf8",
             env: { ...process.env, PATH: `${dir.replace(/\\/g, "/")}:${process.env.PATH}` }
         });
@@ -102,6 +102,12 @@ describe("the credential helper", () => {
         expect(said).toContain("Authorization: Bearer tok-1");
     });
 
+    it("hands nothing to a remote that is not GitHub", () => {
+        expect(helper("get", "protocol=https\nhost=evil.example.test\n\n")).toBe("");
+        expect(helper("get", "protocol=http\nhost=github.com\n\n")).toBe("");
+        expect(helper("get", "protocol=https\nhost=github.com.evil.example.test\n\n")).toBe("");
+    });
+
     it("does nothing for store and erase", () => {
         expect(helper("store")).toBe("");
         expect(helper("erase")).toBe("");
@@ -113,7 +119,7 @@ describe("the boot script and GitHub", () => {
         const setup = commands.SESSION_SETUP;
         expect(setup).toContain("git config --unset-all http.extraHeader || true");
         expect(setup).toContain(
-            'git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""'
+            'git config credential.https://github.com.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""'
         );
         expect(setup.indexOf("--unset-all http.extraHeader")).toBeLessThan(
             setup.indexOf('git checkout -b "$POLARIS_BRANCH"')

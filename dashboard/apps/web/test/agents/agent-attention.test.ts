@@ -430,6 +430,11 @@ describe("the sweep of silent sessions", () => {
             argv.join(" ").includes("rm -rf /session/repo /session/polaris")
         );
         expect(removed.map(([container]) => container)).toEqual(["polaris-session-s1"]);
+        // The kept one restarts with the box, so it is told not to start its agent again.
+        const ended = daemon.runIn.mock.calls.filter(([, argv]) =>
+            argv.join(" ").includes(": > /session/polaris/ended")
+        );
+        expect(ended.map(([container]) => container)).toEqual(["polaris-session-s2"]);
     });
 
     it("fails one whose container was deleted at once, with that as the reason", async () => {
@@ -457,6 +462,9 @@ describe("the sweep of silent sessions", () => {
 
         expect(await runtime.sweepSilentSessions(HOUR)).toBe(0);
         expect(db.sessions.get("s1")).toMatchObject({ state: "working" });
+        // Asked, so it waits its turn behind everything not asked yet.
+        expect(db.sessions.get("s1")?.lastProbedAt).toBeInstanceOf(Date);
+        expect(db.sessions.get("s1")?.lastAliveAt ?? null).toBeNull();
 
         db.sessions.get("s1")!.lastEventAt = new Date(Date.now() - 5 * HOUR);
         expect(await runtime.sweepSilentSessions(HOUR)).toBe(1);

@@ -369,6 +369,20 @@ export async function releaseContainer(containerId: string): Promise<void> {
     await ports.composeDown(containerId).catch(() => undefined);
 }
 
+/** The container stays for its work, and restarts with the box, but its agent
+ *  is not launched again on a session that is over. */
+async function markContainerEnded(containerId: string): Promise<void> {
+    await new HostdPorts()
+        .runIn(containerId, [
+            "sh",
+            "-c",
+            `: > ${commands.SESSION_ROOT}/polaris/${commands.SESSION_ENDED_FILE}`
+        ])
+        .catch((error) => {
+            console.error(`polaris: could not mark container ${containerId} as ended:`, error);
+        });
+}
+
 /**
  * Save the work, then take the container down - or keep it, when the work
  * could not be saved. The one path Stop, the sweep, Try again and the reaper of
@@ -390,6 +404,7 @@ export async function endContainerSession(sessionId: string): Promise<SaveOutcom
         );
     });
     if (outcome.kind === "kept") {
+        if (row?.containerId) await markContainerEnded(row.containerId);
         await noticeWorkKept(sessionId, outcome.branch);
         return outcome;
     }

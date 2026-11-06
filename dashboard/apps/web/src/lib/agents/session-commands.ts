@@ -322,8 +322,10 @@ const PREPARE_WORKTREE = [
     'if [ -n "$GITHUB_REPOSITORY" ] && [ -n "$POLARIS_GIT_CREDENTIAL" ]; then',
     '  printf %s "$POLARIS_GIT_CREDENTIAL" | base64 -d > "$POLARIS_STATE_DIR/git-credential.sh"',
     '  chmod 0700 "$POLARIS_STATE_DIR/git-credential.sh"',
-    '  git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""',
-    "  git config credential.username x-access-token",
+    "  git config --unset-all credential.helper || true",
+    "  git config --unset-all credential.username || true",
+    '  git config credential.https://github.com.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""',
+    "  git config credential.https://github.com.username x-access-token",
     "fi",
     // The agent reports what it is doing through a script Polaris registers in
     // the agent's own configuration, and gets the Polaris tools through an MCP
@@ -696,6 +698,11 @@ export const LAUNCH_SCRIPT = [
     ""
 ].join("\n");
 
+/** Left in the state directory of a container kept for its unsaved work, whose
+ *  session is over. A reboot of the box restarts that container too, and the
+ *  boot then opens a terminal on the work instead of starting the agent again. */
+export const SESSION_ENDED_FILE = "ended";
+
 const LAUNCH_SCRIPT_BASE64 = Buffer.from(LAUNCH_SCRIPT, "utf8").toString("base64");
 
 /** Where the answers land on the way in. Beside the other scripts the setup
@@ -756,6 +763,10 @@ const START_AGENT = [
     // A machine that restarted under a session comes back to the conversation
     // it was in, not to a blank one. The id is the one the agent's own hooks
     // last reported - see `hookScript` - and only a reopened checkout uses it.
+    `if [ -f "$POLARIS_STATE_DIR/${SESSION_ENDED_FILE}" ]; then`,
+    '  echo "polaris: this session has ended. Its work is kept here and the agent was not started again."',
+    "  exec sh",
+    "fi",
     'POLARIS_RESUME_ID=""',
     'if [ "$POLARIS_REOPENED" = "yes" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then',
     '  POLARIS_RESUME_ID="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id")"',

@@ -143,6 +143,17 @@ async function getAppSecrets(): Promise<AppSecrets | null> {
     };
 }
 
+/** GitHub answered with a status that is not a success. */
+export class GitHubStatusError extends Error {
+    constructor(
+        readonly status: number,
+        message: string
+    ) {
+        super(message);
+        this.name = "GitHubStatusError";
+    }
+}
+
 /** Mint a short-lived installation access token used to reach that installation's repos. */
 async function installationToken(
     installationId: number,
@@ -159,7 +170,11 @@ async function installationToken(
         ...(scoped ? { body: scoped } : {}),
         cache: "no-store"
     });
-    if (!res.ok) throw new Error(`GitHub returned ${res.status} minting an installation token`);
+    if (!res.ok)
+        throw new GitHubStatusError(
+            res.status,
+            `GitHub returned ${res.status} minting an installation token`
+        );
     const body = (await res.json()) as { token?: string };
     if (!body.token) throw new Error("GitHub did not return an installation token");
     return body.token;

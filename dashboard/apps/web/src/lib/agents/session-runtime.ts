@@ -29,7 +29,11 @@ import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
-import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
+import {
+    GitHubStatusError,
+    cloneAuthHeader,
+    githubAppInstallationToken
+} from "@/lib/github-service";
 import * as scoping from "@/lib/github-installation-scope";
 import {
     claudeHookSettings,
@@ -321,9 +325,10 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
  * the installation on that repository's own owner.
  *
  * Refused rather than guessed. An owner the App is not installed on used to get
- * the FIRST installation's token - somebody else's account - and a repository
- * the installation does not reach is GitHub refusing the scope, which is worth
- * saying in words the reader can act on.
+ * the FIRST installation's token - somebody else's account. A repository the
+ * installation does not reach is GitHub refusing the scope (422), which only an
+ * administrator can change; anything else GitHub or the network answers is
+ * worth trying again rather than reconfiguring.
  */
 async function cloneToken(repoFullName: string): Promise<string> {
     const scoped = scoping.repositoryScope(repoFullName, scoping.CLONE_PERMISSIONS);
@@ -336,13 +341,18 @@ async function cloneToken(repoFullName: string): Promise<string> {
         token = await githubAppInstallationToken(scoped.owner, scoped.scope);
     } catch (error) {
         console.error(`[agent-session] scoped token for ${repoFullName}:`, error);
+        if (error instanceof GitHubStatusError && error.status === 422) {
+            throw new SessionRefusal(
+                `The GitHub App installed on ${scoped.owner} does not reach ${repoFullName}. The administrators have to add it to the installation.`
+            );
+        }
         throw new SessionRefusal(
-            `The GitHub App installed on ${scoped.owner} does not reach ${repoFullName}. Add the repository to the installation on GitHub, then start the session again.`
+            `GitHub did not hand Polaris a token for ${repoFullName}. Try again in a moment.`
         );
     }
     if (!token) {
         throw new SessionRefusal(
-            `Polaris has no GitHub App installation for ${scoped.owner}, so it cannot check the repository out. Install the App on ${scoped.owner} under Agents settings.`
+            `Polaris has no GitHub App installation for ${scoped.owner}. An administrator connects one under Integrations.`
         );
     }
     return token;
@@ -849,17 +859,35 @@ export async function stopSession(sessionId: string): Promise<SaveOutcome | null
  * the runtime's own `aliveCommand` asks whether the terminal is still there,
  * and only a session whose terminal is gone is failed. One that answers is
  * left alone and not asked again for another stretch. See `sweepVerdict`.
+ *
+ * A server session is asked after a much shorter stretch (`hostSilentMs`): a
+ * restart of its server takes the terminal and leaves nothing else to notice,
+ * and it is only reopened when it is asked. It is still failed no sooner than
+ * any other session.
  */
-export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Promise<number> {
+export async function sweepSilentSessions(
+    maxSilentMs = 6 * 60 * 60 * 1000,
+    hostSilentMs = Math.min(maxSilentMs, 15 * 60 * 1000)
+): Promise<number> {
     const now = new Date();
-    const cutoff = new Date(now.getTime() - maxSilentMs);
+    const quietSince = (cutoff: Date) => [
+        { OR: [{ lastEventAt: { lt: cutoff } }, { lastEventAt: null, createdAt: { lt: cutoff } }] },
+        { OR: [{ lastAliveAt: null }, { lastAliveAt: { lt: cutoff } }] },
+        { OR: [{ lastProbedAt: null }, { lastProbedAt: { lt: cutoff } }] }
+    ];
     const quiet = await prisma.agentSession.findMany({
         where: {
             state: { notIn: ["stopped", "failed"] },
-            OR: [{ lastEventAt: { lt: cutoff } }, { lastEventAt: null, createdAt: { lt: cutoff } }],
-            AND: [{ OR: [{ lastAliveAt: null }, { lastAliveAt: { lt: cutoff } }] }]
+            OR: [
+                {
+                    place: { not: "host" },
+                    AND: quietSince(new Date(now.getTime() - maxSilentMs))
+                },
+                { place: "host", AND: quietSince(new Date(now.getTime() - hostSilentMs)) }
+            ]
         },
         select: { id: true, place: true, containerId: true, lastEventAt: true, createdAt: true },
+        orderBy: { lastProbedAt: { sort: "asc", nulls: "first" } },
         take: 200
     });
     let failed = 0;
@@ -870,13 +898,17 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
         if (probe === "dead" && session.place === "host" && (await reopenOnHost(session.id)))
             probe = "alive";
         const heard = session.lastEventAt ?? session.createdAt;
-        const verdict = core.sweepVerdict(probe, now.getTime() - heard.getTime(), maxSilentMs);
+        const silentFor = now.getTime() - heard.getTime();
+        const early = session.place === "host" && silentFor <= maxSilentMs;
+        const verdict = early ? "keep" : core.sweepVerdict(probe, silentFor, maxSilentMs);
         if (verdict === "keep") {
-            if (probe === "alive")
-                await prisma.agentSession.update({
-                    where: { id: session.id },
-                    data: { lastAliveAt: now }
-                });
+            await prisma.agentSession.update({
+                where: { id: session.id },
+                data:
+                    probe === "alive"
+                        ? { lastAliveAt: now, lastProbedAt: now }
+                        : { lastProbedAt: now }
+            });
             continue;
         }
         failed += 1;

@@ -66,3 +66,21 @@ describe("in Spanish", () => {
         expect(agentText(spanish, "GitHub returned 422 starting the workflow")).toBe("GitHub devolvió 422 al iniciar el workflow");
     });
 });
+
+describe("a session that cannot check its repository out", () => {
+    const refusals = [
+        "Polaris cannot read acme as a GitHub repository name.",
+        "The GitHub App installed on acme does not reach acme/web. The administrators have to add it to the installation.",
+        "GitHub did not hand Polaris a token for acme/web. Try again in a moment.",
+        "Polaris has no GitHub App installation for acme. An administrator connects one under Integrations."
+    ];
+
+    it("is said back in English as it went in", () => {
+        for (const refusal of refusals) expect(agentText(english, refusal)).toBe(refusal);
+    });
+
+    it("is said in Spanish", () => {
+        for (const refusal of refusals) expect(agentText(spanish, refusal)).not.toBe(refusal);
+        expect(agentText(spanish, refusals[1]!)).toContain("acme/web");
+    });
+});

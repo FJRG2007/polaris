@@ -160,6 +160,21 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
         ["owner"]
     ],
     [
+        /^Polaris cannot read (.+) as a GitHub repository name\.$/,
+        "text.badRepositoryName",
+        ["repo"]
+    ],
+    [
+        /^The GitHub App installed on (.+?) does not reach (.+)\. The administrators have to add it to the installation\.$/,
+        "text.installationMissesRepository",
+        ["owner", "repo"]
+    ],
+    [
+        /^GitHub did not hand Polaris a token for (.+)\. Try again in a moment\.$/,
+        "text.cloneTokenFailed",
+        ["repo"]
+    ],
+    [
         /^You already have (\d+) sessions running, which is the most one account may have at once\. Stop one and this will start\.$/,
         "text.accountFull",
         ["count"]
