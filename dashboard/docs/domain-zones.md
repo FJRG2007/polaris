@@ -105,31 +105,93 @@ in the clear, so a router reading that field can serve every world from one port
 in the same shape as the edge's own dynamic config - a file in a shared volume, no API
 and no token between them. A routed server costs no DNS record at all.
 
-It is opt-in per server, from the server's Address card, for three reasons worth
-keeping in view:
+New Java servers are routed by default, and existing ones are moved over only once it
+is proven to work. The Address card still switches any one server either way. Three
+things shape when a server is routed:
 
 - The router binds 25565 on the host, so it is not running until something asks for
   it: an existing install whose first Minecraft server was pinned to that port would
-  otherwise fail to start the whole stack. Turning the shared port on for a server
-  starts it - the dashboard deploys it as its own one-service project through the
-  daemon (`lib/minecraft-router.ts`), reading the network and the routes volume off
-  its own container, because both are named after the compose project this Polaris
-  was installed as. The `mcrouter` compose profile still works and is left alone;
-  a router is only started when nothing is answering on the port.
-- Connections reach the server from the router, so the address half of the player list
-  (`player-access`, which reads the address off the join line) cannot be enforced
-  through it. Turning routing on is refused while that is in use rather than quietly
-  weakening it.
-- Turning it on removes the SRV record, so the router has to be answering first -
-  otherwise it would take a working address away and leave nothing in its place. That
-  is why the table is written before the router is started: mc-router watches that
-  file and exits at startup if it does not exist.
+  otherwise fail to start the whole stack. Routing a server starts it - the
+  dashboard deploys it as its own one-service project through the daemon
+  (`lib/minecraft-router.ts`), reading the network and the routes volume off its own
+  container, because both are named after the compose project this Polaris was
+  installed as. The `mcrouter` compose profile still works and is left alone. "Is
+  the router up" is a connect to the service name `mc-router` on the dashboard's
+  network, not to the host port, so a Minecraft server holding 25565 never reads as
+  the router; when the port is held by something else, starting it fails and the
+  server keeps its SRV record.
+- Connections reach the server from the router, so the address half of the player
+  list (`player-access`, which reads the address off the join line) cannot be
+  enforced through it. A server is only routed while its list survives that
+  (`addressesSurviveRouting`): no rule names an address (or the address half is off)
+  and no linked player follows their sign-ins. The switch is read as the enforcement
+  pass reads it - absent is on - so a server that never touched it is not routed and
+  its players are not refused for arriving from the router.
+- Routing a server removes its SRV record, so the router has to be answering first.
+  For a new server the SRV record is written, then `routeNewServer` routes it and
+  drops the record; any failure leaves the record. An existing server nobody
+  switched (`routed` absent) is adopted by the sweep in two passes: first it is added
+  to the table as a candidate (`routeCandidate`) with its SRV record untouched, and
+  on a later pass the router is asked for it by name with a status ping
+  (`routeAnswers`). Only a reply from the server itself switches it over. The sweep
+  never starts the router for this. The table is written before a router is started:
+  mc-router watches that file and exits at startup if it does not exist.
 
-PROXY protocol is deliberately not enabled: vanilla servers do not speak it, and
-turning it on while backends keep their own published ports would let a client that
-dials one directly forge its source address. Bedrock and ARK are UDP and name no
-address in the connection, so they keep a port in theirs - they just no longer cost a
-DNS record each.
+Bedrock and ARK are UDP and name no address in the connection, so they keep a port in
+theirs - they just no longer cost a DNS record each.
+
+### PROXY protocol, and why it stays off
+
+PROXY protocol would carry the player's address through the router and let the
+address half of the list work for routed servers. Checked against mc-router's own
+source at the pinned tag (`server/configs.go`, v1.46.2) and the current one
+(v1.54.2): `-use-proxy-protocol` (`USE_PROXY_PROTOCOL`) is one switch for the whole
+router, sending a PROXY v2 header to every backend. There is no per-route setting.
+The backends that accept it are Paper and its forks (`config/paper-global.yml`,
+`proxies.proxy-protocol`) and Velocity (`velocity.toml`, `[advanced]
+haproxy-protocol`). Vanilla servers do not, and anything not listed here is treated
+the same way: a backend that does not expect the header fails every connection that
+carries one.
+
+So one router cannot serve a mixed fleet with it on, and turning it on would break
+every routed server that is not Paper. Paper's setting names no trusted senders,
+so a backend with it on would also take a header from anyone who dials its published
+port directly, which every server here still has. Until both are solved (a second router instance for
+PROXY-capable backends, and backends reachable only from the router), it stays off
+and the refusal stays.
+
+### How far one table goes
+
+What mc-router does with the table, from its source (`server/routes_config_loader.go`):
+
+- A change is read five seconds after the file goes quiet, as the whole file:
+  `os.ReadFile`, one `json.Unmarshal`, every mapping registered again. Each write is
+  O(servers) inside the router, however small the change.
+- The watch registers mappings over the ones it holds and never clears first (it
+  calls `Load`; only SIGHUP runs `Reload`, which resets). A name left out of the file
+  stays routed to its old port. Polaris writes each dropped name with a backend on
+  port 0 instead (`retiredRoutes`), so a reused port never takes an old name to
+  another server's world. Retired names stay in the file.
+- The watch is on the file itself. A rename over it replaces the watched inode and
+  stops every later reload, so the table is written in place, not with
+  `writeDynamicFile`. A half-written file fails to parse and the router keeps the
+  routes it has.
+- Its REST API (`POST /routes`, `DELETE /routes/{serverAddress}`, enabled by
+  `-api-binding`) saves the whole table back to the same file after every call, so
+  it is not cheaper per change.
+
+On the Polaris side the table is built a page of installs at a time, with one
+application query per page, and is only written when it changed.
+
+That holds for a single host. Every route dials `POLARIS_APP_DIAL_HOST` by its
+published port, so one router only serves the servers on its own host, and the servers
+on one host are bounded by its own published ports. By estimate (about 70 bytes a
+mapping), a few hundred thousand names is a file of tens of megabytes, re-read in
+full on every change; this was not measured against a running router. Two million servers
+is not one table: it is many hosts, each with its own router and its own table of
+its own servers - sharding by host, the same way the edge is per host. Running the
+router on each server host is not built yet. Today the router runs beside the
+dashboard and routes the servers on that host.
 
 ## Per-server wildcards
 

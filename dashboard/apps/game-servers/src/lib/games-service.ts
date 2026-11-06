@@ -19,7 +19,7 @@ import { readServerUptime } from "./games-uptime";
 import { gameServerCatalogIds } from "./game-catalog";
 import { hasCrossplay } from "./minecraft/blueprints";
 import { drainQueue } from "./minecraft/queue-service";
-import { gameServerAddress } from "./minecraft/address";
+import { adoptRoutedAddress, gameServerAddress } from "./minecraft/address";
 import { sweepArkTimeouts } from "./ark/timeout-service";
 import { wantsLatest } from "./minecraft/blueprint-version";
 import { primaryIdentifier } from "./fivem/players";
@@ -905,6 +905,9 @@ export async function syncFirewallBans(
         // the game itself cannot hold: a name is only let in from its own address.
         const access = await enforcePlayerAddresses(ownerId, install.id).catch(() => null);
         kicked += access?.kicked.length ?? 0;
+        // An existing server moves onto the shared port only once the router has been
+        // seen answering for it by name; until then its SRV record stays.
+        await adoptRoutedAddress(ownerId, install.id).catch(() => false);
         // Who is on is read once and used twice: a decision waiting for one of
         // them, and a copy of what each is carrying so the bag can still be read
         // after they log off.

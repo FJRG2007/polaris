@@ -128,8 +128,17 @@ function isStatusReply(buffer: Buffer): boolean | null {
  * server that has not finished starting, and against a public one is the usual
  * nothing: a closed forward, a router that will not loop its own address back
  * inward, or a server that is down.
+ *
+ * `serverAddress` is the name the handshake carries, the host dialled when it is
+ * left out. A hostname router reads that field and nothing else, so asking it for
+ * one server by name is how a route is proven to answer.
  */
-export function pingJava(host: string, port: number, timeoutMs: number): Promise<boolean> {
+export function pingJava(
+    host: string,
+    port: number,
+    timeoutMs: number,
+    serverAddress?: string
+): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = connect({ host, port, timeout: timeoutMs });
         let received = Buffer.alloc(0);
@@ -141,7 +150,7 @@ export function pingJava(host: string, port: number, timeoutMs: number): Promise
             resolve(answered);
         };
 
-        socket.once("connect", () => socket.write(statusRequest(host, port)));
+        socket.once("connect", () => socket.write(statusRequest(serverAddress ?? host, port)));
         socket.on("data", (chunk) => {
             received = Buffer.concat([received, chunk]);
             const reply = isStatusReply(received);

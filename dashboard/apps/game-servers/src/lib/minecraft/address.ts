@@ -17,8 +17,14 @@ import { gameMessage } from "../game-message";
 import { routesByHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { normalizeZoneName } from "@polaris/deploy";
-import { probeListening } from "./reach";
-import { minecraftRoutes, syncMinecraftRoutes } from "./router-service";
+import { connect } from "node:net";
+import { pingJava } from "./slp";
+import {
+    ROUTE_CANDIDATE_KEY,
+    minecraftRoutes,
+    routerAddress,
+    syncMinecraftRoutes
+} from "./router-service";
 import { host } from "@polaris/app-host";
 import { MINECRAFT_SRV_PREFIX, releaseGameDns, rememberGameDnsRecord } from "../game-dns";
 
@@ -261,7 +267,10 @@ export async function setGameRouted(
         throw new Error(gameMessage("games", "lib.sharePortJavaOnly"));
     }
     const config = readInstallConfig(install.config);
-    if (routed && config.bindAddresses === true) {
+    // Read the way the enforcement pass reads it, where an absent switch is on: a
+    // server that never touched it holds its players to their addresses, and routing
+    // it would have the pass refuse every one of them.
+    if (routed && !(await routingKeepsPlayerList(installedAppId))) {
         throw new Error(gameMessage("games", "lib.boundBehindRouter"));
     }
     // Turning routing on drops the SRV record that carried this server's port, so
@@ -290,7 +299,11 @@ export async function setGameRouted(
     // the address a player already has answers nowhere.
     if (routed) {
         // The router answers on the default port, so the name alone is the address.
-        await patchInstallConfig(installedAppId, { routed: true, portless: true });
+        await patchInstallConfig(installedAppId, {
+            routed: true,
+            portless: true,
+            [ROUTE_CANDIDATE_KEY]: false
+        });
         await syncMinecraftRoutes().catch(() => undefined);
         if (hostname && port)
             await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
@@ -302,7 +315,11 @@ export async function setGameRouted(
             : false;
     // Off the router, the port is out of the address only if that record was actually
     // written - otherwise it goes back to carrying it, which is what a player needs.
-    await patchInstallConfig(installedAppId, { routed: false, portless: srvWritten });
+    await patchInstallConfig(installedAppId, {
+        routed: false,
+        portless: srvWritten,
+        [ROUTE_CANDIDATE_KEY]: false
+    });
     await syncMinecraftRoutes().catch(() => undefined);
     // The last server off the router leaves it holding a port for an empty table.
     // Only ever the one Polaris started: an install running the router from its
@@ -334,16 +351,111 @@ export function routerPort(): number {
         : 25565;
 }
 
+/** How long a check on the router waits before calling it silent. */
+const ROUTER_PROBE_MS = 1500;
+
 /**
  * Whether the hostname router is actually up.
  *
- * A TCP connect, which is all that can be asked from here: it proves something holds
- * the port, not that it is mc-router. That is the useful half - the failure this
- * guards against is the router not running at all, and a Minecraft server pinned to
- * the same port would be a port collision the operator has to resolve either way.
+ * A TCP connect to the router by its service name on the dashboard's own network,
+ * which only resolves while a router container is on it - so unlike a connect to
+ * the host's port, a Minecraft server that happens to hold 25565 does not read as
+ * the router. A status ping would not do: mc-router drops a handshake naming a
+ * hostname it has no route for, which is exactly what an empty table is.
  */
 export async function routerListening(): Promise<boolean> {
-    return (await probeListening([{ port: routerPort(), protocol: "tcp" }], null)) === true;
+    const { host: name, port } = routerAddress();
+    return new Promise((resolve) => {
+        const socket = connect({ host: name, port, timeout: ROUTER_PROBE_MS });
+        const settle = (up: boolean): void => {
+            socket.destroy();
+            resolve(up);
+        };
+        socket.once("connect", () => settle(true));
+        socket.once("timeout", () => settle(false));
+        socket.once("error", () => settle(false));
+    });
+}
+
+/** Whether the router answers for this name: a status ping through it, naming the
+ *  server, that the server itself replies to. The route proven end to end on this
+ *  network - everything but the public forward to the port. */
+export async function routeAnswers(hostname: string): Promise<boolean> {
+    const { host: name, port } = routerAddress();
+    return pingJava(name, port, ROUTER_PROBE_MS * 2, hostname);
+}
+
+/** Whether routing would leave this server's player list meaning what it says. */
+async function routingKeepsPlayerList(installedAppId: string): Promise<boolean> {
+    const { addressesSurviveRouting } = await import("./player-access");
+    return addressesSurviveRouting(installedAppId).catch(() => false);
+}
+
+/**
+ * Put a server that has just been created on the shared port, when it can be.
+ *
+ * The default for a new Java server, because routing is what keeps the address
+ * from costing a DNS record each. Best effort and safe to fail: the server already
+ * has its SRV record, and `setGameRouted` changes nothing until the router is up -
+ * starting it when nothing is answering, and giving up when the port is held by
+ * something that is not the router. Either way the SRV record is what is left, so
+ * the address the server was just given keeps working.
+ *
+ * Returns whether it is routed.
+ */
+export async function routeNewServer(ownerId: string, installedAppId: string): Promise<boolean> {
+    try {
+        if (!(await routingKeepsPlayerList(installedAppId))) return false;
+        await setGameRouted(ownerId, installedAppId, true);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Move an existing server onto the shared port, only once that is proven to work.
+ *
+ * Called by the sweep for every server. A server is a candidate when it is Java,
+ * has a name, nobody ever chose for it (`routed` absent - a server somebody took
+ * off the router stays off), and routing keeps its player list intact. A candidate
+ * is added to the table while its SRV record stays where it is; on a later pass the
+ * router is asked for it by name, and only an answer from the server itself
+ * switches it over and drops the record. A router that is not running, a server
+ * that is stopped, or a forward that is missing leaves it exactly as it was.
+ *
+ * Never starts the router: an install that has not asked for it keeps 25565 free.
+ *
+ * Returns whether it was switched over by this pass.
+ */
+export async function adoptRoutedAddress(
+    ownerId: string,
+    installedAppId: string
+): Promise<boolean> {
+    const install = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, ownerId },
+        select: { catalogId: true, config: true }
+    });
+    if (!install || !routesByHostname(install.catalogId)) return false;
+    const config = readInstallConfig(install.config);
+    if (config.routed !== undefined) return false;
+    const hostname =
+        typeof config.hostname === "string" ? config.hostname.trim().toLowerCase() : "";
+    if (!hostname) return false;
+    const candidate = config[ROUTE_CANDIDATE_KEY] === true;
+    if (!(await routingKeepsPlayerList(installedAppId))) {
+        if (candidate) await patchInstallConfig(installedAppId, { [ROUTE_CANDIDATE_KEY]: false });
+        return false;
+    }
+    // First pass: into the table, which the sweep writes once at its end. The router
+    // waits for the file to settle before reading it, so this one is asked next time.
+    if (!candidate) {
+        await patchInstallConfig(installedAppId, { [ROUTE_CANDIDATE_KEY]: true });
+        return false;
+    }
+    if (!(await routeAnswers(hostname))) return false;
+    await setGameRouted(ownerId, installedAppId, true);
+    return true;
 }
 
 /**

@@ -927,6 +927,28 @@ export async function unlinkPlayerAccount(
     }
 }
 
+/**
+ * Whether this server's player list still means what it says once connections
+ * arrive through the hostname router.
+ *
+ * Through the router every join is read off the join line as the router's own
+ * address, so a rule that names an address would refuse its own player and a link
+ * that follows sign-ins could never match. A list made only of names - or one whose
+ * address half is switched off with no following link - loses nothing.
+ *
+ * Read the way the enforcement pass reads it: an absent switch is on.
+ */
+export async function addressesSurviveRouting(installedAppId: string): Promise<boolean> {
+    const [row, rules, links] = await Promise.all([
+        prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } }),
+        playerAccessRules(installedAppId),
+        linkedPlayers(installedAppId)
+    ]);
+    if (links.some(follows)) return false;
+    if (readInstallConfig(row?.config).bindAddresses === false) return true;
+    return rules.every((rule) => rule.address.trim().toLowerCase() === ANY_ADDRESS);
+}
+
 /** The rules alone, for the enforcement pass and for anything deciding a join. */
 export async function playerAccessRules(installedAppId: string): Promise<PlayerAccess[]> {
     const rows = await prisma.gamePlayerAccess.findMany({

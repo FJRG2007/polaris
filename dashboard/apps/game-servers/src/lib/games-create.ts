@@ -26,7 +26,7 @@ import { joinAccess } from "./minecraft/access";
 import { allocateArkPorts } from "./ark/create";
 import { allocateFivemPort } from "./fivem/create";
 import { allocateHytalePort } from "./hytale/create";
-import { setGameHostname } from "./minecraft/address";
+import { routeNewServer, setGameHostname } from "./minecraft/address";
 import * as memoryPlan from "./minecraft/memory-plan";
 import { normalizeIdentifier } from "./fivem/players";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -675,6 +675,10 @@ async function createMinecraftServer(
     const hostname = await attachHostname(ownerId, install.installedAppId, input, {
         srv: input.edition === "java"
     });
+    // Java servers go on the shared port by default, so the address costs no DNS
+    // record of its own. The SRV record just written is the fallback, and stays
+    // whenever routing cannot be had (see `routeNewServer`).
+    if (hostname && input.edition === "java") await routeNewServer(ownerId, install.installedAppId);
     return { installedAppId: install.installedAppId, hostname };
 }
 
