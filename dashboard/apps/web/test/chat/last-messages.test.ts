@@ -59,6 +59,22 @@ describe("withReceipt", () => {
         });
     });
 
+    it("takes a group's tick over what the message carries", () => {
+        // A group message is never stamped; its tick is worked out from the
+        // members' marks, so it replaces whatever the row says.
+        expect(withReceipt({ ...last, read: false, delivered: false }, "read")).toMatchObject({
+            receipts: true,
+            read: true,
+            delivered: true
+        });
+        expect(withReceipt(last, "delivered")).toMatchObject({ read: false, delivered: true });
+        expect(withReceipt(last, "sent")).toMatchObject({
+            receipts: true,
+            read: false,
+            delivered: false
+        });
+    });
+
     it("passes no message through as none", () => {
         expect(withReceipt(null, true)).toBeNull();
     });

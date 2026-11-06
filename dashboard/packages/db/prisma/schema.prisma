@@ -9815,6 +9815,10 @@ model ChatChannelMember {
     // The last message this person has seen. Null before they have read any.
     lastReadMessageId String?   @db.Uuid
     lastReadAt        DateTime?
+    // The furthest they have ever read, which putting a conversation back to
+    // unread leaves alone: the read tick says somebody saw a message, and they
+    // did. Null on rows from before it existed, where `lastReadAt` stands in.
+    lastSeenAt        DateTime?
     // When their browser last had the messages in hand, which is a different
     // claim to having read them: one is the device, the other is the person.
     // What the second tick means.

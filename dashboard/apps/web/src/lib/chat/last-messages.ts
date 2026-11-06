@@ -1,4 +1,5 @@
 import { prisma } from "@polaris/db";
+import type { MessageReceipt } from "@polaris/core";
 
 /** The newest top-level message in a conversation, as its row in the list shows it. */
 export interface ChatLastMessage {
@@ -8,9 +9,11 @@ export interface ChatLastMessage {
     readonly body: string;
     readonly at: string;
     /** Whether the ticks may be drawn at all: the reader's own message in a
-     *  one-to-one whose two sides allow read receipts. */
+     *  one-to-one whose two sides allow read receipts, or in a group that has
+     *  ticks (see `group-receipts.ts`). */
     readonly receipts: boolean;
-    /** Only ever stamped in a one-to-one conversation - see `ChatMessage.readAt`. */
+    /** Stamped on the message in a one-to-one - see `ChatMessage.readAt` - and
+     *  worked out from the members' marks in a group. */
     readonly delivered: boolean;
     readonly read: boolean;
     readonly deleted: boolean;
@@ -73,14 +76,19 @@ export async function lastMessages(
     );
 }
 
-/** The same message with its ticks allowed or withheld; withheld also clears
- *  them, so nothing on the wire says what the screen may not. */
+/**
+ * The same message with its ticks allowed or withheld; withheld also clears
+ * them, so nothing on the wire says what the screen may not.
+ *
+ * `true` keeps the marks stamped on the message, which is a one-to-one. A tick
+ * replaces them: a group's, worked out from its members' read marks.
+ */
 export function withReceipt(
     last: ChatLastMessage | null,
-    allowed: boolean
+    allowed: boolean | MessageReceipt
 ): ChatLastMessage | null {
     if (!last) return null;
-    return allowed
-        ? { ...last, receipts: true }
-        : { ...last, receipts: false, delivered: false, read: false };
+    if (allowed === true) return { ...last, receipts: true };
+    if (allowed === false) return { ...last, receipts: false, delivered: false, read: false };
+    return { ...last, receipts: true, delivered: allowed !== "sent", read: allowed === "read" };
 }

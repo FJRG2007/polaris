@@ -63,14 +63,18 @@ let writes: { lastReadMessageId: string | null; lastReadAt: Date | null }[] = []
  *  badge that stays wrong until the page is reloaded. */
 let announced = 0;
 
+/** Who the frame went to. Only the reader: nobody else's ticks move. */
+let audiences: string[][] = [];
+
 /** Whether `readAt` on any message was touched. It must not be: the reader did
  *  see those messages, and retracting a receipt would tell the other person
  *  something untrue. */
 let receiptsTouched = 0;
 
 vi.mock("@/lib/chat/live", () => ({
-    publishChatChange: () => {
+    publishChatChange: ({ audience }: { audience: string[] }) => {
         announced += 1;
+        audiences.push(audience);
     }
 }));
 
@@ -93,7 +97,8 @@ vi.mock("@/lib/blocks", () => ({ blockedBy: async () => new Set() }));
 vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async () => new Set(),
     maySee: async () => false,
-    receiptsBetween: async () => false
+    receiptsBetween: async () => false,
+    receiptsAmong: async () => new Set<string>()
 }));
 
 /** The `where` of a `chatMessage.findFirst`, as this module writes them. */
@@ -128,6 +133,7 @@ vi.mock("@polaris/db", () => {
         chatChannelMember: {
             findUnique: async () => ({ ...mark, role: "member" }),
             findFirst: async () => ({ userId: "grace" }),
+            findMany: async () => [{ userId: "grace" }],
             update: async ({
                 data
             }: {
@@ -176,6 +182,7 @@ beforeEach(() => {
     mark = { lastReadMessageId: null, lastReadAt: null };
     writes = [];
     announced = 0;
+    audiences = [];
     receiptsTouched = 0;
 });
 
@@ -192,6 +199,7 @@ describe("from the conversation list", () => {
         caughtUp();
         await messages.markUnread(ada, { channelId: "c1" });
         expect(announced).toBe(1);
+        expect(audiences).toEqual([[ada.id]]);
     });
 
     it("does not pick the reader's own message as the boundary", async () => {

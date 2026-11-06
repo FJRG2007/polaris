@@ -48,6 +48,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         userBlock: { findMany: async () => [] },
         chatChannel: { findUnique: async () => ({ kind: "group" }) },
+        chatChannelMember: { findMany: async () => [] },
         teamMember: { findMany: async () => [{ teamId: TEAM }] },
         chatMessage: { findMany: async () => [] },
         chatReaction: { findMany: async () => [] },

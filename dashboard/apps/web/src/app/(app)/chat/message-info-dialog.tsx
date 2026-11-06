@@ -8,9 +8,11 @@
  * actually see this, and when" - and the answer to that is three moments, not a
  * shape.
  *
- * Only offered on your own message in a one-to-one conversation, and only where
- * the ticks are already shown: the panel is the same fact spelled out, so it is
- * never a way around the setting that withholds them.
+ * Only offered on your own message, and only where the ticks are already shown:
+ * the panel is the same fact spelled out, so it is never a way around the
+ * setting that withholds them. In a group the answer is a person each - who has
+ * read it and who not yet - and somebody whose ticks are withheld is listed as
+ * such rather than guessed at.
  *
  * A step that happened before Polaris started recording the moment says so
  * rather than showing a time it does not know. That is the whole reason the state
@@ -20,8 +22,8 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
-import { Check, CheckCheck, Loader2, SendHorizontal } from "lucide-react";
-import type { ChatMessageView, MessageDelivery } from "@/lib/chat/messages";
+import { Check, CheckCheck, EyeOff, Loader2, SendHorizontal } from "lucide-react";
+import type { ChatMessageView, MessageDelivery, MessageReader } from "@/lib/chat/messages";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 import * as polls from "./chat-reads";
 
@@ -86,6 +88,8 @@ export function MessageInfoDialog({
                     <p className="py-6 text-sm text-muted-foreground">
                         {t("messageInfo.thereIsNothingToShow")}
                     </p>
+                ) : delivery.readers ? (
+                    <GroupReaders sentAt={delivery.sentAt} readers={delivery.readers} />
                 ) : (
                     <ol className="flex flex-col gap-3">
                         <Step
@@ -99,14 +103,14 @@ export function MessageInfoDialog({
                             icon={<Check className="size-4" />}
                             iso={delivery.deliveredAt}
                             reached={delivery.state !== "sent"}
-                            waiting="Not on their device yet."
+                            waiting={t("messageInfo.notOnTheirDevice")}
                         />
                         <Step
                             label={t("messageInfo.read")}
                             icon={<CheckCheck className="size-4" />}
                             iso={delivery.readAt}
                             reached={delivery.state === "read"}
-                            waiting="Not opened yet."
+                            waiting={t("messageInfo.notOpened")}
                         />
                     </ol>
                 )}
@@ -160,5 +164,73 @@ function Step({
                 )}
             </span>
         </li>
+    );
+}
+
+/**
+ * Who in a group has read one message.
+ *
+ * A row a person, read first. The count over it says the same as the tick does:
+ * everybody, or how many of how many - and a member whose ticks are withheld is
+ * never one of the ones counted as having read it.
+ */
+function GroupReaders({ sentAt, readers }: { sentAt: string; readers: readonly MessageReader[] }) {
+    const t = useTranslations("chat");
+    const format = useDisplayFormat();
+    const read = readers.filter((reader) => reader.state === "read").length;
+
+    return (
+        <div className="flex min-w-0 flex-col gap-3">
+            <p className="flex items-center gap-3 text-sm">
+                <SendHorizontal className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                <span className="font-medium">{t("messageInfo.sent")}</span>
+                <span className="text-xs text-muted-foreground">{format.dateTime(sentAt)}</span>
+            </p>
+            <p className="text-sm font-medium">
+                {read === readers.length
+                    ? t("messageInfo.readByEveryone")
+                    : t("messageInfo.readBy", { count: read, total: readers.length })}
+            </p>
+            <ul
+                aria-label={t("messageInfo.readers")}
+                className="flex max-h-72 flex-col gap-1.5 overflow-y-auto overscroll-contain"
+            >
+                {readers.map((reader) => (
+                    <li key={reader.id} className="flex min-w-0 items-center gap-3 text-sm">
+                        <ReaderIcon state={reader.state} />
+                        <span className="min-w-0 flex-1 truncate" title={reader.name}>
+                            {reader.name}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                            {reader.state === "read"
+                                ? t("messageInfo.read")
+                                : reader.state === "delivered"
+                                  ? t("messageInfo.delivered")
+                                  : reader.state === "unknown"
+                                    ? t("messageInfo.unknown")
+                                    : t("messageInfo.waiting")}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+/** The same glyphs the ticks use, one person at a time. */
+function ReaderIcon({ state }: { state: MessageReader["state"] }) {
+    if (state === "unknown")
+        return <EyeOff className="size-4 shrink-0 text-foreground-subtle" aria-hidden="true" />;
+    if (state === "sent")
+        return <Check className="size-4 shrink-0 text-foreground-subtle" aria-hidden="true" />;
+    return (
+        <CheckCheck
+            className={
+                state === "read"
+                    ? "size-4 shrink-0 text-primary"
+                    : "size-4 shrink-0 text-foreground-subtle"
+            }
+            aria-hidden="true"
+        />
     );
 }

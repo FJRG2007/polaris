@@ -6,7 +6,8 @@
  * What is pinned: somebody talking asks for the conversations alone - the
  * order and the unread marks are all a message can move - while a change in
  * who is in what asks for everything, spaces and headings included. Somebody
- * else catching up asks for nothing.
+ * else catching up asks for the conversations only where it can move a tick:
+ * a row ending on the reader's own message, with ticks, not yet read.
  */
 
 import { MessagesWrapper } from "../setup/i18n";
@@ -16,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let onFrame: ((frame: unknown) => void) | null = null;
 let full = 0;
 let channelsOnly = 0;
+let rows: unknown[] = [];
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/chat" }));
 vi.mock("@/app/(app)/chat/server-rail", () => ({ ServerRail: () => null }));
@@ -42,6 +44,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
     ChatProvider: ({ children }: { children: unknown }) => children,
     useChat: () => ({
         viewerId: "ada",
+        channels: rows,
         refresh: () => {
             full += 1;
         },
@@ -59,6 +62,11 @@ beforeEach(() => {
     onFrame = null;
     full = 0;
     channelsOnly = 0;
+    rows = [
+        { id: "c1", last: { authorId: "ada", receipts: true, read: false } },
+        { id: "c2", last: { authorId: "ada", receipts: true, read: true } },
+        { id: "c3", last: { authorId: "grace", receipts: false, read: false } }
+    ];
     render(
         <ChatShell viewerId="ada" viewerName="Ada" orgId={null} orgName={null} may={may}>
             {null}
@@ -82,8 +90,15 @@ describe("a frame arriving", () => {
         expect(full).toBe(0);
     });
 
-    it("asks for nothing when somebody else caught up", () => {
+    it("asks for the list alone when somebody else caught up under an unread tick", () => {
         onFrame?.({ kind: "read", channelId: "c1", userId: "grace" });
+        expect(channelsOnly).toBe(1);
+        expect(full).toBe(0);
+    });
+
+    it("asks for nothing when somebody else's read cannot move a tick", () => {
+        onFrame?.({ kind: "read", channelId: "c2", userId: "grace" });
+        onFrame?.({ kind: "read", channelId: "c3", userId: "grace" });
         expect(channelsOnly + full).toBe(0);
     });
 

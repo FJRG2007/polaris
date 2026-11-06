@@ -816,8 +816,9 @@ export async function receiptsAction(
 /**
  * When one of the reader's own messages arrived and was read.
  *
- * Only ever answered for a one-to-one conversation where the ticks are already
- * shown - the panel is the same fact, spelled out.
+ * Only ever answered where the ticks are already shown - a one-to-one, or a
+ * group, where it also says who has read it. The panel is the same fact, spelled
+ * out.
  */
 export async function messageDeliveryAction(
     messageId: string
