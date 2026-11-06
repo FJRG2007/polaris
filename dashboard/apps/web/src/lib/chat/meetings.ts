@@ -2045,24 +2045,27 @@ export async function inviteEmailsToMeeting(
     if (refusal) throw new ChatAccessError({ key: refusal });
     if (wanted.length === 0) return 0;
 
-    const held = await prisma.meetingEmailInvite.count({ where: { meetingId } });
-    const known = await prisma.meetingEmailInvite.findMany({
-        where: { meetingId, email: { in: wanted } },
-        select: { email: true }
-    });
-    const fresh = wanted.filter((email) => !known.some((row) => row.email === email));
-    if (held + fresh.length > MOST_EMAILS) {
-        throw new ChatAccessError({
-            key: "errors.meetingTooManyEmails",
-            params: { count: MOST_EMAILS }
+    return prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Meeting" WHERE "id" = ${meetingId}::uuid FOR UPDATE`;
+        const held = await tx.meetingEmailInvite.count({ where: { meetingId } });
+        const known = await tx.meetingEmailInvite.findMany({
+            where: { meetingId, email: { in: wanted } },
+            select: { email: true }
         });
-    }
-    if (fresh.length === 0) return 0;
-    await prisma.meetingEmailInvite.createMany({
-        data: fresh.map((email) => ({ meetingId, email, invitedById: actor.id })),
-        skipDuplicates: true
+        const fresh = wanted.filter((email) => !known.some((row) => row.email === email));
+        if (held + fresh.length > MOST_EMAILS) {
+            throw new ChatAccessError({
+                key: "errors.meetingTooManyEmails",
+                params: { count: MOST_EMAILS }
+            });
+        }
+        if (fresh.length === 0) return 0;
+        await tx.meetingEmailInvite.createMany({
+            data: fresh.map((email) => ({ meetingId, email, invitedById: actor.id })),
+            skipDuplicates: true
+        });
+        return fresh.length;
     });
-    return fresh.length;
 }
 
 /** Take an address off the list. It never opened anything, so this is the
@@ -2118,7 +2121,13 @@ export async function transferHost(
         throw new ChatAccessError({ key: "errors.meetingHostNeedsAccount" });
     }
 
-    await prisma.meeting.update({ where: { id: meetingId }, data: { hostId: target.userId } });
+    await prisma.$transaction([
+        prisma.meeting.update({ where: { id: meetingId }, data: { hostId: target.userId } }),
+        prisma.meetingInvite.createMany({
+            data: [{ meetingId, userId: actor.id, invitedById: target.userId }],
+            skipDuplicates: true
+        })
+    ]);
     publishMeetingEvent({ meetingId, kind: "roster" });
 }
 

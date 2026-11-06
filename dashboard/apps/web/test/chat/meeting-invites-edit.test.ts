@@ -190,6 +190,7 @@ vi.mock("@polaris/db", () => {
         );
     const prisma = new Proxy(
         {
+            $queryRaw: async () => [],
             $transaction: async (ops: unknown) =>
                 Array.isArray(ops) ? Promise.all(ops) : (ops as (tx: unknown) => unknown)(prisma)
         } as Record<string, unknown>,
@@ -350,6 +351,21 @@ describe("removing somebody's invitation", () => {
         expect((await meetings.joinMeeting({ id: HOST, name: "Host" }, MEETING)).admission).toBe(
             "admitted"
         );
+    });
+
+    it("lets a host who handed the meeting over come back to it by id", async () => {
+        seats.push({
+            id: "s0",
+            meetingId: MEETING,
+            userId: BOB,
+            admission: "admitted",
+            leftAt: null
+        });
+        await meetings.transferHost({ id: HOST }, MEETING, "s0");
+        expect(meeting.hostId).toBe(BOB);
+
+        const back = await meetings.joinMeeting({ id: HOST, name: "Host" }, MEETING);
+        expect(back.admission).toBe("admitted");
     });
 });
 

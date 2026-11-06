@@ -236,7 +236,7 @@ function ChipRemove({ label, onClick }: { label: string; onClick: () => void }) 
     return (
         <button
             type="button"
-            className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+            className="relative shrink-0 rounded p-0.5 text-muted-foreground after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-[''] hover:text-foreground"
             aria-label={label}
             title={label}
             onClick={onClick}
