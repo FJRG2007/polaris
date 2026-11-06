@@ -54,7 +54,9 @@ const BOOT_STEPS: readonly {
         marks: [
             { text: "polaris: fetching " },
             // i18n-ignore said in the reader's words by lib/agents/words.ts
-            { text: "polaris: opening your workspace", label: "Opening your workspace" }
+            { text: "polaris: opening your workspace", label: "Opening your workspace" },
+            // i18n-ignore said in the reader's words by lib/agents/words.ts
+            { text: "polaris: reopening ", label: "Reopening the checkout" }
         ]
     },
     // i18n-ignore said in the reader's words by lib/agents/words.ts

@@ -119,11 +119,19 @@ export function mcpConfig(url: string, token: string): Record<string, unknown> {
 export function hookScript(ingestUrl: string, token: string): string {
     return [
         "#!/bin/sh",
-        "# Written by Polaris. Reports this session's lifecycle events; parses nothing.",
+        "# Written by Polaris. Reports this session's lifecycle events.",
         // When the hook ran, taken here: posts can overtake each other on the
         // way, and this is what puts them back in order. See applySessionEvents.
         "seq=$(date +%s%N 2>/dev/null || true)",
-        `curl -sS -m 4 -X POST ${shellQuote(ingestUrl)} \\`,
+        'payload="$(cat)"',
+        // The agent's own id for the conversation, kept beside this script, so a
+        // machine that restarts under the session reopens that conversation
+        // rather than a blank one (see LAUNCH_SCRIPT). The first match is the
+        // payload's own: every hook puts it before anything the agent said.
+        // Only a hint for the reboot - Polaris stores what it parses itself.
+        `id="$(printf %s "$payload" | grep -o '"session_id" *: *"[A-Za-z0-9_-]*"' | head -n 1 | cut -d '"' -f 4)"`,
+        'if [ -n "$id" ]; then printf %s "$id" > "$(dirname "$0")/agent-session-id" 2>/dev/null || true; fi',
+        `printf %s "$payload" | curl -sS -m 4 -X POST ${shellQuote(ingestUrl)} \\`,
         '  -H "X-Polaris-Seq: $seq" \\',
         `  -H ${shellQuote(`Authorization: Bearer ${token}`)} \\`,
         '  -H "Content-Type: application/json" \\',

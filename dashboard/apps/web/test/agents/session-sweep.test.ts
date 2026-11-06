@@ -20,6 +20,11 @@ describe("what the silence sweep does with a quiet session", () => {
         expect(core.sweepVerdict("dead", 7 * HOUR, MAX)).toBe("fail");
     });
 
+    it("fails one whose container was deleted without waiting out the allowance", () => {
+        expect(core.sweepVerdict("gone", 7 * HOUR, MAX)).toBe("fail");
+        expect(core.sweepVerdict("unreachable", 7 * HOUR, MAX)).toBe("keep");
+    });
+
     it("waits out a machine that cannot be asked, up to four allowances", () => {
         expect(core.sweepVerdict("unreachable", 7 * HOUR, MAX)).toBe("keep");
         expect(core.sweepVerdict("unreachable", 24 * HOUR, MAX)).toBe("keep");

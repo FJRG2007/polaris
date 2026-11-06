@@ -228,8 +228,10 @@ export function parseHookSequence(value: string | null | undefined): bigint | nu
 
 /** What asking a session's machine whether its terminal is there came back
  *  with. `unreachable` is the machine not answering at all - a server that is
- *  down, a daemon restarting - which is not the same as an answer of no. */
-export type SessionProbe = "alive" | "dead" | "unreachable";
+ *  down, a daemon restarting - which is not the same as an answer of no.
+ *  `gone` is a machine that answered and has no such container at all - deleted,
+ *  not merely out of reach - so there is nothing left to wait for. */
+export type SessionProbe = "alive" | "dead" | "unreachable" | "gone";
 
 /**
  * Whether the silence sweep fails a quiet session, given what a probe said.
@@ -246,7 +248,7 @@ export function sweepVerdict(
     maxSilentMs: number
 ): "keep" | "fail" {
     if (probe === "alive") return "keep";
-    if (probe === "dead") return "fail";
+    if (probe === "dead" || probe === "gone") return "fail";
     return silentForMs > maxSilentMs * 4 ? "fail" : "keep";
 }
 
@@ -372,4 +374,15 @@ export function sessionBranchName(sessionId: string, label: string): string {
 export function sessionStateLabel(state: AgentSessionState, hasReported: boolean): string {
     if (state === "idle" && !hasReported) return "Starting";
     return AGENT_SESSION_STATE_LABELS[state];
+}
+
+/**
+ * How a tool reopens one of its conversations: a flag after the command
+ * (`claude --resume <id>`), a subcommand before the flags (`codex resume <id>`),
+ * or not at all. Empty for every tool nothing has been sourced about.
+ */
+export function agentResumeStyle(cliId: string): "flag" | "subcommand" | "" {
+    if (cliId === "claude") return "flag";
+    if (cliId === "codex") return "subcommand";
+    return "";
 }

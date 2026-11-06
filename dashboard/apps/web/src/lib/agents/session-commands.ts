@@ -136,6 +136,24 @@ export function agentHomeSource(ownerId: string): string {
  */
 export const SHARED_HOME_SOURCE = "agent-homes/shared";
 
+/**
+ * Where a local session's own directory lives on the box: its checkout and
+ * Polaris's files for it, mounted at `SESSION_ROOT`.
+ *
+ * On the box rather than in the container's own layer, so the work survives the
+ * container being recreated - by a restart of the machine, or by an update of
+ * the daemon. Removed when the session ends with its work saved. See
+ * `releaseCheckout` in session-work.ts.
+ */
+export function sessionCheckoutSource(sessionId: string): string {
+    const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
+    if (!safe) throw new Error("Polaris could not work out where to keep this session's checkout.");
+    return `agent-sessions/s-${safe}`;
+}
+
+/** Where that directory is mounted inside the container. */
+export const SESSION_ROOT = "/session";
+
 /** The compose project, and therefore the container, one session gets. */
 export function sessionContainerName(sessionId: string): string {
     return `polaris-session-${sessionId}`;
@@ -254,6 +272,7 @@ const PREPARE_WORKTREE = [
     // workspace is only on the session that opens it for the first time, and
     // every one after that finds what the last one left. See the chown below.
     "POLARIS_WORKDIR_NEW=no",
+    "POLARIS_REOPENED=no",
     // Polaris's own files for this session, outside the checkout. Private to the
     // agent's account: two of them carry the session's token.
     'mkdir -p "$POLARIS_STATE_DIR"',
@@ -264,6 +283,14 @@ const PREPARE_WORKTREE = [
     '    mkdir -p "$POLARIS_WORKDIR"',
     "    POLARIS_WORKDIR_NEW=yes",
     "  fi",
+    '  cd "$POLARIS_WORKDIR"',
+    // A checkout that is already there is this session's own, kept across a
+    // restart of its machine: the branch, the commits and whatever the agent had
+    // not committed yet. Cloning over it would throw all of that away, so the
+    // session reopens on it instead.
+    'elif [ -d "$POLARIS_WORKDIR/.git" ]; then',
+    '  echo "polaris: reopening $GITHUB_REPOSITORY"',
+    "  POLARIS_REOPENED=yes",
     '  cd "$POLARIS_WORKDIR"',
     "else",
     'echo "polaris: fetching $GITHUB_REPOSITORY"',
@@ -284,17 +311,18 @@ const PREPARE_WORKTREE = [
     // `clone -c` writes the header into the new repository's own config, so the
     // clone token would otherwise sit in .git/config for the agent to read.
     "git config --unset-all http.extraHeader || true",
+    'git checkout -b "$POLARIS_BRANCH"',
+    "POLARIS_WORKDIR_NEW=yes",
+    "fi",
     // From here on git asks Polaris for a token scoped to this repository each
     // time it needs one, rather than the agent holding one. See
-    // `gitCredentialScript`.
-    'if [ -n "$POLARIS_GIT_CREDENTIAL" ]; then',
+    // `gitCredentialScript`. Written on a reopen too: the helper carries the
+    // session's reporting token, and a reopened server session has a new one.
+    'if [ -n "$GITHUB_REPOSITORY" ] && [ -n "$POLARIS_GIT_CREDENTIAL" ]; then',
     '  printf %s "$POLARIS_GIT_CREDENTIAL" | base64 -d > "$POLARIS_STATE_DIR/git-credential.sh"',
     '  chmod 0700 "$POLARIS_STATE_DIR/git-credential.sh"',
     '  git config credential.helper "!sh \\"$POLARIS_STATE_DIR/git-credential.sh\\""',
     "  git config credential.username x-access-token",
-    "fi",
-    'git checkout -b "$POLARIS_BRANCH"',
-    "POLARIS_WORKDIR_NEW=yes",
     "fi",
     // The agent reports what it is doing through a script Polaris registers in
     // the agent's own configuration, and gets the Polaris tools through an MCP
@@ -580,6 +608,65 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
     ].join("\n");
 }
 
+/**
+ * Starts the agent, or reopens one of its conversations.
+ *
+ * A file rather than lines in the setup, so anything that has to start the agent
+ * again later - from the shell the window falls back to once the agent has
+ * exited - starts the same agent the same way the boot did. There is one copy. Fixed text - every value arrives in the environment the
+ * boot exported, and the one argument is checked before it is used.
+ *
+ * Not as root. These tools refuse their own skip-permissions flag when they are
+ * running as root - deliberately, and they are right to - so an agent started as
+ * root refused, exited in the same second, and took the window with it. The
+ * container is root because installing packages needs it, so the installing
+ * happens as root and the agent does not. It keeps sudo: the point is not to
+ * take privileges away, it is to not BE root while holding them.
+ *
+ * Run rather than exec by its caller, with a shell afterwards: an agent that
+ * exited for any reason must not take the window, and every word explaining why,
+ * with it.
+ */
+export const LAUNCH_SCRIPT = [
+    "#!/bin/sh",
+    "# Written by Polaris. Starts this session's agent; an argument reopens that conversation.",
+    'id="${1:-}"',
+    'case "$id" in *[!A-Za-z0-9_-]*) echo "polaris: that is not a conversation Polaris can reopen"; exit 1 ;; esac',
+    'line="$POLARIS_AGENT_COMMAND"',
+    'if [ -n "$id" ]; then',
+    '  case "$POLARIS_AGENT_RESUME" in',
+    '    flag) line="$line --resume $id" ;;',
+    '    subcommand) line="$POLARIS_AGENT_BINARY resume $id${POLARIS_AGENT_COMMAND#"$POLARIS_AGENT_BINARY"}" ;;',
+    '    *) id="" ;;',
+    "  esac",
+    "fi",
+    // Through Enigma where Polaris asked for it AND Enigma is actually here: the
+    // install that put it there is best effort, and a launcher that did not
+    // arrive falls back to the tool itself.
+    'if [ -n "$POLARIS_AGENT_LAUNCHER" ] && command -v "$POLARIS_AGENT_LAUNCHER" >/dev/null 2>&1; then',
+    '  line="$POLARIS_AGENT_LAUNCHER $line"',
+    "fi",
+    // The hooks and the Polaris tools, from beside the checkout rather than from
+    // the repository's own .claude and .mcp.json. See PREPARE_WORKTREE.
+    'if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then',
+    '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
+    "fi",
+    'if [ -n "$id" ]; then echo "polaris: starting $POLARIS_AGENT_COMMAND on conversation $id"; else echo "polaris: starting $POLARIS_AGENT_COMMAND"; fi',
+    // Written last, so anything holding a prompt knows the terminal it is about
+    // to type into belongs to the agent rather than to the installer.
+    `: > ${AGENT_READY_FLAG}`,
+    `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
+    'cd "$POLARIS_WORKDIR"',
+    'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
+    '  su -p "$POLARIS_RUNAS" -c "cd \\"$POLARIS_WORKDIR\\" && $line"',
+    "else",
+    '  sh -c "cd \\"$POLARIS_WORKDIR\\" && $line"',
+    "fi",
+    ""
+].join("\n");
+
+const LAUNCH_SCRIPT_BASE64 = Buffer.from(LAUNCH_SCRIPT, "utf8").toString("base64");
+
 /** Where the answers land on the way in. Beside the other scripts the setup
  *  writes and removes, and holding nothing secret - the tool's own defaults. */
 const FIRST_RUN_FILE = "/tmp/polaris-first-run.json";
@@ -623,42 +710,26 @@ const START_AGENT = [
     // put it there is best effort - so a launcher that did not arrive falls back
     // to the tool itself rather than being a command not found in the same
     // second the session starts.
-    'POLARIS_LAUNCH="$POLARIS_AGENT_COMMAND"',
-    'if [ -n "$POLARIS_AGENT_LAUNCHER" ] && command -v "$POLARIS_AGENT_LAUNCHER" >/dev/null 2>&1; then',
-    '  POLARIS_LAUNCH="$POLARIS_AGENT_LAUNCHER $POLARIS_AGENT_COMMAND"',
     // Said where somebody will read it, because nothing else advertises this: a
     // machine that keeps its home can hold several logins, and one command makes
     // the next one.
+    'if [ -n "$POLARIS_AGENT_LAUNCHER" ] && command -v "$POLARIS_AGENT_LAUNCHER" >/dev/null 2>&1; then',
     "  echo \"polaris: this machine keeps its logins. 'enigma account add <name> --login' adds another, 'enigma account use <name>' picks it.\"",
     "fi",
-    // The hooks and the Polaris tools, from beside the checkout rather than from
-    // the repository's own `.claude` and `.mcp.json`. See PREPARE_WORKTREE.
-    'if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then',
-    '  POLARIS_LAUNCH="$POLARIS_LAUNCH --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
+    // The launch is a script beside the checkout rather than a line here, so a
+    // later relaunch runs exactly what the boot ran. Exported, because the shell
+    // left in the window after the agent exits is the one that runs it then.
+    "export POLARIS_AS_ROOT POLARIS_WORKDIR POLARIS_STATE_DIR",
+    `printf %s ${LAUNCH_SCRIPT_BASE64} | base64 -d > "$POLARIS_STATE_DIR/launch.sh"`,
+    'chmod 0755 "$POLARIS_STATE_DIR/launch.sh"',
+    // A machine that restarted under a session comes back to the conversation
+    // it was in, not to a blank one. The id is the one the agent's own hooks
+    // last reported - see `hookScript` - and only a reopened checkout uses it.
+    'POLARIS_RESUME_ID=""',
+    'if [ "$POLARIS_REOPENED" = "yes" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then',
+    '  POLARIS_RESUME_ID="$(head -c 128 "$POLARIS_STATE_DIR/agent-session-id")"',
     "fi",
-    'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
-    // Written last, so anything holding a prompt knows the terminal it is about
-    // to type into belongs to the agent rather than to the installer.
-    `: > ${AGENT_READY_FLAG}`,
-    `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
-    'cd "$POLARIS_WORKDIR"',
-    // Not as root, and this is what "no server running" actually was.
-    //
-    // These tools refuse their own skip-permissions flag when they are running
-    // as root - deliberately, and they are right to. So the agent started,
-    // refused, and exited in the same second; the window went with it and tmux
-    // took the session, which is why the terminal reported no server rather
-    // than reporting what had happened.
-    //
-    // The container is root because installing packages needs it, so the
-    // installing happens as root and the agent does not. It keeps sudo: the
-    // point is not to take privileges away, it is to not BE root while holding
-    // them.
-    //
-    // Run rather than exec, and a shell afterwards. `exec` replaced this shell,
-    // so an agent that exited for any reason took the window and the session
-    // with it - and every word explaining why went too.
-    'as_agent "cd \\"$POLARIS_WORKDIR\\" && $POLARIS_LAUNCH" || true',
+    'sh "$POLARIS_STATE_DIR/launch.sh" "$POLARIS_RESUME_ID" || true',
     'echo "polaris: the agent exited. This terminal is still yours."',
     "exec sh"
 ];
@@ -728,6 +799,9 @@ const SETUP_COMMAND = `sh -c 'eval "$(echo ${Buffer.from(SESSION_SETUP, "utf8").
  */
 export const SESSION_BOOT = [
     "set -eu",
+    // A container that restarted keeps its /tmp, and with it the flag that said
+    // the last agent was up. Left there, a prompt would be typed into the setup.
+    `rm -f ${AGENT_READY_FLAG}`,
     ...INSTALL_TMUX,
     ...REQUIRE_TMUX,
     'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
@@ -753,6 +827,7 @@ export const SESSION_BOOT = [
  */
 export const SESSION_BOOT_FOR_HOST = [
     "set -eu",
+    `rm -f ${AGENT_READY_FLAG}`,
     ...REQUIRE_TMUX,
     'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
     // Same shape as the container's, and for the same reason: a terminal

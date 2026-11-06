@@ -46,6 +46,7 @@ import {
     markSessionStarted,
     failureDetail,
     readableFailure,
+    reissueSessionToken,
     resolveSessionEnigma,
     SessionRefusal,
     sessionPlacement,
@@ -56,8 +57,10 @@ import {
  *  rather than by matching names it does not own. */
 const LABEL_KEY = "polaris.agent-session";
 
-/** Where a `local` session's worktree lives inside its own container. */
-const CONTAINER_WORKDIR = "/session/repo";
+/** Where a `local` session's worktree lives inside its own container: on the
+ *  session's own directory on the box, so it outlives the container. See
+ *  `sessionCheckoutSource`. */
+const CONTAINER_WORKDIR = `${commands.SESSION_ROOT}/repo`;
 
 /**
  * Where a WORKSPACE works, which is inside the home that is kept.
@@ -89,7 +92,7 @@ function hostWorkdir(sessionId: string): string {
 function stateDirFor(session: { id: string; place: string }): string {
     return session.place === "host"
         ? `$HOME/.polaris/sessions/${session.id}/polaris`
-        : "/session/polaris";
+        : `${commands.SESSION_ROOT}/polaris`;
 }
 
 /** What the machine needs to know to bring a session up. Assembled once and used
@@ -111,6 +114,8 @@ interface Bootstrap {
      *  otherwise, and the boot script falls back to empty on a machine where
      *  the launcher did not install. See `enigmaLaunches`. */
     readonly agentLauncher: string;
+    /** How the tool reopens a conversation, or empty. See `agentResumeStyle`. */
+    readonly agentResume: string;
     /** The whole of what installing Enigma means, base64 so it survives the
      *  daemon's rule about control characters. Empty when Enigma is off. */
     readonly enigmaSetup: string;
@@ -264,6 +269,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentCommand: agent.command,
         agentInstall: agent.install,
         agentLauncher: agent.launcher,
+        agentResume: core.agentResumeStyle(agent.cli.id),
         // Empty when Enigma is off, which is what the boot script tests for.
         // One script rather than an argv and a second script: it installs the
         // package globally so the agent can invoke `enigma`, then makes the
@@ -394,6 +400,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_COMMAND: boot.agentCommand,
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_AGENT_LAUNCHER: boot.agentLauncher,
+        POLARIS_AGENT_RESUME: boot.agentResume,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
         POLARIS_FIRST_RUN: boot.firstRun,
@@ -505,14 +512,25 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                                   ),
                             target: commands.AGENT_HOME,
                             kind: "bind" as const
+                        },
+                        // The checkout and Polaris's files for it, on the box
+                        // rather than in the container's own layer, so a
+                        // container that is recreated comes back to the same
+                        // work. Removed when the work has been saved.
+                        {
+                            source: commands.sessionCheckoutSource(session.id),
+                            target: commands.SESSION_ROOT,
+                            kind: "bind" as const
                         }
                     ],
                     labels: { [LABEL_KEY]: session.id },
                     command: commands.bootArgv(commands.SESSION_BOOT),
                     networks: [],
-                    // Never restarted. A session that came back would re-clone over its
-                    // own worktree and lose whatever the agent had not committed.
-                    restart: "no"
+                    // Back after a reboot of the box. The checkout is on the
+                    // box, so the boot finds it and reopens on it rather than
+                    // cloning over it - see PREPARE_WORKTREE - and the agent
+                    // comes back on the conversation it was in.
+                    restart: "unless-stopped"
                 }
             ],
             volumes: [],
@@ -825,7 +843,11 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
     });
     let failed = 0;
     for (const session of quiet) {
-        const probe = await probeSession(session.id);
+        let probe = await probeSession(session.id, session.place, session.containerId);
+        // A server that restarted took the terminal with it but kept the
+        // checkout, so the session is reopened on it rather than failed.
+        if (probe === "dead" && session.place === "host" && (await reopenOnHost(session.id)))
+            probe = "alive";
         const heard = session.lastEventAt ?? session.createdAt;
         const verdict = core.sweepVerdict(probe, now.getTime() - heard.getTime(), maxSilentMs);
         if (verdict === "keep") {
@@ -840,13 +862,16 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
         await finishSession(
             session.id,
             "failed",
-            "The machine running this session stopped reporting."
+            probe === "gone"
+                ? "The container running this session was deleted."
+                : "The machine running this session stopped reporting."
         );
         await clearSessionWaiting(session.id);
         await noticeSessionEnded(session.id, "silent");
         // The same path as Stop: the work is pushed before the container goes,
-        // and a container whose work could not be pushed stays.
-        if (session.place !== "host" && session.containerId)
+        // and a container whose work could not be pushed stays. Nothing to do
+        // for one that is already gone.
+        if (session.place !== "host" && session.containerId && probe !== "gone")
             await endContainerSession(session.id).catch((error) => {
                 console.error(
                     `polaris: could not end the container of session ${session.id}:`,
@@ -857,14 +882,58 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
     return failed;
 }
 
-/** Whether a session's terminal is still there: its tmux session answers,
- *  does not, or the machine could not be asked at all. */
-async function probeSession(sessionId: string): Promise<core.SessionProbe> {
+/**
+ * Whether a session's terminal is still there: its tmux session answers, does
+ * not, the machine could not be asked at all, or - for a container - the box
+ * answered that there is no such container any more.
+ *
+ * A container that exists but is stopped is started again on the way: its boot
+ * reopens on the checkout it kept, so the next probe finds it alive.
+ */
+async function probeSession(
+    sessionId: string,
+    place: string,
+    containerId: string | null
+): Promise<core.SessionProbe> {
     try {
         const result = await runInSession(sessionId, commands.aliveCommand());
         return result.code === 0 ? "alive" : "dead";
     } catch (error) {
         console.error(`[agent-session] ${sessionId}: liveness probe failed:`, error);
+    }
+    if (place === "host" || !containerId) return "unreachable";
+    try {
+        const ports = new HostdPorts();
+        const state = await ports.containerState(containerId);
+        if (state === "stopped") await ports.container(containerId, "start");
+        return state === "gone" ? "gone" : "unreachable";
+    } catch {
         return "unreachable";
+    }
+}
+
+/**
+ * Bring a server session's terminal back after the server restarted under it.
+ *
+ * The same boot as the first start, with a new reporting token: the checkout is
+ * still there, so the boot reopens on it instead of cloning (see
+ * PREPARE_WORKTREE) and starts the agent on the conversation it was in. False
+ * when it could not, which leaves the sweep to fail the session as before.
+ */
+async function reopenOnHost(sessionId: string): Promise<boolean> {
+    try {
+        const reissued = await reissueSessionToken(sessionId);
+        if (!reissued) return false;
+        const boot = await bootstrapFor(reissued.session, reissued.token);
+        await startOnHost(reissued.session, boot);
+        await addSessionMessage(
+            sessionId,
+            "system",
+            "The server restarted, so Polaris reopened this session on its checkout."
+        ).catch(() => undefined);
+        return true;
+    } catch (error) {
+        console.error(`[agent-session] ${sessionId}: could not reopen on its server:`, error);
+        return false;
     }
 }

@@ -26,6 +26,13 @@ import {
 
 const ESC = String.fromCharCode(27);
 
+/** The setup and the launch script it writes: one boot, read as a whole. */
+const WHOLE_BOOT = `${commands.SESSION_SETUP}
+${commands.LAUNCH_SCRIPT}`;
+
+/** Where the setup hands over to the agent. */
+const LAUNCH_LINE = 'sh "$POLARIS_STATE_DIR/launch.sh" "$POLARIS_RESUME_ID"';
+
 describe("the boot script", () => {
     it("interpolates nothing, so no repository name or prompt ever reaches a shell through it", () => {
         expect(commands.SESSION_SETUP).not.toMatch(/\$\{/);
@@ -40,7 +47,7 @@ describe("the boot script", () => {
             "POLARIS_AGENT_COMMAND",
             "POLARIS_HOOK_SETTINGS"
         ]) {
-            expect(commands.SESSION_SETUP).toContain(`$${name}`);
+            expect(WHOLE_BOOT).toContain(`${name}`);
         }
     });
 
@@ -51,7 +58,7 @@ describe("the boot script", () => {
         // order against any more.
         // Against the line that runs the agent: the credential is dropped
         // before anything the agent could read its own environment from.
-        const runs = boot.indexOf('as_agent "cd ');
+        const runs = boot.indexOf(LAUNCH_LINE);
         expect(runs).toBeGreaterThan(0);
         expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(runs);
     });
@@ -124,7 +131,7 @@ describe("the boot script", () => {
     });
 
     it("points Claude at those files with its own flags", () => {
-        const setup = commands.SESSION_SETUP;
+        const setup = commands.LAUNCH_SCRIPT;
         expect(setup).toContain('if [ "$POLARIS_AGENT_CONFIG" = "claude" ]; then');
         expect(setup).toContain(
             '--settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\"'
@@ -436,7 +443,7 @@ describe("the tool's own first-run wizard", () => {
             '[ -n "$POLARIS_FIRST_RUN" ] && [ -n "$POLARIS_HOME" ]'
         );
         expect(commands.SESSION_SETUP.indexOf("POLARIS_FIRST_RUN")).toBeLessThan(
-            commands.SESSION_SETUP.indexOf("polaris: starting")
+            commands.SESSION_SETUP.indexOf(LAUNCH_LINE)
         );
         // After Enigma, which writes into one of the same files.
         expect(commands.SESSION_SETUP.indexOf("$POLARIS_ENIGMA_CONFIGURE")).toBeLessThan(
@@ -647,10 +654,11 @@ describe("how far a session is through coming up", () => {
     it("matches lines this file actually prints", () => {
         // The failure it guards is silent: reword an echo and the bar stops
         // moving, with nothing anywhere saying why.
-        const boot = commands.SESSION_SETUP;
+        const boot = WHOLE_BOOT;
         for (const mark of [
             "polaris: preparing this account",
             "polaris: fetching ",
+            "polaris: reopening ",
             "polaris: installing Enigma",
             "This happens once",
             "is already installed here",
@@ -874,5 +882,140 @@ describe("the directories a server's session names", () => {
         expect(result.stdout.trim()).toBe(
             "/home/someone/.polaris/sessions/s1/repo|/session/polaris"
         );
+    });
+});
+
+describe("a session whose machine restarted under it", () => {
+    /** Runs the whole setup in a real shell, with a checkout already there. */
+    function reboot(options: { resume: string; id?: string }) {
+        const root = mkdtempSync(join(tmpdir(), "polaris-reopen-"));
+        const workdir = join(root, "repo");
+        const stateDir = join(root, "polaris");
+        mkdirSync(workdir, { recursive: true });
+        mkdirSync(stateDir, { recursive: true });
+        expect(spawnSync("git", ["init", "-q", workdir]).status).toBe(0);
+        writeFileSync(join(workdir, "work.txt"), "not committed yet");
+        if (options.id) writeFileSync(join(stateDir, "agent-session-id"), options.id);
+        const result = spawnSync("sh", ["-c", commands.SESSION_SETUP], {
+            encoding: "utf8",
+            input: "",
+            env: {
+                ...process.env,
+                POLARIS_RUNAS: "",
+                POLARIS_HOME: "",
+                POLARIS_WORKDIR: workdir.replace(/\\/g, "/"),
+                POLARIS_STATE_DIR: stateDir.replace(/\\/g, "/"),
+                GITHUB_REPOSITORY: "acme/web",
+                POLARIS_BRANCH: "polaris/fix-login",
+                POLARIS_GIT_CREDENTIAL: "",
+                POLARIS_HOOK_SCRIPT: "",
+                POLARIS_HOOK_SETTINGS: "",
+                POLARIS_MCP_CONFIG: "",
+                POLARIS_ENIGMA_SETUP: "",
+                POLARIS_ENIGMA_CONFIGURE: "",
+                POLARIS_FIRST_RUN: "",
+                POLARIS_SIGNED_IN: "yes",
+                POLARIS_AGENT_INSTALL: "",
+                POLARIS_AGENT_BINARY: "echo",
+                POLARIS_AGENT_COMMAND: "echo agent-ran",
+                POLARIS_AGENT_RESUME: options.resume,
+                POLARIS_AGENT_LAUNCHER: "",
+                POLARIS_AGENT_CONFIG: ""
+            }
+        });
+        return { result, workdir };
+    }
+
+    it("reopens the checkout it kept instead of cloning over it", () => {
+        const { result, workdir } = reboot({ resume: "flag" });
+        expect(result.stdout).toContain("polaris: reopening acme/web");
+        expect(result.stdout).not.toContain("polaris: fetching");
+        expect(readFileSync(join(workdir, "work.txt"), "utf8")).toBe("not committed yet");
+        const steps = bootProgress("polaris: reopening acme/web")!;
+        expect(steps.find((step) => step.key === "fetch")).toMatchObject({
+            state: "doing",
+            label: "Reopening the checkout"
+        });
+    });
+
+    it("starts the agent on the conversation its hooks last reported", () => {
+        const { result } = reboot({ resume: "flag", id: "5f2c-a1_b" });
+        expect(result.stdout).toContain("agent-ran --resume 5f2c-a1_b");
+        expect(result.stdout).toContain("polaris: the agent exited. This terminal is still yours.");
+    });
+
+    it("starts a blank one for a tool nothing says how to reopen", () => {
+        const { result } = reboot({ resume: "", id: "5f2c-a1_b" });
+        expect(result.stdout).toContain("agent-ran");
+        expect(result.stdout).not.toContain("5f2c-a1_b");
+    });
+
+    it("puts a subcommand style's resume before the tool's own flags", () => {
+        const { result } = reboot({ resume: "subcommand", id: "abc" });
+        // POLARIS_AGENT_BINARY is `echo`, so what it prints is its arguments.
+        expect(result.stdout).toContain("resume abc agent-ran");
+    });
+
+    it("refuses an id that is not one, rather than typing it into a shell", () => {
+        const { result } = reboot({ resume: "flag", id: "abc;touch pwned" });
+        expect(result.stdout).toContain("polaris: that is not a conversation Polaris can reopen");
+        expect(result.stdout).not.toContain("agent-ran");
+    });
+
+    it("only reopens where a checkout is, and only resumes a reopened one", () => {
+        const setup = commands.SESSION_SETUP;
+        expect(setup.indexOf('elif [ -d "$POLARIS_WORKDIR/.git" ]; then')).toBeLessThan(
+            setup.indexOf("git clone")
+        );
+        expect(setup).toContain(
+            'if [ "$POLARIS_REOPENED" = "yes" ] && [ -f "$POLARIS_STATE_DIR/agent-session-id" ]; then'
+        );
+    });
+
+    it("clears the flag the last agent left, so a prompt waits for the new one", () => {
+        for (const boot of [commands.SESSION_BOOT, commands.SESSION_BOOT_FOR_HOST]) {
+            expect(boot.indexOf(`rm -f ${commands.AGENT_READY_FLAG}`)).toBeLessThan(
+                boot.indexOf("tmux new-session")
+            );
+        }
+    });
+
+    it("keeps a local session's checkout on the box, one directory per session", () => {
+        expect(commands.sessionCheckoutSource("8ec470cd-9e5f-416a-b541-c58f99125041")).toBe(
+            "agent-sessions/s-8ec470cd-9e5f-416a-b541-c58f99125041"
+        );
+        expect(commands.sessionCheckoutSource("../../etc")).toBe("agent-sessions/s-etc");
+        expect(() => commands.sessionCheckoutSource("../")).toThrow();
+    });
+});
+
+describe("the conversation id a hook leaves behind", () => {
+    function hook(payload: string): string | null {
+        const dir = mkdtempSync(join(tmpdir(), "polaris-hook-"));
+        const path = join(dir, "hook.sh");
+        writeFileSync(path, hookScript("http://127.0.0.1:1/ingest", "t0ken"));
+        const done = spawnSync("sh", [path.replace(/\\/g, "/")], {
+            encoding: "utf8",
+            input: payload
+        });
+        expect(done.status).toBe(0);
+        try {
+            return readFileSync(join(dir, "agent-session-id"), "utf8");
+        } catch {
+            return null;
+        }
+    }
+
+    it("keeps the payload's own id, not one quoted in what the agent said", () => {
+        const payload = JSON.stringify({
+            session_id: "0b9e-41_x",
+            prompt: '"session_id": "evil"'
+        });
+        expect(hook(payload)).toBe("0b9e-41_x");
+    });
+
+    it("keeps nothing that is not shaped like an id", () => {
+        expect(hook(JSON.stringify({ session_id: "a b;c" }))).toBeNull();
+        expect(hook("{}")).toBeNull();
     });
 });

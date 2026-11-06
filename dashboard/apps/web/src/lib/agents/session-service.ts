@@ -421,6 +421,31 @@ export async function createSession(
 }
 
 /**
+ * A session that is still live, with a fresh reporting token, for Polaris to
+ * bring its machine back up under - or null once it has ended.
+ *
+ * Only the token's hash is ever stored, so reopening a session on a server that
+ * restarted means issuing a new one; the old one is worthless from this moment,
+ * which is also the right thing for a token that sat in a file on a machine that
+ * went away. Unscoped: the sweep asks, not a person.
+ */
+export async function reissueSessionToken(
+    sessionId: string
+): Promise<{ session: SessionView; token: string } | null> {
+    const token = generateToken();
+    const updated = await prisma.agentSession.updateMany({
+        where: { id: sessionId, state: { notIn: ["stopped", "failed"] } },
+        data: { tokenHash: hashToken(token) }
+    });
+    if (updated.count === 0) return null;
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: VIEW_SELECT
+    });
+    return record ? { session: toView(record as unknown as SessionRecord), token } : null;
+}
+
+/**
  * The session a reporting token belongs to, or null.
  *
  * A token stops working the moment its session is over, which is what stops a

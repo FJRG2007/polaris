@@ -148,6 +148,9 @@
         "accountFull": "You already have {count} sessions running, which is the most one account may have at once. Stop one and this will start.",
         "unknownAgent": "Polaris no longer knows an agent called {cli}.",
         "noTerminal": "its agent never opened a terminal to type into",
+        "machineSilent": "The machine running this session stopped reporting.",
+        "containerDeleted": "The container running this session was deleted.",
+        "serverReopened": "The server restarted, so Polaris reopened this session on its checkout.",
         "unknownReason": "unknown",
         "firstPrompt": "Polaris could not send the first prompt: {reason}. Send it again from the box below.",
         "workflowFinished": "The workflow finished as {conclusion}. Its log is on the run in GitHub Actions."
@@ -230,6 +233,7 @@
         "workspace": "Preparing your machine",
         "fetch": "Fetching the repository",
         "opening": "Opening your workspace",
+        "reopening": "Reopening the checkout",
         "enigma": "Installing Enigma",
         "agent": "Installing the agent",
         "agentHere": "The agent is already here",

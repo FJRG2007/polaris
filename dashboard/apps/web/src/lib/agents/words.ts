@@ -107,9 +107,14 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "You already have a workspace session open, and it is the same directory this one would use. Stop that session and this will start.":
         "text.ownWorkspaceTaken",
     "its agent never opened a terminal to type into": "text.noTerminal",
+    "The machine running this session stopped reporting.": "text.machineSilent",
+    "The container running this session was deleted.": "text.containerDeleted",
+    "The server restarted, so Polaris reopened this session on its checkout.":
+        "text.serverReopened",
     "Preparing your machine": "boot.workspace",
     "Fetching the repository": "boot.fetch",
     "Opening your workspace": "boot.opening",
+    "Reopening the checkout": "boot.reopening",
     "Installing Enigma": "boot.enigma",
     "Installing the agent": "boot.agent",
     "The agent is already here": "boot.agentHere",

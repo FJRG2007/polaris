@@ -347,6 +347,29 @@ async function recordOutcome(sessionId: string, outcome: SaveOutcome): Promise<v
 }
 
 /**
+ * Take a session's container down, and its checkout with it.
+ *
+ * The checkout lives on the box rather than in the container (see
+ * `sessionCheckoutSource`), so removing the container no longer removes the
+ * work - which is the point while the session runs, and a directory left behind
+ * for every session ever run once it has ended. Emptied from inside, while the
+ * container still has it mounted, because the daemon reaches nothing on the box
+ * outside a container. Best effort: a container that will not answer leaves an
+ * empty-able directory behind, never a running container.
+ */
+export async function releaseContainer(containerId: string): Promise<void> {
+    const ports = new HostdPorts();
+    await ports
+        .runIn(containerId, [
+            "sh",
+            "-c",
+            `rm -rf ${commands.SESSION_ROOT}/repo ${commands.SESSION_ROOT}/polaris`
+        ])
+        .catch(() => undefined);
+    await ports.composeDown(containerId).catch(() => undefined);
+}
+
+/**
  * Save the work, then take the container down - or keep it, when the work
  * could not be saved. The one path Stop, the sweep, Try again and the reaper of
  * leftover containers all take, so none of them can remove a container the
@@ -371,8 +394,7 @@ export async function endContainerSession(sessionId: string): Promise<SaveOutcom
         return outcome;
     }
     await clearWorkKept(sessionId);
-    if (row?.containerId)
-        await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
+    if (row?.containerId) await releaseContainer(row.containerId);
     return outcome;
 }
 
@@ -387,6 +409,5 @@ export async function discardSessionWork(sessionId: string): Promise<void> {
         data: { workState: "discarded", workError: null }
     });
     await clearWorkKept(sessionId);
-    if (row?.containerId)
-        await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
+    if (row?.containerId) await releaseContainer(row.containerId);
 }

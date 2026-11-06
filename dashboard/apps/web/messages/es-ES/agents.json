@@ -148,6 +148,9 @@
         "accountFull": "Ya tienes {count} sesiones en marcha, que es el máximo que puede tener una cuenta a la vez. Detén una y esta se iniciará.",
         "unknownAgent": "Polaris ya no conoce ningún agente llamado {cli}.",
         "noTerminal": "su agente nunca abrió un terminal donde escribir",
+        "machineSilent": "La máquina de esta sesión dejó de dar señales.",
+        "containerDeleted": "El contenedor de esta sesión fue eliminado.",
+        "serverReopened": "El servidor se reinició y Polaris reabrió la sesión en su copia.",
         "unknownReason": "desconocido",
         "firstPrompt": "Polaris no pudo enviar el primer prompt: {reason}. Vuelve a enviarlo desde el cuadro de abajo.",
         "workflowFinished": "El workflow terminó como {conclusion}. Su log está en la ejecución de GitHub Actions."
@@ -230,6 +233,7 @@
         "workspace": "Preparando tu máquina",
         "fetch": "Descargando el repositorio",
         "opening": "Abriendo tu espacio",
+        "reopening": "Reabriendo la copia",
         "enigma": "Instalando Enigma",
         "agent": "Instalando el agente",
         "agentHere": "El agente ya está aquí",

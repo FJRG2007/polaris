@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
     sessions: [] as Record<string, unknown>[],
     listed: [] as Record<string, unknown>[],
     composeDown: vi.fn(async () => undefined),
+    releaseContainer: vi.fn(async (_project: string) => undefined),
     endContainerSession: vi.fn(async () => ({ kind: "pushed", commits: 1, branch: "polaris/x" }))
 }));
 
@@ -35,7 +36,10 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
         composeDown = state.composeDown;
     }
 }));
-vi.mock("@/lib/agents/session-work", () => ({ endContainerSession: state.endContainerSession }));
+vi.mock("@/lib/agents/session-work", () => ({
+    endContainerSession: state.endContainerSession,
+    releaseContainer: state.releaseContainer
+}));
 
 const { ENDED_GRACE_MS, leftoverProjects, reapLeftoverContainers } =
     await import("@/lib/agents/leftover-containers");
@@ -88,6 +92,7 @@ describe("reaping a session that ended on its own", () => {
     beforeEach(() => {
         state.composeDown.mockClear();
         state.endContainerSession.mockClear();
+        state.releaseContainer.mockClear();
         state.listed = [
             {
                 Names: [`/${PREFIX}${ID}-agent-1`],
@@ -143,6 +148,7 @@ describe("reaping a session that ended on its own", () => {
         ];
         expect(await reapLeftoverContainers(NOW)).toBe(1);
         expect(state.endContainerSession).not.toHaveBeenCalled();
-        expect(state.composeDown).toHaveBeenCalledWith(`${PREFIX}${ID}`);
+        // With its checkout, which lives on the box rather than in the container.
+        expect(state.releaseContainer).toHaveBeenCalledWith(`${PREFIX}${ID}`);
     });
 });
