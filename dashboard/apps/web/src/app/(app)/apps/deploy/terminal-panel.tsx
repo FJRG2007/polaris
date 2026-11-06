@@ -318,6 +318,12 @@ export function TerminalPanel({
         // every parent render.
     }, [key, attempt]);
 
+    useEffect(() => {
+        if (resumeId === undefined || resumeId === sessionRef.current) return;
+        sessionRef.current = resumeId;
+        setAttempt((n) => n + 1);
+    }, [resumeId]);
+
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">

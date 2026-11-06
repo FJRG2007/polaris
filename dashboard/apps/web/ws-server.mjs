@@ -18,7 +18,6 @@
  */
 
 import { createServer } from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
 import {
@@ -38,8 +37,10 @@ import {
 import {
     DEFAULT_IDLE_MINUTES,
     DEFAULT_SCROLLBACK_BYTES,
+    attachServerShell,
     createSessionRegistry,
-    positiveInt
+    positiveInt,
+    sessionsRequest
 } from "./terminal-sessions.mjs";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
@@ -75,6 +76,7 @@ const wss = new WebSocketServer({
 server.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`));
 
 wss.on("connection", async (ws, req) => {
+    ws.on("error", (err) => console.error(`polaris ws: socket error - ${err?.message ?? err}`));
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
     const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent"];
@@ -87,7 +89,7 @@ wss.on("connection", async (ws, req) => {
     }
 
     if (ticket.mode === "ssh" || ticket.mode === "ssh-root") {
-        await attachServerShell(ticket, ws);
+        await attachServerShell(sessions, openSshSession, ticket, ws);
         return;
     }
 
@@ -123,116 +125,16 @@ wss.on("connection", async (ws, req) => {
     ws.on("close", () => session.close());
 });
 
-/**
- * A server shell that outlives the socket. The ticket names the session to
- * return to in `containerRef` (empty for a new one); it is only found if the
- * same user opened it on the same server in the same mode, so a foreign or
- * finished id reads the same: ended. A new one is refused past the user's cap.
- *
- * The first text frame tells the panel which session it is on, then the
- * scrollback is replayed, then the live stream follows.
- */
-async function attachServerShell(ticket, ws) {
-    let session = ticket.containerRef
-        ? sessions.find(ticket.userId, ticket.targetId, ticket.mode, ticket.containerRef)
-        : null;
-    if (ticket.containerRef && !session) {
-        ws.close(4006, "session ended");
-        return;
-    }
-    if (!session) {
-        if (!sessions.canOpen(ticket.userId, ticket.sessionCap)) {
-            ws.close(4005, "session limit reached");
-            return;
-        }
-        const opened = await openSshSession(ticket, ws);
-        if (!opened) return;
-        // The socket may have gone while the server was dialled; the cap is
-        // checked again because another tab may have opened one meanwhile.
-        if (ws.readyState !== ws.OPEN || !sessions.canOpen(ticket.userId, ticket.sessionCap)) {
-            opened.close();
-            ws.close(4005, "session limit reached");
-            return;
-        }
-        session = sessions.add({
-            userId: ticket.userId,
-            hostId: ticket.targetId,
-            mode: ticket.mode,
-            ...opened
-        });
-    }
-
-    const sink = {
-        send: (chunk) => ws.readyState === ws.OPEN && ws.send(chunk),
-        close: (code, reason) => ws.close(code, reason)
-    };
-    ws.send(JSON.stringify({ session: { id: session.id, number: session.number } }));
-    const replay = sessions.attach(session, sink);
-    if (replay.length) ws.send(replay);
-
-    ws.on("message", (data, isBinary) => {
-        if (!isBinary) {
-            try {
-                const msg = JSON.parse(data.toString());
-                if (msg && msg.resize) {
-                    session.resize(msg.resize.cols, msg.resize.rows);
-                    return;
-                }
-                if (msg && msg.ping) return;
-            } catch {
-                // Not JSON: input bytes.
-            }
-        }
-        sessions.input(session, data);
-    });
-    ws.on("close", () => sessions.detach(session, sink));
-}
-
-/**
- * The web app's loopback calls on a user's sessions. Gated by the same shared
- * secret as the redeem route; the user and server always come from the web app,
- * which has already checked the caller may use a shell there.
- */
+/** The web app's loopback calls on a user's sessions (see `sessionsRequest`). */
 async function handleInternal(req, res) {
-    const reply = (status, body) => {
-        res.writeHead(status, { "content-type": "application/json" });
-        res.end(JSON.stringify(body));
-    };
-    const url = new URL(req.url ?? "/", "http://sidecar");
-    if (url.pathname !== "/internal/terminal-sessions") return reply(404, { error: "not found" });
-    if (!internalKey || !safeEqual(String(req.headers["x-internal-key"] ?? ""), internalKey)) {
-        return reply(403, { error: "forbidden" });
-    }
-    if (req.method === "GET") {
-        const userId = url.searchParams.get("userId") ?? "";
-        const hostId = url.searchParams.get("hostId") ?? "";
-        if (!userId || !hostId) return reply(400, { error: "userId and hostId required" });
-        return reply(200, {
-            sessions: sessions.list(userId, hostId),
-            used: sessions.count(userId),
-            cap: sessions.cap,
-            idleMinutes: Math.round(sessions.idleMs / 60_000)
-        });
-    }
-    if (req.method !== "POST") return reply(405, { error: "method not allowed" });
-    let body;
-    try {
-        body = JSON.parse(await readBody(req));
-    } catch {
-        return reply(400, { error: "invalid body" });
-    }
-    const userId = typeof body?.userId === "string" ? body.userId : "";
-    const hostId = typeof body?.hostId === "string" ? body.hostId : "";
-    const id = typeof body?.id === "string" ? body.id : "";
-    if (!userId || !hostId || !id) return reply(400, { error: "userId, hostId and id required" });
-    const ok =
-        body.action === "rename"
-            ? sessions.rename(userId, hostId, id, body.name)
-            : body.action === "close"
-              ? sessions.close(userId, hostId, id)
-              : null;
-    if (ok === null) return reply(400, { error: "unknown action" });
-    return reply(ok ? 200 : 404, { ok });
+    const { status, body } = await sessionsRequest(sessions, internalKey, {
+        method: req.method,
+        url: new URL(req.url ?? "/", "http://sidecar"),
+        key: String(req.headers["x-internal-key"] ?? ""),
+        readBody: () => readBody(req)
+    });
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(JSON.stringify(body));
 }
 
 function readBody(req) {
@@ -251,12 +153,6 @@ function readBody(req) {
         req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
         req.on("error", reject);
     });
-}
-
-function safeEqual(a, b) {
-    const ab = Buffer.from(a);
-    const bb = Buffer.from(b);
-    return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
 
 /**

@@ -119,6 +119,7 @@ export function ServerTerminals({
     const onSession = (id: string, number: number): void => {
         // A pending tab learns its id: keep its panel key and list it at once,
         // so the panel stays mounted on the same socket, then refresh.
+        if (active !== PENDING) return;
         setKeys((k) => (k[id] ? k : { ...k, [id]: `${PENDING}-${pendingKey}` }));
         const mode = pendingRoot ? "ssh-root" : "ssh";
         setListing((l) =>
@@ -312,7 +313,7 @@ export function ServerTerminals({
                 </div>
             ) : null}
 
-            {error ? <p className="text-xs text-destructive">{error}</p> : null}
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
 
             {active === PENDING || activeSession ? (
                 <TerminalPanel
