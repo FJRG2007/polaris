@@ -76,7 +76,12 @@ export async function chatLookup(
     return [...found, ...chats, ...rooms, ...said];
 }
 
-async function people(actor: { id: string }, term: string, limit: number, t: Words): Promise<ChatHit[]> {
+async function people(
+    actor: { id: string },
+    term: string,
+    limit: number,
+    t: Words
+): Promise<ChatHit[]> {
     const { people: found } = await searchForConversation(actor, term, limit);
     return found.map((person) => ({
         id: person.id,
@@ -102,7 +107,12 @@ function byRecent(left: ChatChannelView, right: ChatChannelView): number {
 type Rail = () => Promise<ChatChannelView[]>;
 type Words = NamespaceTranslator<"components">;
 
-async function conversations(rail: Rail, term: string, limit: number, t: Words): Promise<ChatHit[]> {
+async function conversations(
+    rail: Rail,
+    term: string,
+    limit: number,
+    t: Words
+): Promise<ChatHit[]> {
     const needle = term.toLowerCase();
     return (await rail())
         .filter(
@@ -154,7 +164,12 @@ async function channels(
         }));
 }
 
-async function messages(actor: { id: string }, term: string, limit: number, t: Words): Promise<ChatHit[]> {
+async function messages(
+    actor: { id: string },
+    term: string,
+    limit: number,
+    t: Words
+): Promise<ChatHit[]> {
     if (!term) return [];
     const hits = await searchMessages(actor, core.chatSearchSchema.parse({ term }));
     return hits.slice(0, limit).map((hit) => ({
@@ -163,7 +178,10 @@ async function messages(actor: { id: string }, term: string, limit: number, t: W
         label: plainExcerpt(hit.message.body, 120) || t("search.hits.attachment"),
         detail:
             hit.message.authorName && hit.channelName
-                ? t("search.hits.saidIn", { author: hit.message.authorName, channel: hit.channelName })
+                ? t("search.hits.saidIn", {
+                      author: hit.message.authorName,
+                      channel: hit.channelName
+                  })
                 : hit.message.authorName || hit.channelName || "",
         href: `/chat/c/${hit.channelId}/${hit.message.id}`
     }));
