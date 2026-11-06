@@ -90,7 +90,9 @@ const VENDOR_PREFIXED = new Map([
  * and only its first quoted token taken - reading every quoted string in the
  * header would name browsers after their version numbers.
  */
-function brandFromHints(brands: string | null | undefined): { name: string; version: string | null } | null {
+function brandFromHints(
+    brands: string | null | undefined
+): { name: string; version: string | null } | null {
     if (!brands) return null;
     for (const entry of brands.slice(0, MAX_BRANDS).split(",")) {
         const name = entry.match(/"([^"]{1,40})"/)?.[1]?.trim();
@@ -125,7 +127,11 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
  * hold on its own: a mobile string that later starts carrying the broad token
  * too would otherwise be read as whichever browser it merely embeds.
  */
-const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonly version: RegExp }[] = [
+const BROWSERS: readonly {
+    readonly test: RegExp;
+    readonly name: string;
+    readonly version: RegExp;
+}[] = [
     { test: /\bEdg\//, name: "Edge", version: /\bEdg\/(\d{1,4})/ },
     { test: /\bEdgA\//, name: "Edge", version: /\bEdgA\/(\d{1,4})/ },
     { test: /\bEdgiOS\//, name: "Edge", version: /\bEdgiOS\/(\d{1,4})/ },
@@ -133,7 +139,11 @@ const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonl
     { test: /\bOPT\//, name: "Opera", version: /\bOPT\/(\d{1,4})/ },
     { test: /\bOPiOS\//, name: "Opera", version: /\bOPiOS\/(\d{1,4})/ },
     { test: /\bVivaldi\//, name: "Vivaldi", version: /\bVivaldi\/(\d{1,4})/ },
-    { test: /\bSamsungBrowser\//, name: "Samsung Internet", version: /\bSamsungBrowser\/(\d{1,4})/ },
+    {
+        test: /\bSamsungBrowser\//,
+        name: "Samsung Internet",
+        version: /\bSamsungBrowser\/(\d{1,4})/
+    },
     { test: /\bFxiOS\//, name: "Firefox", version: /\bFxiOS\/(\d{1,4})/ },
     { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
     { test: /\bCriOS\//, name: "Chrome", version: /\bCriOS\/(\d{1,4})/ },
@@ -184,7 +194,11 @@ function browserFromUserAgent(userAgent: string): { name: string; version: strin
  * guessed. Telling them apart needs `sec-ch-ua-platform-version`, which is a
  * high-entropy hint a site has to ask for and this deployment does not.
  */
-const OPERATING_SYSTEMS: readonly { readonly test: RegExp; readonly name: string; readonly version?: RegExp }[] = [
+const OPERATING_SYSTEMS: readonly {
+    readonly test: RegExp;
+    readonly name: string;
+    readonly version?: RegExp;
+}[] = [
     { test: /Windows/, name: "Windows" },
     { test: /Android/, name: "Android", version: /Android (\d{1,3}(?:\.\d{1,3})?)/ },
     { test: /iPhone|iPad|iPod|iOS/, name: "iOS", version: /OS (\d{1,3}(?:[._]\d{1,3})?)/ },
@@ -380,7 +394,10 @@ export function userAgentMatches(userAgent: string, pattern: string): boolean {
  * key is created with; a request with no user-agent at all cannot match a
  * pattern, so a key that named the clients it expects refuses it.
  */
-export function userAgentAllowed(rules: UserAgentRules, userAgent: string | null | undefined): boolean {
+export function userAgentAllowed(
+    rules: UserAgentRules,
+    userAgent: string | null | undefined
+): boolean {
     const client = userAgent ?? "";
     if (rules.deniedUserAgents.some((pattern) => userAgentMatches(client, pattern))) return false;
     if (rules.allowedUserAgents.length === 0) return true;
