@@ -22,6 +22,7 @@ import { useChat } from "./chat-context";
 import { PersonName } from "@/components/person-name";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
+import { unlockProofFor } from "./lock-session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChatStream } from "./use-chat-stream";
 import type { ChatSearchHit } from "@/lib/chat/search";
@@ -85,7 +86,7 @@ export function SearchPanel({
     const run = async () => {
         if (empty) return;
         setBusy(true);
-        const result = await searchMessagesAction(query);
+        const result = await searchMessagesAction(query, unlockProofFor(channelId));
         setBusy(false);
         setHits(result.hits);
     };
@@ -109,7 +110,7 @@ export function SearchPanel({
                 });
                 if (!stale) return;
                 const query = asked.current;
-                void searchMessagesAction(query).then((result) => {
+                void searchMessagesAction(query, unlockProofFor(channelId)).then((result) => {
                     if (asked.current === query) setHits(result.hits);
                 });
             },

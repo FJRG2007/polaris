@@ -20,6 +20,8 @@ import { searchMessages } from "@/lib/chat/search";
 import { searchForConversation } from "@/lib/chat/access";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { listChannels, listSpaces, type ChatChannelView } from "@/lib/chat/chat-service";
+import { onShelf } from "@/app/(app)/chat/lock-shelf";
+import { lockState } from "@/lib/chat/chat-lock";
 
 /** What one match looks like; the palette's own row shape. */
 export interface ChatHit {
@@ -48,8 +50,14 @@ export async function chatLookup(
     const term = query.trim();
     const t = await readerWords("components");
     // Read once however many kinds ask for it.
+    // Only what the sidebar's usual list shows: a hidden conversation, or a
+    // locked one the reader asked to keep out of sight, is not found from here
+    // either - a match would say it exists.
     let held: Promise<ChatChannelView[]> | null = null;
-    const rail = () => (held ??= listChannels(actor));
+    const rail = () =>
+        (held ??= Promise.all([listChannels(actor), lockState(actor.id)]).then(([listed, lock]) =>
+            listed.filter((channel) => onShelf(channel, "all", lock.hideLocked))
+        ));
 
     if (scope === "contacts") return people(actor, term, ONE_KIND, t);
     if (scope === "messages") return messages(actor, term, ONE_KIND, t);

@@ -21,6 +21,8 @@ const searchMentions = vi.fn();
 vi.mock("@/lib/chat/chat-service", () => ({ listChannels, listSpaces }));
 vi.mock("@/lib/chat/access", () => ({ searchForConversation }));
 vi.mock("@/lib/chat/search", () => ({ searchMessages }));
+const lockState = vi.fn();
+vi.mock("@/lib/chat/chat-lock", () => ({ lockState }));
 vi.mock("@/lib/session", () => ({ userHasManage }));
 vi.mock("@/lib/rich-text/mention-service", () => ({ searchMentions }));
 vi.mock("@/components/rich-text/excerpt", () => ({
@@ -39,6 +41,8 @@ function channel(partial: Record<string, unknown>) {
         name: "",
         others: [],
         lastMessageAt: null,
+        locked: false,
+        hidden: false,
         ...partial
     };
 }
@@ -46,6 +50,7 @@ function channel(partial: Record<string, unknown>) {
 beforeEach(() => {
     vi.clearAllMocks();
     userHasManage.mockResolvedValue(true);
+    lockState.mockResolvedValue({ hasCode: false, hideLocked: false });
     listSpaces.mockResolvedValue([{ id: "s1", name: "Studio" }]);
     listChannels.mockResolvedValue([
         channel({
@@ -152,5 +157,37 @@ describe("all of Chat at once", () => {
         expect(hits.every((hit) => hit.scope === "chats")).toBe(true);
         expect(searchMessages).not.toHaveBeenCalled();
         expect(searchForConversation).not.toHaveBeenCalled();
+    });
+});
+
+describe("hidden and locked conversations", () => {
+    beforeEach(() => {
+        listChannels.mockResolvedValue([
+            channel({ id: "dm-ana", kind: "dm", name: "Ana Ruiz", hidden: true }),
+            channel({ id: "grp", kind: "group", name: "Release crew", locked: true }),
+            channel({
+                id: "secret",
+                kind: "text",
+                name: "release-secret",
+                spaceId: "s1",
+                hidden: true
+            })
+        ]);
+    });
+
+    it("never finds a hidden one, by name or as a channel", async () => {
+        expect((await lookup(user, { scope: "chats", query: "ana" })).map((hit) => hit.id)).toEqual(
+            []
+        );
+        expect(await lookup(user, { scope: "channels", query: "secret" })).toEqual([]);
+    });
+
+    it("finds a locked one by name only while the reader keeps locked chats in sight", async () => {
+        lockState.mockResolvedValue({ hasCode: true, hideLocked: false });
+        expect((await lookup(user, { scope: "chats", query: "" })).map((hit) => hit.id)).toEqual([
+            "grp"
+        ]);
+        lockState.mockResolvedValue({ hasCode: true, hideLocked: true });
+        expect(await lookup(user, { scope: "chats", query: "" })).toEqual([]);
     });
 });

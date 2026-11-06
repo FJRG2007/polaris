@@ -26,6 +26,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
+import { onShelf } from "@/app/(app)/chat/lock-shelf";
 
 /** Shortest and longest code accepted. Short is allowed on purpose: it guards a
  *  screen somebody is already signed in to, and guesses are throttled. */
@@ -291,4 +292,44 @@ export async function lockedFor(
         select: { userId: true }
     });
     return new Set(rows.map((row) => row.userId));
+}
+
+/** The conversations this reader hid, and the ones behind their code - what a
+ *  list that reaches across conversations has to know to leave them out. */
+export interface ChatConcealed {
+    readonly hidden: ReadonlySet<string>;
+    readonly locked: ReadonlySet<string>;
+    readonly hideLocked: boolean;
+}
+
+export async function concealedFor(userId: string): Promise<ChatConcealed> {
+    return concealedFrom(
+        userId,
+        await prisma.chatChannelMember.findMany({
+            where: { userId, OR: [{ locked: true }, { hiddenAt: { not: null } }] },
+            select: { channelId: true, locked: true, hiddenAt: true }
+        })
+    );
+}
+
+/** The same, from memberships a caller already read with both marks. */
+export async function concealedFrom(
+    userId: string,
+    rows: readonly { channelId: string; locked?: boolean; hiddenAt?: Date | null }[]
+): Promise<ChatConcealed> {
+    const hidden = new Set(rows.filter((row) => Boolean(row.hiddenAt)).map((row) => row.channelId));
+    const locked = new Set(rows.filter((row) => row.locked === true).map((row) => row.channelId));
+    // The setting is only worth a read when something is locked.
+    const hideLocked = locked.size > 0 ? (await lockState(userId)).hideLocked : false;
+    return { hidden, locked, hideLocked };
+}
+
+/** Whether a conversation is on the reader's usual list - the sidebar's rule
+ *  (`onShelf`), for the lists that are not the sidebar. */
+export function listedFor(concealed: ChatConcealed, channelId: string): boolean {
+    return onShelf(
+        { locked: concealed.locked.has(channelId), hidden: concealed.hidden.has(channelId) },
+        "all",
+        concealed.hideLocked
+    );
 }

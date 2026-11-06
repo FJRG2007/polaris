@@ -301,12 +301,15 @@ export async function askFriendAction(personId: string): Promise<{ error?: strin
  * is worse than one that finds nothing.
  */
 export async function searchMessagesAction(
-    input: unknown
+    input: unknown,
+    /** The unlock proof for the conversation the search is narrowed to. */
+    proof?: string | null
 ): Promise<{ hits: readonly ChatSearchHit[] }> {
     const me = await actor();
     const parsed = core.chatSearchSchema.safeParse(input);
     if (!parsed.success) return { hits: [] };
-    return { hits: await searchMessages(me, parsed.data) };
+    const unlock = proofSchema.safeParse(proof);
+    return { hits: await searchMessages(me, parsed.data, unlock.success ? unlock.data : null) };
 }
 
 export async function listMembersAction(

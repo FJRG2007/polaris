@@ -45,6 +45,7 @@ import {
     type ChatErrorText
 } from "./access";
 import * as history from "./history-visibility";
+import { concealedFrom, listedFor } from "./chat-lock";
 
 /** A space as the rail draws it. */
 export interface ChatSpaceView {
@@ -2264,10 +2265,21 @@ export interface ChatElsewhere {
 
 export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElsewhere[]> {
     const scopes = await readableChatScopes(actor.id);
-    const memberships = await prisma.chatChannelMember.findMany({
+    const rows = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id },
-        select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
+        select: {
+            channelId: true,
+            lastReadAt: true,
+            muted: true,
+            mutedUntil: true,
+            locked: true,
+            hiddenAt: true
+        }
     });
+    // What the reader keeps off their list is not counted here either, the way
+    // the badge leaves it out (see `unreadConversations`).
+    const concealed = await concealedFrom(actor.id, rows);
+    const memberships = rows.filter((row) => listedFor(concealed, row.channelId));
     if (memberships.length === 0) return [];
 
     const channels = await prisma.chatChannel.findMany({
@@ -2331,11 +2343,24 @@ export interface ChatUnreadConversation {
 export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadConversation[]> {
     const memberships = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id },
-        select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
+        select: {
+            channelId: true,
+            lastReadAt: true,
+            muted: true,
+            mutedUntil: true,
+            locked: true,
+            hiddenAt: true
+        }
     });
+    const concealed = await concealedFrom(actor.id, memberships);
     // Worked out rather than read, for the reason the rail works it out: a mute
     // with an end that has passed is not a mute, and nothing runs to clear it.
-    const heard = memberships.filter((row) => !core.muteInForce(row));
+    // Nor anything off the reader's usual list - hidden, or locked and kept out
+    // of sight: a number for a conversation the list does not show is the list
+    // saying it is there.
+    const heard = memberships.filter(
+        (row) => !core.muteInForce(row) && listedFor(concealed, row.channelId)
+    );
     if (heard.length === 0) return [];
     const [spaces, granted] = await Promise.all([
         reachableSpaceIds(actor),
