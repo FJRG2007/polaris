@@ -210,6 +210,38 @@ describe("selection menu", () => {
     });
 });
 
+describe("text selected inside a received email", () => {
+    it("opens the same menu, without Select all, for what the frame reports", () => {
+        page();
+        act(() => {
+            selectionMenu.openFramedSelection({ x: 40, y: 50, text: "Order 77 shipped" });
+        });
+        expect(screen.getByRole("menuitem", { name: /Copy/ })).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: /Select all/ })).toBeNull();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Ask Polar about this" }));
+        expect(polar.ask).toHaveBeenCalledWith("Order 77 shipped");
+    });
+
+    it("moves the frame's point onto the page and refuses anything that is not a selection", () => {
+        const offset = { left: 100, top: 200 };
+        expect(selectionMenu.framedSelection({ x: 5, y: 6, text: "hi" }, offset)).toEqual({
+            x: 105,
+            y: 206,
+            text: "hi"
+        });
+        expect(selectionMenu.framedSelection(null, offset)).toBeNull();
+        expect(selectionMenu.framedSelection("hi", offset)).toBeNull();
+        expect(selectionMenu.framedSelection({ x: 5, y: 6, text: "   " }, offset)).toBeNull();
+        expect(
+            selectionMenu.framedSelection({ x: Number.NaN, y: 6, text: "hi" }, offset)
+        ).toBeNull();
+        expect(selectionMenu.framedSelection({ x: "5", y: 6, text: "hi" }, offset)).toBeNull();
+        expect(selectionMenu.framedSelection({ x: 5, y: 6, text: 7 }, offset)).toBeNull();
+        const huge = "a".repeat(selectionMenu.FRAMED_SELECTION_MAX + 1);
+        expect(selectionMenu.framedSelection({ x: 5, y: 6, text: huge }, offset)).toBeNull();
+    });
+});
+
 describe("selection quote", () => {
     it("is cleaned and capped, and empty is nothing", () => {
         expect(selectionQuote("  \n\t ")).toBeNull();

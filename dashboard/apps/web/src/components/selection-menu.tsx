@@ -198,11 +198,19 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                         : null
             });
         };
+        // Text selected inside a sandboxed frame (a received email): the frame's
+        // own owner already checked the sender and moved the point onto this page.
+        const onFramed = (event: Event) => {
+            const { x, y, text } = (event as CustomEvent<selectionMenu.FramedSelection>).detail;
+            setMenu({ x, y, found: { text, field: null }, fieldRange: null, range: null });
+        };
         window.addEventListener("contextmenu", record, true);
         window.addEventListener("contextmenu", onContextMenu);
+        window.addEventListener(selectionMenu.FRAMED_SELECTION_EVENT, onFramed);
         return () => {
             window.removeEventListener("contextmenu", record, true);
             window.removeEventListener("contextmenu", onContextMenu);
+            window.removeEventListener(selectionMenu.FRAMED_SELECTION_EVENT, onFramed);
         };
     }, []);
 
@@ -301,11 +309,14 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                                 <MenuShortcut keys="Mod+V" />
                             </DropdownMenuItem>
                         ) : null}
-                        <DropdownMenuItem onSelect={() => selectAll(menu)}>
-                            <TextSelect />
-                            {t("selectionMenu.selectAll")}
-                            <MenuShortcut keys="Mod+A" />
-                        </DropdownMenuItem>
+                        {/* Text in a sandboxed frame cannot be reselected from here. */}
+                        {menu.range || menu.found.field ? (
+                            <DropdownMenuItem onSelect={() => selectAll(menu)}>
+                                <TextSelect />
+                                {t("selectionMenu.selectAll")}
+                                <MenuShortcut keys="Mod+A" />
+                            </DropdownMenuItem>
+                        ) : null}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => openSearch(null, menu.found.text)}>
                             <Search />

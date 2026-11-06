@@ -33,6 +33,7 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { ShieldCheck } from "lucide-react";
 import { cleanedAlready, sanitizeMail } from "./sanitize";
+import * as selectionMenu from "@/lib/selection-menu";
 import { TrimmedPill } from "./trimmed-pill";
 import { trimReceivedHtml, trimReceivedText } from "./trimmed-content";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -348,6 +349,23 @@ function frameDocument(
     window.addEventListener("resize", tell);
     setTimeout(tell, 300);
     setTimeout(tell, 1500);
+    // The other thing it says: a right-click on selected text, so Polaris's own
+    // selection menu opens over the message as it does everywhere else. Only
+    // the selected text and the point travel; Shift+right-click keeps the
+    // browser's menu, as it does on the rest of the page.
+    window.addEventListener("contextmenu", function (event) {
+      if (event.shiftKey && event.button === 2) return;
+      var selection = window.getSelection();
+      var text = selection ? String(selection) : "";
+      if (!text.trim() || text.length > ${selectionMenu.FRAMED_SELECTION_MAX}) return;
+      var x = event.clientX, y = event.clientY;
+      if (event.button !== 2 || (x === 0 && y === 0)) {
+        var rect = selection.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
+        if (rect) { x = rect.left; y = rect.bottom; }
+      }
+      event.preventDefault();
+      parent.postMessage({ polarisMailMenu: { x: x, y: y, text: text } }, "*");
+    }, true);
   })();
 </script>
 </head><body><div id="polaris-body">${body}</div>
@@ -487,6 +505,13 @@ export function SandboxedHtml({
             // Only the frame this component owns, and only a number. Anything
             // else on the wire is somebody else's message.
             if (event.source !== frame.current?.contentWindow) return;
+            const menu = (event.data as { polarisMailMenu?: unknown } | null)?.polarisMailMenu;
+            if (menu !== undefined) {
+                const box = frame.current.getBoundingClientRect();
+                const found = selectionMenu.framedSelection(menu, box);
+                if (found) selectionMenu.openFramedSelection(found);
+                return;
+            }
             const claimed = (event.data as { polarisMailHeight?: unknown } | null)
                 ?.polarisMailHeight;
             if (typeof claimed !== "number" || !Number.isFinite(claimed)) return;

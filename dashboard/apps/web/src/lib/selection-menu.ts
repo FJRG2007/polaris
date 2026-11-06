@@ -118,3 +118,46 @@ export function lastSelection(now: number = Date.now()): SelectionAt | null {
     if (!lastClick || now - lastClick.at > CLICK_FRESH_MS) return null;
     return lastClick.found;
 }
+
+/**
+ * A right-click on text selected inside a sandboxed frame - a received email.
+ *
+ * The frame's document is not this one, so the shell's listener never sees the
+ * click: the frame posts what was selected and where, the page that owns the
+ * frame checks it came from that frame, moves the point into this window's
+ * coordinates, and hands it here. The text is somebody else's and is only ever
+ * treated as text.
+ */
+export const FRAMED_SELECTION_EVENT = "polaris:framed-selection";
+
+/** Longer than any selection anyone copies; past it the frame is not trusted. */
+export const FRAMED_SELECTION_MAX = 20_000;
+
+export interface FramedSelection {
+    readonly x: number;
+    readonly y: number;
+    readonly text: string;
+}
+
+/**
+ * What a frame posted, read as a selection at a point on this page, or null when
+ * it is not one. `offset` is where the frame's top-left corner sits on the page.
+ */
+export function framedSelection(
+    claimed: unknown,
+    offset: { readonly left: number; readonly top: number }
+): FramedSelection | null {
+    if (!claimed || typeof claimed !== "object") return null;
+    const { x, y, text } = claimed as { x?: unknown; y?: unknown; text?: unknown };
+    if (typeof x !== "number" || typeof y !== "number") return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (typeof text !== "string" || !text.trim() || text.length > FRAMED_SELECTION_MAX) return null;
+    return { x: offset.left + x, y: offset.top + y, text };
+}
+
+/** Open the selection menu for text selected inside a frame. */
+export function openFramedSelection(found: FramedSelection): void {
+    window.dispatchEvent(
+        new CustomEvent<FramedSelection>(FRAMED_SELECTION_EVENT, { detail: found })
+    );
+}
