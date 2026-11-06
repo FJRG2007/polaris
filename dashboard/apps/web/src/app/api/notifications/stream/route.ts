@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import { backgroundUser } from "@/lib/session";
 import { createFeedReader } from "@/lib/notifications/feed-reader";
 import {
+    chimingKind,
     closeLiveClient,
     liveClientChimes,
     openLiveClient,
@@ -118,6 +119,16 @@ export async function GET(request: Request): Promise<Response> {
                         // frame is the only thing the client is already listening
                         // to.
                         chime: kind === null || liveClientChimes(userId, connection),
+                        // Which kind of client that is, for the sounds that are not
+                        // the chime - a message, a ring, the notice for either -
+                        // and that a browser and the desktop app would otherwise
+                        // both make. Null for a connection that did not declare
+                        // itself, which does not read it.
+                        sounder: kind === null ? null : chimingKind(userId),
+                        // This connection's name, so the client holding it can say
+                        // whether anybody is at its computer (`../attention`). Only
+                        // for a connection that takes part in the election.
+                        connection: kind === null ? null : connection,
                         // Do not disturb, as the server works it out. The client
                         // stays silent for anything but a critical arrival while
                         // it is on, so a tab that missed the change cannot ring.

@@ -30,14 +30,15 @@ import {
     type CustomGameInput,
     type GameActivity,
     type Outcome,
-    type PickedFolder
+    type PickedFolder,
+    type SystemIdle
 } from "@/shared/bridge";
 import type { ServerRow } from "@/shared/servers";
 import type { UpdateReadyState } from "./update-ready";
 import type { UpdateCheck } from "@/shared/update-check";
 import { readServerAddress } from "@/shared/server-address";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, powerMonitor, type IpcMainInvokeEvent, type WebContents } from "electron";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -131,6 +132,9 @@ const windowSchema = z.object({
     path: z.string().min(1).max(2048),
     title: z.string().trim().min(1).max(200)
 });
+
+/** How long untouched before this computer counts as nobody being at it. */
+const IDLE_AFTER_SECONDS = 120;
 
 const REFUSAL = "This window may not do that.";
 const REFUSED: Outcome = { ok: false, error: REFUSAL };
@@ -266,6 +270,19 @@ export function registerIpc(host: IpcHost): void {
         if (!badge.success) return false;
         applyAppBadge(BrowserWindow.fromWebContents(event.sender), badge.data);
         return true;
+    });
+
+    // Whether anybody is at this computer. The threshold is fixed here rather
+    // than asked for, so the page cannot turn it into a probe of how long the
+    // machine has sat untouched. `unknown` where the system cannot say (some
+    // Linux sessions), which the dashboard reads as somebody being here.
+    ipcMain.handle(CHANNELS.systemIdle, (event): SystemIdle => {
+        if (!fromPolaris(event)) return "unknown";
+        try {
+            return powerMonitor.getSystemIdleState(IDLE_AFTER_SECONDS);
+        } catch {
+            return "unknown";
+        }
     });
 
     ipcMain.handle(CHANNELS.gameCurrent, (event) => {

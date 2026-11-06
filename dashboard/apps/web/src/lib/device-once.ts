@@ -26,6 +26,11 @@
  * contested at all, which is also what turns a burst of arrivals into one chime
  * rather than five.
  *
+ * The desktop app is the one thing tabs cannot settle this with: it keeps a
+ * storage of its own. The server says which kind of client acts, and a claim
+ * made by the other kind is refused before any tab is asked - see
+ * `notifications/sounding-client`.
+ *
  * Nothing here is allowed to make a device silent. A browser that refuses
  * storage - private browsing, a blocked origin - is treated as a device of one
  * tab and the effect runs: a doubled chime is an annoyance, a swallowed one is a
@@ -33,6 +38,7 @@
  */
 
 import { z } from "zod";
+import { anotherClientSounds } from "@/lib/notifications/sounding-client";
 
 const PREFIX = "polaris.device-once:";
 
@@ -69,6 +75,10 @@ type Claim = z.infer<typeof claimSchema>;
  * usable storage answers true rather than leaving the effect undone.
  */
 export async function claimForDevice(key: string, holdMs: number = HOLD_MS): Promise<boolean> {
+    // The desktop app and a browser are two clients this cannot see between, so
+    // the server says which kind of them acts; the other one leaves it alone.
+    // See `notifications/sounding-client`.
+    if (anotherClientSounds()) return false;
     const store = storage();
     if (!store) return true;
 

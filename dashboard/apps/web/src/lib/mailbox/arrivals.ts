@@ -43,6 +43,14 @@ export interface MailArrival {
     readonly subject: string;
 }
 
+/** What stands in for a missing sender or subject, in the reader's language. */
+export interface ArrivalWords {
+    readonly somebody: string;
+    readonly noSubject: string;
+}
+
+const ENGLISH: ArrivalWords = { somebody: "Someone", noSubject: "(no subject)" };
+
 export interface MailArrivals {
     /** Hand this back next time. The server's own clock. */
     readonly cursor: string;
@@ -57,7 +65,11 @@ export interface MailArrivals {
  * announced and a cursor is handed out, so opening a tab never raises a notice
  * about mail that was already there.
  */
-export async function arrivalsSince(userId: string, since: Date | null): Promise<MailArrivals> {
+export async function arrivalsSince(
+    userId: string,
+    since: Date | null,
+    words: ArrivalWords = ENGLISH
+): Promise<MailArrivals> {
     const now = new Date();
     const cursor = now.toISOString();
     if (!since) return { cursor, named: [], more: 0 };
@@ -88,8 +100,8 @@ export async function arrivalsSince(userId: string, since: Date | null): Promise
             const sender = addressesFrom(row.fromJson)[0];
             return {
                 threadId: row.threadId,
-                from: sender ? core.addressLabel(sender) : "Somebody",
-                subject: row.subject.trim() || "(no subject)"
+                from: sender ? core.addressLabel(sender) : words.somebody,
+                subject: row.subject.trim() || words.noSubject
             };
         }),
         more: Math.max(0, total - rows.length)

@@ -33,9 +33,7 @@ vi.mock("@polaris/db", () => ({
 
 let shelf: string | null = null;
 vi.mock("@/lib/mailbox/shelf", async () => {
-    const real = await vi.importActual<typeof import("@/lib/mailbox/shelf")>(
-        "@/lib/mailbox/shelf"
-    );
+    const real = await vi.importActual<typeof import("@/lib/mailbox/shelf")>("@/lib/mailbox/shelf");
     return { ...real, mailShelfFor: async () => shelf };
 });
 
@@ -90,6 +88,21 @@ describe("what is worth announcing", () => {
             { threadId: "t2", from: "bo", subject: "(no subject)" }
         ]);
         expect(answer.more).toBe(5);
+    });
+
+    it("fills a missing sender and subject in the reader's words", async () => {
+        rows = [{ threadId: "t1", subject: " ", fromJson: [] }];
+        total = 1;
+        const since = new Date("2026-09-10T10:00:00Z");
+        const words = { somebody: "Alguien", noSubject: "(sin asunto)" };
+        const answer = await arrivalsSince("u1", since, words);
+        expect(answer.named).toEqual([
+            { threadId: "t1", from: "Alguien", subject: "(sin asunto)" }
+        ]);
+        const fallback = await arrivalsSince("u1", since);
+        expect(fallback.named).toEqual([
+            { threadId: "t1", from: "Someone", subject: "(no subject)" }
+        ]);
     });
 });
 

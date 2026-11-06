@@ -18,7 +18,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
     chimingClient,
     closeLiveClient,
+    chimingKind,
     liveClientChimes,
+    markLiveClientAway,
     openLiveClient,
     resetLiveClients,
     touchLiveClient,
@@ -27,8 +29,14 @@ import {
 
 const AT = 1_700_000_000_000;
 
-function client(id: string, kind: "desktop" | "browser", opened: number, rings = true): LiveClient {
-    return { id, kind, rings, opened, seen: opened };
+function client(
+    id: string,
+    kind: "desktop" | "browser",
+    opened: number,
+    rings = true,
+    away = false
+): LiveClient {
+    return { id, kind, rings, away, opened, seen: opened };
 }
 
 beforeEach(() => resetLiveClients());
@@ -211,5 +219,70 @@ describe("what the stream asks per frame", () => {
         // Never silent by default: an account with nothing registered - a first
         // frame, a restarted server - is treated as the only client there is.
         expect(liveClientChimes("nobody", "whoever", AT)).toBe(true);
+    });
+});
+
+describe("the app only while somebody is at it", () => {
+    it("hands the sound to a browser while nobody is at the app's computer", () => {
+        // The app left open at home, the browser in use somewhere else: the ring
+        // has to be where the person is.
+        const app = client("app", "desktop", AT, true, true);
+        const tab = client("tab", "browser", AT + 10);
+        expect(chimingClient([app, tab])).toBe("tab");
+    });
+
+    it("keeps the app ahead of a browser while somebody is at it", () => {
+        expect(
+            chimingClient([client("tab", "browser", AT), client("app", "desktop", AT + 10)])
+        ).toBe("app");
+    });
+
+    it("falls back to the app when nobody is anywhere", () => {
+        const app = client("app", "desktop", AT + 10, true, true);
+        const tab = client("tab", "browser", AT, true, true);
+        expect(chimingClient([tab, app])).toBe("app");
+    });
+
+    it("treats a client that never says as somebody there", () => {
+        // An older app or any browser: the field is never set, and the election
+        // is exactly the one before this existed.
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT + 10);
+        expect(chimingKind("u1", AT + 20)).toBe("desktop");
+        expect(liveClientChimes("u1", "tab", AT + 20)).toBe(false);
+    });
+
+    it("moves the sound on the next frame after the app reports, and back", () => {
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT + 10);
+        expect(markLiveClientAway("u1", "app", true, AT + 20)).toBe(true);
+        expect(chimingKind("u1", AT + 25)).toBe("browser");
+        expect(liveClientChimes("u1", "tab", AT + 25)).toBe(true);
+
+        markLiveClientAway("u1", "app", false, AT + 30);
+        expect(chimingKind("u1", AT + 35)).toBe("desktop");
+    });
+
+    it("keeps the away mark through the stream's ticks", () => {
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u1", "tab", "browser", true, AT);
+        markLiveClientAway("u1", "app", true, AT + 1);
+        touchLiveClient("u1", "app", "desktop", true, AT + 5000);
+        expect(chimingKind("u1", AT + 5001)).toBe("browser");
+    });
+
+    it("lets a report reach only its own account's connections", () => {
+        openLiveClient("u1", "app", "desktop", true, AT);
+        openLiveClient("u2", "tab", "browser", true, AT);
+        expect(markLiveClientAway("u2", "app", true, AT + 1)).toBe(false);
+        expect(markLiveClientAway("u1", "gone", true, AT + 1)).toBe(false);
+        expect(chimingKind("u1", AT + 2)).toBe("desktop");
+    });
+
+    it("still skips a muted browser when the app is away", () => {
+        // Somebody at the computer is worth less than a client that plays nothing.
+        const app = client("app", "desktop", AT, true, true);
+        const tab = client("tab", "browser", AT, false);
+        expect(chimingClient([app, tab])).toBe("app");
     });
 });

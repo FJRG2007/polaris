@@ -59,6 +59,7 @@ describe("the bell's stream", () => {
             createFeedReader: () => ({ read: async () => [] })
         }));
         vi.doMock("@/lib/notifications/live-clients", () => ({
+            chimingKind: () => "browser",
             closeLiveClient: () => undefined,
             liveClientChimes: () => true,
             openLiveClient: () => undefined,

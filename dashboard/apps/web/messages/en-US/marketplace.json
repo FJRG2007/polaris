@@ -147,13 +147,17 @@
         "description": "Choose the project it goes into. It is added there as a service.",
         "failed": "Your projects could not be read. Try again.",
         "noProjects": "It is deployed into a project, and you have none yet.",
-        "newProject": "Create a project",
         "project": "Project",
         "projectSearch": "Search projects",
         "projectNone": "No project matches",
         "environment": "Environment",
         "environmentSearch": "Search environments",
         "environmentNone": "No environment matches",
+        "createProject": "Create a new project",
+        "projectName": "Project name",
+        "create": "Create",
+        "cancel": "Cancel",
+        "createFailed": "The project could not be created. Try again.",
         "next": "Continue"
     },
     "polaris": {

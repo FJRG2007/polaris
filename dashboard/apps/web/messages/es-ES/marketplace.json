@@ -147,13 +147,17 @@
         "description": "Elige el proyecto al que va. Se añade allí como un servicio.",
         "failed": "No se han podido leer tus proyectos. Vuelve a intentarlo.",
         "noProjects": "Se despliega en un proyecto, y aún no tienes ninguno.",
-        "newProject": "Crear un proyecto",
         "project": "Proyecto",
         "projectSearch": "Buscar proyectos",
         "projectNone": "Ninguno coincide",
         "environment": "Entorno",
         "environmentSearch": "Buscar entornos",
         "environmentNone": "Ningún entorno coincide",
+        "createProject": "Crear un proyecto nuevo",
+        "projectName": "Nombre",
+        "create": "Crear",
+        "cancel": "Cancelar",
+        "createFailed": "No se ha podido crear el proyecto. Reinténtalo.",
         "next": "Continuar"
     },
     "polaris": {

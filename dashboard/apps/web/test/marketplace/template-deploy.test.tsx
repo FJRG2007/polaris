@@ -13,8 +13,14 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 
 const push = vi.hoisted(() => vi.fn());
 const deploy = vi.hoisted(() => ({
-    createApplicationAction: vi.fn(async () => ({}))
+    createApplicationAction: vi.fn(async () => ({})),
+    createProjectAction: vi.fn(async (_input: { name: string }) => ({
+        id: "0190a000-0000-7000-8000-000000000002" as string | undefined,
+        error: undefined as string | undefined
+    }))
 }));
+const NEW_ID = "0190a000-0000-7000-8000-000000000002";
+const created = { id: NEW_ID, name: "Shop", environmentId: "env-2", manyEnvironments: false };
 const targets = vi.hoisted(() => ({
     templateProjectOptionsAction: vi.fn(async (_input: unknown) => ({
         items: [
@@ -104,13 +110,68 @@ describe("deploying a template from the marketplace", () => {
         await waitFor(() => expect(push).toHaveBeenCalledWith("/apps/deploy/project-1"));
     });
 
-    it("says what to do when there is no project to deploy into", async () => {
-        targets.templateProjectOptionsAction.mockResolvedValueOnce({ items: [], next: null });
+    it("creates the first project in place when there is none, then continues into it", async () => {
+        targets.templateProjectOptionsAction
+            .mockResolvedValueOnce({ items: [], next: null })
+            .mockResolvedValueOnce({ items: [created], next: null });
         render(<MarketplaceView installed={[]} canInstall />, { wrapper: MessagesWrapper });
         fireEvent.click(within(cardOf("n8n")).getByRole("button", { name: "Deploy" }));
         const dialog = await screen.findByRole("dialog");
-        const create = await within(dialog).findByRole("link", { name: "Create a project" });
-        expect(create.getAttribute("href")).toBe("/apps/deploy");
-        expect(deploy.createApplicationAction).toHaveBeenCalledTimes(1);
+        expect(await within(dialog).findByText(/you have none yet/)).toBeTruthy();
+
+        const submit = within(dialog).getByRole("button", { name: "Create" });
+        // An empty name is not sent; there is nothing else to go back to.
+        expect((submit as HTMLButtonElement).disabled).toBe(true);
+        expect(within(dialog).queryByRole("button", { name: "Cancel" })).toBeNull();
+
+        fireEvent.change(within(dialog).getByLabelText("Project name"), {
+            target: { value: "  Shop " }
+        });
+        fireEvent.click(submit);
+
+        await waitFor(() =>
+            expect(deploy.createProjectAction).toHaveBeenCalledWith({ name: "  Shop " })
+        );
+        // Read back as the picker lists it, then chosen.
+        expect(targets.templateProjectOptionsAction).toHaveBeenCalledWith({ ids: [NEW_ID] });
+        fireEvent.click(await within(dialog).findByRole("button", { name: "Continue" }));
+        await waitFor(() =>
+            expect(serverOptions.listServerOptionsAction).toHaveBeenCalledWith(
+                expect.objectContaining({ environmentId: "env-2" })
+            )
+        );
+    });
+
+    it("keeps the form open with the reason when the project is refused", async () => {
+        targets.templateProjectOptionsAction.mockResolvedValueOnce({ items: [], next: null });
+        deploy.createProjectAction.mockResolvedValueOnce({
+            id: undefined,
+            error: "Not allowed here"
+        });
+        render(<MarketplaceView installed={[]} canInstall />, { wrapper: MessagesWrapper });
+        fireEvent.click(within(cardOf("n8n")).getByRole("button", { name: "Deploy" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(await within(dialog).findByLabelText("Project name"), {
+            target: { value: "Shop" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+        expect((await within(dialog).findByRole("alert")).textContent).toBe("Not allowed here");
+        expect((within(dialog).getByLabelText("Project name") as HTMLInputElement).value).toBe(
+            "Shop"
+        );
+    });
+
+    it("offers a new project from the picker and goes back to it on Cancel", async () => {
+        render(<MarketplaceView installed={[]} canInstall />, { wrapper: MessagesWrapper });
+        fireEvent.click(within(cardOf("n8n")).getByRole("button", { name: "Deploy" }));
+        const dialog = await screen.findByRole("dialog");
+        const picker = await within(dialog).findByRole("button", { name: "Project" });
+        fireEvent.pointerDown(picker);
+        fireEvent.click(picker);
+        fireEvent.click(await screen.findByText("Create a new project"));
+
+        expect(await within(dialog).findByLabelText("Project name")).toBeTruthy();
+        fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+        expect(await within(dialog).findByRole("button", { name: "Continue" })).toBeTruthy();
     });
 });

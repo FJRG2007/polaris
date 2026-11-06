@@ -110,6 +110,10 @@ export interface PolarisDesktop {
     ): Promise<boolean>;
     /** The programs running now, for picking one to add as a game. */
     runningPrograms?(): Promise<readonly string[]>;
+    /** Whether somebody is at this computer: `idle` after a couple of minutes
+     *  untouched, `locked` behind the lock screen. Absent from an older app,
+     *  which then never says it is away. */
+    systemIdle?(): Promise<"active" | "idle" | "locked" | "unknown">;
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
     /** What is waiting, on the app's icon in the taskbar or Dock. Missing on a

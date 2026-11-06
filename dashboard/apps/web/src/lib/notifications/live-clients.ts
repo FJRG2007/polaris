@@ -16,6 +16,16 @@
  * icon in the dock, it is the one that draws a notice the operating system shows,
  * and somebody who installed it meant it to be where Polaris lives.
  *
+ * Unless nobody is at it. The server cannot tell which computer a connection
+ * comes from, so an app left open on a desk at home silenced the browser its
+ * owner was using somewhere else - a call rang in an empty room. So a client may
+ * say that nobody is at its computer (`away`), and one that is not is preferred
+ * over one that is, before the desktop rule applies. Only the app can say it:
+ * it asks the operating system how long the machine has gone untouched. A
+ * browser cannot see past its own page - a tab behind an editor is not a person
+ * gone - so it never claims to be away, and nor does a client that predates
+ * this. Both count as somebody there, which is how everything behaved before.
+ *
  * Held in memory, like the presence registry beside it and for the same reason: it
  * is worth knowing for as long as a connection is open and never again. It follows
  * that it is only true of the process it lives in, and the way it is wrong is that
@@ -64,6 +74,12 @@ export interface LiveClient {
      * that used to silence one window.
      */
     readonly rings: boolean;
+    /**
+     * Whether the client said nobody is at its computer. False until it says
+     * so, because a client that never reports - a browser, an older app - must
+     * keep the place it always had.
+     */
+    readonly away: boolean;
     /** When it opened. The election orders by this, so it does not move while the
      *  set of connections does not. */
     readonly opened: number;
@@ -77,8 +93,8 @@ const clients = new Map<string, Map<string, LiveClient>>();
 /**
  * Which connection should raise the effects that belong to the device.
  *
- * Pure, and the whole rule: a desktop client first, then the one that has been
- * open longest, then the lowest id. The last two are not arbitrary - the answer
+ * Pure, and the whole rule: a client somebody is at first, then a desktop
+ * client, then the one that has been open longest, then the lowest id. The last two are not arbitrary - the answer
  * has to be the same for every connection asking, and it must not move while
  * nothing changes, or two clients would trade the chime between them and a burst
  * of messages would sound on both.
@@ -94,8 +110,12 @@ export function chimingClient(live: readonly LiveClient[]): string | null {
     // locally anyway, and answering "nobody" here is the one shape this module
     // must never take.
     const willing = live.filter((client) => client.rings);
+    const pool = willing.length > 0 ? willing : live;
+    // The same shape for nobody being anywhere: then the app is as good a place
+    // as any, and the ordinary rule still has to elect somebody.
+    const attended = pool.filter((client) => !client.away);
     let best: LiveClient | null = null;
-    for (const client of willing.length > 0 ? willing : live) {
+    for (const client of attended.length > 0 ? attended : pool) {
         if (!best || better(client, best)) best = client;
     }
     return best?.id ?? null;
@@ -133,7 +153,7 @@ export function openLiveClient(
         held = new Map();
         clients.set(userId, held);
     }
-    held.set(id, { id, kind, rings, opened: now, seen: now });
+    held.set(id, { id, kind, rings, away: false, opened: now, seen: now });
 
     // Past the cap the one heard from longest ago goes, which is the likeliest to
     // be a connection nobody is behind any more.
@@ -173,6 +193,27 @@ export function touchLiveClient(
     held?.set(id, { ...client, seen: now });
 }
 
+/**
+ * Record whether anybody is at the computer a connection comes from. The next
+ * tick of every connection of the account reads the new election.
+ *
+ * Only an open connection of this account can be marked: the id is minted by
+ * the stream and looked up under the account asking, so a report can never
+ * reach somebody else's. One for a connection that is gone changes nothing.
+ */
+export function markLiveClientAway(
+    userId: string,
+    id: string,
+    away: boolean,
+    now = Date.now()
+): boolean {
+    const held = clients.get(userId);
+    const client = held?.get(id);
+    if (!held || !client) return false;
+    held.set(id, { ...client, away, seen: now });
+    return true;
+}
+
 /** Record that a connection has gone. */
 export function closeLiveClient(userId: string, id: string): void {
     const held = clients.get(userId);
@@ -193,6 +234,27 @@ export function liveClientChimes(userId: string, id: string, now = Date.now()): 
     if (!held || held.size === 0) return true;
     const elected = chimingClient([...held.values()]);
     return elected === null || elected === id;
+}
+
+/**
+ * Which KIND of client the account's elected connection is, or null with nobody
+ * registered.
+ *
+ * The chime is not the only thing that belongs to one client. A message's sound,
+ * a call's ring and the notice the system draws for either are settled between
+ * the tabs of one browser by `device-once`, which the desktop app cannot see -
+ * so each of them is told which kind of client has it, and a client of the other
+ * kind leaves it alone. The kind rather than the connection, because the tabs of
+ * a browser already agree which of them acts, and a frozen tab that happens to
+ * hold the elected connection must not be able to silence its siblings.
+ */
+export function chimingKind(userId: string, now = Date.now()): LiveClientKind | null {
+    sweep(now);
+    const held = clients.get(userId);
+    if (!held || held.size === 0) return null;
+    const live = [...held.values()];
+    const elected = chimingClient(live);
+    return live.find((client) => client.id === elected)?.kind ?? null;
 }
 
 /** Drop everything. Exists for tests, which must not inherit each other's state. */
