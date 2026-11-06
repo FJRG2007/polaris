@@ -28,7 +28,8 @@ const { provisionHostnameDns } = host.domainDns;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { loadCloudflareToken } = host.integrationsCloudflareAccountService;
 const { startRouter, stopRouter } = host.minecraftRouter;
-const { deleteDnsRecord, findDnsRecords, resolveZoneForHostname, upsertSrvRecord } = host.integrationsCloudflareApi;
+const { deleteDnsRecord, findDnsRecords, resolveZoneForHostname, upsertSrvRecord } =
+    host.integrationsCloudflareApi;
 
 /** The label game servers live under, so they never collide with a deployed
  *  service's name: `survival.mc.example.com`. One per game, because two games'
@@ -45,7 +46,11 @@ export interface GameAddress {
 
 /** The hostname a server would take on this Polaris, or null when no domain is
  *  configured. Deterministic from the name, so it survives a redeploy. */
-export async function gameHostname(name: string, subdomain?: string, gameLabel: string = GAME_LABEL): Promise<string | null> {
+export async function gameHostname(
+    name: string,
+    subdomain?: string,
+    gameLabel: string = GAME_LABEL
+): Promise<string | null> {
     const { baseDomain } = await getDomainZones();
     if (!baseDomain) return null;
     const label = normalizeZoneName(subdomain?.trim() || name);
@@ -53,7 +58,11 @@ export async function gameHostname(name: string, subdomain?: string, gameLabel: 
 }
 
 /** Whether a hostname is already taken by another of this owner's servers. */
-export async function hostnameTaken(ownerId: string, hostname: string, exceptInstallId?: string): Promise<boolean> {
+export async function hostnameTaken(
+    ownerId: string,
+    hostname: string,
+    exceptInstallId?: string
+): Promise<boolean> {
     const rows = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" } },
         select: { id: true, config: true }
@@ -87,7 +96,8 @@ export async function provisionGameDns(
     owner: { ownerId: string; installedAppId: string }
 ): Promise<GameAddress> {
     const result = await provisionHostnameDns(hostname);
-    if (result.status === "conflict" || result.status === "manual") return { hostname: null, portless: false };
+    if (result.status === "conflict" || result.status === "manual")
+        return { hostname: null, portless: false };
     if (result.status === "created" && result.recordId && result.zoneId) {
         await rememberGameDnsRecord({
             ...owner,
@@ -123,7 +133,11 @@ export async function provisionGameDns(
 
 /** The address to show, from what the server has: its name when it has one, and
  *  the port when the name alone does not carry it. */
-export function formatGameAddress(address: GameAddress | null, fallback: string | null, port: number): string | null {
+export function formatGameAddress(
+    address: GameAddress | null,
+    fallback: string | null,
+    port: number
+): string | null {
     if (!address?.hostname) return fallback;
     return address.portless ? address.hostname : `${address.hostname}:${port}`;
 }
@@ -149,7 +163,8 @@ export function gameServerAddress(server: {
     ip: string | null;
     port: number;
 }): string | null {
-    if (server.hostname) return server.portless ? server.hostname : `${server.hostname}:${server.port}`;
+    if (server.hostname)
+        return server.portless ? server.hostname : `${server.hostname}:${server.port}`;
     if (!server.ip) return null;
     return IMPLIED_PORTS.includes(server.port) ? server.ip : `${server.ip}:${server.port}`;
 }
@@ -231,7 +246,11 @@ export async function setGameHostname(
  * is one record per server); turning it off writes it back, so the address a player
  * already has keeps working either way.
  */
-export async function setGameRouted(ownerId: string, installedAppId: string, routed: boolean): Promise<void> {
+export async function setGameRouted(
+    ownerId: string,
+    installedAppId: string,
+    routed: boolean
+): Promise<void> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId },
         select: { applicationId: true, catalogId: true, config: true }
@@ -243,9 +262,7 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
     }
     const config = readInstallConfig(install.config);
     if (routed && config.bindAddresses === true) {
-        throw new Error(
-            gameMessage("games", "lib.boundBehindRouter")
-        );
+        throw new Error(gameMessage("games", "lib.boundBehindRouter"));
     }
     // Turning routing on drops the SRV record that carried this server's port, so
     // doing it with no router listening would take a working address away and leave
@@ -262,9 +279,7 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
         // person waiting on a switch: waiting here is the difference between this
         // working and this asking them to press it again.
         if (!(await waitForRouter())) {
-            throw new Error(
-                gameMessage("games", "lib.routerSilent", { port: routerPort() })
-            );
+            throw new Error(gameMessage("games", "lib.routerSilent", { port: routerPort() }));
         }
     }
     const hostname = typeof config.hostname === "string" ? config.hostname : "";
@@ -314,7 +329,9 @@ async function waitForRouter(): Promise<boolean> {
  *  unless the operator moved it. */
 export function routerPort(): number {
     const configured = Number(process.env.POLARIS_MC_ROUTER_PORT);
-    return Number.isInteger(configured) && configured > 0 && configured < 65536 ? configured : 25565;
+    return Number.isInteger(configured) && configured > 0 && configured < 65536
+        ? configured
+        : 25565;
 }
 
 /**
@@ -376,7 +393,10 @@ async function setSrvRecord(
 /** The host port the install pinned for this application, which is what a SRV
  *  record has to name. */
 async function publishedPort(applicationId: string): Promise<number | null> {
-    const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { sourceConfig: true } });
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { sourceConfig: true }
+    });
     if (!app) return null;
     try {
         const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
