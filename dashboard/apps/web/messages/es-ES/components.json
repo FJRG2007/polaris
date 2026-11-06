@@ -425,6 +425,11 @@
             "media": "Audio y vídeo",
             "archive": "Comprimidos"
         },
+        "view": {
+            "list": "Lista",
+            "grid": "Cuadrícula",
+            "photos": "Fotos"
+        },
         "title": "Adjuntar archivo",
         "addressHint": "Lo descarga Polaris, no tu navegador, así que el sitio del que viene no sabe nada de ti.",
         "chosen": "{count, plural, one {# archivo elegido} other {# archivos elegidos}}",

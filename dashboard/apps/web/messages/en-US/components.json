@@ -425,6 +425,11 @@
             "media": "Audio and video",
             "archive": "Archives"
         },
+        "view": {
+            "list": "List view",
+            "grid": "Grid view",
+            "photos": "Photo view"
+        },
         "title": "Attach a file",
         "addressHint": "Polaris fetches it, not your browser, so the site it comes from learns nothing about you.",
         "chosen": "{count, plural, one {# file chosen} other {# files chosen}}",
