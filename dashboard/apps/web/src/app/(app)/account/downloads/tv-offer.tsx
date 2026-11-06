@@ -10,6 +10,9 @@
  * names a page), and when nothing answers it offers the download for this
  * computer - or says plainly that a phone cannot do it. An app older than the
  * dialog has only the window it used to open, and is told to update.
+ *
+ * Until a TV release carrying the APK exists on GitHub, the card says so and
+ * offers no install, the same as every other card on Downloads.
  */
 
 import { Tv } from "lucide-react";
@@ -103,13 +106,32 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
     const [home, setHome] = useState(true);
     const [searched, setSearched] = useState(false);
     const [notStarted, setNotStarted] = useState(false);
+    const [refused, setRefused] = useState(false);
 
     useEffect(() => {
         const stop = tv.onState(setState);
-        void tv.state().then((first) => first && setState(first));
+        // Null is the app declining this page, which no update of the page fixes.
+        void tv.state().then(
+            (first) => (first ? setState(first) : setRefused(true)),
+            () => setRefused(true)
+        );
         return stop;
     }, [tv]);
 
+    if (!state && refused) {
+        return (
+            <>
+                <p role="alert" className="text-sm text-destructive">
+                    {t("downloads.tv.dialog.refused")}
+                </p>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onClose}>
+                        {t("downloads.tv.dialog.close")}
+                    </Button>
+                </DialogFooter>
+            </>
+        );
+    }
     if (!state) return <TvLoader label={t("downloads.tv.dialog.connectingApp")} />;
 
     const idle = IDLE.has(state.phase);
@@ -143,13 +165,19 @@ function InstallSteps({ tv, onClose }: { tv: DesktopTv; onClose: () => void }) {
                         />
                         <Button
                             variant="secondary"
-                            disabled={!idle}
+                            disabled={!idle && !searching}
                             onClick={() => {
+                                if (searching) {
+                                    void tv.cancel();
+                                    return;
+                                }
                                 setSearched(true);
                                 void tv.find();
                             }}
                         >
-                            {t("downloads.tv.dialog.find")}
+                            {searching
+                                ? t("downloads.tv.dialog.stopSearch")
+                                : t("downloads.tv.dialog.find")}
                         </Button>
                     </div>
                     {addressError || notStarted ? (
@@ -321,8 +349,17 @@ function OpenInApp({ download, onClose }: { download: ReactNode; onClose: () => 
     );
 }
 
-export function TvOffer({ download }: { download: ReactNode }) {
+export function TvOffer({
+    download,
+    released
+}: {
+    download: ReactNode;
+    /** Whether a TV release with the APK is out; the card draws before it settles. */
+    released: Promise<boolean>;
+}) {
     const t = useTranslations("account");
+    // Null while GitHub has not answered: the desktop app checks again anyway.
+    const [available, setAvailable] = useState<boolean | null>(null);
     const [reach, setReach] = useState<Reach>("browser");
     const [tv, setTv] = useState<DesktopTv | null>(null);
     const [open, setOpen] = useState(false);
@@ -336,6 +373,17 @@ export function TvOffer({ download }: { download: ReactNode }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get(OPEN_PARAM) === OPEN_VALUE) setOpen(true);
     }, []);
+
+    useEffect(() => {
+        let live = true;
+        released.then(
+            (out) => live && setAvailable(out),
+            () => live && setAvailable(null)
+        );
+        return () => {
+            live = false;
+        };
+    }, [released]);
 
     // Closing stops a search; an install under way runs to its end in the app.
     const close = () => {
@@ -356,9 +404,13 @@ export function TvOffer({ download }: { download: ReactNode }) {
             title={t("downloads.tv.title")}
             description={t("downloads.tv.description")}
         >
-            <div>
-                <Button onClick={press}>{t("downloads.tv.install")}</Button>
-            </div>
+            {available === false ? (
+                <p className="text-sm text-muted-foreground">{t("downloads.tv.notReleased")}</p>
+            ) : (
+                <div>
+                    <Button onClick={press}>{t("downloads.tv.install")}</Button>
+                </div>
+            )}
             {reach === "old-app" ? (
                 <p className="text-sm text-muted-foreground">{t("downloads.tv.updateApp")}</p>
             ) : null}
@@ -369,10 +421,20 @@ export function TvOffer({ download }: { download: ReactNode }) {
                     <DialogHeader>
                         <DialogTitle>{t("downloads.tv.dialog.title")}</DialogTitle>
                         <DialogDescription>
-                            {tv ? t("downloads.tv.dialog.intro") : t("downloads.tv.needsApp")}
+                            {available === false
+                                ? t("downloads.tv.notReleased")
+                                : tv
+                                  ? t("downloads.tv.dialog.intro")
+                                  : t("downloads.tv.needsApp")}
                         </DialogDescription>
                     </DialogHeader>
-                    {tv ? (
+                    {available === false ? (
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={close}>
+                                {t("downloads.tv.dialog.close")}
+                            </Button>
+                        </DialogFooter>
+                    ) : tv ? (
                         <InstallSteps tv={tv} onClose={close} />
                     ) : (
                         <OpenInApp download={download} onClose={() => setOpen(false)} />

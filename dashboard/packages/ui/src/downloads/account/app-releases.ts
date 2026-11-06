@@ -51,6 +51,7 @@ export const DESKTOP_TAG_PREFIX = "desktop-v";
 export const EXTENSION_TAG_PREFIX = "extension-v";
 export const STREAMDECK_TAG_PREFIX = "streamdeck-v";
 export const COMPANION_TAG_PREFIX = "companion-v";
+export const TV_TAG_PREFIX = "tv-v";
 
 /** One release, in the fields this module reads. Everything is `unknown` because
  *  it arrives from the network and is checked here rather than trusted. */
@@ -293,4 +294,20 @@ export async function streamDeckDownload(repo: string): Promise<AppDownload | nu
 /** The Bitfocus Companion module, as the one `.tgz` package Companion imports. */
 export async function companionDownload(repo: string): Promise<AppDownload | null> {
     return appDownload(repo, COMPANION_TAG_PREFIX);
+}
+
+/** Polaris TV, as the APK the desktop app sideloads onto a set. */
+export async function tvDownload(repo: string): Promise<AppDownload | null> {
+    return appDownload(repo, TV_TAG_PREFIX);
+}
+
+/**
+ * Whether a TV release carries what the desktop app installs from: the APK and
+ * the checksum list it verifies it against (`desktop/src/main/tv-install.ts`).
+ * A release without both is one the install refuses, so it is not offered.
+ */
+export function tvInstallable(release: AppDownload | null): boolean {
+    if (!release) return false;
+    const names = new Set(release.files.map((file) => file.name));
+    return names.has("polaris-tv.apk") && names.has("SHA256SUMS");
 }
