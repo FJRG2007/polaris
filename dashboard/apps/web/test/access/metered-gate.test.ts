@@ -48,6 +48,7 @@ vi.mock("dymo-api", () => ({
 /** Exports that are not requests, or that an operator pressed a button for. */
 const NOT_A_REQUEST = new Set([
     "MAIL_DENY_RULES",
+    "readIpPlace",
     "VT_MAX_UPLOAD_BYTES",
     "settleIpVerdict",
     "testKey",

@@ -411,6 +411,7 @@
         "find": "Find",
         "finding": "Finding...",
         "noMatch": "Nothing found with that name.",
+        "noPlace": "Nothing at those coordinates.",
         "mapHint": "Or press a country on the map.",
         "automatic": "Use its address",
         "close": "Close"

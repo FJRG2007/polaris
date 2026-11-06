@@ -226,7 +226,7 @@ async function publishProxy(
         const address = !named
             ? endpoint
             : taken
-              ? await lookup(endpoint).then(
+              ? await lookup(endpoint, { family: 4 }).then(
                     ({ address: found }) => found,
                     () => null
                 )

@@ -35,6 +35,7 @@ export function NodePlaceDialog({
     const locale = useLocale();
     const [query, setQuery] = useState("");
     const [matches, setMatches] = useState<PlaceMatch[] | null>(null);
+    const [searchedPoint, setSearchedPoint] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searching, startSearch] = useTransition();
     const [saving, startSave] = useTransition();
@@ -52,6 +53,7 @@ export function NodePlaceDialog({
                 setMatches(null);
                 return;
             }
+            setSearchedPoint(point !== null);
             setMatches(result.matches);
         });
     }
@@ -120,7 +122,9 @@ export function NodePlaceDialog({
                         </ui.Button>
                     </form>
                     {matches?.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">{t("place.noMatch")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t(searchedPoint ? "place.noPlace" : "place.noMatch")}
+                        </p>
                     ) : null}
                     {matches && matches.length > 0 ? (
                         <ul className="flex max-h-48 min-w-0 flex-col overflow-y-auto">

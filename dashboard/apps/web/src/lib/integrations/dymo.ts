@@ -114,16 +114,19 @@ export function verifyIp(
 }
 
 /** Where an address is, out of the same verdict call: only the fields read, each
- *  optional, so an answer without them is a place nobody knows rather than an error. */
+ *  read by its type rather than typed, so a null, a string or a missing field is a
+ *  place nobody knows rather than a paid answer thrown away. */
 const IP_PLACE = z.object({
     response: z
         .object({
-            countryCode: z.string().optional(),
-            city: z.string().optional(),
-            lat: z.number().finite().min(-90).max(90).optional(),
-            lon: z.number().finite().min(-180).max(180).optional()
+            countryCode: z.unknown().optional(),
+            city: z.unknown().optional(),
+            lat: z.unknown().optional(),
+            lon: z.unknown().optional()
         })
+        .nullable()
         .optional()
+        .catch(undefined)
 });
 
 export interface IpPlace {
@@ -133,24 +136,37 @@ export interface IpPlace {
     readonly longitude: number | null;
 }
 
+function degrees(value: unknown, limit: number): number | null {
+    const number = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+    return typeof number === "number" && Number.isFinite(number) && Math.abs(number) <= limit
+        ? number
+        : null;
+}
+
+/** The place in a Dymo IP answer; null when it names no country. */
+export function readIpPlace(answer: unknown): IpPlace | null {
+    const parsed = IP_PLACE.safeParse(answer);
+    const place = parsed.success ? parsed.data.response : undefined;
+    const countryCode =
+        typeof place?.countryCode === "string" ? place.countryCode.trim().toUpperCase() : "";
+    if (!/^[A-Z]{2}$/.test(countryCode)) return null;
+    const city = typeof place?.city === "string" ? place.city.trim().slice(0, 80) || null : null;
+    const latitude = degrees(place?.lat, 90);
+    const longitude = degrees(place?.lon, 180);
+    const known = latitude !== null && longitude !== null;
+    return {
+        countryCode,
+        city,
+        latitude: known ? latitude : null,
+        longitude: known ? longitude : null
+    };
+}
+
 /** Where an IP is, as precisely as the service says; null when it names no country. */
 export function locateIp(apiKey: string, ip: string): Promise<IpPlace | null> {
-    return whileServing(PROVIDER, NAME, async () => {
-        const answer = IP_PLACE.parse(
-            await clientFor(apiKey).isValidIP(ip, { deny: ["FRAUD"] as NegativeIPRules[] })
-        );
-        const place = answer.response;
-        const countryCode = place?.countryCode?.trim().toUpperCase() ?? "";
-        if (!/^[A-Z]{2}$/.test(countryCode)) return null;
-        const city = place?.city?.trim().slice(0, 80) || null;
-        const known = place?.lat !== undefined && place.lon !== undefined;
-        return {
-            countryCode,
-            city,
-            latitude: known ? (place?.lat ?? null) : null,
-            longitude: known ? (place?.lon ?? null) : null
-        };
-    });
+    return whileServing(PROVIDER, NAME, async () =>
+        readIpPlace(await clientFor(apiKey).isValidIP(ip, { deny: ["FRAUD"] as NegativeIPRules[] }))
+    );
 }
 
 /** Try a key that may be new, so it ignores any pause; a bad key throws. */

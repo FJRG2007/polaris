@@ -411,6 +411,7 @@
         "find": "Buscar",
         "finding": "Buscando...",
         "noMatch": "Nada con ese nombre.",
+        "noPlace": "Nada en esas coordenadas.",
         "mapHint": "O pulsa un país en el mapa.",
         "automatic": "Usar su dirección",
         "close": "Cerrar"
