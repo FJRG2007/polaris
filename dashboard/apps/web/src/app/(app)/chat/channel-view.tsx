@@ -93,6 +93,8 @@ import { Button, EmptyState, ResizeHandle, Skeleton, cn, useToast } from "@polar
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
+import { LockedGate } from "./lock-dialogs";
+import { forgetUnlockProof, unlockProofFor } from "./lock-session";
 import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
 import { usePolarContext } from "@/components/polar/polar-panel";
@@ -572,6 +574,10 @@ export function ChannelView({
         setTimeout(() => catchUpAgain.current(), 0);
     }, []);
 
+    /** The conversation is behind the reader's chat lock and this tab has not
+     *  been given the code for it. */
+    const [needsCode, setNeedsCode] = useState(false);
+
     /** The window, written in one place so the fetches below can do their
      *  arithmetic on what is actually on screen without waiting for a render. */
     const show = useCallback((next: readonly ChatMessageView[]) => {
@@ -582,8 +588,21 @@ export function ChannelView({
     /** Back to the live end of the conversation: the newest page and nothing
      *  else. What opening a channel does. */
     const load = useCallback(async () => {
-        const result = await actions.readChannelAction(channelId);
+        const result = await actions.readChannelAction(
+            channelId,
+            undefined,
+            unlockProofFor(channelId)
+        );
         if (result.channel) setDescribed(result.channel);
+        // Behind the reader's chat lock, and this tab holds no good proof for
+        // it: the gate asks for the code instead of showing a refusal.
+        if (result.error && result.channel?.locked) {
+            forgetUnlockProof(channelId);
+            setNeedsCode(true);
+            show([]);
+            return;
+        }
+        setNeedsCode(false);
         if (result.error) {
             setError(result.error);
             show([]);
@@ -604,6 +623,23 @@ export function ChannelView({
     useEffect(() => {
         void load();
     }, [load]);
+
+    // Locked while it is open - from the row's menu here, or in another tab and
+    // brought in by the list - and this tab was never handed the code for it:
+    // the gate goes over it at once rather than at the next reload, and what was
+    // on screen, a thread or a search included, goes with it. A lock taken off
+    // while the gate is up opens it again.
+    const lockedNow = channel ? channel.locked : null;
+    useEffect(() => {
+        if (lockedNow === true && !needsCode && !unlockProofFor(channelId)) {
+            setNeedsCode(true);
+            setThread(null);
+            setSearching(false);
+            show([]);
+        } else if (lockedNow === false && needsCode) {
+            void load();
+        }
+    }, [lockedNow, needsCode, channelId, load, show]);
 
     // After the messages, on purpose. A browser runs server actions one at a
     // time, in the order they were asked for, so whichever of these two
@@ -648,7 +684,11 @@ export function ChannelView({
         fetching.current = true;
         setLoadingOlder(true);
 
-        const result = await actions.readChannelAction(channelId, cursor);
+        const result = await actions.readChannelAction(
+            channelId,
+            cursor,
+            unlockProofFor(channelId)
+        );
         setLoadingOlder(false);
         release();
         if (!result.page) return false;
@@ -686,7 +726,7 @@ export function ChannelView({
         if (!cursor || fetching.current) return;
         fetching.current = true;
 
-        const result = await actions.readSinceAction(channelId, cursor);
+        const result = await actions.readSinceAction(channelId, cursor, unlockProofFor(channelId));
         release();
         if (!result.page) return;
 
@@ -733,7 +773,7 @@ export function ChannelView({
         }
 
         fetching.current = true;
-        const result = await actions.readSinceAction(channelId, newest);
+        const result = await actions.readSinceAction(channelId, newest, unlockProofFor(channelId));
         release();
         const known = new Set(held.current.map((message) => message.id));
         const arrived = (result.page?.messages ?? []).filter((message) => !known.has(message.id));
@@ -810,15 +850,18 @@ export function ChannelView({
      *
      * Answers whether it opened one.
      */
-    const openThreadOf = useCallback(async (messageId: string): Promise<boolean> => {
-        const result = await actions.readThreadAction(messageId);
-        const root = threadRootFor(result.messages ?? [], messageId);
-        if (!root) return false;
-        setThread(root);
-        setThreadHighlight(messageId);
-        setTimeout(() => setThreadHighlight(null), HIGHLIGHT_MS);
-        return true;
-    }, []);
+    const openThreadOf = useCallback(
+        async (messageId: string): Promise<boolean> => {
+            const result = await actions.readThreadAction(messageId, unlockProofFor(channelId));
+            const root = threadRootFor(result.messages ?? [], messageId);
+            if (!root) return false;
+            setThread(root);
+            setThreadHighlight(messageId);
+            setTimeout(() => setThreadHighlight(null), HIGHLIGHT_MS);
+            return true;
+        },
+        [channelId]
+    );
 
     /**
      * Scroll to a message, fetching backwards until it is there.
@@ -889,15 +932,17 @@ export function ChannelView({
      * does not put the bar back over an empty box.
      */
     const quoting = params.get("quote");
+    const quotedFrom = params.get("from");
     const quoted = useRef<string | null>(null);
     useEffect(() => {
         if (!quoting || quoted.current === quoting) return;
         quoted.current = quoting;
         router.replace(`/chat/c/${channelId}`, { scroll: false });
-        void runAction(() => polls.carriedMessage(quoting), setError).then((result) => {
+        const proof = quotedFrom ? unlockProofFor(quotedFrom) : null;
+        void runAction(() => polls.carriedMessage(quoting, proof), setError).then((result) => {
             if (result?.carried) setCarried(result.carried);
         });
-    }, [channelId, quoting, router]);
+    }, [channelId, quoting, quotedFrom, router]);
 
     // Leaving the conversation drops it. What is on the bar is about this box in
     // this room; carrying it to the next one would offer to answer a stranger's
@@ -1022,7 +1067,11 @@ export function ChannelView({
             if (asked.length === 0) return;
             const results = await Promise.all(
                 inBatches(asked, MAX_REREAD).map((messageIds) =>
-                    actions.rereadAction({ channelId, messageIds })
+                    actions.rereadAction({
+                        channelId,
+                        messageIds,
+                        proof: unlockProofFor(channelId)
+                    })
                 )
             );
             const fresh: ChatMessageView[] = [];
@@ -1162,7 +1211,7 @@ export function ChannelView({
             // privately ends up looking exactly like answering anything else, which
             // is the whole point: a dialog with a box of its own was a second way to
             // write a message, and people already know the first one.
-            router.push(`/chat/c/${result.id}?quote=${message.id}`);
+            router.push(`/chat/c/${result.id}?quote=${message.id}&from=${message.channelId}`);
         },
         [router]
     );
@@ -1801,7 +1850,7 @@ export function ChannelView({
         // to the conversation its parent is in - so it goes the way forwarding
         // goes: quoted, with what was typed as the note on top. The bar above the
         // box reads as a reply either way, which is the only part anybody sees.
-        const elsewhere = !replyingTo && carried ? carried.message.id : null;
+        const elsewhere = !replyingTo && carried ? carried.message : null;
         // Cleared before the round trip: the bar is about what is being written,
         // and the message has left.
         setReplyingTo(null);
@@ -1810,12 +1859,15 @@ export function ChannelView({
         const result = await runAction(
             () =>
                 elsewhere
-                    ? actions.forwardAction({
-                          messageId: elsewhere,
-                          channelId,
-                          note: body,
-                          translation
-                      })
+                    ? actions.forwardAction(
+                          {
+                              messageId: elsewhere.id,
+                              channelId,
+                              note: body,
+                              translation
+                          },
+                          unlockProofFor(elsewhere.channelId)
+                      )
                     : actions.sendAction({ channelId, body, replyToId: answering, translation }),
             setError
         );
@@ -2359,7 +2411,24 @@ export function ChannelView({
         channel.contentMode === "age" &&
         !channel.ageConfirmed &&
         ageConfirmedHere !== channelId;
-    const shownConversation = gated ? (
+    const shownConversation = needsCode ? (
+        <LockedGate
+            key={channelId}
+            channelId={channelId}
+            onUnlocked={() => {
+                setNeedsCode(false);
+                setError("");
+                void load();
+                void pins.reload();
+            }}
+            onReset={() => {
+                refresh();
+                setError("");
+                void load();
+                void pins.reload();
+            }}
+        />
+    ) : gated ? (
         <AgeGate
             channelId={channelId}
             channelName={channel.name}
@@ -2481,7 +2550,13 @@ export function ChannelView({
                     membersOpen={members.open && !thread && !searching}
                 />
 
-                <PinnedBar pins={pins.pins} onJump={jumpHere} onShowAll={() => setPinsOpen(true)} />
+                {!needsCode && (
+                    <PinnedBar
+                        pins={pins.pins}
+                        onJump={jumpHere}
+                        onShowAll={() => setPinsOpen(true)}
+                    />
+                )}
 
                 {/* A voice channel is a room AND a record: the one place a
                     group is most likely to want to drop a link used to be the

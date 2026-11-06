@@ -34,12 +34,13 @@ import {
     starredAction,
     unstarAllAction
 } from "../actions";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageTime } from "@/components/message-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { AlarmClock, ArrowLeft, Hash, Star, Users, X } from "lucide-react";
 import { useChatStream } from "../use-chat-stream";
+import { unlockProofFor } from "../lock-session";
 
 /** The filter's value for "every conversation". Radix refuses an empty item. */
 const EVERYWHERE = "all";
@@ -59,6 +60,8 @@ export function SavedView() {
      *  saved messages because both are "come back to this". */
     const [reminders, setReminders] = useState<readonly ChatReminderView[]>([]);
     const toast = useToast();
+    const toastRef = useRef(toast);
+    toastRef.current = toast;
     useEffect(() => {
         let live = true;
         void remindersAction()
@@ -86,10 +89,19 @@ export function SavedView() {
         }
     };
 
+    const readStarred = useCallback(
+        () =>
+            starredAction(only ?? undefined, only ? unlockProofFor(only) : null).then((result) => {
+                if (result.error) toastRef.current.show({ title: result.error });
+                setMessages(result.messages ?? []);
+            }),
+        [only]
+    );
+
     const load = useCallback(() => {
         setMessages(null);
-        void starredAction(only ?? undefined).then((result) => setMessages(result.messages));
-    }, [only]);
+        void readStarred();
+    }, [readStarred]);
 
     useEffect(load, [load]);
 
@@ -107,11 +119,9 @@ export function SavedView() {
                     );
                 });
                 if (!stale) return;
-                void starredAction(only ?? undefined).then((result) =>
-                    setMessages(result.messages)
-                );
+                void readStarred();
             },
-            [messages, only]
+            [messages, readStarred]
         )
     );
 

@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const GET = pollRoute(
-    z.object({ messageId: z.string().trim().min(1).max(200) }),
-    ({ messageId }) => linkPreviewAction(messageId)
+    z.object({
+        messageId: z.string().trim().min(1).max(200),
+        proof: z.string().max(200).optional()
+    }),
+    ({ messageId, proof }) => linkPreviewAction(messageId, proof ?? null)
 );

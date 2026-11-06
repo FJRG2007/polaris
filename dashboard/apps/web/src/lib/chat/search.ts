@@ -20,6 +20,7 @@ import { reachableChannelIds } from "./access";
 import { ageClearedWhere } from "./age-gate";
 import { decorateMessages, type ChatMessageView } from "./messages";
 import * as history from "./history-visibility";
+import { concealedFor, lockCodeHash, readUnlockProof } from "./chat-lock";
 
 /** One result, with enough about where it was said to be worth clicking. */
 export interface ChatSearchHit {
@@ -33,18 +34,30 @@ export interface ChatSearchHit {
 
 export async function searchMessages(
     actor: { id: string },
-    input: core.ChatSearchInput
+    input: core.ChatSearchInput,
+    /** The unlock proof for `input.channelId`, when it is behind the reader's
+     *  chat lock. */
+    proof?: string | null
 ): Promise<readonly ChatSearchHit[]> {
     if (core.chatSearchIsEmpty(input) && !input.channelId) return [];
 
-    const reachable = await reachableChannelIds(actor);
+    const [reachable, concealed] = await Promise.all([
+        reachableChannelIds(actor),
+        concealedFor(actor.id)
+    ]);
     // A conversation named in the request is honoured only if it was already in
-    // the set. Narrowing to something outside it narrows to nothing.
-    const within = input.channelId
-        ? reachable.has(input.channelId)
-            ? [input.channelId]
+    // the set. Narrowing to something outside it narrows to nothing. One behind
+    // the reader's code is searched only with the proof this tab was handed for
+    // it - search would otherwise be the way round the lock. Across everything,
+    // what the reader hid or locked stays out, the way it is out of the list.
+    const asked = input.channelId;
+    const within = asked
+        ? reachable.has(asked) &&
+          (!concealed.locked.has(asked) ||
+              readUnlockProof(proof, actor.id, asked, await lockCodeHash(actor.id)))
+            ? [asked]
             : []
-        : [...reachable];
+        : [...reachable].filter((id) => !concealed.hidden.has(id) && !concealed.locked.has(id));
     if (within.length === 0) return [];
     const floors = await history.historyFloors(actor.id, within);
 

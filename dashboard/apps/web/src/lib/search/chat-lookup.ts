@@ -20,6 +20,8 @@ import { searchMessages } from "@/lib/chat/search";
 import { searchForConversation } from "@/lib/chat/access";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { listChannels, listSpaces, type ChatChannelView } from "@/lib/chat/chat-service";
+import { onShelf } from "@/app/(app)/chat/lock-shelf";
+import { lockState } from "@/lib/chat/chat-lock";
 
 /** What one match looks like; the palette's own row shape. */
 export interface ChatHit {
@@ -48,8 +50,14 @@ export async function chatLookup(
     const term = query.trim();
     const t = await readerWords("components");
     // Read once however many kinds ask for it.
+    // Only what the sidebar's usual list shows: a hidden conversation, or a
+    // locked one the reader asked to keep out of sight, is not found from here
+    // either - a match would say it exists.
     let held: Promise<ChatChannelView[]> | null = null;
-    const rail = () => (held ??= listChannels(actor));
+    const rail = () =>
+        (held ??= Promise.all([listChannels(actor), lockState(actor.id)]).then(([listed, lock]) =>
+            listed.filter((channel) => onShelf(channel, "all", lock.hideLocked))
+        ));
 
     if (scope === "contacts") return people(actor, term, ONE_KIND, t);
     if (scope === "messages") return messages(actor, term, ONE_KIND, t);
@@ -68,7 +76,12 @@ export async function chatLookup(
     return [...found, ...chats, ...rooms, ...said];
 }
 
-async function people(actor: { id: string }, term: string, limit: number, t: Words): Promise<ChatHit[]> {
+async function people(
+    actor: { id: string },
+    term: string,
+    limit: number,
+    t: Words
+): Promise<ChatHit[]> {
     const { people: found } = await searchForConversation(actor, term, limit);
     return found.map((person) => ({
         id: person.id,
@@ -94,7 +107,12 @@ function byRecent(left: ChatChannelView, right: ChatChannelView): number {
 type Rail = () => Promise<ChatChannelView[]>;
 type Words = NamespaceTranslator<"components">;
 
-async function conversations(rail: Rail, term: string, limit: number, t: Words): Promise<ChatHit[]> {
+async function conversations(
+    rail: Rail,
+    term: string,
+    limit: number,
+    t: Words
+): Promise<ChatHit[]> {
     const needle = term.toLowerCase();
     return (await rail())
         .filter(
@@ -146,7 +164,12 @@ async function channels(
         }));
 }
 
-async function messages(actor: { id: string }, term: string, limit: number, t: Words): Promise<ChatHit[]> {
+async function messages(
+    actor: { id: string },
+    term: string,
+    limit: number,
+    t: Words
+): Promise<ChatHit[]> {
     if (!term) return [];
     const hits = await searchMessages(actor, core.chatSearchSchema.parse({ term }));
     return hits.slice(0, limit).map((hit) => ({
@@ -155,7 +178,10 @@ async function messages(actor: { id: string }, term: string, limit: number, t: W
         label: plainExcerpt(hit.message.body, 120) || t("search.hits.attachment"),
         detail:
             hit.message.authorName && hit.channelName
-                ? t("search.hits.saidIn", { author: hit.message.authorName, channel: hit.channelName })
+                ? t("search.hits.saidIn", {
+                      author: hit.message.authorName,
+                      channel: hit.channelName
+                  })
                 : hit.message.authorName || hit.channelName || "",
         href: `/chat/c/${hit.channelId}/${hit.message.id}`
     }));

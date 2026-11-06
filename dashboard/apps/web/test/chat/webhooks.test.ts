@@ -124,6 +124,7 @@ vi.mock("@polaris/db", () => {
             }
         },
         chatChannel: { update: async () => ({}) },
+        chatChannelMember: { updateMany: async () => ({ count: 0 }) },
         chatWebhook
     };
     return {

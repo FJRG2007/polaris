@@ -27,6 +27,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { redactAlert } from "./chat-lock";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { ageClearedWhere } from "./age-gate";
@@ -93,6 +94,9 @@ export interface MessageToast {
     readonly excerpt: string;
     readonly media: MessageToastMedia | null;
     readonly at: string;
+    /** Behind the reader's chat lock: every field above that would say what
+     *  was sent, or by whom, is empty - see `redactAlert`. */
+    readonly locked?: boolean;
 }
 
 /** The fields of an attachment a toast is described from. */
@@ -220,8 +224,9 @@ export async function messageToasts(
 
     const memberships = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id, channelId: { in: asked } },
-        select: { channelId: true, muted: true, mutedUntil: true }
+        select: { channelId: true, muted: true, mutedUntil: true, locked: true }
     });
+    const locked = new Set(memberships.filter((row) => row.locked).map((row) => row.channelId));
     const quiet = new Set(
         memberships.filter((row) => core.muteInForce(row)).map((row) => row.channelId)
     );
@@ -294,7 +299,7 @@ export async function messageToasts(
         }
         seen.add(row.channelId);
 
-        toasts.push({
+        const toast: MessageToast = {
             channelId: row.channelId,
             messageId: row.id,
             conversation: conversationName(row.channel, actor.id),
@@ -305,7 +310,8 @@ export async function messageToasts(
             excerpt: plainExcerpt(row.body, EXCERPT) || describeFiles(row.attachments),
             media: previewOf(row.attachments),
             at: row.createdAt.toISOString()
-        });
+        };
+        toasts.push(locked.has(row.channelId) ? redactAlert(toast) : toast);
     }
     return toasts;
 }

@@ -111,6 +111,9 @@ interface ChatContextValue {
      * the reader's own sends wait behind.
      */
     readonly refreshChannels: () => void;
+    /** One conversation redrawn ahead of the server's answer - the optimistic
+     *  half of a write; the caller puts it back on a refusal. */
+    readonly patchChannel: (channelId: string, patch: Partial<ChatChannelView>) => void;
     /** What the instance allows in a conversation of a given shape. The
      *  defaults until the answer arrives, so the composer is never briefly
      *  stricter than the server. */
@@ -207,6 +210,13 @@ export function ChatProvider({
 }) {
     const router = useRouter();
     const [channels, setChannels] = useState<readonly ChatChannelView[]>([]);
+    const patchChannel = useCallback(
+        (channelId: string, patch: Partial<ChatChannelView>) =>
+            setChannels((current) =>
+                current.map((entry) => (entry.id === channelId ? { ...entry, ...patch } : entry))
+            ),
+        []
+    );
     const [loaded, setLoaded] = useState(false);
     const [kept, setKept] = useState(false);
     const [loadFailed, setLoadFailed] = useState(false);
@@ -450,6 +460,7 @@ export function ChatProvider({
             loadFailed,
             refresh,
             refreshChannels,
+            patchChannel,
             rulesFor,
             callsOff,
             callsOutside
@@ -471,6 +482,7 @@ export function ChatProvider({
             loadFailed,
             refresh,
             refreshChannels,
+            patchChannel,
             rulesFor,
             callsOff,
             callsOutside

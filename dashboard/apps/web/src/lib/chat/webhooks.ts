@@ -18,6 +18,7 @@
  */
 
 import { confineCustomEmoji } from "./custom-emoji";
+import { unhideOnMessage } from "./chat-lock";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { unfurlLater } from "./messages";
@@ -277,6 +278,8 @@ export async function postThroughWebhook(
             where: { id: webhook.channelId },
             data: { lastMessageAt: message.createdAt }
         });
+        // A message, so a conversation somebody hid comes back - see `chat-lock`.
+        await unhideOnMessage(tx, webhook.channelId, null, message.createdAt);
         // `updateMany`, so a webhook deleted while its request was in flight
         // still lands the message it was already let through for.
         await tx.chatWebhook.updateMany({

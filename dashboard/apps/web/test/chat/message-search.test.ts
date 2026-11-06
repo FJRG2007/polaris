@@ -32,6 +32,15 @@ vi.mock("@/lib/chat/access", () => ({
     reachableChannelIds: async () => reachable
 }));
 
+/** What the reader hid and locked, and the one proof this tab holds. */
+let concealed = { hidden: new Set<string>(), locked: new Set<string>(), hideLocked: false };
+const GOOD_PROOF = "good-proof";
+vi.mock("@/lib/chat/chat-lock", () => ({
+    concealedFor: async () => concealed,
+    lockCodeHash: async () => "hash",
+    readUnlockProof: (proof: string | null | undefined) => proof === GOOD_PROOF
+}));
+
 vi.mock("@/lib/chat/messages", () => ({
     decorateMessages: async (_actor: unknown, rows: { id: string; channelId: string }[]) =>
         rows.map((row) => ({ ...row, authorName: null, reactions: [], attachments: [] }))
@@ -80,6 +89,7 @@ beforeEach(() => {
     asked = null;
     reachable = new Set([MINE, ALSO_MINE]);
     joinedMine = null;
+    concealed = { hidden: new Set(), locked: new Set(), hideLocked: false };
 });
 
 describe("what somebody who joined later finds", () => {
@@ -125,6 +135,33 @@ describe("what a search may reach", () => {
         reachable = new Set();
         expect(await searchMessages(actor, query({ term: "x" }))).toEqual([]);
         expect(asked).toBeNull();
+    });
+
+    it("leaves hidden and locked conversations out of a search across everything", async () => {
+        concealed = { hidden: new Set([MINE]), locked: new Set([ALSO_MINE]), hideLocked: false };
+        expect(await searchMessages(actor, query({ term: "release" }))).toEqual([]);
+        expect(asked).toBeNull();
+        reachable = new Set([MINE, ALSO_MINE, THEIRS]);
+        await searchMessages(actor, query({ term: "release" }));
+        expect(asked?.where.channelId).toEqual({ in: [THEIRS] });
+    });
+
+    it("searches a locked conversation only with this tab's proof for it", async () => {
+        concealed = { hidden: new Set(), locked: new Set([MINE]), hideLocked: false };
+        expect(await searchMessages(actor, query({ term: "x", channelId: MINE }))).toEqual([]);
+        expect(asked).toBeNull();
+        expect(
+            await searchMessages(actor, query({ term: "x", channelId: MINE }), "forged")
+        ).toEqual([]);
+        expect(asked).toBeNull();
+        await searchMessages(actor, query({ term: "x", channelId: MINE }), GOOD_PROOF);
+        expect(asked?.where.channelId).toEqual({ in: [MINE] });
+    });
+
+    it("searches a hidden conversation when it is the one open", async () => {
+        concealed = { hidden: new Set([MINE]), locked: new Set(), hideLocked: false };
+        await searchMessages(actor, query({ term: "x", channelId: MINE }));
+        expect(asked?.where.channelId).toEqual({ in: [MINE] });
     });
 
     it("refuses to answer an empty search", async () => {

@@ -32,6 +32,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { lockedFor } from "./chat-lock";
 import * as core from "@polaris/core";
 import { silencedIn } from "./notify";
 import { blockersOf } from "@/lib/blocks";
@@ -142,6 +143,8 @@ export async function announceRoomMention(
     });
     const authorName = author?.name ?? null;
     const about = await chatAlertShelf(channel);
+    // Somebody who locked the conversation is told only that something arrived.
+    const locked = await lockedFor(channelId, [...audience]);
 
     await Promise.all(
         [...audience]
@@ -156,19 +159,21 @@ export async function announceRoomMention(
                 return createNotification({
                     userId,
                     type: "chat.mention",
-                    title: words("notices.roomMention", {
-                        name: authorName ?? words("notices.somebodyCapital"),
-                        mention: label,
-                        where
-                    }),
-                    body: plainExcerpt(body, 140),
+                    title: locked.has(userId)
+                        ? words("lock.newMessage")
+                        : words("notices.roomMention", {
+                              name: authorName ?? words("notices.somebodyCapital"),
+                              mention: label,
+                              where
+                          }),
+                    body: locked.has(userId) ? null : plainExcerpt(body, 140),
                     href: `/chat/c/${channelId}/${messageId}`,
                     level: "info",
                     // Addressed to the room, and drawn as that: the conversation
                     // it went to rather than "you", so it reads as an
                     // announcement and not as a message written to the reader.
                     audience: "group",
-                    audienceLabel: where || null,
+                    audienceLabel: locked.has(userId) ? null : where || null,
                     shelf: await recipientShelf(userId, about).catch(() => null)
                 });
             })

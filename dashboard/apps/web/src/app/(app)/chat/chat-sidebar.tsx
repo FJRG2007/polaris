@@ -54,14 +54,23 @@ import { NicknameDialog } from "./nickname-dialog";
 import { useRemoveFriend } from "./remove-friend";
 import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
 import { InviteDialog } from "./invite-dialog";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { drawsDetailed, listTime, useChatListView, type ChatListView } from "./list-view";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
 import * as move from "./channel-move";
 import { joinMenuGroups } from "./menu-groups";
+import { onShelf, type LockShelf } from "./lock-shelf";
+import * as lockActions from "./lock-actions";
+import { ChatLockProvider, LockCodeDialog, LockShelfEntries, useChatLock } from "./lock-dialogs";
 import {
     Ban,
+    BellOff,
+    Eye,
+    EyeOff,
+    LockOpen,
+    LayoutList,
     CheckCheck,
     ArrowDownToLine,
     ArrowUpToLine,
@@ -127,7 +136,7 @@ import {
     ShortcutHint,
     shortcutPressed
 } from "@polaris/ui";
-import { GroupNameDialog } from "./group-name-dialog";
+import { EditGroupDialog } from "./edit-group-dialog";
 
 /** How the shared mute list draws itself inside a right-click menu. */
 const CONTEXT_PARTS: MenuParts = {
@@ -231,6 +240,14 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
 }
 
 export function ChatSidebar() {
+    return (
+        <ChatLockProvider>
+            <ChatSidebarList />
+        </ChatLockProvider>
+    );
+}
+
+function ChatSidebarList() {
     const {
         channels,
         spaces,
@@ -250,6 +267,21 @@ export function ChatSidebar() {
     const meetings = here.startsWith("/chat/meetings");
 
     const [folded, setFolded] = useState<readonly string[]>([]);
+    // Every chat, or one of the "Locked chats" / "Hidden chats" shelves.
+    const [shelf, setShelf] = useState<LockShelf>("all");
+    const { hideLocked } = useChatLock().state;
+    const [listView, chooseListView] = useChatListView();
+    const directList = useRef<HTMLDivElement>(null);
+    const [listWidth, setListWidth] = useState(0);
+    // The width the rows actually have, which is what "auto" decides by.
+    useEffect(() => {
+        const node = directList.current;
+        if (!node || typeof ResizeObserver === "undefined") return;
+        const watch = new ResizeObserver(([entry]) => setListWidth(entry?.contentRect.width ?? 0));
+        watch.observe(node);
+        return () => watch.disconnect();
+    });
+    const detailed = drawsDetailed(listView, listWidth);
     const [newDirect, setNewDirect] = useState(false);
     const [newChannelIn, setNewChannelIn] = useState<{
         space: ChatSpaceView;
@@ -305,27 +337,46 @@ export function ChatSidebar() {
     const directs = useMemo(
         () =>
             channels
-                .filter((channel) => channel.spaceId === null)
+                // On a shelf, every conversation of that kind wherever it lives.
+                .filter(
+                    (channel) =>
+                        (shelf !== "all" || channel.spaceId === null) &&
+                        onShelf(channel, shelf, hideLocked)
+                )
                 .sort(
                     (left, right) =>
                         Number(right.pinned) - Number(left.pinned) ||
                         (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
                 ),
+        [channels, shelf, hideLocked]
+    );
+    const hiddenCount = useMemo(
+        () => channels.filter((channel) => channel.hidden).length,
+        [channels]
+    );
+    const lockedCount = useMemo(
+        () => channels.filter((channel) => channel.locked).length,
         [channels]
     );
 
     const inSpace = useMemo(() => {
         if (!activeSpaceId) return [];
         const listed = channels.filter(
-            (channel) => channel.spaceId === activeSpaceId && !channel.archived
+            (channel) =>
+                channel.spaceId === activeSpaceId &&
+                !channel.archived &&
+                onShelf(channel, "all", hideLocked)
         );
         return pendingOrder ? move.withChannelOrder(listed, pendingOrder.order) : listed;
-    }, [channels, activeSpaceId, pendingOrder]);
+    }, [channels, activeSpaceId, pendingOrder, hideLocked]);
 
     useEffect(() => {
         if (!pendingOrder?.stored || !activeSpaceId) return;
         const listed = channels.filter(
-            (channel) => channel.spaceId === activeSpaceId && !channel.archived
+            (channel) =>
+                channel.spaceId === activeSpaceId &&
+                !channel.archived &&
+                onShelf(channel, "all", hideLocked)
         );
         if (move.reflectsChannelOrder(listed, pendingOrder.order)) {
             setPendingOrder(null);
@@ -337,7 +388,7 @@ export function ChatSidebar() {
             PENDING_ORDER_SETTLE_MS
         );
         return () => clearTimeout(timer);
-    }, [channels, activeSpaceId, pendingOrder]);
+    }, [channels, activeSpaceId, pendingOrder, hideLocked]);
 
     const voiceIds = useMemo(
         () => inSpace.filter((channel) => channel.kind === "voice").map((channel) => channel.id),
@@ -565,6 +616,13 @@ export function ChatSidebar() {
                     <span>{t("sidebar.savedMessages")}</span>
                 </Link>
 
+                <LockShelfEntries
+                    shelf={shelf}
+                    onShelf={setShelf}
+                    hiddenCount={hiddenCount}
+                    lockedCount={lockedCount}
+                />
+
                 {/* In every rail for the same reason, and drawn for everybody:
                     creating a meeting takes a grant, being invited to one does
                     not, and somebody who has been invited needs the list far
@@ -598,87 +656,101 @@ export function ChatSidebar() {
                     loadFailed ? null : (
                         <SidebarSkeleton />
                     )
-                ) : space === null ? (
+                ) : space === null || shelf !== "all" ? (
                     <Section
-                        label={t("sidebar.directMessages")}
+                        label={
+                            shelf === "locked"
+                                ? t("lock.lockedChats")
+                                : shelf === "hidden"
+                                  ? t("lock.hiddenChats")
+                                  : t("sidebar.directMessages")
+                        }
                         folded={folded.includes("dm")}
                         onToggle={() => toggle("dm")}
+                        action={<ListViewMenu view={listView} onChoose={chooseListView} />}
                     >
-                        {directs.length === 0 ? (
-                            <p className="px-2 py-1 text-xs text-foreground-subtle">
-                                {t("sidebar.nobodyYet")}
-                            </p>
-                        ) : (
-                            directs.map((channel) => (
-                                <Row
-                                    key={channel.id}
-                                    channel={channel}
-                                    roomy
-                                    href={`/chat/c/${channel.id}`}
-                                    active={open === channel.id}
-                                    unread={channel.unread}
-                                    muted={channel.muted}
-                                    label={channel.name}
-                                    personId={
-                                        channel.others.length === 1
-                                            ? (channel.others[0]?.id ?? null)
-                                            : null
-                                    }
-                                    icon={
-                                        channel.others.length === 1 && channel.others[0] ? (
-                                            // Twenty rather than eighteen, which
-                                            // is the size below which a face goes
-                                            // without its presence dot - so this
-                                            // list was the one place in Polaris
-                                            // where somebody's face did not say
-                                            // whether they were there.
-                                            <PhoneSized
-                                                small={
-                                                    <Avatar
-                                                        decorated
-                                                        person={channel.others[0]}
-                                                        size={24}
-                                                    />
-                                                }
-                                                large={
-                                                    <Avatar
-                                                        decorated
-                                                        person={channel.others[0]}
-                                                        size={40}
-                                                    />
-                                                }
-                                            />
-                                        ) : (
-                                            // A group is its picture, or the
-                                            // faces of the people in it. An
-                                            // icon shared by every group is
-                                            // the one thing that cannot tell
-                                            // two of them apart.
-                                            <PhoneSized
-                                                small={
-                                                    <ChatAvatar
-                                                        kind="channel"
-                                                        id={channel.id}
-                                                        name={channel.name}
-                                                        members={channel.others}
-                                                        size={24}
-                                                    />
-                                                }
-                                                large={
-                                                    <ChatAvatar
-                                                        kind="channel"
-                                                        id={channel.id}
-                                                        name={channel.name}
-                                                        members={channel.others}
-                                                        size={40}
-                                                    />
-                                                }
-                                            />
-                                        )
-                                    }
-                                />
-                            ))
-                        )}
+                        <div ref={directList} className="flex flex-col gap-px">
+                            {directs.length === 0 ? (
+                                <p className="px-2 py-1 text-xs text-foreground-subtle">
+                                    {shelf === "locked"
+                                        ? t("lock.noneLocked")
+                                        : shelf === "hidden"
+                                          ? t("lock.noneHidden")
+                                          : t("sidebar.nobodyYet")}
+                                </p>
+                            ) : (
+                                directs.map((channel) => (
+                                    <Row
+                                        key={channel.id}
+                                        channel={channel}
+                                        roomy
+                                        detailed={detailed}
+                                        href={`/chat/c/${channel.id}`}
+                                        active={open === channel.id}
+                                        unread={channel.unread}
+                                        muted={channel.muted}
+                                        label={channel.name}
+                                        personId={
+                                            channel.others.length === 1
+                                                ? (channel.others[0]?.id ?? null)
+                                                : null
+                                        }
+                                        icon={
+                                            channel.others.length === 1 && channel.others[0] ? (
+                                                // Twenty rather than eighteen, which
+                                                // is the size below which a face goes
+                                                // without its presence dot - so this
+                                                // list was the one place in Polaris
+                                                // where somebody's face did not say
+                                                // whether they were there.
+                                                <PhoneSized
+                                                    small={
+                                                        <Avatar
+                                                            decorated
+                                                            person={channel.others[0]}
+                                                            size={detailed ? 40 : 24}
+                                                        />
+                                                    }
+                                                    large={
+                                                        <Avatar
+                                                            decorated
+                                                            person={channel.others[0]}
+                                                            size={40}
+                                                        />
+                                                    }
+                                                />
+                                            ) : (
+                                                // A group is its picture, or the
+                                                // faces of the people in it. An
+                                                // icon shared by every group is
+                                                // the one thing that cannot tell
+                                                // two of them apart.
+                                                <PhoneSized
+                                                    small={
+                                                        <ChatAvatar
+                                                            kind="channel"
+                                                            id={channel.id}
+                                                            name={channel.name}
+                                                            members={channel.others}
+                                                            size={detailed ? 40 : 24}
+                                                        />
+                                                    }
+                                                    large={
+                                                        <ChatAvatar
+                                                            kind="channel"
+                                                            id={channel.id}
+                                                            name={channel.name}
+                                                            members={channel.others}
+                                                            size={40}
+                                                        />
+                                                    }
+                                                />
+                                            )
+                                        }
+                                    />
+                                ))
+                            )}
+                        </div>
                         {/* Under the list rather than above it: it is an
                             account of what the badge counts and this list does
                             not, and nobody comes to the rail looking for it. */}
@@ -1295,7 +1367,8 @@ function Row({
     onManage,
     move: moveTo,
     occupancy = null,
-    roomy = false
+    roomy = false,
+    detailed = false
 }: {
     href: string;
     active: boolean;
@@ -1329,6 +1402,8 @@ function Row({
      * desktop rail's, and from `md` up that is exactly what this still draws.
      */
     roomy?: boolean;
+    /** The messenger row: the last message, when, and its ticks. Needs `channel`. */
+    detailed?: boolean;
 }) {
     const t = useTranslations("chat");
     // A muted conversation still counts its messages - it just does not shout
@@ -1363,77 +1438,98 @@ function Row({
                 // so the desktop rail is untouched.
                 roomy &&
                     "gap-3 rounded-lg py-2.5 text-[0.9375rem] md:gap-2 md:rounded-md md:py-1.5 md:text-sm",
+                detailed && "gap-3 rounded-lg py-2 md:gap-3 md:rounded-lg md:py-2",
                 active ? "bg-card-hover text-foreground" : "text-muted-foreground",
                 shout && "font-medium text-foreground"
             )}
         >
             {icon}
-            <span
-                className={cn(
-                    "flex min-w-0 flex-1 flex-col leading-tight",
-                    roomy && "gap-0.5 md:gap-0"
-                )}
-            >
-                <span className="min-w-0 truncate" title={label}>
-                    <PersonName id={personId} name={label} />
-                </span>
-                {said && (
+            {detailed && channel ? (
+                <DetailedLine
+                    channel={channel}
+                    label={label}
+                    personId={personId ?? null}
+                    unread={unread}
+                    muted={muted}
+                />
+            ) : (
+                <>
                     <span
                         className={cn(
-                            "min-w-0 truncate text-[0.6875rem] text-foreground-subtle",
-                            roomy && "text-[0.75rem] md:text-[0.6875rem]"
+                            "flex min-w-0 flex-1 flex-col leading-tight",
+                            roomy && "gap-0.5 md:gap-0"
                         )}
-                        title={said}
                     >
-                        {said}
+                        <span className="min-w-0 truncate" title={label}>
+                            <PersonName id={personId} name={label} />
+                        </span>
+                        {said && (
+                            <span
+                                className={cn(
+                                    "min-w-0 truncate text-[0.6875rem] text-foreground-subtle",
+                                    roomy && "text-[0.75rem] md:text-[0.6875rem]"
+                                )}
+                                title={said}
+                            >
+                                {said}
+                            </span>
+                        )}
                     </span>
-                )}
-            </span>
-            {/* When they last wrote, on a phone only: the rail beside a
-                conversation has no room for it, and there the list is not what
-                somebody is reading. */}
-            {roomy && channel?.lastMessageAt && (
-                <RelativeTime
-                    iso={channel.lastMessageAt}
-                    formatStyle="narrow"
-                    className="shrink-0 text-xs text-foreground-subtle md:hidden"
-                />
-            )}
-            {/* A game server talks through this conversation: its call is on
-                the server's panel, and members may ask it `/online` here. */}
-            {channel && channel.gameLinks.length > 0 && <GameLinkMark links={channel.gameLinks} />}
-            {/* Said quietly, and only because a row that sits above a newer
-                conversation with nothing to explain it reads as a bug. */}
-            {channel?.pinned && (
-                <Pin
-                    className="size-3 shrink-0 text-foreground-subtle"
-                    aria-label={t("sidebar.pinned")}
-                />
-            )}
-            {occupancy && (
-                <span
-                    className="shrink-0 rounded bg-muted px-1 text-[0.625rem] font-medium tabular-nums leading-4 text-muted-foreground"
-                    aria-label={t("sidebar.placesTaken", {
-                        places: occupancy.replace("/", t("sidebar.of"))
-                    })}
-                    title={t("sidebar.placesTaken", {
-                        places: occupancy.replace("/", t("sidebar.of"))
-                    })}
-                >
-                    {occupancy}
-                </span>
-            )}
-            {unread > 0 && (
-                <span
-                    className={cn(
-                        "shrink-0 rounded-full px-1.5 text-[0.625rem] font-medium leading-4",
-                        muted
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-primary text-primary-foreground"
+                    {/* When they last wrote, on a phone only: the rail beside a
+                        conversation has no room for it, and there the list is not what
+                        somebody is reading. */}
+                    {roomy && channel?.lastMessageAt && (
+                        <RelativeTime
+                            iso={channel.lastMessageAt}
+                            formatStyle="narrow"
+                            className="shrink-0 text-xs text-foreground-subtle md:hidden"
+                        />
                     )}
-                >
-                    {unread > 98 ? "99+" : unread}
-                </span>
+                    {/* A game server talks through this conversation: its call is on
+                        the server's panel, and members may ask it `/online` here. */}
+                    {channel && channel.gameLinks.length > 0 && (
+                        <GameLinkMark links={channel.gameLinks} />
+                    )}
+                    {/* Said quietly, and only because a row that sits above a newer
+                        conversation with nothing to explain it reads as a bug. */}
+                    {channel?.locked && (
+                        <Lock
+                            className="size-3 shrink-0 text-foreground-subtle"
+                            aria-label={t("lock.locked")}
+                        />
+                    )}
+                    {channel?.pinned && (
+                        <Pin
+                            className="size-3 shrink-0 text-foreground-subtle"
+                            aria-label={t("sidebar.pinned")}
+                        />
+                    )}
+                    {occupancy && (
+                        <span
+                            className="shrink-0 rounded bg-muted px-1 text-[0.625rem] font-medium tabular-nums leading-4 text-muted-foreground"
+                            aria-label={t("sidebar.placesTaken", {
+                                places: occupancy.replace("/", t("sidebar.of"))
+                            })}
+                            title={t("sidebar.placesTaken", {
+                                places: occupancy.replace("/", t("sidebar.of"))
+                            })}
+                        >
+                            {occupancy}
+                        </span>
+                    )}
+                    {unread > 0 && (
+                        <span
+                            className={cn(
+                                "shrink-0 rounded-full px-1.5 text-[0.625rem] font-medium leading-4",
+                                muted
+                                    ? "bg-muted text-muted-foreground"
+                                    : "bg-primary text-primary-foreground"
+                            )}
+                        >
+                            {unread > 98 ? "99+" : unread}
+                        </span>
+                    )}
+                </>
             )}
         </PersonRow>
     );
@@ -1473,6 +1569,158 @@ function Row({
         </RowMenu>
     ) : (
         body
+    );
+}
+
+/** The view the conversation list draws, chosen from its heading. */
+function ListViewMenu({
+    view,
+    onChoose
+}: {
+    view: ChatListView;
+    onChoose: (next: ChatListView) => void;
+}) {
+    const t = useTranslations("chat");
+    const options: { value: ChatListView; label: string }[] = [
+        { value: "auto", label: t("listView.auto") },
+        { value: "compact", label: t("listView.compact") },
+        { value: "detailed", label: t("listView.detailed") }
+    ];
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={t("listView.label")}
+                    title={t("listView.label")}
+                    className="flex size-5 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:text-foreground"
+                >
+                    <LayoutList className="size-3.5 shrink-0" />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+                {options.map((option) => (
+                    <DropdownMenuItem key={option.value} onSelect={() => onChoose(option.value)}>
+                        <Check
+                            className={cn(
+                                "size-3.5 shrink-0",
+                                view === option.value ? "opacity-100" : "opacity-0"
+                            )}
+                        />
+                        {option.label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+/** What the last message says, in the words a list row has room for. */
+function previewText(
+    last: NonNullable<ChatChannelView["last"]>,
+    t: ReturnType<typeof useTranslations>
+): string {
+    if (last.deleted) return t("listView.deleted");
+    if (last.kind === "call") return t("listView.call");
+    if (last.kind === "poll") return t("listView.poll");
+    if (last.kind === "system") return "";
+    return last.body.replace(/\s+/g, " ").trim() || t("listView.attachment");
+}
+
+/**
+ * The messenger-style row: name and when on the first line; the ticks or the
+ * call, what was said and by whom, the mute and the count on the second.
+ */
+function DetailedLine({
+    channel,
+    label,
+    personId,
+    unread,
+    muted
+}: {
+    channel: ChatChannelView;
+    label: string;
+    personId: string | null;
+    unread: number;
+    muted: boolean;
+}) {
+    const t = useTranslations("chat");
+    const locale = useLocale();
+    const { viewerId } = useChat();
+    // A list kept from before this field existed has none: read as nothing said.
+    const last = channel.last ?? null;
+    const mine = last !== null && last.authorId === viewerId;
+    const oneToOne = channel.others.length === 1;
+    const sender =
+        last && !oneToOne
+            ? mine
+                ? t("listView.you")
+                : (channel.others.find((person) => person.id === last.authorId)?.name ?? "")
+            : "";
+    const text = last ? previewText(last, t) : "";
+    const line = sender && text ? t("listView.from", { sender, text }) : text;
+    return (
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
+            <span className="flex min-w-0 items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate text-foreground" title={label}>
+                    <PersonName id={personId} name={label} />
+                </span>
+                {last && (
+                    <time
+                        dateTime={last.at}
+                        className={cn(
+                            "shrink-0 text-[0.6875rem] tabular-nums",
+                            unread > 0 ? "text-primary" : "text-foreground-subtle"
+                        )}
+                    >
+                        {listTime(last.at, new Date(), locale, t("listView.yesterday"))}
+                    </time>
+                )}
+            </span>
+            <span className="flex min-w-0 items-center gap-1 text-xs text-foreground-subtle">
+                {last?.kind === "call" ? (
+                    <Phone className="size-3.5 shrink-0" aria-hidden />
+                ) : mine && last.receipts ? (
+                    last.read ? (
+                        <CheckCheck
+                            className="size-3.5 shrink-0 text-primary"
+                            aria-label={t("listView.read")}
+                        />
+                    ) : last.delivered ? (
+                        <CheckCheck
+                            className="size-3.5 shrink-0"
+                            aria-label={t("listView.delivered")}
+                        />
+                    ) : (
+                        <Check className="size-3.5 shrink-0" aria-label={t("listView.sent")} />
+                    )
+                ) : null}
+                <span className="min-w-0 flex-1 truncate" title={line || undefined}>
+                    {line}
+                </span>
+                {channel.locked && (
+                    <Lock className="size-3 shrink-0" aria-label={t("lock.locked")} />
+                )}
+                {channel.pinned && (
+                    <Pin className="size-3 shrink-0" aria-label={t("sidebar.pinned")} />
+                )}
+                {muted && (
+                    <BellOff className="size-3.5 shrink-0" aria-label={t("listView.muted")} />
+                )}
+                {unread > 0 && (
+                    <span
+                        className={cn(
+                            "shrink-0 rounded-full px-1.5 text-[0.625rem] font-medium leading-4",
+                            muted
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-primary text-primary-foreground"
+                        )}
+                    >
+                        {unread > 98 ? "99+" : unread}
+                    </span>
+                )}
+            </span>
+        </span>
     );
 }
 
@@ -1527,9 +1775,45 @@ function RowMenu({
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { blocked, friends, refresh, spaces } = useChat();
+    const { blocked, friends, refresh, spaces, patchChannel } = useChat();
     const t = useTranslations("chat");
     const toast = useToast();
+    const chatLock = useChatLock();
+    const [unlocking, setUnlocking] = useState(false);
+    /** Drawn at once, put back on a refusal - which is answered with its reason. */
+    async function flag(
+        patch: { locked?: boolean; hidden?: boolean },
+        call: () => Promise<{ error?: string }>
+    ): Promise<string | undefined> {
+        const before = { locked: channel.locked, hidden: channel.hidden };
+        patchChannel(channel.id, patch);
+        let failure = "";
+        const result = await runAction(call, (message) => {
+            failure = message;
+        });
+        if (!result || result.error) {
+            patchChannel(channel.id, before);
+            return result?.error || failure || t("lock.failed");
+        }
+        refresh();
+        return undefined;
+    }
+    async function lockThis(): Promise<void> {
+        if (!chatLock.state.hasCode) {
+            chatLock.openSettings();
+            return;
+        }
+        const refused = await flag({ locked: true }, () =>
+            lockActions.setChannelLockedAction({ channelId: channel.id, on: true })
+        );
+        if (refused) toast.show({ title: refused });
+    }
+    async function hideThis(hidden: boolean): Promise<void> {
+        const refused = await flag({ hidden }, () =>
+            lockActions.setChannelHiddenAction({ channelId: channel.id, on: hidden })
+        );
+        if (refused) toast.show({ title: refused });
+    }
     const [removeFriend, removeFriendDialog] = useRemoveFriend((message) =>
         toast.show({ title: message })
     );
@@ -1665,6 +1949,26 @@ function RowMenu({
                                     {channel.pinned ? t("sidebar.unpin") : t("sidebar.pinToTheTop")}
                                 </ContextMenuItem>,
                                 <ContextMenuItem
+                                    onSelect={() =>
+                                        channel.locked ? setUnlocking(true) : void lockThis()
+                                    }
+                                >
+                                    {channel.locked ? (
+                                        <LockOpen className="size-3.5" />
+                                    ) : (
+                                        <Lock className="size-3.5" />
+                                    )}
+                                    {channel.locked ? t("lock.unlockChat") : t("lock.lock")}
+                                </ContextMenuItem>,
+                                <ContextMenuItem onSelect={() => void hideThis(!channel.hidden)}>
+                                    {channel.hidden ? (
+                                        <Eye className="size-3.5" />
+                                    ) : (
+                                        <EyeOff className="size-3.5" />
+                                    )}
+                                    {channel.hidden ? t("lock.unhide") : t("lock.hide")}
+                                </ContextMenuItem>,
+                                <ContextMenuItem
                                     onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
                                 >
                                     <Link2 className="size-3.5" />
@@ -1717,7 +2021,7 @@ function RowMenu({
                                 mayNameGroup && (
                                     <ContextMenuItem onSelect={() => setRenamingGroup(true)}>
                                         <Pencil className="size-3.5" />
-                                        {t("channelHeader.nameThisGroup")}
+                                        {t("editGroup.menu")}
                                         <ShortcutHint id="general.rename" />
                                     </ContextMenuItem>
                                 ),
@@ -1814,8 +2118,22 @@ function RowMenu({
             {/* Outside the menu, which closes on the item that opens this: a dialog
             mounted inside one is unmounted the moment it is asked for. */}
             {removeFriendDialog}
+            <LockCodeDialog
+                open={unlocking}
+                onOpenChange={setUnlocking}
+                title={t("lock.removeLockAsk")}
+                submit={(code) =>
+                    flag({ locked: false }, () =>
+                        lockActions.setChannelLockedAction({
+                            channelId: channel.id,
+                            on: false,
+                            code
+                        })
+                    )
+                }
+            />
             {renamingGroup ? (
-                <GroupNameDialog
+                <EditGroupDialog
                     channel={channel}
                     open
                     onOpenChange={setRenamingGroup}

@@ -1589,7 +1589,7 @@ const CASES: Case[] = [
                 )
             ).carriedMessage("messageId-1"),
         action: "carriedMessageAction",
-        args: ["messageId-1"]
+        args: ["messageId-1", null]
     },
     {
         name: "the instance's chat rules",
@@ -1625,7 +1625,7 @@ const CASES: Case[] = [
                 )
             ).editHistory("messageId-1"),
         action: "editHistoryAction",
-        args: ["messageId-1"]
+        args: ["messageId-1", null]
     },
     {
         name: "the conversations waiting in another workspace",
@@ -1709,7 +1709,7 @@ const CASES: Case[] = [
                 )
             ).linkPreview("messageId-1"),
         action: "linkPreviewAction",
-        args: ["messageId-1"]
+        args: ["messageId-1", null]
     },
     {
         name: "a person's profile as a conversation shows it",

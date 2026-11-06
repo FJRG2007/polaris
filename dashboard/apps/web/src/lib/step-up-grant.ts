@@ -44,7 +44,8 @@ export const STEP_UP_PURPOSES = [
     "connected-sign-in",
     "lockdown",
     "close-account",
-    "vault-passkeys"
+    "vault-passkeys",
+    "chat-lock-reset"
 ] as const;
 
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];

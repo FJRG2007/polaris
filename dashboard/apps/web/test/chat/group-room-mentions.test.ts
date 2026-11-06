@@ -64,6 +64,7 @@ vi.mock("@polaris/db", () => {
         chatSpaceMember: { findUnique: async () => null },
         chatChannelMember: {
             findUnique: async () => ({ role: "member" }),
+            updateMany: async () => ({ count: 0 }),
             findMany: async () => [],
             upsert: async () => undefined
         },

@@ -28,6 +28,7 @@ import type { CustomEmojiSet } from "@/components/rich-text/custom-emoji";
 import { useDisplayFormat } from "@/components/display-format";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 import * as polls from "./chat-reads";
+import { unlockProofFor } from "./lock-session";
 
 export function EditHistoryDialog({
     message,
@@ -56,7 +57,7 @@ export function EditHistoryDialog({
             return;
         }
         let current = true;
-        void polls.editHistory(message.id).then((result) => {
+        void polls.editHistory(message.id, unlockProofFor(message.channelId)).then((result) => {
             if (!current) return;
             if (result.error) setError(result.error);
             else setHistory(result.history ?? null);

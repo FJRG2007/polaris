@@ -90,7 +90,8 @@
         },
         "noticeGone": "Ya no se puede responder a ese aviso",
         "direct": "Mensaje directo",
-        "count": "{count} mensajes"
+        "count": "{count} mensajes",
+        "locked": "Mensaje nuevo"
     },
     "mailUnread": {
         "title": "Correo nuevo",

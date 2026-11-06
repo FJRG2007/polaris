@@ -16,6 +16,8 @@ let members: {
     lastReadAt: Date | null;
     muted: boolean;
     mutedUntil: Date | null;
+    locked?: boolean;
+    hiddenAt?: Date | null;
 }[] = [];
 let channels: { id: string; spaceId: string | null; orgId: string | null }[] = [];
 let spaces: { id: string; orgId: string | null }[] = [];
@@ -79,10 +81,14 @@ vi.mock("@polaris/db", () => ({
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },
         chatChannelMember: { findMany: async () => members },
+        chatLock: { findUnique: async () => lockRow },
         chatChannel: {
             // Nobody here joined too late to read: the history-visibility lookup finds no closed room.
-            findMany: async (query?: { where?: unknown }) =>
-                JSON.stringify(query?.where ?? {}).includes("newcomerHistory") ? [] : channels
+            findMany: async (query?: { where?: unknown }) => {
+                if (JSON.stringify(query?.where ?? {}).includes("newcomerHistory")) return [];
+                roomQuestions.push(query?.where);
+                return channels;
+            }
         },
         chatSpace: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
@@ -98,7 +104,13 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { unreadConversations, unreadTotal } = await import("@/lib/chat/chat-service");
+const { conversationsElsewhere, unreadConversations, unreadTotal } =
+    await import("@/lib/chat/chat-service");
+
+/** The reader's chat lock settings, when they have a code. */
+let lockRow: { hideLocked: boolean } | null = null;
+/** Every `where` the badge asked for its rooms with. */
+let roomQuestions: unknown[] = [];
 
 /** A membership in a conversation, read up to `at` or never opened. */
 function member(
@@ -126,6 +138,43 @@ beforeEach(() => {
     posted = [];
     asked = [];
     shelfChats = new Set([null]);
+    lockRow = null;
+    roomQuestions = [];
+});
+
+describe("what is waiting in Chat, off the usual list", () => {
+    /** The rooms the badge asked for; the mock hands back every room it holds. */
+    function askedRooms(): string[] {
+        const question = JSON.stringify(roomQuestions.at(-1) ?? {});
+        return ["open-1", "hid-1", "lok-1"].filter((id) => question.includes(`"${id}"`));
+    }
+
+    it("leaves out a hidden conversation", async () => {
+        members = [member("open-1"), { ...member("hid-1"), hiddenAt: new Date("2026-10-01") }];
+        await unreadTotal({ id: "u1" });
+        expect(askedRooms()).toEqual(["open-1"]);
+    });
+
+    it("counts a locked one, unless the reader keeps locked chats out of sight", async () => {
+        members = [member("open-1"), { ...member("lok-1"), locked: true }];
+        lockRow = { hideLocked: false };
+        await unreadTotal({ id: "u1" });
+        expect(askedRooms()).toEqual(["open-1", "lok-1"]);
+        lockRow = { hideLocked: true };
+        await unreadTotal({ id: "u1" });
+        expect(askedRooms()).toEqual(["open-1"]);
+    });
+
+    it("leaves a hidden conversation out of another chat's count", async () => {
+        shelfChats = new Set();
+        channels = [room("open-1", { orgId: "o1" }), room("hid-1", { orgId: "o1" })];
+        members = [member("open-1"), { ...member("hid-1"), hiddenAt: new Date("2026-10-01") }];
+        say("open-1", 2);
+        say("hid-1", 3);
+        const [elsewhere] = await conversationsElsewhere({ id: "u1" });
+        expect(askedRooms()).toEqual(["open-1"]);
+        expect(elsewhere?.unread).toBe(2);
+    });
 });
 
 describe("what is waiting in Chat", () => {

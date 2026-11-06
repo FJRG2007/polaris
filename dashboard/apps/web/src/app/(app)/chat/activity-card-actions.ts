@@ -27,6 +27,8 @@ import { isAppInstalled } from "@/lib/apps/install-presence";
 import { createNotification } from "@/lib/notification-service";
 import { callActivityGames } from "@/lib/app-extensions/registry";
 import { openDirect, listChannels } from "@/lib/chat/chat-service";
+import { lockState } from "@/lib/chat/chat-lock";
+import { onShelf } from "./lock-shelf";
 
 /** The most faces a card draws. */
 const CARD_FACES = 8;
@@ -132,11 +134,12 @@ export interface InviteTarget {
 export async function gameInviteTargets(): Promise<readonly InviteTarget[]> {
     const user = await requireUser();
     if (!(await sessionCan(user, "arcade.calls"))) return [];
-    const channels = await listChannels({ id: user.id });
+    const [channels, lock] = await Promise.all([listChannels({ id: user.id }), lockState(user.id)]);
     return channels
         .filter(
             (channel) =>
                 !channel.archived &&
+                onShelf(channel, "all", lock.hideLocked) &&
                 (channel.kind === "text" ||
                     channel.kind === "voice" ||
                     channel.kind === "dm" ||

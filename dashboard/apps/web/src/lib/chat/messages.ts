@@ -55,6 +55,7 @@ import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
+import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -277,10 +278,13 @@ const PAGE = 50;
 export async function readChannel(
     actor: ChatActor,
     channelId: string,
-    before?: string
+    before?: string,
+    /** The unlock proof, for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<ChatPage> {
     const access = await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
+    await requireUnlocked(actor, channelId, proof);
     await markDelivered(actor, access);
     const floor = await history.readableSince(actor, channelId);
 
@@ -319,7 +323,8 @@ export async function readChannel(
  */
 export async function readThread(
     actor: ChatActor,
-    messageId: string
+    messageId: string,
+    proof?: string | null
 ): Promise<readonly ChatMessageView[]> {
     const root = await prisma.chatMessage.findUnique({
         where: { id: messageId },
@@ -328,6 +333,7 @@ export async function readThread(
     if (!root) return [];
     await requireChannel(actor, root.channelId);
     await requireAgeCleared(actor, root.channelId);
+    await requireUnlocked(actor, root.channelId, proof);
     const floor = await history.readableSince(actor, root.channelId);
 
     // A reply passed in place of the root opens the thread it is in, which is
@@ -361,10 +367,12 @@ export async function readThread(
 export async function readSince(
     actor: ChatActor,
     channelId: string,
-    afterId: string | null
+    afterId: string | null,
+    proof?: string | null
 ): Promise<ChatNewerPage> {
     const access = await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
+    await requireUnlocked(actor, channelId, proof);
     await markDelivered(actor, access);
     const cursor = afterId
         ? await prisma.chatMessage.findFirst({
@@ -407,10 +415,12 @@ export async function readSince(
 export async function readChanged(
     actor: ChatActor,
     channelId: string,
-    messageIds: readonly string[]
+    messageIds: readonly string[],
+    proof?: string | null
 ): Promise<ChatMessageView[]> {
     await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
+    await requireUnlocked(actor, channelId, proof);
     const ids = [...new Set(messageIds)].slice(0, MAX_REREAD);
     if (ids.length === 0) return [];
     const rows = await prisma.chatMessage.findMany({
@@ -577,6 +587,8 @@ export async function send(
                 data: { replyCount: { increment: 1 }, lastReplyAt: message.createdAt }
             });
         }
+        // A hidden conversation comes back with a new message, unless muted.
+        await unhideOnMessage(tx, input.channelId, actor.id, message.createdAt);
         // Posting is reading: the sender is caught up by definition, and without
         // this their own message would light their own badge.
         await tx.chatChannelMember.upsert({
@@ -887,7 +899,8 @@ export function unfurlLater(body: string): void {
  */
 export async function linkPreviewFor(
     actor: ChatActor,
-    messageId: string
+    messageId: string,
+    proof?: string | null
 ): Promise<LinkPreviewView | null> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
@@ -897,6 +910,7 @@ export async function linkPreviewFor(
     await requireChannel(actor, message.channelId);
     await history.requireReadable(actor, message.channelId, messageId);
     await requireAgeCleared(actor, message.channelId);
+    await requireUnlocked(actor, message.channelId, proof);
 
     const link = core.firstLink(message.body);
     if (!link) return null;
@@ -954,7 +968,11 @@ export interface CarriedMessage {
  * before a word of it is returned. Somebody who cannot read the room cannot
  * carry a line out of it by holding onto an id.
  */
-export async function readMessage(actor: ChatActor, messageId: string): Promise<CarriedMessage> {
+export async function readMessage(
+    actor: ChatActor,
+    messageId: string,
+    proof?: string | null
+): Promise<CarriedMessage> {
     const found = await prisma.chatMessage.findUnique({
         where: { id: messageId },
         select: { channelId: true }
@@ -963,6 +981,7 @@ export async function readMessage(actor: ChatActor, messageId: string): Promise<
     await requireChannel(actor, found.channelId);
     await history.requireReadable(actor, found.channelId, messageId);
     await requireAgeCleared(actor, found.channelId);
+    await requireUnlocked(actor, found.channelId, proof);
 
     const [row, channel] = await Promise.all([
         prisma.chatMessage.findUnique({ where: { id: messageId }, select: MESSAGE_SELECT }),
@@ -984,7 +1003,11 @@ export async function readMessage(actor: ChatActor, messageId: string): Promise<
     };
 }
 
-export async function editHistory(actor: ChatActor, messageId: string): Promise<ChatEditHistory> {
+export async function editHistory(
+    actor: ChatActor,
+    messageId: string,
+    proof?: string | null
+): Promise<ChatEditHistory> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
         select: { channelId: true, deletedAt: true }
@@ -993,6 +1016,7 @@ export async function editHistory(actor: ChatActor, messageId: string): Promise<
     await requireChannel(actor, message.channelId);
     await history.requireReadable(actor, message.channelId, messageId);
     await requireAgeCleared(actor, message.channelId);
+    await requireUnlocked(actor, message.channelId, proof);
 
     const rules = await rulesForChannel(message.channelId);
     // A deleted message has no text to compare against, and handing back what it
@@ -1556,7 +1580,12 @@ export async function deliveryOf(
  * out; this is where it is true, because a hidden button is a decoration and an
  * action anybody can call is the actual interface.
  */
-export async function forward(actor: ChatActor, input: core.ChatForwardInput): Promise<string> {
+export async function forward(
+    actor: ChatActor,
+    input: core.ChatForwardInput,
+    /** The unlock proof for the conversation the original is in. */
+    proof?: string | null
+): Promise<string> {
     const original = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
         select: { id: true, channelId: true, authorId: true, deletedAt: true }
@@ -1564,6 +1593,7 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
     if (!original || original.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireAgeCleared(actor, original.channelId);
     await history.requireReadable(actor, original.channelId, input.messageId);
+    await requireUnlocked(actor, original.channelId, proof);
     if (
         original.authorId &&
         !(await maySee(original.authorId, "forwarding", { id: actor.id, isAdmin: false }))
@@ -1626,8 +1656,11 @@ export async function starred(
     limit = 100,
     /** Only the ones from this conversation - WhatsApp's starred list for one
      *  chat, reached from that chat. */
-    channelId: string | null = null
+    channelId: string | null = null,
+    /** The unlock proof for that conversation, when it is behind the chat lock. */
+    proof?: string | null
 ): Promise<ChatMessageView[]> {
+    if (channelId) await requireUnlocked(actor, channelId, proof);
     const stars = await prisma.chatStar.findMany({
         where: {
             userId: actor.id,
@@ -1639,10 +1672,18 @@ export async function starred(
     });
     if (stars.length === 0) return [];
 
-    const reachable = await reachableChannelIds(actor);
+    const [reachable, concealed] = await Promise.all([
+        reachableChannelIds(actor),
+        channelId ? null : concealedFor(actor.id)
+    ]);
     const rows = stars
         .map((entry) => entry.message)
-        .filter((row) => reachable.has(row.channelId) && row.deletedAt === null);
+        .filter(
+            (row) =>
+                reachable.has(row.channelId) &&
+                row.deletedAt === null &&
+                !concealed?.locked.has(row.channelId)
+        );
     return decorateMessages(actor, rows);
 }
 

@@ -72,6 +72,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/(app)/chat/emoji-actions", () => ({
     spaceEmojiAction: async () => ({ list: { emoji: [], manages: false } })
 }));
+// The chat lock reaches the server; nothing here is locked.
+vi.mock("@/app/(app)/chat/lock-actions", () => ({
+    lockStateAction: async () => ({ hasCode: false, hideLocked: false })
+}));
+vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
     listScheduledAction: async () => ({ scheduled: [] }),
     readChannelAction: () =>

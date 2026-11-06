@@ -21,6 +21,7 @@
  */
 
 import * as actions from "./actions";
+import { unlockProofFor } from "./lock-session";
 import { runAction } from "@/lib/run-action";
 import type { ChatFrame } from "./use-chat-stream";
 import { Loader2, Pin, PinOff } from "lucide-react";
@@ -61,7 +62,7 @@ export function usePins(channelId: string | null) {
         // A bar that could not be read is a bar not drawn, never an error over
         // the conversation: the messages are what the reader came for.
         try {
-            const result = await actions.pinsAction(channelId);
+            const result = await actions.pinsAction(channelId, unlockProofFor(channelId));
             if (result?.pins) setPins(result.pins);
         } catch {
             setPins((current) => current ?? []);

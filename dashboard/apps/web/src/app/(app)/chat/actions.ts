@@ -63,6 +63,8 @@ import type {
 } from "@/lib/chat/messages";
 import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/chat-service";
 import { requirePostable, searchForConversation } from "@/lib/chat/access";
+import { mayChangeChatPicture } from "@/lib/chat/picture-access";
+import { MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
 
 const CHAT_PATH = "/chat";
 
@@ -74,6 +76,9 @@ async function actor(): Promise<{ id: string; name: string }> {
 
 /** Run one write and turn a refusal into a sentence - see `guardChat`. */
 const guard = guardChat;
+
+/** An unlock proof as a tab hands it back: anything else reads as none. */
+const proofSchema = z.string().max(200).nullish();
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -103,11 +108,16 @@ export async function conversationsElsewhereAction(): Promise<{ chats: ChatElsew
  */
 export async function readChannelAction(
     channelId: string,
-    before?: string
+    before?: string,
+    /** The unlock proof for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<{ page?: ChatPage; channel?: ChatChannelView | null; error?: string }> {
     const me = await actor();
+    const unlock = proofSchema.safeParse(proof);
     const [result, described] = await Promise.all([
-        guard(() => messages.readChannel(me, channelId, before)),
+        guard(() =>
+            messages.readChannel(me, channelId, before, unlock.success ? unlock.data : null)
+        ),
         // Only for the newest page: an older one is somebody scrolling a
         // conversation whose header is already drawn.
         before === undefined
@@ -131,16 +141,21 @@ export async function readChannelAction(
 
 export async function readSinceAction(
     channelId: string,
-    afterId: string | null
+    afterId: string | null,
+    proof?: string | null
 ): Promise<{ page?: ChatNewerPage; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.readSince(me, channelId, afterId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.readSince(me, channelId, afterId, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { page: result.value };
 }
 
 const rereadSchema = z.object({
     channelId: z.string().min(1).max(64),
-    messageIds: z.array(z.string().min(1).max(64)).max(MAX_REREAD)
+    messageIds: z.array(z.string().min(1).max(64)).max(MAX_REREAD),
+    proof: proofSchema
 });
 
 /** Messages already on screen, read again because the live channel said they
@@ -152,16 +167,26 @@ export async function rereadAction(
     const parsed = rereadSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
     const result = await guard(() =>
-        messages.readChanged(me, parsed.data.channelId, parsed.data.messageIds)
+        messages.readChanged(
+            me,
+            parsed.data.channelId,
+            parsed.data.messageIds,
+            parsed.data.proof ?? null
+        )
     );
     return result.error ? { error: result.error } : { messages: result.value };
 }
 
 export async function readThreadAction(
-    messageId: string
+    messageId: string,
+    /** The unlock proof for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.readThread(me, messageId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.readThread(me, messageId, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { messages: result.value };
 }
 
@@ -282,12 +307,15 @@ export async function askFriendAction(personId: string): Promise<{ error?: strin
  * is worse than one that finds nothing.
  */
 export async function searchMessagesAction(
-    input: unknown
+    input: unknown,
+    /** The unlock proof for the conversation the search is narrowed to. */
+    proof?: string | null
 ): Promise<{ hits: readonly ChatSearchHit[] }> {
     const me = await actor();
     const parsed = core.chatSearchSchema.safeParse(input);
     if (!parsed.success) return { hits: [] };
-    return { hits: await searchMessages(me, parsed.data) };
+    const unlock = proofSchema.safeParse(proof);
+    return { hits: await searchMessages(me, parsed.data, unlock.success ? unlock.data : null) };
 }
 
 export async function listMembersAction(
@@ -381,8 +409,13 @@ export async function replyFromNoticeAction(
 }
 
 /** Send a message on to another conversation. */
-export async function forwardAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function forwardAction(
+    input: unknown,
+    /** The unlock proof for the conversation the original is in. */
+    proof?: string | null
+): Promise<{ id?: string; error?: string }> {
     const me = await actor();
+    const unlock = proofSchema.safeParse(proof);
     const parsed = core.chatForwardSchema.safeParse(input);
     if (!parsed.success)
         return {
@@ -391,7 +424,9 @@ export async function forwardAction(input: unknown): Promise<{ id?: string; erro
                 (await getTranslations("chat"))("errors.notForwarded")
         };
 
-    const result = await guard(() => messages.forward(me, parsed.data));
+    const result = await guard(() =>
+        messages.forward(me, parsed.data, unlock.success ? unlock.data : null)
+    );
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : { id: result.value };
 }
@@ -422,18 +457,28 @@ export async function deleteMessageAction(messageId: string): Promise<{ error?: 
  * one has never loaded.
  */
 export async function carriedMessageAction(
-    messageId: string
+    messageId: string,
+    /** The unlock proof for the conversation the message is in. */
+    proof?: string | null
 ): Promise<{ carried?: messages.CarriedMessage; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.readMessage(me, messageId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.readMessage(me, messageId, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { carried: result.value };
 }
 
 export async function editHistoryAction(
-    messageId: string
+    messageId: string,
+    /** The unlock proof for the conversation the message is in. */
+    proof?: string | null
 ): Promise<{ history?: messages.ChatEditHistory; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.editHistory(me, messageId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.editHistory(me, messageId, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { history: result.value };
 }
 
@@ -541,10 +586,15 @@ export async function endPollAction(messageId: string): Promise<{ error?: string
  * described is worse than no card.
  */
 export async function linkPreviewAction(
-    messageId: string
+    messageId: string,
+    /** The unlock proof for the conversation the message is in. */
+    proof?: string | null
 ): Promise<{ preview: LinkPreviewView | null }> {
     const me = await actor();
-    const result = await guard(() => messages.linkPreviewFor(me, messageId));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.linkPreviewFor(me, messageId, unlock.success ? unlock.data : null)
+    );
     return { preview: result.value ?? null };
 }
 
@@ -662,24 +712,40 @@ export async function unpinAction(messageId: unknown): Promise<{ error?: string 
 
 /** Every pin in a conversation, newest first, for the bar and the list. */
 export async function pinsAction(
-    channelId: unknown
+    channelId: unknown,
+    /** The unlock proof for a conversation behind the reader's chat lock. */
+    proof?: string | null
 ): Promise<{ pins?: readonly pins.ChatPinView[]; error?: string }> {
     const me = await actor();
     const parsed = z.string().uuid().safeParse(channelId);
     if (!parsed.success)
         return { error: (await getTranslations("chat"))("errors.notInConversation") };
-    const result = await guard(() => pins.pinsIn(me, parsed.data));
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        pins.pinsIn(me, parsed.data, unlock.success ? unlock.data : null)
+    );
     return result.error ? { error: result.error } : { pins: result.value };
 }
 
 /** Everything this reader kept, for the Starred screen - all of it, or one
  *  conversation's. */
 export async function starredAction(
-    channelId?: unknown
-): Promise<{ messages: readonly ChatMessageView[] }> {
+    channelId?: unknown,
+    /** The unlock proof for that conversation, when it is behind the chat lock. */
+    proof?: string | null
+): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {
     const me = await actor();
     const only = z.string().uuid().safeParse(channelId);
-    return { messages: await messages.starred(me, 100, only.success ? only.data : null) };
+    const unlock = proofSchema.safeParse(proof);
+    const result = await guard(() =>
+        messages.starred(
+            me,
+            100,
+            only.success ? only.data : null,
+            unlock.success ? unlock.data : null
+        )
+    );
+    return result.error ? { error: result.error } : { messages: result.value };
 }
 
 /** Take every star off, or every one in one conversation. */
@@ -1306,6 +1372,46 @@ export async function renameGroupAction(input: unknown): Promise<{ error?: strin
     const result = await guard(() => chat.renameGroup(me, parsed.data.channelId, parsed.data.name));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
+}
+
+/** A GIF from the picker as a group's picture. */
+const groupGifSchema = z.object({
+    channelId: z.string().trim().min(1).max(64),
+    address: z.string().trim().url().max(2048)
+});
+
+/**
+ * Put a GIF from the picker on a group.
+ *
+ * The file is pulled down and stored like an uploaded picture rather than
+ * linked, for the reason `sendMediaAction` gives, and through the same
+ * permission the upload route checks.
+ */
+export async function setGroupGifAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const t = await getTranslations("chat");
+    const parsed = groupGifSchema.safeParse(input);
+    if (!parsed.success) return { error: t("errors.notSaved") };
+
+    const { channelId, address } = parsed.data;
+    if (!(await mayChangeChatPicture(me.id, "channel", channelId))) {
+        return { error: t("editGroup.notYours") };
+    }
+
+    const media = await fetchRemoteMedia(address);
+    if (!media) return { error: t("errors.notFetched") };
+    if (media.bytes.length > MAX_AVATAR_BYTES) return { error: t("editGroup.tooBig") };
+    const mime = sniffImageMime(media.bytes);
+    if (!mime) return { error: t("editGroup.notAnImage") };
+
+    try {
+        await storeAvatar({ kind: "channel", id: channelId }, media.bytes, mime);
+    } catch (error) {
+        console.error("chat: could not store the group GIF:", error);
+        return { error: t("errors.notSaved") };
+    }
+    revalidatePath(CHAT_PATH);
+    return {};
 }
 
 /**

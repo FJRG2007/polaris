@@ -450,14 +450,14 @@ vi.mock("@/app/(app)/chat/chat-reads", () => ({
     spaceBans: forward(() => import("@/app/(app)/chat/actions"), "spaceBansAction", 1),
     chatInvites: forward(() => import("@/app/(app)/chat/actions"), "listInvitesAction", 2),
     chatWebhooks: forward(() => import("@/app/(app)/chat/actions"), "listWebhooksAction", 1),
-    carriedMessage: forward(() => import("@/app/(app)/chat/actions"), "carriedMessageAction", 1),
+    carriedMessage: forward(() => import("@/app/(app)/chat/actions"), "carriedMessageAction", 2),
     chatRules: forward(() => import("@/app/(app)/chat/actions"), "chatRulesAction", 0),
     callsUnavailable: forward(
         () => import("@/app/(app)/chat/meeting-actions"),
         "callsUnavailableAction",
         0
     ),
-    editHistory: forward(() => import("@/app/(app)/chat/actions"), "editHistoryAction", 1),
+    editHistory: forward(() => import("@/app/(app)/chat/actions"), "editHistoryAction", 2),
     conversationsElsewhere: forward(
         () => import("@/app/(app)/chat/actions"),
         "conversationsElsewhereAction",
@@ -472,7 +472,7 @@ vi.mock("@/app/(app)/chat/chat-reads", () => ({
         1
     ),
     messageDelivery: forward(() => import("@/app/(app)/chat/actions"), "messageDeliveryAction", 1),
-    linkPreview: forward(() => import("@/app/(app)/chat/actions"), "linkPreviewAction", 1),
+    linkPreview: forward(() => import("@/app/(app)/chat/actions"), "linkPreviewAction", 2),
     chatProfile: forward(() => import("@/app/(app)/chat/actions"), "profileAction", 2),
     meetingList: forward(() => import("@/app/(app)/chat/meeting-actions"), "listMeetingsAction", 0)
 }));

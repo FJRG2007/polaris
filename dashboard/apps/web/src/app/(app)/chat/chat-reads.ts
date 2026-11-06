@@ -35,10 +35,10 @@ export const chatWebhooks = (channelId: string, signal?: AbortSignal) =>
         signal
     );
 
-export const carriedMessage = (messageId: string, signal?: AbortSignal) =>
+export const carriedMessage = (messageId: string, proof?: string | null, signal?: AbortSignal) =>
     readPoll<Answer<typeof actionsModule.carriedMessageAction>>(
         "/api/chat/carried",
-        { messageId },
+        { messageId, ...(proof ? { proof } : {}) },
         signal
     );
 
@@ -59,10 +59,10 @@ export const callsOutside = (signal?: AbortSignal) =>
         signal
     );
 
-export const editHistory = (messageId: string, signal?: AbortSignal) =>
+export const editHistory = (messageId: string, proof?: string | null, signal?: AbortSignal) =>
     readPoll<Answer<typeof actionsModule.editHistoryAction>>(
         "/api/chat/edit-history",
-        { messageId },
+        { messageId, ...(proof ? { proof } : {}) },
         signal
     );
 
@@ -100,10 +100,10 @@ export const messageDelivery = (messageId: string, signal?: AbortSignal) =>
         signal
     );
 
-export const linkPreview = (messageId: string, signal?: AbortSignal) =>
+export const linkPreview = (messageId: string, proof?: string | null, signal?: AbortSignal) =>
     readPoll<Answer<typeof actionsModule.linkPreviewAction>>(
         "/api/chat/link-preview",
-        { messageId },
+        { messageId, ...(proof ? { proof } : {}) },
         signal
     );
 

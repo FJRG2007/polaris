@@ -29,6 +29,10 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
     blockPersonAction: async () => ({}),
     unblockPersonAction: async () => ({})
 }));
+vi.mock("@/app/(app)/chat/lock-actions", () => ({
+    lockStateAction: async () => ({ hasCode: false, hideLocked: false })
+}));
+vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
     voicePresenceAction: async () => ({ inRoom: {} }),
     markChannelsReadAction: async (input: { channelIds: string[] }) => {
@@ -211,6 +215,8 @@ describe("the groups on a channel's menu", () => {
             "|",
             "Invite people",
             "Pin to the top",
+            "Lock chat",
+            "Hide chat",
             "Copy link",
             "Copy ID",
             "|",
@@ -240,6 +246,8 @@ describe("the groups on a channel's menu", () => {
             "Mark as unread",
             "|",
             "Pin to the top",
+            "Lock chat",
+            "Hide chat",
             "Copy link",
             "Copy ID",
             "|",

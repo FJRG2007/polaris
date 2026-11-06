@@ -14,6 +14,8 @@ import type { ChatGameLinkView } from "./game-links";
 import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
+import { receiptsAmong } from "@/lib/privacy-service";
+import { lastMessages, withReceipt, type ChatLastMessage } from "@/lib/chat/last-messages";
 import { nicknamesFor } from "@/lib/contact-names";
 import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
 import { discardChannelFiles } from "./attachments";
@@ -43,6 +45,7 @@ import {
     type ChatErrorText
 } from "./access";
 import * as history from "./history-visibility";
+import { concealedFrom, listedFor } from "./chat-lock";
 
 /** A space as the rail draws it. */
 export interface ChatSpaceView {
@@ -83,6 +86,8 @@ export interface ChatChannelView {
     readonly private: boolean;
     readonly archived: boolean;
     readonly lastMessageAt: string | null;
+    /** The newest message, for a direct message or a group. Null in a space. */
+    readonly last: ChatLastMessage | null;
     /** How many messages this reader has not seen. Zero for a channel they have
      *  never opened and nothing has happened in. */
     readonly unread: number;
@@ -98,6 +103,11 @@ export interface ChatChannelView {
     /** Whether this reader keeps it at the top of their list. Theirs alone -
      *  pinning a conversation says nothing to the other people in it. */
     readonly pinned: boolean;
+    /** Behind this reader's chat lock code - theirs alone. Its last message is
+     *  left out of the list while it is. */
+    readonly locked: boolean;
+    /** Out of this reader's list until a message arrives, unless muted. */
+    readonly hidden: boolean;
     /** When the quiet ends, or null when it does not - either because the
      *  conversation is not muted or because it was muted with no end. */
     readonly mutedUntil: string | null;
@@ -750,6 +760,8 @@ export async function listChannels(
                 mutedUntil: true,
                 notifyLevel: true,
                 pinnedAt: true,
+                locked: true,
+                hiddenAt: true,
                 translation: true,
                 role: true,
                 timeoutUntil: true
@@ -835,7 +847,7 @@ export async function listChannels(
 
     // Four reads that depend on nothing but the rows above, asked together
     // rather than one after another.
-    const [unread, called, shut, linked] = await Promise.all([
+    const [unread, called, shut, linked, last] = await Promise.all([
         unreadCounts(actor, channels, mine),
         // What this reader calls people, over what those people are called. A
         // direct message is named after who is in it, so a nickname has to
@@ -862,8 +874,30 @@ export async function listChannels(
                     channels.filter((channel) => channel.kind !== "dm").map((channel) => channel.id)
                 )
             )
-            .catch(() => new Map<string, ChatGameLinkView[]>())
+            .catch(() => new Map<string, ChatGameLinkView[]>()),
+        // What each conversation last said, for the detailed list rows. Rooms in
+        // a space are never drawn that way, so they are not asked about. A read
+        // that fails costs the previews, not the list.
+        lastMessages(
+            channels.filter((channel) => !channel.spaceId).map((channel) => channel.id)
+        ).catch(() => new Map<string, ChatLastMessage>())
     ]);
+
+    // The ticks under the reader's own last message, only where the
+    // conversation itself would draw them: a one-to-one whose two sides both
+    // allow read receipts. Asked about every such conversation in one go.
+    const ticked = new Map<string, string>();
+    for (const channel of channels) {
+        if (channel.kind !== "dm" || last.get(channel.id)?.authorId !== actor.id) continue;
+        const other = channel.members.find((member) => member.userId !== actor.id);
+        if (other) ticked.set(channel.id, other.userId);
+    }
+    const allowed = await receiptsAmong({ id: actor.id, isAdmin: false }, [
+        ...ticked.values()
+    ]).catch(() => new Set<string>());
+    const receipts = new Set(
+        [...ticked].filter(([, userId]) => allowed.has(userId)).map(([channelId]) => channelId)
+    );
 
     return channels.map((channel) => {
         const others = channel.members
@@ -900,6 +934,9 @@ export async function listChannels(
             archived: channel.archived,
             lastMessageAt: channel.lastMessageAt?.toISOString() ?? null,
             unread: unread.get(channel.id) ?? 0,
+            last: membership?.locked
+                ? null
+                : withReceipt(last.get(channel.id) ?? null, receipts.has(channel.id)),
             // Worked out rather than read: a mute with an end that has passed is
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,
@@ -907,6 +944,8 @@ export async function listChannels(
             notifyLevel: channelNotifyOf(membership?.notifyLevel),
             translation: core.readChatTranslation(membership?.translation),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
+            locked: membership?.locked ?? false,
+            hidden: membership?.hiddenAt !== null && membership?.hiddenAt !== undefined,
             mayAdminister,
             mayChangePrivacy: Boolean(channel.spaceId && administered.has(channel.spaceId)),
             // The one standing a group confers: its owner may take a message
@@ -2226,10 +2265,21 @@ export interface ChatElsewhere {
 
 export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElsewhere[]> {
     const scopes = await readableChatScopes(actor.id);
-    const memberships = await prisma.chatChannelMember.findMany({
+    const rows = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id },
-        select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
+        select: {
+            channelId: true,
+            lastReadAt: true,
+            muted: true,
+            mutedUntil: true,
+            locked: true,
+            hiddenAt: true
+        }
     });
+    // What the reader keeps off their list is not counted here either, the way
+    // the badge leaves it out (see `unreadConversations`).
+    const concealed = await concealedFrom(actor.id, rows);
+    const memberships = rows.filter((row) => listedFor(concealed, row.channelId));
     if (memberships.length === 0) return [];
 
     const channels = await prisma.chatChannel.findMany({
@@ -2293,11 +2343,24 @@ export interface ChatUnreadConversation {
 export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadConversation[]> {
     const memberships = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id },
-        select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
+        select: {
+            channelId: true,
+            lastReadAt: true,
+            muted: true,
+            mutedUntil: true,
+            locked: true,
+            hiddenAt: true
+        }
     });
+    const concealed = await concealedFrom(actor.id, memberships);
     // Worked out rather than read, for the reason the rail works it out: a mute
     // with an end that has passed is not a mute, and nothing runs to clear it.
-    const heard = memberships.filter((row) => !core.muteInForce(row));
+    // Nor anything off the reader's usual list - hidden, or locked and kept out
+    // of sight: a number for a conversation the list does not show is the list
+    // saying it is there.
+    const heard = memberships.filter(
+        (row) => !core.muteInForce(row) && listedFor(concealed, row.channelId)
+    );
     if (heard.length === 0) return [];
     const [spaces, granted] = await Promise.all([
         reachableSpaceIds(actor),

@@ -1,0 +1,86 @@
+import { prisma } from "@polaris/db";
+
+/** The newest top-level message in a conversation, as its row in the list shows it. */
+export interface ChatLastMessage {
+    readonly authorId: string | null;
+    readonly kind: string;
+    /** Cut short: the row shows one line of it. Empty for a deleted message. */
+    readonly body: string;
+    readonly at: string;
+    /** Whether the ticks may be drawn at all: the reader's own message in a
+     *  one-to-one whose two sides allow read receipts. */
+    readonly receipts: boolean;
+    /** Only ever stamped in a one-to-one conversation - see `ChatMessage.readAt`. */
+    readonly delivered: boolean;
+    readonly read: boolean;
+    readonly deleted: boolean;
+}
+
+interface Row {
+    channelId: string;
+    authorId: string | null;
+    kind: string;
+    body: string;
+    createdAt: Date;
+    delivered: boolean;
+    read: boolean;
+    deleted: boolean;
+}
+
+/** As much of a body as one row can show, with room to spare. */
+const PREVIEW_CHARS = 160;
+
+/**
+ * The last message of each conversation, in one round trip.
+ *
+ * One lateral lookup per id, each answered from the
+ * `(channelId, parentId, createdAt)` index with a single row, so the cost is
+ * bounded by the conversations already being listed and not by how much was
+ * ever said in them. Thread replies are left out: they are not what the
+ * conversation last said.
+ */
+export async function lastMessages(
+    channelIds: readonly string[]
+): Promise<Map<string, ChatLastMessage>> {
+    if (channelIds.length === 0) return new Map();
+    const rows = await prisma.$queryRaw<Row[]>`
+        SELECT c.id::text AS "channelId", m."authorId"::text AS "authorId", m.kind,
+               CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${PREVIEW_CHARS}) ELSE '' END AS body,
+               m."createdAt", m."deliveredAt" IS NOT NULL AS delivered,
+               m."readAt" IS NOT NULL AS read, m."deletedAt" IS NOT NULL AS deleted
+        FROM unnest(${[...channelIds]}::uuid[]) AS c(id)
+        CROSS JOIN LATERAL (
+            SELECT "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt"
+            FROM "ChatMessage"
+            WHERE "channelId" = c.id AND "parentId" IS NULL
+            ORDER BY "createdAt" DESC
+            LIMIT 1
+        ) m`;
+    return new Map(
+        rows.map((row) => [
+            row.channelId,
+            {
+                authorId: row.authorId,
+                kind: row.kind,
+                body: row.body,
+                at: row.createdAt.toISOString(),
+                receipts: false,
+                delivered: row.delivered,
+                read: row.read,
+                deleted: row.deleted
+            }
+        ])
+    );
+}
+
+/** The same message with its ticks allowed or withheld; withheld also clears
+ *  them, so nothing on the wire says what the screen may not. */
+export function withReceipt(
+    last: ChatLastMessage | null,
+    allowed: boolean
+): ChatLastMessage | null {
+    if (!last) return null;
+    return allowed
+        ? { ...last, receipts: true }
+        : { ...last, receipts: false, delivered: false, read: false };
+}
