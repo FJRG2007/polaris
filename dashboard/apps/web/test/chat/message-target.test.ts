@@ -181,6 +181,23 @@ describe("a video in the message", () => {
         expect(messageTarget(at("video"), root, BASE).video?.name).toBe("screen-clip.webm");
     });
 
+    it("is found on a clip that has not been opened yet", () => {
+        // A list draws a still with a play button, not a player, so there is
+        // no video element under the pointer. The menu still has to offer the
+        // clip's own save, copy and open - the same set a picture gets.
+        const { root, at } = row(
+            '<li data-attachment="v1"><button type="button" data-video-src="/api/chat/attachments/v1" data-name="VID-20261103-WA0008.mp4">' +
+                "<span><svg></svg></span><span>VID-20261103-WA0008.mp4</span></button></li>"
+        );
+        const target = messageTarget(at("svg"), root, BASE);
+        expect(target.video).toEqual({
+            url: "/api/chat/attachments/v1",
+            name: "VID-20261103-WA0008.mp4"
+        });
+        expect(target.attachment).toBe("v1");
+        expect(target.image).toBeNull();
+    });
+
     it("is nothing at all when the right-click was elsewhere", () => {
         const { root, at } = row('<p>hello</p><video src="/api/chat/attachments/a4"></video>');
         expect(messageTarget(at("p"), root, BASE).video).toBeNull();

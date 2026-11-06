@@ -29,6 +29,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { typeOfFile } from "@/lib/mime";
 import { chatTarget, type StoredAttachment } from "./attachments";
 import { driverForTarget, LOCAL_TARGET, streamFile } from "@/lib/storage-target";
 
@@ -109,7 +110,9 @@ export async function stageUpload(input: {
 }): Promise<StagedUpload> {
     const folder = `${ATTACHMENT_ROOT}/${safeSegment(input.channelId)}`;
     const path = `${folder}/${crypto.randomUUID()}`;
-    const contentType = input.contentType || "application/octet-stream";
+    // What the browser said, or the name when it said nothing: a phone gallery
+    // pick often has no type, and the upload then carries none either.
+    const contentType = typeOfFile(input.contentType, input.name);
 
     const placed = await streamFile({
         target: await chatTarget(),

@@ -39,6 +39,7 @@ import { ScheduleDialog } from "./schedule-dialog";
 import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
 import { holdReload } from "@/lib/reload-safety";
+import { isWatchableVideo, typeOfFile } from "@/lib/mime";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -127,6 +128,7 @@ export function Composer({
     roomMentions = true,
     commands,
     rules,
+    fixedLimits = false,
     disabled,
     attachable = true,
     mentionSource = null,
@@ -171,6 +173,9 @@ export function Composer({
      * message that was not sent, not a draft - see `drafts`.
      */
     draftKey?: string | null;
+    /** The limits are Polaris's own rather than an administrator's - a call's
+     *  chat - so a refusal does not send anybody to a setting that is not it. */
+    fixedLimits?: boolean;
     /** Whether @ offers `@everyone` and `@here`. Off for somebody the group's
      *  owner has kept them from; the send refuses them either way. */
     roomMentions?: boolean;
@@ -681,7 +686,14 @@ export function Composer({
     const voice = useVoiceRecording((file, sound) => {
         if (disabled) return;
         if (file.size > maxBytes) {
-            setRefused(`A recording here can be up to ${rules.maxAttachmentMib} MB.`);
+            setRefused(
+                [
+                    t("composer.refused.recordingTooBig", { limit: rules.maxAttachmentMib }),
+                    fixedLimits ? "" : t("composer.refused.raise")
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+            );
             return;
         }
         setRefused("");
@@ -963,7 +975,7 @@ export function Composer({
      */
     const keep = (staying: readonly KeptPick[]): void => {
         if (!attachable) {
-            setRefused("You are not allowed to send files here.");
+            setRefused(t("composer.refused.notAllowed"));
             return;
         }
         const room = Math.max(0, rules.maxAttachments - files.length - kept.length);
@@ -971,8 +983,8 @@ export function Composer({
         if (accepted.length < staying.length) {
             setRefused(
                 rules.maxAttachments === 0
-                    ? "Files cannot be sent here."
-                    : `A message can carry ${rules.maxAttachments} files.`
+                    ? t("composer.refused.noFiles")
+                    : t("composer.refused.tooMany", { count: rules.maxAttachments })
             );
         }
         if (accepted.length > 0) setKept((current) => [...current, ...accepted]);
@@ -983,7 +995,7 @@ export function Composer({
         // Said rather than ignored: a file dropped onto a box that quietly does
         // nothing with it reads as a broken composer.
         if (!attachable) {
-            setRefused("You are not allowed to send files here.");
+            setRefused(t("composer.refused.notAllowed"));
             return 0;
         }
         const chosen = Array.from(picked);
@@ -992,14 +1004,25 @@ export function Composer({
         const accepted = small.slice(0, room);
 
         const notes: string[] = [];
-        if (small.length < chosen.length) {
-            notes.push(`Files here can be up to ${rules.maxAttachmentMib} MB.`);
+        // Named, with its size: a phone's own recordings are routinely bigger
+        // than the limit, and "files can be up to 25 MB" under a gallery pick
+        // that put nothing in the box reads as the upload having failed.
+        const large = chosen.find((file) => file.size > maxBytes);
+        if (large) {
+            notes.push(
+                t("composer.refused.tooBig", {
+                    name: large.name,
+                    size: (large.size / (1024 * 1024)).toFixed(1),
+                    limit: rules.maxAttachmentMib
+                })
+            );
+            if (!fixedLimits) notes.push(t("composer.refused.raise"));
         }
         if (accepted.length < small.length) {
             notes.push(
                 rules.maxAttachments === 0
-                    ? "Files cannot be sent here."
-                    : `A message can carry ${rules.maxAttachments} files.`
+                    ? t("composer.refused.noFiles")
+                    : t("composer.refused.tooMany", { count: rules.maxAttachments })
             );
         }
         setRefused(notes.join(" "));
@@ -1786,21 +1809,22 @@ function StagedFile({
      */
     const [open, setOpen] = useState(false);
     const thumbnail = useRef<HTMLButtonElement | null>(null);
-    const type = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
-    const watchable = WATCHABLE.has(type);
+    // From the name when the browser gave no type, which a phone gallery does.
+    const type = typeOfFile(file.type, file.name).split(";")[0]?.trim().toLowerCase() ?? "";
+    const watchable = isWatchableVideo(type);
 
     useEffect(() => {
         // Only what the browser will actually draw. An SVG is an image and is
         // deliberately not on this list - the same rule the conversation itself
         // applies to a picture somebody uploaded.
-        if (!tile.isInlinePicture(type) && !WATCHABLE.has(type)) return;
+        if (!tile.isInlinePicture(type) && !watchable) return;
         const address = URL.createObjectURL(file);
         setPreview(address);
         return () => {
             URL.revokeObjectURL(address);
             setPreview(null);
         };
-    }, [file, type]);
+    }, [file, type, watchable]);
 
     const remove = (
         <tile.AttachmentAction
@@ -1894,12 +1918,6 @@ function StagedFile({
         </li>
     );
 }
-
-/** What is shown as a video rather than as a name. The same three the
- *  conversation plays, so what is previewed here is exactly what will play
- *  there - a file that previewed and then arrived as a download would be worse
- *  than no preview at all. */
-const WATCHABLE = new Set(["video/mp4", "video/webm", "video/ogg"]);
 
 /** A size somebody can read at a glance. Not the display-format helper: that one
  *  writes dates and money, and a file size is neither. */

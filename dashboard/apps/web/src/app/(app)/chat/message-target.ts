@@ -92,9 +92,17 @@ export function messageTarget(
     // The player wraps the element in its own chrome, so a right-click usually
     // lands on a control rather than on the video: the walk goes up to whatever
     // the player was built around and then back down to the element itself.
-    const player = inside(from.closest(".plyr")) ?? inside(from.closest("video"));
+    //
+    // A clip in a list is not a player yet: it is a still with a play button,
+    // and nothing is fetched until it is pressed - see `VideoPreview`. It says
+    // what it would play with `data-video-src`, so a right-click on it offers
+    // the same save, copy and open as a right-click on a picture beside it.
+    const player =
+        inside(from.closest(".plyr")) ??
+        inside(from.closest("video")) ??
+        inside(from.closest("[data-video-src]"));
     const video = player
-        ? player.tagName === "VIDEO"
+        ? player.tagName === "VIDEO" || player.hasAttribute("data-video-src")
             ? player
             : player.querySelector("video")
         : null;
@@ -117,7 +125,7 @@ export function messageTarget(
  * is for an address that ends in an id, which is most of them.
  */
 function videoOf(video: Element): ImageTarget | null {
-    const url = video.getAttribute("src")?.trim() ?? "";
+    const url = (video.getAttribute("data-video-src") ?? video.getAttribute("src"))?.trim() ?? "";
     if (!url) return null;
     const given = video.getAttribute("data-name")?.trim() ?? "";
     return { url, name: given || nameIn(url) || "Video" };

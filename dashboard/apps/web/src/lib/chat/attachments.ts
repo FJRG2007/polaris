@@ -19,7 +19,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { mimeForName } from "@/lib/mime";
+import { isWatchableVideo, mimeForName, typeOfFile } from "@/lib/mime";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { keepChannelForReports, keepForReports } from "./report-files";
 import {
@@ -108,14 +108,11 @@ const PLAYABLE = new Set([
     "audio/aac",
     "audio/wav",
     "audio/x-wav",
-    "audio/flac",
-    "video/mp4",
-    "video/webm",
-    "video/ogg"
+    "audio/flac"
 ]);
 
 export function isPlayableMedia(contentType: string): boolean {
-    return PLAYABLE.has(baseType(contentType));
+    return PLAYABLE.has(baseType(contentType)) || isWatchableVideo(contentType);
 }
 
 /**
@@ -291,7 +288,7 @@ export async function storeAttachment(
             folder,
             path,
             bytes: file.bytes,
-            mime: file.type || "application/octet-stream",
+            mime: typeOfFile(file.type, file.name),
             what: "file"
         });
     } catch (error) {
@@ -306,7 +303,7 @@ export async function storeAttachment(
     return {
         name: file.name.slice(0, 200) || "file",
         size: file.bytes.length,
-        contentType: file.type || "application/octet-stream",
+        contentType: typeOfFile(file.type, file.name),
         connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
         path,
         posterPath: still?.path ?? null,
@@ -341,7 +338,7 @@ export async function storeStreamedAttachment(
 ): Promise<StoredAttachment> {
     const folder = `${ATTACHMENT_ROOT}/${safe(channelId)}`;
     const path = `${folder}/${crypto.randomUUID()}`;
-    const contentType = file.type || mimeForName(file.name) || "application/octet-stream";
+    const contentType = typeOfFile(file.type, file.name);
 
     let placed: { targetId: string; size: number };
     try {

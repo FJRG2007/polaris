@@ -76,7 +76,10 @@ export function VideoPreview({
                 poster={poster}
                 download={download}
                 preload="metadata"
-                className={cn("overflow-hidden rounded-md border border-border bg-black", className)}
+                className={cn(
+                    "overflow-hidden rounded-md border border-border bg-black",
+                    className
+                )}
             />
         );
     }
@@ -100,25 +103,34 @@ export function VideoPreview({
                 )}
             <button
                 type="button"
-            onClick={() => setWatching(true)}
-            aria-label={name ? t("viewer.playNamed", { name }) : t("viewer.play")}
-            className={cn(
-                "group relative flex aspect-video w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-border bg-black/80 transition-colors hover:bg-black",
-                className
-            )}
-            style={poster ? { backgroundImage: `url(${poster})`, backgroundSize: "cover" } : undefined}
-        >
-            <span className="grid size-14 place-items-center rounded-full bg-black/60 ring-1 ring-white/30 transition-transform group-hover:scale-105">
-                <Play className="size-6 translate-x-0.5 fill-white text-white" />
-            </span>
-            {(name || size !== undefined) && (
-                <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-left text-[0.6875rem] text-white/90">
-                    <span className="truncate" title={name}>
-                        {name}
-                    </span>
-                    {size !== undefined && <span className="shrink-0">{readable(size)}</span>}
+                // What it would play, for a menu over it: a right-click on a clip
+                // that has not been opened yet is still a right-click on the clip,
+                // and offers the same save, copy and open as one on a picture.
+                data-video-src={src}
+                data-name={name}
+                onClick={() => setWatching(true)}
+                aria-label={name ? t("viewer.playNamed", { name }) : t("viewer.play")}
+                className={cn(
+                    "group relative flex aspect-video w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-border bg-black/80 transition-colors hover:bg-black",
+                    className
+                )}
+                style={
+                    poster
+                        ? { backgroundImage: `url(${poster})`, backgroundSize: "cover" }
+                        : undefined
+                }
+            >
+                <span className="grid size-14 place-items-center rounded-full bg-black/60 ring-1 ring-white/30 transition-transform group-hover:scale-105">
+                    <Play className="size-6 translate-x-0.5 fill-white text-white" />
                 </span>
-            )}
+                {(name || size !== undefined) && (
+                    <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-left text-[0.6875rem] text-white/90">
+                        <span className="truncate" title={name}>
+                            {name}
+                        </span>
+                        {size !== undefined && <span className="shrink-0">{readable(size)}</span>}
+                    </span>
+                )}
             </button>
         </>
     );

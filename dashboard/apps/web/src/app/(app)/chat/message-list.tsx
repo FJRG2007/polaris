@@ -55,6 +55,7 @@ import { EmojiPicker } from "./emoji-picker";
 import type { SpaceEmojiScope } from "./space-emoji";
 import { EmojiFace } from "@/components/rich-text/custom-emoji";
 import { embedFor } from "@/lib/chat/embeds";
+import { isWatchableVideo } from "@/lib/mime";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import { LinkCard } from "./link-card";
 import { EditHistoryDialog } from "./edit-history-dialog";
@@ -161,13 +162,6 @@ function SentFile({
     );
 }
 
-/** Whether an attachment is a video Polaris will draw a player for. The same
- *  fixed list the download route serves as itself - anything else stays an
- *  opaque download, because the type came from an upload. */
-function isWatchable(contentType: string): boolean {
-    const base = (contentType.split(";")[0] ?? "").trim().toLowerCase();
-    return base === "video/mp4" || base === "video/webm" || base === "video/ogg";
-}
 import { useDisplayFormat } from "@/components/display-format";
 import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
 import { linkProviderName } from "@/components/rich-text/link-providers";
@@ -1187,7 +1181,7 @@ function Message({
                                             kind={
                                                 file.inline
                                                     ? "picture"
-                                                    : isWatchable(file.contentType)
+                                                    : isWatchableVideo(file.contentType)
                                                       ? "video"
                                                       : "file"
                                             }
@@ -1222,7 +1216,7 @@ function Message({
                                                     waveform={file.waveform}
                                                     durationMs={file.durationMs}
                                                 />
-                                            ) : isWatchable(file.contentType) ? (
+                                            ) : isWatchableVideo(file.contentType) ? (
                                                 // Watched where it was sent, and not a
                                                 // byte of it fetched until somebody
                                                 // presses play: a room with four clips

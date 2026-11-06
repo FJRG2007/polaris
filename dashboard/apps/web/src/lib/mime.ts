@@ -21,6 +21,8 @@ const MIME_BY_EXTENSION: Record<string, string> = {
     webm: "video/webm",
     mov: "video/quicktime",
     m4v: "video/x-m4v",
+    "3gp": "video/3gpp",
+    "3gpp": "video/3gpp",
     ogv: "video/ogg",
     mp3: "audio/mpeg",
     wav: "audio/wav",
@@ -42,6 +44,42 @@ export function mimeForName(name: string): string | undefined {
     const dot = name.lastIndexOf(".");
     if (dot < 0) return undefined;
     return MIME_BY_EXTENSION[name.slice(dot + 1).toLowerCase()];
+}
+
+/**
+ * What a picked file is, from what the browser said and - when it said nothing
+ * useful - from its name.
+ *
+ * A phone's gallery routinely hands a page a file with an empty `type`, and an
+ * upload of one arrives with no content type at all. Recorded as an opaque
+ * download, a clip from a phone was drawn as a file to save instead of a video.
+ */
+export function typeOfFile(declared: string | null | undefined, name: string): string {
+    const given = (declared ?? "").trim();
+    const essence = given.split(";")[0]!.trim().toLowerCase();
+    if (essence && essence !== "application/octet-stream") return given;
+    return mimeForName(name) ?? (given || "application/octet-stream");
+}
+
+/**
+ * The videos Polaris draws its own player for.
+ *
+ * QuickTime and 3GPP are what phones record: an iPhone's camera writes `.mov`
+ * and many Android cameras and messengers `.3gp`. Whether this browser can
+ * decode the codec inside is the player's question, not this list's - the
+ * player keeps its download either way.
+ */
+const WATCHABLE_VIDEO = new Set([
+    "video/mp4",
+    "video/webm",
+    "video/ogg",
+    "video/quicktime",
+    "video/x-m4v",
+    "video/3gpp"
+]);
+
+export function isWatchableVideo(contentType: string): boolean {
+    return WATCHABLE_VIDEO.has((contentType.split(";")[0] ?? "").trim().toLowerCase());
 }
 
 /**
