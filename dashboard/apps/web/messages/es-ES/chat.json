@@ -2218,7 +2218,7 @@
         "changeCode": "Cambiar código",
         "newCode": "Código nuevo",
         "currentCode": "Código actual",
-        "codeHint": "Al menos 4 caracteres",
+        "codeHint": "Solo números",
         "hideLocked": "Ocultar chats bloqueados de la lista",
         "newMessage": "Mensaje nuevo",
         "noneHidden": "Ninguno oculto",
@@ -2231,6 +2231,19 @@
         "removeLockAsk": "Escribe tu código para quitar el bloqueo",
         "forgot": "¿Has olvidado el código?",
         "resetTitle": "Quitar el bloqueo",
-        "resetHint": "Confirma que eres tú para quitar el código. Tus chats bloqueados vuelven a abrirse"
+        "resetHint": "Confirma que eres tú para quitar el código. Tus chats bloqueados vuelven a abrirse",
+        "unlockFor": "Abiertos tras el código",
+        "unlockForHint": "Usar un chat abierto lo mantiene abierto",
+        "unlockImmediately": "Al salir del chat",
+        "unlock1": "1 minuto",
+        "unlock5": "5 minutos",
+        "unlock15": "15 minutos",
+        "unlock30": "30 minutos",
+        "unlock60": "1 hora",
+        "unlockClosed": "Hasta cerrar el navegador",
+        "codeLength": "Longitud",
+        "digits4": "4 dígitos",
+        "digits6": "6 dígitos",
+        "digits8": "8 dígitos"
     }
 }

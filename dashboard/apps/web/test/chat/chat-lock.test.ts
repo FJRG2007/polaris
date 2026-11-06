@@ -73,6 +73,30 @@ describe("lock code hashing", () => {
         expect(lock.lockCodeSchema.safeParse("x".repeat(65)).success).toBe(false);
         expect(lock.lockCodeSchema.safeParse(" 1234 ").success).toBe(true);
     });
+
+    it("sets a new code only as 4, 6 or 8 digits", () => {
+        for (const code of ["1234", "123456", "12345678"])
+            expect(lock.newLockCodeSchema.safeParse(code).success).toBe(true);
+        for (const code of ["12345", "1234567", "abcd", "12 34", "123456789"])
+            expect(lock.newLockCodeSchema.safeParse(code).success).toBe(false);
+    });
+
+    it("takes a chosen length only as 4, 6 or 8, and only with a code that long", () => {
+        const parse = (input: unknown) => lock.setLockCodeSchema.safeParse(input).success;
+        expect(parse({ code: "123456", length: 6 })).toBe(true);
+        expect(parse({ code: "1234", length: 4, current: "hunter2" })).toBe(true);
+        // A tab from before the picker sends no length.
+        expect(parse({ code: "12345678" })).toBe(true);
+        expect(parse({ code: "1234", length: 6 })).toBe(false);
+        expect(parse({ code: "12345", length: 5 })).toBe(false);
+        expect(parse({ code: "123456", length: "6" })).toBe(false);
+    });
+
+    it("records how many digits a new code has", async () => {
+        fake.lock = null;
+        await lock.setLockCode(ada, "12345678");
+        expect(fake.upserts[0]).toMatchObject({ create: { codeLength: 8 } });
+    });
 });
 
 describe("guesses", () => {
@@ -121,6 +145,35 @@ describe("unlock proof", () => {
         expect(lock.readUnlockProof(null, "ada", channelId, hash, now)).toBe(false);
     });
 
+    it("lasts the duration the reader chose", () => {
+        const now = 1_800_000_000_000;
+        const proof = lock.unlockProof("ada", channelId, "hash-1", now, 5 * 60_000);
+        expect(lock.readUnlockProof(proof, "ada", channelId, "hash-1", now + 4 * 60_000)).toBe(
+            true
+        );
+        expect(lock.readUnlockProof(proof, "ada", channelId, "hash-1", now + 5 * 60_000 + 1)).toBe(
+            false
+        );
+    });
+
+    it("renewing slides a live proof on, and never revives a dead or forged one", () => {
+        const now = 1_800_000_000_000;
+        const terms = { codeHash: "hash-1", ttlMs: 60_000 };
+        const other = "00000000-0000-4000-8000-000000000002";
+        const live = lock.unlockProof("ada", channelId, "hash-1", now, 60_000);
+        const dead = lock.unlockProof("ada", other, "hash-1", now - 120_000, 60_000);
+        const later = now + 50_000;
+        const renewed = lock.renewProofs("ada", { [channelId]: live, [other]: dead }, terms, later);
+        expect(Object.keys(renewed)).toEqual([channelId]);
+        const next = renewed[channelId];
+        expect(lock.readUnlockProof(next, "ada", channelId, "hash-1", later + 55_000)).toBe(true);
+        expect(lock.renewProofs("bob", { [channelId]: live }, terms, later)).toEqual({});
+        expect(lock.renewProofs("ada", { [channelId]: `${live}x` }, terms, later)).toEqual({});
+        expect(
+            lock.renewProofs("ada", { [channelId]: live }, { ...terms, codeHash: "hash-2" }, later)
+        ).toEqual({});
+    });
+
     it("a new code turns away every proof handed out under the old one", async () => {
         fake.locked = true;
         const proof = await lock.unlockChannel(ada, channelId, "1234");
@@ -157,7 +210,12 @@ describe("forgotten code", () => {
         expect(fake.lock).toBeNull();
         expect(fake.locked).toBe(false);
         expect(fake.counts.has("chat-lock:ada")).toBe(false);
-        expect(await lock.lockState("ada")).toEqual({ hasCode: false, hideLocked: false });
+        expect(await lock.lockState("ada")).toEqual({
+            hasCode: false,
+            hideLocked: false,
+            unlockMinutes: -1,
+            codeLength: null
+        });
         await expect(lock.requireUnlocked(ada, channelId, null)).resolves.toBeUndefined();
     });
 });

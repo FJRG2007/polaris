@@ -12,6 +12,10 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({ ChatProvider: () => null, useC
 vi.mock("@/app/(app)/chat/use-chat-stream", () => ({ useChatStream: () => undefined }));
 vi.mock("@/app/(app)/chat/server-rail", () => ({ ServerRail: () => null }));
 vi.mock("@/app/(app)/chat/chat-sidebar", () => ({ ChatSidebar: () => null }));
+// The lock provider sits in the shell now; its server reads are not under test here.
+vi.mock("@/app/(app)/chat/lock-dialogs", () => ({
+    ChatLockProvider: ({ children }: { children: unknown }) => children
+}));
 
 const { conversationOnScreen } = await import("@/app/(app)/chat/chat-shell");
 

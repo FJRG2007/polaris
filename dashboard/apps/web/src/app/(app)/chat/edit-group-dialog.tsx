@@ -163,7 +163,17 @@ export function EditGroupDialog({
                     <DialogTitle>{t("editGroup.title")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col items-center gap-2">
-                    <div className="relative">
+                    {/* The picture and its pencil are one button, so pressing either
+                        opens the same picker. The badge is opaque and ringed in the
+                        dialog's own colour, so it reads over any picture. */}
+                    <button
+                        type="button"
+                        aria-label={t("editGroup.changeIcon")}
+                        title={t("editGroup.changeIcon")}
+                        disabled={saving}
+                        onClick={() => setChanging(true)}
+                        className="group relative rounded-full disabled:cursor-not-allowed"
+                    >
                         <ChatAvatar
                             kind="channel"
                             id={channel.id}
@@ -172,17 +182,13 @@ export function EditGroupDialog({
                             picture={previewOf(icon, hasIcon)}
                             size={88}
                         />
-                        <button
-                            type="button"
-                            aria-label={t("editGroup.changeIcon")}
-                            title={t("editGroup.changeIcon")}
-                            disabled={saving}
-                            onClick={() => setChanging(true)}
-                            className="absolute right-0 top-0 grid size-7 place-items-center rounded-full border border-border bg-surface-raised text-foreground shadow-sm hover:bg-surface-hover"
+                        <span
+                            aria-hidden
+                            className="absolute right-0 top-0 grid size-7 place-items-center rounded-full bg-foreground text-background ring-4 ring-elevated transition-transform group-hover:scale-105 group-disabled:opacity-60"
                         >
                             <Pencil className="size-3.5 shrink-0" />
-                        </button>
-                    </div>
+                        </span>
+                    </button>
                     {showsIcon && (
                         <button
                             type="button"
@@ -278,7 +284,7 @@ function ChangeIconDialog({
                                 aria-label={t("editGroup.back")}
                                 title={t("editGroup.back")}
                                 onClick={() => setStep("tiles")}
-                                className="grid size-7 place-items-center rounded-md hover:bg-surface-hover"
+                                className="grid size-7 place-items-center rounded-md hover:bg-muted"
                             >
                                 <ArrowLeft className="size-4 shrink-0" />
                             </button>
@@ -291,7 +297,7 @@ function ChangeIconDialog({
                         <button
                             type="button"
                             onClick={() => setPicking(true)}
-                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-surface-sunken p-3 text-sm font-medium hover:bg-surface-hover"
+                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm font-medium hover:bg-muted"
                         >
                             <ImagePlus className="size-8 shrink-0 text-muted-foreground" />
                             <span className="truncate">{t("editGroup.uploadImage")}</span>
@@ -301,9 +307,9 @@ function ChangeIconDialog({
                             disabled={gifsReady !== true}
                             title={gifsReady === false ? t("editGroup.gifsOff") : undefined}
                             onClick={() => setStep("gif")}
-                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-surface-sunken p-3 text-sm font-medium hover:bg-surface-hover disabled:opacity-50"
+                            className="flex aspect-square min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm font-medium enabled:hover:bg-muted disabled:opacity-50"
                         >
-                            <span className="grid size-20 grid-cols-2 gap-0.5 overflow-hidden rounded-md bg-surface-hover">
+                            <span className="grid size-20 grid-cols-2 gap-0.5 overflow-hidden rounded-md bg-muted">
                                 {trending.slice(0, 4).map((gif) => (
                                     // eslint-disable-next-line @next/next/no-img-element -- a picker thumbnail
                                     <img
@@ -401,7 +407,7 @@ function GifGrid({
                         type="button"
                         title={gif.description}
                         onClick={() => onChosen(gif)}
-                        className="aspect-square overflow-hidden rounded-md bg-surface-sunken hover:ring-2 hover:ring-accent"
+                        className="aspect-square overflow-hidden rounded-md bg-muted hover:ring-2 hover:ring-accent"
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element -- a picker thumbnail */}
                         <img

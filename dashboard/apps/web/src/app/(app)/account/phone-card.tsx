@@ -116,6 +116,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                     <form onSubmit={verify} className="flex flex-col gap-2">
                         <div className="flex items-start gap-2">
                             <CodeInput
+                                autoSubmit
                                 value={code}
                                 aria-label={t("phone.code")}
                                 onValueChange={setCode}

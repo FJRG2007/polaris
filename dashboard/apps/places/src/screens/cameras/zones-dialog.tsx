@@ -246,7 +246,7 @@ export function ZonesDialog({
                                 // point of taking it.
                                 maxWidth: `calc(70vh * ${shape ?? DEFAULT_SHAPE})`
                             }}
-                            className="relative mx-auto w-full cursor-crosshair overflow-hidden rounded-md bg-surface-sunken"
+                            className="relative mx-auto w-full cursor-crosshair overflow-hidden rounded-md bg-muted"
                         >
                             {/* The camera's own frame. A camera that is asleep answers 503 and
                                 the picture simply does not arrive, which is the right outcome:

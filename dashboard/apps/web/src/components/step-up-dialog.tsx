@@ -14,7 +14,7 @@
  * is the service's; this only draws it.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { StepUpProofInput } from "@polaris/core";
 import { StepUpFields } from "@/components/step-up-fields";
@@ -53,7 +53,7 @@ export function StepUpDialog({
     const [error, setError] = useState("");
 
     async function confirm(): Promise<void> {
-        if (!proof) return;
+        if (!proof || busy) return;
         setBusy(true);
         setError("");
         const result = await proveStepUpAction(purpose, proof);
@@ -65,6 +65,15 @@ export function StepUpDialog({
         onOpenChange(false);
         await onProved();
     }
+
+    // A whole code confirms on its own, the way every code box does; a password
+    // waits for the button. Each new code is its own proof object, so a refused
+    // one is not sent again until it is retyped.
+    const confirmNow = useRef(confirm);
+    confirmNow.current = confirm;
+    useEffect(() => {
+        if (proof && proof.proof !== "password") void confirmNow.current();
+    }, [proof]);
 
     return (
         <Dialog

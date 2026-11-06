@@ -19,8 +19,10 @@
 import { ServerRail } from "./server-rail";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChatSidebar } from "./chat-sidebar";
+import { ChatLockProvider } from "./lock-dialogs";
 import { usePathname } from "next/navigation";
 import { useChatPane } from "./use-chat-pane";
+import { paneWidthFor } from "./list-view";
 import { useChatStream } from "./use-chat-stream";
 import { resetPaneLayout } from "./pane-preferences";
 import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
@@ -134,50 +136,58 @@ function ChatColumns({ children }: { children: ReactNode }) {
     return (
         // Edge to edge: Chat draws its own rails, headers and panels, and a
         // page's margin around all of that is a strip of unused background on
-        // four sides. No `w-full` - see PAGE_BLEED.
-        <div className={`${PAGE_BLEED} flex flex-row`}>
-            {/* The column of spaces stays on a phone while the list is showing,
+        // four sides. No `w-full` - see PAGE_BLEED. The lock wraps both columns:
+        // the open conversation reads how long its unlock lasts from it.
+        <ChatLockProvider>
+            <div className={`${PAGE_BLEED} flex flex-row`}>
+                {/* The column of spaces stays on a phone while the list is showing,
                 and steps aside with it once a conversation is open - on a narrow
                 screen the conversation gets the whole width. */}
-            <div
-                data-tour="chat.spaces"
-                className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 shrink-0`}
-            >
-                <ServerRail />
-            </div>
-            {/* The width rides a custom property rather than the class, because
+                <div
+                    data-tour="chat.spaces"
+                    className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 shrink-0`}
+                >
+                    <ServerRail />
+                </div>
+                {/* The width rides a custom property rather than the class, because
                 on a phone this column takes whatever the rail of spaces leaves
                 and a remembered desktop width would be wrong in both directions.
                 `flex-1`, not `w-full`: a full width beside the rail is the rail's
                 width wider than the screen, and the right edge of every row - when
                 the last message arrived, the unread count - went off it. */}
-            <div
-                ref={measure}
-                data-tour="chat.conversations"
-                style={{ "--chat-list": `${drawn}px` } as CSSProperties}
-                className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-r border-border md:w-[var(--chat-list)] md:flex-none`}
-            >
-                <ChatSidebar />
-            </div>
-            {/* Only where there are two columns to divide. On a phone one of them
+                <div
+                    ref={measure}
+                    data-tour="chat.conversations"
+                    style={{ "--chat-list": `${drawn}px` } as CSSProperties}
+                    className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-r border-border md:w-[var(--chat-list)] md:flex-none`}
+                >
+                    <ChatSidebar
+                        onListView={(view) => {
+                            const width = paneWidthFor(view, drawn, ceiling);
+                            if (width !== null) resize(width);
+                        }}
+                    />
+                </div>
+                {/* Only where there are two columns to divide. On a phone one of them
                 is always the whole screen, so there is no line to move. */}
-            <ResizeHandle
-                axis="x"
-                size={drawn}
-                min={LIST_PANE.min}
-                max={ceiling}
-                onChange={resize}
-                onReset={reset}
-                onResetAll={resetPaneLayout}
-                label={t("shell.conversationListWidth")}
-                className="hidden md:block"
-            />
-            <div
-                data-tour="chat.conversation"
-                className={`${inConversation ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}
-            >
-                {children}
+                <ResizeHandle
+                    axis="x"
+                    size={drawn}
+                    min={LIST_PANE.min}
+                    max={ceiling}
+                    onChange={resize}
+                    onReset={reset}
+                    onResetAll={resetPaneLayout}
+                    label={t("shell.conversationListWidth")}
+                    className="hidden md:block"
+                />
+                <div
+                    data-tour="chat.conversation"
+                    className={`${inConversation ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}
+                >
+                    {children}
+                </div>
             </div>
-        </div>
+        </ChatLockProvider>
     );
 }

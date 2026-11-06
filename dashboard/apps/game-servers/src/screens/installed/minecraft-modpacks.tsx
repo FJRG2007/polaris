@@ -74,13 +74,13 @@ export function ModpacksCard({
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("modpacks.aPackBringsItsOwn")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("modpacks.aPackBringsItsOwn")}</p>
 
                 {modpack.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2">
-                        <span className="text-xs text-muted-foreground">{t("modpacks.running")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("modpacks.running")}
+                        </span>
                         <span className="text-sm font-medium">{modpack}</span>
                         <Button
                             size="sm"
@@ -122,9 +122,13 @@ export function ModpacksCard({
                             >
                                 {pack.iconUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={pack.iconUrl} alt="" className="size-8 shrink-0 rounded" />
+                                    <img
+                                        src={pack.iconUrl}
+                                        alt=""
+                                        className="size-8 shrink-0 rounded"
+                                    />
                                 ) : (
-                                    <div className="size-8 shrink-0 rounded bg-surface-raised" />
+                                    <div className="size-8 shrink-0 rounded bg-muted" />
                                 )}
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
@@ -137,7 +141,11 @@ export function ModpacksCard({
                                             {pack.title}
                                             <ExternalLink className="ml-1 inline size-3 shrink-0" />
                                         </a>
-                                        {pack.slug === modpack && <Badge variant="success">{t("modpacks.runningBadge")}</Badge>}
+                                        {pack.slug === modpack && (
+                                            <Badge variant="success">
+                                                {t("modpacks.runningBadge")}
+                                            </Badge>
+                                        )}
                                     </div>
                                     <p className="line-clamp-2 text-xs text-muted-foreground">
                                         {pack.description}
@@ -160,10 +168,10 @@ export function ModpacksCard({
 
                 {chosen && (
                     <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
-                        <p className="text-sm font-medium">{t("modpacks.installTitle", { name: chosen.title })}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {t("modpacks.installBody")}
+                        <p className="text-sm font-medium">
+                            {t("modpacks.installTitle", { name: chosen.title })}
                         </p>
+                        <p className="text-xs text-muted-foreground">{t("modpacks.installBody")}</p>
                         <div className="flex items-center gap-2">
                             <Button size="sm" disabled={pending} onClick={() => apply(chosen.slug)}>
                                 {pending ? <Loader2 className="size-4 animate-spin" /> : null}

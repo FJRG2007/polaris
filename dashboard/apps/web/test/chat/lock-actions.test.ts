@@ -25,7 +25,12 @@ vi.mock("@/lib/chat/chat-lock", async () => {
         };
     return {
         ...actual,
-        lockState: record("lockState", { hasCode: true, hideLocked: false }),
+        lockState: record("lockState", {
+            hasCode: true,
+            hideLocked: false,
+            unlockMinutes: -1,
+            codeLength: null
+        }),
         setLockCode: record("setLockCode"),
         setHideLocked: record("setHideLocked"),
         setChannelLocked: record("setChannelLocked"),

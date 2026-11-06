@@ -225,7 +225,7 @@ function PluginRow({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={plugin.iconUrl} alt="" className="size-8 shrink-0 rounded" />
             ) : (
-                <div className="size-8 shrink-0 rounded bg-surface-raised" />
+                <div className="size-8 shrink-0 rounded bg-muted" />
             )}
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">

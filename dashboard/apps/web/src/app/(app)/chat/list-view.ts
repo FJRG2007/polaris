@@ -28,6 +28,22 @@ export function drawsDetailed(view: ChatListView, width: number): boolean {
     return view === "detailed" || (view === "auto" && width >= DETAILED_FROM);
 }
 
+/**
+ * How wide the list pane is made when a view is picked from its menu, or null
+ * to leave it where it was dragged. Detailed rows need room for a face, the
+ * last message and its time, so a narrower pane is widened to fit them (held to
+ * what the window allows); compact rows give that room back. "Auto" never
+ * moves it: it follows the width instead of setting one.
+ */
+export const DETAILED_PANE = 336;
+export const COMPACT_PANE = 256;
+
+export function paneWidthFor(view: ChatListView, drawn: number, ceiling: number): number | null {
+    if (view === "detailed") return drawn < DETAILED_PANE ? Math.min(DETAILED_PANE, ceiling) : null;
+    if (view === "compact") return drawn > COMPACT_PANE ? COMPACT_PANE : null;
+    return null;
+}
+
 export function useChatListView(): [ChatListView, (next: ChatListView) => void] {
     const [view, setView] = useState<ChatListView>("auto");
 

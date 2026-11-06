@@ -193,6 +193,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                 <CodeInput
                                     name="code"
                                     autoFocus
+                                    autoSubmit
                                     value={code}
                                     onValueChange={setCode}
                                     required

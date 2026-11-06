@@ -216,7 +216,13 @@ export function EnableTwoFactorDialog({
 
                         <label className="flex flex-col gap-1 text-sm">
                             {t("authenticator.codeFromApp")}
-                            <CodeInput name="code" value={code} onValueChange={setCode} required />
+                            <CodeInput
+                                name="code"
+                                autoSubmit
+                                value={code}
+                                onValueChange={setCode}
+                                required
+                            />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">

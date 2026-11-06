@@ -242,7 +242,14 @@ function EmailFactor({
                     <form className="flex flex-col gap-3" onSubmit={(event) => void arm(event)}>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("enroll.email.code")}
-                            <CodeInput name="code" value={code} onValueChange={setCode} required />
+                            {/* Submits on its own only when the password is not asked after it. */}
+                            <CodeInput
+                                name="code"
+                                autoSubmit={password !== undefined}
+                                value={code}
+                                onValueChange={setCode}
+                                required
+                            />
                         </label>
                         {password === undefined ? (
                             <>
@@ -422,7 +429,13 @@ function AuthenticatorFactor({
                         </p>
                         <label className="flex flex-col gap-1 text-sm">
                             {t("enroll.authenticator.code")}
-                            <CodeInput name="code" value={code} onValueChange={setCode} required />
+                            <CodeInput
+                                name="code"
+                                autoSubmit
+                                value={code}
+                                onValueChange={setCode}
+                                required
+                            />
                         </label>
                         <Button type="submit" disabled={busy || !isWholeCode(code)}>
                             {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
