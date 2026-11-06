@@ -96,8 +96,7 @@ export type FindServerResult = { found?: string; error?: string; path?: LocalPat
 
 /** What the note says about the search, from what it returned. */
 type Search =
-    | { kind: "idle" | "looking" | "notFound" | "cannotLook" }
-    | { kind: "error"; text: string };
+    { kind: "idle" | "looking" | "notFound" | "cannotLook" } | { kind: "error"; text: string };
 
 /** Sort a search result into retry (it moved and was adopted, or it answers
  *  where it is recorded again) or what to say. Pure and unit-tested. */
@@ -120,7 +119,10 @@ export function searchOutcome(result: FindServerResult | null): "retry" | Search
 /** What the corner of the panel says: one of its own states, or the reason the
  *  far end gave, which is shown as it came. */
 type Status =
-    | { kind: "connecting" | "connected" | "disconnected" | "couldNotConnect" | "couldNotAuthorize" }
+    | {
+          kind:
+              "connecting" | "connected" | "disconnected" | "couldNotConnect" | "couldNotAuthorize";
+      }
     | { kind: "reason"; text: string };
 
 export function TerminalPanel({
@@ -198,7 +200,11 @@ export function TerminalPanel({
                 // The route says why (no such connection, no pinned key, not
                 // permitted), and that is more use than "could not authorize".
                 const reason = (await res.json().catch(() => null)) as { error?: string } | null;
-                setStatus(reason?.error ? { kind: "reason", text: reason.error } : { kind: "couldNotAuthorize" });
+                setStatus(
+                    reason?.error
+                        ? { kind: "reason", text: reason.error }
+                        : { kind: "couldNotAuthorize" }
+                );
                 return;
             }
             const { token } = (await res.json()) as { token: string };
@@ -265,7 +271,9 @@ export function TerminalPanel({
         <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{label}</span>
-                <span>{status.kind === "reason" ? status.text : t(`terminal.status.${status.kind}`)}</span>
+                <span>
+                    {status.kind === "reason" ? status.text : t(`terminal.status.${status.kind}`)}
+                </span>
             </div>
             <div
                 ref={mountRef}

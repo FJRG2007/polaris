@@ -132,7 +132,7 @@ const ATTACH_TO_AGENT = [
         // set if there is one, then the two a terminal emulator would ask for,
         // then the one tmux uses for its own panes, then the last-resort entry
         // that every ncurses install has.
-        "u=; for t in \"$TERM\" xterm-256color screen xterm ansi; do",
+        'u=; for t in "$TERM" xterm-256color screen xterm ansi; do',
         // `dumb` is a terminal with no cursor addressing, so tmux refuses it
         // like a missing one - and it is what a stripped environment leaves
         // behind. Skipped rather than tried, so it costs no error line.

@@ -26,7 +26,9 @@ describe("classifySshFailure", () => {
         expect(classifySshFailure(socketError("ECONNRESET", "read ECONNRESET"))).toBe("other");
         expect(
             classifySshFailure(
-                Object.assign(new Error("Timed out while waiting for handshake"), { answered: true })
+                Object.assign(new Error("Timed out while waiting for handshake"), {
+                    answered: true
+                })
             )
         ).toBe("other");
         expect(

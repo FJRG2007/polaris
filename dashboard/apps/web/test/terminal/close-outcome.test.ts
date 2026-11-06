@@ -11,7 +11,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import enUS from "../../messages/en-US/common.json";
 import esES from "../../messages/es-ES/common.json";
-import { CLOSE_REASONS, closeOutcome, searchOutcome } from "../../src/app/(app)/apps/deploy/terminal-panel";
+import {
+    CLOSE_REASONS,
+    closeOutcome,
+    searchOutcome
+} from "../../src/app/(app)/apps/deploy/terminal-panel";
 
 describe("closeOutcome", () => {
     it("reads a refusal after the socket opened as that refusal", () => {
