@@ -24,6 +24,7 @@ import { maySee } from "@/lib/privacy-service";
 import { resolveSession } from "@/lib/session";
 import { profilesArePublic } from "@/lib/profile-service";
 import { resolveAvatar } from "@/lib/avatar-service";
+import { avatarRendition } from "@/lib/avatar-rendition";
 import { inCallTogether } from "@/lib/chat/meetings";
 import { resolveGuestSeat } from "@/lib/chat/meeting-seat";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
@@ -123,26 +124,33 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         return blankAvatarResponse(certain ? CACHE : NO_CACHE);
     }
 
+    const rendition = avatarRendition(request.headers.get("accept"), picture.mime);
+    const etag = rendition ? `${picture.etag.slice(0, -1)}-${rendition.suffix}"` : picture.etag;
+
     // Answered before the bytes are fetched, which is the point of the split:
     // most requests for a face are a browser checking the one it already has.
-    if (request.headers.get("if-none-match") === picture.etag) {
-        return new Response(null, { status: 304, headers: { ETag: picture.etag, "Cache-Control": CACHE } });
+    if (request.headers.get("if-none-match") === etag) {
+        return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": CACHE, Vary: "Accept" } });
     }
 
-    const bytes = await picture.load();
+    const stored = await picture.load();
     // The row said there was a picture and the bytes did not arrive - a swept
     // upload, a storage target that moved, a NAS that is not answering this
     // second. Same answer as having none, since the screen wants initials rather
     // than a broken image, but not cached: the row still says there is a photo,
     // so this is a failure to fetch it and not a fact about the account.
-    if (!bytes) return blankAvatarResponse(NO_CACHE);
+    if (!stored) return blankAvatarResponse(NO_CACHE);
+    const converted = rendition ? await rendition.convert(stored) : null;
+    if (rendition && !converted) return blankAvatarResponse(NO_CACHE);
+    const bytes = converted ?? stored;
 
     return new Response(bytes as BodyInit, {
         headers: {
-            "Content-Type": picture.mime,
+            "Content-Type": rendition ? rendition.mime : picture.mime,
             "Content-Length": String(bytes.length),
-            ETag: picture.etag,
+            ETag: etag,
             "Cache-Control": CACHE,
+            Vary: "Accept",
             // These bytes came from a person or from Gravatar and are served
             // from Polaris's own origin: the browser must treat them as the
             // image they were sniffed to be and nothing else, and must not be

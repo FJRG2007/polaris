@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { iconAcceptable, ICON_MAX_BYTES, noticeLayout } from "@/main/notice-layout";
+import { ICON_ACCEPT, iconAcceptable, ICON_MAX_BYTES, noticeLayout } from "@/main/notice-layout";
 
 describe("noticeLayout", () => {
     it("keeps the conversation as the subtitle on macOS", () => {
@@ -41,6 +41,14 @@ describe("iconAcceptable", () => {
     it("takes a PNG or JPEG of avatar size", () => {
         expect(iconAcceptable("image/png", 2048)).toBe(true);
         expect(iconAcceptable("image/jpeg; charset=binary", 2048)).toBe(true);
+    });
+
+    it("takes an avatar up to the largest one Polaris stores", () => {
+        expect(iconAcceptable("image/png", 2 * 1024 * 1024)).toBe(true);
+    });
+
+    it("asks the Polaris only for the types it can draw", () => {
+        expect(ICON_ACCEPT).toBe("image/png, image/jpeg");
     });
 
     it("refuses what is not a picture the system decodes, empty or oversized", () => {

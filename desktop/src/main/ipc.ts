@@ -50,7 +50,7 @@ import {
     type NativeImage,
     type WebContents
 } from "electron";
-import { iconAcceptable } from "./notice-layout";
+import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -120,7 +120,11 @@ async function noticeIcon(contents: WebContents, path: string | undefined, origi
     const url = path && origin ? serverPath(path, origin) : null;
     if (!url) return null;
     try {
-        const answer = await contents.session.fetch(url, { signal: AbortSignal.timeout(ICON_WAIT_MS), cache: "force-cache" });
+        const answer = await contents.session.fetch(url, {
+            signal: AbortSignal.timeout(ICON_WAIT_MS),
+            cache: "force-cache",
+            headers: { Accept: ICON_ACCEPT }
+        });
         if (!answer.ok) return null;
         const bytes = Buffer.from(await answer.arrayBuffer());
         if (!iconAcceptable(answer.headers.get("content-type"), bytes.length)) return null;

@@ -41,8 +41,13 @@ export function noticeLayout(words: NoticeWords, platform: NodeJS.Platform): Not
 /** The picture types a notice's icon may be: what `nativeImage` decodes. */
 export const ICON_TYPES: readonly string[] = ["image/png", "image/jpeg"];
 
-/** Larger than any avatar Polaris serves; anything bigger is not an avatar. */
-export const ICON_MAX_BYTES = 1024 * 1024;
+/** The picture types a notice asks the Polaris for: a stored WebP or GIF face
+ *  is then answered as a PNG instead of a picture this cannot draw. */
+export const ICON_ACCEPT = ICON_TYPES.join(", ");
+
+/** The largest avatar Polaris stores (`MAX_AVATAR_BYTES`); anything bigger is
+ *  not an avatar. */
+export const ICON_MAX_BYTES = 2 * 1024 * 1024;
 
 /** Whether a fetched picture may be a notice's icon. */
 export function iconAcceptable(contentType: string | null, size: number): boolean {
