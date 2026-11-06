@@ -27,7 +27,7 @@ type Notice = {
 };
 
 /** The failure kinds the bell has its own sentence for. */
-const FAILURE_KINDS = new Set(["key", "credit", "rate", "down", "model"]);
+const FAILURE_KINDS = new Set(["key", "credit", "paid", "rate", "down", "model"]);
 
 /** Why a failed run stopped, in a sentence: the provider's failure when the
  *  answer carried one, otherwise the plain fact that it ended early. Pure. */

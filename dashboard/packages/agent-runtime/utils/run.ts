@@ -1,7 +1,9 @@
+import { getUnsubmittedReview } from "../agents/postRun.ts";
 import type { AgentResult } from "../agents/shared.ts";
 import type { MainResult } from "../main.ts";
 import { reportProgress } from "../mcp/comment.ts";
 import type { ToolContext } from "../mcp/server.ts";
+import type { ToolState } from "../toolState.ts";
 import { log } from "./cli.ts";
 import { reportErrorToComment } from "./errorReport.ts";
 
@@ -9,6 +11,22 @@ export interface HandleAgentResultParams {
   result: AgentResult;
   toolContext: ToolContext;
   silent: boolean | undefined;
+}
+
+/**
+ * a full Review exists to post one: finishing without a submitted review means
+ * the work failed (the model call was refused, or the posting tool was turned
+ * away) however cleanly the agent exited. IncrementalReview stays exempt - its
+ * non-substantive path posts nothing on purpose. runs before finalizeSuccessRun
+ * so the failure reaches the progress comment, the job summary and the run row.
+ */
+export function requireSubmittedReview<R extends AgentResult>(result: R, toolState: ToolState): R {
+  if (!result.success || getUnsubmittedReview(toolState, true) !== "Review") return result;
+  return {
+    ...result,
+    success: false,
+    error: result.error || "the review finished without posting a review on the pull request",
+  };
 }
 
 function getErrorMessage(error: unknown): string {

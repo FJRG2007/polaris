@@ -157,7 +157,8 @@
         "serverReopened": "The server restarted, so Polaris reopened this session on its checkout.",
         "unknownReason": "unknown",
         "firstPrompt": "Polaris could not send the first prompt: {reason}. Send it again from the box below.",
-        "workflowFinished": "The workflow finished as {conclusion}. Its log is on the run in GitHub Actions."
+        "workflowFinished": "The workflow finished as {conclusion}. Its log is on the run in GitHub Actions.",
+        "reportedFailure": "The run reported a failure without saying why. Its log is on the run in GitHub Actions."
     },
     "errors": {
         "checkSettings": "Check the settings",

@@ -91,6 +91,8 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Cancelled from Polaris.": "text.cancelled",
     "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.":
         "text.stoppedReporting",
+    "The run reported a failure without saying why. Its log is on the run in GitHub Actions.":
+        "text.reportedFailure",
     "Could not write the workflow file": "text.workflowWrite",
     "GitHub has not registered the workflow file yet. It was just written, so try again in a moment.":
         "text.workflowUnregistered",
