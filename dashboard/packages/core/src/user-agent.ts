@@ -90,7 +90,9 @@ const VENDOR_PREFIXED = new Map([
  * and only its first quoted token taken - reading every quoted string in the
  * header would name browsers after their version numbers.
  */
-function brandFromHints(brands: string | null | undefined): { name: string; version: string | null } | null {
+function brandFromHints(
+    brands: string | null | undefined
+): { name: string; version: string | null } | null {
     if (!brands) return null;
     for (const entry of brands.slice(0, MAX_BRANDS).split(",")) {
         const name = entry.match(/"([^"]{1,40})"/)?.[1]?.trim();
@@ -125,7 +127,11 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
  * hold on its own: a mobile string that later starts carrying the broad token
  * too would otherwise be read as whichever browser it merely embeds.
  */
-const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonly version: RegExp }[] = [
+const BROWSERS: readonly {
+    readonly test: RegExp;
+    readonly name: string;
+    readonly version: RegExp;
+}[] = [
     { test: /\bEdg\//, name: "Edge", version: /\bEdg\/(\d{1,4})/ },
     { test: /\bEdgA\//, name: "Edge", version: /\bEdgA\/(\d{1,4})/ },
     { test: /\bEdgiOS\//, name: "Edge", version: /\bEdgiOS\/(\d{1,4})/ },
@@ -133,7 +139,11 @@ const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonl
     { test: /\bOPT\//, name: "Opera", version: /\bOPT\/(\d{1,4})/ },
     { test: /\bOPiOS\//, name: "Opera", version: /\bOPiOS\/(\d{1,4})/ },
     { test: /\bVivaldi\//, name: "Vivaldi", version: /\bVivaldi\/(\d{1,4})/ },
-    { test: /\bSamsungBrowser\//, name: "Samsung Internet", version: /\bSamsungBrowser\/(\d{1,4})/ },
+    {
+        test: /\bSamsungBrowser\//,
+        name: "Samsung Internet",
+        version: /\bSamsungBrowser\/(\d{1,4})/
+    },
     { test: /\bFxiOS\//, name: "Firefox", version: /\bFxiOS\/(\d{1,4})/ },
     { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
     { test: /\bCriOS\//, name: "Chrome", version: /\bCriOS\/(\d{1,4})/ },
@@ -141,7 +151,30 @@ const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonl
     { test: /\bSafari\//, name: "Safari", version: /\bVersion\/(\d{1,4})/ }
 ];
 
+/** What the Polaris desktop app is called wherever a device list names it. */
+export const POLARIS_DESKTOP = "Polaris Desktop";
+
+/**
+ * The Polaris desktop app's own claim. It is an Electron window, so its
+ * user-agent carries `Chrome/` like any Chromium - and without this a sign-in
+ * from the app reads as "Chrome on Windows", a browser its owner never opened.
+ * Electron writes the app's name and version (`Polaris/0.1.15`) and its own
+ * `Electron/` token; both are required, so a browser that merely mentions
+ * Polaris is not taken for the app. The version is the app's, in full: its
+ * major is 0 for now and says nothing on its own.
+ */
+const DESKTOP_APP = /\bPolaris\/(\d{1,4}(?:\.\d{1,4}){0,2})\b/;
+const ELECTRON = /\bElectron\/\d/;
+
+function desktopFromUserAgent(userAgent: string): { name: string; version: string | null } | null {
+    if (!ELECTRON.test(userAgent)) return null;
+    const version = userAgent.match(DESKTOP_APP)?.[1];
+    return version ? { name: POLARIS_DESKTOP, version } : null;
+}
+
 function browserFromUserAgent(userAgent: string): { name: string; version: string | null } {
+    const desktop = desktopFromUserAgent(userAgent);
+    if (desktop) return desktop;
     for (const entry of BROWSERS) {
         if (!entry.test.test(userAgent)) continue;
         return { name: entry.name, version: userAgent.match(entry.version)?.[1] ?? null };
@@ -161,7 +194,11 @@ function browserFromUserAgent(userAgent: string): { name: string; version: strin
  * guessed. Telling them apart needs `sec-ch-ua-platform-version`, which is a
  * high-entropy hint a site has to ask for and this deployment does not.
  */
-const OPERATING_SYSTEMS: readonly { readonly test: RegExp; readonly name: string; readonly version?: RegExp }[] = [
+const OPERATING_SYSTEMS: readonly {
+    readonly test: RegExp;
+    readonly name: string;
+    readonly version?: RegExp;
+}[] = [
     { test: /Windows/, name: "Windows" },
     { test: /Android/, name: "Android", version: /Android (\d{1,3}(?:\.\d{1,3})?)/ },
     { test: /iPhone|iPad|iPod|iOS/, name: "iOS", version: /OS (\d{1,3}(?:[._]\d{1,3})?)/ },
@@ -235,7 +272,9 @@ export function describeClient(
     }
 
     const claimed = browserFromUserAgent(userAgent);
-    const hinted = brandFromHints(brands);
+    // The desktop app's hints name only the Chromium it embeds, so its own
+    // token wins over them the way a rebadged browser's hints win elsewhere.
+    const hinted = claimed.name === POLARIS_DESKTOP ? null : brandFromHints(brands);
     // The hints name the browser; the user-agent is the fallback. A rebadged
     // Chromium sends both, and its own `Brave/` token does not exist - so where
     // the hints named it and gave no number, the user-agent's Chrome version is
@@ -355,7 +394,10 @@ export function userAgentMatches(userAgent: string, pattern: string): boolean {
  * key is created with; a request with no user-agent at all cannot match a
  * pattern, so a key that named the clients it expects refuses it.
  */
-export function userAgentAllowed(rules: UserAgentRules, userAgent: string | null | undefined): boolean {
+export function userAgentAllowed(
+    rules: UserAgentRules,
+    userAgent: string | null | undefined
+): boolean {
     const client = userAgent ?? "";
     if (rules.deniedUserAgents.some((pattern) => userAgentMatches(client, pattern))) return false;
     if (rules.allowedUserAgents.length === 0) return true;

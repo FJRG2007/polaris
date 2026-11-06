@@ -1416,7 +1416,7 @@
             "notReleased": "Polaris TV aún no se ha publicado. Podrás instalarla desde aquí cuando lo esté.",
             "dialog": {
                 "title": "Instalar Polaris TV",
-                "intro": "Para Android TV y Google TV de esta red. En la TV, activa las opciones de desarrollador y luego la depuración USB y la de red.",
+                "intro": "Para Android TV y Google TV, en esta red o por cable USB. En la TV, activa las opciones de desarrollador y la depuración USB, y la de red para la red.",
                 "connectingApp": "Consultando la app de escritorio...",
                 "refused": "La app de escritorio no dejó instalar desde esta página. Usa \"Install on a TV\" en su menú.",
                 "address": "IP de la TV",
@@ -1431,8 +1431,8 @@
                 "cancel": "Cancelar",
                 "close": "Cerrar",
                 "keepsGoing": "Si cierras esto, la instalación sigue en la app de escritorio.",
-                "debugClosed": "La depuración de red está cerrada en la TV.",
-                "debugOpen": "La depuración de red sigue activa. Apágala en las opciones de desarrollador de la TV.",
+                "debugClosed": "La depuración está apagada en la TV.",
+                "debugOpen": "La depuración puede seguir activa. Apágala en las opciones de desarrollador.",
                 "backupKept": "Copia guardada en este equipo: {path}",
                 "opening": "Abriendo Polaris Desktop...",
                 "opened": "Sigue en Polaris Desktop. Esta página se abre allí con el instalador.",
@@ -1440,14 +1440,15 @@
                 "phone": "Instalar en una TV requiere un ordenador en la red de la TV. Aún no hay app para móvil, así que abre esta página en ese ordenador.",
                 "steps": {
                     "searching": "Buscando TVs en esta red...",
+                    "usbListing": "Buscando TVs conectadas por USB...",
                     "connecting": "Conectando con la TV...",
-                    "allow": "En la TV, elige Permitir en el aviso de depuración.",
+                    "allow": "En la TV, elige Permitir cuando pida permitir la depuración USB.",
                     "checking": "Comprobando la TV...",
                     "backup": "Guardando una copia de los ajustes de la TV...",
                     "download": "Descargando Polaris TV...",
                     "install": "Instalando...",
                     "home": "Haciéndola la pantalla de inicio...",
-                    "closing": "Cerrando la depuración de red en la TV..."
+                    "closing": "Apagando la depuración en la TV..."
                 },
                 "outcomes": {
                     "installed": "Polaris TV está instalada. Búscala entre las apps de la TV.",
@@ -1466,8 +1467,14 @@
                     "backup-failed": "No se pudo guardar la copia, así que no se instaló nada. Revisa el espacio libre del equipo.",
                     "sideload-refused": "Esta TV rechaza apps que no vienen de su tienda. No cambió nada en ella.",
                     "install-failed": "La TV no pudo instalarla. No cambió nada más en ella.",
-                    "install-interrupted": "La conexión se cortó durante la instalación. Busca Polaris TV entre las apps de la TV o reinténtalo."
-                }
+                    "install-interrupted": "La conexión se cortó durante la instalación. Busca Polaris TV entre las apps de la TV o reinténtalo.",
+                    "usb-busy": "Otro programa usa la depuración USB de la TV. Cierra adb o scrcpy y reintenta. En Windows, la TV puede necesitar el Google USB Driver.",
+                    "usb-gone": "La TV ya no está conectada por USB. Revisa el cable y vuelve a intentarlo."
+                },
+                "usb": "Cable USB",
+                "usbHint": "Conecta la TV a este ordenador. Cierra adb o scrcpy si están abiertos.",
+                "usbFind": "Buscar por USB",
+                "usbNone": "No hay TV en los puertos USB. Revisa el cable y la depuración USB."
             }
         }
     },

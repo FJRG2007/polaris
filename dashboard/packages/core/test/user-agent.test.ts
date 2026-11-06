@@ -10,7 +10,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { describeClient, describeDevice, userAgentAllowed, userAgentMatches } from "../src/user-agent.js";
+import {
+    describeClient,
+    describeDevice,
+    userAgentAllowed,
+    userAgentMatches
+} from "../src/user-agent.js";
 
 const CHROME_WINDOWS =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -38,6 +43,25 @@ describe("describeClient", () => {
             claimedBrowser: "Chrome",
             claimedOs: "Windows"
         });
+    });
+
+    it("names the Polaris desktop app rather than the Chromium inside it", () => {
+        // Electron's default user-agent: the app's own name and version, then
+        // the engine's tokens.
+        const desktop =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Polaris/0.1.15 Chrome/134.0.6998.205 Electron/35.7.5 Safari/537.36";
+        const hints = '"Not:A-Brand";v="24", "Chromium";v="134"';
+        const reading = describeClient(desktop, hints, '"Windows"');
+        expect(reading.browser).toBe("Polaris Desktop");
+        expect(reading.browserVersion).toBe("0.1.15");
+        expect(reading.label).toBe("Polaris Desktop on Windows");
+        // Even a hint naming a browser does not rename the app.
+        expect(describeClient(desktop, '"Google Chrome";v="134"').browser).toBe("Polaris Desktop");
+        // Another Electron app, or a browser that only mentions Polaris, is not it.
+        expect(describeClient(desktop.replace("Polaris/0.1.15", "Slack/4.41.0")).browser).toBe(
+            "Chrome"
+        );
+        expect(describeClient(`${CHROME_WINDOWS} Polaris/1.0`).browser).toBe("Chrome");
     });
 
     it("takes the major version only, which is the one anybody reads", () => {
@@ -98,7 +122,9 @@ describe("describeClient", () => {
             label: "Edge on Windows"
         });
         const edgeUserAgent = `${CHROME_WINDOWS} Edg/131.0.0.0`;
-        expect(describeClient(edgeUserAgent).browser).toBe(describeClient(edgeUserAgent, edge).browser);
+        expect(describeClient(edgeUserAgent).browser).toBe(
+            describeClient(edgeUserAgent, edge).browser
+        );
     });
 
     // The lookup is keyed by header text, so it is asked about whatever a caller
@@ -116,7 +142,11 @@ describe("describeClient", () => {
     it("names the browsers that rebadge themselves on iOS and Android", () => {
         const webkit = WEBKIT_IPHONE;
         const cases = [
-            [`${webkit} Version/17.5 EdgiOS/131.2903.92 Mobile/15E148 Safari/605.1.15`, "Edge", "131"],
+            [
+                `${webkit} Version/17.5 EdgiOS/131.2903.92 Mobile/15E148 Safari/605.1.15`,
+                "Edge",
+                "131"
+            ],
             [`${webkit} CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1`, "Chrome", "131"],
             [`${webkit} FxiOS/133.0 Mobile/15E148 Safari/605.1.15`, "Firefox", "133"],
             // Opera on iOS writes neither `OPR/` nor anything Chromium: current

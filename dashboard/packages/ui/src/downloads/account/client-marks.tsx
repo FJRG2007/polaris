@@ -351,6 +351,9 @@ export function BrowserMark({ browser, className }: { browser: string; className
     if (browser === "Edge") return <EdgeMark className={size} />;
     if (browser === "Opera") return <OperaMark className={size} />;
     if (browser === "Vivaldi") return <VivaldiMark className={size} />;
+    // The Polaris desktop app: the same glyph its connected-client row draws.
+    if (browser === "Polaris Desktop")
+        return <Monitor aria-hidden className={cn(size, "text-muted-foreground")} />;
     return <Globe aria-hidden className={cn(size, "text-muted-foreground")} />;
 }
 

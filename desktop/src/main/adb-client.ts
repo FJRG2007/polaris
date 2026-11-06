@@ -4,8 +4,9 @@
  * nobody has to install platform-tools.
  *
  * Protocol as AOSP documents it (packages/modules/adb, protocol.txt and
- * SYNC.TXT). Plain TCP only: Android 11's Wireless debugging pairing is another
- * protocol, which this does not speak.
+ * SYNC.TXT). Over TCP, or over any other link that carries the same packets - a
+ * USB cable's bulk endpoints (`usb-link.ts`). Android 11's Wireless debugging
+ * pairing is another protocol, which this does not speak.
  */
 
 import { connect as tcp, type Socket } from "node:net";
@@ -118,9 +119,53 @@ export function signToken(key: string, token: Buffer): Buffer {
     );
 }
 
+/** A path to the TV's adbd that carries whole packets. */
+export interface AdbLink {
+    /** One packet: USB sends its header and payload as two transfers, TCP as one write. */
+    send(header: Buffer, data: Buffer): void;
+    close(): void;
+}
+
+export interface AdbLinkEvents {
+    data(chunk: Buffer): void;
+    /** The link is gone - unplugged, closed by the TV, or failed. */
+    lost(error: Error): void;
+}
+
+export type AdbLinkOpener = (events: AdbLinkEvents) => Promise<AdbLink>;
+
+/** The network link: a TCP socket to the TV's port. */
+export function tcpLink(host: string, port: number, connectMs: number): AdbLinkOpener {
+    return (events) =>
+        new Promise((resolve, reject) => {
+            const socket: Socket = tcp({ host, port });
+            const timer = setTimeout(() => {
+                socket.destroy();
+                reject(new Error("timeout"));
+            }, connectMs);
+            socket.once("connect", () => {
+                clearTimeout(timer);
+                socket.removeAllListeners("error");
+                socket.on("error", (error) => events.lost(error));
+                socket.on("close", () => events.lost(new Error("The TV closed the connection.")));
+                socket.on("data", (chunk) => events.data(chunk));
+                resolve({
+                    send: (header, data) => socket.write(Buffer.concat([header, data])),
+                    close: () => socket.destroy()
+                });
+            });
+            socket.once("error", (error) => {
+                clearTimeout(timer);
+                reject(error);
+            });
+        });
+}
+
 export interface AdbOptions {
-    readonly host: string;
-    readonly port: number;
+    /** How to reach the TV; a TCP connection to `host`:`port` when absent. */
+    readonly link?: AdbLinkOpener;
+    readonly host?: string;
+    readonly port?: number;
     /** PEM. Its public half is what the TV is asked to allow. */
     readonly key: string;
     readonly connectMs: number;
@@ -139,7 +184,7 @@ interface Waiter {
 }
 
 export class AdbConnection {
-    private socket: Socket | null = null;
+    private link: AdbLink | null = null;
     private readonly reader = new PacketReader();
     private readonly inbox: Packet[] = [];
     private waiters: Waiter[] = [];
@@ -183,37 +228,23 @@ export class AdbConnection {
     }
 
     private send(command: number, arg0: number, arg1: number, data?: Buffer): void {
-        this.socket?.write(encodePacket(command, arg0, arg1, data));
+        const packet = encodePacket(command, arg0, arg1, data);
+        this.link?.send(packet.subarray(0, HEADER_BYTES), packet.subarray(HEADER_BYTES));
     }
 
     async open(): Promise<void> {
-        const { host, port, connectMs } = this.options;
-        await new Promise<void>((resolve, reject) => {
-            const socket = tcp({ host, port });
-            const timer = setTimeout(() => {
-                socket.destroy();
-                reject(new Error("timeout"));
-            }, connectMs);
-            socket.once("connect", () => {
-                clearTimeout(timer);
-                this.socket = socket;
-                socket.removeAllListeners("error");
-                socket.on("error", (error) => this.fail(error));
-                socket.on("close", () => this.fail(new Error("The TV closed the connection.")));
-                socket.on("data", (chunk) => {
-                    try {
-                        for (const packet of this.reader.push(chunk)) this.deliver(packet);
-                    } catch (caught) {
-                        this.fail(caught as Error);
-                        socket.destroy();
-                    }
-                });
-                resolve();
-            });
-            socket.once("error", (error) => {
-                clearTimeout(timer);
-                reject(error);
-            });
+        const { host = "", port = 0, connectMs } = this.options;
+        const opener = this.options.link ?? tcpLink(host, port, connectMs);
+        this.link = await opener({
+            data: (chunk) => {
+                try {
+                    for (const packet of this.reader.push(chunk)) this.deliver(packet);
+                } catch (caught) {
+                    this.fail(caught as Error);
+                    this.close();
+                }
+            },
+            lost: (error) => this.fail(error)
         });
         this.send(A_CNXN, VERSION, MAX_PAYLOAD, Buffer.from("host::\0"));
         const isHandshake = (packet: Packet) => packet.command === A_CNXN || packet.command === A_AUTH;
@@ -300,7 +331,8 @@ export class AdbConnection {
     }
 
     close(): void {
-        this.socket?.destroy();
-        this.socket = null;
+        const link = this.link;
+        this.link = null;
+        link?.close();
     }
 }

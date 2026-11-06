@@ -1416,7 +1416,7 @@
             "notReleased": "Polaris TV has not been published yet. It can be installed from here once it is.",
             "dialog": {
                 "title": "Install Polaris TV",
-                "intro": "For Android TV and Google TV on this network. On the TV, turn on Developer options, then USB debugging and Network debugging.",
+                "intro": "For Android TV and Google TV, on this network or by USB cable. On the TV, turn on Developer options and USB debugging, and Network debugging for the network.",
                 "connectingApp": "Asking the desktop app...",
                 "refused": "The desktop app did not let this page install. Use \"Install on a TV\" in its menu instead.",
                 "address": "TV address",
@@ -1431,8 +1431,8 @@
                 "cancel": "Cancel",
                 "close": "Close",
                 "keepsGoing": "Closing this leaves the install running in the desktop app.",
-                "debugClosed": "Network debugging is closed on the TV.",
-                "debugOpen": "Network debugging is still on. Turn it off in the TV's Developer options.",
+                "debugClosed": "Debugging is turned off on the TV.",
+                "debugOpen": "Debugging may still be on. Turn it off in the TV's Developer options.",
                 "backupKept": "Backup kept on this computer: {path}",
                 "opening": "Opening Polaris Desktop...",
                 "opened": "Carry on in Polaris Desktop. This page opens there with the installer.",
@@ -1440,14 +1440,15 @@
                 "phone": "Installing on a TV takes a computer on the TV's network. There is no phone app yet, so open this page on that computer.",
                 "steps": {
                     "searching": "Looking for TVs on this network...",
+                    "usbListing": "Looking for TVs plugged in by USB...",
                     "connecting": "Connecting to the TV...",
-                    "allow": "On the TV, choose Allow on the debugging prompt.",
+                    "allow": "On the TV, choose Allow when it asks to allow USB debugging.",
                     "checking": "Checking the TV...",
                     "backup": "Saving a backup of the TV's settings...",
                     "download": "Downloading Polaris TV...",
                     "install": "Installing...",
                     "home": "Making it the Home screen...",
-                    "closing": "Closing network debugging on the TV..."
+                    "closing": "Turning off debugging on the TV..."
                 },
                 "outcomes": {
                     "installed": "Polaris TV is installed. Find it among the TV's apps.",
@@ -1466,8 +1467,14 @@
                     "backup-failed": "The backup could not be saved, so nothing was installed. Check this computer's free space.",
                     "sideload-refused": "This TV refuses apps that do not come from its store. Nothing changed on it.",
                     "install-failed": "The TV could not install it. Nothing else changed on it.",
-                    "install-interrupted": "The connection dropped during the install. Look for Polaris TV among the TV's apps, or try again."
-                }
+                    "install-interrupted": "The connection dropped during the install. Look for Polaris TV among the TV's apps, or try again.",
+                    "usb-busy": "Another program is using the TV's USB debugging. Close adb or scrcpy and retry. On Windows, the TV may need the Google USB Driver.",
+                    "usb-gone": "The TV is no longer connected by USB. Check the cable and try again."
+                },
+                "usb": "USB cable",
+                "usbHint": "Plug the TV into this computer. Close adb or scrcpy if open.",
+                "usbFind": "Find by USB",
+                "usbNone": "No TV on this computer's USB ports. Check the cable and USB debugging."
             }
         }
     },

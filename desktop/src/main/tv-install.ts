@@ -5,7 +5,10 @@
  * change, nothing uninstalled or disabled, the set's own launcher left enabled so
  * Home always has a way back, Home confirmed rather than assumed, and network and
  * USB debugging switched off afterwards with only a refused connection on port
- * 5555 counting as closed.
+ * 5555 counting as closed - or, over a USB cable, the TV no longer offering ADB.
+ *
+ * Over the network or over a USB cable: the TV's own Wireless debugging can be
+ * one a set switches straight back off, and a cable needs none of it.
  *
  * What it does not: PROMPT.md's closing also revokes USB debugging authorisations,
  * checks the Wireless debugging port, reboots the set and checks again. Nobody
@@ -21,6 +24,7 @@ import { networkInterfaces } from "node:os";
 import { openLocalWindow } from "./windows";
 import { repository } from "../../package.json";
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
+import { usbDevices, usbLink } from "./usb-link";
 import { AdbConnection, newAdbKey } from "./adb-client";
 import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -45,6 +49,8 @@ const DOWNLOAD_MS = 300_000;
 
 /** What a failed connection means, in terms the person can act on. */
 export function connectFailure(error: { code?: string; message?: string; }): TvOutcome {
+    if (error.code === "USB_BUSY") return "usb-busy";
+    if (error.code === "USB_GONE") return "usb-gone";
     if (error.code === "ECONNREFUSED") return "adb-off";
     if (error.message === "The TV stopped answering.") return "not-allowed";
     if (error.code === "EHOSTUNREACH" || error.code === "ENETUNREACH") return "unreachable";
@@ -160,9 +166,17 @@ export async function latestApk(): Promise<{ apk: Buffer; version: string; } | n
     return { apk, version: release.tag_name.slice(TAG_PREFIX.length) };
 }
 
-async function backUp(adb: AdbConnection, host: string): Promise<string> {
+/** A TV on the network by its address, or one plugged in by USB by its id. */
+export type TvTarget = { readonly kind: "network"; readonly host: string; } | { readonly kind: "usb"; readonly id: string; };
+
+/** The backup folder's name for a TV: its address, or its USB id with only safe characters. */
+export function targetLabel(target: TvTarget): string {
+    return target.kind === "network" ? target.host : `usb-${target.id.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 64)}`;
+}
+
+async function backUp(adb: AdbConnection, target: TvTarget): Promise<string> {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const folder = join(app.getPath("userData"), "tv-backups", `${host}-${stamp}`);
+    const folder = join(app.getPath("userData"), "tv-backups", `${targetLabel(target)}-${stamp}`);
     await mkdir(folder, { recursive: true });
     const reads: readonly (readonly [string, string])[] = [
         ["packages.txt", "pm list packages"],
@@ -181,18 +195,22 @@ let window: BrowserWindow | null = null;
 const pages = new Set<WebContents>();
 let busy = false;
 let searcher: WebContents | null = null;
-let state: TvInstallState = { phase: "ready", found: [], outcome: null, backup: null, closed: null };
+let state: TvInstallState = { phase: "ready", found: [], usb: null, usbListing: false, outcome: null, backup: null, closed: null };
 
 function publish(next: Partial<TvInstallState>): void {
     state = { ...state, ...next };
     for (const page of pages) if (!page.isDestroyed()) page.send(CHANNELS.tvEvent, state);
 }
 
-async function closeAdb(adb: AdbConnection, host: string): Promise<boolean> {
+async function closeAdb(adb: AdbConnection, target: TvTarget): Promise<boolean> {
     await adb.shell("settings put global adb_wifi_enabled 0; settings put global adb_enabled 0").catch(() => "");
     adb.close();
     for (let attempt = 0; attempt < CLOSE_ATTEMPTS; attempt += 1) {
-        if ((await answersOn(host, ADB_PORT, SCAN_MS)) === "refused") return true;
+        if (target.kind === "usb") {
+            // Debugging off takes the ADB interface off the cable.
+            const still = await usbDevices().catch(() => null);
+            if (still && !still.some((one) => one.id === target.id)) return true;
+        } else if ((await answersOn(target.host, ADB_PORT, SCAN_MS)) === "refused") return true;
         await new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS));
     }
     return false;
@@ -208,7 +226,7 @@ export function lateFailure(stage: TvStage): TvOutcome {
     return stage === "home" ? "installed-home-unknown" : "connection-lost";
 }
 
-async function install(host: string, makeHome: boolean): Promise<void> {
+async function install(target: TvTarget, makeHome: boolean): Promise<void> {
     publish({ phase: "download", outcome: null, backup: null, closed: null });
     const release = await latestApk().catch((caught: unknown) => {
         console.error("[tv]", caught);
@@ -229,8 +247,7 @@ async function install(host: string, makeHome: boolean): Promise<void> {
 
     publish({ phase: "connecting" });
     const adb = new AdbConnection({
-        host,
-        port: ADB_PORT,
+        ...(target.kind === "usb" ? { link: usbLink(target.id) } : { host: target.host, port: ADB_PORT }),
         key,
         connectMs: 8_000,
         approveMs: 60_000,
@@ -250,12 +267,12 @@ async function install(host: string, makeHome: boolean): Promise<void> {
         publish({ phase: "checking" });
         const refusal = tvRefusal(await adb.shell("getprop ro.build.version.sdk"), await adb.shell("pm list features"));
         if (refusal) {
-            await finish(adb, host, refusal);
+            await finish(adb, target, refusal);
             return;
         }
         stage = "backup";
         publish({ phase: "backup" });
-        publish({ backup: await backUp(adb, host) });
+        publish({ backup: await backUp(adb, target) });
 
         stage = "send";
         publish({ phase: "install" });
@@ -264,7 +281,7 @@ async function install(host: string, makeHome: boolean): Promise<void> {
         const installed = await adb.shell(`pm install -r ${REMOTE_APK}`, 180_000);
         await adb.shell(`rm -f ${REMOTE_APK}`).catch(() => "");
         if (!installed.includes("Success")) {
-            await finish(adb, host, /VERIFICATION_FAILURE/.test(installed) ? "sideload-refused" : "install-failed");
+            await finish(adb, target, /VERIFICATION_FAILURE/.test(installed) ? "sideload-refused" : "install-failed");
             return;
         }
         stage = "home";
@@ -279,16 +296,16 @@ async function install(host: string, makeHome: boolean): Promise<void> {
             );
             outcome = homeIsOurs(resolved) ? "installed-home" : "installed-home-refused";
         }
-        await finish(adb, host, outcome);
+        await finish(adb, target, outcome);
     } catch (caught) {
         console.error("[tv]", caught);
-        await finish(adb, host, lateFailure(stage));
+        await finish(adb, target, lateFailure(stage));
     }
 }
 
-async function finish(adb: AdbConnection, host: string, outcome: TvOutcome): Promise<void> {
+async function finish(adb: AdbConnection, target: TvTarget, outcome: TvOutcome): Promise<void> {
     publish({ phase: "closing" });
-    const closed = await closeAdb(adb, host);
+    const closed = await closeAdb(adb, target);
     publish({ phase: outcome.startsWith("installed") ? "done" : "failed", outcome, closed });
 }
 
@@ -317,10 +334,16 @@ export function openTvInstall(): void {
     });
 }
 
-const startSchema = z.object({
-    host: z.unknown().transform(readTvAddress).pipe(z.string()),
-    home: z.boolean()
-});
+const startSchema = z.union([
+    z.object({ host: z.unknown().transform(readTvAddress).pipe(z.string()), home: z.boolean() }),
+    z.object({ usb: z.string().trim().min(1).max(200), home: z.boolean() })
+]);
+
+/** Where a start asked to install; a USB id only counts if it was listed. */
+export function startTarget(input: z.infer<typeof startSchema>, listed: readonly { readonly id: string; }[] | null): TvTarget | null {
+    if ("host" in input) return { kind: "network", host: input.host };
+    return listed?.some((one) => one.id === input.usb) ? { kind: "usb", id: input.usb } : null;
+}
 
 /** `fromTv` accepts the TV window and a Polaris window on its own Polaris. */
 export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean): void {
@@ -354,11 +377,26 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         publish({ phase: "ready", found });
         return state;
     });
+    ipcMain.handle(CHANNELS.tvFindUsb, async (event) => {
+        if (!fromTv(event)) return null;
+        if (busy) return state;
+        busy = true;
+        publish({ usbListing: true });
+        const usb = await usbDevices().catch((caught: unknown) => {
+            console.error("[tv]", caught);
+            return [];
+        });
+        busy = false;
+        publish({ usb, usbListing: false, outcome: null });
+        return state;
+    });
     ipcMain.handle(CHANNELS.tvStart, async (event, raw: unknown) => {
         const input = startSchema.safeParse(raw);
         if (!fromTv(event) || !input.success || busy) return false;
+        const target = startTarget(input.data, state.usb);
+        if (!target) return false;
         busy = true;
-        void install(input.data.host, input.data.home).finally(() => {
+        void install(target, input.data.home).finally(() => {
             busy = false;
         });
         return true;

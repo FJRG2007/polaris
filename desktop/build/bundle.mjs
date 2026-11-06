@@ -1,5 +1,5 @@
 /**
- * Bundle the app into `dist/`: the main process and both preloads as CommonJS
+ * Bundle the app into `dist/`: the main process and the preloads as CommonJS
  * for Electron's Node, the three local pages' scripts for the browser, and their
  * HTML, stylesheet and mark copied beside them.
  *
@@ -31,7 +31,11 @@ const node = {
 await build({ ...node, entryPoints: [join(ROOT, "src/main/index.ts")], outfile: join(DIST, "main/index.js") });
 await build({
     ...node,
-    entryPoints: { app: join(ROOT, "src/preload/app.ts"), local: join(ROOT, "src/preload/local.ts") },
+    entryPoints: {
+        app: join(ROOT, "src/preload/app.ts"),
+        local: join(ROOT, "src/preload/local.ts"),
+        usb: join(ROOT, "src/preload/usb.ts")
+    },
     outdir: join(DIST, "preload")
 });
 await build({
@@ -43,12 +47,12 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
-    entryPoints: ["connect", "api-key", "push", "tv", "overlay", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
+    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
     outdir: join(DIST, "renderer")
 });
 
 mkdirSync(join(DIST, "renderer"), { recursive: true });
-for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "overlay.html", "updating.html", "styles.css", "mark.svg"]) {
+for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "updating.html", "styles.css", "mark.svg"]) {
     copyFileSync(join(ROOT, "src/renderer", file), join(DIST, "renderer", file));
 }
 // The window icon on Linux - Windows and macOS take theirs from the executable -
