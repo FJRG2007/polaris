@@ -170,8 +170,10 @@ describe("joining a meeting", () => {
         expect(created).toEqual([]);
     });
 
+    // Somebody never invited arrives on the link: by id alone they are refused
+    // (meeting-invites-edit.test.ts).
     it("puts somebody who was never invited at the door", async () => {
-        const seat = await meetings.joinMeeting({ id: "grace", name: "Grace" }, "m1");
+        const seat = await meetings.joinMeeting({ id: "grace", name: "Grace" }, "m1", true);
 
         expect(seat.admission).toBe("waiting");
         expect(created).toEqual([{ userId: "grace", admission: "waiting" }]);
@@ -188,7 +190,7 @@ describe("joining a meeting", () => {
     it("lets anybody in when the host is not approving people", async () => {
         meeting.approveGuests = false;
 
-        const seat = await meetings.joinMeeting({ id: "grace", name: "Grace" }, "m1");
+        const seat = await meetings.joinMeeting({ id: "grace", name: "Grace" }, "m1", true);
 
         expect(seat.admission).toBe("admitted");
     });

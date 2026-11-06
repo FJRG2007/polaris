@@ -230,7 +230,9 @@
         "lockWrongCode": "Ese código no es correcto",
         "lockRequired": "Este chat está bloqueado. Escribe tu código para abrirlo",
         "lockResetUnconfirmed": "Confirma primero que eres tú",
-        "meetingEmailsNeedGuests": "Solo cuentas Polaris: invita a la gente por nombre, no por correo"
+        "meetingEmailsNeedGuests": "Solo cuentas Polaris: invita a la gente por nombre, no por correo",
+        "meetingNotInvited": "No tienes invitación a esta reunión. Pide el enlace a quien la organiza",
+        "meetingTooManyEmails": "Una reunión admite como mucho {count} direcciones de correo"
     },
     "media": {
         "refused": {
@@ -537,9 +539,6 @@
         "removeThem": "¿Quitarle?",
         "theyAreDroppedFromThe": "Sale de la reunión. Alguien con cuenta no puede volver a entrar; un invitado con el enlace vuelve a la puerta.",
         "remove": "Quitar",
-        "invitePeople": "Invitar a gente",
-        "theyGetAnAlertWith": "Reciben un aviso con la reunión y entran directamente cuando empiece. Para quien no tenga cuenta, envía el enlace.",
-        "cancel": "Cancelar",
         "hostedBy": "la organiza {name}",
         "present": "{count, plural, one {# persona} other {# personas}} en la sala.",
         "guestSuffix": " - invitado",
@@ -2295,6 +2294,23 @@
         "people": "Invitar personas",
         "peopleSkipLobby": "Reciben un aviso y entran sin esperar a que les dejes pasar.",
         "peopleHint": "Reciben un aviso con la reunión.",
-        "emailsNeedGuests": "Solo cuentas Polaris: quien no tiene cuenta no puede entrar, así que invítale por nombre."
+        "emailsNeedGuests": "Solo cuentas Polaris: quien no tiene cuenta no puede entrar, así que invítale por nombre.",
+        "manage": "Invitaciones",
+        "manageHint": "Añade o quita personas y gestiona el código",
+        "removePerson": "Quitar la invitación de {name}",
+        "nobodyYet": "Aún no hay invitados",
+        "addPeople": "Añadir gente",
+        "addPeopleHint": "Cada persona que añadas recibe un aviso, como al crear la reunión.",
+        "noCode": "Sin código. Añade uno para que se pueda escribir en /m.",
+        "addCode": "Añadir un código",
+        "newCode": "Otro código",
+        "removeCode": "Quitar código",
+        "replaceCodeQuestion": "El código actual deja de funcionar al momento.",
+        "replaceCode": "Cambiar código",
+        "removeCodeQuestion": "El código deja de funcionar al momento. El enlace sigue sirviendo.",
+        "confirmRemoveCode": "Quitarlo",
+        "back": "Mantenerlo",
+        "done": "Hecho",
+        "add": "Añadir"
     }
 }
