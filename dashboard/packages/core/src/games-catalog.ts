@@ -120,7 +120,8 @@ export function findGame(id: string): GameDefinition | undefined {
  *  `isGameServersApp` for that. */
 export function gameForCatalogId(catalogId: string): GameDefinition | undefined {
     return GAMES.find(
-        (game) => game.legacyManagerCatalogId === catalogId || game.serverCatalogIds.includes(catalogId)
+        (game) =>
+            game.legacyManagerCatalogId === catalogId || game.serverCatalogIds.includes(catalogId)
     );
 }
 
@@ -138,7 +139,10 @@ export function isGameServersApp(catalogId: string): boolean {
 /** Whether a catalog id turns the Game servers page on - the one app, or one of
  *  the per-game managers that used to. */
 export function isGameManagerApp(catalogId: string): boolean {
-    return isGameServersApp(catalogId) || GAMES.some((game) => game.legacyManagerCatalogId === catalogId);
+    return (
+        isGameServersApp(catalogId) ||
+        GAMES.some((game) => game.legacyManagerCatalogId === catalogId)
+    );
 }
 
 /**
@@ -164,3 +168,9 @@ const BEDROCK_CATALOG_ID = "minecraft-bedrock";
 export function routesByHostname(catalogId: string): boolean {
     return Boolean(gameOfServer(catalogId)?.srv) && catalogId !== BEDROCK_CATALOG_ID;
 }
+
+/** What the hostname router puts on a player's server list for a server that is
+ *  asleep, and for one that is coming up. The router answers these pings itself,
+ *  so a reply carrying either is the router speaking, not the server. */
+export const MINECRAFT_ROUTER_ASLEEP_MOTD = "Asleep - join to start it";
+export const MINECRAFT_ROUTER_LOADING_MOTD = "Starting up - join again in a moment";

@@ -41,6 +41,10 @@ const PREVIEW_CHARS = 160;
  * bounded by the conversations already being listed and not by how much was
  * ever said in them. Thread replies are left out: they are not what the
  * conversation last said.
+ *
+ * Every number handed to a function is cast: Prisma binds a JS number as a
+ * bigint, and `left(text, bigint)` does not exist, so an uncast length failed
+ * the whole read and every row in the list drew with nothing under its name.
  */
 export async function lastMessages(
     channelIds: readonly string[]
@@ -48,7 +52,7 @@ export async function lastMessages(
     if (channelIds.length === 0) return new Map();
     const rows = await prisma.$queryRaw<Row[]>`
         SELECT c.id::text AS "channelId", m."authorId"::text AS "authorId", m.kind,
-               CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${PREVIEW_CHARS}) ELSE '' END AS body,
+               CASE WHEN m."deletedAt" IS NULL THEN left(m.body, ${PREVIEW_CHARS}::int) ELSE '' END AS body,
                m."createdAt", m."deliveredAt" IS NOT NULL AS delivered,
                m."readAt" IS NOT NULL AS read, m."deletedAt" IS NOT NULL AS deleted
         FROM unnest(${[...channelIds]}::uuid[]) AS c(id)

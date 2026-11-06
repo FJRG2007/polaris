@@ -25,7 +25,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpCircle, Loader2, Search, Settings, Store } from "lucide-react";
+import { ArrowUpCircle, Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { CAPABILITY_KEYS } from "@/lib/apps/capability-words";
 import { appSettingsHref, builtInSettingsHref } from "@/lib/apps/app-settings";
@@ -674,7 +674,19 @@ function BuiltInCard({
     const t = useTranslations("marketplace");
     const navLabel = useNavLabel();
     const locale = useLocale();
+    const router = useRouter();
     const settingsHref = builtInSettingsHref(entry.id);
+    // The same menu every other card has, so its settings are where a reader
+    // looks for them; nothing installs a built-in app, so nothing uninstalls it.
+    const entries: OverflowEntry[] = settingsHref
+        ? [
+              {
+                  key: "settings",
+                  label: t("detail.settings"),
+                  onSelect: () => router.push(settingsHref)
+              }
+          ]
+        : [];
     return (
         <store.StoreCard
             preview={
@@ -715,19 +727,7 @@ function BuiltInCard({
                     <Button asChild size="sm">
                         <Link href={entry.href}>{t("card.open")}</Link>
                     </Button>
-                    {settingsHref ? (
-                        <Button
-                            asChild
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={t("detail.settings")}
-                            title={t("detail.settings")}
-                        >
-                            <Link href={settingsHref}>
-                                <Settings className="size-4" />
-                            </Link>
-                        </Button>
-                    ) : null}
+                    <OverflowMenu label={t("card.more", { name: entry.name })} entries={entries} />
                 </>
             }
         />

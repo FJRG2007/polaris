@@ -756,7 +756,8 @@ services:
   #    the header, and turning it on while the backends keep their own published
   #    ports would let a client that dials one directly forge its source address.
   #    The cost is that a routed server sees connections from this container, which
-  #    is why routing is opted into per server rather than switched on for all.
+  #    is why a server whose player list is bound to addresses is never routed.
+  #    The flag is one switch for every backend (docs/domain-zones.md).
   mc-router:
     profiles: ["mcrouter"]
     image: itzg/mc-router:1.46.2
