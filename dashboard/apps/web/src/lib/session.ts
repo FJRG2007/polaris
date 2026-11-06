@@ -233,11 +233,19 @@ export function accessFor(user: SessionUser): AppAccessInput {
         reachesSubject: async (subject) =>
             user.viewingAs?.mode !== "role" &&
             (await import("@/lib/access/grants")).reachesAnySubject(user.id, [subject]),
-        // Polar's own audience, the same answer every Polar route checks.
-        closes: async (appId) =>
-            appId === "polar" &&
-            user.viewingAs?.mode !== "role" &&
-            !(await (await import("@/lib/polar/access")).polarAccessFor(user.id)).use
+        // Polar's own audience, the same answer every Polar route checks, and
+        // the VPN's: an administrator, somebody given access, or everybody once
+        // an administrator opens it to all - never merely being signed in.
+        closes: async (appId) => {
+            if (user.viewingAs?.mode === "role") return false;
+            if (appId === "polar")
+                return !(await (await import("@/lib/polar/access")).polarAccessFor(user.id)).use;
+            if (appId === "vpn")
+                return (
+                    (await (await import("@/lib/vpn/wireguard-service")).accessOf(user)) === null
+                );
+            return false;
+        }
     };
 }
 

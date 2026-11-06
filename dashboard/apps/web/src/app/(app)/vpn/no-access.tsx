@@ -10,7 +10,8 @@ import * as ui from "@polaris/ui";
 import { ShieldOff } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export function VpnNoAccess() {
+/** `withDevices` off where the devices screen is closed to them too. */
+export function VpnNoAccess({ withDevices = true }: { withDevices?: boolean }) {
     const t = useTranslations("vpn");
     return (
         <ui.EmptyState
@@ -18,9 +19,11 @@ export function VpnNoAccess() {
             title={t("access.title")}
             description={t("access.body")}
             action={
-                <ui.Button asChild size="sm" variant="outline">
-                    <Link href="/vpn/devices">{t("access.devices")}</Link>
-                </ui.Button>
+                withDevices ? (
+                    <ui.Button asChild size="sm" variant="outline">
+                        <Link href="/vpn/devices">{t("access.devices")}</Link>
+                    </ui.Button>
+                ) : undefined
             }
         />
     );

@@ -24,7 +24,7 @@ export const ACCOUNT_HOME = "/account";
 export const OVERVIEW_APP = "overview";
 /** Apps that say nothing about what an account holds, so one reaching nothing
  *  else is not offered these either: Overview shows the others, Polar acts in
- *  them, and the VPN, once installed, is open to every account. */
+ *  them, and the VPN only connects devices. */
 const COMPANION_APPS = new Set([OVERVIEW_APP, "polar", "vpn"]);
 
 export interface AppAccessInput {
