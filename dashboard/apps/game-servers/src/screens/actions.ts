@@ -429,7 +429,8 @@ export async function redeployGameServerAction(
 }
 
 /** DNS records of deleted servers the provider has not let go of yet, for the
- *  notice on the list. Null when there are none. */
+ *  notice on the list. Null when there are none. The provider's reason is only
+ *  an administrator's to read. */
 export async function gameDnsLeftoversAction(): Promise<{
     count: number;
     noToken: boolean;
@@ -439,7 +440,7 @@ export async function gameDnsLeftoversAction(): Promise<{
     const { count, reason } = await gameDns.gameDnsLeftovers(user.id);
     if (count === 0) return null;
     const noToken = reason === gameDns.NO_TOKEN;
-    return { count, noToken, reason: noToken ? null : reason };
+    return { count, noToken, reason: noToken || !user.isAdmin ? null : reason };
 }
 
 /** Try removing those records again now, rather than at the next sweep. */

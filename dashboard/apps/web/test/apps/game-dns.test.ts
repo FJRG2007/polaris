@@ -108,11 +108,16 @@ vi.mock("@polaris/db", () => {
                 findMany: async ({
                     where
                 }: {
-                    where: { OR?: Array<{ config: { contains: string } }> };
+                    where: {
+                        status?: string | { not: string };
+                        OR?: Array<{ config: { contains: string } }>;
+                    };
                 }) =>
                     state.installs.filter(
                         (install) =>
-                            install.status !== "removed" &&
+                            (typeof where.status === "string"
+                                ? install.status === where.status
+                                : install.status !== (where.status?.not ?? "removed")) &&
                             (where.OR ?? []).some((clause) =>
                                 install.config.includes(clause.config.contains)
                             )
@@ -368,7 +373,10 @@ describe("the sweep over records written before any were remembered", () => {
             "skyblock",
             "offgrid"
         ];
-        leftovers.forEach((label, index) => legacySrv(label, 25565 + (index % 5)));
+        leftovers.forEach((label, index) => {
+            install(`deleted-${label}`, { hostname: `${label}.mc.example.com` }, "removed");
+            legacySrv(label, 25565 + (index % 5));
+        });
         // A live server keeps its record.
         install("live", { hostname: "survival.mc.example.com" });
         legacySrv("survival");
@@ -408,9 +416,19 @@ describe("the sweep over records written before any were remembered", () => {
     });
 
     it("walks a zone larger than one page", async () => {
-        for (let index = 0; index < 250; index += 1) legacySrv(`s${index}`);
+        for (let index = 0; index < 250; index += 1) {
+            install(`deleted-${index}`, { hostname: `s${index}.mc.example.com` }, "removed");
+            legacySrv(`s${index}`);
+        }
         expect((await gameDns.sweepGameDns()).legacyRemoved).toBe(250);
         expect(state.zone).toEqual([]);
+    });
+
+    it("leaves a record of that shape no server here ever held", async () => {
+        legacySrv("handmade");
+        install("other", { hostname: "other.mc.example.com" }, "removed");
+        expect(await gameDns.sweepLegacySrv()).toBe(0);
+        expect(state.zone.map((record) => record.id)).toEqual(["legacy-handmade"]);
     });
 
     it("leaves a record a row remembers to the rows", async () => {

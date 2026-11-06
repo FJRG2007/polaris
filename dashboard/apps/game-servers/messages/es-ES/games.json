@@ -1,7 +1,7 @@
 {
     "dnsLeftovers": {
         "title": "{count, plural, one {Queda # registro DNS} other {Quedan # registros DNS}} de servidores borrados en tu zona",
-        "retrying": "Polaris intenta quitarlos de nuevo cada hora.",
+        "refused": "Cloudflare no los quitó. Los administradores lo saben y Polaris lo intenta de nuevo cada hora.",
         "reason": "Cloudflare no los quitó: {reason}. Polaris lo intenta de nuevo cada hora.",
         "noToken": "Polaris no tiene conexión con Cloudflare para quitarlos. Un administrador puede volver a conectarla en Integraciones.",
         "retry": "Reintentar",

@@ -59,7 +59,7 @@ export function DnsLeftoversNotice() {
                         ? t("dnsLeftovers.noToken")
                         : leftovers.reason
                           ? t("dnsLeftovers.reason", { reason: leftovers.reason })
-                          : t("dnsLeftovers.retrying")}
+                          : t("dnsLeftovers.refused")}
                 </p>
                 {failed && <p className="text-danger">{t("dnsLeftovers.retryFailed")}</p>}
             </div>

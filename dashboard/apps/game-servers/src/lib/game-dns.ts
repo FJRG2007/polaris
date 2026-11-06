@@ -13,9 +13,9 @@
  * again until it is gone.
  *
  * The sweep also finds the SRV records written before any of this was kept: a
- * `_minecraft._tcp.<name>.mc.<domain>` record pointing at its own name is the
- * exact shape Polaris writes and nothing else does, so one whose name no live
- * server holds is a leftover of a deleted one.
+ * `_minecraft._tcp.<name>.mc.<domain>` record pointing at its own name, whose
+ * name a deleted server held and no live server holds, is a leftover of that
+ * deleted one. A record of that shape no server here ever held is left alone.
  */
 
 import { prisma } from "@polaris/db";
@@ -221,14 +221,29 @@ export function legacyGameSrvHostname(
 }
 
 /** The live server holding each of these hostnames, for those a live one holds. */
-async function liveHolders(
+function liveHolders(
     hostnames: readonly string[]
+): Promise<Map<string, { id: string; ownerId: string }>> {
+    return holdersOf(hostnames, { not: "removed" });
+}
+
+/** A deleted server that held each of these hostnames, for those one did: the
+ *  install history that shows a name was Polaris's. */
+function removedHolders(
+    hostnames: readonly string[]
+): Promise<Map<string, { id: string; ownerId: string }>> {
+    return holdersOf(hostnames, "removed");
+}
+
+async function holdersOf(
+    hostnames: readonly string[],
+    status: "removed" | { not: "removed" }
 ): Promise<Map<string, { id: string; ownerId: string }>> {
     const live = new Map<string, { id: string; ownerId: string }>();
     if (hostnames.length === 0) return live;
     const rows = await prisma.installedApp.findMany({
         where: {
-            status: { not: "removed" },
+            status,
             OR: hostnames.map((hostname) => ({
                 config: { contains: hostname, mode: "insensitive" as const }
             }))
@@ -294,8 +309,9 @@ export async function sweepGameDns(): Promise<GameDnsSweep> {
 
 /**
  * Remove `_minecraft._tcp.<name>.mc.<domain>` records that point at their own name
- * when no live server holds that name and no row remembers them - the shape of
- * every record a deleted server left before records were remembered. Reads the
+ * when a deleted server held that name, no live server holds it and no row
+ * remembers them - every record a deleted server left before records were
+ * remembered, and nothing an operator made by hand. Reads the
  * zone a page at a time and stops after a bounded number of pages.
  */
 export async function sweepLegacySrv(): Promise<number> {
@@ -319,8 +335,10 @@ export async function sweepLegacySrv(): Promise<number> {
             const hostname = legacyGameSrvHostname(record, base);
             return hostname ? [{ id: record.id, hostname }] : [];
         });
-        const [live, known] = await Promise.all([
-            liveHolders([...new Set(candidates.map((candidate) => candidate.hostname))]),
+        const names = [...new Set(candidates.map((candidate) => candidate.hostname))];
+        const [live, deleted, known] = await Promise.all([
+            liveHolders(names),
+            removedHolders(names),
             prisma.gameDnsRecord.findMany({
                 where: {
                     zoneId: zone.id,
@@ -333,6 +351,7 @@ export async function sweepLegacySrv(): Promise<number> {
         let removedHere = 0;
         for (const candidate of candidates) {
             if (live.has(candidate.hostname) || remembered.has(candidate.id)) continue;
+            if (!deleted.has(candidate.hostname)) continue;
             if ((await deleteDnsRecordIfPresent(token, zone.id, candidate.id)) === "deleted")
                 removedHere += 1;
         }
