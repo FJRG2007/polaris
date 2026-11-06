@@ -87,42 +87,51 @@ export function ConsentNote({ text, consent }: { text: string; consent: SiteApp[
     );
 }
 
-/** The dashboard's store card, where the action is the way to the app's page. */
+/**
+ * The dashboard's store card, where the action is the way to the app's page.
+ * A `compact` card leaves out the preview: on a shelf where no app has a
+ * capture, every preview is the same placeholder repeating the card's own name
+ * and summary, and a wall of them reads as noise rather than a catalogue.
+ */
 function StoreCard({
     app,
     page,
     words,
-    featured = false
+    featured = false,
+    compact = false
 }: {
     app: SiteApp;
     page: string;
     words: StoreWords;
     featured?: boolean;
+    compact?: boolean;
 }) {
     return (
         <store.StoreCard
             muted={app.comingSoon}
             featured={featured}
             preview={
-                // The name below is the link a keyboard reaches; the picture is
-                // the same destination for a pointer.
-                <Link
-                    href={page}
-                    tabIndex={-1}
-                    aria-hidden
-                    className="block border-b border-border"
-                >
-                    <store.StorePreview
-                        name={app.name}
-                        summary={app.summary}
-                        mark={<StoreAppMark app={app} size={44} />}
-                        tint={app.tint}
-                        ink={app.ink}
-                        shot={withBase(app.shot)}
-                        alt={app.alt}
-                        eager={featured}
-                    />
-                </Link>
+                compact ? null : (
+                    // The name below is the link a keyboard reaches; the picture is
+                    // the same destination for a pointer.
+                    <Link
+                        href={page}
+                        tabIndex={-1}
+                        aria-hidden
+                        className="block border-b border-border"
+                    >
+                        <store.StorePreview
+                            name={app.name}
+                            summary={app.summary}
+                            mark={<StoreAppMark app={app} size={44} />}
+                            tint={app.tint}
+                            ink={app.ink}
+                            shot={withBase(app.shot)}
+                            alt={app.alt}
+                            eager={featured}
+                        />
+                    </Link>
+                )
             }
             mark={<StoreAppMark app={app} size={40} />}
             title={
@@ -267,27 +276,34 @@ export function MarketplaceGrid({
             {shown.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">{words.noMatch}</p>
             ) : (
-                siteShelves(shown).map((group) => (
-                    <section
-                        key={group.shelf}
-                        className="flex min-w-0 flex-col gap-3"
-                        aria-label={words.shelves[group.shelf]}
-                    >
-                        <h2 className="text-sm font-medium text-muted-foreground">
-                            {words.shelves[group.shelf]}
-                        </h2>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                            {group.apps.map((app) => (
-                                <StoreCard
-                                    key={app.id}
-                                    app={app}
-                                    page={pageOf(app.id)}
-                                    words={words}
-                                />
-                            ))}
-                        </div>
-                    </section>
-                ))
+                siteShelves(shown).map((group) => {
+                    const compact = group.apps.every((app) => !app.shot);
+                    return (
+                        <section
+                            key={group.shelf}
+                            className="flex min-w-0 flex-col gap-3"
+                            aria-label={words.shelves[group.shelf]}
+                        >
+                            <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                {words.shelves[group.shelf]}
+                                <Badge className="tabular-nums">{group.apps.length}</Badge>
+                            </h2>
+                            {/* Two lines kept for every summary, so the badges and the
+                            footer sit on the same line across a row. */}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [&_.line-clamp-2]:min-h-10">
+                                {group.apps.map((app) => (
+                                    <StoreCard
+                                        key={app.id}
+                                        app={app}
+                                        page={pageOf(app.id)}
+                                        words={words}
+                                        compact={compact}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    );
+                })
             )}
         </div>
     );

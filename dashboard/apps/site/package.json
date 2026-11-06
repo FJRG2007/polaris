@@ -6,7 +6,7 @@
     "description": "The public Polaris website: what it replaces, the marketplace, downloads and the API reference, as a static site.",
     "scripts": {
         "generate": "node scripts/run-generate.mjs",
-        "build": "npm run generate && next build",
+        "build": "npm run generate && next build && node scripts/check-assets.mjs",
         "test": "vitest run --passWithNoTests",
         "typecheck": "tsc --noEmit"
     },
