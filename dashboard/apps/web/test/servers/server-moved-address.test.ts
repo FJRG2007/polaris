@@ -116,16 +116,33 @@ describe("a machine whose address moved", () => {
         expect(probed.length).toBeLessThanOrEqual(254);
     });
 
-    it("does not knock on Polaris' own door, or on the address that failed", async () => {
+    it("sweeps neither Polaris' own address nor the one that failed", async () => {
         openPorts = new Set(["10.0.1.142"]);
         realAddress = "10.0.1.142";
 
         await findLocalPath(HOST, ADA);
 
-        // On a host-networked install Polaris' own address is the box this runs
-        // on, and the recorded one has already been tried and failed.
+        // Polaris' own address is asked once, by handshake, before the sweep; the
+        // recorded one has already been tried and failed.
         expect(probed).not.toContain("10.0.1.50");
         expect(probed).not.toContain("10.0.1.138");
+        expect(handshakes.filter((address) => address === "10.0.1.50")).toHaveLength(1);
+    });
+
+    it("finds the box Polaris runs on, at Polaris' own address", async () => {
+        // The server enrolled is this very machine and its lease moved. The sweep
+        // used to skip this address, so it was never found - and every shell on it
+        // closed the moment it opened.
+        openPorts = new Set(["10.0.1.7"]);
+        realAddress = "10.0.1.50";
+
+        expect(await findLocalPath(HOST, ADA)).toEqual({
+            kind: "found",
+            address: "10.0.1.50",
+            moved: true
+        });
+        // Found before a single port of the network was knocked on.
+        expect(probed).toEqual([]);
     });
 
     it("only handshakes with what answered on the port", async () => {
@@ -136,7 +153,8 @@ describe("a machine whose address moved", () => {
 
         await findLocalPath(HOST, ADA);
 
-        expect(handshakes.sort()).toEqual(["10.0.1.142", "10.0.1.7"]);
+        // Plus Polaris' own address, which is asked first and costs one.
+        expect(handshakes.sort()).toEqual(["10.0.1.142", "10.0.1.50", "10.0.1.7"]);
     });
 
     it("stops at the machine that answers with the key", async () => {

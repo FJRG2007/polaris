@@ -8,6 +8,8 @@ export {
     openSshClient,
     testAndCaptureHostKey,
     hostKeyAccepted,
+    classifySshFailure,
+    type SshFailureKind,
     type SshAuth,
     type SshConnectOptions
 } from "./client.js";

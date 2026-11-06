@@ -63,6 +63,36 @@ export interface SshConnectOptions {
     readonly sock?: Duplex;
 }
 
+/** Why a connection to a server failed, in the terms a screen can act on. */
+export type SshFailureKind = "unreachable" | "identity" | "login" | "other";
+
+/** Socket errors that mean nothing answered at that address and port. */
+const UNREACHABLE_CODES = new Set([
+    "ECONNREFUSED",
+    "EHOSTUNREACH",
+    "ENETUNREACH",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "EAI_AGAIN"
+]);
+
+/**
+ * Sort an `openSshClient` failure into what the reader can do about it: nothing
+ * answered (switched off, or not at the address on record), something answered
+ * without this server's pinned key, or it answered and turned the login away.
+ * Read from ssh2's own wording where it has no error code. Pure and unit-tested.
+ */
+export function classifySshFailure(error: unknown): SshFailureKind {
+    const code = (error as { code?: unknown } | null)?.code;
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    const answered = (error as { answered?: unknown } | null)?.answered === true;
+    if (typeof code === "string" && UNREACHABLE_CODES.has(code) && !answered) return "unreachable";
+    if (!answered && /timed out/i.test(message)) return "unreachable";
+    if (/host denied|verification failed/i.test(message)) return "identity";
+    if (/authentication methods failed/i.test(message)) return "login";
+    return "other";
+}
+
 /**
  * Whether a presented server key is accepted given the pin(s). `undefined` pins
  * mean trust-on-add (accept once, for capture); a string or array means the key
@@ -75,12 +105,22 @@ export function hostKeyAccepted(presented: string, pins: string | string[] | und
 }
 
 /** Open an authenticated ssh2 client. Rejects if the host key does not match the
- *  pin, if auth fails, or on any transport error. The caller owns `client.end()`. */
+ *  pin, if auth fails, or on any transport error. The caller owns `client.end()`.
+ *  An error raised after the TCP connection opened carries `answered: true`. */
 export function openSshClient(options: SshConnectOptions): Promise<Client> {
     const client = new Client();
+    let answered = false;
     return new Promise<Client>((resolve, reject) => {
+        client.once("connect", () => {
+            answered = true;
+        });
         client.once("ready", () => resolve(client));
-        client.once("error", (error) => reject(error));
+        client.once("error", (error) => {
+            if (answered && error && typeof error === "object") {
+                Object.assign(error, { answered: true });
+            }
+            reject(error);
+        });
         try {
             client.connect(buildConnectConfig(options));
         } catch (error) {

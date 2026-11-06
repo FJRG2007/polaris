@@ -95,7 +95,20 @@
         },
         "refused": "The server refused the session: {reason}.",
         "untrusted": "{surface, select, app {The app would not open the connection. A terminal needs this address's certificate trusted, and accepting the warning on the page is not enough. <download>Download Polaris's certificate</download> and add it to this device's trusted roots, then reload.} other {The browser would not open the connection. A terminal needs this address's certificate trusted, and accepting the warning on the page is not enough. <download>Download Polaris's certificate</download> and add it to this device's trusted roots, then reload.}}",
-        "retry": "Try again"
+        "retry": "Try again",
+        "reasons": {
+            "expired": "This terminal was no longer valid when it connected. Try again.",
+            "noTerminal": "The container would not open a shell. It may have stopped.",
+            "gone": "This server or connection is no longer available to you.",
+            "unreachable": "Nothing answered at this server's address. It is switched off, or it moved to another address.",
+            "identity": "Something answered at this server's address with a different key, so Polaris did not sign in. If the server was reinstalled, remove it and add it again under Servers.",
+            "login": "The server turned the sign-in away: Polaris's account or key on it was changed or removed. Add the server again under Servers.",
+            "shell": "The server accepted the sign-in but would not open a shell."
+        },
+        "looking": "Looking for it on this network...",
+        "notFound": "It is not on this network either.",
+        "cannotLook": "Polaris does not know its own address on this network, so it could not look for it.",
+        "lookForIt": "Look for it on this network"
     },
     "storage": {
         "unreachable": "Files cannot be saved right now: the storage {name} is not reachable.",

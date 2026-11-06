@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { machineHref } from "@/lib/machines/machine-links";
 import { renameServerAction } from "./actions";
+import { useFindServer } from "./use-find-server";
 import { dropServerOptions } from "@/components/server-picker";
 import { useEffect, useRef, useState } from "react";
 import { QuickEnroll } from "./quick-enroll";
@@ -799,6 +800,7 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
  */
 function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: () => void }) {
     const t = useTranslations("servers");
+    const findServer = useFindServer();
     const [asRoot, setAsRoot] = useState(false);
 
     // A different server may not offer root at all; starting each one as the login
@@ -843,6 +845,7 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                         key={asRoot ? "root" : "login"}
                         target={{ kind: "host", hostId: server.hostId ?? server.id, asRoot }}
                         label={`${asRoot ? "root" : server.detail}@${server.address}`}
+                        findServer={() => findServer(server.hostId ?? server.id)}
                     />
                 ) : null}
             </DialogContent>

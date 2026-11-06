@@ -157,10 +157,20 @@ async function sweepForMachine(
     connection: Awaited<ReturnType<typeof getHostConnection>>,
     near: string
 ): Promise<string | null> {
+    // The machine Polaris runs on first, with one handshake. It is enrolled like
+    // any other server, and its lease moves like any other. The sweep used to
+    // skip this address as "not a server to be found", which is exactly wrong
+    // when the server IS this box: it stayed recorded at an address it had left,
+    // every shell on it closed at once, and the one place it answered with its
+    // pinned key was never asked. The key check is what makes asking safe.
+    if (near !== connection.address && (await answersAsSameMachine(near, connection))) {
+        return near;
+    }
+
     const prefix = near.split(".").slice(0, 3).join(".");
     const addresses = Array.from({ length: 254 }, (_, index) => `${prefix}.${index + 1}`).filter(
-        // Polaris' own address is not a server to be found: on a host-networked
-        // install it is the box this is running on.
+        // Both already asked: Polaris' own address just above, and the recorded
+        // one is the address that failed.
         (address) => address !== near && address !== connection.address
     );
 
