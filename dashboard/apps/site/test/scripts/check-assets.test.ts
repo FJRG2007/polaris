@@ -32,6 +32,15 @@ describe("the export's picture check", () => {
         expect(refProblem("data:image/svg+xml,<svg/>", options())).toBeNull();
     });
 
+    it("matches the site's own origin however the owner is cased", () => {
+        // CI writes the origin from the repository owner as it is spelled.
+        const cased = { ...options(), origin: "https://FJRG2007.github.io" };
+        expect(refProblem("https://fjrg2007.github.io/polaris/media/home.webp", cased)).toBeNull();
+        expect(refProblem("https://example.com/polaris/media/home.webp", cased)).toMatch(
+            /hotlinked/
+        );
+    });
+
     it("fails a path from the domain's root, which Pages serves outside the site", () => {
         expect(refProblem("/logos/apps/n8n.svg", options())).toMatch(/outside the base path/);
     });

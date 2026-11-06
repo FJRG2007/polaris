@@ -50,7 +50,10 @@ export function refProblem(ref, { page, base, origin, exists }) {
     let path = ref.split(/[?#]/)[0];
     if (/^https?:\/\//i.test(path) || path.startsWith("//")) {
         const url = new URL(path, "https://invalid.example");
-        if (`${url.protocol}//${url.host}` !== origin)
+        // Compared as URL origins, so a host is matched however it is cased: CI
+        // builds the origin from the repository owner ("FJRG2007"), while every
+        // address on a page carries the lower-cased host.
+        if (url.origin !== new URL(origin).origin)
             return "is hotlinked from another site; keep the file in the repo";
         path = url.pathname;
     }
