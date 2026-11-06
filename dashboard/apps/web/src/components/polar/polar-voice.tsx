@@ -162,10 +162,7 @@ export function DictationButton({
             label={refusal ?? (available ? t("voice.dictate") : t("voice.unavailable"))}
             aria-disabled={!usable || undefined}
             disabled={disabled}
-            className={cn(
-                (!available || refusal) && "opacity-50",
-                available && "rounded-r-none"
-            )}
+            className={cn((!available || refusal) && "opacity-50", available && "rounded-r-none")}
             onClick={() => {
                 if (refusal) return;
                 if (!available) return onNotice("unavailable");
