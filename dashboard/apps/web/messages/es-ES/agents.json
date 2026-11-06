@@ -157,7 +157,8 @@
         "serverReopened": "El servidor se reinició y Polaris reabrió la sesión en su copia.",
         "unknownReason": "desconocido",
         "firstPrompt": "Polaris no pudo enviar el primer prompt: {reason}. Vuelve a enviarlo desde el cuadro de abajo.",
-        "workflowFinished": "El workflow terminó como {conclusion}. Su log está en la ejecución de GitHub Actions."
+        "workflowFinished": "El workflow terminó como {conclusion}. Su log está en la ejecución de GitHub Actions.",
+        "reportedFailure": "La ejecución informó de un fallo sin decir por qué. Su log está en la ejecución de GitHub Actions."
     },
     "errors": {
         "checkSettings": "Revisa los ajustes",

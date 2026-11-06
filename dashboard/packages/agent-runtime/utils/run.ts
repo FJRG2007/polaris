@@ -97,6 +97,18 @@ export async function handleAgentResult(ctx: HandleAgentResultParams): Promise<M
     return { success: false, error, output: ctx.result.output || "" };
   }
 
+  // a full Review exists to post one, and create_pull_request_review flips
+  // wasUpdated when it does. finishing without it means the work failed - the
+  // model call was refused, or the tool that posts was turned away - however
+  // cleanly the agent exited, and calling that a success is what made failed
+  // reviews read as done. IncrementalReview stays exempt: its non-substantive
+  // path posts nothing on purpose.
+  if (mode === "Review" && !toolState.wasUpdated) {
+    const error = ctx.result.error || "the review finished without posting a review on the pull request";
+    toolState.failureBody ??= error;
+    return { success: false, error, output: ctx.result.output || "" };
+  }
+
   log.success("Task complete.");
 
   return {

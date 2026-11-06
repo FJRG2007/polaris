@@ -9,6 +9,7 @@
         "failed": {
             "key": "The model did not answer ({where}): the key was refused. Check the key or pick another model.",
             "credit": "The model did not answer ({where}): the account is out of credit. Add credit or pick another model.",
+            "paid": "The model did not answer ({where}): the account has no credit and this model is not free. Pick a free one.",
             "rate": "The model did not answer ({where}): too many requests for now. Ask again in a minute or pick another model.",
             "down": "The model did not answer ({where}): the provider is having trouble. Ask again later or pick another model.",
             "model": "The model did not answer ({where}). Ask again or pick another model.",
@@ -161,6 +162,7 @@
         "provider": {
             "key": "{provider} refused the key Polar used. It may be wrong, revoked or missing a permission.",
             "credit": "{provider} says the account behind this key is out of credit. Add credit or a payment method in its billing settings.",
+            "paid": "{provider} has no credit on this account, and this model is not free. Pick a free model or add credit.",
             "rate": "{provider} is limiting how often this key can be used. Wait a minute and try again.",
             "down": "{provider} is having trouble answering right now. Try again in a few minutes.",
             "model": "{provider} no longer serves this model. Pick another one.",

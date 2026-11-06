@@ -381,6 +381,24 @@ export function isAgentWorkflowRun(workflowRun: { path?: string } | undefined): 
 }
 
 /**
+ * What a finished workflow means for its run.
+ *
+ * The job's conclusion is not the whole truth: a job can end green while the
+ * run inside it failed - the model refused the call, the review was never
+ * posted - and the runtime says so on the row before the job ends. A run that
+ * reported a failure is failed whatever the conclusion, so the screen and the
+ * bell never call it a success. Pure.
+ */
+export function runOutcome(
+    conclusion: string | null | undefined,
+    reported: { error: string | null; failureKind: string | null }
+): "succeeded" | "failed" | "cancelled" {
+    if (conclusion === "cancelled") return "cancelled";
+    if (conclusion !== "success") return "failed";
+    return reported.error || reported.failureKind ? "failed" : "succeeded";
+}
+
+/**
  * Close out a run whose workflow has finished.
  *
  * The runtime reports its own outcome, but a job that was cancelled, killed or
@@ -426,7 +444,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
     if (!run) return [];
 
     const conclusion = payload.workflow_run?.conclusion;
-    const state = conclusion === "success" ? "succeeded" : conclusion === "cancelled" ? "cancelled" : "failed";
+    const state = runOutcome(conclusion, run);
     // A run that got far enough to work out why it failed has already reported
     // it, and that is the reason worth keeping. This webhook only ever knows
     // that the job ended badly, so it fills in for the failures that never got
@@ -437,8 +455,11 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
             state !== "failed"
                 ? null
                 : (run.error ??
-                  // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
-                  `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`),
+                  (conclusion === "success"
+                      ? // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
+                        "The run reported a failure without saying why. Its log is on the run in GitHub Actions."
+                      : // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
+                        `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`)),
         // Already recorded by the run's own report, where there was one. Passing
         // it back keeps `finishAgentRun` from clearing it, which would leave the
         // fallback with nothing to decide on.

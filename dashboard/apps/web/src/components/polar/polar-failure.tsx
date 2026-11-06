@@ -58,7 +58,8 @@ export function PolarFailureNotice({
     const failure: PolarFailure | null = stored?.code === "provider" ? stored : null;
     const alternative = failure && onTryWith ? standIn(failure, failedModel, providers) : null;
     // Only a key problem is somebody's to fix: a limit or an outage passes.
-    const keyProblem = failure?.kind === "key" || failure?.kind === "credit";
+    const keyProblem =
+        failure?.kind === "key" || failure?.kind === "credit" || failure?.kind === "paid";
     const sentence =
         stored?.code === "usage_limit"
             ? t("errors.usageLimit", {

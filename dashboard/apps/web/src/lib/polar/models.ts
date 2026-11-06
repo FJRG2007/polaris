@@ -14,7 +14,7 @@
  * Server-only.
  */
 
-import type { LanguageModel } from "ai";
+import { wrapLanguageModel, type LanguageModel } from "ai";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -37,6 +37,7 @@ import {
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
 import { providerWindows, WINDOW_PROVIDERS } from "@/lib/polar/provider-windows";
+import { creditMiddleware, freeVariantOf } from "@/lib/polar/credit";
 import {
     polarAccessFor,
     polarCredentialFor,
@@ -77,6 +78,9 @@ export interface PolarModelOption {
     reasoning: boolean;
     attachment: boolean;
     contextTokens: number;
+    /** The longest answer the catalogue says the model writes; 0 or absent
+     *  when unknown. */
+    outputTokens?: number;
     /** The window the provider's own API reports, when it reports one; it
      *  wins over the catalogue's `contextTokens` (`provider-windows.ts`). */
     providerContextTokens: number | null;
@@ -183,6 +187,7 @@ function catalogueOption(
         reasoning: model.reasoning,
         attachment: model.attachment,
         contextTokens: model.contextTokens,
+        outputTokens: model.outputTokens,
         providerContextTokens,
         costInput: model.costInput,
         costOutput: model.costOutput,
@@ -259,11 +264,27 @@ export async function resolvePolarModel(
     if (!option) return "unknown_model";
     const credential = await polarCredentialFor(userId, choice.provider, choice.payer, granted);
     if (!credential) return "no_key";
-    return { model: languageModel(credential, option.model), option, credential };
+    return {
+        model: languageModel(
+            credential,
+            option.model,
+            freeVariantOf(option.model, provider.models)
+        ),
+        option,
+        credential
+    };
 }
 
-/** The AI SDK model for a credential. */
-export function languageModel(credential: ChatCredential, model: string): LanguageModel {
+/**
+ * The AI SDK model for a credential. `free` is the model's no-cost variant on
+ * OpenRouter, when the catalogue lists one: an account with no credit is
+ * answered by it rather than refused (`credit.ts`).
+ */
+export function languageModel(
+    credential: ChatCredential,
+    model: string,
+    free: string | null = null
+): LanguageModel {
     const apiKey = credential.secret;
     switch (credential.provider) {
         case "anthropic":
@@ -285,7 +306,12 @@ export function languageModel(credential: ChatCredential, model: string): Langua
         default: {
             const baseURL = OPENAI_COMPATIBLE_BASES[credential.provider];
             if (!baseURL) throw new Error(`polar: no client for ${credential.provider}`);
-            return createOpenAICompatible({ name: credential.provider, baseURL, apiKey })(model);
+            const client = createOpenAICompatible({ name: credential.provider, baseURL, apiKey });
+            if (credential.provider !== "openrouter") return client(model);
+            return wrapLanguageModel({
+                model: client(model),
+                middleware: creditMiddleware(free ? () => client(free) : null)
+            });
         }
     }
 }
@@ -299,11 +325,8 @@ async function resolveAutomatic(
     signals: TurnSignals,
     access: PolarAccess
 ): Promise<ResolvedModel | ModelRefusal> {
-    const candidates = automaticCandidates(
-        await polarModelOptions(userId, access),
-        signals,
-        failingProviders(userId)
-    );
+    const options = await polarModelOptions(userId, access);
+    const candidates = automaticCandidates(options, signals, failingProviders(userId));
     const route = autoRoute(signals);
     const tried = new Map<string, ChatCredential | null>();
     for (const option of candidates) {
@@ -316,7 +339,14 @@ async function resolveAutomatic(
         const credential = tried.get(option.provider);
         if (!credential) continue;
         return {
-            model: languageModel(credential, option.model),
+            model: languageModel(
+                credential,
+                option.model,
+                freeVariantOf(
+                    option.model,
+                    options.find((entry) => entry.provider === option.provider)?.models ?? []
+                )
+            ),
             option,
             credential,
             automatic: route

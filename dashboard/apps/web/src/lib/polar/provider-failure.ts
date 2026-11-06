@@ -13,7 +13,9 @@
 import { z } from "zod";
 import type { UIMessage } from "ai";
 
-export const FAILURE_KINDS = ["key", "credit", "rate", "down", "model", "other"] as const;
+/** `paid`: the account has no credit and the model has no free variant to
+ *  fall back on (`credit.ts`). */
+export const FAILURE_KINDS = ["key", "credit", "paid", "rate", "down", "model", "other"] as const;
 export type FailureKind = (typeof FAILURE_KINDS)[number];
 
 export interface ProviderFailure {
@@ -28,7 +30,7 @@ const CREDIT =
 const MODEL =
     /model[_ ]not[_ ]found|no such model|unknown model|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
 
-interface CallErrorShape {
+export interface CallErrorShape {
     statusCode?: unknown;
     responseBody?: unknown;
     message?: unknown;
@@ -37,15 +39,28 @@ interface CallErrorShape {
 }
 
 /** The innermost error that carries a status: a retry wraps its last attempt. */
-function callError(error: unknown, depth = 0): CallErrorShape | null {
+export function callError(error: unknown, depth = 0): CallErrorShape | null {
     if (typeof error !== "object" || error === null || depth > 4) return null;
     const shape = error as CallErrorShape;
     if (typeof shape.statusCode === "number") return shape;
     return callError(shape.lastError, depth + 1) ?? callError(shape.cause, depth + 1);
 }
 
+/** What `credit.ts` marks a refusal with when the model needs credit the
+ *  account does not have and has no free variant. */
+export const PAID_MODEL_MARK = "polarPaidModel";
+
+/** Whether an error, or one it wraps, carries that mark. */
+export function isPaidModelError(error: unknown, depth = 0): boolean {
+    if (typeof error !== "object" || error === null || depth > 4) return false;
+    const shape = error as { [PAID_MODEL_MARK]?: unknown; lastError?: unknown; cause?: unknown };
+    if (shape[PAID_MODEL_MARK] === true) return true;
+    return isPaidModelError(shape.lastError, depth + 1) || isPaidModelError(shape.cause, depth + 1);
+}
+
 /** Pure. Anything that is not a provider's answer is `other`. */
 export function classifyProviderFailure(error: unknown): ProviderFailure {
+    if (isPaidModelError(error)) return { kind: "paid", status: 402 };
     const found = callError(error);
     if (!found) return { kind: "other", status: null };
     const status = found.statusCode as number;

@@ -245,8 +245,12 @@ export async function finishAgentRun(runId: string, input: FinishRunInput): Prom
             tokenHash: null,
             error: input.error ?? null,
             result: input.result ?? null,
-            tokensIn: input.tokensIn ?? null,
-            tokensOut: input.tokensOut ?? null,
+            // Left alone unless this call knows them: the runtime reports its
+            // counts while it works, and the webhook that closes the run after
+            // it knows none. Writing null here erased every run's spend, so the
+            // usage limits summed nothing and never applied.
+            ...(input.tokensIn === undefined ? {} : { tokensIn: input.tokensIn }),
+            ...(input.tokensOut === undefined ? {} : { tokensOut: input.tokensOut }),
             failureKind: input.failureKind ?? null
         }
     });

@@ -86,6 +86,7 @@ import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
 import { goalCheckStream } from "@/lib/polar/goal-service";
 import { polarGoal, savePolarGoal, setPolarGoal } from "@/lib/polar/goal-store";
 import { noticePolarRunEnd } from "@/lib/polar/run-notices";
+import { polarOutputTokens } from "@/lib/polar/credit";
 import {
     FAILURE_PART,
     classifyProviderFailure,
@@ -470,6 +471,9 @@ export async function POST(request: Request): Promise<Response> {
             ...(web ? WEB_APPROVAL : {}),
             ...(web ? browserApprovalFor(user.id) : {})
         },
+        // Without a length the provider reserves the model's whole output
+        // window, which an account with little credit cannot cover (`credit.ts`).
+        maxOutputTokens: polarOutputTokens(resolved.option),
         stopWhen: isStepCount(STEP_MAX),
         // Automatic sends a quick question at the lowest effort.
         reasoning: reasoningFor(
