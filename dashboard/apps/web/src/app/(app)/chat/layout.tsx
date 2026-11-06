@@ -40,9 +40,10 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
         can(user.id, "chat.meetings")
     ]);
 
-    // The file viewer an attachment opens in is Drive's, and says Drive's words.
+    // The file viewer an attachment opens in is Drive's, and says Drive's words;
+    // the badges beside a name in a profile say their own.
     return (
-        <Messages namespaces={["driveViewer"]}>
+        <Messages namespaces={["driveViewer", "badges"]}>
             <ChatShell
                 viewerId={user.id}
                 viewerName={user.name}

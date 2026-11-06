@@ -34,6 +34,7 @@ import { prisma, VISIBLE_USER } from "@polaris/db";
 import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
 import { mutualsBetween } from "@/lib/mutuals";
+import { badgesBesideName, type BadgeView } from "@/lib/badges/badge-service";
 import { channelAccess, type ChatActor } from "./access";
 
 /** Somebody, as a profile panel draws them. */
@@ -82,6 +83,13 @@ export interface ChatProfile {
      * nothing they wrote or share with anybody.
      */
     readonly restricted: boolean;
+    /**
+     * The badges this reader may see, in their owner's order - the same answer
+     * the profile page draws, so a badge is beside the name everywhere or
+     * nowhere. Empty outside the profile audience and for a hidden badge, which
+     * is hidden from its owner's own preview too.
+     */
+    readonly badges: BadgeView[];
     /** When the account was made, ISO. Empty outside the profile audience. */
     readonly memberSince: string;
     /**
@@ -161,10 +169,11 @@ export async function chatProfile(
     // Asked after the reach above rather than beside it: there is no point
     // working out what two people have in common before it is settled that this
     // one may be shown the other at all.
-    const [mutual, role, friendship] = await Promise.all([
+    const [mutual, role, friendship, badges] = await Promise.all([
         self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
         roleIn(together, person.id),
-        self ? ("self" as const) : standing(actor.id, person.id)
+        self ? ("self" as const) : standing(actor.id, person.id),
+        mayReadProfile ? badgesBesideName(person.id, reader) : []
     ]);
 
     // Outside the profile audience: what the roster beside this conversation
@@ -180,6 +189,7 @@ export async function chatProfile(
             mutual,
             role,
             restricted: true,
+            badges: [],
             memberSince: "",
             friendship
         };
@@ -197,6 +207,7 @@ export async function chatProfile(
         mutual,
         role,
         restricted: false,
+        badges,
         memberSince: person.createdAt.toISOString(),
         friendship
     };

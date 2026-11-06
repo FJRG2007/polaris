@@ -46,6 +46,7 @@ const PROFILE = () => ({
     role: null,
     restricted: false,
     memberSince: "2021-03-04T12:00:00.000Z",
+    badges: [],
     friendship,
     mutual: {
         friends: { people: [{ id: "alan", name: "Alan Turing", username: "alan" }], total: 3 },

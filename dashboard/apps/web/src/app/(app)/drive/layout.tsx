@@ -7,5 +7,9 @@ import type { ReactNode } from "react";
 import { Messages } from "@/components/i18n/messages";
 
 export default function DriveLayout({ children }: { children: ReactNode }) {
-    return <Messages namespaces={["drive", "driveViewer", "drivePoints"]}>{children}</Messages>;
+    return (
+        <Messages namespaces={["drive", "driveViewer", "drivePoints", "badges"]}>
+            {children}
+        </Messages>
+    );
 }

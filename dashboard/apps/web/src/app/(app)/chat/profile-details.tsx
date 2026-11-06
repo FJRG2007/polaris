@@ -34,6 +34,7 @@ import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import { ProfileBanner } from "@/components/profile-banner";
+import { BadgeStrip } from "@/components/badges/badges-dialog";
 import * as polls from "./chat-reads";
 
 /** Somebody, as far as the screen already knows them. */
@@ -189,19 +190,28 @@ export function ProfileDetails({
                     </p>
                     {loading && !profile ? (
                         <Skeleton className="h-3 w-24" />
-                    ) : (
-                        profile?.username && (
-                            // The handle is the address of their own page, so it
-                            // is the way to it.
-                            <Link
-                                href={`/u/${profile.username}`}
-                                className="flex items-center gap-0.5 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
-                            >
-                                <AtSign className="size-3 shrink-0" />
-                                {profile.username}
-                            </Link>
-                        )
-                    )}
+                    ) : profile?.username || profile?.badges.length ? (
+                        // The handle, and the badges in a row beside it - the
+                        // same strip the profile page draws.
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                            {profile.username ? (
+                                // The handle is the address of their own page,
+                                // so it is the way to it.
+                                <Link
+                                    href={`/u/${profile.username}`}
+                                    title={profile.username}
+                                    className="flex min-w-0 items-center gap-0.5 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                >
+                                    <AtSign className="size-3 shrink-0" />
+                                    <span className="min-w-0 truncate">{profile.username}</span>
+                                </Link>
+                            ) : null}
+                            <BadgeStrip
+                                badges={profile.badges}
+                                className="rounded-md bg-muted/40 px-0.5"
+                            />
+                        </div>
+                    ) : null}
                     {/* Their name, when it is not already what they are called
                         here and they allow this reader to see it. */}
                     {profile?.fullName && profile.fullName !== name && (

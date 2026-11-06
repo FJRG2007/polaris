@@ -59,11 +59,24 @@ let blocked = new Set<string>();
 let namesOpen = new Set<string>();
 /** Whether the reader and grace are friends already. */
 let friendsWithGrace = false;
+/** Whose profile audience leaves the reader out. Nobody's by default. */
+let profileClosed = new Set<string>();
+/** Who asked about whose badges, so a refusal can be shown never to ask. */
+let badgeReads: string[] = [];
 
 vi.mock("@/lib/privacy-service", () => ({
     // The profile itself is open, as it is for every account that never chose.
     maySee: async (subjectId: string, field: string) =>
-        field === "profile" || namesOpen.has(subjectId)
+        (field === "profile" && !profileClosed.has(subjectId)) || namesOpen.has(subjectId)
+}));
+
+// The badges a viewer may see are the badge service's to decide (its own
+// audience, each badge's rule, the hidden ones); the profile only carries them.
+vi.mock("@/lib/badges/badge-service", () => ({
+    badgesBesideName: async (subjectId: string) => {
+        badgeReads.push(subjectId);
+        return subjectId === "grace" ? [{ key: "calls", icon: "calls", kind: "ladder" }] : [];
+    }
 }));
 
 vi.mock("@/lib/blocks", () => ({
@@ -136,6 +149,28 @@ beforeEach(() => {
     spaceOwner = "grace";
     spaceAdmins = new Set();
     friendsWithGrace = false;
+    profileClosed = new Set();
+    badgeReads = [];
+});
+
+describe("the badges beside the name", () => {
+    it("are the ones the badge service lets this reader see", async () => {
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace");
+        expect(profile?.badges.map((badge) => badge.key)).toEqual(["calls"]);
+    });
+
+    it("are none, and never read, for a reader outside the profile audience", async () => {
+        profileClosed = new Set(["grace"]);
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace");
+        expect(profile?.restricted).toBe(true);
+        expect(profile?.badges).toEqual([]);
+        expect(badgeReads).toEqual([]);
+    });
+
+    it("are not read at all for somebody the reader may not be shown", async () => {
+        expect(await chatProfile({ id: "ada" }, "d1", "alan")).toBeNull();
+        expect(badgeReads).toEqual([]);
+    });
 });
 
 describe("what the panel needs beside the profile", () => {
