@@ -891,9 +891,7 @@ export async function listChannels(
         // otherwise only a list that quietly says nothing under every name.
         lastMessages(
             channels
-                .filter(
-                    (channel) => !channel.spaceId || Boolean(mine.get(channel.id)?.hiddenAt)
-                )
+                .filter((channel) => !channel.spaceId || Boolean(mine.get(channel.id)?.hiddenAt))
                 .map((channel) => channel.id)
         ).catch((caught: unknown) => {
             console.error("[chat] could not read the last messages for the list", caught);

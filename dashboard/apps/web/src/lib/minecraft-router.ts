@@ -81,8 +81,8 @@ export async function routerPlacement(): Promise<RouterPlacement | null> {
         const answer = await client.dockerRequest("GET", `/containers/${hostname()}/json`);
         if (answer.status !== 200) return null;
         const body = JSON.parse(answer.body) as {
-            NetworkSettings?: { Networks?: Record<string, unknown>; };
-            Mounts?: { Destination?: string; Name?: string; Type?: string; }[];
+            NetworkSettings?: { Networks?: Record<string, unknown> };
+            Mounts?: { Destination?: string; Name?: string; Type?: string }[];
         };
         // The dashboard is on more than one network - the control plane's own, and
         // the dedicated one a locally installed messaging bridge joins - and the

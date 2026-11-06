@@ -120,7 +120,8 @@ export function findGame(id: string): GameDefinition | undefined {
  *  `isGameServersApp` for that. */
 export function gameForCatalogId(catalogId: string): GameDefinition | undefined {
     return GAMES.find(
-        (game) => game.legacyManagerCatalogId === catalogId || game.serverCatalogIds.includes(catalogId)
+        (game) =>
+            game.legacyManagerCatalogId === catalogId || game.serverCatalogIds.includes(catalogId)
     );
 }
 
@@ -138,7 +139,10 @@ export function isGameServersApp(catalogId: string): boolean {
 /** Whether a catalog id turns the Game servers page on - the one app, or one of
  *  the per-game managers that used to. */
 export function isGameManagerApp(catalogId: string): boolean {
-    return isGameServersApp(catalogId) || GAMES.some((game) => game.legacyManagerCatalogId === catalogId);
+    return (
+        isGameServersApp(catalogId) ||
+        GAMES.some((game) => game.legacyManagerCatalogId === catalogId)
+    );
 }
 
 /**
