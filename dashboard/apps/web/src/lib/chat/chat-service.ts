@@ -885,11 +885,23 @@ export async function listChannels(
             )
             .catch(() => new Map<string, ChatGameLinkView[]>()),
         // What each conversation last said, for the detailed list rows. Rooms in
-        // a space are never drawn that way, so they are not asked about. A read
-        // that fails costs the previews, not the list.
+        // a space are drawn that way only on the hidden shelf, so only those are
+        // asked about (a locked one shows nothing). A read that fails costs the
+        // previews, not the list - and is logged, because a failure here is
+        // otherwise only a list that quietly says nothing under every name.
         lastMessages(
-            channels.filter((channel) => !channel.spaceId).map((channel) => channel.id)
-        ).catch(() => new Map<string, ChatLastMessage>())
+            channels
+                .filter(
+                    (channel) =>
+                        !channel.spaceId ||
+                        (mine.get(channel.id)?.hiddenAt !== null &&
+                            mine.get(channel.id)?.hiddenAt !== undefined)
+                )
+                .map((channel) => channel.id)
+        ).catch((caught: unknown) => {
+            console.error("[chat] could not read the last messages for the list", caught);
+            return new Map<string, ChatLastMessage>();
+        })
     ]);
 
     // The ticks under the reader's own last message, only where the
