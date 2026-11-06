@@ -127,7 +127,7 @@ export function NodePlaceDialog({
                         </p>
                     ) : null}
                     {matches && matches.length > 0 ? (
-                        <ul className="flex max-h-48 min-w-0 flex-col overflow-y-auto">
+                        <ul className="flex max-h-48 min-w-0 flex-col overflow-y-auto overscroll-contain">
                             {matches.map((match) => {
                                 const label = [
                                     match.city,
