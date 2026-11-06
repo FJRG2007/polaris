@@ -39,12 +39,19 @@ const { installs, applications, targets, remote } = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            groupBy: async ({ where }: { where: { targetId: { in: string[] }; catalogId: { in: string[] } } }) => {
+            groupBy: async ({
+                where
+            }: {
+                where: { targetId: { in: string[] }; catalogId: { in: string[] } };
+            }) => {
                 const rows = installs.filter(
                     (row) =>
-                        where.targetId.in.includes(row.targetId ?? "") && where.catalogId.in.includes(row.catalogId)
+                        where.targetId.in.includes(row.targetId ?? "") &&
+                        where.catalogId.in.includes(row.catalogId)
                 );
-                return [...new Set(rows.map((row) => row.targetId))].map((targetId) => ({ targetId }));
+                return [...new Set(rows.map((row) => row.targetId))].map((targetId) => ({
+                    targetId
+                }));
             },
             findMany: async (args: {
                 where: { targetId?: { in?: string[] }; status?: unknown };
@@ -53,9 +60,12 @@ vi.mock("@polaris/db", () => ({
             }) => {
                 const within = args.where.targetId?.in;
                 const rows = installs.filter(
-                    (row) => row.status !== "removed" && (!within || within.includes(row.targetId ?? ""))
+                    (row) =>
+                        row.status !== "removed" && (!within || within.includes(row.targetId ?? ""))
                 );
-                const start = args.cursor ? rows.findIndex((row) => row.id === args.cursor?.id) + 1 : 0;
+                const start = args.cursor
+                    ? rows.findIndex((row) => row.id === args.cursor?.id) + 1
+                    : 0;
                 return rows.slice(start, start + (args.take ?? rows.length));
             },
             findUnique: async ({ where }: { where: { id: string } }) =>
@@ -66,7 +76,13 @@ vi.mock("@polaris/db", () => ({
                 where.id.in.flatMap((id) => {
                     const app = applications.get(id);
                     return app
-                        ? [{ id, sourceConfig: app.sourceConfig, target: targets.get(app.targetId) ?? null }]
+                        ? [
+                              {
+                                  id,
+                                  sourceConfig: app.sourceConfig,
+                                  target: targets.get(app.targetId) ?? null
+                              }
+                          ]
                         : [];
                 })
         },
@@ -75,11 +91,13 @@ vi.mock("@polaris/db", () => ({
                 [...targets.entries()]
                     .filter(([id, target]) => {
                         if ("OR" in where) return target.kind === "local" || target.hostId === null;
-                        if (where.hostId && typeof where.hostId === "object") return target.hostId !== null;
+                        if (where.hostId && typeof where.hostId === "object")
+                            return target.hostId !== null;
                         return target.hostId === where.hostId;
                     })
                     .map(([id, target]) => ({ id, ...target })),
-            findUnique: async ({ where }: { where: { id: string } }) => targets.get(where.id) ?? null
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                targets.get(where.id) ?? null
         }
     }
 }));
@@ -104,8 +122,15 @@ vi.mock("@/lib/minecraft-router", () => ({
     stopRouter: async () => undefined
 }));
 
-const { LOCAL_SHARD, installShard, minecraftRoutes, nextTable, routesByShard, shardOf, syncMinecraftRoutes } =
-    await import("@polaris-app/game-servers/src/lib/minecraft/router-service");
+const {
+    LOCAL_SHARD,
+    installShard,
+    minecraftRoutes,
+    nextTable,
+    routesByShard,
+    shardOf,
+    syncMinecraftRoutes
+} = await import("@polaris-app/game-servers/src/lib/minecraft/router-service");
 
 /** A Java server named `name`, on `targetId`, published on `port`. */
 function server(
@@ -153,7 +178,8 @@ afterEach(async () => {
 
 const localTable = async (): Promise<Record<string, string>> =>
     JSON.parse(await readFile(join(dir, "mc-routes.json"), "utf8")).mappings;
-const remoteTable = (hostId: string): Record<string, string> => JSON.parse(remote.tables.get(hostId) ?? "{}").mappings;
+const remoteTable = (hostId: string): Record<string, string> =>
+    JSON.parse(remote.tables.get(hostId) ?? "{}").mappings;
 
 describe("which machine a route belongs to", () => {
     it("is the connected server's own, or this machine's", () => {
@@ -209,7 +235,9 @@ describe("a table per machine", () => {
         server("far", "t-b", 25572);
         await syncMinecraftRoutes(away);
         expect(remote.writes).toEqual(["host-a"]);
-        expect(remoteTable("host-a")).toEqual({ "away.mc.example.com": "host.docker.internal:25571" });
+        expect(remoteTable("host-a")).toEqual({
+            "away.mc.example.com": "host.docker.internal:25571"
+        });
         await expect(readFile(join(dir, "mc-routes.json"), "utf8")).rejects.toThrow();
     });
 
@@ -237,11 +265,15 @@ describe("a table per machine", () => {
             await syncMinecraftRoutes(away);
             installs[0]!.status = "removed";
             await syncMinecraftRoutes(away);
-            const since = JSON.parse(await readFile(join(dir, "mc-routes-retired-host-a.json"), "utf8"));
+            const since = JSON.parse(
+                await readFile(join(dir, "mc-routes-retired-host-a.json"), "utf8")
+            );
             expect(since).toEqual({ "away.mc.example.com": start });
             vi.setSystemTime(start + 30 * 60_000);
             await syncMinecraftRoutes(away);
-            expect(remoteTable("host-a")).toEqual({ "away.mc.example.com": "host.docker.internal:0" });
+            expect(remoteTable("host-a")).toEqual({
+                "away.mc.example.com": "host.docker.internal:0"
+            });
             vi.setSystemTime(start + 61 * 60_000);
             await syncMinecraftRoutes(away);
             expect(remoteTable("host-a")).toEqual({});

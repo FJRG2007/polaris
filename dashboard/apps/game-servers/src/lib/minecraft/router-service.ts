@@ -109,7 +109,9 @@ export function routesConfig(routes: readonly MinecraftRoute[]): string {
 export const LOCAL_SHARD = "local";
 
 /** Which shard a deploy target's servers belong to. Pure. */
-export function shardOf(target: { kind: string; hostId: string | null } | null | undefined): string {
+export function shardOf(
+    target: { kind: string; hostId: string | null } | null | undefined
+): string {
     return target && target.kind !== "local" && target.hostId ? target.hostId : LOCAL_SHARD;
 }
 
@@ -149,7 +151,10 @@ export function routesByShard(routes: readonly ShardRoute[]): Map<string, ShardR
 /** The deploy targets on one machine. Few per machine, one indexed query. */
 async function shardTargets(shard: string): Promise<string[]> {
     const targets = await prisma.deployTarget.findMany({
-        where: shard === LOCAL_SHARD ? { OR: [{ kind: "local" }, { hostId: null }] } : { hostId: shard },
+        where:
+            shard === LOCAL_SHARD
+                ? { OR: [{ kind: "local" }, { hostId: null }] }
+                : { hostId: shard },
         select: { id: true }
     });
     return targets.map((target) => target.id);
@@ -194,7 +199,11 @@ export async function shardRoutes(shard?: string): Promise<ShardRoute[]> {
             const hostname =
                 typeof config.hostname === "string" ? config.hostname.trim().toLowerCase() : "";
             if (hostname)
-                wanted.push({ hostname, applicationId: install.applicationId, routed: config.routed === true });
+                wanted.push({
+                    hostname,
+                    applicationId: install.applicationId,
+                    routed: config.routed === true
+                });
         }
         const placed = await publishedPorts(wanted.map((entry) => entry.applicationId));
         for (const entry of wanted) {
@@ -227,7 +236,10 @@ export async function minecraftRoutes(shard?: string): Promise<MinecraftRoute[]>
 async function publishedPorts(
     applicationIds: readonly string[]
 ): Promise<Map<string, { port: number; target: { kind: string; hostId: string | null } | null }>> {
-    const ports = new Map<string, { port: number; target: { kind: string; hostId: string | null } | null }>();
+    const ports = new Map<
+        string,
+        { port: number; target: { kind: string; hostId: string | null } | null }
+    >();
     if (applicationIds.length === 0) return ports;
     const apps = await prisma.application.findMany({
         where: { id: { in: [...applicationIds] } },
@@ -363,7 +375,11 @@ async function writeTable(shard: string, table: string): Promise<void> {
 /** One machine's table, written only when it changed. This machine's is always
  *  written, empty included, because its router exits at startup without one - and so
  *  is a connected server's when `always` says its router is about to be started. */
-async function syncShard(shard: string, routes: readonly MinecraftRoute[], always = false): Promise<void> {
+async function syncShard(
+    shard: string,
+    routes: readonly MinecraftRoute[],
+    always = false
+): Promise<void> {
     const previous = await readTable(shard);
     const since = await readSince(shard);
     const now = Date.now();

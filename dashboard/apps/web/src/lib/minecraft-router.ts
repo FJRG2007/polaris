@@ -241,9 +241,11 @@ export function remoteRouterSpec(port: number): ComposeSpec {
  * machine's table is megabytes and one argument to the remote shell stops at 128 KiB.
  */
 export function remoteTableWriteScript(): string {
-    return ["set -e", `mkdir -p ${quoteArg(REMOTE_TABLE_DIR)}`, `cat > ${quoteArg(REMOTE_TABLE_FILE)}`].join(
-        "\n"
-    );
+    return [
+        "set -e",
+        `mkdir -p ${quoteArg(REMOTE_TABLE_DIR)}`,
+        `cat > ${quoteArg(REMOTE_TABLE_FILE)}`
+    ].join("\n");
 }
 
 /** Prints the table, or nothing when the machine has none yet. */
@@ -259,7 +261,11 @@ const HOST_READY_TIMEOUT_MS = 8_000;
 
 /** A short command on a connected server, over a borrowed connection: the sweep asks
  *  every machine on every pass, and a handshake each time is most of what that costs. */
-async function onHost(hostId: string, script: string, input?: string): Promise<{ code: number; out: string }> {
+async function onHost(
+    hostId: string,
+    script: string,
+    input?: string
+): Promise<{ code: number; out: string }> {
     const connection = await getHostConnectionUnscoped(hostId);
     const lease = await borrowSsh("exec", hostId, {
         host: connection.address,
@@ -324,7 +330,8 @@ export async function routerRunningOn(hostId: string): Promise<boolean> {
  */
 export async function startRouterOn(hostId: string, port: number): Promise<string | null> {
     const connection = await getHostConnectionUnscoped(hostId).catch(() => null);
-    if (!connection) return "Polaris cannot reach that server, so it cannot start the router there.";
+    if (!connection)
+        return "Polaris cannot reach that server, so it cannot start the router there.";
     const ports = hostPorts(connection);
     try {
         await ports.composeUp(remoteRouterSpec(port));

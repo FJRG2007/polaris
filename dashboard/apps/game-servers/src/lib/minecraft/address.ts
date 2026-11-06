@@ -226,7 +226,9 @@ export async function setGameHostname(
     });
     const port = install?.applicationId ? await publishedPort(install.applicationId) : null;
     if (!port) return null;
-    const serving = install?.applicationId ? await servingMachine(install.applicationId) : undefined;
+    const serving = install?.applicationId
+        ? await servingMachine(install.applicationId)
+        : undefined;
     // A routed server needs no SRV record: the router answers on the default port and
     // reads the name out of the handshake, so the port was never part of the address.
     // Asking for one anyway would write a record per server, which is the thing
@@ -374,7 +376,8 @@ async function moveOntoRouter(
     });
     if (syncTable) await syncMinecraftRoutes(installedAppId).catch(() => undefined);
     if (!hostname || !port) return;
-    if (!(await nameReachesServingMachine(ownerId, installedAppId, hostname, port, applicationId))) return;
+    if (!(await nameReachesServingMachine(ownerId, installedAppId, hostname, port, applicationId)))
+        return;
     await setSrvRecord(hostname, port, false, { ownerId, installedAppId });
 }
 
@@ -394,9 +397,13 @@ async function nameReachesServingMachine(
     if (!applicationId) return false;
     const serving = await servingMachine(applicationId);
     if (!serving) return true;
-    const address = await provisionGameDns(hostname, port, false, { ownerId, installedAppId }, serving).catch(
-        () => null
-    );
+    const address = await provisionGameDns(
+        hostname,
+        port,
+        false,
+        { ownerId, installedAppId },
+        serving
+    ).catch(() => null);
     return Boolean(address?.hostname);
 }
 
@@ -451,7 +458,10 @@ export async function routerListening(): Promise<boolean> {
 /** Whether the router answers for this name: a status ping through it, naming the
  *  server, that the server itself replies to. The route proven end to end on this
  *  network - everything but the public forward to the port. */
-export async function routeAnswers(hostname: string, shard: string = LOCAL_SHARD): Promise<boolean> {
+export async function routeAnswers(
+    hostname: string,
+    shard: string = LOCAL_SHARD
+): Promise<boolean> {
     const { host: name, port } = await routerFor(shard);
     if (!name) return false;
     return serverAnswersThrough(name, port, ROUTER_PROBE_MS * 2, hostname);
@@ -609,7 +619,15 @@ export async function adoptRoutedAddress(
     if (!(await forwardAnswers(installedAppId, hostname, shard))) return false;
     const port = install.applicationId ? await publishedPort(install.applicationId) : null;
     if (!port) return false;
-    if (!(await nameReachesServingMachine(ownerId, installedAppId, hostname, port, install.applicationId)))
+    if (
+        !(await nameReachesServingMachine(
+            ownerId,
+            installedAppId,
+            hostname,
+            port,
+            install.applicationId
+        ))
+    )
         return false;
     // The route is already in the table, as a candidate's, so the sweep's own write
     // at its end is the only one this needs.
@@ -685,7 +703,9 @@ async function servingMachine(
     const app = await prisma.application
         .findUnique({
             where: { id: applicationId },
-            select: { target: { select: { kind: true, host: { select: { name: true, address: true } } } } }
+            select: {
+                target: { select: { kind: true, host: { select: { name: true, address: true } } } }
+            }
         })
         .catch(() => null);
     const target = app?.target;
