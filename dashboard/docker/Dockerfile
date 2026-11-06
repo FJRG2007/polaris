@@ -18,9 +18,13 @@ FROM node:22-bookworm-slim AS next-cache
 WORKDIR /cache
 
 # ---------------------------------------------------------------------------
-# Builder - compile every workspace package and the Next.js app.
+# Builder - compile every workspace package and the Next.js app. Two stages:
+# `deps` is the installed workspace, which only changes with the lockfile, and
+# `builder` is everything after the source tree lands, which changes with every
+# commit. Split so CI can keep the first in its layer cache without the second
+# (see `ci-cache` below); the layers are the same ones a single stage made.
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS deps
 
 # openssl lets Prisma detect the right engine (debian-openssl-3.0.x) at generate
 # time so the client matches the runner, which also has openssl 3.x on trixie.
@@ -103,6 +107,8 @@ COPY patches ./patches
 # lockfile changes, which is exactly when the packages have to be fetched anyway.
 RUN npm ci
 
+FROM deps AS builder
+
 # The source tree follows (node_modules/.next/dist are .dockerignore'd, so this
 # does not clobber the installed dependencies above).
 COPY . .
@@ -114,6 +120,10 @@ RUN npm run db:generate
 # it (the default ~4 GB is what the app build now peaks at). Empty on an
 # operator's machine, which keeps Node's own limit for the RAM that box has.
 ARG NODE_BUILD_OPTIONS=""
+# "1" skips the ESLint pass inside `next build` (next.config.mjs). Passed only by
+# dashboard-publish.yml, whose tag waits on dashboard-ci's checks job linting the
+# same sources; empty everywhere else, an operator's update included, which lints.
+ARG POLARIS_BUILD_SKIP_LINT=""
 # Most of the app build is recompiling modules that did not change; with the last
 # build's cache in place Next skips them. Only the compiler reads it - the runner
 # below copies the standalone output, so none of it reaches the image.
@@ -253,10 +263,12 @@ COPY --from=builder /build/apps/web/.next/cache /cache/
 
 # ---------------------------------------------------------------------------
 # Runner - minimal runtime. Non-root, only the standalone server + migrations.
+# `runtime-base` is the system packages and the Prisma CLI, which do not change
+# from one commit to the next; `runner` adds this build's output on top.
 # ---------------------------------------------------------------------------
 # Debian 13. Its 12 still ships util-linux, glibc, curl and libxml2 with
 # vulnerabilities it has no fix for, and the image scans flag every one.
-FROM node:22-trixie-slim AS runner
+FROM node:22-trixie-slim AS runtime-base
 
 ENV NODE_ENV=production \
     # Next standalone server binds these; 0.0.0.0 so the proxy can reach it.
@@ -303,6 +315,27 @@ RUN npm install -g prisma@6.2.1 && npm cache clean --force \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
         /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
         /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
+# ---------------------------------------------------------------------------
+# What CI keeps in its registry layer cache: every stage whose layers outlive the
+# commit - the installed workspace, the runtime's system packages and Prisma CLI,
+# and the Minecraft jars - and none of the ones rebuilt by every commit. Exported
+# with `--target ci-cache` and `mode=max` (dashboard-publish.yml), which writes
+# the layers of every stage this one copies from. Exporting the image's own graph
+# instead also wrote the multi-gigabyte compile and compile-cache layers, which no
+# later build can hit, and compressing them took five minutes of every publish.
+# Nothing else builds it, and it is not the last stage, so a plain build of this
+# file still produces the runner.
+# ---------------------------------------------------------------------------
+FROM scratch AS ci-cache
+COPY --from=deps /build/package-lock.json /deps/
+COPY --from=runtime-base /usr/lib/os-release /runtime-base/
+COPY --from=minecraft-mods /out /minecraft-mods/
+COPY --from=minecraft-plugins /out /minecraft-plugins/
+COPY --from=minecraft-anticheat /out /minecraft-anticheat/
+COPY --from=minecraft-symbiote /out /minecraft-symbiote/
+
+FROM runtime-base AS runner
 
 # Commit this image was built from, passed by CI. Surfaced by the update checker
 # so the dashboard can report how far behind the release branch it is.
