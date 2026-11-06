@@ -291,6 +291,14 @@ async function finish(adb: AdbConnection, host: string, outcome: TvOutcome): Pro
     publish({ phase: outcome.startsWith("installed") ? "done" : "failed", outcome, closed });
 }
 
+/** Stops a search under way; an install is never stopped part way. */
+function stopSearch(): void {
+    if (state.phase !== "searching") return;
+    search += 1;
+    busy = false;
+    publish({ phase: "ready" });
+}
+
 /** The window. One at a time: a second click brings it forward. */
 export function openTvInstall(): void {
     if (window && !window.isDestroyed()) {
@@ -301,6 +309,8 @@ export function openTvInstall(): void {
     window = openLocalWindow("tv", { title: "Install on a TV - Polaris", width: 560, height: 620 });
     window.on("closed", () => {
         window = null;
+        // Closing stops a search, as closing the dashboard dialog does.
+        stopSearch();
     });
 }
 
@@ -322,10 +332,7 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
     });
     ipcMain.handle(CHANNELS.tvCancel, (event) => {
         if (!fromTv(event)) return null;
-        if (state.phase !== "searching") return state;
-        search += 1;
-        busy = false;
-        publish({ phase: "ready" });
+        stopSearch();
         return state;
     });
     ipcMain.handle(CHANNELS.tvFind, async (event) => {

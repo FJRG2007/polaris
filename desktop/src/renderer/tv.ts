@@ -79,7 +79,10 @@ function render(state: TvInstallState): void {
     const idle = IDLE.has(state.phase);
     address.disabled = !idle;
     home.disabled = !idle;
-    available(find, idle);
+    // A search can be stopped from the same button that started it.
+    const searching = state.phase === "searching";
+    available(find, idle || searching);
+    find.textContent = searching ? "Stop search" : "Find TVs";
     available(start, idle && validAddress());
     say(addressError, addressProblem());
     say(step, STEPS[state.phase] ?? null);
@@ -118,7 +121,8 @@ address.addEventListener("input", () => {
     if (latest) render(latest);
 });
 find.addEventListener("click", () => {
-    if (find.getAttribute("aria-disabled") !== "true") void bridge.find();
+    if (find.getAttribute("aria-disabled") === "true") return;
+    void (latest?.phase === "searching" ? bridge.cancel() : bridge.find());
 });
 start.addEventListener("click", () => {
     if (start.getAttribute("aria-disabled") === "true") return;
