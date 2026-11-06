@@ -335,6 +335,7 @@
         "dictate": "Dictate",
         "dictateStop": "Stop and transcribe",
         "dictateCancel": "Discard recording",
+        "dictateInCall": "The call is using the microphone",
         "recording": "Recording {time}",
         "silent": "Polar can't hear anything. Check your microphone.",
         "transcribing": "Transcribing",

@@ -73,6 +73,9 @@ export const PromptInputTextarea = forwardRef<
         const node = own.current;
         if (!node) return;
         node.style.height = "auto";
+        // A box that is not on screen measures nothing. Fitting it to that left
+        // it zero pixels tall once it came back - an input nobody can click.
+        if (node.scrollHeight === 0) return;
         node.style.height = `${Math.min(node.scrollHeight, MAX_ROWS_PX)}px`;
     }, []);
 

@@ -89,6 +89,7 @@ export function PolarComposer({
     submit,
     streaming = false,
     hidden = false,
+    inCall = false,
     highlighted = false,
     className
 }: {
@@ -126,8 +127,11 @@ export function PolarComposer({
     };
     /** Whether an answer is streaming in, which the border shows. */
     streaming?: boolean;
-    /** Hidden but kept mounted, so a draft survives a voice conversation. */
+    /** Hidden but kept mounted. */
     hidden?: boolean;
+    /** A voice conversation is open beside it. The box, the attachments and
+     *  send all keep working; only what would open a second microphone rests. */
+    inCall?: boolean;
     /** Something is being dragged over it. */
     highlighted?: boolean;
     className?: string;
@@ -218,6 +222,7 @@ export function PolarComposer({
                         <DictationButton
                             available={kit.voice.dictation}
                             disabled={disabled}
+                            refusal={inCall ? t("voice.dictateInCall") : undefined}
                             payer={kit.payer}
                             transcribers={kit.voice.transcribers}
                             transcriber={kit.voice.transcriber}
@@ -234,7 +239,7 @@ export function PolarComposer({
                     {/* One button, as in ChatGPT: with nothing typed or attached
                         it starts a voice conversation, and it sends once there is
                         something to send. */}
-                    {!submit.busy && empty ? (
+                    {!submit.busy && empty && !inCall ? (
                         "refusal" in voiceMode ? (
                             <VoiceModeButton
                                 primary
