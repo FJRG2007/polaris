@@ -52,7 +52,10 @@ export interface ChatChange {
      *      conversation reads its pins again.
      *  emoji - a space's own emoji were added, renamed or removed. Carries the
      *      space and its rooms, never an emoji: a tab that reaches one of the
-     *      rooms asks for the list again through the same check. */
+     *      rooms asks for the list again through the same check.
+     *  call-settled - somebody declined a call ringing for them on one of their
+     *      devices. Sent to that person alone (`audience`), so every other
+     *      device and tab of theirs stops ringing too. */
     readonly kind:
         | "posted"
         | "channels"
@@ -63,7 +66,8 @@ export interface ChatChange {
         | "activity"
         | "pins"
         | "emoji"
-        | "game-invite";
+        | "game-invite"
+        | "call-settled";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */
@@ -87,6 +91,8 @@ export interface ChatChange {
     /** Only on `game-invite`: the game session somebody was invited to. Sent to
      *  its `audience` alone, who read the invitation through its own check. */
     readonly sessionId?: string;
+    /** Only on `call-settled`: the call that stopped ringing. */
+    readonly meetingId?: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is
      *  calling. */
     readonly actorName?: string;

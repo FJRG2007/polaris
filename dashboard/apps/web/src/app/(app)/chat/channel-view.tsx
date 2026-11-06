@@ -46,7 +46,7 @@ import { requestActivityJoin } from "./activity-join";
 import { useCallHidden } from "./call-hidden";
 import { CallRosterList } from "./call-roster";
 import type { PollDraft } from "./poll-dialog";
-import { draftMessage } from "./draft-message";
+import { draftMessage, stillPending } from "./draft-message";
 import { ScheduledBar } from "./scheduled-bar";
 import { ChannelHeader, PanelSearch } from "./channel-header";
 import { useWideScreen } from "./use-wide-screen";
@@ -550,14 +550,10 @@ export function ChannelView({
     };
 
     /** Drop everything the server has now confirmed, so a message is never on
-     *  screen twice. */
-    const settle = useCallback((arrived: readonly ChatMessageView[]) => {
-        setPending((current) =>
-            current.filter((entry) => {
-                const real = sent.current.get(entry.id);
-                return !real || !arrived.some((message) => message.id === real);
-            })
-        );
+     *  screen twice. `echoes` when `arrived` is new to this screen, so a draft
+     *  is settled by its own echo even before its send has answered. */
+    const settle = useCallback((arrived: readonly ChatMessageView[], echoes = false) => {
+        setPending((current) => stillPending(current, arrived, sent.current, echoes));
     }, []);
 
     /**
@@ -758,7 +754,7 @@ export function ChannelView({
         } else {
             show(window);
         }
-        settle(arrived);
+        settle(arrived, true);
     }, [channelId, load, release, settle, show]);
 
     // How `release` reaches back into the catch-up without the two defining each
@@ -1828,6 +1824,10 @@ export function ChannelView({
             return;
         }
         sent.current.set(draft.id, result.id);
+        // The message may be on screen already: the stream brings it the moment
+        // it is stored, often before this answer. Settled now rather than after
+        // the reload below, which is one more round trip that can be slow.
+        settle(held.current);
         await load();
         refresh();
     };

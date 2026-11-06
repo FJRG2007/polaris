@@ -149,14 +149,13 @@ export async function GET(request: Request): Promise<Response> {
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
 
-                // Somebody's face changed. Sent on whether this reader shares
-                // a room with them, which is the same question as whether their
-                // face could be on this screen, and it carries the id alone -
-                // what they now look like is pulled by the browser through the
-                // endpoint that answers for every other face.
-                //
-                // Their own browser is skipped: it changed it, and it already
-                // redrew.
+                // A call declined on another of this person's devices: theirs
+                // alone, so every other screen of theirs stops ringing it.
+                if (change.kind === "call-settled") {
+                    if (!change.meetingId || !change.audience?.includes(actor.id)) return;
+                    send({ kind: "call-settled", meetingId: change.meetingId });
+                    return;
+                }
                 // An invitation to play: to the people invited and nobody else,
                 // with the session's id alone - the toast reads the invitation
                 // through the check that decides whether it is theirs.
@@ -166,6 +165,14 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
 
+                // Somebody's face changed. Sent on whether this reader shares
+                // a room with them, which is the same question as whether their
+                // face could be on this screen, and it carries the id alone -
+                // what they now look like is pulled by the browser through the
+                // endpoint that answers for every other face.
+                //
+                // Their own browser is skipped: it changed it, and it already
+                // redrew.
                 if (change.kind === "appearance") {
                     if (change.actorId === actor.id) return;
                     if (!change.channels?.some((id) => scope.reachable().has(id))) return;
@@ -259,11 +266,16 @@ export async function GET(request: Request): Promise<Response> {
                 // that sent it asks for what is newer than what it holds, which
                 // the send already brought, so it costs that tab one short read.
                 // A pin is the same: the tab that pinned redrew, its other
-                // devices did not.
+                // devices did not. And a call they walked into is not theirs
+                // already on every device: answering on the desk is what tells
+                // the phone and the other tabs to stop ringing, so only their
+                // own ring is kept from them.
+                const ownRing = change.kind === "call" && change.call?.state === "ringing";
                 if (
                     change.actorId === actor.id &&
                     change.kind !== "posted" &&
-                    change.kind !== "pins"
+                    change.kind !== "pins" &&
+                    (change.kind !== "call" || ownRing)
                 ) {
                     return;
                 }

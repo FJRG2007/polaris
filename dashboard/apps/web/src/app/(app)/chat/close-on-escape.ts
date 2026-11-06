@@ -34,23 +34,34 @@ export function closesConversation(event: KeyboardEvent, root: ParentNode = docu
 }
 
 /**
- * Call `onEscape` for a press nothing else wanted.
+ * Call `onEscape` for a press nothing else wanted, wherever the focus is.
  *
- * On the window and in the bubbling phase, so everything nearer the focus -
- * and the document-level listeners the pickers and the composer use - has had
- * its turn first.
+ * Seen on the way in, at the window in the capture phase, so no handler nearer
+ * the focus can hide it: one that stops propagation on Escape (a row, a field,
+ * a panel) used to swallow the press before it bubbled back up here, which is
+ * why closing seemed to depend on where the last click landed. Whether an
+ * overlay owns the key is read then, before it closes itself; whether anybody
+ * took the key is read once the press has been handled everywhere, in the task
+ * after it, so the pickers, the composer and the dialogs still come first.
  */
 export function useCloseOnEscape(onEscape: () => void): void {
     const latest = useRef(onEscape);
     latest.current = onEscape;
 
     useEffect(() => {
+        const pending = new Set<ReturnType<typeof setTimeout>>();
         const onKey = (event: KeyboardEvent) => {
             if (!closesConversation(event)) return;
-            event.preventDefault();
-            latest.current();
+            const timer = setTimeout(() => {
+                pending.delete(timer);
+                if (!event.defaultPrevented) latest.current();
+            }, 0);
+            pending.add(timer);
         };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
+        window.addEventListener("keydown", onKey, true);
+        return () => {
+            window.removeEventListener("keydown", onKey, true);
+            for (const timer of pending) clearTimeout(timer);
+        };
     }, []);
 }

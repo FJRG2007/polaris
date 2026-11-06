@@ -15,12 +15,12 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ChatRulesView } from "@/app/(app)/admin/chat/chat-rules-view";
+import { ChatRulesView } from "@/app/(app)/admin/apps/[appId]/settings/_chat/chat-rules-view";
 import { MessagesWrapper } from "../setup/i18n";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { DEFAULT_CHAT_RULES, type ChatRuleScope, type ChatRules } from "@polaris/core";
 
-vi.mock("@/app/(app)/admin/chat/actions", () => ({
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/actions", () => ({
     setChatRulesAction: async () => ({})
 }));
 

@@ -11,13 +11,13 @@
 import { withMessages } from "../../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { ChatRulesView } from "@/app/(app)/admin/chat/chat-rules-view";
-import { CallServerView } from "@/app/(app)/admin/chat/call-server-view";
+import { ChatRulesView } from "@/app/(app)/admin/apps/[appId]/settings/_chat/chat-rules-view";
+import { CallServerView } from "@/app/(app)/admin/apps/[appId]/settings/_chat/call-server-view";
 import { DEFAULT_CHAT_RULES, type ChatRuleScope, type ChatRules } from "@polaris/core";
 
 let settings: Record<string, unknown> = {};
 
-vi.mock("@/app/(app)/admin/chat/actions", () => ({
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/actions", () => ({
     callServerSettingsAction: async () => ({ settings, error: null }),
     setCallServerAction: async () => ({}),
     setChatRulesAction: async () => ({})
@@ -44,7 +44,16 @@ describe("admin chat in Spanish", () => {
     });
 
     it("keeps the link inside the translated sentence", async () => {
-        settings = { url: "", key: "", hasSecret: false, shipped: true, ready: true, answering: false, unused: null, container: "stopped" };
+        settings = {
+            url: "",
+            key: "",
+            hasSecret: false,
+            shipped: true,
+            ready: true,
+            answering: false,
+            unused: null,
+            container: "stopped"
+        };
         render(withMessages(<CallServerView />, "es-ES"));
 
         const link = await screen.findByRole("link", { name: "Contenedores" });
@@ -55,7 +64,16 @@ describe("admin chat in Spanish", () => {
     });
 
     it("chooses where a running server is in Spanish", async () => {
-        settings = { url: "", key: "", hasSecret: false, shipped: true, ready: true, answering: true, unused: null, container: "running" };
+        settings = {
+            url: "",
+            key: "",
+            hasSecret: false,
+            shipped: true,
+            ready: true,
+            answering: true,
+            unused: null,
+            container: "running"
+        };
         render(withMessages(<CallServerView />, "es-ES"));
 
         expect(await screen.findByText("En marcha en este servidor.")).toBeTruthy();

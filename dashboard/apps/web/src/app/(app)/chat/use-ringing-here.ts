@@ -13,6 +13,7 @@
  * there - never saw the frame, and still has to ring.
  */
 
+import { declineCall } from "./call-requests";
 import { useChatStream } from "./use-chat-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { playCallSound, RING_FOR_MS } from "@/lib/call-sounds";
@@ -52,6 +53,12 @@ export function useRingingHere(
     useChatStream(
         useCallback(
             (frame) => {
+                // Declined on another of this person's devices.
+                if (frame.kind === "call-settled") {
+                    const meetingId = frame.meetingId;
+                    setRing((current) => (current?.meetingId === meetingId ? null : current));
+                    return;
+                }
                 if (frame.kind !== "call") return;
                 setRing((current) => ringAfter(current, frame, viewerId, channelId, Date.now()));
             },
@@ -94,6 +101,7 @@ export function useRingingHere(
         if (!ring) return;
         playCallSound("hangUp");
         peers.current?.post({ kind: "settled", meetingId: ring.meetingId });
+        void declineCall(ring.meetingId).catch(() => undefined);
         setRing(null);
     }, [ring]);
 

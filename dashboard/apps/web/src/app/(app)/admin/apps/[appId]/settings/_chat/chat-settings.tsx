@@ -1,10 +1,9 @@
 /**
- * What is allowed in a conversation, and where its calls run (/admin/chat).
+ * What is allowed in a conversation, and where its calls run: the Chat app's
+ * administrator settings, drawn by Polaris apps > Chat > Settings. The caller
+ * has already checked that the reader is an administrator.
  */
 
-import { PageHeader } from "@polaris/ui";
-import { requireAdmin } from "@/lib/session";
-import { getTranslations } from "@/lib/i18n/request";
 import { allChatRules } from "@/lib/chat/rules";
 import { ChatRulesView } from "./chat-rules-view";
 import { CallServerView } from "./call-server-view";
@@ -15,24 +14,18 @@ import { DriveShareView } from "./drive-share-view";
 import { linkSafetyOverview } from "@/lib/chat/link-safety";
 import { LinkSafetyView } from "./link-safety-view";
 
-export const dynamic = "force-dynamic";
-
-export default async function ChatRulesPage() {
-    await requireAdmin();
-    const [rules, offered, share, linkSafety, t] = await Promise.all([
+export async function ChatAdminSettings() {
+    const [rules, offered, share, linkSafety] = await Promise.all([
         allChatRules(),
         orgChatOffered(),
         driveShare(),
-        linkSafetyOverview(),
-        getTranslations("admin")
+        linkSafetyOverview()
     ]);
 
     return (
-        // A column of settings and nothing wide, centred the way the rest of the
-        // narrow admin pages are: a limit of three words in a track the width of
-        // the screen is the whole reason this page looked wrong.
-        <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader title={t("chat.page.title")} description={t("chat.page.description")} />
+        // A column of settings and nothing wide: a limit of three words in a track
+        // the width of the screen is the whole reason the old page looked wrong.
+        <div className="flex w-full max-w-2xl flex-col">
             <ChatRulesView initial={rules} />
             {/* Beside the size limit it qualifies: the limit is about what this
                 instance stores, and this is what decides whether sending a file

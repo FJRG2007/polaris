@@ -10,7 +10,7 @@ import type * as settingsActionsModule from "@/app/(app)/admin/settings/actions"
 import type * as retentionActionsModule from "@/app/(app)/admin/retention/actions";
 import type * as inboxActionsModule from "@/app/(app)/admin/inbox/actions";
 import type * as domainsActionsModule from "@/app/(app)/admin/domains/actions";
-import type * as chatActionsModule from "@/app/(app)/admin/chat/actions";
+import type * as chatActionsModule from "@/app/(app)/admin/apps/[appId]/settings/_chat/actions";
 import type * as dnsActionsModule from "@/app/(app)/account/domains/dns-actions";
 
 type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;

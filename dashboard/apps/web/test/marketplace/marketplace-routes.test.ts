@@ -37,6 +37,9 @@ vi.mock("@/lib/apps/install-service", () => ({
     )
 }));
 vi.mock("@/app/(app)/vpn/vpn-admin-settings", () => ({ VpnAdminSettings: () => null }));
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
+    ChatAdminSettings: () => null
+}));
 vi.mock("@/app/(app)/apps/marketplace/marketplace-view", () => ({ MarketplaceView: () => null }));
 vi.mock("@/app/(app)/apps/marketplace/[appId]/app-detail", () => ({
     AppDetail: () => null,

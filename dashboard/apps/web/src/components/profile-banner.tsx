@@ -21,12 +21,44 @@
  */
 
 import { cn } from "@polaris/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { bannerUrl, orgBannerUrl } from "@/lib/avatar-url";
 import { tintFor } from "@polaris/core";
 import { accentGradient, useAccent, type AccentSubject } from "@/lib/profile-accent";
 import { fillCss, readFill, type BannerFill } from "@polaris/core";
 import { useProfileStyle } from "@/components/profile-style-store";
+
+/**
+ * What each band last looked like, kept for the life of the page.
+ *
+ * A band is drawn again from nothing whenever whatever holds it is - a card a
+ * menu opened over, a panel that came back - and the colour under it used to
+ * start again from what a new mount knows: no answer from the appearance store
+ * yet, so the colour from their face, then the one they chose a moment later.
+ * That was the flash. The last colour this page already drew for them stands in
+ * until the store answers, and a picture that just failed is not asked for
+ * again only to fail a second time - for a minute, or until the connection
+ * comes back, since a dropped request is not a missing picture.
+ */
+const drawnFill = new Map<string, BannerFill | null>();
+const failedPictures = new Map<string, number>();
+const FAILED_PICTURE_TTL_MS = 60_000;
+
+function pictureFailedRecently(src: string): boolean {
+    const at = failedPictures.get(src);
+    if (at === undefined) return false;
+    if (Date.now() - at < FAILED_PICTURE_TTL_MS) return true;
+    failedPictures.delete(src);
+    return false;
+}
+
+if (typeof window !== "undefined") window.addEventListener("online", () => failedPictures.clear());
+
+/** Forget what the page kept - for tests, which start every case clean. */
+export function resetProfileBannerMemory(): void {
+    drawnFill.clear();
+    failedPictures.clear();
+}
 
 export function ProfileBanner({
     person,
@@ -59,7 +91,16 @@ export function ProfileBanner({
     // An organization has no appearance of its own to wear; asking would be a
     // request per company card for a row that cannot exist.
     const stored = useProfileStyle(kind === "org" || fill !== undefined ? null : person.id);
-    const chosen = fill === undefined ? stored?.banner ?? null : typeof fill === "string" ? readFill(fill) : fill;
+    const key = `${kind}:${person.id}`;
+    const given = fill === undefined ? undefined : typeof fill === "string" ? readFill(fill) : fill;
+    // Null from the store is "not known yet", not "none": a plain profile comes
+    // back as a style whose banner is null, which is an answer and replaces what
+    // was kept.
+    const known = given !== undefined ? given : stored ? (stored.banner ?? null) : undefined;
+    const chosen = known !== undefined ? known : (drawnFill.get(key) ?? null);
+    useEffect(() => {
+        if (known !== undefined) drawnFill.set(key, known);
+    }, [key, known]);
     // A face with no colour in it - initials, a black and white photograph - is
     // still that person's colour: the tint their initials are drawn on is
     // already stable per account and already what everybody has learnt to
@@ -69,16 +110,20 @@ export function ProfileBanner({
         : accent
           ? accentGradient(accent)
           : tintFor(person.id);
-    const [failed, setFailed] = useState(false);
+    const src = kind === "org" ? orgBannerUrl(person.id) : bannerUrl(person.id);
+    const [failed, setFailed] = useState(() => pictureFailedRecently(src));
 
     return (
         <div className={cn("relative w-full overflow-hidden", className)} style={{ background }}>
             {!failed && (
                 // eslint-disable-next-line @next/next/no-img-element -- one picture per profile, no loader wanted
                 <img
-                    src={kind === "org" ? orgBannerUrl(person.id) : bannerUrl(person.id)}
+                    src={src}
                     alt=""
-                    onError={() => setFailed(true)}
+                    onError={() => {
+                        failedPictures.set(src, Date.now());
+                        setFailed(true);
+                    }}
                     className="absolute inset-0 size-full object-cover"
                 />
             )}

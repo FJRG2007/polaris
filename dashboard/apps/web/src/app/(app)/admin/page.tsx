@@ -48,7 +48,7 @@ const SECTIONS = [
     { key: "activity", href: "/admin/activity", icon: Activity },
     { key: "evidence", href: "/admin/evidence", icon: ClipboardCheck },
     { key: "inbox", href: "/admin/inbox", icon: MessagesSquare },
-    { key: "chat", href: "/admin/chat", icon: MessageSquare },
+    { key: "chat", href: "/admin/apps/chat/settings", icon: MessageSquare },
     { key: "email", href: "/admin/email", icon: Mail },
     { key: "domains", href: "/admin/domains", icon: Globe },
     { key: "consumption", href: "/admin/consumption", icon: Gauge },

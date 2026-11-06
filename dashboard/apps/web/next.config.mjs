@@ -177,6 +177,9 @@ const nextConfig = {
         // service's settings in Deploy.
         { source: "/account/webhooks", destination: "/automations/webhooks", permanent: false },
         { source: "/overview", destination: "/home", permanent: false },
+        // The chat settings moved under Polaris apps > Chat > Settings. Kept for
+        // good, temporary for the reason above.
+        { source: "/admin/chat", destination: "/admin/apps/chat/settings", permanent: false },
         // Home's screens were at /house for one release. Temporary on purpose: a
         // permanent redirect is a 308 with no expiry, cached by every browser
         // that ever followed it, and this project has already lost one path that

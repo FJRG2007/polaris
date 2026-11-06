@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { apiAdmin } from "@/lib/api-session";
 import { pollRoute } from "@/lib/poll-route";
-import { callServerSettingsAction } from "@/app/(app)/admin/chat/actions";
+import { callServerSettingsAction } from "@/app/(app)/admin/apps/[appId]/settings/_chat/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

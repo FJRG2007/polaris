@@ -60,6 +60,7 @@ import {
     type NoticeStanding
 } from "@/lib/desktop-notify";
 import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
+import { declineCall } from "@/app/(app)/chat/call-requests";
 import { publishCardRings, shownStages, stageShown, subscribeStages } from "@/lib/chat/call-stage";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
@@ -361,6 +362,12 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     useChatStream(
         useCallback(
             (frame) => {
+                // Declined on another of this person's devices: the desk, the
+                // phone and every tab stop ringing together.
+                if (frame.kind === "call-settled") {
+                    settle(frame.meetingId);
+                    return;
+                }
                 if (frame.kind !== "call") return;
                 // Called back, joined, or rung again, on any device: the missed
                 // call from that conversation is answered. Every tab and every
@@ -767,12 +774,14 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                             aria-label={t("calls.decline")}
                             title={t("calls.decline")}
                             onClick={() => {
-                                // Declined here and nowhere else: the caller is
-                                // not told, because a missed call and a refused
-                                // one look the same from the other end and
-                                // Polaris has no business saying which it was.
+                                // Declined on every device of this account, and
+                                // nowhere else: the caller is not told, because a
+                                // missed call and a refused one look the same
+                                // from the other end and Polaris has no business
+                                // saying which it was.
                                 playCallSound("hangUp");
                                 settle(entry.meetingId);
+                                void declineCall(entry.meetingId).catch(() => undefined);
                             }}
                         >
                             <PhoneOff className="size-4" />

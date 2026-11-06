@@ -76,3 +76,44 @@ export function draftMessage(facts: {
         createdAt: new Date().toISOString()
     };
 }
+
+/**
+ * The drafts the server has not confirmed yet, once `arrived` is on screen.
+ *
+ * A draft is confirmed by the id its send answered with, when that answer is
+ * in. It is also confirmed by its own echo: the live stream tells this screen
+ * about the message the moment the server stores it, which is usually before
+ * the send itself has answered - and when that answer is slow, or never comes,
+ * the draft sat under the real message as "sending" until the conversation was
+ * opened again. So a message by the same author with the same text, not already
+ * claimed by another draft's id, settles the oldest draft waiting for it; two
+ * identical lines sent in a row are two echoes and settle one each.
+ *
+ * Only for `echoes`: messages that are new to this screen, as a live catch-up
+ * brings them. A reloaded page holds older lines too, and an "ok" said five
+ * minutes ago is not the echo of the "ok" being sent now.
+ */
+export function stillPending(
+    pending: readonly ChatMessageView[],
+    arrived: readonly ChatMessageView[],
+    sent: ReadonlyMap<string, string>,
+    echoes: boolean
+): readonly ChatMessageView[] {
+    const known = new Set(sent.values());
+    const claimed = new Set<string>();
+    const kept = pending.filter((draft) => {
+        const real = sent.get(draft.id);
+        if (real) return !arrived.some((message) => message.id === real);
+        const echo = arrived.find(
+            (message) =>
+                !known.has(message.id) &&
+                !claimed.has(message.id) &&
+                message.authorId === draft.authorId &&
+                message.body.trim() === draft.body.trim()
+        );
+        if (!echo || !echoes) return true;
+        claimed.add(echo.id);
+        return false;
+    });
+    return kept.length === pending.length ? pending : kept;
+}

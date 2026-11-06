@@ -42,5 +42,8 @@ export const ownVoice = (meetingId: string) =>
 export const licensedFilter = (meetingId: string) =>
     step<Answer<typeof actions.licensedFilterAction>>("licensed-filter", { meetingId });
 
+export const declineCall = (meetingId: string) =>
+    step<Answer<typeof actions.declineCallAction>>("decline", { meetingId });
+
 export const claimCall = (meetingId: string, deviceId: string) =>
     step<Answer<typeof actions.claimCallAction>>("claim", { meetingId, deviceId });

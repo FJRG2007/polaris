@@ -21,7 +21,7 @@ import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Input, Skeleton } from "@polaris/ui";
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react";
-import * as polls from "../admin-polls";
+import * as polls from "@/app/(app)/admin/admin-polls";
 
 /** How often a server that has not answered yet is asked again. Short: it is the
  *  difference between watching it come up and reloading the page to find out. */

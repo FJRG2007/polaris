@@ -28,6 +28,12 @@ let posted: unknown[] = [];
 let onPeer: ((message: unknown) => void) | null = null;
 let session: { meetingId: string; channelId: string; title: string } | null = null;
 
+/** The account-wide decline the card sends, so every other device stops too. */
+const { declineCall } = vi.hoisted(() => ({
+    declineCall: vi.fn(async (_meetingId: string) => ({}))
+}));
+vi.mock("@/app/(app)/chat/call-requests", () => ({ declineCall }));
+
 vi.mock("@/components/session-scope", () => ({ useSessionScope: () => "scope" }));
 
 vi.mock("@/app/(app)/chat/call-hold", () => ({
@@ -131,7 +137,24 @@ describe("a call ringing in several tabs", () => {
         fireEvent.click(await screen.findByLabelText("Decline"));
 
         expect(posted).toEqual([{ kind: "settled", meetingId: "m1" }]);
+        // And every other device of the account: the desk, the phone, a
+        // browser elsewhere - none of them shares this channel.
+        expect(declineCall).toHaveBeenCalledWith("m1");
         await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull());
+    });
+
+    it("stops ringing when another device of the account declined it", async () => {
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        onFrame?.(ring("m1"), { owner: true });
+        onFrame?.(ring("m2"), { owner: true });
+        expect(await screen.findAllByText("Grace is calling")).toHaveLength(2);
+
+        onFrame?.({ kind: "call-settled", meetingId: "m1" }, { owner: true });
+
+        await vi.waitFor(() => expect(screen.getAllByText("Grace is calling")).toHaveLength(1));
+        // Told to the other tabs of this browser too, and not declined again.
+        expect(posted).toEqual([{ kind: "settled", meetingId: "m1" }]);
+        expect(declineCall).not.toHaveBeenCalled();
     });
 
     it("stops when the account has already answered on another device", async () => {

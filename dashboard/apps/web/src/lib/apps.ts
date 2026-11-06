@@ -893,7 +893,7 @@ const ADMIN_AREAS: AppSubapp[] = [
         label: "Communication", // i18n-ignore
         icon: MessageSquare,
         base: "/admin/email",
-        match: ["/admin/chat", "/admin/safety"],
+        match: ["/admin/safety"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -916,26 +916,6 @@ const ADMIN_AREAS: AppSubapp[] = [
                     "ses",
                     "outgoing",
                     "account mail"
-                ]
-            },
-            {
-                label: "Chat", // i18n-ignore
-                href: "/admin/chat",
-                adminOnly: true,
-                icon: MessageSquare,
-                keywords: [
-                    "messages",
-                    "limits",
-                    "edit history",
-                    "delete",
-                    "attachments",
-                    "rate limit",
-                    "direct messages",
-                    "group chats",
-                    "calls",
-                    "call server",
-                    "video calls",
-                    "meetings"
                 ]
             },
             {
@@ -981,6 +961,26 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Store,
                 keywords: ["marketplace", "install", "catalog", "built in"]
+            },
+            {
+                label: "Chat", // i18n-ignore
+                href: "/admin/apps/chat/settings",
+                adminOnly: true,
+                icon: MessageSquare,
+                keywords: [
+                    "messages",
+                    "limits",
+                    "edit history",
+                    "delete",
+                    "attachments",
+                    "rate limit",
+                    "direct messages",
+                    "group chats",
+                    "calls",
+                    "call server",
+                    "video calls",
+                    "meetings"
+                ]
             },
             {
                 label: "Get started", // i18n-ignore

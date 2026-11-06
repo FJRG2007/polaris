@@ -42,6 +42,8 @@ const frameSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("emoji"), spaceId: z.string() }),
     // Somebody invited this reader to play. Read through `pendingGameInvites`.
     z.object({ kind: z.literal("game-invite"), sessionId: z.string() }),
+    // A call that rang for you was declined on another of your devices.
+    z.object({ kind: z.literal("call-settled"), meetingId: z.string() }),
     // Somebody caught up. Theirs to take an unread count down with, and the
     // other side's to move the ticks under their own messages.
     z.object({

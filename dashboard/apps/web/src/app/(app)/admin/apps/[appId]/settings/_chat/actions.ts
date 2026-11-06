@@ -11,6 +11,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { CHAT_SETTINGS_PATH } from "@/lib/apps/app-settings";
 import { getTranslations } from "@/lib/i18n/request";
 import { setChatRules } from "@/lib/chat/rules";
 import { setOrgChatOffered } from "@/lib/chat/isolation";
@@ -43,7 +44,7 @@ export async function setChatRulesAction(
         targetId: `chat.rules.${chosen}`,
         metadata: { ...parsed.data }
     });
-    revalidatePath("/admin/chat");
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -66,7 +67,7 @@ export async function setDriveShareAction(how: unknown): Promise<{ error?: strin
         targetId: "chat.driveShare",
         metadata: { how }
     });
-    revalidatePath("/admin/chat");
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -87,7 +88,7 @@ export async function setOrgChatOfferedAction(offered: unknown): Promise<{ error
         targetId: "chat.orgIsolation",
         metadata: { offered: wanted }
     });
-    revalidatePath("/admin/chat");
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -112,7 +113,7 @@ export async function setLinkSafetyAction(input: unknown): Promise<{ error?: str
         targetId: "chat.linkSafety",
         metadata: { ...saved }
     });
-    revalidatePath("/admin/chat");
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -156,6 +157,6 @@ export async function setCallServerAction(
         targetId: "chat.calls",
         metadata: { cleared: String(url ?? "").trim() === "" }
     });
-    revalidatePath("/admin/chat");
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }

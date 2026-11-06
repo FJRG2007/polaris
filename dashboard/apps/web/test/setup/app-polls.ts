@@ -374,7 +374,8 @@ vi.mock("@/app/(app)/chat/call-requests", () => {
         readCall: forward(calls, "readCallAction", 1),
         ownVoice: forward(calls, "ownVoiceAction", 1),
         licensedFilter: forward(calls, "licensedFilterAction", 1),
-        claimCall: forward(calls, "claimCallAction", 2)
+        claimCall: forward(calls, "claimCallAction", 2),
+        declineCall: forward(calls, "declineCallAction", 1)
     };
 });
 
@@ -478,7 +479,7 @@ vi.mock("@/app/(app)/chat/chat-reads", () => ({
 
 vi.mock("@/app/(app)/admin/admin-polls", () => ({
     callServerSettings: forward(
-        () => import("@/app/(app)/admin/chat/actions"),
+        () => import("@/app/(app)/admin/apps/[appId]/settings/_chat/actions"),
         "callServerSettingsAction",
         0
     ),

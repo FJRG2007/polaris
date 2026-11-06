@@ -17,7 +17,8 @@ const actions = vi.hoisted(() => {
         "readCallAction",
         "ownVoiceAction",
         "licensedFilterAction",
-        "claimCallAction"
+        "claimCallAction",
+        "declineCallAction"
     ] as const;
     return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<
         (typeof names)[number],
@@ -94,6 +95,12 @@ const CASES = [
         name: "licensed-filter",
         ask: () => requests.licensedFilter(MEETING),
         action: "licensedFilterAction",
+        args: [MEETING]
+    },
+    {
+        name: "decline",
+        ask: () => requests.declineCall(MEETING),
+        action: "declineCallAction",
         args: [MEETING]
     },
     {

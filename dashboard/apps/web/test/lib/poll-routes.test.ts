@@ -369,7 +369,7 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     linkPreviewAction: actions.linkPreviewAction,
     profileAction: actions.profileAction
 }));
-vi.mock("@/app/(app)/admin/chat/actions", () => ({
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/actions", () => ({
     callServerSettingsAction: actions.callServerSettingsAction
 }));
 vi.mock("@/app/(app)/admin/domains/actions", () => ({
