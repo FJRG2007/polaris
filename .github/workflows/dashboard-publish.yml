@@ -302,17 +302,25 @@ jobs:
       # space left on device" inside the cache export, and a crashed runner fails
       # the job even under continue-on-error - so `latest` was never moved. The
       # preinstalled SDKs below are never used by this job and hold over 20 GB.
+      #
+      # Deleted in the background: removing them took two minutes in front of
+      # everything else, while the space is only needed at the end of the build,
+      # when the image and the caches are written. The runner reaps the process
+      # at the end of the job if it is somehow still going.
       - name: Free disk space
         run: |
           df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
-          df -h /
+          sudo nohup rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell \
+            > /dev/null 2>&1 &
       - uses: actions/checkout@v7
+      # `cleanup: false` here and in every job: the runner VM is thrown away with
+      # the job, and removing this builder first cost the web job 45 seconds.
       - uses: docker/setup-buildx-action@v4
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -345,9 +353,9 @@ jobs:
             POLARIS_BUILD_SHA=${{ github.sha }}
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
+            POLARIS_BUILD_SKIP_LINT=1
           build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
-          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max' || '' }}
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
@@ -358,6 +366,33 @@ jobs:
           # so the index carries the two images and nothing else.
           provenance: false
           sbom: false
+      # The layer cache the next build reads, written from the `ci-cache` stage
+      # rather than from the image: that stage reaches only the layers that outlive
+      # a commit (the installed workspace, the runtime's packages, the Minecraft
+      # jars). The image's own graph also holds the compile and its multi-gigabyte
+      # compile cache, new on every commit and so never hit, and compressing them
+      # for `mode=max` took five minutes of every publish. Everything this builds
+      # is already in this builder from the build above, so it only writes.
+      #
+      # No `no-cache`, even on the schedule: the build above has just made these
+      # layers fresh, and rebuilding them would store an `apt-get upgrade` other
+      # than the one the published image carries.
+      - name: Save the layer cache
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          context: dashboard
+          file: dashboard/docker/Dockerfile
+          target: ci-cache
+          build-args: |
+            POLARIS_BUILD_SHA=${{ github.sha }}
+            NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            POLARIS_APP_BUNDLES=publish
+            POLARIS_BUILD_SKIP_LINT=1
+          build-contexts: next-cache=${{ runner.temp }}/next-cache
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
+          outputs: type=cacheonly
       # The installable apps' bundles, from the same build: every layer is already
       # in this builder, so this only writes out the stage the image took its
       # index from - the files the image names by digest, and nothing else.
@@ -373,6 +408,7 @@ jobs:
             POLARIS_BUILD_SHA=${{ github.sha }}
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
+            POLARIS_BUILD_SKIP_LINT=1
           # The same context as the build above, or the stages after it would not
           # match the layers already in this builder and the app would compile again.
           build-contexts: next-cache=${{ runner.temp }}/next-cache
@@ -417,6 +453,7 @@ jobs:
             POLARIS_BUILD_SHA=${{ github.sha }}
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
+            POLARIS_BUILD_SKIP_LINT=1
           build-contexts: next-cache=${{ runner.temp }}/next-cache
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           outputs: type=local,dest=${{ runner.temp }}/next-cache-out
@@ -468,6 +505,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -511,6 +549,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -567,6 +606,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -592,6 +632,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -625,6 +666,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -667,6 +709,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -709,6 +752,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -744,6 +788,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -786,6 +831,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -827,6 +873,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -867,6 +914,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -901,6 +949,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -935,6 +984,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -979,6 +1029,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -1028,6 +1079,7 @@ jobs:
         with:
           buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io

@@ -89,6 +89,9 @@ const BUILD_STAMP = BUILD_SHA
     ? createHash("sha256").update(BUILD_SHA).digest("hex").slice(0, 16)
     : Date.now().toString(36);
 
+/** How long webpack keeps a compile cache entry no build has read (see `webpack`). */
+const WEBPACK_CACHE_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
     output: "standalone",
@@ -107,8 +110,10 @@ const nextConfig = {
     },
     // CI's checks job runs ESLint over these same sources beside the app build, so
     // linting again inside `next build` proved nothing new. Skipped only where that
-    // job is known to run: dashboard-ci.yml sets the flag on its build, and nothing
-    // else does - the image and every local build still lint. The type check stays:
+    // job is known to run: dashboard-ci.yml sets the flag on its build, and
+    // dashboard-publish.yml on the image it builds beside a call to that workflow,
+    // whose result its tag waits on. Every other build still lints, an operator's
+    // update and a local build included. The type check stays:
     // it also covers the route types Next generates under .next/types, which exist
     // only after a build, so the checks job's `tsc` never sees them.
     eslint: { ignoreDuringBuilds: process.env.POLARIS_BUILD_SKIP_LINT === "1" },
@@ -416,7 +421,7 @@ const nextConfig = {
         { source: "/vault/notifications/:path*", destination: "/api/bw/notifications/:path*" },
         { source: "/vault/events/:path*", destination: "/api/bw/events/:path*" }
     ],
-    webpack: (config, { isServer, webpack }) => {
+    webpack: (config, { dev, isServer, webpack }) => {
         // @polaris/ui is transpiled from TypeScript source and, like the rest of
         // the repo, uses explicit .js import specifiers. Map them back to .ts/.tsx
         // so webpack resolves them the way tsc's bundler resolution does.
@@ -434,6 +439,16 @@ const nextConfig = {
         // path to every browser (scripts/portable-import-meta.mjs), and the
         // postbuild check fails the build if any path still gets through.
         if (!isServer) config.plugins.push(new PortableImportMetaUrl(workspaceRoot, webpack));
+        // The production compile cache is carried from one CI build to the next
+        // (dashboard-publish.yml, dashboard-ci.yml), and webpack keeps an entry it
+        // has not used for 60 days by default. Minified chunks are stored by their
+        // content hash, so every commit added entries no later build asks for: the
+        // image's copy passed 5 GB, and restoring, copying and exporting it cost a
+        // publish more time than the compile it saved. Each build marks what it
+        // reads as used, so two days still keeps everything the current tree needs.
+        if (!dev && config.cache && typeof config.cache === "object") {
+            config.cache.maxAge = WEBPACK_CACHE_MAX_AGE_MS;
+        }
         return config;
     }
 };
