@@ -170,16 +170,21 @@ function Heading({ children }: { children: React.ReactNode }) {
 function RecentRow({ entry }: { entry: RecentActivityView }) {
     const game = entry.gameId ? (core.findGame(entry.gameId) ?? null) : null;
     const Icon = entry.source === "minecraft" ? Pickaxe : Gamepad2;
+    // A picture that did not load - a server with no icon, one since removed -
+    // falls back to the game's mark rather than a broken image.
+    const [broken, setBroken] = useState(false);
+    const picture = entry.imageUrl && !broken ? entry.imageUrl : null;
     return (
         <li className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/40 p-3">
             <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                {entry.imageUrl ? (
+                {picture ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a small icon the dashboard serves itself
                     <img
-                        src={entry.imageUrl}
+                        src={picture}
                         alt=""
                         aria-hidden
-                        className="size-full object-cover"
+                        className="size-full object-cover [image-rendering:pixelated]"
+                        onError={() => setBroken(true)}
                     />
                 ) : game ? (
                     <GameLogo game={game} className="size-9" />
