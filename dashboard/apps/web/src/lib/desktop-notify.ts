@@ -28,6 +28,7 @@
 
 import { desktopBridge } from "@/lib/desktop-bridge";
 import { attending } from "@/components/use-attention";
+import { browserNoticePayload, desktopNoticePayload } from "@/lib/notice-payload";
 
 /**
  * The notices this device has drawn and not yet withdrawn, by tag.
@@ -228,8 +229,17 @@ export async function mayNotify(): Promise<boolean> {
  * offering to join a room nobody is in.
  */
 export async function notifyDesktop(input: {
+    /** Who it is from: the sender's name. */
     title: string;
+    /** Where it was said - the conversation, "Email" - as a line of its own
+     *  where the notice draws one, and joined to the title where it does not. */
+    subtitle?: string;
+    /** The title where the subtitle cannot be drawn apart - see
+     *  `notice-payload`. */
+    combined?: string;
     body?: string;
+    /** A path on this Polaris to the sender's face. */
+    icon?: string;
     /** Notices sharing a tag replace each other rather than stacking, which is
      *  what stops six messages from one conversation becoming six notices. */
     tag: string;
@@ -263,7 +273,7 @@ export async function notifyDesktop(input: {
 }): Promise<{ close: () => void } | null> {
     const app = desktopBridge();
     if (app) {
-        const { reply, actions, ...drawnAs } = input;
+        const { reply, actions, title, subtitle, combined, body, icon, ...drawnAs } = input;
         const answerable = reply && app.onNoticeReply ? reply : null;
         const buttons = actions?.length && app.onNoticeAction ? actions : null;
         if (answerable) listenForReplies(app);
@@ -271,6 +281,10 @@ export async function notifyDesktop(input: {
         const drawn = await app
             .notify({
                 ...drawnAs,
+                ...desktopNoticePayload(
+                    { title, subtitle, combined, body, icon },
+                    app.noticeFeatures
+                ),
                 ...(answerable ? { reply: { placeholder: answerable.placeholder } } : {}),
                 ...(buttons ? { actions: buttons.map(({ id, text }) => ({ id, text })) } : {})
             })
@@ -283,6 +297,7 @@ export async function notifyDesktop(input: {
         return handle;
     }
     if (!(await mayNotify())) return null;
+    const words = browserNoticePayload(input);
 
     // Drawn by the service worker where one is running: only its notices carry
     // buttons, a press on one is heard even after the tab is gone, and a phone's
@@ -291,10 +306,10 @@ export async function notifyDesktop(input: {
     if (worker) {
         try {
             listenToWorker();
-            await worker.showNotification(input.title, {
-                body: input.body,
+            await worker.showNotification(words.title, {
+                body: words.body,
                 tag: input.tag,
-                icon: "/polaris-mark-128.png",
+                icon: words.icon,
                 badge: "/polaris-mark-128.png",
                 requireInteraction: input.insistent ?? false,
                 silent: !(input.sound ?? false),
@@ -323,10 +338,10 @@ export async function notifyDesktop(input: {
     }
 
     try {
-        const notice = new Notification(input.title, {
-            body: input.body,
+        const notice = new Notification(words.title, {
+            body: words.body,
             tag: input.tag,
-            icon: "/polaris-mark-128.png",
+            icon: words.icon,
             badge: "/polaris-mark-128.png",
             requireInteraction: input.insistent ?? false,
             // Silent unless the caller says otherwise: the sound is normally

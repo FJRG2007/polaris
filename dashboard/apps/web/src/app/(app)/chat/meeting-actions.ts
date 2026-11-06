@@ -39,6 +39,7 @@ import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { MOST_INVITED, meetingInvitesSchema } from "@/lib/chat/meeting-invites";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
+import { rememberDecline } from "@/lib/chat/declined-calls";
 
 /**
  * Whether this account may be in a call at all.
@@ -346,7 +347,17 @@ export async function claimCallAction(meetingId: string, deviceId: string): Prom
  */
 export async function declineCallAction(meetingId: string): Promise<{ error?: string }> {
     const user = await requirePermission("chat.use");
-    publishChatChange({ kind: "call-settled", actorId: user.id, audience: [user.id], meetingId });
+    const id = String(meetingId).slice(0, 100);
+    // Remembered as well as announced: a device whose stream was reconnecting
+    // when the frame went out hears it on its next ask instead - see
+    // `declined-calls`.
+    rememberDecline(user.id, id);
+    publishChatChange({
+        kind: "call-settled",
+        actorId: user.id,
+        audience: [user.id],
+        meetingId: id
+    });
     return {};
 }
 

@@ -45,9 +45,16 @@ export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     // A non-200 makes EventSource give up rather than reconnect every few
     // seconds against a session that is gone.
-    if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+    if (!session)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
     if (!(await sessionCan(session, "mail.use"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     // Held rather than re-read off `session` inside the closures: the narrowing
@@ -179,6 +186,12 @@ export async function GET(request: Request): Promise<Response> {
             // An opening comment gets the response on the wire, which is what
             // makes EventSource fire `open` instead of sitting in `connecting`.
             write(":ok\n\n");
+            // Said on every connection, a reconnection included: a frame sent
+            // while this tab's connection was down - a laptop asleep, a network
+            // dropping - is gone, and the mail it announced would otherwise wait
+            // for the next change in the mailbox, which can be an hour away. A
+            // page older than this does not know the kind and skips it.
+            send({ kind: "ready" });
             heartbeat = setInterval(() => write(":\n\n"), HEARTBEAT_MS);
         },
         cancel() {

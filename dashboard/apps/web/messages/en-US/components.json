@@ -96,6 +96,7 @@
     "mailUnread": {
         "title": "New mail",
         "from": "New email from {from}",
+        "kind": "Email",
         "somebody": "Someone",
         "noSubject": "(no subject)",
         "more": "{count} more {count, plural, one {message} other {messages}} in your inbox"

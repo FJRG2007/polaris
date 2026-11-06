@@ -30,7 +30,13 @@ export type AddressCheck = { readonly ok: boolean; readonly message: string | nu
 
 export interface NoticeInput {
     readonly title: string;
+    /** Where it was said - the conversation, "Mail" - drawn under the title on
+     *  macOS and beside it elsewhere. Ignored by an app older than it. */
+    readonly subtitle?: string;
     readonly body?: string;
+    /** A path on the Polaris to a PNG or JPEG for the notice's picture: the
+     *  sender's face. The app's mark when absent or unreadable. */
+    readonly icon?: string;
     /** A field on the notice to answer in, with this placeholder: a message
      *  answered where it arrived. The answer comes back through
      *  `onNoticeReply`. */
@@ -56,6 +62,8 @@ export interface NoticeInput {
     readonly sound?: boolean;
 }
 
+export type NoticeFeature = "subtitle" | "icon";
+
 export type PickedFolder =
     | { readonly ok: true; readonly name: string; readonly files: number; readonly zip: Uint8Array; }
     | { readonly ok: false; readonly error: string; }
@@ -65,6 +73,10 @@ export interface PolarisDesktop {
     /** This app's version. */
     readonly version: string;
     readonly platform: string;
+    /** What this app's notices draw beyond a title and a body. Absent from an
+     *  app older than it, which then draws neither, so the page keeps the words
+     *  in the title itself. */
+    readonly noticeFeatures?: readonly NoticeFeature[];
     /** Show a notice drawn by the operating system. Resolves false when it cannot. */
     notify(input: NoticeInput): Promise<boolean>;
     /** Take back the notice with this tag. */

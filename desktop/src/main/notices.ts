@@ -12,15 +12,30 @@
  * of the same service read the same too, and each is announced.
  */
 
-import { Notification } from "electron";
+import { join } from "node:path";
+import { Notification, nativeImage, type NativeImage } from "electron";
 import { OnceNotices } from "./notice-once";
+import { noticeLayout } from "./notice-layout";
 
 const live = new Map<string, Notification>();
 const said = new OnceNotices();
 
+/** The app's own mark, at full size: a notice without a picture of its own is
+ *  drawn with it rather than with the system's blank tile. A PNG, because
+ *  Windows draws a toast's picture from a file and does not take an .ico. */
+let mark: NativeImage | null = null;
+function appMark(): NativeImage | undefined {
+    mark ??= nativeImage.createFromPath(join(__dirname, "..", "icon.png"));
+    return mark.isEmpty() ? undefined : mark;
+}
+
 export interface Notice {
     readonly title: string;
+    /** Where it was said - a conversation, "Mail" - under the title. */
+    readonly subtitle?: string;
     readonly body?: string;
+    /** Its picture - the sender's face. The app's mark when absent. */
+    readonly icon?: NativeImage | null;
     readonly tag: string;
     readonly insistent?: boolean;
     /** True when the page already played its own sound for it. */
@@ -41,9 +56,13 @@ export function showNotice(notice: Notice): boolean {
     if (!Notification.isSupported()) return false;
     if (notice.once && said.repeated(notice.tag, `${notice.title}\n${notice.body ?? ""}`)) return true;
     live.get(notice.tag)?.close();
+    const words = noticeLayout(notice, process.platform);
+    const icon = notice.icon && !notice.icon.isEmpty() ? notice.icon : appMark();
     const shown = new Notification({
-        title: notice.title,
-        body: notice.body ?? "",
+        title: words.title,
+        body: words.body,
+        ...(words.subtitle ? { subtitle: words.subtitle } : {}),
+        ...(icon ? { icon } : {}),
         silent: notice.silent ?? false,
         timeoutType: notice.insistent ? "never" : "default",
         urgency: notice.insistent ? "critical" : "normal",

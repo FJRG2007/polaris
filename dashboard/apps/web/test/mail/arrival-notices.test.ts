@@ -15,19 +15,26 @@ import english from "../../messages/en-US/components.json";
 import spanish from "../../messages/es-ES/components.json";
 
 let watched = false;
-const notices: { title: string; body: string; tag: string }[] = [];
+const notices: {
+    title: string;
+    subtitle?: string;
+    combined?: string;
+    body: string;
+    tag: string;
+}[] = [];
 
 vi.mock("@/lib/desktop-notify", () => ({
     canNotify: () => true,
     tabIsWatched: () => watched,
     closeDesktopNotice: () => undefined,
-    notifyDesktop: async (input: { title: string; body: string; tag: string }) => {
+    notifyDesktop: async (input: (typeof notices)[number]) => {
         notices.push(input);
     }
 }));
 vi.mock("@/lib/notifications/browser-notices", () => ({ noticeAllowed: () => true }));
 
-const { noticeMailFrame, SHARED_CURSOR_KEY } = await import("@/components/mail-unread");
+const { noticeMailFrame, SHARED_CURSOR_KEY, ARRIVALS_RETRY_MS } =
+    await import("@/components/mail-unread");
 
 const asked: string[] = [];
 let answer = { cursor: "2026-11-06T10:00:00.000Z", named: [] as unknown[], more: 0 };
@@ -80,7 +87,11 @@ describe("the notice's title", () => {
         await noticeMailFrame({ current: "2026-11-06T10:00:00.000Z" }, true, t);
         expect(notices).toEqual([
             expect.objectContaining({
-                title: "New email from Ana",
+                // The sender, with "Email" on the line under it where the
+                // notice draws one and the whole sentence where it does not.
+                title: "Ana",
+                subtitle: "Email",
+                combined: "New email from Ana",
                 body: "Invoice for March",
                 tag: "mail:t1"
             })
@@ -95,11 +106,14 @@ describe("the notice's title", () => {
         };
         await noticeMailFrame({ current: "2026-11-06T10:00:00.000Z" }, true, t);
         expect(notices[0]?.title.length).toBeLessThanOrEqual(200);
+        expect(notices[0]?.combined?.length).toBeLessThanOrEqual(200);
     });
 
     it("is worded as mail in every language", () => {
         expect(english.mailUnread.from).toBe("New email from {from}");
         expect(spanish.mailUnread.from).toBe("Correo nuevo de {from}");
+        expect(english.mailUnread.kind).toBe("Email");
+        expect(spanish.mailUnread.kind).toBe("Correo");
     });
 });
 
@@ -139,5 +153,38 @@ describe("the cursor", () => {
         const cursor = { current: "2026-11-06T09:00:00.000Z" };
         await noticeMailFrame(cursor, false, t);
         expect(window.localStorage.getItem(SHARED_CURSOR_KEY)).toBe("2026-11-06T11:00:00.000Z");
+    });
+});
+
+describe("an ask that failed", () => {
+    it("is made again shortly instead of waiting for the next change in the mailbox", async () => {
+        vi.useFakeTimers();
+        try {
+            let failing = true;
+            vi.stubGlobal("fetch", async (url: string) => {
+                asked.push(url);
+                if (failing) return new Response("", { status: 503 });
+                return new Response(
+                    JSON.stringify({
+                        cursor: "2026-11-06T10:05:00.000Z",
+                        named: [{ threadId: "t1", from: "Ana", subject: "Hi" }],
+                        more: 0
+                    }),
+                    { status: 200 }
+                );
+            });
+            const cursor = { current: "2026-11-06T10:00:00.000Z" };
+            await noticeMailFrame(cursor, true, t);
+            expect(notices).toEqual([]);
+            expect(cursor.current).toBe("2026-11-06T10:00:00.000Z");
+
+            failing = false;
+            await vi.advanceTimersByTimeAsync(ARRIVALS_RETRY_MS);
+            expect(asked).toHaveLength(2);
+            expect(notices).toEqual([expect.objectContaining({ title: "Ana", tag: "mail:t1" })]);
+            expect(cursor.current).toBe("2026-11-06T10:05:00.000Z");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

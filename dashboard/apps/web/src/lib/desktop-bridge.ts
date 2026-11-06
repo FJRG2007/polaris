@@ -103,9 +103,17 @@ export interface PolarisDesktop {
             readonly key: string;
         }): Promise<DesktopOutcome>;
     };
+    /** What the app's notices draw beyond a title and a body. Absent from an
+     *  app older than it, which draws neither. */
+    readonly noticeFeatures?: readonly string[];
     notify(input: {
         readonly title: string;
+        /** Ignored by an app that does not list "subtitle" in `noticeFeatures`. */
+        readonly subtitle?: string;
         readonly body?: string;
+        /** A path on the Polaris to a PNG or JPEG. Ignored by an app that does
+         *  not list "icon" in `noticeFeatures`. */
+        readonly icon?: string;
         readonly tag: string;
         readonly href?: string;
         readonly insistent?: boolean;

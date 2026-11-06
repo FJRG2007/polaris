@@ -44,7 +44,10 @@ vi.mock("@/lib/call-sounds", () => ({
     },
     willBeHeard: async () => false
 }));
-vi.mock("@/lib/chat/call-elsewhere-request", () => ({ askCallElsewhere: async () => null }));
+vi.mock("@/lib/chat/call-elsewhere-request", () => ({
+    askCallElsewhere: async () => null,
+    askRingState: async () => null
+}));
 vi.mock("@/lib/device-once", () => ({ claimForDevice: async () => true }));
 
 async function settled(): Promise<void> {

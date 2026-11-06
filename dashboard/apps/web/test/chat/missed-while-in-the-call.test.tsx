@@ -63,7 +63,8 @@ vi.mock("@/lib/call-sounds", () => ({
 }));
 
 vi.mock("@/lib/chat/call-elsewhere-request", () => ({
-    askCallElsewhere: async () => null
+    askCallElsewhere: async () => null,
+    askRingState: async () => null
 }));
 
 /** Grace calling, in whichever conversation. */

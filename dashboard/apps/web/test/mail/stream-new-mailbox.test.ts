@@ -47,6 +47,7 @@ async function nextFrame(reader: ReadableStreamDefaultReader<Uint8Array>, waitMs
 
 describe("the mail stream", () => {
     const aborts: AbortController[] = [];
+    const openings: string[] = [];
     afterEach(() => {
         for (const abort of aborts) abort.abort();
         owned.ids = [];
@@ -60,9 +61,23 @@ describe("the mail stream", () => {
             new Request("http://polaris.test/api/mail/stream", { signal: abort.signal })
         );
         const reader = response.body!.getReader();
-        await reader.read(); // the opening comment
+        // The opening comment and the frame saying the connection is up, which
+        // may come in one chunk or two.
+        const decoder = new TextDecoder();
+        let opening = "";
+        while (!opening.includes('"kind":"ready"')) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            opening += decoder.decode(chunk.value);
+        }
+        openings.push(opening);
         return reader;
     }
+
+    it("says it is up on every connection, so a reconnected tab asks what it missed", async () => {
+        await open();
+        expect(openings.at(-1)).toContain('data: {"kind":"ready"}');
+    });
 
     it("wakes the tab for a mailbox connected after it opened", async () => {
         const reader = await open();

@@ -133,3 +133,23 @@ export function ringDecision(frame: CallFrameFacts, viewerId: string): RingDecis
     if (frame.userId !== "" && frame.userId === viewerId) return "settle";
     return "ignore";
 }
+
+/**
+ * Which calls a ringing telephone stops after asking the server where this
+ * account stands: the one it is sitting in on another device, and every ringing
+ * call it declined on another device - the frame saying so is easily missed by
+ * a device whose connection was down when it went out.
+ */
+export function ringsToStop(
+    state: {
+        readonly call: { readonly meetingId: string } | null;
+        readonly declined: readonly string[];
+    },
+    ringing: readonly { readonly meetingId: string }[]
+): string[] {
+    const stop = new Set<string>();
+    if (state.call) stop.add(state.call.meetingId);
+    const declined = new Set(state.declined);
+    for (const entry of ringing) if (declined.has(entry.meetingId)) stop.add(entry.meetingId);
+    return [...stop];
+}

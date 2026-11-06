@@ -22,6 +22,7 @@
 import { can } from "@polaris/auth";
 import { NextResponse } from "next/server";
 import * as meetings from "@/lib/chat/meetings";
+import { declinedCalls } from "@/lib/chat/declined-calls";
 import { backgroundUser, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -34,6 +35,11 @@ export async function GET(): Promise<Response> {
     // Nothing rather than a refusal for an account that may not call at all,
     // so the card is simply absent instead of every screen having to know why.
     if (!(await sessionCan(user, "chat.use")) || !(await can(user.id, "chat.call")))
-        return NextResponse.json({ call: null });
-    return NextResponse.json({ call: await meetings.callElsewhere(user.id) });
+        return NextResponse.json({ call: null, declined: [] });
+    // The calls declined on another device, for one that missed the frame
+    // saying so. Additive: an older page reads `call` and nothing else.
+    return NextResponse.json({
+        call: await meetings.callElsewhere(user.id),
+        declined: declinedCalls(user.id)
+    });
 }

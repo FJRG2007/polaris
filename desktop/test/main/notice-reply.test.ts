@@ -10,7 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const made = vi.hoisted(() => [] as { options: Record<string, unknown>; handlers: Map<string, (...args: unknown[]) => void>; closed: boolean; }[]);
 
+/** The app's own mark, as the mocked `nativeImage` reads it from disk. */
+const MARK = { isEmpty: () => false, name: "mark" };
+
 vi.mock("electron", () => ({
+    nativeImage: { createFromPath: () => MARK },
     Notification: class {
         static isSupported() {
             return true;
@@ -55,6 +59,21 @@ describe("a notice that can be answered", () => {
         made[0]?.handlers.get("reply")?.({}, "on my way");
         expect(answers).toEqual(["on my way"]);
         expect(made[0]?.closed).toBe(true);
+    });
+
+    it("draws the app's mark when it has no picture of its own, and the sender's face when it has", () => {
+        showNotice({ title: "Deployed", tag: "deploy:d1" });
+        expect(made[0]?.options.icon).toBe(MARK);
+        const face = { isEmpty: () => false, name: "face" };
+        showNotice({ title: "Ana", tag: "message:c1", icon: face as never });
+        expect(made[1]?.options.icon).toBe(face);
+    });
+
+    it("replaces the notice with the same tag rather than stacking a second", () => {
+        showNotice({ title: "Ana", body: "one", tag: "message:c2" });
+        showNotice({ title: "Ana", body: "two", tag: "message:c2" });
+        expect(made[0]?.closed).toBe(true);
+        expect(made[1]?.closed).toBe(false);
     });
 
     it("has no field when it was not asked to take an answer", () => {

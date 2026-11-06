@@ -63,6 +63,8 @@ const logosDir = join(root, "docs", "assets", "logos");
 // Polaris's own app logos, the files `@polaris/ui` writes from its `AppLogo`.
 const appLogosDir = join(dashboard, "packages", "ui", "assets", "app-logos");
 const repo = process.env.GITHUB_REPOSITORY || "FJRG2007/polaris";
+// The path Pages serves the site under, the same default `next.config.mjs` uses.
+const base = process.env.SITE_BASE_PATH ?? "/polaris";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const logos = new Set(readdirSync(logosDir));
@@ -92,6 +94,20 @@ function imageVersion(image: string | undefined): string | null {
     if (!image) return null;
     const tag = image.slice(image.lastIndexOf("/") + 1).split(":")[1];
     return tag && tag !== "latest" ? tag : null;
+}
+
+/**
+ * An app as the site draws its mark. The dashboard's `logo` is a path from its
+ * own root (`/logos/apps/n8n.svg`), which on Pages is outside the site; it is
+ * served under the base path instead, and a logo the dashboard does not hold is
+ * dropped so the mark falls back to the app's own tile rather than a broken image.
+ */
+function onSite(app: AppManifest): AppManifest {
+    if (!app.logo) return app;
+    const file = app.logo.replace(/^\/+/, "");
+    return existsSync(join(web, "public", file))
+        ? { ...app, logo: `${base}/${file}` }
+        : { ...app, logo: undefined };
 }
 
 /**
@@ -169,8 +185,8 @@ function storeList(webLocale: string, showcase: site.ShowcaseSection[]): site.Si
             description: app.description,
             keywords: [...(app.keywords ?? [])],
             comingSoon: app.comingSoon === true,
-            mark: renderToStaticMarkup(createElement(AppMark, { app, size: 40 })),
-            markLarge: renderToStaticMarkup(createElement(AppMark, { app, size: 72 })),
+            mark: renderToStaticMarkup(createElement(AppMark, { app: onSite(app), size: 40 })),
+            markLarge: renderToStaticMarkup(createElement(AppMark, { app: onSite(app), size: 72 })),
             logo: ownAppLogo(app.id),
             tint,
             ink: initialsInk(tint),
@@ -669,7 +685,6 @@ for (const file of [
     "polaris-mark-512.png"
 ])
     copyFileSync(join(web, "public", file), join(siteDir, "public", file));
-const base = process.env.SITE_BASE_PATH ?? "/polaris";
 writeFileSync(
     join(siteDir, "public", "manifest.webmanifest"),
     JSON.stringify(

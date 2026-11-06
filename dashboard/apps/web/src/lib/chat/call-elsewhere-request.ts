@@ -25,15 +25,31 @@ const answerSchema = z.object({
             participantId: z.string().min(1),
             title: z.string()
         })
-        .nullable()
+        .nullable(),
+    /** Calls this account declined on another device a moment ago. Absent from
+     *  a server older than it. */
+    declined: z.array(z.string().min(1).max(100)).max(50).optional()
 });
 
+export interface RingState {
+    readonly call: CallElsewhere | null;
+    readonly declined: readonly string[];
+}
+
 export async function askCallElsewhere(): Promise<CallElsewhere | null> {
+    return (await askRingState())?.call ?? null;
+}
+
+/** The same question, with the calls declined elsewhere: what a ringing
+ *  telephone asks, so it stops for a decline whose frame it never heard. */
+export async function askRingState(): Promise<RingState | null> {
     try {
         const response = await fetch(CALL_ELSEWHERE_PATH, { cache: "no-store" });
         if (!response.ok) return null;
         const parsed = answerSchema.safeParse(await response.json());
-        return parsed.success ? parsed.data.call : null;
+        return parsed.success
+            ? { call: parsed.data.call, declined: parsed.data.declined ?? [] }
+            : null;
     } catch {
         return null;
     }
