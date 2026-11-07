@@ -282,6 +282,12 @@ function shorten(line: string): string {
  * Anything unrecognised gets null and the cause line stands on its own, which is
  * already far better than the panel saying "starting".
  */
+/** Paper 26 refusing a dimension that was imported without its generation
+ *  settings - the one crash here Polaris repairs on the disk by itself. */
+export function isWorldGenSettingsCrash(cause: string | null): boolean {
+    return cause !== null && /world gen settings file for dimension/i.test(cause);
+}
+
 export function crashAdvice(cause: string): string | null {
     const loader = loaderCrashOf(cause);
     if (loader) {
@@ -293,6 +299,9 @@ export function crashAdvice(cause: string): string | null {
     }
     if (isConfigCrash(cause)) {
         return gameMessage("games", "lib.crash.config");
+    }
+    if (isWorldGenSettingsCrash(cause)) {
+        return gameMessage("games", "lib.crash.worldGenSettings");
     }
     if (/newer version of minecraft/i.test(cause)) {
         return gameMessage("games", "lib.crash.newerWorld");

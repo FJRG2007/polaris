@@ -893,6 +893,7 @@
         "chooseTextChannel": "Choose a text channel of that space",
         "crash": {
             "config": "The settings on disk were written by a newer Minecraft than this server now runs, and it cannot read them. Setting them aside lets the server write its own again.",
+            "worldGenSettings": "The world's Nether or End was copied in without its generation settings. Polaris fills them in from the main world and starts the server again.",
             "newerWorld": "One of the worlds on this server was saved by a newer Minecraft than it now runs, and the server stops rather than damage it. Remove that world, or put the server back on the release it was made with.",
             "worldLocked": "The server is not allowed to write into its own world folder, so it cannot claim the world.",
             "portTaken": "Something else already holds the port this server was given.",

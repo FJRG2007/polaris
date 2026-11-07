@@ -967,6 +967,38 @@ export async function setAsideOtherLevels(
     }
 }
 
+/**
+ * Give the level's dimensions what Paper 26 needs to open them.
+ *
+ * A server whose Nether or End was imported without its generation settings
+ * stops on every boot (see `dimensionRepairArgv`), and nothing in the game will
+ * ever write them, so the crash-loop sweep calls this the moment it reads that
+ * crash. True when something was put right, which is the cue to start it again.
+ *
+ * Never throws: a server this could not reach stays stopped under the banner
+ * that names the crash, which is where it was.
+ */
+export async function repairLevelDimensions(
+    ownerId: string,
+    installedAppId: string
+): Promise<boolean> {
+    try {
+        await startForFileAccess(ownerId, installedAppId);
+        return await withServerContainer(ownerId, installedAppId, async (server) => {
+            if (server.edition !== "java") return false;
+            const { level } = await readWorldSettings(
+                ownerId,
+                server.applicationId,
+                server.edition
+            );
+            const repaired = await server.run(world.dimensionRepairArgv(level));
+            return repaired.code === 0 && world.dimensionsRepaired(repaired.output);
+        });
+    } catch {
+        return false;
+    }
+}
+
 export async function setAsideRetiredPlugins(
     ownerId: string,
     installedAppId: string,
