@@ -229,6 +229,14 @@ final class Profiles {
         prefs(ctx).edit().putString(ROSTER, toJson(roster)).commit();
     }
 
+    /** Whose the TV's Polaris link is; null when the profile it belonged to was deleted. */
+    static void setLinked(Context ctx, String id) {
+        SharedPreferences.Editor edit = prefs(ctx).edit();
+        if (id == null) edit.remove(LINKED);
+        else edit.putString(LINKED, id);
+        edit.commit();
+    }
+
     static void setActive(Context ctx, String id) {
         prefs(ctx).edit().putString(ACTIVE, id).commit();
     }

@@ -104,6 +104,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private static final int LAUNCHER_SETTINGS_REQUEST = 42;
     /** Sent by QuickSettingsActivity: open Launcher settings from here so Home rebuilds when they close. */
     static final String ACTION_LAUNCHER_SETTINGS = "app.polaris.tv.action.LAUNCHER_SETTINGS";
+    /** Quick settings' Switch profile: "Who's watching?" over Home, Back returns. */
+    static final String ACTION_SWITCH_PROFILE = "app.polaris.tv.action.SWITCH_PROFILE";
     /** Sent by the "library" action word of app_keys: open the App library over Home (needs app_library). */
     static final String ACTION_APP_LIBRARY = "app.polaris.tv.action.APP_LIBRARY";
     /** The system input switcher, forwarded here by InputsRequestActivity while handle_view_inputs is on. */
@@ -305,6 +307,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             open(i);
         }
     };
+    /** "Who's watching?" while it is up. */
+    private Dialog profilePicker;
+    /** The active profile's initial before the greeting; shown with two or more profiles. */
+    private TextView profileAvatar;
+    /** Screen off and on: the picker asks again after a long time off (Profiles.PICKER_AFTER_OFF_MS). */
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long now = SystemClock.elapsedRealtime();
+            if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) ProfileSession.screenOff(now);
+            else ProfileSession.screenOn(now);
+            if (resumed) showProfilePickerIfDue();
+        }
+    };
     private final BroadcastReceiver wakeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -469,6 +485,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
+        // Before anything reads the recents or greets: a TV from before profiles gets profile #1, unchanged.
+        Profiles.migrate(this, cfg.greetingName);
         homeAppKeys = RemoteKeys.parseAppKeys(cfg.appKeys);
         clockFormat = cfg.clockFormat;
         ClockFormat.apply(getWindow().getDecorView(), clockFormat);
@@ -549,6 +567,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // still follows the dock.
         if (!cfg.dockTitle) hero.setVisibility(View.GONE);
         greeting = findViewById(R.id.greeting);
+        profileAvatar = findViewById(R.id.profileAvatar);
+        profileAvatar.setTextColor(Color.WHITE);
+        profileAvatar.setGravity(Gravity.CENTER);
+        profileAvatar.setTextSize(12);
+        profileAvatar.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        profileAvatar.setOnClickListener(v -> showProfilePicker(true));
         clockBlock = findViewById(R.id.leftBlock);
         clockRefresh = new ClockRefresh(clockBlock);
         greetingColor = greeting.getCurrentTextColor();
@@ -921,9 +945,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
             int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
             int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && v.getId() == leftButton
+                    && profileAvatar.getVisibility() == View.VISIBLE) {
+                profileAvatar.requestFocus();
+                return true;
+            }
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
             return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == rightButton;
         };
+        // The profile's initial sits left of the pills: Right goes back to them, Down to the tiles.
+        profileAvatar.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
+                View next = findViewById(rtlMenuBar ? R.id.btnSettings : firstButton);
+                if (next != null) next.requestFocus();
+                return true;
+            }
+            return keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_LEFT;
+        });
         btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
         btnVpn.setOnKeyListener(pillKeys);
@@ -960,6 +1004,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             registerReceiver(packageReceiver, packageFilter);
+        }
+        IntentFilter screenFilter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+        screenFilter.addAction(Intent.ACTION_SCREEN_ON);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenReceiver, screenFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(screenReceiver, screenFilter);
         }
         if (openOnStartOnWake) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1050,6 +1101,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         return true;
     }
 
+    private boolean switchProfileIfAsked(Intent intent) {
+        if (intent == null || !ACTION_SWITCH_PROFILE.equals(intent.getAction())) return false;
+        setIntent(new Intent(Intent.ACTION_MAIN));
+        getWindow().getDecorView().post(() -> showProfilePicker(true));
+        return true;
+    }
+
     private boolean openLauncherSettingsIfAsked(Intent intent) {
         if (intent == null || !ACTION_LAUNCHER_SETTINGS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
@@ -1066,6 +1124,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (openLauncherSettingsIfAsked(intent)) return;
+        if (switchProfileIfAsked(intent)) return;
         if (openLibraryIfAsked(intent)) return;
         if (openInputsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
@@ -1197,6 +1256,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         // Just linked: greet by the name the approval handed over, before the first answer from Polaris.
         greetWith(greetingNameNow());
+        refreshProfileAvatar();
+        showProfilePickerIfDue();
         restartIdleClock();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
@@ -1479,6 +1540,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (gameDay != null) gameDay.shutdown();
         unregisterReceiver(packageReceiver);
         if (openOnStartOnWake) unregisterReceiver(wakeReceiver);
+        unregisterReceiver(screenReceiver);
+        if (profilePicker != null) profilePicker.dismiss();
         wallpaperPlayer.close();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
@@ -2815,9 +2878,80 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
-    /** The name the greeting adds: the theme's greeting_name, else the linked account's first name, else none. */
+    /**
+     * The name the greeting adds: the active profile's when it was named on the TV, else the theme's
+     * greeting_name, else the linked account's first name when the link is this profile's, else none.
+     */
     private String greetingNameNow() {
-        return themeGreetingName.isEmpty() ? PolarisLink.accountFirstName(this) : themeGreetingName;
+        Profiles.Profile profile = ProfileSession.active(this);
+        String linkedId = Profiles.linkedId(this);
+        // A link made before the TV recorded whose it is (or with no roster at all) belongs to the one there is.
+        boolean linkedHere = profile == null || linkedId == null || profile.id.equals(linkedId);
+        return Profiles.greetingName(profile, linkedHere, themeGreetingName, PolarisLink.accountFirstName(this));
+    }
+
+    /** "Who's watching?" when it is owed: a cold start or a long screen-off, and only with two or more profiles. */
+    private void showProfilePickerIfDue() {
+        if (profilePicker != null && profilePicker.isShowing()) return;
+        if (!ProfileSession.pickerDue(Profiles.load(this).size())) return;
+        showProfilePicker(false);
+    }
+
+    /** {@code backReturns}: opened from Switch profile, so Back goes back to the profile in use. */
+    private void showProfilePicker(boolean backReturns) {
+        if (isFinishing() || isDestroyed()) return;
+        if (profilePicker != null && profilePicker.isShowing()) return;
+        profilePicker = ProfilePicker.show(this, backReturns, new ProfilePicker.Listener() {
+            @Override
+            public void onPicked(Profiles.Profile profile) {
+                profilePicker = null;
+                ProfileSession.choose(MainActivity.this, profile.id);
+                greetWith(greetingNameNow());
+                refreshProfileAvatar();
+            }
+
+            @Override
+            public void onAdd() {
+                profilePicker = null;
+                openProfileSettings(LauncherSettingsActivity.PROFILES_ADD);
+            }
+
+            @Override
+            public void onManage() {
+                profilePicker = null;
+                openProfileSettings(LauncherSettingsActivity.PROFILES_MANAGE);
+            }
+        });
+        profilePicker.setOnDismissListener(d -> {
+            if (profilePicker == d) profilePicker = null;
+        });
+    }
+
+    private void openProfileSettings(String what) {
+        startActivityForResult(new Intent(this, LauncherSettingsActivity.class)
+                .putExtra(LauncherSettingsActivity.EXTRA_PROFILES, what), LAUNCHER_SETTINGS_REQUEST);
+    }
+
+    /** The initial before the greeting, in the active profile's colour; hidden while the TV has one profile. */
+    private void refreshProfileAvatar() {
+        if (profileAvatar == null) return;
+        List<Profiles.Profile> roster = Profiles.load(this);
+        Profiles.Profile profile = Profiles.active(roster, ProfileSession.activeId(this));
+        if (roster.size() < 2 || profile == null) {
+            profileAvatar.setVisibility(View.GONE);
+            return;
+        }
+        String name = ProfilePicker.displayName(this, profile);
+        profileAvatar.setText(name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(Locale.getDefault()));
+        profileAvatar.setContentDescription(getString(R.string.profile_switch_hint, name));
+        GradientDrawable dot = ProfilePicker.circle(Profiles.avatarColor(profile.avatar));
+        GradientDrawable lit = ProfilePicker.circle(Profiles.avatarColor(profile.avatar));
+        lit.setStroke((int) (2 * density), Color.WHITE);
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, lit);
+        states.addState(new int[]{}, dot);
+        profileAvatar.setBackground(states);
+        profileAvatar.setVisibility(View.VISIBLE);
     }
 
     private void greetWith(String name) {

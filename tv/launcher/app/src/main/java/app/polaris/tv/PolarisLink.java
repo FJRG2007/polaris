@@ -283,6 +283,9 @@ final class PolarisLink {
             prefs(context).edit().putString("origin", origin).putString("token", sealed)
                     .putString("instance", instance).putLong(ASKED_AT, System.currentTimeMillis())
                     .putString(ACCOUNT_FIRST_NAME, firstName).commit();
+            // The link is the profile's that made it, so only that profile greets by the account's name.
+            String profile = ProfileSession.activeId(context);
+            if (profile != null) Profiles.setLinked(context, profile);
             return status;
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);

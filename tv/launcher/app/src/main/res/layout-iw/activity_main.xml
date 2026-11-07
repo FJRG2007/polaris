@@ -257,6 +257,16 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
+                    <!-- The active profile's initial: shown with two or more profiles, OK opens the picker. Its own
+                         line here, so the greeting stays centred over the clock. -->
+                    <TextView
+                        android:id="@+id/profileAvatar"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_gravity="right"
+                        android:layout_marginBottom="4dp"
+                        android:focusable="true"
+                        android:visibility="gone" />
                     <TextView
                         android:id="@+id/greeting"
                         android:gravity="center_horizontal"

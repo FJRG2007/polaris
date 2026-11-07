@@ -48,6 +48,11 @@ public final class QuickSettingsActivity extends Activity {
         // Through Home, so it rebuilds with the new choices when Launcher settings closes.
         addRow(rows, R.drawable.ic_home_settings, R.string.launcher_settings, 0,
                 new Intent(this, MainActivity.class).setAction(MainActivity.ACTION_LAUNCHER_SETTINGS));
+        // Switch profile only once there is somebody to switch to; through Home, which hosts the picker.
+        if (Profiles.load(this).size() >= 2) {
+            addRow(rows, R.drawable.ic_settings, R.string.profile_switch, 0,
+                    new Intent(this, MainActivity.class).setAction(MainActivity.ACTION_SWITCH_PROFILE));
+        }
         rows.getChildAt(0).requestFocus();
     }
 
