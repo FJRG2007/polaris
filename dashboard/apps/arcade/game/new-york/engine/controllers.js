@@ -26,7 +26,8 @@ import {
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
-  HELI_CRUISE_SPEED, arrivalFor, createTurnSignal, heliTopSpeed, settleBody, stepTurbo, stepTurnSignal, turnLamps
+  HELI_CRUISE_SPEED, KEY_BINDINGS, PERSON_MOVE, approachVelocity, arrivalFor, cameraRelativeMove, createJumpState, createTurnSignal,
+  heliTopSpeed, settleBody, slideVelocity, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
@@ -255,15 +256,7 @@ class ThirdPersonControllerManager {
   }
 
   bindKeyboard() {
-    const bindings = {
-      forward: ['KeyW', 'ArrowUp'],
-      backward: ['KeyS', 'ArrowDown'],
-      left: ['KeyA', 'ArrowLeft'],
-      right: ['KeyD', 'ArrowRight'],
-      up: ['Space', 'KeyE'],
-      down: ['KeyQ', 'KeyC'],
-      turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's only; Shift+V still steps the camera back
-    };
+    const bindings = KEY_BINDINGS;
     const actionsByCode = new Map(Object.entries(bindings).flatMap(([action, codes]) => codes.map((code) => [code, action])));
     this._pressedCodes = new Set();
     this._keyboardKeys = {};
@@ -273,6 +266,9 @@ class ThirdPersonControllerManager {
     const onKey = (e, isDown) => {
       const action = actionsByCode.get(e.code);
       if (!action || (isDown && isTypingInField(e))) return;
+      // Ctrl descends, so Ctrl with a flying key must not save, bookmark or select the page instead. The browser keeps
+      // Ctrl+W, Ctrl+T and Ctrl+N for itself whatever a page does; outside full screen those still reach it.
+      if (isDown && e.ctrlKey && !e.altKey && !e.metaKey) e.preventDefault();
       if (isDown) this._pressedCodes.add(e.code);
       else this._pressedCodes.delete(e.code);
       // Releasing one binding must not cancel another key held for the same action.
@@ -405,6 +401,8 @@ class ThirdPersonControllerManager {
     ent.speed = 0;
     if (this.activeMode === 'person') {
       ent.verticalVel = 0;
+      ent.vx = 0;
+      ent.vz = 0;
       ent._charHidden = false;
       if (ent.mesh) ent.mesh.visible = true;
       ent.rig.reset(ent.position.x, ent.position.z, ent.heading, personGround, this);
@@ -520,10 +518,13 @@ class ThirdPersonControllerManager {
       position: new THREE.Vector3(-11.6, ISLAND_BOUNDS.sidewalkHeight, SPAWN_Z + 12),
       heading: 0,
       speed: 0,
+      vx: 0,
+      vz: 0,
       verticalVel: 0,
       cameraTargetOffset: new THREE.Vector3(0, 1.55, 0),
-      chaseDistance: 4.3,
-      chaseHeight: 1.95
+      // The arrival check keeps this much camera clear (findTeleportPosition); the on-foot rig is PERSON_CAMERA
+      chaseDistance: 3.3,
+      chaseHeight: 1.6
     };
   }
 
@@ -1054,8 +1055,11 @@ class ThirdPersonControllerManager {
         if (p.mesh) p.mesh.visible = true;
         const air = p.position.y - this.getGroundHeight(p.position.x, p.position.z, 'person');
         p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, air > 0.02 ? air : 0);
+        // Not drawn from inside its own head: first person, or the spring arm pulled in to the shoulder (cameras.js)
+        const hidden = this.activeMode === 'person' && this.personHidden;
+        if (p.mesh) p.mesh.visible = !hidden;
         p.crowd.begin();
-        p.crowd.add(p.rig, 0);
+        if (!hidden) p.crowd.add(p.rig, 0);
         p.crowd.end();
       } else if (!p._charHidden) {
         p.rig.placed = false;
@@ -1122,6 +1126,8 @@ class ThirdPersonControllerManager {
       const p = this.entities.person;
       const walkSpeed = 1.48;
       p.speed = walkSpeed;
+      p.vx = 0;
+      p.vz = 0;
       p.position.x += Math.sin(p.heading) * walkSpeed * dt;
       p.position.z += Math.cos(p.heading) * walkSpeed * dt;
       if (p.position.z < -340) p.heading = 0;
@@ -1162,31 +1168,43 @@ class ThirdPersonControllerManager {
     this.poseCharacters(dt, focusPos);
   }
 
+  // On foot, as in GTA or Fortnite: WASD and the stick move relative to the camera (viewYaw, set by cameras.js each
+  // frame) and the body swings round to face where it goes, or keeps facing the view in first person. The velocity
+  // eases in and out (player-rules.js PERSON_MOVE), Shift or L3 sprints, and a jump has coyote time and a buffer.
   updatePerson(dt) {
     const p = this.entities.person;
-    const maxSpeed = 8.2;
-    const turnRate = 2.6;
+    if (!(dt > 0)) return;
+    const k = this.keys;
+    const yaw = Number.isFinite(this.viewYaw) ? this.viewYaw : p.heading;
+    const move = cameraRelativeMove(Number(k.forward || 0) - Number(k.backward || 0), Number(k.right || 0) - Number(k.left || 0), yaw);
+    const top = k.turbo ? PERSON_MOVE.sprint : PERSON_MOVE.run;
 
-    let targetSpeed = 0;
-    if (this.keys.forward) targetSpeed = maxSpeed * this.keys.forward;
-    else if (this.keys.backward) targetSpeed = -maxSpeed * 0.65 * this.keys.backward;
+    const groundBefore = this.getGroundHeight(p.position.x, p.position.z, 'person');
+    const grounded = p.position.y <= groundBefore + 0.02 && p.verticalVel <= 0;
+    const rate = (move.amount > 0 ? PERSON_MOVE.accel : PERSON_MOVE.decel) * (grounded ? 1 : PERSON_MOVE.airControl);
+    const v = approachVelocity(p.vx || 0, p.vz || 0, move.x * move.amount * top, move.z * move.amount * top, rate, dt);
+    p.vx = v.vx;
+    p.vz = v.vz;
+    p.speed = Math.hypot(p.vx, p.vz);
 
-    if (this.keys.left) p.heading += turnRate * dt * this.keys.left;
-    if (this.keys.right) p.heading -= turnRate * dt * this.keys.right;
+    if (this.personView === 'first') p.heading = yaw;
+    else if (move.amount > 0.05) p.heading = turnToward(p.heading, Math.atan2(move.x, move.z), dt);
+    p.heading = wrapAngle(p.heading);
 
-    const accelerating = Math.abs(targetSpeed) > Math.abs(p.speed) && p.speed * targetSpeed >= 0;
-    const acceleration = accelerating ? 5.5 * Math.abs(targetSpeed) / maxSpeed : 12;
-    p.speed += Math.max(-acceleration * dt, Math.min(acceleration * dt, targetSpeed - p.speed));
-
-    p.position.x += Math.sin(p.heading) * p.speed * dt;
-    p.position.z += Math.cos(p.heading) * p.speed * dt;
+    const prevX = p.position.x, prevZ = p.position.z;
+    p.position.x += p.vx * dt;
+    p.position.z += p.vz * dt;
     this.resolveHorizontalCollision(p.position, 0.48);
+    // A wall takes the speed into it, so the body slides along instead of pressing on with a run
+    const slid = slideVelocity(p.vx, p.vz, p.position.x - prevX, p.position.z - prevZ, dt);
+    p.vx = slid.vx;
+    p.vz = slid.vz;
+    p.speed = Math.hypot(p.vx, p.vz);
 
     const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person');
-    if (this.keys.up && p.position.y <= groundY + 0.02) {
-      p.verticalVel = 5.2;
-    }
-    p.verticalVel -= 14.5 * dt;
+    p.jump ??= createJumpState();
+    if (stepJump(p.jump, grounded, !!k.up, dt)) p.verticalVel = PERSON_MOVE.jumpSpeed;
+    p.verticalVel -= PERSON_MOVE.gravity * dt;
     p.position.y += p.verticalVel * dt;
     if (p.position.y < groundY) {
       p.position.y = groundY;

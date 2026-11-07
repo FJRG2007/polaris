@@ -20,7 +20,7 @@ class GameMenu {
    * @param {(open: boolean) => void} options.onOpenChange
    * @param {() => boolean} options.blocked  something else owns Esc right now (the map, a popover)
    */
-  constructor({ audio, mode, controls, quality, onOpenChange, blocked }) {
+  constructor({ audio, mode, controls, quality, onOpenChange, blocked, look = null }) {
     this.audio = audio;
     this.mode = mode;
     this.controls = controls;
@@ -36,6 +36,10 @@ class GameMenu {
     this.soundToggle = document.getElementById('menu-sound-toggle');
     this.volume = document.getElementById('menu-volume');
     this.volumeValue = document.getElementById('menu-volume-value');
+    // Look sensitivity (mouse, touch and the right stick on foot): { get(): number, set(value) }, 1 = 100 %
+    this.lookSetting = look;
+    this.look = document.getElementById('menu-look');
+    this.lookValue = document.getElementById('menu-look-value');
     this.view = 'main';
     this.isOpen = false;
 
@@ -62,6 +66,7 @@ class GameMenu {
     });
     this.soundToggle.addEventListener('click', () => this.audio.setEnabled(!this.audio.enabled));
     this.volume.addEventListener('input', () => this.audio.setVolume(Number(this.volume.value) / 100));
+    this.look?.addEventListener('input', () => this.setLook(Number(this.look.value) / 100));
     document.getElementById('btn-menu')?.addEventListener('click', () => this.open());
 
     // Capture, ahead of every other key handler in the page: while the menu is open no key reaches the game
@@ -152,8 +157,17 @@ class GameMenu {
     if (el instanceof HTMLButtonElement && this.dialog.contains(el)) el.click();
   }
 
-  /** Gamepad left and right: the volume, when it has the focus. */
+  setLook(value) {
+    this.lookSetting?.set(value);
+    this.refresh();
+  }
+
+  /** Gamepad left and right: the volume or the look sensitivity, when it has the focus. */
   adjust(step) {
+    if (this.look && document.activeElement === this.look) {
+      this.setLook((Number(this.look.value) + step * 10) / 100);
+      return;
+    }
     if (document.activeElement !== this.volume) return;
     this.volume.value = String(Math.max(0, Math.min(100, Number(this.volume.value) + step * 10)));
     this.audio.setVolume(Number(this.volume.value) / 100);
@@ -190,6 +204,13 @@ class GameMenu {
     this.volume.setAttribute('aria-valuetext', formatNumber(audio.volume, { style: 'percent' }));
     this.volumeValue.textContent = formatNumber(audio.volume, { style: 'percent' });
     document.getElementById('menu-sound-unavailable').hidden = audio.supported;
+    if (this.look && this.lookSetting) {
+      const look = this.lookSetting.get();
+      const text = formatNumber(look, { style: 'percent' });
+      this.look.value = String(Math.round(look * 100));
+      this.look.setAttribute('aria-valuetext', text);
+      this.lookValue.textContent = text;
+    }
     if (this.view === 'controls') this.drawControls();
   }
 

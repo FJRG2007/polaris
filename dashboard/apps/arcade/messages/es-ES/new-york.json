@@ -159,8 +159,10 @@
         "person": {
             "move": "Andar",
             "turn": "Girar",
+            "sprint": "Esprintar",
             "up": "Saltar",
-            "orbit": "Mirar"
+            "orbit": "Mirar",
+            "lock": "Mirar con el ratón"
         },
         "car": {
             "move": "Avanzar / Atrás",
@@ -181,6 +183,7 @@
             "turbo": "Turbo"
         },
         "drag": "Ratón",
+        "click": "Clic",
         "general": "Siempre",
         "modes": "Cambiar modo",
         "camera": "Cambiar cámara",
@@ -218,6 +221,7 @@
         "on": "Sí",
         "off": "No",
         "volume": "Volumen",
+        "lookSensitivity": "Sensibilidad",
         "soundOn": "Con sonido",
         "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}",
         "callMute": "Silenciar micrófono",

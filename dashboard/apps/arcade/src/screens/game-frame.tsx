@@ -65,9 +65,10 @@ const fromGame = z.discriminatedUnion("type", [
     z.object({ type: z.literal("polaris-game:state") }).passthrough()
 ]);
 
-/** What the game's page may do in a call: run its scripts, nothing else.
- *  Not `allow-same-origin` - see the top of this file. */
-export const FRAME_SANDBOX = "allow-scripts";
+/** What the game's page may do in a call: run its scripts and hold the mouse
+ *  for looking around on foot, nothing else. Not `allow-same-origin` - see the
+ *  top of this file. */
+export const FRAME_SANDBOX = "allow-scripts allow-pointer-lock";
 
 /** Whether a message came from this frame's page: its window, from the
  *  sandbox's opaque origin (or this origin, for a browser without one). */

@@ -1,5 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { bryantParkLawn } from './landmarks.js';
+import {
+  PERSON_CAMERA, clampSensitivity, lookCurve, personCameraPose, springArm, stepArm, turnLook, wrapAngle
+} from './player-rules.js';
+
+const DEFAULT_NEAR = 0.35;
+const SENSITIVITY_KEY = 'nyc-look-sensitivity';
 
 // Chase, action, cockpit, fixed-location and aerial cameras, with mouse/touch orbit and zoom.
 
@@ -25,7 +31,7 @@ class CameraSystem {
     this.camera = new THREE.PerspectiveCamera(
       56,
       window.innerWidth / window.innerHeight,
-      0.35,
+      DEFAULT_NEAR,
       60000 // at 1:1 the boroughs & harbor run out ~20-40 km to the fogged horizon (reversed float depth keeps precision)
     );
 
@@ -49,6 +55,20 @@ class CameraSystem {
     this._desiredPos = new THREE.Vector3();
     this._desiredLook = new THREE.Vector3();
 
+    // On foot the chase and first-person cameras share one look, held in world space rather than as an offset from the
+    // body, so the stick and WASD move relative to it and switching between the two keeps the view (player-rules.js)
+    this.personLook = { yaw: 0, pitch: PERSON_CAMERA.pitch };
+    this.lookIdle = 0;
+    this._personEntity = null;
+    this._personReset = true;
+    this._personPivot = new THREE.Vector3();
+    this._personArm = NaN;
+    this._personSide = NaN;
+    this.lookSensitivity = 1;
+    try { this.lookSensitivity = clampSensitivity(localStorage.getItem(SENSITIVITY_KEY)); } catch { /* Storage is optional. */ }
+    /** Set by main.js: whether the mouse may be captured now (no menu, map or start screen over the city). */
+    this.lockAllowed = () => true;
+
     this.bindPointerControls();
   }
 
@@ -62,6 +82,10 @@ class CameraSystem {
       // Only two touch pointers may share a gesture; mouse and pen drags stay independent.
       if (pointers.size && (e.pointerType !== 'touch' || pointers.values().next().value.type !== 'touch')) return;
       e.preventDefault();
+      // On foot a click captures the mouse for look, as in a shooter; Esc gives it back (the browser's own rule)
+      if (e.pointerType === 'mouse' && document.pointerLockElement !== canvas && this.canLockPointer()) {
+        try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* A frame without the permission drags instead. */ }
+      }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
       canvas.setPointerCapture(e.pointerId);
       this.isDragging = true;
@@ -79,7 +103,13 @@ class CameraSystem {
       pointer.x = e.clientX;
       pointer.y = e.clientY;
 
-      if (pair) {
+      if (!pair && this.isPersonView()) {
+        // Under pointer lock the mousemove below already turns the view
+        if (document.pointerLockElement !== canvas) {
+          const k = PERSON_CAMERA.drag * this.lookSensitivity;
+          this.lookBy(-dx * k, -dy * k);
+        }
+      } else if (pair) {
         const distance = Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y);
         if (previousDistance > 1 && distance > 1) {
           this.zoomMultiplier = Math.max(0.45, Math.min(2.4, this.zoomMultiplier * previousDistance / distance));
@@ -108,6 +138,15 @@ class CameraSystem {
       if (document.hidden) clearPointers();
     });
 
+    document.addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement !== canvas || !this.isPersonView()) return;
+      // Some browsers report one large jump as the lock starts
+      const mx = Math.max(-300, Math.min(300, e.movementX || 0));
+      const my = Math.max(-300, Math.min(300, e.movementY || 0));
+      const k = PERSON_CAMERA.mouse * this.lookSensitivity;
+      this.lookBy(-mx * k, -my * k);
+    });
+
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       this.zoomMultiplier = Math.max(0.45, Math.min(2.4, this.zoomMultiplier + e.deltaY * 0.001));
@@ -125,12 +164,41 @@ class CameraSystem {
     }
   }
 
+  /** Whether the on-foot look is in charge: the body is a person and the camera is the chase or first-person one. */
+  isPersonView() {
+    return this.controllerManager.getActiveEntity()?.type === 'person' &&
+      (this.activePresetId === 'chase' || this.activePresetId === 'pov');
+  }
+
+  canLockPointer() {
+    return this.isPersonView() && this.lockAllowed() !== false;
+  }
+
+  /** Turns the on-foot look, in radians (positive yaw left, positive pitch up). */
+  lookBy(dYaw, dPitch) {
+    turnLook(this.personLook, dYaw, dPitch, this.activePresetId === 'pov' ? 'first' : 'third');
+    this.lookIdle = 0;
+  }
+
+  setLookSensitivity(value) {
+    this.lookSensitivity = clampSensitivity(value);
+    try { localStorage.setItem(SENSITIVITY_KEY, String(this.lookSensitivity)); } catch { /* Storage is optional. */ }
+  }
+
   applyGamepadInput(lookX, lookY, zoom, dt) {
     if (!(dt > 0) || !Number.isFinite(dt)) return;
     if (this.activePresetId !== 'chase' && this.activePresetId !== 'pov') return;
     // POV uses the orbit angles, but only chase renders a zoomed camera distance.
     if (this.activePresetId !== 'chase') zoom = 0;
     if (!lookX && !lookY && !zoom) return;
+    if (this.isPersonView()) {
+      // The pad's radial deadzone is already off (gamepad-controls.js); the curve leaves small tilts for fine aim
+      const c = lookCurve(lookX, lookY);
+      const s = this.lookSensitivity;
+      if (c.x || c.y) this.lookBy(-c.x * PERSON_CAMERA.pad.yaw * s * dt, -c.y * PERSON_CAMERA.pad.pitch * s * dt);
+      this.zoomMultiplier = Math.max(0.45, Math.min(2.4, this.zoomMultiplier + zoom * 0.9 * dt));
+      return;
+    }
     this.orbitYawOffset -= lookX * 2.0 * dt;
     this.orbitPitchOffset = Math.max(-0.32, Math.min(0.68, this.orbitPitchOffset + lookY * 1.25 * dt));
     this.zoomMultiplier = Math.max(0.45, Math.min(2.4, this.zoomMultiplier + zoom * 0.9 * dt));
@@ -142,6 +210,11 @@ class CameraSystem {
     this.orbitPitchOffset = 0.09;
     this.zoomMultiplier = 1;
     this.userOrbitTimer = 0;
+    const entity = this.controllerManager.getActiveEntity();
+    if (entity?.type === 'person') {
+      this.personLook.yaw = wrapAngle(entity.heading);
+      this.personLook.pitch = PERSON_CAMERA.pitch;
+    }
   }
 
   resetForTeleport() {
@@ -154,6 +227,7 @@ class CameraSystem {
     this.followOffset.set(0, 0, 0);
     this.followLookOffset.set(0, 0, 0);
     this.followBaseY = 0;
+    this._personReset = true;
     this.setCameraPreset('chase', true);
   }
 
@@ -186,8 +260,17 @@ class CameraSystem {
     const speedLag = this.smoothedSpeed * 0.1;
 
     const totalYaw = entity.heading + this.orbitYawOffset;
+    const personView = this.isPersonView();
+    if (!personView) {
+      this.controllerManager.personHidden = false;
+      this.controllerManager.personView = 'third';
+      // Back on foot from a vehicle the look starts again behind the body; through the action camera (V between chase
+      // and first person) it is kept
+      if (entity?.type !== 'person') this._personEntity = null;
+    }
 
-    switch (this.activePresetId) {
+    if (personView) this.updatePersonView(entity, dt);
+    else switch (this.activePresetId) {
       case 'chase': {
         const dist = entity.chaseDistance * this.zoomMultiplier * (1 + Math.min(0.25, this.smoothedSpeed * 0.01));
         const height = entity.chaseHeight * this.zoomMultiplier + Math.sin(this.orbitPitchOffset) * dist * 0.85;
@@ -325,7 +408,10 @@ class CameraSystem {
       }
     }
 
-    if (!this.initialized || this.activePresetId === 'pov') {
+    if (personView) {
+      this.initialized = true;
+      this.followEntity = null; // the follow cameras re-anchor from here
+    } else if (!this.initialized || this.activePresetId === 'pov') {
       this.currentPos.copy(desiredPos);
       this.currentLookAt.copy(desiredLook);
       this.initialized = true;
@@ -374,6 +460,83 @@ class CameraSystem {
     }
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentLookAt);
+
+    // The direction the screen faces: what WASD and the stick move the body along on foot (controllers.js)
+    const vx = l.x - p.x, vz = l.z - p.z;
+    if (vx * vx + vz * vz > 1e-6) this.controllerManager.viewYaw = Math.atan2(vx, vz);
+
+    const fov = personView ? PERSON_CAMERA.fov[this.activePresetId === 'pov' ? 'first' : 'third'] : this.getActivePreset().fov;
+    const near = personView ? PERSON_CAMERA.near : DEFAULT_NEAR;
+    if (this.camera.fov !== fov || this.camera.near !== near) {
+      this.camera.fov = fov;
+      this.camera.near = near;
+      this.camera.updateProjectionMatrix();
+    }
+    if (document.pointerLockElement === this.domElement && !this.canLockPointer()) document.exitPointerLock?.();
+  }
+
+  // On foot: an over-the-shoulder spring arm in third person, the eyes in first. Writes currentPos and currentLookAt.
+  updatePersonView(entity, dt) {
+    const first = this.activePresetId === 'pov';
+    const view = first ? 'first' : 'third';
+    const look = this.personLook;
+    const pivot = this._personPivot;
+    const feet = entity.position;
+    const arriving = this._personEntity !== entity || this._personReset;
+    if (arriving || pivot.distanceToSquared(feet) > 36) {
+      // Arriving on foot (or teleported): look the way the body faces, from right behind it
+      if (arriving) {
+        look.yaw = wrapAngle(entity.heading);
+        look.pitch = PERSON_CAMERA.pitch;
+      }
+      pivot.copy(feet);
+      this._personArm = NaN;
+      this._personSide = NaN;
+      this._personEntity = entity;
+      this._personReset = false;
+    }
+    turnLook(look, 0, 0, view);
+
+    // Back behind a body that is going somewhere, but only once the player has left the look alone a while, and never
+    // swinging round in front of one that runs towards the camera
+    this.lookIdle += dt;
+    if (!first && !this.isDragging && this.lookIdle > PERSON_CAMERA.recenterAfter && Math.abs(entity.speed) > 0.5) {
+      const d = wrapAngle(entity.heading - look.yaw);
+      if (Math.abs(d) < 1.75) look.yaw = wrapAngle(look.yaw + d * (1 - Math.exp(-PERSON_CAMERA.recenterRate * dt)));
+    }
+
+    // Position follows with its own lag (none in first person, where any lag is felt as swimming); the look has none
+    if (first) {
+      pivot.copy(feet);
+    } else {
+      const k = 1 - Math.exp(-PERSON_CAMERA.followRate * dt);
+      const ky = 1 - Math.exp(-PERSON_CAMERA.followRateY * dt);
+      pivot.x += (feet.x - pivot.x) * k;
+      pivot.z += (feet.z - pivot.z) * k;
+      pivot.y += (feet.y - pivot.y) * ky;
+    }
+
+    const pose = personCameraPose(pivot, look, view, this.zoomMultiplier);
+    let eye = pose.eye;
+    let arm = 0;
+    if (!first) {
+      const reach = pose.arm + PERSON_CAMERA.shoulder + 2;
+      const colliders = this.controllerManager.nearColliders?.(pose.pivot.x, pose.pivot.z, reach) || [];
+      const free = springArm(colliders, pose);
+      this._personSide = stepArm(this._personSide, free.side, dt);
+      this._personArm = stepArm(this._personArm, free.arm, dt);
+      arm = this._personArm;
+      const sx = pose.pivot.x + pose.side.x * this._personSide, sz = pose.pivot.z + pose.side.z * this._personSide;
+      eye = { x: sx - pose.dir.x * arm, y: pose.pivot.y - pose.dir.y * arm, z: sz - pose.dir.z * arm };
+      // Looking up brings the lens down to the pavement, never under it
+      const ground = this.controllerManager.getGroundHeight?.(eye.x, eye.z, 'person') ?? 0;
+      eye.y = Math.max(ground + 0.25, eye.y);
+    }
+    this.currentPos.set(eye.x, eye.y, eye.z);
+    this.currentLookAt.set(eye.x + pose.dir.x * 20, eye.y + pose.dir.y * 20, eye.z + pose.dir.z * 20);
+    // The body is not drawn from inside its own head
+    this.controllerManager.personView = view;
+    this.controllerManager.personHidden = first || arm < 0.6;
   }
 }
 

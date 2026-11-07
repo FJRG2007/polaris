@@ -534,3 +534,15 @@ describe("cast lights by graphics quality", () => {
         expect(quality.lightBudget(48)).toBe(48);
     });
 });
+
+describe("the helicopter on the keyboard", () => {
+    it("descends on Ctrl as well as Q and C, and climbs on Space and E", () => {
+        expect(rules.KEY_BINDINGS.down).toEqual(["KeyQ", "KeyC", "ControlLeft", "ControlRight"]);
+        expect(rules.KEY_BINDINGS.up).toEqual(["Space", "KeyE"]);
+    });
+
+    it("gives every key to one action only", () => {
+        const codes = Object.values(rules.KEY_BINDINGS).flat();
+        expect(new Set(codes).size).toBe(codes.length);
+    });
+});
