@@ -893,6 +893,7 @@
         "chooseTextChannel": "Elige un canal de texto de ese espacio",
         "crash": {
             "config": "Los ajustes guardados los escribió un Minecraft más nuevo que el que usa ahora este servidor, y no puede leerlos. Apartarlos deja que el servidor vuelva a escribir los suyos.",
+            "worldGenSettings": "El Nether o el End del mundo se copiaron sin sus ajustes de generación. Polaris los completa desde el mundo principal y vuelve a arrancar el servidor.",
             "newerWorld": "Uno de los mundos de este servidor se guardó con un Minecraft más nuevo que el que usa ahora, y el servidor se para antes que dañarlo. Quita ese mundo, o vuelve a poner el servidor en la versión con la que se creó.",
             "worldLocked": "El servidor no tiene permiso para escribir en su propia carpeta del mundo, así que no puede tomar el mundo.",
             "portTaken": "Otra cosa ya ocupa el puerto que se dio a este servidor.",

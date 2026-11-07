@@ -34,6 +34,7 @@ import { isGameServerApp } from "./games-service";
 import {
     crashLoopOf,
     isCrashLooping,
+    isWorldGenSettingsCrash,
     loaderCrashOf,
     loaderInstallFailure,
     outlivedTheLoop,
@@ -240,6 +241,22 @@ export async function sweepCrashLoops(
                 };
                 await record(install.id, loop, now);
             }
+        }
+
+        // A Nether or End that Paper 26 imported without its generation settings
+        // stops every boot and nothing in the game will write them, but the
+        // overworld's copy is on the same disk. Put in place while the server is
+        // already stopped, then started again: there is nothing left for the
+        // operator to decide. One that could not be repaired is stopped again and
+        // reported like any other loop.
+        if (isWorldGenSettingsCrash(loop.cause)) {
+            const { repairLevelDimensions } = await import("./minecraft/world-service");
+            if (await repairLevelDimensions(ownerId, install.id).catch(() => false)) {
+                await forget(install.id, CRASH_LOOP_KEY);
+                await setApplicationRunning(applicationId, ownerId, true).catch(() => undefined);
+                continue;
+            }
+            await setApplicationRunning(applicationId, ownerId, false).catch(() => undefined);
         }
 
         const locale = await ownerLocale(ownerId);

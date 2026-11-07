@@ -597,3 +597,67 @@ export function parseListing(output: string): string[] {
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
 }
+
+/**
+ * The script that puts back what Paper 26's world import needs and did not get.
+ *
+ * Minecraft 26.1 moved every dimension into `<level>/dimensions/<ns>/<name>`, and
+ * Paper insists that each of them carries its own copy of the world generation
+ * settings (`data/minecraft/world_gen_settings.dat`) or it refuses to boot:
+ * `Unable to read or access the world gen settings file for dimension
+ * minecraft:the_nether` (`PaperWorldLoader.loadWorldGenSettings`). Paper writes
+ * that copy itself when it imports a vanilla world, from the overworld's
+ * (`VanillaWorldMigration`), and when it imports a CraftBukkit `<level>_nether`,
+ * from the level data inside that folder (`LegacyCraftBukkitWorldMigration`).
+ *
+ * The second import has nothing to read when the folder is not one CraftBukkit
+ * wrote. The image makes exactly such a folder: extracting a map onto Paper or
+ * Spigot, it moves the map's `DIM-1` into `<level>_nether` and its `DIM1` into
+ * `<level>_the_end` and nothing else (itzg `start-setupWorld`, "Moving Nether to
+ * Spigot location"). Paper 26 then imports the region files, deletes the folder,
+ * finds no settings, and stops - on that boot and every one after.
+ *
+ * So two repairs, both idempotent and both no-ops on a healthy world:
+ *
+ * - A dimension folder beside the level that has no `level.dat` is put back
+ *   inside it, where vanilla keeps it and where Paper's vanilla import reads it.
+ * - Every dimension inside the level that has no settings is given the
+ *   overworld's, which is the same file Paper's own vanilla import copies in.
+ *
+ * The level arrives as `$1`, never inside the script text. Prints `repaired`
+ * when it changed anything.
+ */
+const DIMENSION_REPAIR_SCRIPT = [
+    'L="$1"; changed=0',
+    'for pair in _nether:DIM-1 _the_end:DIM1; do',
+    '  side="$L${pair%%:*}"; dim="${pair#*:}"',
+    '  if [ -d "$side/$dim" ] && [ ! -e "$side/level.dat" ] && [ ! -e "$L/$dim" ] && [ -f "$L/level.dat" ]; then',
+    '    mv -- "$side/$dim" "$L/$dim" && changed=1',
+    '    rmdir -- "$side" 2>/dev/null',
+    '  fi',
+    'done',
+    'src=""',
+    'for c in "$L/dimensions/minecraft/overworld/data/minecraft/world_gen_settings.dat" "$L/data/minecraft/world_gen_settings.dat"; do',
+    '  if [ -z "$src" ] && [ -f "$c" ]; then src="$c"; fi',
+    'done',
+    'if [ -n "$src" ]; then',
+    '  for d in "$L"/dimensions/*/*; do',
+    '    [ -d "$d" ] || continue',
+    '    [ "$d" = "$L/dimensions/minecraft/overworld" ] && continue',
+    '    t="$d/data/minecraft/world_gen_settings.dat"',
+    '    if [ ! -e "$t" ]; then mkdir -p -- "$d/data/minecraft" && cp -- "$src" "$t" && changed=1; fi',
+    '  done',
+    'fi',
+    '[ "$changed" = 1 ] && echo repaired',
+    "exit 0"
+].join("\n");
+
+/** That script as one argv, for a Java level. No shell ever sees the name. */
+export function dimensionRepairArgv(level: string): string[] {
+    return ["sh", "-c", DIMENSION_REPAIR_SCRIPT, "polaris-dimensions", `${DATA_DIR}/${level}`];
+}
+
+/** Whether the repair said it changed anything. */
+export function dimensionsRepaired(output: string): boolean {
+    return parseListing(output).includes("repaired");
+}
