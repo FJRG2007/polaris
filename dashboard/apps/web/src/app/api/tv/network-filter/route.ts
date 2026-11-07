@@ -24,7 +24,7 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
         getHostLanIp().catch(() => null)
     ]);
     const running = engine?.status === "running";
-    const dot = running ? await encryptedDnsStatus(settings, address) : null;
+    const dot = running ? await encryptedDnsStatus(settings, address, engine) : null;
     const available = Boolean(dot?.enabled && dot.hostname && !dot.blocker && dot.listening);
     return Response.json(
         {

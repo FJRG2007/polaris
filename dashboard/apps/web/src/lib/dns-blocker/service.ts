@@ -28,11 +28,20 @@ import { deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
 import { encodeBlockyConfig, ruleFiles } from "./render";
+import { edgeHostnameTaken } from "@/lib/app-edge";
 import { wildcardCertificate } from "@/lib/wildcard-cert-service";
-import { DOT_PORT, dotFiles, dotHostname, engineTlsFor, type EngineTls } from "./dot";
-import { forgetEngineFiles, writeEngineFiles } from "./engine-files";
+import {
+    DOT_PORT,
+    dotFiles,
+    dotHostname,
+    engineTlsFor,
+    servedTlsFiles,
+    type DotCertificate,
+    type EngineTls
+} from "./dot";
+import { forgetEngineFiles, pruneEngineCertificates, writeEngineFiles } from "./engine-files";
 import { DNS_CHECK_NAME } from "./settings";
-import { clockChangeDecision } from "./clock-change";
+import { certificateRenewalDecision, clockChangeDecision } from "./clock-change";
 import { resolveServiceNames } from "./services-registry";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
@@ -110,13 +119,15 @@ export interface DnsBlockerStatus {
  *   no certificate to serve it with.
  * - `blocker`: why it cannot be switched on here (`noCertificate`: no deploy
  *   domain with a wildcard certificate; `noAddress`: no address on the network;
- *   `portTaken`: something other than the filter holds port 853 here).
- * - `listening`: the filter publishes 853 and it answers on its address now.
+ *   `nameTaken`: a deployed app or the dashboard already answers for the
+ *   hostname; `portTaken`: something other than the filter holds port 853 here).
+ * - `listening`: the filter publishes 853, answers on its address now, and was
+ *   given the certificate there is now.
  */
 export interface EncryptedDnsStatus {
     readonly enabled: boolean;
     readonly hostname: string | null;
-    readonly blocker: "noCertificate" | "noAddress" | "portTaken" | null;
+    readonly blocker: "noCertificate" | "noAddress" | "nameTaken" | "portTaken" | null;
     readonly listening: boolean;
 }
 
@@ -149,12 +160,32 @@ async function requireApp(): Promise<{ id: string; config: string | null }> {
     return row;
 }
 
+/** The certificate encrypted DNS is served with, or null when there is none or
+ *  its hostname already belongs to a deployed app or the dashboard: the filter
+ *  would answer that name with itself for every device on the network. */
+async function servableCertificate(): Promise<DotCertificate | null> {
+    const certificate = await wildcardCertificate().catch(() => null);
+    if (!certificate) return null;
+    const taken = await edgeHostnameTaken(dotHostname(certificate.base)).catch(() => true);
+    return taken ? null : certificate;
+}
+
 /** What the engine serves encrypted DNS with, answering at `address`, or null
- *  when it is off, there is no address, or there is no certificate. */
+ *  when it is off, there is no address, or there is no certificate to serve. */
 async function engineTls(settings: DnsSettings, address: string | null): Promise<EngineTls | null> {
     if (!settings.encryptedDns || !address) return null;
-    const certificate = await wildcardCertificate().catch(() => null);
+    const certificate = await servableCertificate();
     return certificate ? engineTlsFor(certificate, address) : null;
+}
+
+/** The configuration the engine was last given, or null. */
+async function storedConfig(engine: EngineRow | null): Promise<string | null> {
+    if (!engine?.applicationId) return null;
+    const stored = await prisma.envVar.findFirst({
+        where: { scopeType: "application", scopeId: engine.applicationId, key: DNS_CONFIG_ENV },
+        select: { value: true }
+    });
+    return stored?.value ?? null;
 }
 
 /** The engine's configuration, or a refusal when it would not fit the one
@@ -246,35 +277,45 @@ export async function dnsBlockerStatus(): Promise<DnsBlockerStatus> {
         address,
         settings,
         stale: !current,
-        encryptedDns: await encryptedDnsStatus(settings, address)
+        encryptedDns: await encryptedDnsStatus(settings, address, engine)
     };
 }
 
-/** Where encrypted DNS stands, for the screen and for a TV. */
+/** Where encrypted DNS stands, for the screen and for a TV. Port 853 is only
+ *  asked while encrypted DNS is on or the engine publishes it. */
 export async function encryptedDnsStatus(
     settings: DnsSettings,
-    address: string | null
+    address: string | null,
+    engine: EngineRow | null
 ): Promise<EncryptedDnsStatus> {
-    const [certificate, published] = await Promise.all([
+    const [certificate, published, stored] = await Promise.all([
         wildcardCertificate().catch(() => null),
-        enginePublishesTls()
+        enginePublishesTls(engine),
+        storedConfig(engine).catch(() => null)
     ]);
     const hostname = certificate ? dotHostname(certificate.base) : null;
-    const answers = certificate && address ? await tcpListening(address, 1500, DOT_PORT) : false;
+    const taken = hostname ? await edgeHostnameTaken(hostname).catch(() => true) : false;
+    const asked = certificate !== null && address !== null && (settings.encryptedDns || published);
+    const answers = asked && address ? await tcpListening(address, 1500, DOT_PORT) : false;
     const blocker = !certificate
         ? "noCertificate"
         : !address
           ? "noAddress"
-          : answers && !published
-            ? "portTaken"
-            : null;
-    const listening = settings.encryptedDns && published && answers;
+          : taken
+            ? "nameTaken"
+            : answers && !published
+              ? "portTaken"
+              : null;
+    const current =
+        certificate !== null &&
+        address !== null &&
+        servedTlsFiles(stored)?.certFile === engineTlsFor(certificate, address).certFile;
+    const listening = settings.encryptedDns && blocker === null && published && answers && current;
     return { enabled: settings.encryptedDns, hostname, blocker, listening };
 }
 
 /** Whether the engine as stored publishes port 853. */
-async function enginePublishesTls(): Promise<boolean> {
-    const engine = await engineRow();
+async function enginePublishesTls(engine: EngineRow | null): Promise<boolean> {
     if (!engine?.applicationId) return false;
     const app = await prisma.application.findUnique({
         where: { id: engine.applicationId },
@@ -313,12 +354,21 @@ async function ensureLogVolume(engine: EngineRow): Promise<void> {
  *  the next save or pass writes them again. */
 async function syncRules(settings: DnsSettings): Promise<void> {
     const files = ruleFiles(settings);
-    if (settings.encryptedDns) {
-        const certificate = await wildcardCertificate().catch(() => null);
-        if (certificate) for (const [path, text] of dotFiles(certificate)) files.set(path, text);
-    }
+    const certificate = settings.encryptedDns ? await servableCertificate() : null;
+    const keep = new Set<string>();
+    if (certificate)
+        for (const [path, text] of dotFiles(certificate)) {
+            files.set(path, text);
+            keep.add(path);
+        }
     await writeEngineFiles(files).catch((error: unknown) =>
         console.error("polaris: the network filter's rules were not written:", error)
+    );
+    // Never the pair the running configuration still names: a restart reads it.
+    const served = servedTlsFiles(await storedConfig(await engineRow()).catch(() => null));
+    if (served) for (const path of [served.certFile, served.keyFile]) keep.add(path);
+    await pruneEngineCertificates(keep).catch((error: unknown) =>
+        console.error("polaris: the network filter's old certificates were not removed:", error)
     );
 }
 
@@ -346,7 +396,7 @@ async function apply(
     const taken =
         wanted !== null &&
         address !== null &&
-        !(await enginePublishesTls()) &&
+        !(await enginePublishesTls(engine)) &&
         (await tcpListening(address, 1500, DOT_PORT));
     const tls = taken ? null : wanted;
     const served = running ? tls : null;
@@ -622,13 +672,15 @@ export async function reapplyAfterClockChange(
         lastDeployFailed(engine),
         engineTls(settings, address)
     ]);
-    const decision = clockChangeDecision({
+    const input = {
         engine: { running: engine.status === "running" && !deployFailed },
         stored: stored?.value ?? null,
         settings,
         now,
         tls
-    });
+    };
+    const clock = clockChangeDecision(input);
+    const decision = clock.apply ? clock : certificateRenewalDecision(input);
     if (!decision.apply || decision.encoded.length > ENV_VALUE_MAX) return { applied: false };
     // A save that landed while this was deciding applies itself; this one must
     // not then write the settings it read over the operator's.
@@ -636,7 +688,9 @@ export async function reapplyAfterClockChange(
     if (again?.config !== row.config || storedAgain?.value !== stored?.value)
         return { applied: false };
     console.info(
-        `polaris: the network filter's schedules moved with the clock in ${settings.timeZone}; applying them again`
+        clock.apply
+            ? `polaris: the network filter's schedules moved with the clock in ${settings.timeZone}; applying them again`
+            : "polaris: the network filter's encrypted DNS certificate was renewed; applying it again"
     );
     await apply(engine, engine.ownerId, address, settings);
     return { applied: true };

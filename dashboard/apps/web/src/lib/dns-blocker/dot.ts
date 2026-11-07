@@ -70,3 +70,46 @@ export function dotFiles(certificate: DotCertificate): Map<string, string> {
         [paths.keyFile, certificate.keyPem]
     ]);
 }
+
+/** The certificate and key files an encoded configuration names, or null when it
+ *  serves no encrypted DNS or cannot be read. */
+export function servedTlsFiles(
+    encoded: string | null | undefined
+): { certFile: string; keyFile: string } | null {
+    if (!encoded) return null;
+    try {
+        const parsed: unknown = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+        const { certFile, keyFile } = parsed as Record<string, unknown>;
+        return typeof certFile === "string" && typeof keyFile === "string"
+            ? { certFile, keyFile }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The command, as arguments and never a shell line, that removes every
+ *  certificate and key file on the engine's volume but the ones in `keep`. */
+export function staleDotFilesCommand(keep: Iterable<string>): string[] {
+    const kept = [...new Set(keep)]
+        .filter((path) => path.startsWith(`${QUERY_LOG_DIR}/dot-`))
+        .sort()
+        .flatMap((path) => ["!", "-path", path]);
+    return [
+        "find",
+        QUERY_LOG_DIR,
+        "-maxdepth",
+        "1",
+        "-type",
+        "f",
+        "-name",
+        "dot-*",
+        ...kept,
+        "-exec",
+        "rm",
+        "-f",
+        "{}",
+        ";"
+    ];
+}

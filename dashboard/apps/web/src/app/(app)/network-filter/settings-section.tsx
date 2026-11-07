@@ -294,9 +294,11 @@ export function DnsSettingsSection() {
                                 {t("encrypted.openDomains")}
                             </Link>
                         </p>
-                    ) : dot?.blocker === "noAddress" || dot?.blocker === "portTaken" ? (
-                        <p className="text-xs text-muted-foreground">
-                            {t(`encrypted.${dot.blocker}`)}
+                    ) : dot?.blocker === "noAddress" ||
+                      dot?.blocker === "nameTaken" ||
+                      dot?.blocker === "portTaken" ? (
+                        <p className="min-w-0 break-words text-xs text-muted-foreground">
+                            {t(`encrypted.${dot.blocker}`, { hostname: dot.hostname ?? "" })}
                         </p>
                     ) : dot?.hostname ? (
                         <p className="min-w-0 break-all text-xs text-muted-foreground">

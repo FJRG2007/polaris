@@ -558,6 +558,7 @@
         "ready": "Devices will use {hostname} as their Private DNS name.",
         "serving": "Devices can set {hostname} as their Private DNS name.",
         "notAnswering": "Saved, but nothing answers port 853 for {hostname} yet. Press Apply now under Status, then check again in a minute.",
+        "nameTaken": "{hostname} already belongs to an app or to this dashboard, so the filter cannot take it for encrypted DNS.",
         "portTaken": "Something else on this machine already answers on port 853, so the filter cannot serve encrypted DNS there."
     }
 }
