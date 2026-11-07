@@ -3,23 +3,24 @@ package app.polaris.tv;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.junit.Test;
 
 public class RemoteBlockingTest {
 
-    private static Boolean desired(String json) {
+    private static Boolean desired(String json) throws JSONException {
         return RemoteBlocking.desiredBlocking(new JSONObject(json));
     }
 
     @Test
-    public void readsTheOwnersChoice() {
+    public void readsTheOwnersChoice() throws JSONException {
         assertEquals(Boolean.TRUE, desired("{\"desired\":{\"blocking\":true}}"));
         assertEquals(Boolean.FALSE, desired("{\"desired\":{\"blocking\":false,\"theme\":\"stockholm\"}}"));
     }
 
     @Test
-    public void keepsItsOwnSettingWhenNothingWasChosenOrTheBlockIsMalformed() {
+    public void keepsItsOwnSettingWhenNothingWasChosenOrTheBlockIsMalformed() throws JSONException {
         assertNull(desired("{\"desired\":null}"));
         assertNull(desired("{}"));
         assertNull(desired("{\"desired\":{}}"));
@@ -36,7 +37,7 @@ public class RemoteBlockingTest {
     }
 
     @Test
-    public void readsTheChoiceId() {
+    public void readsTheChoiceId() throws JSONException {
         assertEquals(FIRST, RemoteBlocking.desiredChoice(new JSONObject(
                 "{\"desired\":{\"blocking\":true,\"choice\":\"" + FIRST.toUpperCase() + "\"}}")));
         assertNull(RemoteBlocking.desiredChoice(new JSONObject("{\"desired\":{\"blocking\":true}}")));
