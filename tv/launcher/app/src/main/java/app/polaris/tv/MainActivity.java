@@ -327,6 +327,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * reach Home after onPause, when that key opened another app, and must not start the clock over the app.
      */
     private boolean resumed;
+    /** A theme applied from Polaris while an app was in front: Home starts again to wear it once it is back. */
+    private boolean themeRestartPending;
     /** Rebuild the tiles on the way back to Home only when apps changed meanwhile (TileRefresh). */
     private final TileRefresh tileRefresh = new TileRefresh();
     /** PackageManager's change counter at the last rebuild, to catch a package broadcast that never arrived. */
@@ -1128,7 +1130,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     }
                 }
                 // Home reads a theme when it starts, so it starts again to wear the one just applied.
-                if (picked.themeApplied) runOnUiThread(() -> CatalogInstall.restartHome(this));
+                if (picked.themeApplied) runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (resumed) CatalogInstall.restartHome(this);
+                    else themeRestartPending = true;
+                });
             } catch (java.io.IOException unreachable) {
                 runOnUiThread(() -> btnPolaris.setText(R.string.polaris_title));
             }
@@ -1152,6 +1158,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        if (themeRestartPending) {
+            themeRestartPending = false;
+            CatalogInstall.restartHome(this);
+            return;
+        }
         refreshPolaris();
         SelfUpdateRun.dailyCheck(this);
         watchPrivateDns();

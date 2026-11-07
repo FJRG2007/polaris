@@ -83,6 +83,12 @@ export function TvCatalogPicker({
     const statusId = `tv-catalog-${row.id}`;
     const problem = status === "failed" || status === "unavailable" || status === "asked";
     const addons = row.catalog.addons?.ids ?? [];
+    const { theme: themePick, addons: addonsPick } = row.catalog;
+
+    function retry() {
+        if (themePick?.applied === "failed") onTheme(themePick.id);
+        if (addonsPick?.applied === "failed") onAddons([...addonsPick.ids]);
+    }
 
     function fetchItems() {
         setItems(undefined);
@@ -113,17 +119,29 @@ export function TvCatalogPicker({
                         {t(`tv.catalog.status.${status}`)}
                     </span>
                 </div>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={status === "updateFirst" || status === "nextUpdate"}
-                    aria-expanded={open}
-                    aria-describedby={statusId}
-                    onClick={toggle}
-                >
-                    {open ? t("tv.catalog.close") : t("tv.catalog.open")}
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                    {status === "failed" ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            aria-describedby={statusId}
+                            onClick={retry}
+                        >
+                            {t("tv.catalog.retry")}
+                        </Button>
+                    ) : null}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={status === "updateFirst" || status === "nextUpdate"}
+                        aria-expanded={open}
+                        aria-describedby={statusId}
+                        onClick={toggle}
+                    >
+                        {open ? t("tv.catalog.close") : t("tv.catalog.open")}
+                    </Button>
+                </div>
             </div>
             {open ? (
                 items === undefined ? (

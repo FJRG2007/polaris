@@ -100,4 +100,35 @@ describe("the themes and add-ons picker", () => {
         await screen.findByText("Sample aerial");
         expect(load).toHaveBeenCalledTimes(2);
     });
+
+    it("sends a pick the TV could not apply again from the status line", () => {
+        const onTheme = vi.fn();
+        const onAddons = vi.fn();
+        const row = {
+            ...ROW,
+            catalog: {
+                theme: { id: "aerial", applied: "failed" },
+                addons: { ids: ["weather"], applied: "installed" }
+            }
+        } as unknown as TvRow;
+        render(
+            <I18nProvider locale="en-US" messages={webCatalogs.pick("en-US", LOADED)}>
+                <TvCatalogPicker
+                    row={row}
+                    load={async () => ITEMS}
+                    onTheme={onTheme}
+                    onAddons={onAddons}
+                />
+            </I18nProvider>
+        );
+        screen.getByText("The TV could not apply it. Try again.");
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(onTheme).toHaveBeenCalledWith("aerial");
+        expect(onAddons).not.toHaveBeenCalled();
+    });
+
+    it("offers no retry while nothing failed", () => {
+        draw(async () => ITEMS, "en-US");
+        expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    });
 });

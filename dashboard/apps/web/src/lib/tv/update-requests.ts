@@ -82,17 +82,6 @@ export function isPendingTvUpdate(state: string): boolean {
 }
 
 /** One connected TV, as /account/tv lists it. */
-function catalogOf(desired: TvDesired | null): TvRow["catalog"] {
-    return {
-        theme: desired?.theme
-            ? { id: desired.theme.id, applied: desired.theme.applied ?? null }
-            : null,
-        addons: desired?.addons
-            ? { ids: desired.addons.ids, applied: desired.addons.applied ?? null }
-            : null
-    };
-}
-
 export interface TvRow {
     readonly id: string;
     readonly name: string;
@@ -122,6 +111,17 @@ export interface TvRow {
     };
     /** The address the TV last called from, as this instance saw it. */
     readonly address: string | null;
+}
+
+function catalogOf(desired: TvDesired | null): TvRow["catalog"] {
+    return {
+        theme: desired?.theme
+            ? { id: desired.theme.id, applied: desired.theme.applied ?? null }
+            : null,
+        addons: desired?.addons
+            ? { ids: desired.addons.ids, applied: desired.addons.applied ?? null }
+            : null
+    };
 }
 
 /** Bounded: a person has a few TVs, not thousands. */
