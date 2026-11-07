@@ -469,6 +469,7 @@ export async function setUserRole(
         prisma.userRole.deleteMany({ where: { userId } }),
         prisma.userRole.create({ data: { userId, roleId: role.id } })
     ]);
+    refreshVpnAccessLater();
     // Their sessions stay: changing somebody's role is not a reason to sign them out.
     // Only what the role reaches is re-decided, and this is what carries that to the
     // guards already serving them.

@@ -17,7 +17,7 @@
 
 import * as rules from "./settings";
 import * as wg from "./wireguard";
-import { openAccess, vpnPermission } from "./wireguard-service";
+import { openAccess, vpnPermission, vpnPermissionsAmong } from "./wireguard-service";
 import { prisma } from "@polaris/db";
 import { syncVpnEdge } from "./edge";
 import { randomUUID } from "node:crypto";
@@ -285,42 +285,47 @@ async function grantedMembers(known: ReadonlySet<string>): Promise<string[] | nu
     const active = rows
         .slice(0, POLICY_MEMBERS)
         .filter((row) => wg.accessStanding(row, now) === "active")
-        .filter((row) => known.has(rules.headscaleUserName(row.userId)));
-    const shut = await shutByPermission(
-        active.map((row) => row.userId),
-        false
-    );
-    return active
-        .filter((row) => !shut.has(row.userId))
-        .map((row) => rules.headscaleUserName(row.userId));
+        .map((row) => row.userId);
+    const switchedOn = await prisma.userPermission.findMany({
+        where: { permission: "vpn.use", effect: "allow", user: { vpnAccess: { is: null } } },
+        select: { userId: true },
+        orderBy: { createdAt: "asc" },
+        take: POLICY_MEMBERS
+    });
+    const candidates = [
+        ...new Set([...active, ...switchedOn.map((row) => row.userId)])
+    ].filter((id) => known.has(rules.headscaleUserName(id)));
+    const shut = await shutByPermission(candidates, false);
+    return candidates
+        .filter((id) => !shut.has(id))
+        .slice(0, POLICY_MEMBERS)
+        .map((id) => rules.headscaleUserName(id));
 }
 
 /**
  * The accounts among `ids` that `vpn.use` keeps off the VPN (`wg.vpnStanding`):
- * which is a deny, whatever access the VPN screen or open access gave. Each
- * resolved once and all at once - bounded by the VPN's own members.
+ * a deny, whatever access the VPN screen or open access gave, or nothing that
+ * lets them in at all. Read in a fixed number of queries (`vpnPermissionsAmong`).
  */
 async function shutByPermission(ids: readonly string[], open: boolean): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
     const [admins, withRow, granted] = await Promise.all([
         prisma.user.findMany({ where: { id: { in: [...ids] }, isAdmin: true }, select: { id: true } }),
         prisma.vpnAccess.findMany({ where: { userId: { in: [...ids] } }, select: { userId: true } }),
-        Promise.all(ids.map(async (id) => [id, await vpnPermission(id)] as const))
+        vpnPermissionsAmong(ids)
     ]);
     const isAdmin = new Set(admins.map((row) => row.id));
     const hasRow = new Set(withRow.map((row) => row.userId));
     return new Set(
-        granted
-            .filter(
-                ([id, permission]) =>
-                    wg.vpnStanding({
-                        isAdmin: isAdmin.has(id),
-                        hasRow: hasRow.has(id),
-                        open,
-                        ...permission
-                    }) === "none"
-            )
-            .map(([id]) => id)
+        ids.filter(
+            (id) =>
+                wg.vpnStanding({
+                    isAdmin: isAdmin.has(id),
+                    hasRow: hasRow.has(id),
+                    open,
+                    ...(granted.get(id) ?? { permission: "implicit-deny", accountAllows: false })
+                }) === "none"
+        )
     );
 }
 

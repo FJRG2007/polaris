@@ -139,12 +139,26 @@ export interface PolarGrants {
     spend: AuthzDecision;
 }
 
-/** Read the two decisions out of one account's global statements. Pure. */
+/**
+ * Read the two decisions out of one account's global statements. Pure.
+ *
+ * Any matching deny counts, `*` included. An allow counts only from a statement
+ * that names Polar (`polar.use`, `polar.spend`, `polar.*`): a role holding every
+ * permission, or a policy allowing `*`, never meant Polar before these existed,
+ * and must not start spending the deployment's keys after an update.
+ */
 export function polarGrantsOf(statements: readonly PolicyStatement[]): PolarGrants {
-    return {
-        use: evaluateStatements(statements, "polar.use", "*"),
-        spend: evaluateStatements(statements, "polar.spend", "*")
+    const naming = statements
+        .filter((statement) => statement.effect === "allow")
+        .map((statement) => ({
+            ...statement,
+            actions: statement.actions.filter((pattern) => pattern.startsWith("polar."))
+        }));
+    const decide = (action: string): AuthzDecision => {
+        const decision = evaluateStatements(statements, action, "*");
+        return decision === "allow" ? evaluateStatements(naming, action, "*") : decision;
     };
+    return { use: decide("polar.use"), spend: decide("polar.spend") };
 }
 
 /**

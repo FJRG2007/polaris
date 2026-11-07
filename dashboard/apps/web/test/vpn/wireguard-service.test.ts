@@ -5,6 +5,8 @@ const tx = vi.hoisted(() => ({ $executeRaw: vi.fn(async () => 1) }));
 const db = vi.hoisted(() => ({
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
     user: { findMany: vi.fn() },
+    userPermission: { findMany: vi.fn(async () => []) },
+    policy: { findMany: vi.fn(async () => []) },
     vpnProxyUsage: { findUnique: vi.fn(), upsert: vi.fn() },
     vpnAccess: { findUnique: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() },
     vpnNode: {

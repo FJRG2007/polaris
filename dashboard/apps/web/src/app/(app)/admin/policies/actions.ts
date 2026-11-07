@@ -20,6 +20,7 @@ import {
 } from "@polaris/auth";
 import { requireAdmin } from "@/lib/session";
 import { publishAccessChange } from "@/lib/access-live";
+import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -67,6 +68,7 @@ export async function updatePolicyAction(
     if (parsed.error) return { error: parsed.error };
     try {
         await updatePolicy(id, { name, description, document: parsed.value });
+        refreshVpnAccessLater();
         // Rewriting a policy changes what everybody it is attached to holds.
         publishAccessChange();
         await recordAudit({ actorId: admin.id, action: "policy.update", targetType: "policy", targetId: id });
@@ -80,6 +82,7 @@ export async function updatePolicyAction(
 export async function deletePolicyAction(id: string): Promise<void> {
     const admin = await requireAdmin();
     await deletePolicy(id);
+    refreshVpnAccessLater();
     publishAccessChange();
     await recordAudit({ actorId: admin.id, action: "policy.delete", targetType: "policy", targetId: id });
     revalidatePath("/admin/policies");
@@ -93,6 +96,7 @@ export async function attachPolicyAction(
     const admin = await requireAdmin();
     if (!principalId) return;
     await attachPolicy(policyId, principalType, principalId);
+    refreshVpnAccessLater();
     // A policy attached to a group or a role is everybody in it, which is a
     // query and a chance to be wrong - so only a person is named. See
     // `access-live`.
@@ -108,6 +112,7 @@ export async function detachPolicyAction(
 ): Promise<void> {
     const admin = await requireAdmin();
     await detachPolicy(policyId, principalType, principalId);
+    refreshVpnAccessLater();
     publishAccessChange(principalType === "user" ? { userIds: [principalId] } : {});
     await recordAudit({ actorId: admin.id, action: "policy.detach", targetType: "policy", targetId: policyId, metadata: { principalType, principalId } });
     revalidatePath("/admin/policies");

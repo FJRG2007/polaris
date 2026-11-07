@@ -11,6 +11,7 @@ const db = vi.hoisted(() => ({
     accounts: [] as { id: string; bannedAt: Date | null; disabledAt: Date | null }[],
     admins: [] as { id: string; name: string; email: string }[],
     open: false,
+    permissions: [] as { userId: string; permission: string; effect: string }[],
     grants: [] as {
         userId: string;
         nodes: string[];
@@ -35,6 +36,21 @@ vi.mock("@polaris/db", () => ({
                     ? db.admins
                     : db.accounts.filter((account) => where.id?.in.includes(account.id))
         },
+        userPermission: {
+            findMany: async ({
+                where
+            }: {
+                where: { permission: string; effect?: string; userId?: { in: string[] } };
+            }) =>
+                db.permissions.filter(
+                    (row) =>
+                        row.permission === where.permission &&
+                        (!where.effect || row.effect === where.effect) &&
+                        (!where.userId || where.userId.in.includes(row.userId)) &&
+                        (!where.effect || !db.grants.some((grant) => grant.userId === row.userId))
+                )
+        },
+        policy: { findMany: async () => [] },
         setting: {
             findUnique: async ({ where }: { where: { key: string } }) =>
                 where.key === "vpn.openAccess" && db.open ? { value: "true" } : null
@@ -116,6 +132,7 @@ beforeEach(() => {
     ];
     db.admins = [];
     db.open = false;
+    db.permissions = [];
     db.grants = [];
 });
 
@@ -221,6 +238,25 @@ describe("bringing the VPN in line with the accounts", () => {
     it("keeps a suspended grant out even when the VPN is open to all", async () => {
         db.open = true;
         db.grants = [grant(BANNED, true)];
+        headscale();
+        await refreshVpnAccess();
+        const policy = await appliedPolicy();
+        expect(policy.grants.some((grant) => grant.src.includes("autogroup:member"))).toBe(false);
+        expect(policy.groups["group:vpn"]).toContain(`${headscaleUserName(KEPT)}@`);
+        expect(policy.groups["group:vpn"]).not.toContain(`${headscaleUserName(BANNED)}@`);
+    });
+
+    it("names an account switched On with no grant of its own while the VPN is closed", async () => {
+        db.permissions = [{ userId: KEPT, permission: "vpn.use", effect: "allow" }];
+        headscale();
+        await refreshVpnAccess();
+        const policy = await appliedPolicy();
+        expect(policy.groups["group:vpn"]).toEqual([`${headscaleUserName(KEPT)}@`]);
+    });
+
+    it("holds back an account switched Off even when the VPN is open to all", async () => {
+        db.open = true;
+        db.permissions = [{ userId: BANNED, permission: "vpn.use", effect: "deny" }];
         headscale();
         await refreshVpnAccess();
         const policy = await appliedPolicy();

@@ -197,6 +197,17 @@ describe("Polar access policy", () => {
             expect(decidePolarAccess(restricted, { ...member, grants }).use).toBe(false);
         });
 
+        it("does not let a wildcard allow spend the deployment's keys, but a wildcard deny still shuts", () => {
+            const everything = polarGrantsOf([allow("*")]);
+            expect(everything).toEqual({ use: "implicit-deny", spend: "implicit-deny" });
+            expect(decidePolarAccess(restricted, { ...member, grants: everything })).toMatchObject({
+                use: false,
+                spend: false
+            });
+            expect(polarGrantsOf([allow("polar.*")])).toEqual({ use: "allow", spend: "allow" });
+            expect(polarGrantsOf([allow("polar.use"), deny("*")]).use).toBe("deny");
+        });
+
         it("never spends for somebody denied Polar itself, and an administrator is always in", () => {
             const grants = polarGrantsOf([deny("polar.use"), allow("polar.spend")]);
             expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).spend).toBe(false);
