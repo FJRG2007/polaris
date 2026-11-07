@@ -176,7 +176,8 @@
             "move": "Cabeceo",
             "turn": "Rotar",
             "up": "Subir",
-            "down": "Bajar"
+            "down": "Bajar",
+            "turbo": "Turbo"
         },
         "drag": "Ratón",
         "general": "Siempre",
@@ -193,7 +194,6 @@
         "padMove": "Moverse y girar",
         "padLook": "Mirar",
         "padThrottle": "Acelerar y frenar",
-        "padLift": "Subir y bajar",
         "padJump": "Saltar",
         "padCamera": "Cambiar cámara",
         "padModes": "Cambiar modo",

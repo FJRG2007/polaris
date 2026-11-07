@@ -27,6 +27,7 @@ import { createRemotePlayers } from './remote-players.js';
 import { reportFailure, reportProgress, reportReady, shareState } from './embed.js';
 import { formatNumber, onLocaleChange, t } from './i18n.js';
 import { GameMenu } from './game-menu.js';
+import { installBrowserGuards } from './browser-defaults.js';
 
 // js/main.js
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
@@ -39,6 +40,7 @@ const PLAYING_BUILD_BUDGET = 6;
 const BUILD_STEPS = ['renderer', 'lighting', 'cityGrid', 'boroughs', 'landmarks', 'blocks', 'streetDetails', 'traffic', 'roadPaint', 'controllers', 'culling', 'postFX', 'ui'];
 
 async function initApp() {
+  installBrowserGuards();
   const container = document.getElementById('canvas-container');
   // The city data is in (nyc-geodata.js holds every module that needs it until it is): the build starts
   enterStage('build');
@@ -318,7 +320,7 @@ async function initApp() {
     person: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space'], 'up'], [['Drag'], 'orbit']],
     car: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['B'], 'horn'], [['Drag'], 'orbit']],
     cyclist: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Drag'], 'orbit']],
-    helicopter: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space', 'E'], 'up'], [['Q', 'C'], 'down']]
+    helicopter: [[['W', 'S'], 'move'], [['A', 'D'], 'turn'], [['Space', 'E'], 'up'], [['Q', 'C'], 'down'], [['Shift'], 'turbo']]
   };
   const keyName = (key) => (key === 'Drag' ? t('controls.drag') : key);
   const modeHints = (mode) => (controlHints[mode] || []).map(([keys, action]) => [keys.map(keyName), t(`controls.${mode}.${action}`)]);
@@ -344,7 +346,10 @@ async function initApp() {
         rows: [
           [[t('controls.leftStick')], t('controls.padMove')],
           [[t('controls.rightStick')], t('controls.padLook')],
-          ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : mode === 'helicopter' ? [[['RT', 'LT'], t('controls.padLift')]] : []),
+          ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : []),
+          ...(mode === 'helicopter'
+            ? [[['RT', 'A'], t('controls.helicopter.up')], [['LT', 'B'], t('controls.helicopter.down')], [['L3'], t('controls.helicopter.turbo')]]
+            : []),
           ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
           [['Y'], t('controls.padCamera')],
           [['LB', 'RB'], t('controls.padModes')],
@@ -355,8 +360,9 @@ async function initApp() {
       }
     ];
   }
-  // Top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s): full scale of the speed meter
-  const topSpeedMph = { person: 18, car: 81, cyclist: 43, helicopter: 116 };
+  // Top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s, the helicopter 83 with turbo): full scale of the
+  // speed meter
+  const topSpeedMph = { person: 18, car: 81, cyclist: 43, helicopter: 186 };
 
   function renderControlHints(mode) {
     if (!elControlsHint) return;
@@ -386,7 +392,7 @@ async function initApp() {
   }
 
   function selectMode(mode) {
-    controllerManager.setMode(mode);
+    controllerManager.setMode(mode, { follow: true });
     touchControls.setMode(controllerManager.activeMode);
     gamepadControls.reset();
     modeButtons.forEach((btn) => {

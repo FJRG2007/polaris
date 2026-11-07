@@ -25,6 +25,7 @@ import {
 } from './helicopter.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
+import { HELI_CRUISE_SPEED, arrivalFor, heliTopSpeed, stepTurbo } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
 
@@ -203,7 +204,8 @@ class ThirdPersonControllerManager {
       left: false,
       right: false,
       up: false,
-      down: false
+      down: false,
+      turbo: false
     };
 
     this.entities = {
@@ -254,7 +256,8 @@ class ThirdPersonControllerManager {
       left: ['KeyA', 'ArrowLeft'],
       right: ['KeyD', 'ArrowRight'],
       up: ['Space', 'KeyE'],
-      down: ['KeyQ', 'KeyC']
+      down: ['KeyQ', 'KeyC'],
+      turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's only; Shift+V still steps the camera back
     };
     const actionsByCode = new Map(Object.entries(bindings).flatMap(([action, codes]) => codes.map((code) => [code, action])));
     this._pressedCodes = new Set();
@@ -325,9 +328,15 @@ class ThirdPersonControllerManager {
     for (const action of Object.keys(this.keys)) this.keys[action] = false;
   }
 
-  setMode(mode) {
+  /** `follow`: the player switched, so the new body arrives where they are (restoring a saved place does not). */
+  setMode(mode, { follow = false } = {}) {
     if (!this.entities[mode]) return;
+    const previous = this.entities[this.activeMode];
+    const switching = follow && mode !== this.activeMode;
     this.activeMode = mode;
+    // The new body arrives where the player is, not where it was last left; where nothing is clear it stays put
+    const arrival = switching ? arrivalFor(previous?.position && { ...previous.position, heading: previous.heading }, mode) : null;
+    if (arrival) this.teleportActiveTo(arrival.x, arrival.z, arrival.heading, arrival.altitude);
     const active = this.entities[mode];
     if (active.mesh) active.mesh.visible = true;
     if (active.helmet) active.helmet.visible = true;
@@ -382,7 +391,7 @@ class ThirdPersonControllerManager {
       ent._posedX = NaN;
       if (ent.helmet) ent.helmet.visible = true;
     } else if (heli) {
-      ent.verticalSpeed = ent.pitchAngle = ent.rollAngle = 0;
+      ent.verticalSpeed = ent.pitchAngle = ent.rollAngle = ent.turbo = 0;
       ent.tiltPivot.rotation.x = ent.tiltPivot.rotation.z = 0;
       ent.tiltPivot.position.y = 0;
     }
@@ -843,6 +852,7 @@ class ThirdPersonControllerManager {
       heading: 0.62,
       speed: 0,
       verticalSpeed: 0,
+      turbo: 0,
       pitchAngle: 0,
       rollAngle: 0,
       cameraTargetOffset: new THREE.Vector3(0, 1.55, 0),
@@ -1232,7 +1242,8 @@ class ThirdPersonControllerManager {
     c.chassisPivot.position.y = c.heaveY;
 
     if (c.carState) {
-      c.carState.value.x = braking ? 1 : 0;
+      // Lit while braking, and held at a standstill with no throttle (an automatic's foot on the brake), like traffic
+      c.carState.value.x = braking || (Math.abs(c.speed) < 0.3 && !throttle) ? 1 : 0;
       c.carState.value.w = c.speed < -0.2 ? 1 : 0;
     }
 
@@ -1288,8 +1299,11 @@ class ThirdPersonControllerManager {
 
   updateHelicopter(dt, elapsed) {
     const h = this.entities.helicopter;
-    const maxHorizSpeed = 52.0;
     const maxVertSpeed = 16.0;
+    // Turbo (Shift, or the left stick's click) ramps the top speed up and back down over about a second, never past
+    // HELI_TURBO times cruise, so building collisions and the city's streaming keep up with it
+    h.turbo = stepTurbo(h.turbo, this.keys.turbo, dt);
+    const maxHorizSpeed = heliTopSpeed(h.turbo);
 
     let fwdInput = 0;
     if (this.keys.forward) fwdInput = this.keys.forward;
@@ -1304,8 +1318,11 @@ class ThirdPersonControllerManager {
     else if (this.keys.down) vertInput = -this.keys.down;
 
     if (fwdInput !== 0) {
-      h.speed += fwdInput * 24.0 * dt;
-      h.speed = Math.max(-maxHorizSpeed * 0.6, Math.min(maxHorizSpeed, h.speed));
+      h.speed += fwdInput * 24.0 * (1 + h.turbo) * dt;
+      h.speed = Math.max(-HELI_CRUISE_SPEED * 0.6, Math.min(maxHorizSpeed, h.speed));
+    } else if (h.speed > maxHorizSpeed) {
+      // Letting go of turbo: back to cruise smoothly, not at once
+      h.speed = Math.max(maxHorizSpeed, h.speed - 18.0 * dt);
     } else {
       h.speed *= Math.max(0, 1 - dt * 1.8);
     }
@@ -1329,7 +1346,7 @@ class ThirdPersonControllerManager {
     h.position.y = Math.max(0.25, Math.min(380, h.position.y));
     this.resolveHorizontalCollision(h.position, 4.5, null, h);
 
-    const targetPitch = (h.speed / maxHorizSpeed) * 0.24;
+    const targetPitch = (h.speed / HELI_CRUISE_SPEED) * 0.24;
     const targetRoll = -yawInput * 0.28;
     h.pitchAngle += (targetPitch - h.pitchAngle) * Math.min(1, dt * 5);
     h.rollAngle += (targetRoll - h.rollAngle) * Math.min(1, dt * 5);
