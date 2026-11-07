@@ -250,6 +250,16 @@ export function builtInApps(): AppEntry[] {
     return POLARIS_APPS.filter((app) => !app.requiresApp && !app.hidden && !NOT_AN_APP.has(app.id));
 }
 
+/** One of the apps every Polaris comes with, by its switcher id. */
+export function findBuiltInApp(id: string): AppEntry | undefined {
+    return builtInApps().find((entry) => entry.id === id);
+}
+
+/** A built-in app's own page, on the admin screen that lists it. */
+export function builtInHref(id: string): string {
+    return `${POLARIS_APPS_PATH}/${encodeURIComponent(id)}`;
+}
+
 /** A built-in screen that does a Deploy template's job, and what opens it. */
 export interface BuiltInAlternative {
     /** The catalogue label, translated where it is drawn (`useNavLabel`). */

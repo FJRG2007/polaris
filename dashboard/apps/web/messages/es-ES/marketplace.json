@@ -100,6 +100,8 @@
         "configuration": "Configuración"
     },
     "detail": {
+        "builds": "Versiones",
+        "noBuild": "Sin versión propia",
         "back": "Catálogo",
         "replaces": "Sustituye a",
         "needsProject": "Un proyecto de Deploy donde ejecutarlo, y permiso para gestionar apps en él.",
@@ -164,6 +166,7 @@
         "title": "Apps de Polaris",
         "description": "Activa para todos las apps propias de Polaris.",
         "builtIn": "Incluida",
-        "builtInBy": "Viene con cada Polaris"
+        "builtInBy": "Viene con cada Polaris",
+        "cannotUninstall": "Incluida - todo Polaris la necesita"
     }
 }

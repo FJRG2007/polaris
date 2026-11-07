@@ -100,6 +100,8 @@
         "configuration": "Configuration"
     },
     "detail": {
+        "builds": "Builds",
+        "noBuild": "No build of its own",
         "back": "All apps",
         "replaces": "Replaces",
         "needsProject": "A Deploy project to run it in, and permission to manage apps there.",
@@ -164,6 +166,7 @@
         "title": "Polaris apps",
         "description": "Switch on Polaris's own apps for everybody here.",
         "builtIn": "Built in",
-        "builtInBy": "Part of every Polaris"
+        "builtInBy": "Part of every Polaris",
+        "cannotUninstall": "Built in - every Polaris needs it"
     }
 }

@@ -206,7 +206,7 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
     );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+export function Fact({ label, children }: { label: string; children: ReactNode }) {
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
