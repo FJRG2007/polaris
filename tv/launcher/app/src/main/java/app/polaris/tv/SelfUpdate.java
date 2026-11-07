@@ -27,6 +27,8 @@ final class SelfUpdate {
     /** The Home key edition (build.gradle homeCategory=false) asks for its own APK, so an update never brings back
      *  the HOME category that the firmware it runs on uninstalls. Empty for the ordinary build. */
     static final String EDITION = BuildConfig.HOME_CATEGORY ? "" : "home-key";
+    /** What the instance names the ordinary build; read as the empty edition this build calls it. */
+    static final String STANDARD = "standard";
 
     /** States the instance accepts on a report (queued is its own). */
     static final String DOWNLOADING = "downloading";
@@ -517,7 +519,8 @@ final class SelfUpdate {
                     || url.startsWith("//")) {
                 return null;
             }
-            return new Release(name, code, size, sha, url, answer.optString("edition", ""));
+            String edition = answer.optString("edition", "");
+            return new Release(name, code, size, sha, url, STANDARD.equals(edition) ? "" : edition);
         } catch (JSONException notARelease) {
             return null;
         }

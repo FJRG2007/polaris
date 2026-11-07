@@ -185,12 +185,16 @@ export function apkNameOf(edition: TvEdition): string {
     return edition === "standard" ? APK_NAME : `polaris-tv-${edition}.apk`;
 }
 
-/** The newest published APK of an edition, verified, or null when the newest release has none. */
-export async function latestApk(edition: TvEdition = "standard"): Promise<{ apk: Buffer; version: string; } | null> {
+/** The newest TV release, or null when none is published or it has no ordinary APK to install. */
+async function latestTvRelease(): Promise<PublishedRelease | null> {
     const source = releaseSource(repository);
     if (!source) return null;
     const release = await newestRelease(source.api);
-    if (!release) return null;
+    return release?.assets.some((one) => one.name === APK_NAME) ? release : null;
+}
+
+/** An edition's APK from a release, verified, or null when the release does not publish it. */
+async function apkOf(release: PublishedRelease, edition: TvEdition): Promise<{ apk: Buffer; version: string; } | null> {
     const name = apkNameOf(edition);
     const apkAsset = release.assets.find((one) => one.name === name);
     const sums = release.assets.find((one) => one.name === CHECKSUMS);
@@ -202,6 +206,14 @@ export async function latestApk(edition: TvEdition = "standard"): Promise<{ apk:
     const apk = Buffer.from(await download.arrayBuffer());
     if (createHash("sha256").update(apk).digest("hex") !== expected) throw new Error("download");
     return { apk, version: release.tag_name.slice(TAG_PREFIX.length) };
+}
+
+/** The newest published APK of an edition, verified, or null when the newest release has none. */
+export async function latestApk(edition: TvEdition = "standard"): Promise<{ apk: Buffer; version: string; } | null> {
+    const source = releaseSource(repository);
+    if (!source) return null;
+    const release = await newestRelease(source.api);
+    return release ? apkOf(release, edition) : null;
 }
 
 /** A TV on the network by its address, or one plugged in by USB by its id. */
@@ -452,7 +464,7 @@ async function overWirelessDebugging(
 
 async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, code: string | null = null): Promise<void> {
     publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null, linking: null });
-    const release = await latestApk().catch((caught: unknown) => {
+    const release = await latestTvRelease().catch((caught: unknown) => {
         console.error("[tv]", caught);
         return undefined;
     });
@@ -556,20 +568,17 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
             homeGuard: listsPackage(await adb.shell(`pm list packages ${HOME_GUARD_PACKAGE}`), HOME_GUARD_PACKAGE)
         });
         publish({ home: path.home });
-        // A box that uninstalls Home apps at boot gets the edition without the HOME category, fetched
-        // now that the TV said which it is; nothing has changed on it yet.
-        let apk = release.apk;
-        if (path.edition !== "standard") {
-            publish({ phase: "download" });
-            const edition = await latestApk(path.edition).catch((caught: unknown) => {
-                console.error("[tv]", caught);
-                return undefined;
-            });
-            if (!edition) {
-                await finish(adb, target, edition === null ? "home-key-not-released" : "download-failed");
-                return;
-            }
-            apk = edition.apk;
+        // A box that uninstalls Home apps at boot gets the edition without the HOME category, so the APK is
+        // fetched, from the release looked up before connecting, once the TV said which it is.
+        publish({ phase: "download" });
+        const fetched = await apkOf(release, path.edition).catch((caught: unknown) => {
+            console.error("[tv]", caught);
+            return undefined;
+        });
+        if (!fetched) {
+            const unreleased = path.edition === "standard" ? "not-released" : "home-key-not-released";
+            await finish(adb, target, fetched === null ? unreleased : "download-failed");
+            return;
         }
         stage = "backup";
         publish({ phase: "backup" });
@@ -577,7 +586,7 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
 
         stage = "send";
         publish({ phase: "install" });
-        await adb.push(REMOTE_APK, apk);
+        await adb.push(REMOTE_APK, fetched.apk);
         stage = "install";
         const installed = await adb.shell(`pm install -r ${REMOTE_APK}`, 180_000);
         await adb.shell(`rm -f ${REMOTE_APK}`).catch(() => "");

@@ -279,8 +279,10 @@ public class HomeKeyService extends AccessibilityService {
         }
         if (RemoteKeys.handle(this, event, inFront(appKeys, frontAppKeys, event.getKeyCode()),
                 holdAppKeys.get(event.getKeyCode()))) return true;
-        // home_long_press_home: Android never sees the Home key, so a held press cannot turn into ALL_APPS.
-        if (homeLongPressHome && event.getKeyCode() == KeyEvent.KEYCODE_HOME) {
+        // home_long_press_home: Android never sees the Home key, so a held press cannot turn into ALL_APPS. The Home key
+        // edition with no stock home to send back (Android would show its chooser) takes the key the same way.
+        if ((homeLongPressHome || (!BuildConfig.HOME_CATEGORY && stockHome.isEmpty()))
+                && event.getKeyCode() == KeyEvent.KEYCODE_HOME) {
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) openHome();
             return true;
         }

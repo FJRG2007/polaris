@@ -389,5 +389,27 @@ public class SelfUpdateTest {
         assertEquals("home-key", SelfUpdate.readRelease(body).edition);
         // An instance from before editions names none, which is the ordinary build.
         assertEquals("", SelfUpdate.readRelease(body.replace(",\"edition\":\"home-key\"", "")).edition);
+        // The instance names the ordinary build "standard", which is the edition this build calls empty.
+        assertEquals("", SelfUpdate.readRelease(body.replace("\"edition\":\"home-key\"", "\"edition\":\"standard\"")).edition);
+    }
+
+    @Test
+    public void theOrdinaryBuildInstallsTheStandardReleaseTheInstanceNames() throws Exception {
+        assertEquals("", SelfUpdate.EDITION);
+        String body = new JSONObject(release("3.5", APK)).put("edition", "standard").toString();
+        net.gets.add(new SelfUpdate.Reply(200, body, -1));
+        net.downloads.add(answer(200, APK));
+        SelfUpdate.Result result = update("3.4", 13).update(REQUEST, file);
+        assertEquals(SelfUpdate.Outcome.INSTALLING, result.outcome);
+        assertEquals(1, installer.installs);
+    }
+
+    @Test
+    public void theOrdinaryBuildRefusesTheHomeKeyRelease() throws Exception {
+        String body = new JSONObject(release("3.5", APK)).put("edition", "home-key").toString();
+        net.gets.add(new SelfUpdate.Reply(200, body, -1));
+        SelfUpdate.Result result = update("3.4", 13).update(REQUEST, file);
+        assertEquals(SelfUpdate.Outcome.NO_RELEASE, result.outcome);
+        assertEquals(0, installer.installs);
     }
 }
