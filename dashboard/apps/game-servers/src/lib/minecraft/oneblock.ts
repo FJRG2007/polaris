@@ -46,12 +46,23 @@ export function islandOffset(config: string): number | null {
     return Number.isFinite(value) ? value : null;
 }
 
-/** Whether the file shows the plugin already has somewhere to put islands. A file
- *  that does not say is treated as not set: telling it is the safe side, since a
- *  plugin with no origin is a server with no game on it. */
-export function isSetUp(config: string): boolean {
+/** The world the plugin's file puts the islands in, or null when it names none. */
+export function islandWorld(config: string): string | null {
+    const line = /^world:[ 	]*["']?([^"'#\s]+)["']?[ 	]*(?:#.*)?$/m.exec(config);
+    return line?.[1] ?? null;
+}
+
+/**
+ * Whether the file shows the plugin already has somewhere to put islands on
+ * `level`. A file that does not say is treated as not set: telling it is the safe
+ * side, since a plugin with no origin is a server with no game on it. Nor is one
+ * whose islands are in another world - after a new world that is the old level's
+ * folder, which the server no longer loads, and the plugin answers `/ob` with
+ * nothing to join.
+ */
+export function isSetUp(config: string, level: string): boolean {
     const offset = islandOffset(config);
-    return offset !== null && offset !== 0;
+    return offset !== null && offset !== 0 && islandWorld(config) === level;
 }
 
 /**

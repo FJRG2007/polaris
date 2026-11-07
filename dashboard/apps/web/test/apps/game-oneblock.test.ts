@@ -100,13 +100,20 @@ describe("the OneBlock blueprint", () => {
 describe("reading the plugin's file", () => {
     it("takes an offset of zero as never set", () => {
         expect(oneblock.islandOffset(BUNDLED)).toBe(0);
-        expect(oneblock.isSetUp(BUNDLED)).toBe(false);
-        expect(oneblock.isSetUp(CONFIGURED)).toBe(true);
+        expect(oneblock.isSetUp(BUNDLED, "world")).toBe(false);
+        expect(oneblock.isSetUp(CONFIGURED, "world")).toBe(true);
     });
 
     it("takes a file that does not say as not set", () => {
         expect(oneblock.islandOffset("world: world\n")).toBeNull();
-        expect(oneblock.isSetUp("world: world\n")).toBe(false);
+        expect(oneblock.isSetUp("world: world\n", "world")).toBe(false);
+    });
+
+    it("takes islands left in another world as not set", () => {
+        // A new world is a new level folder; the file still names the old one.
+        expect(oneblock.islandWorld(CONFIGURED)).toBe("world");
+        expect(oneblock.islandWorld('world: "world-20261107"\n')).toBe("world-20261107");
+        expect(oneblock.isSetUp(CONFIGURED, "world-20261107")).toBe(false);
     });
 
     it("sends the console form of the command, on the server's own world", () => {
@@ -145,6 +152,13 @@ describe("setting it up from the walk", () => {
         file = CONFIGURED;
         await applyOneBlockSetup("owner", "app", install.config);
         expect(sent).toEqual([]);
+    });
+
+    it("sets the plugin up again on a new world", async () => {
+        file = CONFIGURED.replace("world: world", "world: world-old");
+        await applyOneBlockSetup("owner", "app", install.config);
+        expect(sent).toEqual([oneblock.setupLines("world")]);
+        expect(JSON.parse(install.config).oneblockReady).toBeUndefined();
     });
 
     it("does nothing on a server built on another blueprint", async () => {

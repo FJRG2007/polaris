@@ -34,9 +34,9 @@ export async function applyOneBlockSetup(
         const file = await readContainerFile(server, oneblock.ONEBLOCK_CONFIG_PATH);
         // Not there yet: the plugin writes it the first time it loads.
         if (file === null) return false;
-        if (oneblock.isSetUp(file)) return true;
         const level = await levelOf(server);
         if (!level) return false;
+        if (oneblock.isSetUp(file, level)) return true;
         await server.sayAll(oneblock.setupLines(level));
         // Not marked here: the next pass reads the file the command wrote, which
         // is the only evidence that the plugin took it.
