@@ -24,3 +24,12 @@ that cannot take it.
   validates it and a name resolves through it within 30 s, and puts the old one back otherwise, on Off, and
   when Home finds names no longer resolving. It needs `WRITE_SECURE_SETTINGS`, which the desktop installer
   grants only when its "block ads and trackers" box is ticked; the installer's backup keeps the DNS from before.
+- **Updates.** A Launcher settings row shows the installed version and the newest on the instance
+  (`/api/tv/update`), with Update now; Home checks once a day and only shows a notice. An "Update" on
+  `/account/tv` reaches the TV as `updateRequest` on its next `/api/tv/state` poll, which carries the TV's
+  `versionName`/`versionCode`, and runs the same flow. `SelfUpdate` downloads the APK from the instance
+  (resumed with `Range`, waiting out `Retry-After`), checks its SHA-256 and version code, never installs an
+  equal or older build, installs through `PackageInstaller`, and reports each step to `/api/tv/update/report`.
+  On Android 12+ the install asks nobody when the app updates itself; otherwise the TV shows the system
+  confirm and Polaris says "Confirm on the TV". The desktop installer stays the way to install a TV whose
+  launcher is too old for this.

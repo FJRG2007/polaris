@@ -41,6 +41,8 @@ final class PolarisLink {
     private static final int GCM_IV_BYTES = 12;
     private static final int GCM_TAG_BITS = 128;
     private static final int MAX_BODY = 64 * 1024;
+    private static final java.util.regex.Pattern UUID = java.util.regex.Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     /** Home asks at most this often, so a TV left on the launcher is not polling. */
     static final long STATE_MS = 5 * 60_000;
 
@@ -108,12 +110,18 @@ final class PolarisLink {
         final String accountName;
         final int unread;
         final int alerts;
+        /** An update asked for from Polaris, or null. */
+        final String updateRequestId;
+        final String updateRequestVersion;
 
-        State(String instanceName, String accountName, int unread, int alerts) {
+        State(String instanceName, String accountName, int unread, int alerts, String updateRequestId,
+                String updateRequestVersion) {
             this.instanceName = instanceName;
             this.accountName = accountName;
             this.unread = unread;
             this.alerts = alerts;
+            this.updateRequestId = updateRequestId;
+            this.updateRequestVersion = updateRequestVersion;
         }
     }
 
@@ -202,17 +210,26 @@ final class PolarisLink {
         }
     }
 
-    /** What the instance says now. Null when the key is no longer accepted. */
+    /**
+     * What the instance says now. Null when the key is no longer accepted. Carries this build's version, which
+     * is how Polaris knows what the TV runs and when an update it asked for has landed.
+     */
     State state() throws IOException {
-        PolarisFailover.Reply reply = failover.request("GET", "/api/tv/state", null, token);
+        String path = "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE);
+        PolarisFailover.Reply reply = failover.request("GET", path, null, token);
         if (reply.status == 401) return null;
         if (!reply.ok()) throw new IOException("Refused: " + reply.status);
         try {
             JSONObject answer = new JSONObject(reply.body);
             JSONObject instance = answer.getJSONObject("instance");
             JSONObject account = answer.getJSONObject("account");
+            // Older instances leave updateRequest out; a malformed one is ignored rather than refused.
+            JSONObject request = answer.optJSONObject("updateRequest");
+            String requestId = request == null ? null : request.optString("id", "");
+            if (requestId != null && !UUID.matcher(requestId).matches()) requestId = null;
             return new State(instance.optString("name"), account.optString("name"),
-                    Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")));
+                    Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")), requestId,
+                    requestId == null ? null : request.optString("versionName", null));
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }
@@ -233,6 +250,11 @@ final class PolarisLink {
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }
+    }
+
+    /** The update routes, over the address in use and this TV's key. */
+    SelfUpdate.Net updateNet() {
+        return new SelfUpdateRun.Http(failover.origin(), token);
     }
 
     boolean onLocalAddress() {

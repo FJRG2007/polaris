@@ -39,6 +39,25 @@
         <item quantity="one">%d notificación sin leer</item>
         <item quantity="other">%d notificaciones sin leer</item>
     </plurals>
+    <string name="update_row">Actualizaciones: %1$s</string>
+    <string name="update_row_available">Actualizaciones: %1$s, hay %2$s</string>
+    <string name="update_title">Actualizaciones</string>
+    <string name="update_installed">Instalado: Polaris TV %1$s (compilación %2$d)</string>
+    <string name="update_checking">Consultando tu Polaris...</string>
+    <string name="update_available">Lo más nuevo en tu Polaris: %1$s</string>
+    <string name="update_up_to_date">Al día. Lo más nuevo en tu Polaris: %1$s</string>
+    <string name="update_now">Actualizar ahora</string>
+    <string name="update_downloading">Descargando %1$s...</string>
+    <string name="update_installing">Instalando la actualización. Si la TV lo pide, confírmalo en ella.</string>
+    <string name="update_confirm_on_tv">Confirma la actualización de Polaris TV en la TV para terminarla.</string>
+    <string name="update_busy">Ya hay una actualización en curso.</string>
+    <string name="update_no_release">Tu Polaris aún no tiene una versión de TV que instalar.</string>
+    <string name="update_rate_limited">Tu Polaris está ocupado. Vuelve a probar en unos minutos.</string>
+    <string name="update_mismatch">La descarga no coincidía con su suma de control, así que no se instaló nada.</string>
+    <string name="update_refused">Esa versión no es más nueva que esta, así que no se instaló nada.</string>
+    <string name="update_failed">La actualización no terminó: %1$s</string>
+    <string name="update_notice">Polaris TV %1$s está lista. Instálala desde Ajustes del lanzador, Actualizaciones.</string>
+    <string name="update_not_connected">Polaris TV %1$s. Conecta esta TV a tu Polaris en Cuenta de Polaris para actualizarla desde allí.</string>
     <plurals name="polaris_alerts">
         <item quantity="one">%d alerta</item>
         <item quantity="other">%d alertas</item>

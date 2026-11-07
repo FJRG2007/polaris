@@ -41,6 +41,25 @@
         <item quantity="one">%d unread notification</item>
         <item quantity="other">%d unread notifications</item>
     </plurals>
+    <string name="update_row">Updates: %1$s</string>
+    <string name="update_row_available">Updates: %1$s, %2$s available</string>
+    <string name="update_title">Updates</string>
+    <string name="update_installed">Installed: Polaris TV %1$s (build %2$d)</string>
+    <string name="update_checking">Checking your Polaris...</string>
+    <string name="update_available">Newest on your Polaris: %1$s</string>
+    <string name="update_up_to_date">Up to date. Newest on your Polaris: %1$s</string>
+    <string name="update_now">Update now</string>
+    <string name="update_downloading">Downloading %1$s...</string>
+    <string name="update_installing">Installing the update. If the TV asks, confirm it there.</string>
+    <string name="update_confirm_on_tv">Confirm the Polaris TV update on the TV to finish it.</string>
+    <string name="update_busy">An update is already running.</string>
+    <string name="update_no_release">Your Polaris has no TV build to install yet.</string>
+    <string name="update_rate_limited">Your Polaris is busy. Try again in a few minutes.</string>
+    <string name="update_mismatch">The download did not match its checksum, so nothing was installed.</string>
+    <string name="update_refused">That build is not newer than this one, so nothing was installed.</string>
+    <string name="update_failed">The update did not finish: %1$s</string>
+    <string name="update_notice">Polaris TV %1$s is ready. Install it from Launcher settings, Updates.</string>
+    <string name="update_not_connected">Polaris TV %1$s. Connect this TV to your Polaris under Polaris account to update it from there.</string>
     <plurals name="polaris_alerts">
         <item quantity="one">%d alert</item>
         <item quantity="other">%d alerts</item>

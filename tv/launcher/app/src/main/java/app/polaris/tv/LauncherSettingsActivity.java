@@ -43,6 +43,7 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView followThemeChoice;
     private TextView openOnStartChoice;
     private TextView dnsChoice;
+    private TextView updatesChoice;
     private int columns;
     private int rowsBelowDock;
     private int dockOpacity;
@@ -66,6 +67,8 @@ public final class LauncherSettingsActivity extends Activity {
                 v -> startActivity(new Intent(this, PolarisActivity.class)));
         dnsChoice = findViewById(R.id.dnsChoice);
         dnsChoice.setOnClickListener(v -> openDns());
+        updatesChoice = findViewById(R.id.updatesChoice);
+        updatesChoice.setOnClickListener(v -> openUpdates());
         columns = config.columns;
         rowsBelowDock = config.rowsBelowDock;
         dockOpacity = config.dockOpacity;
@@ -412,6 +415,71 @@ public final class LauncherSettingsActivity extends Activity {
         String dnsHost = PrivateDnsSwitch.of(this).ours();
         dnsChoice.setText(getString(R.string.dns_row,
                 dnsHost == null ? getString(R.string.off) : getString(R.string.dns_state_on, dnsHost)));
+        String newest = SelfUpdateRun.newest(this);
+        updatesChoice.setText(newest != null && SelfUpdate.compare(newest, BuildConfig.VERSION_NAME) > 0
+                ? getString(R.string.update_row_available, BuildConfig.VERSION_NAME, newest)
+                : getString(R.string.update_row, BuildConfig.VERSION_NAME));
+    }
+
+    /** Installed and newest, with Update now once the newest is known to be newer. */
+    private void openUpdates() {
+        if (!PolarisLink.connected(this)) {
+            say(getString(R.string.update_not_connected, BuildConfig.VERSION_NAME));
+            return;
+        }
+        AlertDialog shown = new AlertDialog.Builder(this)
+                .setTitle(R.string.update_title)
+                .setMessage(updatesText(getString(R.string.update_checking)))
+                .setPositiveButton(R.string.update_now, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+        android.widget.Button now = shown.getButton(AlertDialog.BUTTON_POSITIVE);
+        now.setEnabled(false);
+        SelfUpdateRun.check(this, result -> {
+            if (isFinishing() || isDestroyed() || !shown.isShowing()) return;
+            refresh();
+            shown.setMessage(updatesText(checkMessage(result)));
+            if (result.outcome != SelfUpdate.Outcome.AVAILABLE) return;
+            now.setEnabled(true);
+            now.requestFocus();
+            now.setOnClickListener(v -> {
+                now.setEnabled(false);
+                shown.setMessage(updatesText(getString(R.string.update_downloading, result.release.versionName)));
+                if (!SelfUpdateRun.start(this, null, done -> {
+                    if (isFinishing() || isDestroyed() || !shown.isShowing()) return;
+                    shown.setMessage(updatesText(runMessage(done)));
+                })) {
+                    shown.setMessage(updatesText(getString(R.string.update_busy)));
+                }
+            });
+        });
+    }
+
+    private String updatesText(String status) {
+        return getString(R.string.update_installed, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE) + "
+
+" + status;
+    }
+
+    private String checkMessage(SelfUpdate.Result result) {
+        switch (result.outcome) {
+            case AVAILABLE: return getString(R.string.update_available, result.release.versionName);
+            case UP_TO_DATE: return getString(R.string.update_up_to_date, result.release.versionName);
+            default: return runMessage(result);
+        }
+    }
+
+    private String runMessage(SelfUpdate.Result result) {
+        switch (result.outcome) {
+            case NO_RELEASE: return getString(R.string.update_no_release);
+            case UP_TO_DATE: return getString(R.string.update_up_to_date, result.release.versionName);
+            case RATE_LIMITED: return getString(R.string.update_rate_limited);
+            case MISMATCH: return getString(R.string.update_mismatch);
+            case REFUSED: return getString(R.string.update_refused);
+            case FAILED: return getString(R.string.update_failed, result.reason);
+            case INSTALLING: return getString(R.string.update_installing);
+            default: return getString(R.string.polaris_unreachable);
+        }
     }
 
     private boolean hasOnTvChoices() {
