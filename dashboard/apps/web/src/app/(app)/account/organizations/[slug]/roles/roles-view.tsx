@@ -115,7 +115,10 @@ export function RolesView({
 }) {
     const t = useTranslations("accountOrgs");
     const [creating, setCreating] = useState(false);
-    const shown = useMemo(() => new Set(listed), [listed]);
+    const shown = useMemo(
+        () => new Set(listed.filter((permission) => permission !== "org.read")),
+        [listed]
+    );
 
     return (
         <Listed.Provider value={shown}>

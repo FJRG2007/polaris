@@ -10,8 +10,10 @@ import {
     PERMISSION_APPS,
     PERMISSION_META,
     PERMISSIONS,
+    hasPermission,
     listedOrgPermissions,
-    listedPermissions
+    listedPermissions,
+    mergeRolePermissions
 } from "../src/index.js";
 
 describe("listedPermissions", () => {
@@ -33,10 +35,12 @@ describe("listedPermissions", () => {
     });
 
     it("lists an app's permissions again once it is reinstalled, grants untouched", () => {
-        const grants = new Set(["status.manage", "drive.read"]);
+        const grants = mergeRolePermissions([["status.manage", "drive.read"]]);
         expect(listedPermissions([])).not.toContain("status.manage");
+        expect(hasPermission(grants, "status.manage")).toBe(true);
         expect(listedPermissions(["status-pages"])).toContain("status.manage");
-        expect([...grants]).toEqual(["status.manage", "drive.read"]);
+        expect(hasPermission(grants, "status.manage")).toBe(true);
+        expect(hasPermission(grants, "drive.read")).toBe(true);
     });
 
     it("splits Mail between the mailbox (core) and the mail server app", () => {
