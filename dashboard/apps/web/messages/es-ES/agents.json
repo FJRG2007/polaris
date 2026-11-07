@@ -368,6 +368,24 @@
             "draftTitle": "Cambios de una sesión de agente",
             "draftAsked": "Lo que se le pidió al agente:",
             "draftFrom": "Abierta desde la sesión de agente en Polaris: {url}"
+        },
+        "history": {
+            "loadOlder": "Cargar mensajes anteriores",
+            "loadingOlder": "Cargando mensajes anteriores",
+            "olderFailed": "No se cargaron los mensajes anteriores. Vuelve a intentarlo.",
+            "fromTerminal": "Escrito en la terminal",
+            "tool": "Ejecutó {name}",
+            "result": "Resultado",
+            "resultError": "Falló",
+            "emptyResult": "No devolvió nada.",
+            "noResult": "Aún sin resultado.",
+            "markers": {
+                "compacted": "La conversación se compactó para liberar contexto.",
+                "interrupted": "Interrumpido."
+            },
+            "errors": {
+                "invalid": "Esa petición del historial no es válida."
+            }
         }
     },
     "rules": {

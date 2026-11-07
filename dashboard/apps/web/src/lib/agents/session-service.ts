@@ -650,7 +650,7 @@ export async function sessionMessages(
     limit = 100
 ): Promise<{ role: string; body: string; authorId: string | null; at: string }[]> {
     const records = await prisma.agentSessionMessage.findMany({
-        where: { sessionId },
+        where: { sessionId, kind: "text" },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { role: true, body: true, authorId: true, createdAt: true }

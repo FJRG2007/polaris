@@ -23,6 +23,7 @@ import * as work from "@/lib/agents/session-work";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
+import * as history from "@/lib/agents/session-history";
 import { appBaseUrl } from "@/lib/domain-service";
 import { safeChangePath } from "@/lib/agents/session-changes";
 import { addComment } from "@/lib/tasks/task-detail-service";
@@ -619,4 +620,39 @@ export async function resumeSessionAction(input: unknown): Promise<{ error?: str
     }
     revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     return {};
+}
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
+
+const historyInputSchema = z.object({
+    sessionId: sessionIdSchema,
+    before: z.string().trim().uuid().optional()
+});
+
+/**
+ * A page of a session's conversation, for whoever may read the session - its
+ * owner, or somebody it was shared with.
+ *
+ * Asking for the newest page first reads whatever the agent's transcript gained
+ * since the last read (claimed per session, so many viewers are one read every
+ * few seconds). An older page only reads what is stored.
+ */
+export async function sessionHistoryAction(input: unknown): Promise<{
+    messages?: history.HistoryMessage[];
+    older?: boolean;
+    error?: string;
+}> {
+    const user = await requirePermission("agents.read");
+    const t = await getTranslations("agents");
+    const parsed = historyInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.history.errors.invalid") };
+    const { sessionId, before } = parsed.data;
+    const session =
+        (await sessions.getSession(sessionId, user.id)) ??
+        (await sessions.sharedSession(sessionId, user.id));
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!before) await history.syncSessionHistory(sessionId);
+    return history.historyPage(sessionId, { before });
 }

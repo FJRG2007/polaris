@@ -29,13 +29,13 @@ vi.mock("../../src/app/(app)/apps/agents/sessions/actions", () => ({
     promptSessionAction: vi.fn(async () => ({})),
     interruptSessionAction: vi.fn(async () => ({})),
     stopSessionAction: vi.fn(async () => ({})),
-    sessionScreenAction: (...args: unknown[]) => sessionScreenAction(...args)
+    sessionScreenAction: (...args: unknown[]) => sessionScreenAction(...args),
+    sessionHistoryAction: vi.fn(async () => ({ messages: [], older: false }))
 }));
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 
-const { SessionDetail } = await import(
-    "../../src/app/(app)/apps/agents/sessions/[sessionId]/session-detail"
-);
+const { SessionDetail } =
+    await import("../../src/app/(app)/apps/agents/sessions/[sessionId]/session-detail");
 
 function workspaceSession(overrides: Partial<SessionView> = {}): SessionView {
     return {
@@ -74,7 +74,14 @@ afterEach(() => {
 
 describe("the boot progress card", () => {
     it("reads the session's own terminal and turns it into a bar and a step list", async () => {
-        render(<SessionDetail session={workspaceSession()} events={[]} messages={[]} />, { wrapper: MessagesWrapper });
+        render(
+            <SessionDetail
+                session={workspaceSession()}
+                events={[]}
+                history={{ messages: [], older: false }}
+            />,
+            { wrapper: MessagesWrapper }
+        );
 
         await waitFor(() => expect(screen.getByText("Getting the machine ready.")).toBeTruthy());
 
@@ -94,8 +101,10 @@ describe("the boot progress card", () => {
             <SessionDetail
                 session={workspaceSession({ state: "working" })}
                 events={[]}
-                messages={[]}
-            />, { wrapper: MessagesWrapper });
+                history={{ messages: [], older: false }}
+            />,
+            { wrapper: MessagesWrapper }
+        );
 
         await waitFor(() => expect(sessionScreenAction).not.toHaveBeenCalled());
         expect(screen.queryByText("Getting the machine ready.")).toBeNull();

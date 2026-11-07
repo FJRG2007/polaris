@@ -44,6 +44,7 @@ import {
 } from "./session-hooks";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
+import { syncFinalSessionHistory } from "./session-history";
 import {
     addSessionMessage,
     finishSession,
@@ -836,6 +837,7 @@ export async function stopSession(sessionId: string): Promise<SaveOutcome | null
     await finishSession(sessionId, "stopped");
     // Whoever pressed Stop has answered whatever it was waiting on.
     await clearSessionWaiting(sessionId);
+    await syncFinalSessionHistory(sessionId);
     if (placement.place === "host") {
         await runInSession(
             sessionId,
@@ -921,6 +923,7 @@ export async function sweepSilentSessions(
         );
         await clearSessionWaiting(session.id);
         await noticeSessionEnded(session.id, "silent");
+        if (probe !== "gone") await syncFinalSessionHistory(session.id);
         // The same path as Stop: the work is pushed before the container goes,
         // and a container whose work could not be pushed stays. Nothing to do
         // for one that is already gone.

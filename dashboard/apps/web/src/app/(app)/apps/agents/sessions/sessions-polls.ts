@@ -40,3 +40,13 @@ export const sessionResumable = (sessionId: string, signal?: AbortSignal) =>
         { sessionId },
         signal
     );
+
+export const sessionHistory = (
+    input: Parameters<typeof actions.sessionHistoryAction>[0],
+    signal?: AbortSignal
+) =>
+    readPoll<Answer<typeof actions.sessionHistoryAction>>(
+        "/api/agents/sessions/history",
+        { input: JSON.stringify(input) },
+        signal
+    );

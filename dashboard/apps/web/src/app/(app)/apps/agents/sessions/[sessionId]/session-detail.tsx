@@ -15,7 +15,7 @@ import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import * as polls from "../sessions-polls";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { bootProgress, type BootStep } from "@/lib/agents/boot-progress";
@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { SessionChanges, ShipPullRequest } from "./session-changes";
+import { SessionHistory, type HistoryPage } from "./session-history";
+import { promptKey } from "@/lib/agents/transcript-decoders";
 import {
     Badge,
     Button,
@@ -72,7 +74,8 @@ const TONE: Record<core.AgentSessionState, string> = {
 interface Props {
     session: SessionView;
     events: { kind: string; detail: string; subject: string; at: string }[];
-    messages: { role: string; body: string; authorId: string | null; at: string }[];
+    /** The newest page of the conversation, as the server last read it. */
+    history: HistoryPage;
     /** Whether this account may steer the session: read its checkout and ship
      *  from it. The actions check the same thing again. */
     canControl?: boolean;
@@ -84,7 +87,7 @@ interface Props {
 export function SessionDetail({
     session,
     events,
-    messages,
+    history,
     canControl = false,
     shared = false
 }: Props) {
@@ -118,7 +121,6 @@ export function SessionDetail({
     const [attached, setAttached] = useState(false);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
-    const bottom = useRef<HTMLDivElement>(null);
 
     const over = core.isSessionOver(session.state);
     /** Whether the agent exited and can be reopened on its conversation. Asked
@@ -156,10 +158,6 @@ export function SessionDetail({
         return pollWhileVisible(() => router.refresh(), REFRESH_MS);
     }, [over, router]);
 
-    useEffect(() => {
-        bottom.current?.scrollIntoView({ block: "end" });
-    }, [messages.length, events.length]);
-
     // Only while it is starting. After that the terminal belongs to the agent
     // and reading it on a timer would be polling somebody's session for a bar
     // that has nothing left to say.
@@ -194,14 +192,12 @@ export function SessionDetail({
     // The server's copy has landed, so the local one goes. Matched on the body
     // rather than an id, because the row the server writes has one of its own
     // and the two were never the same message twice.
-    useEffect(() => {
-        if (pending.length === 0) return;
-        const said = new Set(
-            messages.filter((message) => message.role === "user").map((one) => one.body)
-        );
-        setPending((queue) => queue.filter((one) => !said.has(one.body)));
-        // Only when the server's list changes; `pending` is read, never depended on.
-    }, [messages]);
+    const dropEchoed = useCallback((said: Set<string>) => {
+        setPending((queue) => {
+            const left = queue.filter((one) => !said.has(promptKey(one.body)));
+            return left.length === queue.length ? queue : left;
+        });
+    }, []);
 
     const send = () => {
         const body = text.trim();
@@ -482,47 +478,13 @@ export function SessionDetail({
                             <CardTitle>{t("session.conversation")}</CardTitle>
                         </CardHeader>
                         <CardBody className="space-y-3">
-                            {messages.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    {t("session.nothingSaid")}
-                                </p>
-                            ) : (
-                                messages.map((message, index) => (
-                                    <div key={`${message.at}-${index}`} className="space-y-1">
-                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                            {
-                                                message.role === "user"
-                                                    ? t("session.you")
-                                                    : message.role === "agent"
-                                                      ? t("sessions.form.agent")
-                                                      : "Polaris" /* i18n-ignore the product's name */
-                                            }
-                                        </p>
-                                        <p className="whitespace-pre-wrap break-words text-sm">
-                                            {/* Only Polaris's own lines are its words to translate;
-                                                what a person or the agent said stays as said. */}
-                                            {message.role === "system"
-                                                ? agentText(t, message.body)
-                                                : message.body}
-                                        </p>
-                                    </div>
-                                ))
-                            )}
-
-                            {/* Sent, not yet echoed back. Dimmed rather than marked
-                                as failing: nothing has gone wrong, the server has
-                                simply not been re-read yet. */}
-                            {pending.map((one) => (
-                                <div key={one.key} className="space-y-1 opacity-60">
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                        {t("session.you")}
-                                    </p>
-                                    <p className="whitespace-pre-wrap break-words text-sm">
-                                        {one.body}
-                                    </p>
-                                </div>
-                            ))}
-                            <div ref={bottom} />
+                            <SessionHistory
+                                sessionId={session.id}
+                                initial={history}
+                                live={!over}
+                                pending={pending}
+                                onUserBodies={dropEchoed}
+                            />
                         </CardBody>
                     </Card>
 

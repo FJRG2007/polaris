@@ -368,6 +368,24 @@
             "draftTitle": "Changes from an agent session",
             "draftAsked": "What the agent was asked:",
             "draftFrom": "Opened from the agent session in Polaris: {url}"
+        },
+        "history": {
+            "loadOlder": "Load earlier messages",
+            "loadingOlder": "Loading earlier messages",
+            "olderFailed": "Earlier messages did not load. Try again.",
+            "fromTerminal": "Typed in the terminal",
+            "tool": "Ran {name}",
+            "result": "Result",
+            "resultError": "Failed",
+            "emptyResult": "Nothing came back.",
+            "noResult": "No result yet.",
+            "markers": {
+                "compacted": "The conversation was compacted to free up context.",
+                "interrupted": "Interrupted."
+            },
+            "errors": {
+                "invalid": "That history request is not valid."
+            }
         }
     },
     "rules": {
