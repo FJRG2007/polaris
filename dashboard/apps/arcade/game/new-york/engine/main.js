@@ -20,6 +20,7 @@ import { buildRoadPaint } from './road-paint.js';
 import { ThirdPersonControllerManager } from './controllers.js';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
+import { StartScreen } from './start-screen.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
 import { LightingSystem } from './lighting.js';
 import { NYCMapSystem } from './nyc-map.js';
@@ -216,6 +217,7 @@ async function initApp() {
     gameMenu?.refresh();
   }
   let gameMenu = null;
+  let startScreen = null;
   soundButton?.addEventListener('click', () => audioSystem.setEnabled(!audioSystem.enabled));
   updateSoundButton();
   // pagehide also covers navigation away on mobile; preserve the context across back-forward cache restores.
@@ -331,6 +333,7 @@ async function initApp() {
     onPadChange: ({ connected, name }) => {
       showPadNotice(t(connected ? 'controls.padConnected' : 'controls.padDisconnected', { name: name || t('controls.gamepad') }));
       gameMenu?.refresh();
+      startScreen?.refresh();
     }
   });
   // A gamepad plugged in, paired or lost says so for a few seconds. It is a manual popover, shown afresh each time, so it
@@ -690,19 +693,30 @@ async function initApp() {
     mode: () => controllerManager.activeMode,
     controls: controlSections,
     quality: () => (qualitySetting === 'auto' ? `${t('quality.auto')} · ${t(`quality.${quality}`)}` : t(`quality.${qualitySetting}`)),
-    blocked: () => !playing || mapSystem.isFullMapOpen || (supportsPopover && document.querySelector('.popover:popover-open') !== null),
-    onOpenChange: (open) => {
-      paused = open;
-      if (open) closePopovers();
-      controllerManager.resetInput();
-      touchControls.setEnabled(!open);
-      gamepadControls.reset();
-      audioSystem.setPaused(open);
-      // A frame that ran before the pause must not count the menu's time as one long step
-      lastTime = performance.now();
-    }
+    blocked: () => !playing || startScreen?.isOpen || mapSystem.isFullMapOpen || (supportsPopover && document.querySelector('.popover:popover-open') !== null),
+    onOpenChange: setPaused
   });
   gamepadControls.callbacks.menu = gameMenu;
+  // The menu and the start screen both hold the city still while they are open
+  function setPaused(open) {
+    paused = open;
+    if (open) closePopovers();
+    controllerManager.resetInput();
+    touchControls.setEnabled(!open);
+    gamepadControls.reset();
+    audioSystem.setPaused(open);
+    // A frame that ran before the pause must not count the menu's time as one long step
+    lastTime = performance.now();
+  }
+  // Before anything moves, the reader picks how they play (start-screen.js); it opens once the city is on screen
+  startScreen = new StartScreen({
+    gamepad: () => gamepadControls,
+    onOpenChange: setPaused,
+    onChoose: (choice) => {
+      document.body.dataset.input = choice;
+    }
+  });
+  gamepadControls.callbacks.startScreen = startScreen;
 
   // Text drawn by code follows the reader's language too (the page's own text is translated by i18n.js)
   function renderTexts() {
@@ -909,6 +923,7 @@ async function initApp() {
         initTimings = null;
         hideLoadingScreen();
         playing = true;
+        startScreen.open();
         pipelineGate.setBudget(PLAYING_BUILD_BUDGET);
         sunShadow.autoUpdate = true;
         audioSystem.ready = true;

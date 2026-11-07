@@ -219,5 +219,18 @@
         "volume": "Volume",
         "soundOn": "Play sound",
         "noAudio": "{surface, select, app {Sound is not available in this app.} other {Sound is not available in this browser.}}"
+    },
+    "start": {
+        "title": "How do you want to play?",
+        "controllerTitle": "Use a controller",
+        "device": "Play on this device",
+        "deviceHint": "Keyboard and mouse, or touch",
+        "controller": "Use a controller",
+        "controllerHint": "A Bluetooth or USB gamepad",
+        "gamepad": "Gamepad",
+        "padWaiting": "Turn it on and press any button",
+        "padReady": "Ready",
+        "phone": "Phone",
+        "phoneSoon": "Coming in the next update"
     }
 }

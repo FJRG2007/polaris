@@ -252,7 +252,8 @@ class GamepadControls {
       return;
     }
 
-    const menu = this.callbacks.menu;
+    // The start screen, before play, is driven exactly like the menu
+    const menu = this.callbacks.startScreen?.isOpen ? this.callbacks.startScreen : this.callbacks.menu;
     if (menu?.isOpen) {
       this.controller.clearGamepadInput();
       const y = stick(pad, 0).y;

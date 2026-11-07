@@ -219,5 +219,18 @@
         "volume": "Volumen",
         "soundOn": "Con sonido",
         "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}"
+    },
+    "start": {
+        "title": "¿Cómo quieres jugar?",
+        "controllerTitle": "Usar un mando",
+        "device": "Jugar en este dispositivo",
+        "deviceHint": "Teclado y ratón, o táctil",
+        "controller": "Usar un mando",
+        "controllerHint": "Un mando Bluetooth o USB",
+        "gamepad": "Mando",
+        "padWaiting": "Enciéndelo y pulsa cualquier botón",
+        "padReady": "Listo",
+        "phone": "Teléfono",
+        "phoneSoon": "Llega en la próxima actualización"
     }
 }
