@@ -156,7 +156,8 @@ export function nextMinorStage(stage: MinorStage): StageOrAdult {
 
 /** Whether `a` is a later stage than `b` (adult is later than every stage). */
 export function isLaterStage(a: StageOrAdult, b: StageOrAdult): boolean {
-    const rank = (stage: StageOrAdult) => (stage === ADULT ? MINOR_STAGES.length : MINOR_STAGES.indexOf(stage));
+    const rank = (stage: StageOrAdult) =>
+        stage === ADULT ? MINOR_STAGES.length : MINOR_STAGES.indexOf(stage);
     return rank(a) > rank(b);
 }
 
@@ -201,7 +202,8 @@ export function delayRefusal(input: {
     const days = calendarDaysBetween(input.dueOn, input.until);
     if (days <= 0) return "notLater";
     if (days > STAGE_DELAY_MAX_DAYS) return "tooLong";
-    if (calendarDaysBetween(input.until, dayOfAge(input.birthMonth, MAJORITY_AGE)) <= 0) return "pastMajority";
+    if (calendarDaysBetween(input.until, dayOfAge(input.birthMonth, MAJORITY_AGE)) <= 0)
+        return "pastMajority";
     return null;
 }
 
@@ -325,7 +327,10 @@ export const STAGE_PRESETS: Readonly<Record<PresetCapability, StageLevels>> = {
 
 /** What is only a guardian's to give below the consent age, whatever the stage
  *  says: profiling and handing their content to a third party. */
-export const CONSENT_GATED: readonly PresetCapability[] = ["feature:polarMemories", "feature:thirdParty"];
+export const CONSENT_GATED: readonly PresetCapability[] = [
+    "feature:polarMemories",
+    "feature:thirdParty"
+];
 
 const FLOOR_SET: ReadonlySet<MinorCapability> = new Set(MINOR_FLOOR);
 
@@ -361,7 +366,10 @@ export interface MinorCeiling {
     readonly allowed: ReadonlySet<MinorCapability>;
     /** Allowed, with guardian-approved people only. A subset of `allowed`. */
     readonly contactsOnly: ReadonlySet<MinorCapability>;
-    readonly ignored: readonly { readonly override: MinorOverride; readonly reason: IgnoredReason }[];
+    readonly ignored: readonly {
+        readonly override: MinorOverride;
+        readonly reason: IgnoredReason;
+    }[];
 }
 
 /**
@@ -389,7 +397,10 @@ export function minorCeiling(input: {
         const effect = effects.get(key);
         if (level === "floor" || level === "off") {
             if (effect === "allow") {
-                ignored.push({ override: { key, effect }, reason: level === "floor" ? "floor" : "stageLocked" });
+                ignored.push({
+                    override: { key, effect },
+                    reason: level === "floor" ? "floor" : "stageLocked"
+                });
             }
             continue;
         }
@@ -421,7 +432,13 @@ export function deniedPermissions(ceiling: MinorCeiling): Permission[] {
 }
 
 /** What a guardian may see about a minor's account. Never message contents. */
-export const GUARDIAN_VIEWS = ["signIns", "appUsage", "contacts", "requests", "restrictions"] as const;
+export const GUARDIAN_VIEWS = [
+    "signIns",
+    "appUsage",
+    "contacts",
+    "requests",
+    "restrictions"
+] as const;
 
 export type GuardianView = (typeof GUARDIAN_VIEWS)[number];
 
@@ -433,7 +450,11 @@ const CLOSE_VIEW: Readonly<Record<GuardianView, boolean>> = {
     restrictions: true
 };
 
-const TEEN_VIEW: Readonly<Record<GuardianView, boolean>> = { ...CLOSE_VIEW, appUsage: false, contacts: false };
+const TEEN_VIEW: Readonly<Record<GuardianView, boolean>> = {
+    ...CLOSE_VIEW,
+    appUsage: false,
+    contacts: false
+};
 
 /** What guardians see: everything up to preteen, less from teen or from the
  *  consent age, whichever comes first (D6). Supervision itself lasts to 18. */

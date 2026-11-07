@@ -20,11 +20,18 @@ describe("the floor", () => {
             minors.MINOR_FLOOR.map((key) => ({ key, effect: "allow" as const }))
         );
         for (const key of minors.MINOR_FLOOR) expect(result.allowed.has(key)).toBe(false);
-        expect(result.ignored.map((entry) => entry.reason)).toEqual(minors.MINOR_FLOOR.map(() => "floor"));
+        expect(result.ignored.map((entry) => entry.reason)).toEqual(
+            minors.MINOR_FLOOR.map(() => "floor")
+        );
     });
 
     it("keeps administration and family.manage away from every minor", () => {
-        for (const key of ["users.manage", "settings.manage", "system.manage", "family.manage"] as const) {
+        for (const key of [
+            "users.manage",
+            "settings.manage",
+            "system.manage",
+            "family.manage"
+        ] as const) {
             expect(minors.isFloorCapability(key)).toBe(true);
         }
     });
@@ -102,7 +109,8 @@ describe("stage presets", () => {
             const result = ceiling(stage);
             for (const key of result.allowed) {
                 if (!(PERMISSIONS as readonly string[]).includes(key)) continue;
-                for (const implied of impliedBy(key as Permission)) expect(result.allowed.has(implied)).toBe(true);
+                for (const implied of impliedBy(key as Permission))
+                    expect(result.allowed.has(implied)).toBe(true);
             }
         }
     });
@@ -110,17 +118,23 @@ describe("stage presets", () => {
 
 describe("guardian overrides", () => {
     it("open a guardian-decided key", () => {
-        expect(ceiling("teen", [{ key: "app:polar", effect: "allow" }]).allowed.has("app:polar")).toBe(true);
+        expect(
+            ceiling("teen", [{ key: "app:polar", effect: "allow" }]).allowed.has("app:polar")
+        ).toBe(true);
     });
 
     it("close a key the stage gives", () => {
-        expect(ceiling("teen", [{ key: "mail.use", effect: "deny" }]).allowed.has("mail.use")).toBe(false);
+        expect(ceiling("teen", [{ key: "mail.use", effect: "deny" }]).allowed.has("mail.use")).toBe(
+            false
+        );
     });
 
     it("cannot open a key the stage does not offer yet", () => {
         const result = ceiling("child", [{ key: "vault.use", effect: "allow" }]);
         expect(result.allowed.has("vault.use")).toBe(false);
-        expect(result.ignored).toEqual([{ override: { key: "vault.use", effect: "allow" }, reason: "stageLocked" }]);
+        expect(result.ignored).toEqual([
+            { override: { key: "vault.use", effect: "allow" }, reason: "stageLocked" }
+        ]);
     });
 
     it("keep a deny however the list is ordered", () => {
@@ -143,7 +157,9 @@ describe("guardian overrides", () => {
         ]);
         expect(result.allowed.has("games.manage")).toBe(false);
         expect(result.allowed.has("games.moderate")).toBe(true);
-        expect(result.ignored).toEqual([{ override: { key: "games.manage", effect: "allow" }, reason: "needs" }]);
+        expect(result.ignored).toEqual([
+            { override: { key: "games.manage", effect: "allow" }, reason: "needs" }
+        ]);
     });
 
     it("cascade when a denied read takes the writes with it", () => {
@@ -164,7 +180,11 @@ describe("the consent age", () => {
         expect(below.allowed.has("feature:polarMemories")).toBe(false);
         expect(below.allowed.has("feature:thirdParty")).toBe(false);
         expect(below.allowed.has("app:polar")).toBe(true);
-        const allowed = ceiling("olderTeen", [{ key: "feature:thirdParty", effect: "allow" }], true);
+        const allowed = ceiling(
+            "olderTeen",
+            [{ key: "feature:thirdParty", effect: "allow" }],
+            true
+        );
         expect(allowed.allowed.has("feature:thirdParty")).toBe(true);
     });
 
@@ -179,12 +199,17 @@ describe("the consent age", () => {
 describe("what guardians see (D6)", () => {
     it("is everything up to preteen", () => {
         for (const stage of ["baby", "child", "preteen"] as const) {
-            expect(Object.values(minors.guardianVisibility(stage, false)).every(Boolean)).toBe(true);
+            expect(Object.values(minors.guardianVisibility(stage, false)).every(Boolean)).toBe(
+                true
+            );
         }
     });
 
     it("drops usage and contacts from teen, or from the consent age", () => {
-        for (const view of [minors.guardianVisibility("teen", false), minors.guardianVisibility("preteen", true)]) {
+        for (const view of [
+            minors.guardianVisibility("teen", false),
+            minors.guardianVisibility("preteen", true)
+        ]) {
             expect(view.appUsage).toBe(false);
             expect(view.contacts).toBe(false);
             expect(view.signIns).toBe(true);
@@ -200,7 +225,9 @@ describe("deny statements", () => {
         expect(denied).toContain("vault.use");
         expect(denied).toContain("family.manage");
         expect(denied).not.toContain("drive.read");
-        expect(denied.every((permission) => (PERMISSIONS as readonly string[]).includes(permission))).toBe(true);
+        expect(
+            denied.every((permission) => (PERMISSIONS as readonly string[]).includes(permission))
+        ).toBe(true);
     });
 });
 

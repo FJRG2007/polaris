@@ -51,14 +51,24 @@ describe("the day, in the instance's time zone", () => {
     it("is the local calendar date, not the server's UTC one", () => {
         const instant = new Date("2027-05-31T23:30:00Z");
         expect(minors.calendarDateIn(instant)).toEqual({ year: 2027, month: 5, day: 31 });
-        expect(minors.calendarDateIn(instant, "Europe/Madrid")).toEqual({ year: 2027, month: 6, day: 1 });
-        expect(minors.calendarDateIn(instant, "America/Los_Angeles")).toEqual({ year: 2027, month: 5, day: 31 });
+        expect(minors.calendarDateIn(instant, "Europe/Madrid")).toEqual({
+            year: 2027,
+            month: 6,
+            day: 1
+        });
+        expect(minors.calendarDateIn(instant, "America/Los_Angeles")).toEqual({
+            year: 2027,
+            month: 5,
+            day: 31
+        });
     });
 
     it("moves a stage on the local 1st", () => {
         const instant = new Date("2027-05-31T23:30:00Z");
         expect(minors.stageFor("2014-06", minors.calendarDateIn(instant))).toBe("preteen");
-        expect(minors.stageFor("2014-06", minors.calendarDateIn(instant, "Europe/Madrid"))).toBe("teen");
+        expect(minors.stageFor("2014-06", minors.calendarDateIn(instant, "Europe/Madrid"))).toBe(
+            "teen"
+        );
     });
 });
 
@@ -82,7 +92,13 @@ describe("stages", () => {
     });
 
     it("follows D1 exactly", () => {
-        expect(minors.STAGE_START_AGE).toEqual({ baby: 0, child: 4, preteen: 9, teen: 13, olderTeen: 16 });
+        expect(minors.STAGE_START_AGE).toEqual({
+            baby: 0,
+            child: 4,
+            preteen: 9,
+            teen: 13,
+            olderTeen: 16
+        });
         expect(minors.MAJORITY_AGE).toBe(18);
         expect(minors.DEFAULT_DIGITAL_CONSENT_AGE).toBe(14);
     });
@@ -124,9 +140,9 @@ describe("holding a move back (D5)", () => {
     it("allows up to 90 days, once per stage", () => {
         expect(minors.delayRefusal({ ...base, until: day("2027-08-30") })).toBeNull();
         expect(minors.delayRefusal({ ...base, until: day("2027-08-31") })).toBe("tooLong");
-        expect(minors.delayRefusal({ ...base, until: day("2027-07-01"), alreadyDelayed: true })).toBe(
-            "alreadyDelayed"
-        );
+        expect(
+            minors.delayRefusal({ ...base, until: day("2027-07-01"), alreadyDelayed: true })
+        ).toBe("alreadyDelayed");
     });
 
     it("refuses a day that is not later than the move", () => {
@@ -136,7 +152,12 @@ describe("holding a move back (D5)", () => {
 
     it("never delays majority", () => {
         expect(
-            minors.delayRefusal({ ...base, to: "adult", dueOn: day("2032-06-01"), until: day("2032-07-01") })
+            minors.delayRefusal({
+                ...base,
+                to: "adult",
+                dueOn: day("2032-06-01"),
+                until: day("2032-07-01")
+            })
         ).toBe("majority");
     });
 

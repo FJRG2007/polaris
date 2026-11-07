@@ -27,7 +27,8 @@ export const birthMonthField = z
     .trim()
     .superRefine((value, ctx) => {
         const issue = minors.birthMonthIssue(value, minors.calendarDateIn(new Date()));
-        if (issue) ctx.addIssue({ code: z.ZodIssueCode.custom, message: BIRTH_MONTH_MESSAGES[issue] });
+        if (issue)
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: BIRTH_MONTH_MESSAGES[issue] });
     });
 
 /** A minor's birth month: one that is somebody's, and under the majority age. */
@@ -35,7 +36,10 @@ export const minorBirthMonthField = birthMonthField.superRefine((value, ctx) => 
     const today = minors.calendarDateIn(new Date());
     if (minors.birthMonthIssue(value, today)) return;
     if (minors.ageOn(value, today) >= minors.MAJORITY_AGE) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Already ${minors.MAJORITY_AGE} or older` });
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Already ${minors.MAJORITY_AGE} or older`
+        });
     }
 });
 
@@ -68,7 +72,11 @@ export const createMinorSchema = z
     })
     .superRefine((value, ctx) => {
         if (passwordMatchesIdentity(value.password, [value.name, value.username, value.email])) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["password"], message: IDENTITY_PASSWORD_MESSAGE });
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["password"],
+                message: IDENTITY_PASSWORD_MESSAGE
+            });
         }
     });
 
@@ -92,7 +100,11 @@ export const setMinorOverridesSchema = z.object({
             const seen = new Set<string>();
             overrides.forEach((override, index) => {
                 if (seen.has(override.key)) {
-                    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, "key"], message: "Listed twice" });
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: [index, "key"],
+                        message: "Listed twice"
+                    });
                 }
                 seen.add(override.key);
             });
