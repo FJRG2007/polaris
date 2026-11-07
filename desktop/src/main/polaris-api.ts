@@ -17,6 +17,7 @@ import { app, net } from "electron";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { describeNetError, netErrorCode } from "./reachability";
+import { markCertificateFailure } from "./window-failover";
 import { RELEARN_MS, readStoredInstance, writeStoredInstance } from "./instance-store";
 
 /** A refusal or failure, with a sentence for the push window. */
@@ -44,7 +45,17 @@ function instancesFile(): string {
     return join(app.getPath("userData"), "instances.json");
 }
 
-const netFetch = (url: string, init?: RequestInit): Promise<Response> => net.fetch(url, init);
+/**
+ * `net.fetch`, with a refused certificate marked for the failover
+ * (`markCertificateFailure`).
+ */
+async function netFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+        return await net.fetch(url, init);
+    } catch (caught) {
+        throw markCertificateFailure(caught);
+    }
+}
 
 /** Learn the server's identity and local addresses over its own address. Best-effort; an older Polaris has none. */
 export async function learnServer(server: string): Promise<InstanceRecord | null> {
@@ -72,8 +83,12 @@ export async function knownInstance(server: string): Promise<InstanceRecord | nu
 
 const asked = new Set<string>();
 
-/** The failover for a server, read back from disk the first time it is asked for. */
-function failoverFor(server: string): Failover | undefined {
+/**
+ * The failover for a server, read back from disk the first time it is asked for.
+ * Undefined while nothing has been learned about it yet - asking also starts
+ * learning it, so a server opened while online can fail over the next time.
+ */
+export function failoverFor(server: string): Failover | undefined {
     const held = failovers.get(server);
     if (held) return held;
     const stored = readStoredInstance(instancesFile(), server);
