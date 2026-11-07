@@ -1574,9 +1574,13 @@ model TvUpdateRequest {
 model TvPreference {
     apiKeyId  String    @id @db.Uuid
     userId    String    @db.Uuid
-    // { blocking, theme?, addons? }, read back through lib/tv/preferences.
+    // { blocking }, read back through lib/tv/preferences.
     // Null until the owner chooses something, so the TV keeps its own setting.
     desired   Json?
+    // A fresh id on every choice: the TV acts once per id and names it in its
+    // report, so a report about an earlier choice is never taken for this one.
+    choice    String?   @db.Uuid
+    askedAt   DateTime?
     // What the TV last reported for Block ads and trackers: on | off | failed |
     // unavailable | no-permission | no-filter | left-as-set.
     applied   String?

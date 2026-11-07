@@ -91,10 +91,12 @@ export interface TvRow {
         readonly reason: string | null;
         readonly at: string;
     } | null;
-    /** Block ads and trackers: what the owner asked (null: never asked), and what the TV last said. */
+    /** Block ads and trackers: what the owner asked (null: never asked), when, and
+     *  what the TV said about it (null: nothing yet). */
     readonly blocking: {
         readonly desired: boolean | null;
         readonly applied: TvBlockingReport | null;
+        readonly askedAt: string | null;
     };
     /** The address the TV last called from, as this instance saw it. */
     readonly address: string | null;
@@ -117,7 +119,7 @@ export async function listTvs(userId: string, now = new Date()): Promise<TvRow[]
             tvUpdate: {
                 select: { versionName: true, state: true, reason: true, updatedAt: true }
             },
-            tvPreference: { select: { desired: true, applied: true } }
+            tvPreference: { select: { desired: true, applied: true, askedAt: true } }
         },
         orderBy: { createdAt: "asc" },
         take: MAX_TVS
@@ -140,7 +142,8 @@ export async function listTvs(userId: string, now = new Date()): Promise<TvRow[]
             : null,
         blocking: {
             desired: readDesired(key.tvPreference?.desired)?.blocking ?? null,
-            applied: readReport(key.tvPreference?.applied)
+            applied: readReport(key.tvPreference?.applied),
+            askedAt: key.tvPreference?.askedAt?.toISOString() ?? null
         },
         address: key.lastUsedIp ?? null
     }));

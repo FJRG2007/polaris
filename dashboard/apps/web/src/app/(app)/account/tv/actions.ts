@@ -12,13 +12,16 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { seenDevices } from "@/lib/dns-blocker/insights";
-import { DnsBlockerRefusal } from "@/lib/dns-blocker/service";
+import { DnsBlockerRefusal, type DnsRefusalCode } from "@/lib/dns-blocker/service";
 import { reachOf, type TvFilterReach } from "@/lib/tv/filter-reach";
 import { listTvs, requestTvUpdates, type TvRow } from "@/lib/tv/update-requests";
 import { tvNameSchema } from "@/lib/tv/tv-name";
 import { renameTv, setTvBlocking } from "@/lib/tv/preferences";
 
 const LIMIT = 30;
+
+/** The refusals that mean no filter runs here; any other is one that runs and cannot be read now. */
+const FILTER_OFF: readonly DnsRefusalCode[] = ["notInstalled", "notRunning"];
 const WINDOW_MS = 60_000;
 
 const targetSchema = z.union([
@@ -93,11 +96,11 @@ export async function setTvBlockingAction(
         : !throttle.ok
           ? "tv.prefs.errors.tooMany"
           : null;
-    const changed =
+    const outcome =
         !refusal && parsed.success
             ? await setTvBlocking(user.id, parsed.data.keyId, parsed.data.blocking)
-            : false;
-    if (changed && parsed.success) {
+            : "notATv";
+    if (outcome === "done" && parsed.success) {
         await recordAudit({
             actorId: user.id,
             action: "account.tv.blocking.changed",
@@ -107,8 +110,9 @@ export async function setTvBlockingAction(
         });
     }
     const [tvs, latest] = await Promise.all([listTvs(user.id), latestVersion()]);
-    if (refusal || !changed)
-        return { tvs, latest, error: t(refusal ?? "tv.updates.errors.notATv") };
+    if (refusal) return { tvs, latest, error: t(refusal) };
+    if (outcome === "tooOld") return { tvs, latest, error: t("tv.prefs.status.updateFirst") };
+    if (outcome !== "done") return { tvs, latest, error: t("tv.updates.errors.notATv") };
     return { tvs, latest };
 }
 
@@ -153,8 +157,10 @@ export async function tvFilterReachAction(): Promise<Record<string, TvFilterReac
     try {
         seen = await seenDevices("24h");
     } catch (caught) {
-        if (!(caught instanceof DnsBlockerRefusal)) {
-            console.error("[account/tv] reading the network filter's devices failed", caught);
+        const off = caught instanceof DnsBlockerRefusal && FILTER_OFF.includes(caught.code);
+        if (!off) {
+            if (!(caught instanceof DnsBlockerRefusal))
+                console.error("[account/tv] reading the network filter's devices failed", caught);
             return Object.fromEntries(tvs.map((tv) => [tv.id, "unknown" as const]));
         }
     }

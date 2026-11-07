@@ -13,7 +13,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const ID = "0190a000-0000-7000-8000-00000000000a";
 
-function tv(blocking: TvRow["blocking"]): TvRow {
+const ASKED = "2026-11-07T10:00:00.000Z";
+
+function tv(blocking: Omit<TvRow["blocking"], "askedAt"> & { askedAt?: string | null }): TvRow {
     return {
         id: ID,
         name: "Sample TV",
@@ -21,7 +23,10 @@ function tv(blocking: TvRow["blocking"]): TvRow {
         versionCode: 14,
         lastSeenAt: null,
         update: null,
-        blocking,
+        blocking: {
+            ...blocking,
+            askedAt: blocking.askedAt ?? (blocking.desired === null ? null : ASKED)
+        },
         address: "192.168.1.20"
     };
 }
@@ -36,8 +41,13 @@ const setTvBlockingAction = vi.fn(
 );
 let reach: Record<string, string> = { [ID]: "reaching" };
 
+const tvUpdatesAction = vi.fn(async () => ({
+    tvs: [tv({ desired: true, applied: null })],
+    latest: "3.5"
+}));
+
 vi.mock("@/app/(app)/account/tv/actions", () => ({
-    tvUpdatesAction: async () => ({ tvs: [], latest: "3.5" }),
+    tvUpdatesAction,
     requestTvUpdateAction: async () => ({ tvs: [], latest: "3.5" }),
     renameTvAction: async () => ({ tvs: [], latest: "3.5" }),
     setTvBlockingAction,
@@ -68,9 +78,35 @@ describe("the Block ads and trackers switch", () => {
         fireEvent.click(toggle);
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         expect(setTvBlockingAction).toHaveBeenCalledWith({ keyId: ID, blocking: true });
-        answer({ tvs: [tv({ desired: true, applied: "off" })], latest: "3.5" });
+        expect(screen.getByText("Waiting for the TV to apply it")).toBeTruthy();
+        answer({ tvs: [tv({ desired: true, applied: null })], latest: "3.5" });
         await screen.findByText("Waiting for the TV to apply it");
         expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("asks again when the same value is asked after a failure, instead of showing it", async () => {
+        const toggle = show(tv({ desired: true, applied: "no-permission" }));
+        expect(
+            screen.getByText("Install the TV again from Polaris Desktop to allow it")
+        ).toBeTruthy();
+        fireEvent.click(toggle);
+        answer({ tvs: [tv({ desired: false, applied: null })], latest: "3.5" });
+        fireEvent.click(await screen.findByRole("switch", { checked: false }));
+        expect(setTvBlockingAction).toHaveBeenLastCalledWith({ keyId: ID, blocking: true });
+        expect(screen.getByText("Waiting for the TV to apply it")).toBeTruthy();
+    });
+
+    it("stops asking the server once a TV has been waited on for a while", async () => {
+        vi.useFakeTimers();
+        try {
+            show(tv({ desired: true, applied: null }));
+            await vi.advanceTimersByTimeAsync(2 * 60_000);
+            tvUpdatesAction.mockClear();
+            await vi.advanceTimersByTimeAsync(30_000);
+            expect(tvUpdatesAction).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("goes back where it was when the change is refused, and says why", async () => {

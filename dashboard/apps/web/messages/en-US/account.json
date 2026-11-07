@@ -1733,6 +1733,7 @@
             "save": "Save",
             "cancel": "Cancel",
             "status": {
+                "updateFirst": "Update the TV to change it from here",
                 "notAsked": "Set on the TV itself",
                 "waiting": "Waiting for the TV to apply it",
                 "on": "On for this TV",

@@ -14,7 +14,7 @@ const counted: unknown[] = [];
 const noted: { keyId: string; version: unknown }[] = [];
 let pendingUpdate: { id: string; versionName: string } | null = null;
 let desired: unknown = null;
-const reported: { keyId: string; userId: string; report: string }[] = [];
+const reported: { keyId: string; userId: string; report: string; choice: string | null }[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -51,8 +51,11 @@ vi.mock("@/lib/tv/update-requests", async (original) => ({
 vi.mock("@/lib/tv/preferences", async (original) => ({
     ...(await original<typeof import("@/lib/tv/preferences")>()),
     desiredFor: async () => desired,
-    noteTvBlocking: async (keyId: string, userId: string, report: string) =>
-        void reported.push({ keyId, userId, report })
+    noteTvBlocking: async (
+        keyId: string,
+        userId: string,
+        reportedNow: { report: string; choice: string | null }
+    ) => void reported.push({ keyId, userId, ...reportedNow })
 }));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 vi.mock("@/lib/cli/sign-in", () => ({
@@ -112,14 +115,19 @@ describe("the state a TV reads", () => {
     });
 
     it("hands over what the owner asked of the TV", async () => {
-        desired = { blocking: true };
+        desired = { blocking: true, choice: "0190a000-0000-7000-8000-0000000000aa" };
         const body = (await (await GET(asked())).json()) as { desired: unknown };
-        expect(body.desired).toEqual({ blocking: true });
+        expect(body.desired).toEqual(desired);
     });
 
     it("keeps what the TV says it did with Block ads and trackers", async () => {
         await GET(asked("GET", "?versionName=3.5&blocking=no-filter"));
-        expect(reported).toEqual([{ keyId: "key-1", userId: "user-1", report: "no-filter" }]);
+        const choice = "0190a000-0000-7000-8000-0000000000aa";
+        await GET(asked("GET", `?versionName=3.5&blocking=on&blockingChoice=${choice}`));
+        expect(reported).toEqual([
+            { keyId: "key-1", userId: "user-1", report: "no-filter", choice: null },
+            { keyId: "key-1", userId: "user-1", report: "on", choice }
+        ]);
     });
 
     it("ignores a malformed blocking report without refusing the poll", async () => {

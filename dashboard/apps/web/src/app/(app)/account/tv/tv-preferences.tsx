@@ -15,24 +15,35 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Input, Skeleton, Switch } from "@polaris/ui";
 import type { TvBlockingReport } from "@/lib/tv/preferences";
 import { TV_NAME_MAX, tvNameSchema } from "@/lib/tv/tv-name";
+import { tvTakesBlocking } from "@/lib/tv/version-order";
 
 /** Where Block ads and trackers stands on one TV, for the line under its switch. */
 export type TvBlockingStatus =
-    "notAsked" | "waiting" | "on" | "off" | Exclude<TvBlockingReport, "on" | "off">;
+    | "updateFirst"
+    | "notAsked"
+    | "waiting"
+    | "on"
+    | "off"
+    | Exclude<TvBlockingReport, "on" | "off">;
 
 /** What the switch shows: what was asked, or failing that what the TV said. */
 export function blockingSwitchOn(row: TvRow): boolean {
     return row.blocking.desired ?? row.blocking.applied === "on";
 }
 
+/**
+ * `applied` is always the TV's answer to the latest choice (a new choice clears
+ * it), so anything there is how that choice went.
+ */
 export function blockingStatus(row: TvRow): TvBlockingStatus {
     const { desired, applied } = row.blocking;
+    if (!tvTakesBlocking(row.versionCode)) return "updateFirst";
     if (desired === null) return applied === "on" ? "on" : applied ? "off" : "notAsked";
-    if (desired && applied === "on") return "on";
-    if (!desired && (applied === "off" || applied === "left-as-set")) return "off";
-    // Asked for on, and the TV said why it could not.
-    if (desired && applied && applied !== "off") return applied;
-    return "waiting";
+    if (applied === null) return "waiting";
+    if (applied === "on") return "on";
+    if (applied === "off" || (!desired && applied === "left-as-set")) return "off";
+    // The TV said why it could not.
+    return applied;
 }
 
 /** Whether the TV still has to act on what was asked; the list refreshes until it has. */
@@ -41,6 +52,7 @@ export function blockingWaiting(row: TvRow): boolean {
 }
 
 const STATUS_WORDS = {
+    updateFirst: "tv.prefs.status.updateFirst",
     notAsked: "tv.prefs.status.notAsked",
     waiting: "tv.prefs.status.waiting",
     on: "tv.prefs.status.on",
@@ -78,7 +90,7 @@ export function TvPreferences({
 }) {
     const t = useTranslations("account");
     const status = blockingStatus(row);
-    const problem = !["notAsked", "waiting", "on", "off"].includes(status);
+    const problem = !["updateFirst", "notAsked", "waiting", "on", "off"].includes(status);
     const statusId = `tv-blocking-${row.id}`;
     return (
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -98,6 +110,7 @@ export function TvPreferences({
                 </div>
                 <Switch
                     checked={blockingSwitchOn(row)}
+                    disabled={status === "updateFirst"}
                     onChange={onBlocking}
                     aria-label={t("tv.prefs.blocking")}
                     aria-describedby={statusId}

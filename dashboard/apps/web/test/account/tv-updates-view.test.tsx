@@ -31,7 +31,7 @@ function tv(overrides: Partial<TvRow> = {}): TvRow {
         versionCode: 13,
         lastSeenAt: null,
         update: null,
-        blocking: { desired: null, applied: null },
+        blocking: { desired: null, applied: null, askedAt: null },
         address: "192.168.1.20",
         ...overrides
     };
@@ -117,7 +117,15 @@ describe("the rows", () => {
 
 describe("Block ads and trackers", () => {
     const at = (desired: boolean | null, applied: TvRow["blocking"]["applied"]) =>
-        tv({ blocking: { desired, applied } });
+        tv({
+            versionName: "3.5",
+            versionCode: 14,
+            blocking: {
+                desired,
+                applied,
+                askedAt: desired === null ? null : "2026-11-07T10:00:00.000Z"
+            }
+        });
 
     it("shows what the TV says when nobody asked from here", () => {
         expect(blockingStatus(at(null, null))).toBe("notAsked");
@@ -126,28 +134,40 @@ describe("Block ads and trackers", () => {
         expect(blockingSwitchOn(at(null, "off"))).toBe(false);
     });
 
-    it("waits on the TV until it reports what was asked", () => {
+    it("waits on the TV until it answers what was asked", () => {
         expect(blockingStatus(at(true, null))).toBe("waiting");
-        expect(blockingStatus(at(true, "off"))).toBe("waiting");
-        expect(blockingStatus(at(false, "on"))).toBe("waiting");
-        expect(blockingWaiting(at(true, "off"))).toBe(true);
+        expect(blockingStatus(at(false, null))).toBe("waiting");
+        expect(blockingWaiting(at(true, null))).toBe(true);
         // The switch shows what was asked, not what the TV last said.
-        expect(blockingSwitchOn(at(true, "off"))).toBe(true);
-        expect(blockingSwitchOn(at(false, "on"))).toBe(false);
+        expect(blockingSwitchOn(at(true, null))).toBe(true);
+        expect(blockingSwitchOn(at(false, null))).toBe(false);
     });
 
     it("settles once the TV did it", () => {
         expect(blockingStatus(at(true, "on"))).toBe("on");
         expect(blockingStatus(at(false, "off"))).toBe("off");
         expect(blockingStatus(at(false, "left-as-set"))).toBe("off");
+        expect(blockingStatus(at(true, "left-as-set"))).toBe("left-as-set");
         expect(blockingWaiting(at(true, "on"))).toBe(false);
     });
 
-    it("passes on why the TV could not turn it on", () => {
+    it("passes on why the TV could not do it", () => {
         for (const reason of ["failed", "unavailable", "no-permission", "no-filter"] as const) {
             expect(blockingStatus(at(true, reason))).toBe(reason);
             expect(blockingWaiting(at(true, reason))).toBe(false);
         }
+        expect(blockingStatus(at(false, "no-permission"))).toBe("no-permission");
+    });
+
+    it("asks a launcher too old to act on it to be updated first, and never waits on it", () => {
+        for (const versionCode of [null, 13]) {
+            const old = { ...at(true, null), versionCode };
+            expect(blockingStatus(old)).toBe("updateFirst");
+            expect(blockingWaiting(old)).toBe(false);
+        }
+        const markup = draw([{ ...at(null, null), versionName: "3.4", versionCode: 13 }], "3.5");
+        expect(markup).toContain("Update the TV to change it from here");
+        expect(markup).toMatch(/role="switch"[^>]*disabled/);
     });
 
     it("draws the switch, its state, and holds a skeleton while the filter is asked", () => {

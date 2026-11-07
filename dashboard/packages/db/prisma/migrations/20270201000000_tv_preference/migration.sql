@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS "TvPreference" (
     "apiKeyId" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "desired" JSONB,
+    "choice" UUID,
+    "askedAt" TIMESTAMP(3),
     "applied" TEXT,
     "appliedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

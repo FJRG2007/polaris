@@ -1733,6 +1733,7 @@
             "save": "Guardar",
             "cancel": "Cancelar",
             "status": {
+                "updateFirst": "Actualiza el TV para cambiarlo desde aquí",
                 "notAsked": "Se ajusta en el propio TV",
                 "waiting": "Esperando a que el TV lo aplique",
                 "on": "Activado en el TV",

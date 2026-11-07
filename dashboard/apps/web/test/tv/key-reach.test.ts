@@ -63,8 +63,12 @@ vi.mock("@polaris/db", () => ({
         notification: { count: async () => 0 },
         tvUpdateRequest: { findUnique: async () => null },
         tvPreference: {
-            findUnique: async () => ({ desired: { blocking: true }, applied: null }),
-            upsert: async () => ({})
+            findUnique: async () => ({
+                desired: { blocking: true },
+                choice: "0190a000-0000-7000-8000-0000000000aa",
+                applied: null
+            }),
+            updateMany: async () => ({ count: 1 })
         }
     }
 }));
@@ -160,7 +164,10 @@ describe("the state and update routes", () => {
             "unread",
             "updateRequest"
         ]);
-        expect(body.desired).toEqual({ blocking: true });
+        expect(body.desired).toEqual({
+            blocking: true,
+            choice: "0190a000-0000-7000-8000-0000000000aa"
+        });
     });
 
     it.each(TV_ROUTES)("%s stays shut to any other kind", async (_, call) => {

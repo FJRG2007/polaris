@@ -28,16 +28,47 @@ public class RemoteBlockingTest {
         assertNull(RemoteBlocking.desiredBlocking(null));
     }
 
+    private static final String FIRST = "0190a000-0000-7000-8000-00000000000a";
+    private static final String SECOND = "0190a000-0000-7000-8000-00000000000b";
+
+    private static RemoteBlocking.Step step(Boolean desired, String choice, String actedOn) {
+        return RemoteBlocking.step(desired, RemoteBlocking.choiceKey(desired, choice), actedOn);
+    }
+
+    @Test
+    public void readsTheChoiceId() {
+        assertEquals(FIRST, RemoteBlocking.desiredChoice(new JSONObject(
+                "{\"desired\":{\"blocking\":true,\"choice\":\"" + FIRST.toUpperCase() + "\"}}")));
+        assertNull(RemoteBlocking.desiredChoice(new JSONObject("{\"desired\":{\"blocking\":true}}")));
+        assertNull(RemoteBlocking.desiredChoice(new JSONObject(
+                "{\"desired\":{\"blocking\":true,\"choice\":\"x&blocking=on\"}}")));
+        assertNull(RemoteBlocking.desiredChoice(new JSONObject("{\"desired\":{\"choice\":7}}")));
+        assertNull(RemoteBlocking.desiredChoice(null));
+    }
+
     @Test
     public void actsOncePerChoice() {
-        assertEquals(RemoteBlocking.Step.NOTHING, RemoteBlocking.step(null, null));
-        assertEquals(RemoteBlocking.Step.NOTHING, RemoteBlocking.step(null, true));
-        assertEquals(RemoteBlocking.Step.TURN_ON, RemoteBlocking.step(true, null));
-        assertEquals(RemoteBlocking.Step.TURN_ON, RemoteBlocking.step(true, false));
-        assertEquals(RemoteBlocking.Step.NOTHING, RemoteBlocking.step(true, true));
-        assertEquals(RemoteBlocking.Step.TURN_OFF, RemoteBlocking.step(false, null));
-        assertEquals(RemoteBlocking.Step.TURN_OFF, RemoteBlocking.step(false, true));
-        assertEquals(RemoteBlocking.Step.NOTHING, RemoteBlocking.step(false, false));
+        assertEquals(RemoteBlocking.Step.NOTHING, step(null, null, null));
+        assertEquals(RemoteBlocking.Step.NOTHING, step(null, FIRST, FIRST));
+        assertEquals(RemoteBlocking.Step.TURN_ON, step(true, FIRST, null));
+        assertEquals(RemoteBlocking.Step.NOTHING, step(true, FIRST, FIRST));
+        assertEquals(RemoteBlocking.Step.TURN_OFF, step(false, SECOND, FIRST));
+        assertEquals(RemoteBlocking.Step.NOTHING, step(false, SECOND, SECOND));
+    }
+
+    @Test
+    public void triesAgainWhenTheSameValueIsAskedAgain() {
+        // Turned on, failed, asked for on again: a new id, so a new attempt.
+        assertEquals(RemoteBlocking.Step.TURN_ON, step(true, SECOND, FIRST));
+    }
+
+    @Test
+    public void actsOncePerValueForAnInstanceThatSendsNoId() {
+        assertEquals(RemoteBlocking.Step.TURN_ON, step(true, null, null));
+        assertEquals(RemoteBlocking.Step.TURN_ON, step(true, null, "false"));
+        assertEquals(RemoteBlocking.Step.NOTHING, step(true, null, "true"));
+        assertEquals(RemoteBlocking.Step.TURN_OFF, step(false, null, "true"));
+        assertEquals(RemoteBlocking.Step.NOTHING, step(false, null, "false"));
     }
 
     @Test
@@ -66,9 +97,13 @@ public class RemoteBlockingTest {
     @Test
     public void addsTheReportToTheQuery() {
         assertEquals("/api/tv/state?versionName=1.0&blocking=on",
-                RemoteBlocking.withReport("/api/tv/state?versionName=1.0", "on"));
-        assertEquals("/api/tv/state?blocking=no-filter", RemoteBlocking.withReport("/api/tv/state", "no-filter"));
-        assertEquals("/api/tv/state", RemoteBlocking.withReport("/api/tv/state", null));
-        assertEquals("/api/tv/state", RemoteBlocking.withReport("/api/tv/state", ""));
+                RemoteBlocking.withReport("/api/tv/state?versionName=1.0", "on", null));
+        assertEquals("/api/tv/state?blocking=no-filter",
+                RemoteBlocking.withReport("/api/tv/state", "no-filter", null));
+        assertEquals("/api/tv/state?blocking=on&blockingChoice=" + FIRST,
+                RemoteBlocking.withReport("/api/tv/state", "on", FIRST));
+        assertEquals("/api/tv/state?blocking=on", RemoteBlocking.withReport("/api/tv/state", "on", "not-an-id"));
+        assertEquals("/api/tv/state", RemoteBlocking.withReport("/api/tv/state", null, FIRST));
+        assertEquals("/api/tv/state", RemoteBlocking.withReport("/api/tv/state", "", null));
     }
 }

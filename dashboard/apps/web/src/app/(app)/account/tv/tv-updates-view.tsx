@@ -30,6 +30,11 @@ import {
 /** How often a pending row asks how it is going. */
 const REFRESH_MS = 5000;
 
+/** How long the list keeps asking after Block ads and trackers is waiting on a
+ *  TV. A TV that is on answers within seconds; one that is off answers when it
+ *  is turned on, and the page shows that once it is opened again. */
+const BLOCKING_WAIT_MS = 2 * 60_000;
+
 const PENDING: readonly TvUpdateState[] = [
     "queued",
     "downloading",
@@ -79,7 +84,19 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [reach, setReach] = useState<Record<string, TvFilterReach> | null>(null);
-    const anyPending = view.tvs.some((row) => pending(row) || blockingWaiting(row));
+    const waitingOn = view.tvs
+        .filter(blockingWaiting)
+        .map((row) => `${row.id}:${row.blocking.askedAt ?? ""}`)
+        .join(",");
+    const [waitedOut, setWaitedOut] = useState<string | null>(null);
+    const anyPending =
+        view.tvs.some(pending) || (waitingOn !== "" && waitingOn !== waitedOut);
+
+    useEffect(() => {
+        if (!waitingOn) return;
+        const timer = window.setTimeout(() => setWaitedOut(waitingOn), BLOCKING_WAIT_MS);
+        return () => window.clearTimeout(timer);
+    }, [waitingOn]);
 
     useEffect(() => {
         let live = true;
@@ -136,7 +153,12 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
         setView((current) => ({
             ...current,
             tvs: current.tvs.map((r) =>
-                r.id === row.id ? { ...r, blocking: { ...r.blocking, desired: next } } : r
+                r.id === row.id
+                    ? {
+                          ...r,
+                          blocking: { desired: next, applied: null, askedAt: new Date().toISOString() }
+                      }
+                    : r
             )
         }));
         setError(null);

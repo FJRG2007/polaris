@@ -1109,8 +1109,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 int count = state == null ? 0 : state.unread + state.alerts;
                 runOnUiThread(() -> btnPolaris.setText(count > 0
                         ? getString(R.string.polaris_title) + " " + count : getString(R.string.polaris_title)));
-                // Block ads and trackers as asked from Polaris; the outcome goes back on the next poll.
-                if (state != null) RemoteBlockingRun.apply(this, link, state.desiredBlocking);
+                // Block ads and trackers as asked from Polaris; the outcome goes back at once, or on the next poll.
+                if (state != null && RemoteBlockingRun.apply(this, link, state.desiredBlocking, state.desiredChoice)) {
+                    try {
+                        link.state();
+                    } catch (java.io.IOException later) {
+                        // Reported on the next poll instead.
+                    }
+                }
             } catch (java.io.IOException unreachable) {
                 runOnUiThread(() -> btnPolaris.setText(R.string.polaris_title));
             }

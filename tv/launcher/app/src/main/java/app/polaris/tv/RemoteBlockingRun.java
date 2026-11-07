@@ -13,8 +13,10 @@ import java.io.IOException;
 final class RemoteBlockingRun {
 
     private static final String PREFS = "remote_blocking";
-    /** "true" or "false": the Polaris choice this TV last acted on. */
+    /** What names the Polaris choice this TV last acted on ({@link RemoteBlocking#choiceKey}). */
     private static final String ACTED = "acted";
+    /** That choice's id, named in the report; absent for an instance that sends none. */
+    private static final String CHOICE = "choice";
     /** What came of it, in the instance's words. */
     private static final String REPORT = "report";
 
@@ -25,21 +27,23 @@ final class RemoteBlockingRun {
         return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /** What to tell the instance on the next poll, or null when there is nothing to say. */
-    static String report(Context context) {
-        return RemoteBlocking.current(prefs(context).getString(REPORT, null), PrivateDnsSwitch.of(context).ours());
+    /** {@code path} with what to tell the instance on this poll, and the choice it answers. */
+    static String withReport(Context context, String path) {
+        SharedPreferences prefs = prefs(context);
+        String report = RemoteBlocking.current(prefs.getString(REPORT, null), PrivateDnsSwitch.of(context).ours());
+        return RemoteBlocking.withReport(path, report, prefs.getString(CHOICE, null));
     }
 
     /**
      * Carries out {@code desired} from a state answer, once per choice. Blocks up to
      * {@link PrivateDnsSwitch#CHECK_MS} while the resolver is checked. An instance that cannot be reached for its
-     * hostname leaves the choice for the next poll.
+     * hostname leaves the choice for the next poll. True when it acted, so there is an outcome to report.
      */
-    static synchronized void apply(Context context, PolarisLink link, Boolean desired) {
+    static synchronized boolean apply(Context context, PolarisLink link, Boolean desired, String choice) {
         SharedPreferences prefs = prefs(context);
-        String acted = prefs.getString(ACTED, null);
-        RemoteBlocking.Step step = RemoteBlocking.step(desired, acted == null ? null : Boolean.valueOf(acted));
-        if (step == RemoteBlocking.Step.NOTHING) return;
+        String key = RemoteBlocking.choiceKey(desired, choice);
+        RemoteBlocking.Step step = RemoteBlocking.step(desired, key, prefs.getString(ACTED, null));
+        if (step == RemoteBlocking.Step.NOTHING) return false;
         String report;
         if (step == RemoteBlocking.Step.TURN_OFF) {
             report = RemoteBlocking.report(PrivateDnsSwitch.turnOff(context));
@@ -50,12 +54,13 @@ final class RemoteBlockingRun {
             try {
                 host = link.networkFilterHostname();
             } catch (IOException unreachable) {
-                return;
+                return false;
             }
             report = host == null ? RemoteBlocking.NO_FILTER
                     : RemoteBlocking.report(PrivateDnsSwitch.turnOn(context, host));
         }
-        prefs.edit().putString(ACTED, String.valueOf(desired)).putString(REPORT, report).commit();
+        prefs.edit().putString(ACTED, key).putString(CHOICE, choice).putString(REPORT, report).commit();
+        return true;
     }
 
     /** The resolver stopped answering and the TV's own DNS is back: say it failed, not that it was changed. */

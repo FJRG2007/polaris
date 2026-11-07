@@ -135,9 +135,11 @@ final class PolarisLink {
         final String updateRequestVersion;
         /** Block ads and trackers as asked from Polaris, or null when the TV keeps its own setting. */
         final Boolean desiredBlocking;
+        /** The id of that choice, or null. */
+        final String desiredChoice;
 
         State(String instanceName, String accountName, int unread, int alerts, String updateRequestId,
-                String updateRequestVersion, Boolean desiredBlocking) {
+                String updateRequestVersion, Boolean desiredBlocking, String desiredChoice) {
             this.instanceName = instanceName;
             this.accountName = accountName;
             this.unread = unread;
@@ -145,6 +147,7 @@ final class PolarisLink {
             this.updateRequestId = updateRequestId;
             this.updateRequestVersion = updateRequestVersion;
             this.desiredBlocking = desiredBlocking;
+            this.desiredChoice = desiredChoice;
         }
     }
 
@@ -241,9 +244,8 @@ final class PolarisLink {
      * and trackers ({@link RemoteBlocking}).
      */
     State state() throws IOException {
-        String path = RemoteBlocking.withReport(
-                "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                RemoteBlockingRun.report(context));
+        String path = RemoteBlockingRun.withReport(context,
+                "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
         PolarisFailover.Reply reply = failover.request("GET", path, null, token);
         if (reply.status == 401) return null;
         if (!reply.ok()) throw new IOException("Refused: " + reply.status);
@@ -258,7 +260,7 @@ final class PolarisLink {
             return new State(instance.optString("name"), account.optString("name"),
                     Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")), requestId,
                     requestId == null ? null : request.optString("versionName", null),
-                    RemoteBlocking.desiredBlocking(answer));
+                    RemoteBlocking.desiredBlocking(answer), RemoteBlocking.desiredChoice(answer));
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }

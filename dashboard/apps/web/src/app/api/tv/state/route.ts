@@ -9,9 +9,10 @@
  * names only its version is never offered an update from /account/tv.
  *
  * `desired` is what the TV's owner asked of it from /account/tv
- * (`{ blocking, theme?, addons? }`), or null when they never chose, so the TV
- * keeps its own setting. The TV says what it did with `?blocking=` on a later
- * poll (lib/tv/preferences); a malformed report is ignored, never refused.
+ * (`{ blocking, choice }`), or null when they never chose, so the TV keeps its
+ * own setting. The TV acts once per `choice` and says what it did with
+ * `?blocking=&blockingChoice=<choice>` (lib/tv/preferences); a malformed report
+ * is ignored, never refused.
  */
 
 import { prisma } from "@polaris/db";

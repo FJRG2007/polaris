@@ -2,6 +2,9 @@ package app.polaris.tv;
 
 import org.json.JSONObject;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 /**
  * "Block ads and trackers" asked for from Polaris (/account/tv, often from the phone that scanned the TV's QR).
  *
@@ -9,8 +12,11 @@ import org.json.JSONObject;
  * with {@link PrivateDns} and says what happened with {@code ?blocking=} on a later poll. Pure: the parsing, the
  * decision and the words for the report, so every path is a unit test ({@link RemoteBlockingRun} does the rest).
  *
- * The TV acts once per choice: a change made in the TV's own Settings afterwards is kept until the owner flips the
- * switch in Polaris again, and a failed attempt is reported rather than retried on every poll.
+ * The TV acts once per choice, which the instance names with {@code desired.choice} (a new id every time the owner
+ * flips the switch, even back to what it was): a change made in the TV's own Settings afterwards is kept until the
+ * owner flips the switch in Polaris again, and a failed attempt is reported rather than retried on every poll. The
+ * report names the choice it answers ({@code &blockingChoice=}), so one about an earlier choice is never taken for
+ * the latest.
  */
 final class RemoteBlocking {
 
@@ -22,6 +28,9 @@ final class RemoteBlocking {
     static final String NO_PERMISSION = "no-permission";
     static final String NO_FILTER = "no-filter";
     static final String LEFT_AS_SET = "left-as-set";
+
+    private static final Pattern UUID = Pattern.compile(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 
     enum Step {
         NOTHING,
@@ -37,16 +46,38 @@ final class RemoteBlocking {
      * the question, or the block is malformed: the TV then keeps its own setting.
      */
     static Boolean desiredBlocking(JSONObject answer) {
-        if (answer == null) return null;
-        JSONObject desired = answer.optJSONObject("desired");
+        JSONObject desired = desired(answer);
         if (desired == null) return null;
         Object blocking = desired.opt("blocking");
         return blocking instanceof Boolean ? (Boolean) blocking : null;
     }
 
-    /** What to do for {@code desired}, given the choice this TV last acted on (null: none yet). */
-    static Step step(Boolean desired, Boolean actedOn) {
-        if (desired == null || desired.equals(actedOn)) return Step.NOTHING;
+    /** {@code desired.choice} from a state answer: the id of the owner's latest choice, or null. */
+    static String desiredChoice(JSONObject answer) {
+        JSONObject desired = desired(answer);
+        if (desired == null) return null;
+        Object choice = desired.opt("choice");
+        if (!(choice instanceof String)) return null;
+        String id = ((String) choice).toLowerCase(Locale.ROOT);
+        return UUID.matcher(id).matches() ? id : null;
+    }
+
+    private static JSONObject desired(JSONObject answer) {
+        return answer == null ? null : answer.optJSONObject("desired");
+    }
+
+    /**
+     * What names one choice: its id, or for an instance that sends none the value asked. Null when nothing was
+     * asked.
+     */
+    static String choiceKey(Boolean desired, String choice) {
+        if (desired == null) return null;
+        return choice != null ? choice : String.valueOf(desired);
+    }
+
+    /** What to do for {@code desired}, named {@code key}, given the key this TV last acted on (null: none yet). */
+    static Step step(Boolean desired, String key, String actedOn) {
+        if (desired == null || key == null || key.equals(actedOn)) return Step.NOTHING;
         return desired ? Step.TURN_ON : Step.TURN_OFF;
     }
 
@@ -77,9 +108,13 @@ final class RemoteBlocking {
         return kept;
     }
 
-    /** {@code path} with the report added to its query; unchanged when there is nothing to say. */
-    static String withReport(String path, String report) {
+    /**
+     * {@code path} with the report, and the choice it answers when there is one, added to its query; unchanged when
+     * there is nothing to say.
+     */
+    static String withReport(String path, String report, String choice) {
         if (report == null || report.isEmpty()) return path;
-        return path + (path.indexOf('?') >= 0 ? '&' : '?') + "blocking=" + report;
+        String query = path + (path.indexOf('?') >= 0 ? '&' : '?') + "blocking=" + report;
+        return choice != null && UUID.matcher(choice).matches() ? query + "&blockingChoice=" + choice : query;
     }
 }
