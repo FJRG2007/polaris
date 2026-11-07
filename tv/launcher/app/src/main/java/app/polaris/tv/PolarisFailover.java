@@ -37,6 +37,8 @@ final class PolarisFailover {
     static final long HOLD_MS = 60_000;
     static final long VERIFIED_MS = 10 * 60_000;
     static final int TIMEOUT_MS = 8_000;
+    static final long RELEARN_MS = 24 * 60 * 60_000L;
+    static final long UNPINNED_RELEARN_MS = 60 * 60_000L;
     private static final int MAX_ADDRESSES = 16;
 
     private static final Pattern ID = Pattern.compile("^[A-Za-z0-9_-]{8,64}$");
@@ -161,6 +163,16 @@ final class PolarisFailover {
         } catch (JSONException | RuntimeException notOne) {
             return null;
         }
+    }
+
+    /**
+     * Whether the usual address should be asked for the instance's record again: within an hour while the record
+     * has no local CA pin, within a day once it has one, so a renewed CA reaches the TV. A clock that went back
+     * counts as due.
+     */
+    static boolean relearnDue(boolean pinned, long askedAt, long now) {
+        if (askedAt <= 0 || now < askedAt) return true;
+        return now - askedAt >= (pinned ? RELEARN_MS : UNPINNED_RELEARN_MS);
     }
 
     /** The bytes the instance signs. */

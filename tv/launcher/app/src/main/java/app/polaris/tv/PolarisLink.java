@@ -37,6 +37,7 @@ import javax.crypto.spec.GCMParameterSpec;
 final class PolarisLink {
 
     private static final String PREFS = "polaris";
+    private static final String ASKED_AT = "instanceAskedAt";
     private static final String KEYSTORE = "AndroidKeyStore";
     private static final String KEY_ALIAS = "polaris-tv";
     private static final int GCM_IV_BYTES = 12;
@@ -239,7 +240,7 @@ final class PolarisLink {
             String sealed = seal(answer.getString("token"));
             if (sealed == null) throw new IOException("This TV could not store the sign-in");
             prefs(context).edit().putString("origin", origin).putString("token", sealed)
-                    .putString("instance", instance).commit();
+                    .putString("instance", instance).putLong(ASKED_AT, System.currentTimeMillis()).commit();
             return status;
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
@@ -247,18 +248,25 @@ final class PolarisLink {
     }
 
     /**
-     * Asks the usual address again, once per link, for a record that has no local CA pin yet: a TV paired before
-     * its Polaris published one would otherwise keep sending its key over plain http on the local network. The
-     * new record is kept only when it is the same instance and key; it applies from the next load.
+     * Asks the usual address again for the instance's record, at most once per link and as often as
+     * {@link PolarisFailover#relearnDue} allows across links: a TV paired before its Polaris published a local CA
+     * pin would otherwise keep sending its key over plain http on the local network, and a pinned TV would keep a
+     * pin its Polaris replaced. The new record is kept only when it is the same instance and key and carries a pin;
+     * it applies from the next load.
      */
     private void relearn() {
-        if (relearned || (instance != null && !instance.localCaSha256.isEmpty()) || PolarisFailover.plain(origin)) return;
+        if (relearned || PolarisFailover.plain(origin)) return;
         relearned = true;
+        SharedPreferences prefs = prefs(context);
+        long now = System.currentTimeMillis();
+        boolean pinned = instance != null && !instance.localCaSha256.isEmpty();
+        if (!PolarisFailover.relearnDue(pinned, prefs.getLong(ASKED_AT, 0), now)) return;
+        prefs.edit().putLong(ASKED_AT, now).apply();
         String body = learn(origin);
         PolarisFailover.Instance fresh = body == null ? null : PolarisFailover.readInstance(body);
         if (fresh == null || fresh.localCaSha256.isEmpty()) return;
         if (instance != null && (!instance.id.equals(fresh.id) || !instance.publicKey.equals(fresh.publicKey))) return;
-        prefs(context).edit().putString("instance", body).apply();
+        prefs.edit().putString("instance", body).apply();
     }
 
     /**
