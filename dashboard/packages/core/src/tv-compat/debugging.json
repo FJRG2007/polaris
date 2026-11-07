@@ -13,7 +13,7 @@
                 "es-ES": {
                     "about": "Ajustes > Preferencias del dispositivo > Información",
                     "press": "Compilación",
-                    "developer": "Ajustes > Preferencias del dispositivo > Opciones de desarrollador",
+                    "developer": "Ajustes > Preferencias del dispositivo > Opciones para desarrolladores",
                     "switches": ["Depuración por USB", "Depuración de red"]
                 }
             }
