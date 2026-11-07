@@ -1,8 +1,8 @@
 -- Polaris TV reports its build number beside its version.
-ALTER TABLE "ApiKey" ADD COLUMN "clientBuild" INTEGER;
+ALTER TABLE "ApiKey" ADD COLUMN IF NOT EXISTS "clientBuild" INTEGER;
 
 -- The one update each connected TV was last asked to install.
-CREATE TABLE "TvUpdateRequest" (
+CREATE TABLE IF NOT EXISTS "TvUpdateRequest" (
     "apiKeyId" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "requestId" UUID NOT NULL,
@@ -15,6 +15,7 @@ CREATE TABLE "TvUpdateRequest" (
     CONSTRAINT "TvUpdateRequest_pkey" PRIMARY KEY ("apiKeyId")
 );
 
-CREATE INDEX "TvUpdateRequest_userId_idx" ON "TvUpdateRequest"("userId");
+CREATE INDEX IF NOT EXISTS "TvUpdateRequest_userId_idx" ON "TvUpdateRequest"("userId");
 
+ALTER TABLE "TvUpdateRequest" DROP CONSTRAINT IF EXISTS "TvUpdateRequest_apiKeyId_fkey";
 ALTER TABLE "TvUpdateRequest" ADD CONSTRAINT "TvUpdateRequest_apiKeyId_fkey" FOREIGN KEY ("apiKeyId") REFERENCES "ApiKey"("id") ON DELETE CASCADE ON UPDATE CASCADE;

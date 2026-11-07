@@ -69,6 +69,10 @@ const NOT_DOWNLOADS = new Map<string, string>([
     [
         "system/local-ca/route.ts",
         "this instance's certificate, fetched by a machine being set up rather than by a reader waiting at a screen"
+    ],
+    [
+        "tv/update/apk/route.ts",
+        "the TV app's update, fetched by the TV itself with its API key rather than by a reader waiting at a screen"
     ]
 ]);
 
