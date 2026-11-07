@@ -1525,6 +1525,9 @@ model ApiKey {
     clientName        String?
     clientOs          String?
     clientVersion     String?
+    // The build number Polaris TV reports beside its version (Android's
+    // versionCode). Null for every other kind, and for a TV that never said.
+    clientBuild       Int?
     signedInIp        String?
     pinToAddress      Boolean?
     createdAt         DateTime  @default(now())
@@ -1534,10 +1537,34 @@ model ApiKey {
     groups  ApiKeyAccessGroup[]
     usage   ApiKeyUsage[]
     calls   ApiKeyCallHour[]
+    tvUpdate TvUpdateRequest?
 
     @@index([userId])
     @@index([userId, kind])
     @@index([projectId])
+}
+
+// The one update a connected Polaris TV was last asked to install, from
+// /account/tv. One row per TV, replaced by the next request, so the table never
+// holds more than one row per TV key. The TV collects it on its next poll of
+// /api/tv/state and reports progress to /api/tv/update/report under requestId.
+model TvUpdateRequest {
+    apiKeyId    String   @id @db.Uuid
+    userId      String   @db.Uuid
+    // Changes with every new request, so a report for an older one is ignored.
+    requestId   String   @db.Uuid
+    // The release asked for, as its tag spells it after "tv-v".
+    versionName String
+    // queued | downloading | waiting-confirmation | installing | done | failed
+    state       String   @default("queued")
+    // Why it failed, in the TV's own words. Bounded; null unless failed.
+    reason      String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 // How much one key was used on one day.
