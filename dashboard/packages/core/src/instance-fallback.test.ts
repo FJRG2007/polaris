@@ -78,6 +78,45 @@ describe("readInstance", () => {
             readInstance({ id: ID, publicKey: real.publicKey, addresses: ["ftp://x"] })
         ).toBeNull();
     });
+
+    it("reads an answer with no local CA as before, with no field at all", () => {
+        const old = readInstance({ id: ID, publicKey: real.publicKey, addresses: [PRIMARY] });
+        expect(old).not.toBeNull();
+        expect(old && "localCaSha256" in old).toBe(false);
+        expect(
+            readInstance({
+                id: ID,
+                publicKey: real.publicKey,
+                addresses: [PRIMARY],
+                localCaSha256: []
+            })
+        ).toEqual({ id: ID, publicKey: real.publicKey, addresses: [PRIMARY] });
+    });
+
+    it("keeps well-formed local CA fingerprints and drops the rest", () => {
+        const pin = "ab".repeat(32);
+        expect(
+            readInstance({
+                id: ID,
+                publicKey: real.publicKey,
+                addresses: [PRIMARY],
+                localCaSha256: [pin.toUpperCase(), pin, "zz".repeat(32), "abc", 7, null]
+            })
+        ).toEqual({
+            id: ID,
+            publicKey: real.publicKey,
+            addresses: [PRIMARY],
+            localCaSha256: [pin]
+        });
+        expect(
+            readInstance({
+                id: ID,
+                publicKey: real.publicKey,
+                addresses: [PRIMARY],
+                localCaSha256: pin
+            })
+        ).toEqual({ id: ID, publicKey: real.publicKey, addresses: [PRIMARY] });
+    });
 });
 
 describe("createFailover", () => {

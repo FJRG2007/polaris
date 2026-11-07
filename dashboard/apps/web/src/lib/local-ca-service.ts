@@ -17,6 +17,7 @@ import { prisma } from "@polaris/db";
 import { promisify } from "node:util";
 import { loadEnv } from "@polaris/config";
 import { networkInterfaces } from "node:os";
+import { X509Certificate } from "node:crypto";
 import { execFile } from "node:child_process";
 import { getHostLanIps } from "@/lib/host-address";
 import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
@@ -280,5 +281,22 @@ export async function readLocalCaRoot(): Promise<string | null> {
         return await readFile(join(caDir(), CA_CRT), "utf8");
     } catch {
         return null;
+    }
+}
+
+/**
+ * SHA-256 of the CA root (lowercase hex of its DER), for `GET /api/instance`: a
+ * client that learns it over the usual, publicly trusted address can then accept
+ * this CA's certificates on a proven local address without the operator
+ * installing anything. Reads the existing root only - never mints one - so an
+ * install with no CA yet (or an unreadable one) publishes nothing.
+ */
+export async function localCaFingerprints(): Promise<string[]> {
+    const pem = await readLocalCaRoot();
+    if (!pem) return [];
+    try {
+        return [new X509Certificate(pem).fingerprint256.replaceAll(":", "").toLowerCase()];
+    } catch {
+        return [];
     }
 }

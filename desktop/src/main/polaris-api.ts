@@ -17,6 +17,7 @@ import { app, net } from "electron";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { describeNetError, netErrorCode } from "./reachability";
+import { markCertificateFailure } from "./window-failover";
 import { RELEARN_MS, readStoredInstance, writeStoredInstance } from "./instance-store";
 
 /** A refusal or failure, with a sentence for the push window. */
@@ -39,18 +40,31 @@ export const KEY_REFUSED = "The API key was refused - it may have been revoked o
  * `@polaris/core/instance-fallback`.
  */
 const failovers = new Map<string, Failover>();
+/** What each server said about itself, as the failovers above were built from. */
+const records = new Map<string, InstanceRecord>();
 
 function instancesFile(): string {
     return join(app.getPath("userData"), "instances.json");
 }
 
-const netFetch = (url: string, init?: RequestInit): Promise<Response> => net.fetch(url, init);
+/**
+ * `net.fetch`, with a refused certificate marked for the failover
+ * (`markCertificateFailure`).
+ */
+async function netFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+        return await net.fetch(url, init);
+    } catch (caught) {
+        throw markCertificateFailure(caught);
+    }
+}
 
 /** Learn the server's identity and local addresses over its own address. Best-effort; an older Polaris has none. */
 export async function learnServer(server: string): Promise<InstanceRecord | null> {
     const instance = await learnInstance(server, netFetch);
     if (!instance) return null;
     failovers.set(server, createFailover({ primary: server, instance, fetch: netFetch }));
+    records.set(server, instance);
     try {
         writeStoredInstance(instancesFile(), server, instance);
     } catch {
@@ -72,8 +86,12 @@ export async function knownInstance(server: string): Promise<InstanceRecord | nu
 
 const asked = new Set<string>();
 
-/** The failover for a server, read back from disk the first time it is asked for. */
-function failoverFor(server: string): Failover | undefined {
+/**
+ * The failover for a server, read back from disk the first time it is asked for.
+ * Undefined while nothing has been learned about it yet - asking also starts
+ * learning it, so a server opened while online can fail over the next time.
+ */
+export function failoverFor(server: string): Failover | undefined {
     const held = failovers.get(server);
     if (held) return held;
     const stored = readStoredInstance(instancesFile(), server);
@@ -87,8 +105,22 @@ function failoverFor(server: string): Failover | undefined {
     }
     const failover = createFailover({ primary: server, instance: stored.record, fetch: netFetch });
     failovers.set(server, failover);
-    if (Date.now() - stored.learnedAt > RELEARN_MS) void learnServer(server).catch(() => undefined);
+    records.set(server, stored.record);
+    const stale = Date.now() - stored.learnedAt > RELEARN_MS;
+    const unpinned = !stored.record.localCaSha256?.length && !asked.has(server);
+    if (unpinned) asked.add(server);
+    if (stale || unpinned) void learnServer(server).catch(() => undefined);
     return failover;
+}
+
+/**
+ * What was learned about a server over its own address - in memory, or read back
+ * from disk the first time - or null. Synchronous: the certificate check asks it
+ * on every verification.
+ */
+export function instanceRecordFor(server: string): InstanceRecord | null {
+    if (!records.has(server)) failoverFor(server);
+    return records.get(server) ?? null;
 }
 
 /** "Using your local network address" while on one, otherwise null. */

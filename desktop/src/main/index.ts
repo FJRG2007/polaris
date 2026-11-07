@@ -10,7 +10,10 @@
  * The first run asks for the address. It is asked whether it is a Polaris
  * (`shared/server-identity`) as it is typed and again before it is kept, so the form says "that is not Polaris" instead of opening a window onto
  * somebody else's page, and a window that later fails to load comes back to the
- * same form with the reason in words. Every address opened is kept in a list
+ * same form with the reason in words - unless the address simply stopped
+ * answering and the same Polaris proves itself on a local address, which the
+ * window then uses until the usual one answers again (`window-failover`).
+ * Every address opened is kept in a list
  * (Servers, in the tray icon - File on macOS), so going to another Polaris and
  * back is a press, not typing.
  */
@@ -43,6 +46,10 @@ import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalS
 import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
 import { describeNetError, finishedLoad, isCertificateError, netErrorCode } from "./reachability";
 import { sameInstanceAs } from "./same-instance";
+import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
+import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
+import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
+import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
 
 /** Where the dashboard opens, the same as the installable app's start page. */
@@ -68,7 +75,25 @@ const games = new GameWatcher((game) => {
     if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
 });
 
-const server = (): string | null => current;
+/**
+ * The same Polaris on a local address that proved it is this instance, while
+ * the usual address is not answering and the windows are on it; else null.
+ * `current` stays the usual address - the server's identity for its key, its
+ * settings and its place on the list.
+ */
+let alternate: string | null = null;
+/** Asks the usual address again while the windows are on the alternate. */
+let recheck: ReturnType<typeof setInterval> | null = null;
+
+/** The one origin Polaris windows may be on right now (see `activeOrigin`). */
+const server = (): string | null => activeOrigin(current, alternate);
+
+/** Back to the usual address for good: a server switched or removed, or the usual one answering again. */
+function dropAlternate(): void {
+    alternate = null;
+    if (recheck) clearInterval(recheck);
+    recheck = null;
+}
 
 /**
  * The update installed and waiting for a restart, told to every Polaris window
@@ -80,7 +105,8 @@ const server = (): string | null => current;
 function frontPage(): number | null {
     const focused = BrowserWindow.getFocusedWindow();
     const window = focused && kindOf(focused.webContents) === "polaris" ? focused : main;
-    if (!window || window.isDestroyed() || !current || !isServerUrl(window.webContents.getURL(), current)) return null;
+    const origin = server();
+    if (!window || window.isDestroyed() || !origin || !isServerUrl(window.webContents.getURL(), origin)) return null;
     return window.webContents.id;
 }
 
@@ -88,7 +114,8 @@ const updates = new UpdateReadyState((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
         const contents = window.webContents;
         if (contents.isDestroyed() || kindOf(contents) !== "polaris") continue;
-        if (current && isServerUrl(contents.getURL(), current)) contents.send(CHANNELS.updateReady, state);
+        const origin = server();
+        if (origin && isServerUrl(contents.getURL(), origin)) contents.send(CHANNELS.updateReady, state);
     }
 });
 
@@ -99,11 +126,12 @@ function showPolaris(path?: string): void {
         updating.focus();
         return;
     }
-    if (!current) {
+    const origin = server();
+    if (!origin) {
         openConnect();
         return;
     }
-    const url = (path && serverPath(path, current)) || null;
+    const url = (path && serverPath(path, origin)) || null;
     if (main && !main.isDestroyed()) {
         if (url) void main.loadURL(url);
         if (main.isMinimized()) main.restore();
@@ -111,7 +139,7 @@ function showPolaris(path?: string): void {
         main.focus();
         return;
     }
-    openMain(url ?? `${current}${START}`);
+    openMain(url ?? `${origin}${START}`);
 }
 
 /** Ask before a link leaves the Polaris in use. No is the default: a website may
@@ -130,7 +158,7 @@ async function confirmSwitch(origin: string): Promise<boolean> {
 
 const deepLinks = new DeepLinks(
     {
-        current: server,
+        current: () => current,
         saved: () => savedServers().map((saved) => saved.origin),
         show: showPolaris,
         confirmSwitch,
@@ -191,36 +219,161 @@ function rememberPlace(window: BrowserWindow): void {
     window.on("close", write);
 }
 
+/**
+ * Where the same Polaris answers now, as the failover in `polaris-api` finds it:
+ * a local address only after it signed a fresh challenge with the key learned
+ * over the usual one, over TLS this computer trusts or that chains to the local
+ * CA learned over the usual address (`local-ca-pin`). Null when nothing
+ * was learned about the server yet.
+ */
+async function provenAddress(): Promise<{ readonly origin: string; readonly untrusted: boolean; } | null> {
+    const primary = current;
+    const failover = primary ? failoverFor(primary) : undefined;
+    if (!primary || !failover) return null;
+    const origin = await failover.resolve().catch(() => primary);
+    return { origin, untrusted: failover.status().untrusted.length > 0 };
+}
+
+/** Put the main window on `to` - an alternate the failover proved, or null for
+ *  the usual address - at the place it is on now. */
+function moveTo(window: BrowserWindow, to: string | null, from = window.webContents.getURL()): void {
+    const primary = current;
+    if (!primary) return;
+    const origin = to ?? primary;
+    if (to) {
+        alternate = to;
+        watchForPrimary(window);
+    } else dropAlternate();
+    window.setTitle(titleWith(window.webContents.getTitle(), to ? addressWords(primary) : null));
+    void window.loadURL(samePlaceOn(from, origin) ?? `${origin}${START}`);
+}
+
+/** Ask the usual address again on the failover's own rhythm while the window is
+ *  on the alternate, and go back once it answers. */
+function watchForPrimary(window: BrowserWindow): void {
+    if (recheck) clearInterval(recheck);
+    // One wait for the person to leave the window, however many rechecks find the usual address answering.
+    let waitingForBlur = false;
+    recheck = setInterval(() => {
+        const primary = current;
+        const failover = primary ? failoverFor(primary) : undefined;
+        if (!primary || !failover || !alternate || window.isDestroyed()) {
+            dropAlternate();
+            return;
+        }
+        void failover
+            .resolve()
+            .then((resolved) => {
+                if (current !== primary || !alternate || window.isDestroyed()) return;
+                const step = backStep(resolved, primary, window.isFocused());
+                if (step === "now") moveTo(window, null);
+                if (step !== "on-blur" || waitingForBlur) return;
+                waitingForBlur = true;
+                window.once("blur", () => {
+                    waitingForBlur = false;
+                    if (current === primary && alternate && !window.isDestroyed()) moveTo(window, null);
+                });
+            })
+            .catch(() => undefined);
+    }, DEFAULT_HOLD_MS);
+}
+
+/**
+ * The address the window is on did not answer at `failedUrl`: go to the same
+ * Polaris elsewhere if one proves itself. Answers whether that is in hand, or
+ * why not - `untrusted` when a local address failed only on its certificate.
+ */
+async function failOver(window: BrowserWindow, failedUrl: string): Promise<"moved" | "none" | "untrusted"> {
+    const primary = current;
+    const found = await provenAddress().catch(() => null);
+    if (!primary || current !== primary || window.isDestroyed()) return "moved";
+    if (found && found.origin !== primary) {
+        if (found.origin !== alternate) {
+            showNotice({ title: "Polaris", body: addressWords(primary) ?? undefined, tag: "polaris-address", silent: true, once: true });
+        }
+        moveTo(window, found.origin, failedUrl);
+        return "moved";
+    }
+    if (alternate) {
+        // The alternate stopped answering: the usual address gets one more go, and
+        // its own failure comes back here with no alternate left.
+        moveTo(window, null, failedUrl);
+        return "moved";
+    }
+    return found?.untrusted ? "untrusted" : "none";
+}
+
 function openMain(url: string): void {
     const window = openPolarisWindow(url, server, savedPlace());
     main = window;
     rememberPlace(window);
     let offline = false;
-    window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
-        // -3 is a load that another one replaced: a redirect, a click, nothing wrong.
-        if (!isMainFrame || code === -3 || !current || !isServerUrl(url, current)) return;
-        offline = false;
-        loadError = describeNetError(netErrorCode(description), new URL(current).host);
+    let failingOver = false;
+
+    /** Say why in the servers window, in place of this one. */
+    const giveUp = (error: string) => {
+        loadError = error;
+        dropAlternate();
         if (main === window) main = null;
         window.close();
         openConnect();
+    };
+
+    window.webContents.on("did-fail-load", (_event, code, description, failedUrl, isMainFrame) => {
+        const origin = server();
+        if (!isMainFrame || !origin) return;
+        const step = failedLoadStep(code, description, failedUrl, origin);
+        if (step === "ignore") return;
+        offline = false;
+        const error = describeNetError(netErrorCode(description), new URL(origin).host);
+        if (step === "error") return giveUp(error);
+        if (failingOver) return;
+        failingOver = true;
+        void failOver(window, failedUrl).then((outcome) => {
+            failingOver = false;
+            if (outcome !== "moved") giveUp(outcome === "untrusted" ? `${error} ${UNTRUSTED_WORDS}` : error);
+        });
     });
-    // The Polaris's own worker answers for it when it is gone, so this load succeeded.
-    // The window stays for its Try again; the servers window is the way to the others.
+    // The Polaris's own worker answers for it when it is gone, so this load
+    // succeeded. That is the address not answering, so the same Polaris is looked
+    // for elsewhere first; failing that the window stays for its Try again, and the
+    // servers window is the way to the others.
     window.webContents.on("did-finish-load", () => {
         if (!current) return;
         const load = finishedLoad(window.webContents.getTitle(), offline);
         offline = load === "offline";
         if (load === "recovered") loadError = null;
-        if (!offline) return;
-        loadError = describeNetError(null, new URL(current).host);
-        openConnect();
+        if (!offline) {
+            // Online on the usual address: learn, or refresh, where else it answers,
+            // so the next outage - or a start without internet - can use it.
+            if (!alternate) failoverFor(current);
+            return;
+        }
+        if (failingOver) return;
+        failingOver = true;
+        const host = new URL(server() ?? current).host;
+        void failOver(window, window.webContents.getURL()).then((outcome) => {
+            failingOver = false;
+            if (outcome === "moved" || window.isDestroyed()) return;
+            loadError = describeNetError(null, host);
+            if (outcome === "untrusted") loadError = `${loadError} ${UNTRUSTED_WORDS}`;
+            openConnect();
+        });
+    });
+    // The page's own title, with the words while on the alternate: the quiet sign of it.
+    window.on("page-title-updated", (event, title) => {
+        if (!alternate || !current) return;
+        event.preventDefault();
+        window.setTitle(titleWith(title, addressWords(current)));
     });
     window.on("closed", () => {
-        if (main === window) main = null;
+        if (main !== window) return;
+        main = null;
+        // The next window starts on the usual address and fails over again if it
+        // has to, rather than inheriting an alternate nobody is watching.
+        dropAlternate();
     });
 }
-
 function openConnect(): void {
     if (sheet && !sheet.isDestroyed()) {
         sheet.focus();
@@ -315,10 +468,11 @@ async function connectCheck(raw: unknown): Promise<AddressCheck> {
  *  (see `backIndex`). */
 function goBack(): void {
     const contents = BrowserWindow.getFocusedWindow()?.webContents;
-    if (!contents || !current || kindOf(contents) !== "polaris") return;
+    const origin = server();
+    if (!contents || !origin || kindOf(contents) !== "polaris") return;
     const history = contents.navigationHistory;
     const urls = history.getAllEntries().map((entry) => entry.url);
-    const index = backIndex(urls, history.getActiveIndex(), current);
+    const index = backIndex(urls, history.getActiveIndex(), origin);
     if (index !== null) history.goToIndex(index);
 }
 
@@ -335,6 +489,7 @@ async function connectSubmit(raw: unknown, typedName = ""): Promise<Outcome> {
     setServerAddress(origin);
     if (name) setSavedServers(renameServer(savedServers(), origin, name));
     if (changed) leaveServer();
+    dropAlternate();
     current = origin;
     loadError = null;
     refreshMenu();
@@ -391,6 +546,7 @@ function removeServer(origin: string): Outcome {
         const listOpen = Boolean(sheet);
         setServerAddress(null);
         current = null;
+        dropAlternate();
         leaveServer();
         if (listOpen) openConnect();
     }
@@ -435,11 +591,29 @@ function start(): void {
         setOpenAtLogin(settings.openAtLogin());
         if (app.isPackaged) app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
 
+        // The same Polaris's own local certificate, on its other addresses only and
+        // only when it chains to the CA learned over the usual address; every other
+        // verification keeps Chromium's verdict. The default session carries both
+        // the failover's proof (`net.fetch`) and the main window, so the proof and
+        // the page it unlocks see the same rule.
+        session.defaultSession.setCertificateVerifyProc((request, callback) => {
+            if (request.errorCode !== AUTHORITY_INVALID || !current) {
+                callback(USE_CHROMIUM);
+                return;
+            }
+            let verdict = USE_CHROMIUM;
+            try {
+                verdict = verifyDecision(request, pinScope(current, instanceRecordFor(current)));
+            } catch {
+                // Anything unexpected keeps Chromium's own verdict.
+            }
+            callback(verdict);
+        });
         session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
-            callback(allowPermission(permission, details.requestingUrl, current));
+            callback(allowPermission(permission, details.requestingUrl, server()));
         });
         session.defaultSession.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
-            allowPermission(permission, requestingOrigin, current)
+            allowPermission(permission, requestingOrigin, server())
         );
 
         registerIpc({
