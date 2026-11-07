@@ -292,6 +292,14 @@ describe("arrival placement", () => {
         expect(placement.placeArrival({ x: Number.NaN, z: 0, clear: () => true })).toBeNull();
     });
 
+    it("never arrives at a point the clamp could not place", () => {
+        // The old controller clamp took (x, z) while placeArrival hands it { x, z }: every point came back NaN
+        const positional = (px: unknown, pz?: number) => ({ x: Math.min(100, px as number), z: Math.min(100, pz as number) });
+        expect(placement.placeArrival({ x: 3.6, z: 410.6, heading: 0, clear: () => true, clamp: positional })).toBeNull();
+        const shore = ({ x, z }: { x: number; z: number }) => ({ x: Math.max(-50, Math.min(50, x)), z });
+        expect(placement.placeArrival({ x: 3.6, z: 410.6, heading: 0, clear: () => true, clamp: shore })).toEqual({ x: 3.6, z: 410.6, heading: 0 });
+    });
+
     it("lists lane points nearest first and skips edges out of reach", () => {
         const points = placement.laneCandidates([avenue], 3, 0);
         expect(points[0]).toMatchObject({ x: 2, z: 0 });

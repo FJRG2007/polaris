@@ -51,9 +51,14 @@ function laneCandidates(edges, x, z, reach = LANE_REACH) {
  * the shore leaves nowhere). Returns { x, z, heading } or null when nothing is clear: the caller then keeps the body
  * where it was, as before.
  */
-function placeArrival({ x, z, heading = Math.PI, onRoad = false, edges = [], clear, clamp = (p) => p }) {
+function placeArrival({ x, z, heading = Math.PI, onRoad = false, edges = [], clear, clamp: clampTo = (p) => p }) {
   if (!Number.isFinite(x) || !Number.isFinite(z) || typeof clear !== 'function') return null;
   if (!Number.isFinite(heading)) heading = Math.PI;
+  // A point the clamp could not place on the map is no point at all
+  const clamp = (point) => {
+    const p = clampTo(point);
+    return p && Number.isFinite(p.x) && Number.isFinite(p.z) ? p : null;
+  };
   if (onRoad) {
     for (const lane of laneCandidates(edges, x, z)) {
       const p = clamp({ x: lane.x, z: lane.z });
