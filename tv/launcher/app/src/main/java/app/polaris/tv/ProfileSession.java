@@ -1,6 +1,8 @@
 package app.polaris.tv;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 
 /**
  * Who is watching right now, for the whole process: the active profile, whether "Who's watching?" is still owed
@@ -56,14 +58,38 @@ final class ProfileSession {
 
     /**
      * Whether Home has to ask "Who's watching?" now. With one profile the cold start's question is settled for
-     * good, so a second profile added later does not make the picker appear until the next cold start.
+     * good, so a second profile added later does not make the picker appear until the next cold start. A single
+     * profile with a PIN ({@code pinned}, the active one) still asks, since the PIN is asked there.
      */
-    static boolean pickerDue(int profiles) {
-        boolean due = Profiles.pickerNeeded(profiles, coldStartPending, afterLongOff ? Long.MAX_VALUE : 0L);
-        if (profiles < 2) {
+    static boolean pickerDue(int profiles, boolean pinned) {
+        int count = pinned ? Math.max(2, profiles) : profiles;
+        boolean due = Profiles.pickerNeeded(count, coldStartPending, afterLongOff ? Long.MAX_VALUE : 0L);
+        if (count < 2) {
             coldStartPending = false;
             afterLongOff = false;
         }
         return due;
+    }
+
+    /**
+     * The active profile has a PIN and nobody has typed it (or picked another profile) since the cold start or
+     * the last long screen-off: only "Who's watching?" may show until then.
+     */
+    static boolean locked(Context ctx) {
+        if (!coldStartPending && !afterLongOff) return false;
+        String id = activeId(ctx);
+        return id != null && Profiles.hasPin(ctx, id);
+    }
+
+    /**
+     * For the screens past Home (Polaris, Launcher settings, Quick settings) in onResume: while locked, the viewer
+     * goes back to Home, which asks "Who's watching?". True when it did, and the screen is finishing.
+     */
+    static boolean sendHomeIfLocked(Activity activity) {
+        if (!locked(activity)) return false;
+        activity.startActivity(new Intent(activity, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
+        activity.finish();
+        return true;
     }
 }

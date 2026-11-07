@@ -25,6 +25,12 @@ public final class QuickSettingsActivity extends Activity {
 
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        ProfileSession.sendHomeIfLocked(this);   // a profile's PIN is owed: back to "Who's watching?"
+    }
+
+    @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_quick_settings);
