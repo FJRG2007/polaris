@@ -203,11 +203,114 @@ describe("which rung is in force", () => {
         expect(levelOf("auto", "medium")).toBe("medium");
     });
 
-    it("is held to the saver ceiling while the server is on backup access", () => {
-        expect(levelOf("max", "low", true)).toBe("medium");
-        expect(levelOf("auto", "high", true)).toBe("medium");
-        expect(levelOf("low", "high", true)).toBe("low");
-        expect(levelOf("max", "low", false)).toBe("max");
+    // The data saver used to clamp every call to the middle rung, which is how a
+    // sharer on a backup line with room to spare could not raise a page of text
+    // above 1080p at 15 fps however far they moved the bar.
+    it("is never clamped by the data saver - a picked rung is what is sent", () => {
+        expect(levelOf("max", "low")).toBe("max");
+        expect(levelOf("auto", "max")).toBe("max");
+    });
+});
+
+describe("the automatic walk on a backup line (data saver)", () => {
+    const screen = () => startAuto(SCREEN_LADDER);
+    const calm = { connection: "excellent", limitation: "none" } as const;
+
+    it("stays at the top while the line has room", () => {
+        let state = screen();
+        for (let read = 0; read < 20; read += 1) {
+            state = driftAuto(
+                state,
+                { ...calm, rtt: 0.05, available: 30_000_000 },
+                SCREEN_LADDER,
+                true
+            );
+        }
+        expect(state.level).toBe("max");
+    });
+
+    it("comes down when the line starts to queue, and only then", () => {
+        const queued = { ...calm, rtt: quality.SAVER_QUEUED_RTT_S };
+        expect(driftAuto(screen(), queued, SCREEN_LADDER, true).level).toBe("high");
+        // The same round trip without the saver is a far line, not a full one.
+        expect(driftAuto(screen(), queued, SCREEN_LADDER, false).level).toBe("max");
+    });
+
+    it("climbs back only once the estimate says the bigger rung fits", () => {
+        const low = { level: "high" as const, healthy: HEALTHY_TO_CLIMB - 1 };
+        const thin = { ...calm, available: SCREEN_LADDER.rungs.max.maxBitrate * 0.3 };
+        expect(driftAuto(low, thin, SCREEN_LADDER, true).level).toBe("high");
+        const wide = { ...calm, available: SCREEN_LADDER.rungs.max.maxBitrate };
+        expect(driftAuto(low, wide, SCREEN_LADDER, true).level).toBe("max");
+        // No estimate is no evidence, and no evidence is not a cap.
+        expect(driftAuto(low, calm, SCREEN_LADDER, true).level).toBe("max");
+        // Without the saver the estimate is not consulted at all.
+        expect(driftAuto(low, thin, SCREEN_LADDER, false).level).toBe("max");
+    });
+});
+
+describe("how a shared screen is tuned", () => {
+    it("follows the framerate while nothing has had to give", () => {
+        expect(quality.screenTuning("max", false)).toEqual({
+            hint: "motion",
+            preference: "maintain-framerate"
+        });
+        expect(quality.screenTuning("medium", false).hint).toBe("detail");
+    });
+
+    it("is held sharp once auto has brought it down", () => {
+        expect(quality.screenTuning("high", true)).toEqual({
+            hint: "detail",
+            preference: "maintain-resolution"
+        });
+    });
+});
+
+describe("what the transport says about the uplink", () => {
+    it("reads the pair the transport names", () => {
+        const uplink = quality.uplinkFrom([
+            { type: "transport", selectedCandidatePairId: "b" },
+            {
+                type: "candidate-pair",
+                id: "a",
+                nominated: true,
+                state: "succeeded",
+                currentRoundTripTime: 1
+            },
+            {
+                type: "candidate-pair",
+                id: "b",
+                currentRoundTripTime: 0.04,
+                availableOutgoingBitrate: 8e6
+            }
+        ]);
+        expect(uplink).toEqual({ rtt: 0.04, available: 8e6 });
+    });
+
+    it("falls back to a nominated pair that succeeded", () => {
+        expect(
+            quality.uplinkFrom([
+                {
+                    type: "candidate-pair",
+                    id: "a",
+                    nominated: true,
+                    state: "succeeded",
+                    currentRoundTripTime: 0.1
+                }
+            ])
+        ).toEqual({ rtt: 0.1 });
+    });
+
+    it("says nothing when there is no pair, or no report", () => {
+        expect(quality.uplinkFrom([{ type: "outbound-rtp" }])).toEqual({});
+        expect(quality.uplinkFrom(undefined)).toEqual({});
+    });
+
+    it("rides along on the sender's reading", () => {
+        expect(senderHealthFrom([], "good", false, { rtt: 0.2 })).toEqual({
+            connection: "good",
+            rtt: 0.2
+        });
     });
 });
 

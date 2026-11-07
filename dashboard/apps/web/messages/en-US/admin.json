@@ -707,8 +707,8 @@
             "needsToken": "Connect a Cloudflare token first",
             "needsServer": "Add a cloud server first",
             "connectCloudflare": "The tunnel and every switch need a Cloudflare token. <link>Connect one under Integrations</link>.",
-            "dataSaver": "Data saver while on backup",
-            "dataSaverHint": "Holds image pulls, update checks, auto-deploys and scheduled backups until the direct path is back.",
+            "dataSaver": "Save data on the backup connection",
+            "dataSaverHint": "While the domain runs on its backup connection, image pulls, update checks, auto-deploys and scheduled backups wait for the direct path, and calls lower their quality only when the connection cannot carry more.",
             "state": {
                 "direct": "Direct",
                 "backup": "On backup since",

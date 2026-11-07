@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Checkbox, Skeleton } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -41,10 +41,16 @@ export function BackupAccessCard() {
         select: (body) => body as BackupView
     });
     const [busy, setBusy] = useState(false);
+    const [savingSaver, setSavingSaver] = useState(false);
     const [rechecking, setRechecking] = useState(false);
     const [error, setError] = useState("");
     const [confirm, confirmDialog] = useConfirm();
     const view = live.data;
+    /** The view as last drawn, for a save that comes back after other changes. */
+    const latest = useRef(view);
+    latest.current = view;
+    const busyNow = useRef(busy);
+    busyNow.current = busy;
 
     async function save(change: Partial<BackupConfig>) {
         if (!view) return;
@@ -57,6 +63,29 @@ export function BackupAccessCard() {
         const result = await runAction(() => saveBackupAccessAction(next), setError);
         setBusy(false);
         live.replace(result ?? before);
+    }
+
+    /**
+     * The data saver switch on its own: flipped on screen at once, saved behind
+     * it, and put back if the save fails. Only the switch waits on the answer -
+     * the rest of the card stays usable.
+     */
+    async function saveDataSaver(on: boolean) {
+        if (!view || view.config.dataSaver === on) return;
+        const next = { ...view.config, dataSaver: on };
+        live.replace({ ...view, config: next });
+        setSavingSaver(true);
+        setError("");
+        const result = await runAction(() => saveBackupAccessAction(next), setError);
+        setSavingSaver(false);
+        const now = latest.current;
+        if (result) {
+            // Another change still being saved owns what is drawn; its answer
+            // carries this one too.
+            if (!busyNow.current) live.replace(result);
+            return;
+        }
+        if (now) live.replace({ ...now, config: { ...now.config, dataSaver: !on } });
     }
 
     async function recheck() {
@@ -219,10 +248,9 @@ export function BackupAccessCard() {
                             <label className="flex items-center gap-2">
                                 <Checkbox
                                     checked={view.config.dataSaver}
-                                    disabled={busy}
-                                    onChange={(event) =>
-                                        void save({ dataSaver: event.target.checked })
-                                    }
+                                    disabled={savingSaver}
+                                    aria-busy={savingSaver}
+                                    onChange={(event) => void saveDataSaver(event.target.checked)}
                                 />
                                 <span className="min-w-0">
                                     {t("domains.backup.dataSaver")}

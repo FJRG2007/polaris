@@ -39,6 +39,7 @@ import { z } from "zod";
 import { callRemoteSchema, emitCallRemote } from "@/lib/chat/call-remote";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as quality from "./call-quality";
+import * as shareHeal from "./call-share-heal";
 import { volumeFor } from "./call-volumes";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
@@ -201,6 +202,12 @@ const MICROPHONE = "microphone" as Track.Source;
 const CAMERA = "camera" as Track.Source;
 const SCREEN = "screen_share" as Track.Source;
 const SCREEN_AUDIO = "screen_share_audio" as Track.Source;
+/** How often a viewer looks at the screens it is receiving - see
+ *  `call-share-heal`. */
+const SHARE_LOOK_MS = 2_500;
+/** How long a stalled screen is let go of before it is taken again. Long
+ *  enough for the server to drop the old subscription first. */
+const SHARE_RESUBSCRIBE_GAP_MS = 500;
 /** What `Room.state` reads when the connection is up, spelled out for the same
  *  reason. */
 const CONNECTED = "connected" as Room["state"];
@@ -666,6 +673,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** The same for a shared screen, readable from the timer that decides
      *  whether the room may be let go of. */
     const sharingRef = useRef(false);
+    /** The republish of a shared screen waiting to happen, and how many tries
+     *  this one has spent - see `call-share-heal`. */
+    const shareRepair = useRef<{ timer: ReturnType<typeof setTimeout> | null; attempt: number }>({
+        timer: null,
+        attempt: 0
+    });
+    /** The repair, as the room's reconnection handler reaches it. Assigned on
+     *  every render. */
+    const healShareRef = useRef<() => void>(() => undefined);
     const roleRef = useRef<AudioRole | null>(null);
     /** Whether the microphone was on before this device went quiet for a room,
      *  so leaving the group gives back what it took rather than a default. */
@@ -731,6 +747,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         return which === "camera"
             ? quality.levelOf(quality.cameraQuality(), autoCamera.current.level)
             : quality.levelOf(quality.screenQuality(), autoScreen.current.level);
+    }, []);
+
+    /** Whether auto has had to bring the shared screen below the top of its
+     *  ladder - which is when it is held sharp rather than smooth, see
+     *  `screenTuning`. A rung somebody picked is never degraded. */
+    const screenDegraded = useCallback((level: quality.CallLevel): boolean => {
+        return quality.screenQuality() === "auto" && level !== quality.SCREEN_LADDER.ceiling;
     }, []);
 
     /** Put what is actually going out on screen. Only the controls read this;
@@ -1060,7 +1083,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         : {}),
                     ...(screening
                         ? {
-                              screenShareEncoding: quality.encodingFor(quality.SCREEN_LADDER, level)
+                              screenShareEncoding: quality.encodingFor(
+                                  quality.SCREEN_LADDER,
+                                  level
+                              ),
+                              // A shared screen goes out as VP8 with plain
+                              // simulcast, not the room's VP9 layers. Published
+                              // again as VP9 after a reconnection, the server
+                              // refused one of its layers ("duplicate layer")
+                              // and viewers whose dependency descriptor did not
+                              // match were sent nothing: a share that showed as
+                              // on and never arrived. The camera keeps VP9.
+                              videoCodec: "vp8" as const
                           }
                         : {}),
                     // A document survives a dropped frame far better than it
@@ -1078,9 +1112,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // one of them, so a face stays legible without the freezing
                     // that keeping every pixel on a thin uplink causes.
                     degradationPreference: screening
-                        ? quality.screenIsMotion(level)
-                            ? "maintain-framerate"
-                            : "maintain-resolution"
+                        ? quality.screenTuning(level, screenDegraded(level)).preference
                         : "balanced"
                 });
                 return true;
@@ -1098,7 +1130,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 return false;
             }
         },
-        [levelNow]
+        [levelNow, screenDegraded]
     );
 
     /** One publish per source at a time - see `call-tracks`. */
@@ -1702,6 +1734,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         stillHere: joined.remoteParticipants.has(participant.identity)
                     });
                     if (cue) sound(cue);
+                })
+                // Back from a dropped connection with a screen up: the client has
+                // republished it by itself, and that is the publication the server
+                // has been seen to refuse. It is put up again cleanly - once per
+                // reconnection, on a backoff - see `healShare`.
+                .on(RoomEvent.Reconnected, () => {
+                    if (!screen.current) return;
+                    if (!shareRepair.current.timer) shareRepair.current.attempt = 0;
+                    healShareRef.current();
                 })
                 .on(RoomEvent.LocalTrackPublished, () => {
                     publishLocalPreview();
@@ -2781,6 +2822,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Take the screen and its sound down together, however it ended. */
     const stopSharing = useCallback(() => {
         screen.current = null;
+        if (shareRepair.current.timer) clearTimeout(shareRepair.current.timer);
+        shareRepair.current = { timer: null, attempt: 0 };
         screenAudio.current?.stop();
         screenAudio.current = null;
         void publish(SCREEN, null);
@@ -2795,6 +2838,46 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [publish, publishLocalPreview, sound]);
 
     /**
+     * Put the shared screen up again, cleanly, on the backoff in
+     * `call-share-heal`.
+     *
+     * The publication is taken down and the same capture published again with
+     * this hook's own options, and anything else of the source still on the
+     * connection is swept by `publish`. Called after a reconnection - where
+     * the client's own republish is what the server refused - and after a
+     * publish that failed. One at a time: a repair already waiting is the one
+     * that runs.
+     */
+    const healShare = useCallback(() => {
+        const held = shareRepair.current;
+        if (held.timer) return;
+        const wait = shareHeal.republishDelay(held.attempt);
+        if (wait === null) {
+            console.error("call: the shared screen could not be put back up");
+            return;
+        }
+        held.timer = setTimeout(() => {
+            held.timer = null;
+            const track = screen.current;
+            const current = room.current;
+            if (!track || track.readyState !== "live") return;
+            // Not connected now: the next reconnection starts this again.
+            if (!current || current.state !== CONNECTED) return;
+            held.attempt += 1;
+            void publish(SCREEN, track, { again: true }).then((done) => {
+                if (screen.current !== track) return;
+                if (!done) {
+                    healShareRef.current();
+                    return;
+                }
+                held.attempt = 0;
+                publishLocalPreview();
+            });
+        }, wait);
+    }, [publish, publishLocalPreview]);
+    healShareRef.current = healShare;
+
+    /**
      * Make a freshly picked screen the one being followed: what the encoder is
      * told it is looking at, and the browser's own "stop sharing" and
      * still-picture signals. Used for the first pick and every change after it.
@@ -2805,7 +2888,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // browser guesses from the track alone and guesses "motion",
             // which spends the whole allowance smoothing a page of text that
             // never moved.
-            track.contentHint = quality.screenIsMotion(level) ? "motion" : "detail";
+            track.contentHint = quality.screenTuning(level, screenDegraded(level)).hint;
             // The browser's own "stop sharing" bar ends the track without
             // going through this hook, and the call has to notice.
             track.onended = () => {
@@ -2819,7 +2902,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             };
             setShareStill(track.muted);
         },
-        [stopSharing]
+        [screenDegraded, stopSharing]
     );
 
     /** Send the screen's sound or hold it back, as the share menu's box says. */
@@ -2908,7 +2991,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 watchScreen(track, level);
                 screen.current = track;
                 screenAudio.current = audio;
-                await publish(SCREEN, track);
+                if (!(await publish(SCREEN, track))) healShareRef.current();
                 if (audio) await publish(SCREEN_AUDIO, audio);
                 applyShareAudio(shareAudioOn.current);
                 publishLocalPreview();
@@ -3303,8 +3386,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         quality.screenConstraints(level, screen.current?.getSettings())
                     );
                     if (screen.current) {
-                        const motion = quality.screenIsMotion(level);
-                        screen.current.contentHint = motion ? "motion" : "detail";
+                        const tuning = quality.screenTuning(level, screenDegraded(level));
+                        screen.current.contentHint = tuning.hint;
                         // In place where the browser allows it, so nobody
                         // watching sees the share drop and come back; published
                         // again only where it does not.
@@ -3313,7 +3396,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         const live = await retuneScreenEncoding(
                             published,
                             quality.encodingFor(quality.SCREEN_LADDER, level),
-                            motion ? "maintain-framerate" : "maintain-resolution"
+                            tuning.preference
                         );
                         if (!live) await publish(SCREEN, screen.current, { again: true });
                     }
@@ -3321,7 +3404,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 publishLocalPreview();
             })();
         },
-        [cameraOn, outgoingCamera, publish, publishLocalPreview]
+        [cameraOn, outgoingCamera, publish, publishLocalPreview, screenDegraded]
     );
 
     const setCameraQuality = useCallback(
@@ -3353,7 +3436,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         async (
             source: Track.Source,
             connection: string,
-            countFrames: boolean
+            countFrames: boolean,
+            uplink: quality.Uplink
         ): Promise<quality.CallHealth> => {
             const publication = room.current?.localParticipant.getTrackPublication(source);
             const sender = publication?.track as
@@ -3368,10 +3452,30 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                   }
                 | undefined;
             const stats = await sender?.getSenderStats?.().catch(() => undefined);
-            return quality.senderHealthFrom(stats, connection, countFrames);
+            return quality.senderHealthFrom(stats, connection, countFrames, uplink);
         },
         []
     );
+
+    /**
+     * The round trip and the send estimate of this browser's connection, off
+     * the first published track whose report carries them. Every publication
+     * rides the same connection, so any of them answers for all. Nothing
+     * published, or a browser that reports neither, is no evidence.
+     */
+    const uplinkNow = useCallback(async (): Promise<quality.Uplink> => {
+        const local = room.current?.localParticipant;
+        if (!local) return {};
+        for (const publication of local.trackPublications.values()) {
+            const track = publication.track as
+                { getRTCStatsReport?: () => Promise<RTCStatsReport | undefined> } | undefined;
+            const report = await track?.getRTCStatsReport?.().catch(() => undefined);
+            if (!report) continue;
+            const uplink = quality.uplinkFrom(report.values() as Iterable<quality.UplinkStatEntry>);
+            if (uplink.rtt !== undefined || uplink.available !== undefined) return uplink;
+        }
+        return {};
+    }, []);
 
     /**
      * Follow the picture, while nobody has taken the wheel.
@@ -3423,11 +3527,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
             void (async () => {
                 let moved = false;
+                const uplink = await uplinkNow();
                 if (quality.cameraQuality() === "auto") {
                     // Frames counted here and not below: a camera always has
                     // some, and a screen nobody is touching has almost none
                     // because there is no new picture to send.
-                    const health = await senderHealth(CAMERA, connection, true);
+                    const health = await senderHealth(CAMERA, connection, true, uplink);
                     const next = quality.driftAuto(
                         autoCamera.current,
                         health,
@@ -3447,7 +3552,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     autoCamera.current = next;
                 }
                 if (quality.screenQuality() === "auto") {
-                    const health = await senderHealth(SCREEN, connection, false);
+                    const health = await senderHealth(SCREEN, connection, false, uplink);
                     const next = quality.driftAuto(
                         autoScreen.current,
                         health,
@@ -3459,6 +3564,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                             screen.current,
                             quality.screenConstraints(next.level, screen.current?.getSettings())
                         );
+                        // Held sharp once it has had to come down, and given the
+                        // new allowance in place - never republished from here.
+                        const tuning = quality.screenTuning(next.level, screenDegraded(next.level));
+                        if (screen.current) screen.current.contentHint = tuning.hint;
+                        void retuneScreenEncoding(
+                            current.localParticipant.getTrackPublication(SCREEN)?.track as
+                                EncodedTrack | undefined,
+                            quality.encodingFor(quality.SCREEN_LADDER, next.level),
+                            tuning.preference
+                        );
                     }
                     autoScreen.current = next;
                 }
@@ -3467,7 +3582,84 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
         again();
         return () => clearTimeout(timer);
-    }, [meetingId, senderHealth, settleLevels]);
+    }, [meetingId, screenDegraded, senderHealth, settleLevels, uplinkNow]);
+
+    /**
+     * Somebody else's screen that never arrives, taken again.
+     *
+     * Every few seconds each shared screen this browser is subscribed to and
+     * showing is asked how many frames it has decoded; one that has decoded
+     * none for a while is let go of and taken again, a few times, and only then
+     * is the viewer told - see `call-share-heal` for what counts. A screen not
+     * on show is not judged: the server is right to send it nothing.
+     */
+    useEffect(() => {
+        if (!meetingId) return;
+        const watches = new Map<string, shareHeal.ShareWatch>();
+        let stopped = false;
+        async function look(): Promise<void> {
+            const current = room.current;
+            if (!current || current.state !== CONNECTED) return;
+            const at = Date.now();
+            const present = new Set<string>();
+            for (const person of current.remoteParticipants.values()) {
+                const publication = person.getTrackPublication(SCREEN);
+                if (!publication) continue;
+                const sid = publication.trackSid;
+                present.add(sid);
+                // Mid-resubscription, or deliberately not on show: neither is
+                // judged, and the clock starts again when it is back.
+                if (!publication.isSubscribed || !publication.track) continue;
+                // Not on show: switched off, muted, drawn nowhere, or paused by
+                // the server - which is what a tile out of sight is under the
+                // adaptive stream, and is the server being right.
+                if (
+                    !publication.isEnabled ||
+                    publication.isMuted ||
+                    publication.track.attachedElements.length === 0 ||
+                    String(publication.track.streamState) !== "active"
+                ) {
+                    // The clock stops; the tries already spent are kept, so a
+                    // tile that blinks out of sight cannot reset the budget.
+                    const held = watches.get(sid);
+                    if (held) watches.set(sid, { ...held, since: at });
+                    continue;
+                }
+                const receiver = publication.track as {
+                    getReceiverStats?: () => Promise<{ framesDecoded?: number } | undefined>;
+                };
+                const stats = await receiver.getReceiverStats?.().catch(() => undefined);
+                if (stopped) return;
+                const { watch, verdict } = shareHeal.watchShare(watches.get(sid), {
+                    sid,
+                    frames: stats?.framesDecoded,
+                    at
+                });
+                watches.set(sid, watch);
+                if (verdict === "resubscribe") {
+                    const remote = publication as { setSubscribed?: (on: boolean) => void };
+                    remote.setSubscribed?.(false);
+                    setTimeout(() => {
+                        if (!stopped && room.current === current) remote.setSubscribed?.(true);
+                    }, SHARE_RESUBSCRIBE_GAP_MS);
+                } else if (verdict === "give-up") {
+                    console.warn("call: a shared screen is not arriving", sid);
+                    toastRef.current.show({
+                        key: `call-share-stalled-${sid}`,
+                        title: words.current("callRoom.shareNotArriving", {
+                            name: person.name || person.identity
+                        })
+                    });
+                }
+            }
+            for (const sid of [...watches.keys()]) if (!present.has(sid)) watches.delete(sid);
+        }
+        const timer = setInterval(() => void look(), SHARE_LOOK_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [meetingId]);
 
     /**
      * What the sampler is looking at, refreshed on every render.
