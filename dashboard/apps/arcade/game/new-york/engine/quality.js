@@ -3,6 +3,9 @@
 //   low     no shadows, no reflections, no bloom: the cheapest shaders, for the WebGL2 fallback and weak GPUs
 //   medium  sun shadows and bloom, no screen-space reflections
 //   high    everything (shadows, half-res SSR, bloom)
+// castLights is the share of each cast-light pool (car beams, street lamps, shop spots) lit at once. Every pool keeps
+// its size whatever the level - adding or removing a light recompiles every lit material - so a lower level only
+// leaves more of its lights at intensity 0, which the clustered lighting skips.
 // Auto starts from what the device says about itself and steps down for the next visit when the game ran slowly.
 
 const SETTING_KEY = 'nyc-quality';
@@ -11,10 +14,22 @@ const LEVELS = ['low', 'medium', 'high'];
 const SETTINGS = ['auto', ...LEVELS];
 
 const PRESETS = {
-  low: { shadows: false, reflections: false, bloom: false },
-  medium: { shadows: true, reflections: false, bloom: true },
-  high: { shadows: true, reflections: true, bloom: true }
+  low: { shadows: false, reflections: false, bloom: false, castLights: 0.375 },
+  medium: { shadows: true, reflections: false, bloom: true, castLights: 0.67 },
+  high: { shadows: true, reflections: true, bloom: true, castLights: 1 }
 };
+
+// The share in use this session; set once from the level (a change of level restarts the city)
+let castLightShare = 1;
+
+function setCastLightShare(share) {
+  castLightShare = Number.isFinite(share) ? Math.min(Math.max(share, 0), 1) : 1;
+}
+
+/** How many lights of a pool may be lit at once: its share, rounded, at least one. */
+function lightBudget(pool, share = castLightShare) {
+  return Math.min(pool, Math.max(1, Math.round(pool * share)));
+}
 
 function readStorage(key) {
   try {
@@ -76,4 +91,7 @@ function learnAutoQuality(level, fps) {
   else if (fps > 55 && readStorage(AUTO_KEY) === level && index < LEVELS.length - 1) writeStorage(AUTO_KEY, LEVELS[index + 1]);
 }
 
-export { LEVELS, PRESETS, SETTINGS, learnAutoQuality, readQualitySetting, resolveQuality, saveQualitySetting };
+export {
+  LEVELS, PRESETS, SETTINGS, learnAutoQuality, lightBudget, readQualitySetting, resolveQuality, saveQualitySetting,
+  setCastLightShare
+};

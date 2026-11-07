@@ -14,6 +14,7 @@ import * as guards from "../../../arcade/game/new-york/engine/browser-defaults.j
 import * as gamepad from "../../../arcade/game/new-york/engine/gamepad-controls.js";
 import * as placement from "../../../arcade/game/new-york/engine/arrival-placement.js";
 import * as embed from "../../../arcade/game/new-york/engine/embed.js";
+import * as quality from "../../../arcade/game/new-york/engine/quality.js";
 
 // The gamepad module reads only the field check from the city config, which otherwise needs the city data
 vi.mock("../../../arcade/game/new-york/engine/city-config.js", () => ({
@@ -309,5 +310,31 @@ describe("car lamps shared in a call", () => {
             reverse: true,
             signal: -1
         });
+    });
+});
+
+describe("cast lights by graphics quality", () => {
+    afterEach(() => quality.setCastLightShare(1));
+
+    it("light fewer of each pool on lower levels, never none and never more than the pool", () => {
+        const lit = (level: "low" | "medium" | "high", pool: number) =>
+            quality.lightBudget(pool, quality.PRESETS[level].castLights);
+        for (const pool of [6, 28, 36, 48, 96]) {
+            expect(lit("high", pool)).toBe(pool);
+            expect(lit("medium", pool)).toBeLessThan(pool);
+            expect(lit("low", pool)).toBeLessThan(lit("medium", pool));
+            expect(lit("low", pool)).toBeGreaterThanOrEqual(1);
+        }
+        expect(lit("low", 96)).toBe(36);
+        expect(quality.lightBudget(1, 0)).toBe(1);
+    });
+
+    it("follow the share set for the session, which a bad value cannot break", () => {
+        quality.setCastLightShare(quality.PRESETS.low.castLights);
+        expect(quality.lightBudget(48)).toBe(18);
+        quality.setCastLightShare(Number.NaN);
+        expect(quality.lightBudget(48)).toBe(48);
+        quality.setCastLightShare(4);
+        expect(quality.lightBudget(48)).toBe(48);
     });
 });

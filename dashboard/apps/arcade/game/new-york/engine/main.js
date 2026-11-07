@@ -6,7 +6,9 @@ import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { createPostProcessing } from './post-processing.js';
 import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { drawOnlyCompiled } from './async-pipelines.js';
-import { PRESETS, learnAutoQuality, readQualitySetting, resolveQuality, saveQualitySetting } from './quality.js';
+import {
+  PRESETS, learnAutoQuality, readQualitySetting, resolveQuality, saveQualitySetting, setCastLightShare
+} from './quality.js';
 import { getLocationLabel, isTypingInField, ROADS, NYC_LANDMARKS, TELEPORT_LOCATIONS } from './city-config.js';
 import { buildCityGrid } from './city-grid.js';
 import { buildBoroughs } from './boroughs.js';
@@ -116,6 +118,7 @@ async function initApp() {
   const qualitySetting = readQualitySetting();
   const quality = resolveQuality(qualitySetting, renderer);
   const preset = PRESETS[quality];
+  setCastLightShare(preset.castLights);
   renderer.shadowMap.enabled = preset.shadows;
   console.log(`[init] quality ${quality} (${qualitySetting}), ${renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL2'}`);
   await stepDone('renderer');

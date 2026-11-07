@@ -22,6 +22,7 @@ import { createSubwayEntranceParts, createFoodCartParts } from './street-props.j
 import { createSubwayEntrances } from './subway-entrances.js';
 import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites } from './city-grid.js';
 import { bryantParkLawn } from './landmarks.js';
+import { lightBudget } from './quality.js';
 
 // Instanced street furniture, traffic signals, trees and nearby light pools.
 
@@ -1091,10 +1092,11 @@ function buildStreetDetails(scene, colliders = []) {
 
     const cobraCount = nearbyLights(cobraCells, camera, STREETLIGHT_DIST, activeCobras);
 
-    const cobraCutoff = cobraCount > STREETLIGHT_SPOT_POOL
-      ? Math.min(STREETLIGHT_DIST, activeCobras[STREETLIGHT_SPOT_POOL]._effDist)
+    const spotBudget = lightBudget(STREETLIGHT_SPOT_POOL); // quality.js: fewer lit on lower levels, same pool
+    const cobraCutoff = cobraCount > spotBudget
+      ? Math.min(STREETLIGHT_DIST, activeCobras[spotBudget]._effDist)
       : STREETLIGHT_DIST;
-    const spotUsed = Math.min(cobraCount, STREETLIGHT_SPOT_POOL);
+    const spotUsed = Math.min(cobraCount, spotBudget);
     for (let i = 0; i < spotUsed; i++) {
       const s = activeCobras[i];
       const fade = smoothFade(s._effDist, cobraCutoff * 0.62, cobraCutoff);
@@ -1111,10 +1113,11 @@ function buildStreetDetails(scene, colliders = []) {
 
     const ptCount = nearbyLights(pointCells, camera, STREET_POINT_DIST, activePoints);
 
-    const ptCutoff = ptCount > STREET_POINT_POOL
-      ? Math.min(STREET_POINT_DIST, activePoints[STREET_POINT_POOL]._effDist)
+    const pointBudget = lightBudget(STREET_POINT_POOL);
+    const ptCutoff = ptCount > pointBudget
+      ? Math.min(STREET_POINT_DIST, activePoints[pointBudget]._effDist)
       : STREET_POINT_DIST;
-    const ptUsed = Math.min(ptCount, STREET_POINT_POOL);
+    const ptUsed = Math.min(ptCount, pointBudget);
     for (let i = 0; i < ptUsed; i++) {
       const s = activePoints[i];
       const fade = smoothFade(s._effDist, ptCutoff * 0.62, ptCutoff);

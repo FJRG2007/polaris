@@ -38,6 +38,7 @@ import { REAL_BUILDINGS } from './building-geodata.js';
 import { createBuildingFootprints } from './building-footprints.js';
 import { polygonContains, polygonBoxOverlaps } from './building-collision.js';
 import { pavedPlazaRects, parkTreeSites, sidewalkBlocks } from './city-grid.js';
+import { lightBudget } from './quality.js';
 
 // Surveyed footprints define buildings and collisions; architectural details stream around the player.
 
@@ -944,10 +945,11 @@ function buildCityBlocks(scene, landmarkColliders = []) {
     }
     spotCandidates.sort((a, b) => a.effDist - b.effDist);
 
-    const storeCutoff = spotCandidates.length > STORE_SPOT_POOL
-      ? Math.min(STORE_MAX_DIST, spotCandidates[STORE_SPOT_POOL].effDist)
+    const storeBudget = lightBudget(STORE_SPOT_POOL); // quality.js: fewer lit on lower levels, same pool
+    const storeCutoff = spotCandidates.length > storeBudget
+      ? Math.min(STORE_MAX_DIST, spotCandidates[storeBudget].effDist)
       : STORE_MAX_DIST;
-    const activeSpots = Math.min(STORE_SPOT_POOL, spotCandidates.length);
+    const activeSpots = Math.min(storeBudget, spotCandidates.length);
     for (let i = 0; i < STORE_SPOT_POOL; i++) {
       const spot = storeSpotPool[i];
       if (i < activeSpots) {
