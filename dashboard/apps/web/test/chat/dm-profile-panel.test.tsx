@@ -16,7 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { SearchPanel } from "@/app/(app)/chat/search-panel";
 import { DirectProfile } from "@/app/(app)/chat/direct-profile";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 
 const PERSON = { id: "grace", name: "Grace Hopper" };
 
@@ -154,15 +154,16 @@ describe("the profile column", () => {
         expect(screen.queryByRole("button", { name: /friend request/ })).toBeNull();
     });
 
-    it("shows what you have in common as counts that open into the list", async () => {
+    it("shows what you have in common as one line of counts that open the larger view", async () => {
         panel();
         const friends = await screen.findByRole("button", { name: "3 friends in common" });
         expect(screen.getByRole("button", { name: "1 space in common" })).toBeDefined();
         expect(screen.queryByText("Alan Turing")).toBeNull();
         await userEvent.click(friends);
-        expect(friends.getAttribute("aria-expanded")).toBe("true");
-        expect(screen.getByText("Alan Turing").closest("a")?.getAttribute("href")).toBe("/u/alan");
-        expect(screen.getByText("and 2 more")).toBeDefined();
+        const dialog = await screen.findByRole("dialog");
+        const alan = await within(dialog).findByText("Alan Turing");
+        expect(alan.closest("a")?.getAttribute("href")).toBe("/u/alan");
+        expect(within(dialog).getByText("and 2 more")).toBeDefined();
     });
 
     it("cuts a long bio and opens the rest on request", async () => {

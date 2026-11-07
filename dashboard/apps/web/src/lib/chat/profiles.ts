@@ -105,6 +105,9 @@ export interface ChatProfile {
      * already waiting (in either direction), `none` offers one.
      */
     readonly friendship: "self" | "friends" | "pending" | "none";
+    /** When the two of them became friends, ISO - the request being accepted.
+     *  Empty unless they are friends. */
+    readonly friendsSince?: string;
 }
 
 /** What somebody can be in a place, beyond being in it. */
@@ -177,10 +180,10 @@ export async function chatProfile(
     // Asked after the reach above rather than beside it: there is no point
     // working out what two people have in common before it is settled that this
     // one may be shown the other at all.
-    const [mutual, role, friendship, badges, recent] = await Promise.all([
+    const [mutual, role, between, badges, recent] = await Promise.all([
         self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
         roleIn(together, person.id),
-        self ? ("self" as const) : standing(actor.id, person.id),
+        self ? { standing: "self" as const, since: null } : standing(actor.id, person.id),
         // Loaded on use: the badge service records audits, which reads the
         // server's auth setup - nothing a profile read needs on import.
         mayReadProfile
@@ -196,6 +199,7 @@ export async function chatProfile(
               })
             : null
     ]);
+    const friendship = between.standing;
 
     // Outside the profile audience: what the roster beside this conversation
     // already draws, and nothing else.
@@ -232,7 +236,8 @@ export async function chatProfile(
         badges,
         recent,
         memberSince: person.createdAt.toISOString(),
-        friendship
+        friendship,
+        friendsSince: between.since?.toISOString() ?? ""
     };
 }
 
@@ -261,13 +266,13 @@ async function roleIn(
 
 /**
  * Whether two people are friends, have a request waiting between them in either
- * direction, or neither. One row at most answers it - a friendship is one row
- * naming both people.
+ * direction, or neither, and since when they have been friends. One row at most
+ * answers it - a friendship is one row naming both people.
  */
 async function standing(
     viewerId: string,
     personId: string
-): Promise<"friends" | "pending" | "none"> {
+): Promise<{ standing: "friends" | "pending" | "none"; since: Date | null }> {
     const row = await prisma.friendship.findFirst({
         where: {
             status: { in: ["accepted", "pending"] },
@@ -276,8 +281,12 @@ async function standing(
                 { requesterId: personId, addresseeId: viewerId }
             ]
         },
-        select: { status: true }
+        select: { status: true, createdAt: true, respondedAt: true }
     });
-    if (!row) return "none";
-    return row.status === "accepted" ? "friends" : "pending";
+    if (!row) return { standing: "none", since: null };
+    // Accepted is when they became friends; a row from before that was
+    // recorded has only the request's own date.
+    return row.status === "accepted"
+        ? { standing: "friends", since: row.respondedAt ?? row.createdAt }
+        : { standing: "pending", since: null };
 }

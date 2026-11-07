@@ -21,7 +21,7 @@
 
 import Link from "next/link";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { AtSign, ChevronRight, Lock } from "lucide-react";
+import { AtSign, Lock } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { Badge, cn, Skeleton } from "@polaris/ui";
@@ -96,7 +96,8 @@ export function ProfileDetails({
     actions,
     onAvatar,
     bannerActions,
-    footer
+    footer,
+    onMutual
 }: {
     person: ProfilePerson;
     profile: ChatProfile | null;
@@ -116,13 +117,16 @@ export function ProfileDetails({
     /** What closes the profile off at the bottom - the column's way to the
      *  larger view. */
     footer?: ReactNode;
+    /** Opens the larger view on what the two of them have in common. Given, the
+     *  column draws Discord's one line of counts under the name instead of the
+     *  lists that open in place. */
+    onMutual?: (tab: MutualTab) => void;
 }) {
     const t = useTranslations("chat");
     const where = usePresence(person.id);
     const name = profile?.name || person.name;
     const full = size === "full";
     const panel = size === "panel";
-    const locale = useLocale();
 
     return (
         <div className="flex flex-col">
@@ -235,6 +239,12 @@ export function ProfileDetails({
                     ) : null}
                 </div>
 
+                {/* Discord's line of counts under the name, each the way to
+                    that tab of the larger view. */}
+                {panel && onMutual && profile?.mutual && !profile.restricted ? (
+                    <MutualLine mutual={profile.mutual} onOpen={onMutual} />
+                ) : null}
+
                 {actions}
 
                 {/* What they are showing, and only that. Where they are is
@@ -252,14 +262,6 @@ export function ProfileDetails({
                 {/* The larger view has a pane of its own for this, beside the
                     profile rather than under it - see ProfileActivityPane. */}
                 {full ? null : <ActivityCards personId={person.id} />}
-
-                {/* What the two of them have in common, from the same module the
-                    profile page draws it from. Not on the card: a glance is the
-                    name, the face and what they said, and this is the part of a
-                    profile somebody reads when they have sat down with it. */}
-                {panel && profile?.mutual && !profile.restricted ? (
-                    <MutualSections mutual={profile.mutual} />
-                ) : null}
 
                 {profile?.description && (
                     <div className="w-full text-left">
@@ -285,21 +287,20 @@ export function ProfileDetails({
                 )}
 
                 {size !== "card" && profile?.memberSince ? (
-                    <div className="w-full text-left">
-                        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                            {t("profileDetails.memberSince")}
-                        </p>
-                        <p
-                            className={cn(
-                                "mt-1 text-muted-foreground",
-                                full ? "text-sm" : "text-xs"
-                            )}
-                        >
-                            {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
-                                new Date(profile.memberSince)
-                            )}
-                        </p>
-                    </div>
+                    <SinceRow
+                        label={t("profileDetails.memberSince")}
+                        iso={profile.memberSince}
+                        large={full}
+                    />
+                ) : null}
+
+                {/* Under it in the larger view, and only between friends. */}
+                {full && profile?.friendsSince ? (
+                    <SinceRow
+                        label={t("profileDetails.friendsSince")}
+                        iso={profile.friendsSince}
+                        large
+                    />
                 ) : null}
 
                 {profile?.restricted ? (
@@ -311,6 +312,21 @@ export function ProfileDetails({
 
                 {footer}
             </div>
+        </div>
+    );
+}
+
+/** A date under a small heading: when they joined, when you became friends. */
+function SinceRow({ label, iso, large }: { label: string; iso: string; large: boolean }) {
+    const locale = useLocale();
+    return (
+        <div className="w-full text-left">
+            <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                {label}
+            </p>
+            <p className={cn("mt-1 text-muted-foreground", large ? "text-sm" : "text-xs")}>
+                {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso))}
+            </p>
         </div>
     );
 }
@@ -375,33 +391,57 @@ export function ClampedBio({ text }: { text: string }) {
 /** The two halves of what you have in common, as the column draws them. */
 type Shared = ChatProfile["mutual"];
 
+/** The tabs of the larger view that list what two people have in common. */
+export type MutualTab = "friends" | "spaces";
+
 /**
- * Discord's two rows under a profile: "3 mutual friends", "2 mutual servers",
- * each a count that opens into the list. Collapsed to begin with - the count is
- * the fact; the names are for whoever asks. Each person goes to their page and
- * each space opens in the chat. Nothing is drawn for a half with nobody in it.
+ * Discord's line under a name in the column: a few faces and "1 friend in
+ * common", a dot, "6 spaces in common". Each half opens the larger view on its
+ * own tab rather than unfolding a list in a narrow column. Nothing is drawn for
+ * a half with nobody in it.
  */
-export function MutualSections({ mutual }: { mutual: Shared }) {
+export function MutualLine({
+    mutual,
+    onOpen
+}: {
+    mutual: Shared;
+    onOpen: (tab: MutualTab) => void;
+}) {
     const t = useTranslations("chat");
-    if (mutual.friends.total === 0 && mutual.spaces.total === 0) return null;
+    const friends = mutual.friends.total;
+    const spaces = mutual.spaces.total;
+    if (friends === 0 && spaces === 0) return null;
+    const link =
+        "flex min-w-0 items-center gap-1.5 rounded text-left hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
     return (
-        <div className="flex w-full flex-col gap-1 border-t border-border pt-3">
-            {mutual.friends.total > 0 ? (
-                <Section
-                    label={t("profileDetails.mutualFriends", { count: mutual.friends.total })}
-                    more={mutual.friends.total - mutual.friends.people.length}
-                >
-                    <FriendRows people={mutual.friends.people} />
-                </Section>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+            {friends > 0 ? (
+                <button type="button" onClick={() => onOpen("friends")} className={link}>
+                    <span aria-hidden className="flex shrink-0 -space-x-1">
+                        {mutual.friends.people.slice(0, 3).map((person) => (
+                            <Avatar
+                                key={person.id}
+                                person={person}
+                                size={16}
+                                className="ring-2 ring-background"
+                            />
+                        ))}
+                    </span>
+                    <span className="min-w-0 truncate">
+                        {t("profileDetails.mutualFriends", { count: friends })}
+                    </span>
+                </button>
             ) : null}
-            {mutual.spaces.total > 0 ? (
-                <Section
-                    label={t("profileDetails.mutualServers", { count: mutual.spaces.total })}
-                    more={mutual.spaces.total - mutual.spaces.spaces.length}
-                >
-                    <SpaceRows spaces={mutual.spaces.spaces} />
-                </Section>
+            {friends > 0 && spaces > 0 ? (
+                <span aria-hidden className="size-1 shrink-0 rounded-full bg-muted-foreground/60" />
+            ) : null}
+            {spaces > 0 ? (
+                <button type="button" onClick={() => onOpen("spaces")} className={link}>
+                    <span className="min-w-0 truncate">
+                        {t("profileDetails.mutualServers", { count: spaces })}
+                    </span>
+                </button>
             ) : null}
         </div>
     );
@@ -467,49 +507,5 @@ export function SpaceRows({ spaces }: { spaces: Shared["spaces"]["spaces"] }) {
                 </li>
             ))}
         </>
-    );
-}
-
-/** One collapsible count and the list under it. */
-function Section({
-    label,
-    more,
-    children
-}: {
-    label: string;
-    /** How many the list leaves out, said under it when it is any. */
-    more: number;
-    children: ReactNode;
-}) {
-    const t = useTranslations("chat");
-    const [open, setOpen] = useState(false);
-    return (
-        <div className="flex flex-col">
-            <button
-                type="button"
-                aria-expanded={open}
-                onClick={() => setOpen((current) => !current)}
-                className="flex min-w-0 items-center justify-between gap-2 rounded px-1.5 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted"
-            >
-                <span className="min-w-0 truncate">{label}</span>
-                <ChevronRight
-                    aria-hidden
-                    className={cn(
-                        "size-3.5 shrink-0 text-muted-foreground transition-transform",
-                        open && "rotate-90"
-                    )}
-                />
-            </button>
-            {open ? (
-                <>
-                    <ul className="flex flex-col gap-0.5 pb-1">{children}</ul>
-                    {more > 0 ? (
-                        <p className="px-1.5 pb-1 text-xs text-muted-foreground">
-                            {t("profileDetails.andMore", { count: more })}
-                        </p>
-                    ) : null}
-                </>
-            ) : null}
-        </div>
     );
 }

@@ -35,7 +35,12 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { PersonPressContext, type PersonPress } from "@/components/person-press";
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ProfileActivityPane } from "./profile-activity-pane";
-import { ProfileDetails, useChatProfile, type ProfilePerson } from "./profile-details";
+import {
+    ProfileDetails,
+    useChatProfile,
+    type MutualTab,
+    type ProfilePerson
+} from "./profile-details";
 import { Button, Dialog, DialogContent, DialogFloating, DialogTitle } from "@polaris/ui";
 import { ArrowUpRight, MessageSquare, MoreHorizontal, Pencil } from "lucide-react";
 
@@ -357,7 +362,8 @@ export function PersonProfileDialog({
     viewerId,
     onMention,
     onNickname,
-    onClose
+    onClose,
+    initialTab
 }: {
     person: ProfilePerson;
     channelId: string;
@@ -365,11 +371,45 @@ export function PersonProfileDialog({
     onMention?: (text: string) => void;
     onNickname: (person: MenuPerson) => void;
     onClose: () => void;
+    /** The tab the right half opens on; activity unless a count was pressed. */
+    initialTab?: "activity" | MutualTab;
 }) {
     const t = useTranslations("chat");
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
     const { profile, loading } = useChatProfile(channelId, person.id, true);
+    const router = useRouter();
+    const [messageError, setMessageError] = useState("");
+    const direct = useOpenDirect(setMessageError);
+    const here = channel?.kind === "dm" && channel.others.some((other) => other.id === person.id);
+    // Offered with "nothing to share", as Discord does: back to the
+    // conversation when this already is it, otherwise into one.
+    const messageAction =
+        person.id === viewerId ? undefined : (
+            <div className="flex flex-col items-center gap-1.5">
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={direct.busy}
+                    onClick={() =>
+                        here
+                            ? onClose()
+                            : void direct.open(person.id, (id) => {
+                                  onClose();
+                                  router.push(`/chat/c/${id}`);
+                              })
+                    }
+                >
+                    <MessageSquare className="size-4" />
+                    {t("personCard.message")}
+                </Button>
+                {messageError ? (
+                    <p role="alert" className="text-xs text-danger">
+                        {messageError}
+                    </p>
+                ) : null}
+            </div>
+        );
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -409,8 +449,15 @@ export function PersonProfileDialog({
                         }
                     />
                 </div>
-                <div className="min-w-0 border-t border-border p-5 md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0 md:pr-14">
-                    <ProfileActivityPane personId={person.id} profile={profile} loading={loading} />
+                <div className="min-w-0 border-t border-border p-5 md:overflow-y-auto md:overscroll-contain md:border-l md:border-t-0">
+                    <ProfileActivityPane
+                        personId={person.id}
+                        name={profile?.name || person.name}
+                        profile={profile}
+                        loading={loading}
+                        initialTab={initialTab}
+                        messageAction={messageAction}
+                    />
                 </div>
             </DialogContent>
         </Dialog>

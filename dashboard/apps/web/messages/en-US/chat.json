@@ -1676,6 +1676,7 @@
         "restricted": "This profile is private.",
         "about": "About",
         "memberSince": "Member since",
+        "friendsSince": "Friends since",
         "viewFullBio": "View full bio",
         "showLess": "Show less",
         "mutualFriends": "{count, plural, one {# friend in common} other {# friends in common}}",
@@ -1687,8 +1688,8 @@
         "sections": "Profile sections",
         "current": "Now",
         "recent": "Recent activity",
-        "emptyTitle": "Nothing to show",
-        "emptyHint": "Games they play here show up when they share them with you."
+        "emptyTitle": "{name} has no activity to share here",
+        "emptyHint": "Nothing shared yet. Why not break the ice?"
     },
     "notifyMenu": {
         "notifications": "Notifications",

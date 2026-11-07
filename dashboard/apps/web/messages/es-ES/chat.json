@@ -1676,6 +1676,7 @@
         "restricted": "Este perfil es privado.",
         "about": "Sobre mí",
         "memberSince": "Miembro desde",
+        "friendsSince": "Amigos desde",
         "viewFullBio": "Ver biografía",
         "showLess": "Ver menos",
         "mutualFriends": "{count, plural, one {# amistad en común} other {# amistades en común}}",
@@ -1687,8 +1688,8 @@
         "sections": "Secciones del perfil",
         "current": "Ahora",
         "recent": "Actividad reciente",
-        "emptyTitle": "Nada que mostrar",
-        "emptyHint": "Sus partidas aquí salen si las comparte contigo."
+        "emptyTitle": "{name} no tiene actividad que compartir",
+        "emptyHint": "Aún no ha compartido nada. ¿Rompes el hielo?"
     },
     "notifyMenu": {
         "notifications": "Avisos",
