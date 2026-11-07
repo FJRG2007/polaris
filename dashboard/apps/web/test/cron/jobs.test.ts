@@ -164,6 +164,9 @@ describe("the work Polaris runs on a schedule", () => {
             // could each start the event that had come due.
             "game-events",
             "game-health",
+            // Two passes could each give the same newcomer their lucky blocks
+            // before either had tagged them as served.
+            "game-lucky-starters",
             // Two passes would each rewrite the same mod's config file at once.
             "game-mod-announcements",
             // Two passes would each read the same server's mod list and write

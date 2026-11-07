@@ -407,6 +407,17 @@ export function gameJobTable(): readonly AppJob[] {
             run: async () => (await import("./minecraft/events/events-service")).sweepEvents()
         },
         {
+            key: "game-lucky-starters",
+            // Every minute: a newcomer on a Lucky blocks server is given their
+            // first lucky blocks. The game remembers who has had them, so a pass
+            // with nobody new changes nothing.
+            everyMs: MINUTE,
+            // Leased: two passes at once could each give the same newcomer theirs
+            // before either tagged them.
+            leaseMs: 5 * MINUTE,
+            run: async () => (await import("./minecraft/lucky-starter-service")).sweepLuckyStarters()
+        },
+        {
             key: "game-challenges",
             // Every minute: a server with challenges on gets its loop back after
             // a restart, and a day, week or month that came round gets its new
