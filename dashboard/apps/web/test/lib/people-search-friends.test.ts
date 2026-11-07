@@ -12,12 +12,27 @@ interface Account {
     name: string;
     email: string;
     username: string;
+    emails?: { email: string; verifiedAt: Date | null }[];
 }
 
 const accounts: Account[] = [
     { id: "viewer", name: "Test Viewer", email: "viewer@example.test", username: "viewer" },
-    { id: "friend", name: "Fixture Friend", email: "friend@example.test", username: "fixture_friend" },
-    { id: "stranger", name: "Fixture Stranger", email: "stranger@example.test", username: "fixture_stranger" }
+    {
+        id: "friend",
+        name: "Fixture Friend",
+        email: "friend@example.test",
+        username: "fixture_friend"
+    },
+    {
+        id: "stranger",
+        name: "Fixture Stranger",
+        email: "stranger@example.test",
+        username: "fixture_stranger",
+        emails: [
+            { email: "stranger.work@example.test", verifiedAt: new Date(0) },
+            { email: "stranger.unproven@example.test", verifiedAt: null }
+        ]
+    }
 ];
 
 let friends = new Set<string>();
@@ -34,7 +49,9 @@ function textMatches(value: string, rule: Text): boolean {
 function clauseMatches(person: Account, clause: Record<string, unknown>): boolean {
     for (const [field, rule] of Object.entries(clause)) {
         if (field === "OR") {
-            if (!(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))) {
+            if (
+                !(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))
+            ) {
                 return false;
             }
         } else if (field === "id") {
@@ -43,6 +60,12 @@ function clauseMatches(person: Account, clause: Record<string, unknown>): boolea
             if (id.not && id.not === person.id) return false;
         } else if (field === "name" || field === "username" || field === "email") {
             if (!textMatches(person[field], rule as Text)) return false;
+        } else if (field === "emails") {
+            const wanted = (rule as { some: { email: string; verifiedAt: { not: null } } }).some;
+            const proven = (person.emails ?? []).filter((row) => row.verifiedAt !== null);
+            if (!proven.some((row) => row.email === wanted.email)) return false;
+        } else if (field !== "bannedAt" && field !== "disabledAt") {
+            throw new Error(`unhandled field ${field}`);
         }
     }
     return true;
@@ -138,6 +161,14 @@ describe("the instance's discovery policy", () => {
         policy({ emailExact: true });
         expect(await search("stranger@example.test")).toEqual(["stranger"]);
         expect(await search("example.test")).toEqual([]);
+    });
+
+    it("finds a stranger by a proven added address, never an unproven one", async () => {
+        policy({ emailExact: true });
+        expect(await search("Stranger.Work@example.test")).toEqual(["stranger"]);
+        expect(await search("stranger.unproven@example.test")).toEqual([]);
+        policy({ emailExact: false });
+        expect(await search("stranger.work@example.test")).toEqual([]);
     });
 
     it("stops finding strangers by username when that is off, and keeps friends", async () => {

@@ -81,7 +81,15 @@ export function strangerMatches(term: string, policy: DiscoveryPolicy): Prisma.U
             ? [{ username: like(handle) }]
             : []),
         ...(policy.namePartial ? [{ name: like(term) }] : []),
-        ...(policy.emailExact && term.includes("@", 1) ? [{ email: term.toLowerCase() }] : [])
+        ...(policy.emailExact && term.includes("@", 1) ? addressMatches(term.toLowerCase()) : [])
+    ];
+}
+
+/** An account by its main address or one it added and proved, as a whole. */
+function addressMatches(address: string): Prisma.UserWhereInput[] {
+    return [
+        { email: address },
+        { emails: { some: { email: address, verifiedAt: { not: null } } } }
     ];
 }
 

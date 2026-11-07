@@ -66,8 +66,3 @@ export function readDiscoveryPolicy(stored: string | null): DiscoveryPolicy {
     }
     return policy;
 }
-
-/** Whether any rule lets a stranger be found at all. */
-export function findsStrangers(policy: DiscoveryPolicy): boolean {
-    return DISCOVERY_RULES.some((rule) => policy[rule]);
-}

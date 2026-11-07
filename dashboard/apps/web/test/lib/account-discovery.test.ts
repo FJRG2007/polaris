@@ -72,6 +72,10 @@ function matches(person: Account, where: Record<string, unknown>): boolean {
             if (!textMatches(person[field], rule as Text)) return false;
         } else if (field === "bannedAt" || field === "disabledAt") {
             if (rule === null && person[field] !== null) return false;
+        } else if (field === "emails") {
+            return false;
+        } else {
+            throw new Error(`unhandled field ${field}`);
         }
     }
     return true;
@@ -226,13 +230,14 @@ describe("an administrator", () => {
     });
 });
 
-describe("picking by id agrees with the search", () => {
-    it("accepts a colleague, a friend and a findable stranger", async () => {
-        expect(await byId(["colleague", "friend", "stranger"])).toEqual([
-            "colleague",
-            "friend",
-            "stranger"
-        ]);
+describe("picking by id", () => {
+    it("accepts a colleague and a friend", async () => {
+        expect(await byId(["colleague", "friend"])).toEqual(["colleague", "friend"]);
+    });
+
+    it("refuses a stranger the search would find, since an id proves nothing typed", async () => {
+        expect(await search("fixture_stranger")).toEqual(["stranger"]);
+        expect(await byId(["colleague", "friend", "stranger"])).toEqual(["colleague", "friend"]);
     });
 
     it("refuses whoever is hidden or blocked", async () => {

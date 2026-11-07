@@ -23,7 +23,7 @@ import { nicknamesFor } from "@/lib/contact-names";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { conversationAudience } from "@/lib/chat/access";
 import type { ReferenceKind } from "@/components/rich-text/references";
-import { findsStrangers, type DiscoveryPolicy } from "@/lib/discovery-policy";
+import type { DiscoveryPolicy } from "@/lib/discovery-policy";
 
 /** One row of the picker. */
 export interface MentionCandidate {
@@ -267,7 +267,8 @@ export async function searchAccounts(
  * The same people as `searchAccounts`, asked by id rather than by what was
  * typed: which of these accounts this one may pick. One question for any number
  * of ids, so a caller checking a list never searches by address and never
- * misses somebody whose address is inside another's.
+ * misses somebody whose address is inside another's. Colleagues and friends
+ * only: a stranger the search found by their username is not reachable by id.
  *
  * @param actor - The caller, already past the permission check.
  * @param ids - The accounts in question.
@@ -282,14 +283,12 @@ export async function accountsByIdInReach(
         actor,
         {
             colleagues: { id: { in: wanted } },
-            // Anybody the search could have offered: a friend always, and a
-            // stranger whenever the policy lets strangers be found at all - by
-            // id there is no typed text to hold the policy against, and the id
-            // came from a search that already did.
-            others: (friends, policy) => {
-                const ids = findsStrangers(policy)
-                    ? wanted
-                    : wanted.filter((id) => friends.includes(id));
+            // A friend, never a stranger: by id there is no typed text to hold
+            // the discovery policy against, and an id says nothing about what
+            // the caller knew - one resolved from a typed address would find
+            // somebody the policy keeps unfindable by address.
+            others: (friends) => {
+                const ids = wanted.filter((id) => friends.includes(id));
                 return ids.length > 0 ? { id: { in: ids } } : null;
             }
         },
