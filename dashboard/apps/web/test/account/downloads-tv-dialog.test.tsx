@@ -202,6 +202,7 @@ describe("the install dialog", () => {
         await userEvent.click(pair);
         expect(start).toHaveBeenLastCalledWith({
             host: "192.168.1.40",
+            mode: "system",
             home: true,
             code: "123456"
         });
@@ -214,6 +215,7 @@ describe("the install dialog", () => {
         await userEvent.click(screen.getByRole("button", { name: "Pair and install" }));
         expect(start).toHaveBeenLastCalledWith({
             host: "192.168.1.40",
+            mode: "system",
             home: true,
             code: "654321"
         });
@@ -228,6 +230,60 @@ describe("the install dialog", () => {
         await userEvent.type(screen.getByLabelText("TV address"), "192.168.1.41");
         expect(screen.queryByLabelText("Pairing code")).toBeNull();
         expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
+    });
+
+    it("installs as the TV's system by default, and sends home for apps that only read that", async () => {
+        await openDialog();
+        await userEvent.type(screen.getByLabelText("TV address"), "192.168.1.40");
+        expect(
+            screen.getByRole("radio", { name: "As the TV's system" }).getAttribute("aria-checked")
+        ).toBe("true");
+        await userEvent.click(screen.getByRole("button", { name: "Install" }));
+        expect(start).toHaveBeenLastCalledWith({
+            host: "192.168.1.40",
+            mode: "system",
+            home: true
+        });
+
+        await userEvent.click(screen.getByRole("radio", { name: "Only as an app" }));
+        expect(screen.getByText("Installs it and changes nothing else on the TV.")).toBeTruthy();
+        await userEvent.click(screen.getByRole("button", { name: "Install" }));
+        expect(start).toHaveBeenLastCalledWith({ host: "192.168.1.40", mode: "app", home: false });
+    });
+
+    it("lists what the TV allowed, and leaves out a level this page cannot name", async () => {
+        await openDialog();
+        act(() =>
+            listener?.({
+                ...BASE,
+                phase: "done",
+                outcome: "installed-home",
+                closed: true,
+                control: [
+                    { rung: "home", state: "got" },
+                    { rung: "battery", state: "refused" },
+                    { rung: "notification-listener", state: "skipped" },
+                    { rung: "from-a-newer-app", state: "got" }
+                ]
+            })
+        );
+        expect(await screen.findByText("What this TV allowed")).toBeTruthy();
+        expect(screen.getByText("Home screen")).toBeTruthy();
+        expect(screen.getByText("Allowed")).toBeTruthy();
+        expect(screen.getByText("Refused by this TV")).toBeTruthy();
+        expect(screen.getByText("Not tried here")).toBeTruthy();
+        expect(screen.queryByText(/from-a-newer-app/)).toBeNull();
+    });
+
+    it("says an app-only install changed nothing else", async () => {
+        await openDialog();
+        act(() =>
+            listener?.({ ...BASE, phase: "done", outcome: "installed", closed: true, control: [] })
+        );
+        expect(
+            await screen.findByText("Installed only as an app. Nothing else on the TV was changed.")
+        ).toBeTruthy();
+        expect(screen.queryByText("What this TV allowed")).toBeNull();
     });
 
     it("lists a found TV by the name it announced, beside its address", async () => {

@@ -40,6 +40,7 @@ export type DesktopTvPhase =
     | "download"
     | "install"
     | "home"
+    | "control"
     | "closing"
     | "done"
     | "failed";
@@ -64,6 +65,20 @@ export interface DesktopTvState {
     readonly waiting?: DesktopTvWaiting | null;
     /** The name a found TV announced, by address. Absent on an app older than that. */
     readonly named?: Readonly<Record<string, string>>;
+    /**
+     * What installing as the TV's system got, level by level; empty for an app-only install. An app
+     * newer than this page may name a level or state it does not know. Absent on older desktop apps.
+     */
+    readonly control?: readonly DesktopTvControl[] | null;
+}
+
+/** system: Polaris TV becomes the TV's system, with every permission it allows. app: installed, nothing else changed. */
+export type DesktopTvInstallMode = "system" | "app";
+
+/** One level of control the app tried on the TV. */
+export interface DesktopTvControl {
+    readonly rung: string;
+    readonly state: string;
 }
 
 /** The instruction for this TV while the install waits: its menus, from the TV checker's data. */
@@ -90,11 +105,13 @@ export interface DesktopTv {
         input:
             | {
                   readonly host: string;
+                  /** Read by apps that know it; older ones read only `home`, so both are sent. */
+                  readonly mode?: DesktopTvInstallMode;
                   readonly home: boolean;
                   /** The six digits the TV shows for Wireless debugging, once it asked for them. */
                   readonly code?: string;
               }
-            | { readonly usb: string; readonly home: boolean }
+            | { readonly usb: string; readonly mode?: DesktopTvInstallMode; readonly home: boolean }
     ): Promise<boolean>;
     onState(listener: (state: DesktopTvState) => void): () => void;
 }
