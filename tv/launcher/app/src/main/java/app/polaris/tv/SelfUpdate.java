@@ -24,6 +24,11 @@ final class SelfUpdate {
     static final String PACKAGE = "app.polaris.tv";
     static final String RELEASE_PATH = "/api/tv/update";
     static final String REPORT_PATH = "/api/tv/update/report";
+    /** The Home key edition (build.gradle homeCategory=false) asks for its own APK, so an update never brings back
+     *  the HOME category that the firmware it runs on uninstalls. Empty for the ordinary build. */
+    static final String EDITION = BuildConfig.HOME_CATEGORY ? "" : "home-key";
+    /** What the instance names the ordinary build; read as the empty edition this build calls it. */
+    static final String STANDARD = "standard";
 
     /** States the instance accepts on a report (queued is its own). */
     static final String DOWNLOADING = "downloading";
@@ -135,13 +140,20 @@ final class SelfUpdate {
         final long size;
         final String sha256;
         final String url;
+        /** The edition the instance says this APK is; empty for the ordinary build and from instances before editions. */
+        final String edition;
 
         Release(String versionName, long versionCode, long size, String sha256, String url) {
+            this(versionName, versionCode, size, sha256, url, "");
+        }
+
+        Release(String versionName, long versionCode, long size, String sha256, String url, String edition) {
             this.versionName = versionName;
             this.versionCode = versionCode;
             this.size = size;
             this.sha256 = sha256;
             this.url = url;
+            this.edition = edition;
         }
     }
 
@@ -267,7 +279,7 @@ final class SelfUpdate {
     private Result run(String requestId, boolean install, Partial file) {
         Reply reply;
         try {
-            reply = call(() -> net.get(RELEASE_PATH));
+            reply = call(() -> net.get(releasePath(EDITION)));
         } catch (IOException | InterruptedException unreachable) {
             return new Result(Outcome.UNREACHABLE, null, null);
         }
@@ -280,6 +292,9 @@ final class SelfUpdate {
         }
         Release release = reply.status == 200 ? readRelease(reply.body) : null;
         if (release == null) return new Result(Outcome.UNREACHABLE, null, null);
+        // An instance that knows no editions answers with the ordinary APK: installing it would bring back the HOME
+        // category, and with it an uninstall at the next boot.
+        if (!release.edition.equals(EDITION)) return fail(requestId, Outcome.NO_RELEASE, null, Failure.NO_RELEASE);
         if (!newer(release)) {
             // Already there (the update may have finished before this TV restarted): say so, never go back.
             if (file != null) file.delete();
@@ -486,6 +501,11 @@ final class SelfUpdate {
         return report(requestId, state, FAILED.equals(state) ? reasonFor(status) : null);
     }
 
+    /** Where the newest release of an edition is asked for. */
+    static String releasePath(String edition) {
+        return edition.isEmpty() ? RELEASE_PATH : RELEASE_PATH + "?edition=" + edition;
+    }
+
     static Release readRelease(String body) {
         try {
             JSONObject answer = new JSONObject(body);
@@ -499,7 +519,8 @@ final class SelfUpdate {
                     || url.startsWith("//")) {
                 return null;
             }
-            return new Release(name, code, size, sha, url);
+            String edition = answer.optString("edition", "");
+            return new Release(name, code, size, sha, url, STANDARD.equals(edition) ? "" : edition);
         } catch (JSONException notARelease) {
             return null;
         }

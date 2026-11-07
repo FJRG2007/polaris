@@ -7,7 +7,7 @@
 import models from "@tv-compat/models.json";
 import { describe, expect, it } from "vitest";
 import type { TvModel } from "@tv-compat/schema";
-import { TCL_APPOPS, choosePath, matchModel, type TvSighting } from "@/main/tv-path";
+import { HOME_GUARD_PACKAGE, TCL_APPOPS, choosePath, listsPackage, matchModel, type TvSighting } from "@/main/tv-path";
 
 const TV_MODELS = models as readonly TvModel[];
 const SWEPT: TvSighting = { services: [], adbOpen: true };
@@ -109,5 +109,23 @@ describe("choosePath from what the TV says", () => {
 
     it("never needs pairing once the TV has answered", () => {
         expect(choosePath({ services: ["adb-tls-pairing"] }, { manufacturer: "Google", model: "x", sdk: 34 }).route).toBe("network");
+    });
+});
+
+describe("the edition a TV gets", () => {
+    const identity = { manufacturer: "Unlisted", model: "Box 1", sdk: 30 };
+
+    it("gives the Home key edition only to a box running NES's core service", () => {
+        expect(choosePath(SWEPT, { ...identity, homeGuard: true }).edition).toBe("home-key");
+        expect(choosePath(SWEPT, { ...identity, homeGuard: true }).home).toBe("offered");
+        expect(choosePath(SWEPT, { ...identity, homeGuard: false }).edition).toBe("standard");
+        expect(choosePath(SWEPT, identity).edition).toBe("standard");
+        expect(choosePath(SWEPT).edition).toBe("standard");
+    });
+
+    it("matches the exact package in pm's listing", () => {
+        expect(listsPackage("package:com.nes.coreservice\r\n", HOME_GUARD_PACKAGE)).toBe(true);
+        expect(listsPackage("package:com.nes.coreservice.extra\n", HOME_GUARD_PACKAGE)).toBe(false);
+        expect(listsPackage("", HOME_GUARD_PACKAGE)).toBe(false);
     });
 });

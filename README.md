@@ -556,6 +556,10 @@ flowchart LR
 
 [What to check](docs/features/troubleshooting.md) when a screen says Polaris is not reachable. None of it needs a terminal.
 
+### When an antivirus blocks Polaris
+
+[What to exclude](docs/features/antivirus.md), and where, in Microsoft Defender, Malwarebytes and the other main antivirus programs.
+
 ### A request through the edge
 
 Every router has an explicit priority, highest first. Routes with firewall rules pass through the guard before reaching the app.

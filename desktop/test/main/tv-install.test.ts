@@ -31,7 +31,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { connectFailure, grantCommands, homeIsOurs, lateFailure, alreadyLinked, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
+const { accessibilityEntries, alreadyLinked, apkNameOf, connectFailure, grantCommands, homeIsOurs, homeKeyCommands, homeKeyOn, lateFailure, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
     await import(
     "../../src/main/tv-install"
 );
@@ -397,5 +397,59 @@ describe("finding the release", () => {
     it("refuses an APK that does not match its checksum", async () => {
         serve([[tv]], `${"0".repeat(64)}  polaris-tv.apk\n`);
         await expect(latestApk()).rejects.toThrow();
+    });
+
+    it("fetches the Home key edition from its own asset and checksum line", async () => {
+        const withEdition = {
+            ...tv,
+            assets: [...tv.assets, { name: "polaris-tv-home-key.apk", browser_download_url: "https://files.example/home-key/apk" }]
+        };
+        const asked = serve([[withEdition]], `${"0".repeat(64)}  polaris-tv.apk\n${digest}  polaris-tv-home-key.apk\n`);
+        expect(apkNameOf("home-key")).toBe("polaris-tv-home-key.apk");
+        expect(await latestApk("home-key")).toMatchObject({ version: "1.2.3" });
+        expect(asked).toContain("https://files.example/home-key/apk");
+    });
+
+    it("reports the Home key edition unreleased when the newest release lacks it", async () => {
+        serve([[tv]]);
+        expect(await latestApk("home-key")).toBeNull();
+    });
+});
+
+describe("the Home key service", () => {
+    const service = "app.polaris.tv/.HomeKeyService";
+
+    it("reads null and empty as no services, and refuses an answer that is not a list", () => {
+        expect(accessibilityEntries("null\n")).toEqual([]);
+        expect(accessibilityEntries("  \n")).toEqual([]);
+        expect(accessibilityEntries("com.a/.One:com.b/com.b.Two$Inner\n")).toEqual(["com.a/.One", "com.b/com.b.Two$Inner"]);
+        expect(accessibilityEntries("cmd: Can't find service: settings")).toBeNull();
+    });
+
+    it("puts the service after what is there, never in its place", () => {
+        expect(homeKeyCommands([])).toEqual([
+            `settings put secure enabled_accessibility_services '${service}'`,
+            "settings put secure accessibility_enabled 1"
+        ]);
+        expect(homeKeyCommands(["com.a/.One", "com.b/.Two$X"])[0]).toBe(
+            `settings put secure enabled_accessibility_services 'com.a/.One:com.b/.Two$X:${service}'`
+        );
+    });
+
+    it("clears and writes back a list that already has it, so the service binds again", () => {
+        const [first, last] = homeKeyCommands(["com.a/.One", "app.polaris.tv/app.polaris.tv.HomeKeyService"]);
+        const list = "'com.a/.One:app.polaris.tv/app.polaris.tv.HomeKeyService'";
+        expect(first).toBe(
+            `settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services ${list}`
+        );
+        expect(last).toBe("settings put secure accessibility_enabled 1");
+    });
+
+    it("counts it on only when listed and accessibility is on", () => {
+        expect(homeKeyOn(`com.a/.One:${service}\n1\n`)).toBe(true);
+        expect(homeKeyOn("app.polaris.tv/app.polaris.tv.HomeKeyService\r\n1\r\n")).toBe(true);
+        expect(homeKeyOn(`${service}\n0\n`)).toBe(false);
+        expect(homeKeyOn("com.a/.One\n1\n")).toBe(false);
+        expect(homeKeyOn("null\nnull\n")).toBe(false);
     });
 });

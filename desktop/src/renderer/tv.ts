@@ -29,6 +29,12 @@ const OUTCOMES: Record<TvOutcome, string> = {
         "Polaris TV is installed, but this TV kept its own Home screen. Open Polaris TV from the TV's apps.",
     "installed-home-unknown":
         "Polaris TV is installed, but the connection was lost before Home was confirmed. Press Home on the TV to see which screen opens.",
+    "installed-home-key":
+        "Polaris TV is installed. This TV keeps its own Home screen, so the remote's Home button now opens Polaris TV instead.",
+    "installed-home-key-off":
+        "Polaris TV is installed, but the TV did not let the Home button open it. Open Polaris TV from the TV's apps, or install again.",
+    "home-key-not-released":
+        "This TV removes other Home screens every time it restarts, and the version of Polaris TV made for it has not been published yet. Nothing changed on the TV.",
     "adb-off":
         "Debugging was not turned on at the TV in time. Install again and follow the step shown here, or use the USB cable tab.",
     "not-allowed": "Nobody answered on the TV. Try again and choose Allow on the TV's prompt.",

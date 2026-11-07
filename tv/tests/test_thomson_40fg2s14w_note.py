@@ -91,6 +91,16 @@ def application_id():
     return re.search(r"namespace '([^']+)'", gradle).group(1)
 
 
+def launcher_manifest():
+    """The launcher's AndroidManifest.xml as the default build sees it: `${homeCategory}` expanded to the
+    category build.gradle gives it when homeCategory is left at its default (true), which is HOME."""
+    gradle = GRADLE.read_text(encoding="utf-8")
+    default = re.search(r"gradleProperty\('homeCategory'\)\.getOrElse\('(true|false)'\)", gradle).group(1)
+    launcher, home_key = re.search(r"homeCategory: homeCategory \? '([^']+)' : '([^']+)'", gradle).groups()
+    category = launcher if default == "true" else home_key
+    return MANIFEST.read_text(encoding="utf-8").replace("${homeCategory}", category)
+
+
 def manifest_components(text):
     """[(name, home, direct_boot_aware)] for every component of a manifest.
 
@@ -199,7 +209,7 @@ class DirectBootClaimTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.components = manifest_components(MANIFEST.read_text(encoding="utf-8"))
+        self.components = manifest_components(launcher_manifest())
         self.home = [name for name, home, _ in self.components if home]
         self.aware = [name for name, _, aware in self.components if aware]
 

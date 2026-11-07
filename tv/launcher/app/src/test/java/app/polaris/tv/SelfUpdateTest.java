@@ -374,4 +374,42 @@ public class SelfUpdateTest {
         assertEquals(Arrays.asList("waiting-confirmation", "failed", "done"), net.states());
         assertEquals("The update was cancelled on the TV.", new JSONObject(net.reports.get(1)).getString("reason"));
     }
+
+    @Test
+    public void theHomeKeyEditionAsksForItsOwnApk() {
+        assertEquals("/api/tv/update", SelfUpdate.releasePath(""));
+        assertEquals("/api/tv/update?edition=home-key", SelfUpdate.releasePath("home-key"));
+    }
+
+    @Test
+    public void aReleaseCarriesTheEditionTheInstanceNamed() {
+        String sha = "a".repeat(64);
+        String body = "{\"versionName\":\"3.6\",\"size\":10,\"sha256\":\"" + sha
+                + "\",\"url\":\"/api/tv/update/apk?version=3.6&edition=home-key\",\"edition\":\"home-key\"}";
+        assertEquals("home-key", SelfUpdate.readRelease(body).edition);
+        // An instance from before editions names none, which is the ordinary build.
+        assertEquals("", SelfUpdate.readRelease(body.replace(",\"edition\":\"home-key\"", "")).edition);
+        // The instance names the ordinary build "standard", which is the edition this build calls empty.
+        assertEquals("", SelfUpdate.readRelease(body.replace("\"edition\":\"home-key\"", "\"edition\":\"standard\"")).edition);
+    }
+
+    @Test
+    public void theOrdinaryBuildInstallsTheStandardReleaseTheInstanceNames() throws Exception {
+        assertEquals("", SelfUpdate.EDITION);
+        String body = new JSONObject(release("3.5", APK)).put("edition", "standard").toString();
+        net.gets.add(new SelfUpdate.Reply(200, body, -1));
+        net.downloads.add(answer(200, APK));
+        SelfUpdate.Result result = update("3.4", 13).update(REQUEST, file);
+        assertEquals(SelfUpdate.Outcome.INSTALLING, result.outcome);
+        assertEquals(1, installer.installs);
+    }
+
+    @Test
+    public void theOrdinaryBuildRefusesTheHomeKeyRelease() throws Exception {
+        String body = new JSONObject(release("3.5", APK)).put("edition", "home-key").toString();
+        net.gets.add(new SelfUpdate.Reply(200, body, -1));
+        SelfUpdate.Result result = update("3.4", 13).update(REQUEST, file);
+        assertEquals(SelfUpdate.Outcome.NO_RELEASE, result.outcome);
+        assertEquals(0, installer.installs);
+    }
 }

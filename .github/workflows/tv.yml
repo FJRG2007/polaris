@@ -48,10 +48,19 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/polaris-tv.apk"
+      # The Home key edition (no HOME category) for firmware that uninstalls Home apps at boot.
+      - name: Home key edition build
+        working-directory: tv/launcher
+        run: |
+          ./gradlew --no-daemon -PhomeCategory=false lintRelease assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/polaris-tv-home-key.apk"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: polaris-tv-launcher
-          path: tv/launcher/app/build/outputs/apk/release/app-release.apk
+          path: |
+            ${{ runner.temp }}/polaris-tv.apk
+            ${{ runner.temp }}/polaris-tv-home-key.apk
           if-no-files-found: error
 
   addons:
@@ -146,6 +155,11 @@ jobs:
           export TV_KEYSTORE_PATH="$RUNNER_TEMP/tv.keystore"
           printf '%s' "$TV_KEYSTORE_BASE64" | base64 -d > "$TV_KEYSTORE_PATH"
           (cd tv/launcher && chmod +x gradlew && ./gradlew --no-daemon assembleRelease)
+          mkdir out
+          cp tv/launcher/app/build/outputs/apk/release/app-release.apk out/polaris-tv.apk
+          # Same package and key, no HOME category: NES boxes (TiVo Stream 4K, Nokia Streaming Box 8000).
+          (cd tv/launcher && ./gradlew --no-daemon -PhomeCategory=false assembleRelease)
+          cp tv/launcher/app/build/outputs/apk/release/app-release.apk out/polaris-tv-home-key.apk
           mkdir -p "$RUNNER_TEMP/apks"
           for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
             "$ANDROID_HOME/build-tools/34.0.0/apksigner" sign --ks "$TV_KEYSTORE_PATH" \
@@ -153,9 +167,7 @@ jobs:
               --out "$RUNNER_TEMP/apks/$(basename "$apk")" "$apk"
           done
           rm -f "$TV_KEYSTORE_PATH"
-          mkdir out
-          cp tv/launcher/app/build/outputs/apk/release/app-release.apk out/polaris-tv.apk
           python3 -I tv/tools/catalog.py --apks "$RUNNER_TEMP/apks" --out out
-          (cd out && sha256sum polaris-tv.apk catalog.json theme-*.zip theme-*.jpg addon-*.apk addon-*.jpg > SHA256SUMS)
+          (cd out && sha256sum polaris-tv.apk polaris-tv-home-key.apk catalog.json theme-*.zip theme-*.jpg addon-*.apk addon-*.jpg > SHA256SUMS)
           gh release create "${{ steps.decide.outputs.tag }}" out/* \
             --title "Polaris TV ${{ steps.decide.outputs.tag }}" --notes "Android TV and Google TV." --latest=false

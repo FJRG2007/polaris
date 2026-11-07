@@ -35,6 +35,25 @@ export interface TvIdentity {
     readonly model: string;
     /** The Android API level, null when it did not say. */
     readonly sdk: number | null;
+    /** Whether HOME_GUARD_PACKAGE is installed. Absent when it was not asked. */
+    readonly homeGuard?: boolean;
+}
+
+/**
+ * NES middleware's core service (TiVo Stream 4K, Nokia Streaming Box 8000): at every boot it
+ * uninstalls each non-system app that declares the HOME category, and the stock launcher's HOME
+ * priority leaves set-home-activity changing nothing (tv/examples/tivo-stream-4k/README.md,
+ * "The launcher"). Such a box gets the Home key edition instead.
+ */
+export const HOME_GUARD_PACKAGE = "com.nes.coreservice";
+
+/** standard: polaris-tv.apk. home-key: polaris-tv-home-key.apk, the same launcher with no HOME
+ *  category, opened from the remote's Home key by its accessibility service. */
+export type TvEdition = "standard" | "home-key";
+
+/** Whether `pm list packages <name>` listed that exact package, not one that only starts with it. */
+export function listsPackage(listing: string, name: string): boolean {
+    return listing.split(/\r?\n/).some((line) => line.trim() === `package:${name}`);
 }
 
 /**
@@ -58,6 +77,8 @@ export interface TvPath {
     readonly reason: TvQuirkId | null;
     /** Run by the installer after the install; never shown. */
     readonly afterInstall: readonly string[];
+    /** Which APK this TV gets. */
+    readonly edition: TvEdition;
     /** Where the person turns debugging on, for this TV's platform. */
     readonly instruction: TvDebuggingSteps;
 }
@@ -116,7 +137,8 @@ export function choosePath(sighting: TvSighting, identity?: TvIdentity | null): 
     const quirks = new Set<TvQuirkId>(model?.quirks ?? []);
     const makerOfTv = maker ?? (model ? makerOf(model.brand) : null);
     const instruction = stepsFor(platform);
-    const base = { model, platform, instruction };
+    const edition: TvEdition = identity?.homeGuard === true ? "home-key" : "standard";
+    const base = { model, platform, instruction, edition };
 
     const tooOld = identity?.sdk !== null && identity?.sdk !== undefined && identity.sdk < MIN_SDK;
     if (tooOld || model?.install === "none")

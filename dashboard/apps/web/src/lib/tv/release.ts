@@ -6,7 +6,11 @@
  * `polaris-tv.apk` and `SHA256SUMS`). The checksum list is read first; the APK is
  * downloaded once per version into the data directory, hashed while it arrives,
  * and kept only if it matches. A mismatch is refused, never served. Only the
- * newest verified APK is kept on disk.
+ * newest verified APK of each edition is kept on disk.
+ *
+ * Editions: `standard` is `polaris-tv.apk`; `home-key` is `polaris-tv-home-key.apk`,
+ * the same launcher with no HOME category, for firmware that uninstalls Home apps
+ * at boot (NES boxes). A release without an edition's APK has none to offer.
  *
  * The same release carries the Themes & add-ons catalog (`catalog.json`) and its
  * files. Those are served from here too (`preparedTvCatalogFile`), each one
@@ -29,6 +33,22 @@ import { tvDownload, tvInstallable, type AppDownload } from "@/lib/app-releases"
 export const TV_APK_NAME = "polaris-tv.apk";
 export const TV_CHECKSUMS_NAME = "SHA256SUMS";
 
+export const TV_EDITIONS = ["standard", "home-key"] as const;
+export type TvEdition = (typeof TV_EDITIONS)[number];
+
+/** The edition a request names in `?edition=`: absent is the ordinary build, an
+ *  unknown one is null. */
+export function editionOf(request: Request): TvEdition | null {
+    const asked = new URL(request.url).searchParams.get("edition");
+    if (asked === null || asked === "") return "standard";
+    return TV_EDITIONS.find((edition) => edition === asked) ?? null;
+}
+
+/** The release asset an edition is published as. */
+export function tvApkName(edition: TvEdition): string {
+    return edition === "standard" ? TV_APK_NAME : `polaris-tv-${edition}.apk`;
+}
+
 /** How long a resolved release is reused before GitHub is asked again. */
 const RELEASE_TTL_MS = 10 * 60 * 1000;
 /** How long a failed lookup is remembered, so a broken release is not
@@ -49,6 +69,7 @@ const MAX_HOPS = 3;
 const VERSION = /^[0-9A-Za-z.+-]{1,40}$/;
 
 export interface TvReleaseInfo {
+    readonly edition: TvEdition;
     readonly versionName: string;
     /** Lowercase hex, from the release's SHA256SUMS. */
     readonly sha256: string;
@@ -167,40 +188,54 @@ interface Held<T> {
     readonly failure: TvReleaseError | null;
 }
 
-/** The newest release as this instance knows it: what to install, and every file it lists a checksum for. */
+/** The newest release as this instance knows it: its version, and every file it lists a checksum for. */
 interface TvRelease {
-    readonly info: TvReleaseInfo;
+    readonly versionName: string;
     readonly checksums: ReadonlyMap<string, string>;
     readonly urls: ReadonlyMap<string, string>;
 }
 
 let infoHeld: Held<TvRelease> | null = null;
 let infoRunning: Promise<TvRelease | null> | null = null;
+/** An edition whose APK was downloaded and refused, so the next poll does not download it again. Per edition:
+ *  a bad Home key build must not stop the ordinary one, or the catalog. */
+const refused = new Map<TvEdition, { readonly at: number; readonly failure: TvReleaseError }>();
 
 async function lookRelease(): Promise<TvRelease | null> {
     const release = await tvDownload(loadEnv().POLARIS_REPO);
     if (!release || !tvInstallable(release)) return null;
     const versionName = release.version.trim();
-    const apkUrl = fileUrl(release, TV_APK_NAME);
     const sumsUrl = fileUrl(release, TV_CHECKSUMS_NAME);
-    if (!VERSION.test(versionName) || !apkUrl || !sumsUrl) return null;
+    // The ordinary launcher is what makes a release a TV release; the other editions ride along with it.
+    if (!VERSION.test(versionName) || !sumsUrl || !fileUrl(release, TV_APK_NAME)) return null;
     const listing = await readText(
         await fromGitHub(sumsUrl, CHECKSUMS_TIMEOUT_MS),
         CHECKSUMS_MAX_BYTES
     );
     const checksums = checksumsOf(listing);
-    const sha256 = checksums.get(TV_APK_NAME);
-    if (!sha256) throw new TvReleaseError("mismatch");
+    if (!checksums.has(TV_APK_NAME)) throw new TvReleaseError("mismatch");
     const urls = new Map(release.files.map((file) => [file.name, file.url] as const));
-    return { info: { versionName, sha256, apkUrl }, checksums, urls };
+    return { versionName, checksums, urls };
 }
 
 /**
- * The newest TV release and its published checksum, without downloading the
- * APK. Null when none is released. Cached for ten minutes, failures for one.
+ * The newest TV release of an edition and its published checksum, without
+ * downloading the APK. Null when none is released, or when the release has no
+ * APK of that edition. Cached for ten minutes, failures for one.
  */
-export async function tvReleaseInfo(): Promise<TvReleaseInfo | null> {
-    return (await tvRelease())?.info ?? null;
+export async function tvReleaseInfo(
+    edition: TvEdition = "standard"
+): Promise<TvReleaseInfo | null> {
+    const refusal = refused.get(edition);
+    if (refusal && Date.now() - refusal.at < FAILURE_TTL_MS) throw refusal.failure;
+    const release = await tvRelease();
+    if (!release) return null;
+    const apkName = tvApkName(edition);
+    const apkUrl = release.urls.get(apkName);
+    if (!apkUrl) return null;
+    const sha256 = release.checksums.get(apkName);
+    if (!sha256) throw new TvReleaseError("mismatch");
+    return { edition, versionName: release.versionName, sha256, apkUrl };
 }
 
 async function tvRelease(): Promise<TvRelease | null> {
@@ -237,7 +272,20 @@ function cacheDir(): string {
 /** The name a verified APK is kept under: its version and hash, so a file on disk
  *  is only ever trusted for the release it was checked against. */
 function keptName(info: TvReleaseInfo): string {
-    return `polaris-tv-${info.versionName}-${info.sha256.slice(0, 16)}.apk`;
+    return `${keptPrefix(info.edition)}${info.versionName}-${info.sha256.slice(0, 16)}.apk`;
+}
+
+function keptPrefix(edition: TvEdition): string {
+    return edition === "standard" ? "polaris-tv-" : `polaris-tv-${edition}-`;
+}
+
+/** The edition a kept file belongs to, read back from its name. */
+function keptEdition(name: string): TvEdition {
+    return (
+        TV_EDITIONS.find(
+            (edition) => edition !== "standard" && name.startsWith(keptPrefix(edition))
+        ) ?? "standard"
+    );
 }
 
 async function hashFile(path: string): Promise<string> {
@@ -322,10 +370,11 @@ async function prepare(info: TvReleaseInfo): Promise<TvApk> {
     }
     verified.set(path, { sha256: info.sha256, size });
 
-    // Only the newest verified build is kept.
+    // Only the newest verified build of this edition is kept; the other edition's stays.
     for (const name of await readdir(dir).catch(() => [] as string[])) {
         if (join(dir, name) === path) continue;
         if (name.endsWith(".part") && !(await abandoned(join(dir, name)))) continue;
+        if (!name.endsWith(".part") && keptEdition(name) !== info.edition) continue;
         await rm(join(dir, name), { force: true }).catch(() => undefined);
         verified.delete(join(dir, name));
     }
@@ -339,8 +388,8 @@ const preparing = new Map<string, Promise<TvApk>>();
  * build is released; throws `TvReleaseError` when one is but cannot be served.
  * Concurrent callers share one download.
  */
-export async function preparedTvApk(): Promise<TvApk | null> {
-    const info = await tvReleaseInfo();
+export async function preparedTvApk(edition: TvEdition = "standard"): Promise<TvApk | null> {
+    const info = await tvReleaseInfo(edition);
     if (!info) return null;
     const key = keptName(info);
     const running = preparing.get(key);
@@ -349,7 +398,7 @@ export async function preparedTvApk(): Promise<TvApk | null> {
         .catch((caught: unknown) => {
             if (caught instanceof TvReleaseError) {
                 // Remember the refusal so the next poll does not download it again.
-                infoHeld = { at: Date.now(), value: null, failure: caught };
+                refused.set(edition, { at: Date.now(), failure: caught });
             }
             throw caught;
         })
@@ -420,10 +469,10 @@ export async function preparedTvCatalogFile(name: string): Promise<TvCatalogFile
     const sha256 = release.checksums.get(name);
     const url = release.urls.get(name);
     if (!sha256 || !url) return null;
-    const key = `${release.info.versionName}/${name}`;
+    const key = `${release.versionName}/${name}`;
     const running = preparingCatalog.get(key);
     if (running) return running;
-    const started = prepareCatalogFile(release.info.versionName, name, sha256, url).finally(() =>
+    const started = prepareCatalogFile(release.versionName, name, sha256, url).finally(() =>
         preparingCatalog.delete(key)
     );
     preparingCatalog.set(key, started);
@@ -434,6 +483,7 @@ export async function preparedTvCatalogFile(name: string): Promise<TvCatalogFile
 export function resetTvReleaseCache(): void {
     infoHeld = null;
     infoRunning = null;
+    refused.clear();
     verified.clear();
     preparing.clear();
     preparingCatalog.clear();
