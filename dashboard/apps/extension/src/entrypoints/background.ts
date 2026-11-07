@@ -1024,6 +1024,10 @@ const LINK_CHECK_MINUTES = 15;
  *  popup, which is a thing people do far more often than that. */
 const LINK_CHECK_FLOOR_MS = 60_000;
 
+/** The gap a popup's own check keeps, so a popup opened again and again does
+ *  not ask each time while still finding out about access taken away. */
+const LINK_RECHECK_FLOOR_MS = 5_000;
+
 /**
  * Forget the connection in front, without touching the vault it was for.
  *
@@ -1107,14 +1111,16 @@ async function closeForbiddenVault(): Promise<void> {
  * everything, and an unreachable server changes nothing at all - a Polaris
  * somebody is behind a tunnel from is not a connection that was revoked.
  */
-async function refreshLink(force = false): Promise<void> {
+async function refreshLink(force = false, floorMs = LINK_CHECK_FLOOR_MS): Promise<void> {
     const [origin, token, checkedAt] = await Promise.all([
         reachOrigin(),
         LINK_TOKEN.getValue(),
         LINK_CHECKED.getValue()
     ]);
     if (!origin || !token) return;
-    if (!force && checkedAt !== null && Date.now() - checkedAt < LINK_CHECK_FLOOR_MS) return;
+    const age = checkedAt === null ? Infinity : Date.now() - checkedAt;
+    if (!force && age < floorMs) return;
+    const faces = force || age >= LINK_CHECK_FLOOR_MS;
     const state = await link.checkLink(origin, token);
     if (state === null) return;
     if (state === "ended") {
@@ -1128,10 +1134,13 @@ async function refreshLink(force = false): Promise<void> {
     ]);
     // Every face at once, and each one kept as it was when its answer is "could
     // not find out" - a slow server should not turn a photo back into initials.
-    const [self, ...orgFaces] = await Promise.all([
-        link.fetchFace(origin, token, null),
-        ...state.organizations.map((org) => link.fetchFace(origin, token, org.id))
-    ]);
+    // A popup's quick check reads only the access and leaves the faces held.
+    const [self, ...orgFaces] = faces
+        ? await Promise.all([
+              link.fetchFace(origin, token, null),
+              ...state.organizations.map((org) => link.fetchFace(origin, token, org.id))
+          ])
+        : [undefined, ...state.organizations.map(() => undefined)];
     const orgs: Record<string, string | null> = {};
     state.organizations.forEach((org, index) => {
         const found = orgFaces[index];
@@ -1158,18 +1167,25 @@ async function refreshLink(force = false): Promise<void> {
     if (state.locale !== spoken) await retitleMenus();
 }
 
-/** The check a popup asked for, while it runs: a popup opening twice in a row
- *  asks the server once. */
-let checkingLink: Promise<void> | null = null;
+/** The check a popup asked for, while it runs, and the floor it was asked with:
+ *  a popup opening twice in a row, or its plain status and its checked one, ask
+ *  the server once. */
+let checkingLink: { readonly floorMs: number; readonly done: Promise<void> } | null = null;
 
-/** Ask the server now, past the floor `refreshLink` keeps for routine asks. */
-function checkLinkNow(): Promise<void> {
-    checkingLink ??= refreshLink(true)
+/** Ask the server unless it was asked within `floorMs`, sharing a check in flight.
+ *  A check in flight under a looser floor may have asked nothing, so a stricter
+ *  one waits for it and then decides for itself. */
+function checkLinkNow(floorMs = LINK_RECHECK_FLOOR_MS): Promise<void> {
+    if (checkingLink && checkingLink.floorMs <= floorMs) return checkingLink.done;
+    const before = checkingLink?.done ?? Promise.resolve();
+    const done: Promise<void> = before
+        .then(() => refreshLink(false, floorMs))
         .catch(() => undefined)
         .finally(() => {
-            checkingLink = null;
+            if (checkingLink?.done === done) checkingLink = null;
         });
-    return checkingLink;
+    checkingLink = { floorMs, done };
+    return done;
 }
 
 /** The collection running right now, so one request is never polled twice over. */
@@ -3207,7 +3223,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // from what is held, and a connection that ended a moment ago
                 // shows as ended on the next draw rather than holding this one up
                 // behind a request to a server that may be unreachable.
-                void refreshLink();
+                void checkLinkNow(LINK_CHECK_FLOOR_MS);
                 return { ok: true, status: await status() };
 
             case "statusChecked":

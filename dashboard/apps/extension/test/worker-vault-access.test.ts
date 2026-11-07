@@ -18,6 +18,7 @@ const SITE = { tabId: 7, url: "https://shop.example.org/login" };
 /** What the session endpoint says the account may use right now. */
 let can = { vault: true, polar: true };
 let sessionAsks = 0;
+let faceAsks = 0;
 
 async function network(input: RequestInfo | URL): Promise<Response> {
     const url = String(input instanceof Request ? input.url : input);
@@ -30,7 +31,14 @@ async function network(input: RequestInfo | URL): Promise<Response> {
             can
         });
     }
+    if (url.startsWith(`${ORIGIN}/api/extension/avatar`)) faceAsks++;
     return new Response("", { status: 503 });
+}
+
+/** Moves the worker's clock on, past whatever floor a check keeps. */
+let clock = Date.now();
+function later(ms: number): void {
+    clock += ms;
 }
 
 async function ask(request: Request, from: typeof SITE | null = null): Promise<Reply> {
@@ -56,6 +64,9 @@ beforeEach(async () => {
     vi.resetModules();
     can = { vault: true, polar: true };
     sessionAsks = 0;
+    faceAsks = 0;
+    clock = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
     created.length = 0;
     vi.stubGlobal("fetch", network);
     (fakeBrowser as unknown as { contextMenus: unknown }).contextMenus = {
@@ -103,12 +114,30 @@ describe("an account the vault is kept from", () => {
         expect((await statusOf("statusChecked")).canVault).toBe(true);
         const asked = sessionAsks;
 
-        // Taken away on Polaris a moment later: the routine ask is still inside
-        // its floor, and the popup's own check is not.
+        // Taken away on Polaris a little later: the routine ask is still inside
+        // its once-a-minute floor, and the popup's own check is not.
         can = { vault: false, polar: true };
+        later(10_000);
         expect((await statusOf("status")).canVault).toBe(true);
         expect((await statusOf("statusChecked")).canVault).toBe(false);
-        expect(sessionAsks).toBeGreaterThan(asked);
+        expect(sessionAsks).toBe(asked + 1);
+    });
+
+    it("asks once for a popup opened again and again, and leaves the faces alone", async () => {
+        await import("../src/entrypoints/background");
+        await statusOf("statusChecked");
+        const asked = sessionAsks;
+        const faces = faceAsks;
+
+        await Promise.all([statusOf("status"), statusOf("statusChecked")]);
+        await statusOf("statusChecked");
+        expect(sessionAsks).toBe(asked);
+
+        later(10_000);
+        await statusOf("status");
+        await statusOf("statusChecked");
+        expect(sessionAsks).toBe(asked + 1);
+        expect(faceAsks).toBe(faces);
     });
 
     it("drops the vault's right-click entries and its page script, and keeps Polar's", async () => {
@@ -132,9 +161,10 @@ describe("an account the vault is kept from", () => {
         stub.management = { getSelf: async () => ({ installType: "normal" }) };
         stub.sidePanel = { setOptions: async () => undefined };
         stub.commands = { onCommand: { addListener() {} } };
-        (fakeBrowser.runtime as unknown as { onConnect: unknown }).onConnect = {
-            addListener() {}
-        };
+        Object.assign(fakeBrowser.runtime, {
+            onConnect: { addListener() {} },
+            getPlatformInfo: async () => ({ os: "linux", arch: "x86-64" })
+        });
         await fakeBrowser.storage.local.set({ "inline.everywhere": true });
         const background = await import("../src/entrypoints/background");
         background.default.main?.();
@@ -143,6 +173,7 @@ describe("an account the vault is kept from", () => {
 
         // Taken away, and found out on the popup opening.
         can = { vault: false, polar: true };
+        later(10_000);
         await statusOf("statusChecked");
         await vi.waitFor(() => expect(created).not.toContain("polaris-fill"));
         expect(created).not.toContain("polaris-generate");
