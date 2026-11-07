@@ -167,7 +167,7 @@ class FrigateGlanceInstallTest(unittest.TestCase):
             "cmd": "exit 0",
             "sleep": "exit 0",
             "settings": '[ "$1" = get ] && echo null; exit 0',
-            "logcat": f'case "$1" in -c) : > "$FAKE_ROOT/logcat.txt" ;; -d) cat "$FAKE_ROOT/logcat.txt" ;; esac',
+            "logcat": 'case "$1" in -c) : > "$FAKE_ROOT/logcat.txt" ;; -d) cat "$FAKE_ROOT/logcat.txt" ;; esac',
             "am": f'[ "$1" = start ] && "{py}" "$FAKE_ROOT/app.py" start; exit 0',
             "content": f'exec "{py}" "$FAKE_ROOT/content.py" "$@"',
             # A folder or file the adb shell creates is the shell's.

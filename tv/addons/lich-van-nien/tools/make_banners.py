@@ -6,7 +6,7 @@ Usage: python3 tools/make_banners.py <NotoSerif-Regular.ttf> <Roboto-Regular.ttf
 """
 import sys
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 W, H = 640, 360
 OUT = Path(__file__).resolve().parent.parent / "app/src/main/res/drawable-nodpi"
