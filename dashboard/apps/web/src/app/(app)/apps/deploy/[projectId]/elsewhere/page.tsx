@@ -12,6 +12,7 @@
  * API - and anything staler than a minute is asked again on the way in.
  */
 
+import { leaveIfPolarisProject } from "../polaris-redirect";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
 import { ElsewhereView } from "@/app/(app)/apps/deploy/elsewhere-view";
@@ -33,6 +34,7 @@ export default async function ProjectElsewherePage({
     params: Promise<{ projectId: string }>;
 }) {
     const { projectId } = await params;
+    await leaveIfPolarisProject(projectId);
     const user = await requirePermission("deploy.read");
 
     let access;

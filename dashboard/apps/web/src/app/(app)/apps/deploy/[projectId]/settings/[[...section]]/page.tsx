@@ -1,3 +1,4 @@
+import { leaveIfPolarisProject } from "../../polaris-redirect";
 import { notFound } from "next/navigation";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { ProjectSettings } from "../../../project-settings";
@@ -18,6 +19,7 @@ export default async function ProjectSettingsPage({
     params: Promise<{ projectId: string; section?: string[] }>;
 }) {
     const { projectId, section } = await params;
+    await leaveIfPolarisProject(projectId);
     const user = await requirePermission("deploy.read");
 
     let access;

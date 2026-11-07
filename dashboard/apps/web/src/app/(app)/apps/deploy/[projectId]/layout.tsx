@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { ProjectShell } from "../project-shell";
 import { listProjects, getProject } from "@/lib/deploy-service";
+import { polarisProjectIds } from "@/lib/deploy/managed-projects";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { readerProjectGlance } from "@/lib/deploy/project-glance";
 import { listProjectStagedChanges } from "@/lib/deploy-staged-changes";
@@ -30,6 +31,10 @@ export default async function ProjectLayout({
 
     const project = await getProject(projectId, user.id);
     if (!project) notFound();
+    // A project Polaris runs for one of its apps draws no shell and reads nothing
+    // more: the page under it sends the reader to that app's settings, and only
+    // the page can see which service the address named.
+    if (await polarisProjectIds().then((hidden) => hidden.has(project.id))) return children;
 
     // The switcher in this shell lists the shelf the project itself is on, not
     // whichever one happens to be open: a project reached by link must not offer

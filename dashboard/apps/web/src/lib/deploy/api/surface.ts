@@ -26,6 +26,7 @@
 
 import { linesSince } from "./text";
 import { prisma } from "@polaris/db";
+import { polarisProjectIds } from "@/lib/deploy/managed-projects";
 import { open } from "node:fs/promises";
 import { DeployApiRefusal } from "./refusal";
 import type { Permission } from "@polaris/core";
@@ -308,7 +309,15 @@ async function mapBounded<T, R>(
  *  reach in each - an environment the access is limited away from is left out. */
 export async function listProjects(caller: DeployCaller): Promise<ProjectLine[]> {
     requireScope(caller, "deploy.read");
-    const ids = (await visibleProjectIds(caller.userId))
+    // The projects Polaris runs for its own apps are not listed, the same as on
+    // the Deploy screen; their services stay reachable by id for what already
+    // names them.
+    const [visible, hidden] = await Promise.all([
+        visibleProjectIds(caller.userId),
+        polarisProjectIds()
+    ]);
+    const ids = visible
+        .filter((id) => !hidden.has(id))
         .filter((id) => !caller.projectId || id === caller.projectId)
         .slice(0, MAX_PROJECTS);
     if (ids.length === 0) return [];

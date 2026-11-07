@@ -16,6 +16,7 @@ import {
 } from "@/lib/deploy/private-domain";
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma, type Prisma } from "@polaris/db";
+import { polarisProjectIds } from "@/lib/deploy/managed-projects";
 import * as dnsCutover from "./deploy/dns-cutover";
 import { copyGroupLinks, groupLayers } from "@/lib/deploy/variable-groups";
 import * as follow from "./follow/follow";
@@ -271,8 +272,14 @@ export async function visibleApplication(
  * feature until it did not.
  */
 export async function listProjects(userId: string, orgId: string | null) {
+    // Deploy lists what people deployed. The projects Polaris runs for its own apps
+    // stay as they are and are reached from those apps' settings instead.
+    const [scoped, hidden] = await Promise.all([
+        scopedProjectWhere(userId, orgId),
+        polarisProjectIds()
+    ]);
     return prisma.project.findMany({
-        where: await scopedProjectWhere(userId, orgId),
+        where: hidden.size > 0 ? { AND: [scoped, { id: { notIn: [...hidden] } }] } : scoped,
         orderBy: { createdAt: "asc" },
         include: {
             environments: {

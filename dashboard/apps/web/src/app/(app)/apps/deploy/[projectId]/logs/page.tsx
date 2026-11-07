@@ -1,3 +1,4 @@
+import { leaveIfPolarisProject } from "../polaris-redirect";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
 import { getProjectFull } from "@/lib/deploy-service";
@@ -20,6 +21,7 @@ export default async function ProjectLogsPage({
 }) {
     const { projectId } = await params;
     const query = await searchParams;
+    await leaveIfPolarisProject(projectId, query.service);
     const user = await requirePermission("deploy.read");
 
     try {

@@ -1,3 +1,4 @@
+import { leaveIfPolarisProject } from "./polaris-redirect";
 import { notFound } from "next/navigation";
 import { localServerName } from "@/lib/local-server";
 import { targetLabel } from "@/lib/deploy-target-service";
@@ -72,6 +73,7 @@ export default async function DeployProjectPage({
         searchParams,
         requirePermission("deploy.read")
     ]);
+    await leaveIfPolarisProject(projectId, query.service);
     // Three reads that need nothing from one another, taken together.
     const [canManage, project, access] = await Promise.all([
         userHasManage(user, "deploy.manage"),
