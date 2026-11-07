@@ -47,7 +47,7 @@ import { app, BrowserWindow, dialog, net, screen, session, shell } from "electro
 import { describeNetError, finishedLoad, isCertificateError, netErrorCode } from "./reachability";
 import { sameInstanceAs } from "./same-instance";
 import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
-import { pinScope, verifyDecision } from "./local-ca-pin";
+import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
@@ -597,9 +597,13 @@ function start(): void {
         // the failover's proof (`net.fetch`) and the main window, so the proof and
         // the page it unlocks see the same rule.
         session.defaultSession.setCertificateVerifyProc((request, callback) => {
-            let verdict = -3;
+            if (request.errorCode !== AUTHORITY_INVALID || !current) {
+                callback(USE_CHROMIUM);
+                return;
+            }
+            let verdict = USE_CHROMIUM;
             try {
-                verdict = verifyDecision(request, pinScope(current, current ? instanceRecordFor(current) : null));
+                verdict = verifyDecision(request, pinScope(current, instanceRecordFor(current)));
             } catch {
                 // Anything unexpected keeps Chromium's own verdict.
             }

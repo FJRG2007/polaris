@@ -106,7 +106,10 @@ export function failoverFor(server: string): Failover | undefined {
     const failover = createFailover({ primary: server, instance: stored.record, fetch: netFetch });
     failovers.set(server, failover);
     records.set(server, stored.record);
-    if (Date.now() - stored.learnedAt > RELEARN_MS) void learnServer(server).catch(() => undefined);
+    const stale = Date.now() - stored.learnedAt > RELEARN_MS;
+    const unpinned = !stored.record.localCaSha256?.length && !asked.has(server);
+    if (unpinned) asked.add(server);
+    if (stale || unpinned) void learnServer(server).catch(() => undefined);
     return failover;
 }
 
