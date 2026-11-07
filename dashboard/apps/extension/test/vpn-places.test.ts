@@ -127,3 +127,29 @@ describe("flags", () => {
             expect(vendored.has(places.flagPath(code)!.slice("/flags/".length))).toBe(true);
     });
 });
+
+describe("time connected", () => {
+    const START = 1_800_000_000_000;
+
+    it("counts whole minutes, and nothing without a start", () => {
+        expect(places.elapsedMinutes(null, START)).toBeNull();
+        expect(places.elapsedMinutes(Number.NaN, START)).toBeNull();
+        expect(places.elapsedMinutes(START, START + 59_999)).toBe(0);
+        expect(places.elapsedMinutes(START, START + 12 * 60_000 + 5)).toBe(12);
+        expect(places.elapsedMinutes(START, START - 60_000)).toBe(0);
+    });
+
+    it("reads as minutes, hours and days in the popup's language", () => {
+        const minute = (n: number, locale: string) =>
+            new Intl.NumberFormat(locale, { style: "unit", unit: "minute", unitDisplay: "short" }).format(n);
+        const hour = (n: number, locale: string) =>
+            new Intl.NumberFormat(locale, { style: "unit", unit: "hour", unitDisplay: "short" }).format(n);
+        expect(places.formatElapsed(12, "en-US")).toBe(minute(12, "en-US"));
+        expect(places.formatElapsed(12, "en-US")).toMatch(/12/);
+        expect(places.formatElapsed(120, "es-ES")).toBe(hour(2, "es-ES"));
+        expect(places.formatElapsed(125, "es-ES")).toBe(`${hour(2, "es-ES")} ${minute(5, "es-ES")}`);
+        expect(places.formatElapsed(3 * 24 * 60 + 7, "en-US")).toBe("3 days");
+        for (const minutes of [1, 59, 60, 61, 1439, 1440, 100_000])
+            expect(places.formatElapsed(minutes, "en-US")).not.toMatch(/NaN|^0/);
+    });
+});

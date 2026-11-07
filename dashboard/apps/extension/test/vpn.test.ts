@@ -40,10 +40,13 @@ function harness(
         send?: typeof fetch;
         control?: string;
         everySite?: boolean;
+        noPrivacy?: boolean;
     } = {}
 ) {
     const route = stored<VpnRoute | null>(null);
     const login = stored<VpnLogin | null>(null);
+    // What the browser's storage hands back for a key never written: the fallback.
+    const guard = stored<boolean>(true);
     const settings = {
         set: vi.fn(async () => undefined),
         clear: vi.fn(async () => undefined),
@@ -66,7 +69,7 @@ function harness(
             onRequest: { addListener: (listener: typeof request) => (request = listener) }
         },
         webRequest: { onAuthRequired: { addListener: (listener: Listener) => (auth = listener) } },
-        privacy: { network: { webRTCIPHandlingPolicy: webRtc } }
+        privacy: options.noPrivacy ? undefined : { network: { webRTCIPHandlingPolicy: webRtc } }
     } as unknown as VpnApi;
     const send =
         options.send ??
@@ -81,6 +84,7 @@ function harness(
         api,
         route,
         login,
+        webRtcGuard: guard,
         link: async () => ({ origin: ORIGIN, token: "token" }),
         origins: async () => [ORIGIN],
         changed,
@@ -96,6 +100,7 @@ function harness(
         login,
         settings,
         webRtc,
+        guard,
         changed,
         send,
         ask: (details: object) => new Promise<object>((resolve) => auth(details, resolve)),
@@ -189,6 +194,7 @@ describe("connecting on Chromium", () => {
             scope: "regular"
         });
         expect(route.box.value?.nodeName).toBe("Madrid");
+        expect(route.box.value?.since).toBe(NOW * 1000);
         expect(login.box.value?.password).toBe("p");
         expect(login.box.value).not.toHaveProperty("host");
         expect(changed).toHaveBeenCalled();
@@ -386,7 +392,12 @@ describe("state", () => {
             async () => new Response("", { status: 404 })
         ) as unknown as typeof fetch;
         const { vpn } = harness({ send });
-        expect(await vpn.state()).toEqual({ available: false, nodes: [], active: null });
+        expect(await vpn.state()).toEqual({
+            available: false,
+            nodes: [],
+            active: null,
+            webRtcGuard: true
+        });
     });
 
     it("still names the active server when the list cannot be read", async () => {
@@ -396,6 +407,62 @@ describe("state", () => {
             }) as unknown as typeof fetch
         });
         route.box.value = { origin: ORIGIN, nodeId: "n", nodeName: "Madrid", host: "h", port: 443 };
-        expect((await vpn.state()).active).toEqual({ nodeId: "n", nodeName: "Madrid" });
+        expect((await vpn.state()).active).toEqual({ nodeId: "n", nodeName: "Madrid", since: null });
+    });
+
+    it("says when it connected, and nothing for a route saved before that was kept", async () => {
+        const { vpn, route } = harness();
+        const saved = { origin: ORIGIN, nodeId: "n", nodeName: "Madrid", host: "h", port: 443 };
+        route.box.value = { ...saved, since: NOW * 1000 - 720_000 };
+        expect((await vpn.state()).active?.since).toBe(NOW * 1000 - 720_000);
+        for (const since of [Number.NaN, 0, -5, NOW * 1000 + 3_600_000, "x" as unknown as number]) {
+            route.box.value = { ...saved, since };
+            expect((await vpn.state()).active?.since).toBeNull();
+        }
+    });
+
+    it("hides the WebRTC setting where the browser cannot hold WebRTC", async () => {
+        const { vpn } = harness({ noPrivacy: true });
+        expect((await vpn.state()).webRtcGuard).toBeNull();
+    });
+});
+
+describe("the WebRTC setting", () => {
+    it("is on when nothing was ever chosen", async () => {
+        const { vpn, webRtc } = harness();
+        expect((await vpn.state()).webRtcGuard).toBe(true);
+        await vpn.connect(NODE);
+        expect(webRtc.set).toHaveBeenCalledWith({ value: "disable_non_proxied_udp", scope: "regular" });
+    });
+
+    it("leaves WebRTC alone on connecting when it is off", async () => {
+        const { vpn, webRtc, guard } = harness();
+        guard.box.value = false;
+        expect(await vpn.connect(NODE)).toEqual({ ok: true });
+        expect(webRtc.set).not.toHaveBeenCalled();
+        expect(webRtc.clear).toHaveBeenCalled();
+        expect((await vpn.state()).webRtcGuard).toBe(false);
+    });
+
+    it("applies to a connection already up, without reconnecting", async () => {
+        const { vpn, webRtc, guard, settings } = harness();
+        await vpn.connect(NODE);
+        const proxied = settings.set.mock.calls.length;
+        webRtc.set.mockClear();
+        await vpn.setWebRtcGuard(false);
+        expect(guard.box.value).toBe(false);
+        expect(webRtc.clear).toHaveBeenCalledWith({ scope: "regular" });
+        await vpn.setWebRtcGuard(true);
+        expect(webRtc.set).toHaveBeenCalledWith({ value: "disable_non_proxied_udp", scope: "regular" });
+        expect(settings.set.mock.calls.length).toBe(proxied);
+    });
+
+    it("is only kept while disconnected, and touches nothing", async () => {
+        const { vpn, webRtc, guard } = harness();
+        await vpn.setWebRtcGuard(false);
+        await vpn.setWebRtcGuard(true);
+        expect(guard.box.value).toBe(true);
+        expect(webRtc.set).not.toHaveBeenCalled();
+        expect(webRtc.clear).not.toHaveBeenCalled();
     });
 });

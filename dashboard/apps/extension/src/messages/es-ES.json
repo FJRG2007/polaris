@@ -459,6 +459,12 @@
         "unavailable": "No disponible",
         "showServers": "Servidores en {country}",
         "loadFailed": "Polaris no envió la lista de servidores.",
-        "loading": "Cargando servidores"
+        "loading": "Cargando servidores",
+        "connectedFor": "Conectada desde hace {duration}",
+        "connectedJustNow": "Conectada hace un momento",
+        "privacy": "Privacidad",
+        "webRtcGuard": "Ocultar tu dirección a WebRTC",
+        "webRtcOnHint": "Con la VPN conectada, las llamadas y demás WebRTC de los sitios pasan por el servidor y no revelan tu dirección real. Algunas pueden ir peor.",
+        "webRtcOffHint": "Las llamadas van directas y pueden ir mejor, pero un sitio puede ver tu dirección real por WebRTC aunque estés conectado."
     }
 }

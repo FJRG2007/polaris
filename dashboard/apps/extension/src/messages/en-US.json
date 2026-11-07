@@ -459,6 +459,12 @@
         "unavailable": "Unavailable",
         "showServers": "Servers in {country}",
         "loadFailed": "Polaris did not send the server list.",
-        "loading": "Loading servers"
+        "loading": "Loading servers",
+        "connectedFor": "Connected for {duration}",
+        "connectedJustNow": "Connected just now",
+        "privacy": "Privacy",
+        "webRtcGuard": "Hide your address from WebRTC",
+        "webRtcOnHint": "While connected, calls and other WebRTC on sites go through the server, so they cannot reveal your real address. Some may connect worse.",
+        "webRtcOffHint": "Calls connect directly and may work better, but a site can learn your real address through WebRTC even while connected."
     }
 }

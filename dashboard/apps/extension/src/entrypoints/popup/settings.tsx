@@ -202,7 +202,7 @@ export function SettingsSection({
 }
 
 /** A choice of two, as the popup's chips draw one, with a line saying what it does. */
-function Choice<T extends string>({
+export function Choice<T extends string>({
     label,
     value,
     options,

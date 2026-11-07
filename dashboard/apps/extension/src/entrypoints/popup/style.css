@@ -1610,6 +1610,7 @@ button.chip.choice {
 
 .vpn-where,
 .vpn-server,
+.vpn-since,
 .vpn-name {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1767,6 +1768,14 @@ button.chip.choice {
     gap: 4px;
     margin: 0;
     padding: 16px;
+    overflow-wrap: anywhere;
+}
+
+.vpn-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 16px 16px;
     overflow-wrap: anywhere;
 }
 

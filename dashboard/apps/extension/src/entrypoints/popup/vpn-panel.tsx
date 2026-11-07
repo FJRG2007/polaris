@@ -8,10 +8,16 @@
  * pressed as a whole, tries one more server when the first does not carry
  * traffic, and says which one it ended on. A server picked by hand is not
  * swapped for another: whoever picked it is told why it failed instead.
+ *
+ * Connected, the card says for how long, where the saved connection says when it
+ * began. It does not show the exit address: the check before connecting only
+ * learns that traffic flows, and asking a lookup service would tell a third
+ * party who is behind the VPN.
  */
 
 import { useWords } from "./words";
-import { useMemo, useState } from "react";
+import { Choice } from "./settings";
+import { useEffect, useMemo, useState } from "react";
 import * as places from "@/lib/vpn-places";
 import { EVERY_SITE } from "@/lib/injection";
 import { askBackground } from "@/lib/messages";
@@ -47,6 +53,7 @@ export function VpnPanel(): React.JSX.Element {
     const [connecting, setConnecting] = useState<VpnNode | null>(null);
     const [error, setError] = useState<{ text: string; retry: () => void } | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    const [guardError, setGuardError] = useState<string | null>(null);
 
     const countries = useMemo(
         () => places.groupByCountry(state?.nodes ?? [], t.locale, t("vpn.otherPlaces")),
@@ -119,6 +126,17 @@ export function VpnPanel(): React.JSX.Element {
         });
     };
 
+    /** Optimistic: the choice shows at once and goes back if the worker refuses it. */
+    const turnWebRtc = (on: boolean): void => {
+        setGuardError(null);
+        shareVpnState({ ...state, webRtcGuard: on });
+        void askBackground({ kind: "vpnWebRtc", on }).then((reply) => {
+            if (reply.ok && "vpn" in reply) return shareVpnState(reply.vpn);
+            shareVpnState({ ...state, webRtcGuard: !on });
+            setGuardError(reply.ok ? t("errors.serverSilent") : reply.error);
+        });
+    };
+
     /** Another usable server than the one that failed, and than the one in use. */
     const otherThan = (failed: VpnNode): VpnNode | null =>
         places.randomPick(
@@ -178,6 +196,9 @@ export function VpnPanel(): React.JSX.Element {
                             <span className="vpn-server muted small" title={server}>
                                 {server}
                             </span>
+                        ) : null}
+                        {status === "on" && state.active?.since ? (
+                            <ConnectedFor since={state.active.since} />
                         ) : null}
                     </span>
                 </div>
@@ -355,7 +376,53 @@ export function VpnPanel(): React.JSX.Element {
                     )}
                 </>
             )}
+
+            {state.webRtcGuard === null ? null : (
+                <section>
+                    <h2>{t("vpn.privacy")}</h2>
+                    <div className="vpn-setting">
+                        <Choice
+                            label={t("vpn.webRtcGuard")}
+                            value={state.webRtcGuard ? "on" : "off"}
+                            options={[
+                                { value: "on", label: t("settings.on") },
+                                { value: "off", label: t("settings.off") }
+                            ]}
+                            hint={t(state.webRtcGuard ? "vpn.webRtcOnHint" : "vpn.webRtcOffHint")}
+                            onChange={(value) => turnWebRtc(value === "on")}
+                        />
+                        {guardError ? (
+                            <p className="vpn-note small" role="alert">
+                                {guardError}
+                            </p>
+                        ) : null}
+                    </div>
+                </section>
+            )}
         </main>
+    );
+}
+
+/** "Connected for 12 min", moved on each minute while the popup is open. */
+function ConnectedFor({ since }: { since: number }): React.JSX.Element | null {
+    const t = useWords();
+    const [now, setNow] = useState(Date.now);
+    useEffect(() => {
+        // The next tick lands when the count changes, not a minute after opening.
+        const wait = 60_000 - ((now - since) % 60_000);
+        const timer = window.setTimeout(() => setNow(Date.now()), Math.max(1_000, wait));
+        return () => window.clearTimeout(timer);
+    }, [now, since]);
+    const minutes = places.elapsedMinutes(since, now);
+    if (minutes === null) return null;
+    const text =
+        minutes < 1
+            ? t("vpn.connectedJustNow")
+            : t("vpn.connectedFor", { duration: places.formatElapsed(minutes, t.locale) });
+    return (
+        <span className="vpn-since muted small" title={text}>
+            {text}
+        </span>
     );
 }
 

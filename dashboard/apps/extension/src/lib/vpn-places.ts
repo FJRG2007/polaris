@@ -158,3 +158,22 @@ export function flagPath(code: string | null): string | null {
     const valid = countryCode(code);
     return valid ? `/flags/${valid.toLowerCase()}.svg` : null;
 }
+
+/** Whole minutes since `since`, or null when there is no start to count from. */
+export function elapsedMinutes(since: number | null, now: number): number | null {
+    if (since === null || !Number.isFinite(since)) return null;
+    return Math.max(0, Math.floor((now - since) / 60_000));
+}
+
+/** A minute count or more, as "12 min", "2 h 5 min" or "3 days" in `locale`. */
+export function formatElapsed(minutes: number, locale: string): string {
+    const unit = (value: number, name: "minute" | "hour" | "day"): string =>
+        new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "short" }).format(value);
+    if (minutes < 60) return unit(Math.max(1, minutes), "minute");
+    if (minutes < 24 * 60) {
+        const rest = minutes % 60;
+        const hours = unit(Math.floor(minutes / 60), "hour");
+        return rest ? `${hours} ${unit(rest, "minute")}` : hours;
+    }
+    return unit(Math.floor(minutes / (24 * 60)), "day");
+}
