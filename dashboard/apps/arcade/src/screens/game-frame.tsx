@@ -143,7 +143,9 @@ export function GameFrame({
             stall.current = window.setTimeout(() => {
                 if (document.hidden) return watch();
                 setLoad((now) =>
-                    now.phase === "loading" ? { phase: "failed", reason: "error" } : now
+                    now.phase === "loading" || now.phase === "starting"
+                        ? { phase: "failed", reason: "error" }
+                        : now
                 );
             }, STALLED_MS);
         };

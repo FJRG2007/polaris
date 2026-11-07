@@ -25,8 +25,9 @@ function withinTime(promise, ms) {
  */
 export async function startRenderer(create, { webgpuMs = WEBGPU_START_MS, webglMs = WEBGL_START_MS } = {}) {
   const first = create(false);
+  const firstStarted = first.init();
   try {
-    await withinTime(first.init(), webgpuMs);
+    await withinTime(firstStarted, webgpuMs);
     return first;
   } catch (error) {
     // A WebGPU that said no has already been replaced by WebGL 2 inside three.js; only one that never answered gets here
@@ -34,6 +35,10 @@ export async function startRenderer(create, { webgpuMs = WEBGPU_START_MS, webglM
     if (!first.backend?.isWebGPUBackend) throw error;
     console.warn(`[gpu] WebGPU did not start (${error.message}), starting on WebGL 2`);
     first.domElement?.remove();
+    firstStarted.then(
+      () => first.dispose?.(),
+      () => first.dispose?.()
+    );
   }
   const fallback = create(true);
   await withinTime(fallback.init(), webglMs);

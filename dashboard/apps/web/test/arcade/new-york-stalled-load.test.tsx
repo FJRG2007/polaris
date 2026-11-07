@@ -51,6 +51,24 @@ describe("starting the graphics", () => {
         expect(hung.domElement.remove).toHaveBeenCalled();
     });
 
+    it("releases a WebGPU renderer that answers after WebGL 2 took its place", async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        let answer!: () => void;
+        const late = {
+            ...fake(() => new Promise<void>((resolve) => (answer = resolve)), true),
+            dispose: vi.fn()
+        };
+        const webgl = fake(() => Promise.resolve(), false);
+        const started = startRenderer((forceWebGL: boolean) => (forceWebGL ? webgl : late));
+        await vi.advanceTimersByTimeAsync(WEBGPU_START_MS);
+        await expect(started).resolves.toBe(webgl);
+        expect(late.dispose).not.toHaveBeenCalled();
+        answer();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(late.dispose).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps a WebGPU that starts", async () => {
         const webgpu = fake(() => Promise.resolve(), true);
         const create = vi.fn(() => webgpu);
@@ -95,6 +113,16 @@ describe("the game's frame, mid-load", () => {
         render(<GameFrame game={game} />);
         await tell({ type: "polaris-game:hello" });
         await tell({ type: "polaris-game:progress", stage: "data", done: 1 });
+        await act(async () => vi.advanceTimersByTime(STALLED_MS - 1));
+        expect(screen.queryByRole("alert")).toBeNull();
+        await act(async () => vi.advanceTimersByTime(1));
+        expect(screen.getByRole("alert").textContent).toContain("failed");
+    });
+
+    it("says the game could not start when its page says hello and then nothing", async () => {
+        vi.useFakeTimers();
+        render(<GameFrame game={game} />);
+        await tell({ type: "polaris-game:hello" });
         await act(async () => vi.advanceTimersByTime(STALLED_MS - 1));
         expect(screen.queryByRole("alert")).toBeNull();
         await act(async () => vi.advanceTimersByTime(1));
