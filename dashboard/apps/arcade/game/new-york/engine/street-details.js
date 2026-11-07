@@ -77,7 +77,9 @@ function createStreetNameBlades() {
     const mat = new THREE.MeshStandardNodeMaterial({ roughness: 0.32 });
     const names = attribute('bladeNames', 'vec2');
     const right = step(0.5, uv().x);
-    const cell = mix(names.x, names.y, right);
+    // The index reaches the fragment as an interpolated float (83.99998 for 84): rounded, or mod/floor pick the cell
+    // beside it on part of the blade and the name breaks up into speckle
+    const cell = floor(mix(names.x, names.y, right).add(0.5));
     const col = mod(cell, BLADE_COLS);
     const row = floor(cell.div(BLADE_COLS));
     const u = uv().x.mul(2).sub(right);
