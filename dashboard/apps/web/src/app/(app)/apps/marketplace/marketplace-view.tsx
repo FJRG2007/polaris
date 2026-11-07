@@ -204,7 +204,6 @@ export function MarketplaceView({
     // the update action would answer.
     const asksUpdates = scope === "polaris" && canUpdateApps;
     const updates = useAppUpdates({ enabled: asksUpdates });
-    const [retrying, startRetry] = useTransition();
     const listed = useMemo(() => new Set(all.map((app) => app.id)), [all]);
     const updatableIds = useMemo(
         () => (asksUpdates ? new Set([...listed, ...NATIVE_APP_IDS]) : listed),
@@ -370,29 +369,7 @@ export function MarketplaceView({
                 </div>
             )}
 
-            {asksUpdates && updates.failed && (
-                <div
-                    role="alert"
-                    className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-4 py-3"
-                >
-                    <p className="min-w-0 truncate text-sm text-danger">
-                        {tc("appUpdates.checkFailed")}
-                    </p>
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={retrying}
-                        aria-busy={retrying || undefined}
-                        onClick={() =>
-                            startRetry(async () => {
-                                await updates.load(true);
-                            })
-                        }
-                    >
-                        {tc("appUpdates.check")}
-                    </Button>
-                </div>
-            )}
+            {asksUpdates && updates.failed && <UpdateCheckFailed updates={updates} />}
 
             {browsing && rows.length > 0 && (
                 <InstalledSection installed={rows} onUninstall={setRemoving} />
@@ -601,6 +578,38 @@ function InstalledSection({
                 })}
             </div>
         </section>
+    );
+}
+
+/** The update check failed: says so, with the button that asks again. */
+export function UpdateCheckFailed({ updates }: { updates: AppUpdates }) {
+    const tc = useTranslations("components");
+    const [retrying, startRetry] = useTransition();
+    return (
+        <div
+            role="alert"
+            className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-4 py-3"
+        >
+            <p
+                className="min-w-0 truncate text-sm text-danger"
+                title={tc("appUpdates.checkFailed")}
+            >
+                {tc("appUpdates.checkFailed")}
+            </p>
+            <Button
+                size="sm"
+                variant="secondary"
+                disabled={retrying}
+                aria-busy={retrying || undefined}
+                onClick={() =>
+                    startRetry(async () => {
+                        await updates.load(true);
+                    })
+                }
+            >
+                {tc("appUpdates.check")}
+            </Button>
+        </div>
     );
 }
 

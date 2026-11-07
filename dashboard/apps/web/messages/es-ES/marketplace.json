@@ -167,6 +167,7 @@
         "description": "Activa para todos las apps propias de Polaris.",
         "builtIn": "Incluida",
         "builtInBy": "Viene con cada Polaris",
-        "cannotUninstall": "Incluida - todo Polaris la necesita"
+        "cannotUninstall": "Incluida - todo Polaris la necesita",
+        "developer": "Polaris"
     }
 }

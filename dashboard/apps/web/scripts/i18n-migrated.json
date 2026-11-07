@@ -1672,6 +1672,7 @@
         "web/src/app/(app)/apps/marketplace/store-card-update.tsx",
         "web/src/app/(app)/apps/marketplace/[appId]/screenshot-gallery.tsx",
         "web/src/app/(app)/apps/marketplace/[appId]/app-detail.tsx",
+        "web/src/app/(app)/apps/marketplace/[appId]/built-in-detail.tsx",
         "web/src/app/(app)/watch/page.tsx",
         "web/src/app/(app)/watch/containers/page.tsx",
         "web/src/app/(app)/watch/servers/page.tsx",

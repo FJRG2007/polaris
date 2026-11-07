@@ -167,6 +167,7 @@
         "description": "Switch on Polaris's own apps for everybody here.",
         "builtIn": "Built in",
         "builtInBy": "Part of every Polaris",
-        "cannotUninstall": "Built in - every Polaris needs it"
+        "cannotUninstall": "Built in - every Polaris needs it",
+        "developer": "Polaris"
     }
 }

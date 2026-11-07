@@ -14,6 +14,9 @@ import { builtInSettingsHref } from "@/lib/apps/app-settings";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { builtInApps, builtInHref, findStoreApp } from "@/lib/apps/marketplace-store";
+import { resolveActiveApp } from "@/lib/apps";
+import { NATIVE_APPS } from "@/lib/apps/native-apps";
+import { appUpdatesAction } from "@/lib/app-bundles/actions";
 
 const push = vi.hoisted(() => vi.fn());
 
@@ -127,6 +130,15 @@ describe("a built-in app's page", () => {
         render(await page(plain!.id), { wrapper: MessagesWrapper });
         expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
         expect(builtInHref(plain!.id)).toBe(`/admin/apps/${plain!.id}`);
+    });
+
+    it("says the update check failed instead of claiming no build", async () => {
+        vi.mocked(appUpdatesAction).mockRejectedValueOnce(new Error("refused"));
+        const host = resolveActiveApp(Object.values(NATIVE_APPS)[0]!).id;
+        render(await page(host), { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Could not check for updates")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Check for app updates" })).toBeTruthy();
+        expect(screen.queryByText("No build of its own")).toBeNull();
     });
 
     it("is not found for an id nothing knows", async () => {

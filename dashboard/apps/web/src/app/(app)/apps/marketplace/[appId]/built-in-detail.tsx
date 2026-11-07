@@ -26,7 +26,12 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { BuiltInMark, BuiltInPreview, useBuiltInListing } from "../store-card";
 import { findBuiltInApp, POLARIS_APPS_PATH } from "@/lib/apps/marketplace-store";
 import { buildLabel, useAppUpdates } from "@/components/app-bundles/use-app-updates";
-import { builtInNativeUpdates, NativeUpdateNote, switcherCategory } from "../marketplace-view";
+import {
+    builtInNativeUpdates,
+    NativeUpdateNote,
+    switcherCategory,
+    UpdateCheckFailed
+} from "../marketplace-view";
 
 export function BuiltInAppDetail({
     appId,
@@ -95,22 +100,32 @@ export function BuiltInAppDetail({
             {natives.length > 0 && (
                 <section className="flex min-w-0 flex-col gap-2" aria-label={t("detail.builds")}>
                     <h2 className="text-sm font-medium">{t("detail.builds")}</h2>
-                    {natives.map((native) =>
-                        native.state.loading ? (
-                            <Skeleton key={native.id} className="h-10 w-full max-w-md" />
-                        ) : (
-                            <div key={native.id} className="flex min-w-0 max-w-md flex-col gap-1">
-                                <dl className="grid min-w-0 grid-cols-1 gap-x-6 text-sm sm:grid-cols-[max-content_1fr]">
-                                    <Fact label={native.name}>
-                                        {native.state.row?.installed
-                                            ? buildLabel(native.state.row.installed)
-                                            : t("detail.noBuild")}
-                                    </Fact>
-                                </dl>
-                                <NativeUpdateNote update={native} />
-                            </div>
-                        )
+                    {updates.failed && (
+                        <div className="max-w-md">
+                            <UpdateCheckFailed updates={updates} />
+                        </div>
                     )}
+                    {updates.rows !== null || !updates.failed
+                        ? natives.map((native) =>
+                              native.state.loading ? (
+                                  <Skeleton key={native.id} className="h-10 w-full max-w-md" />
+                              ) : (
+                                  <div
+                                      key={native.id}
+                                      className="flex min-w-0 max-w-md flex-col gap-1"
+                                  >
+                                      <dl className="grid min-w-0 grid-cols-1 gap-x-6 text-sm sm:grid-cols-[max-content_1fr]">
+                                          <Fact label={native.name}>
+                                              {native.state.row?.installed
+                                                  ? buildLabel(native.state.row.installed)
+                                                  : t("detail.noBuild")}
+                                          </Fact>
+                                      </dl>
+                                      <NativeUpdateNote update={native} />
+                                  </div>
+                              )
+                          )
+                        : null}
                 </section>
             )}
 
@@ -134,7 +149,7 @@ export function BuiltInAppDetail({
             <section className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-sm font-medium">{t("detail.information")}</h2>
                 <dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-                    <Fact label={t("detail.developer")}>Polaris</Fact>
+                    <Fact label={t("detail.developer")}>{t("polaris.developer")}</Fact>
                     <Fact label={t("detail.category")}>
                         {navLabel(switcherCategory(entry.category))}
                     </Fact>
