@@ -12,12 +12,27 @@ interface Account {
     name: string;
     email: string;
     username: string;
+    emails?: { email: string; verifiedAt: Date | null }[];
 }
 
 const accounts: Account[] = [
     { id: "viewer", name: "Test Viewer", email: "viewer@example.test", username: "viewer" },
-    { id: "friend", name: "Fixture Friend", email: "friend@example.test", username: "fixture_friend" },
-    { id: "stranger", name: "Fixture Stranger", email: "stranger@example.test", username: "fixture_stranger" }
+    {
+        id: "friend",
+        name: "Fixture Friend",
+        email: "friend@example.test",
+        username: "fixture_friend"
+    },
+    {
+        id: "stranger",
+        name: "Fixture Stranger",
+        email: "stranger@example.test",
+        username: "fixture_stranger",
+        emails: [
+            { email: "stranger.work@example.test", verifiedAt: new Date(0) },
+            { email: "stranger.unproven@example.test", verifiedAt: null }
+        ]
+    }
 ];
 
 let friends = new Set<string>();
@@ -34,7 +49,9 @@ function textMatches(value: string, rule: Text): boolean {
 function clauseMatches(person: Account, clause: Record<string, unknown>): boolean {
     for (const [field, rule] of Object.entries(clause)) {
         if (field === "OR") {
-            if (!(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))) {
+            if (
+                !(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))
+            ) {
                 return false;
             }
         } else if (field === "id") {
@@ -43,6 +60,12 @@ function clauseMatches(person: Account, clause: Record<string, unknown>): boolea
             if (id.not && id.not === person.id) return false;
         } else if (field === "name" || field === "username" || field === "email") {
             if (!textMatches(person[field], rule as Text)) return false;
+        } else if (field === "emails") {
+            const wanted = (rule as { some: { email: string; verifiedAt: { not: null } } }).some;
+            const proven = (person.emails ?? []).filter((row) => row.verifiedAt !== null);
+            if (!proven.some((row) => row.email === wanted.email)) return false;
+        } else if (field !== "bannedAt" && field !== "disabledAt") {
+            throw new Error(`unhandled field ${field}`);
         }
     }
     return true;
@@ -50,6 +73,12 @@ function clauseMatches(person: Account, clause: Record<string, unknown>): boolea
 
 vi.mock("@/lib/rich-text/mention-service", () => ({
     like: (term: string) => ({ contains: term })
+}));
+// The instance's discovery policy, as the operator left it; null is the default.
+let storedPolicy: string | null = null;
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => storedPolicy,
+    setSetting: async () => {}
 }));
 vi.mock("@/lib/privacy-service", () => ({
     discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) => new Set(userIds)
@@ -76,6 +105,7 @@ async function search(term: string): Promise<string[]> {
 describe("finding somebody who is not a friend", () => {
     beforeEach(() => {
         friends = new Set(["friend"]);
+        storedPolicy = null;
     });
 
     it("lists nobody from a few letters", async () => {
@@ -97,5 +127,59 @@ describe("finding somebody who is not a friend", () => {
     it("lists nobody at all for somebody with no friends", async () => {
         friends = new Set();
         expect(await search("fixture")).toEqual([]);
+    });
+});
+
+describe("the instance's discovery policy", () => {
+    beforeEach(() => {
+        friends = new Set(["friend"]);
+    });
+
+    function policy(rules: Record<string, boolean>) {
+        storedPolicy = JSON.stringify({
+            usernameExact: true,
+            usernamePartial: false,
+            namePartial: false,
+            emailExact: false,
+            ...rules
+        });
+    }
+
+    it("finds a stranger by part of their username only when that is on", async () => {
+        policy({ usernamePartial: true });
+        expect(await search("fixture_str")).toEqual(["stranger"]);
+        expect(await search("Fixture Stranger")).toEqual([]);
+    });
+
+    it("finds a stranger by part of their name only when that is on", async () => {
+        policy({ namePartial: true });
+        expect(await search("Stranger")).toEqual(["stranger"]);
+        expect(await search("fixture_str")).toEqual([]);
+    });
+
+    it("finds a stranger by their whole address only when that is on, never part of it", async () => {
+        policy({ emailExact: true });
+        expect(await search("stranger@example.test")).toEqual(["stranger"]);
+        expect(await search("example.test")).toEqual([]);
+    });
+
+    it("finds a stranger by a proven added address, never an unproven one", async () => {
+        policy({ emailExact: true });
+        expect(await search("Stranger.Work@example.test")).toEqual(["stranger"]);
+        expect(await search("stranger.unproven@example.test")).toEqual([]);
+        policy({ emailExact: false });
+        expect(await search("stranger.work@example.test")).toEqual([]);
+    });
+
+    it("stops finding strangers by username when that is off, and keeps friends", async () => {
+        policy({ usernameExact: false });
+        expect(await search("fixture_stranger")).toEqual([]);
+        expect(await search("Friend")).toEqual(["friend"]);
+    });
+
+    it("reads an unreadable value as the defaults", async () => {
+        storedPolicy = "not json";
+        expect(await search("fixture_stranger")).toEqual(["stranger"]);
+        expect(await search("Stranger")).toEqual([]);
     });
 });

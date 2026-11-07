@@ -21,12 +21,19 @@ vi.mock("@polaris/auth", () => ({
 
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
-vi.mock("@/lib/rich-text/mention-service", () => ({ like: (term: string) => ({ contains: term }) }));
+vi.mock("@/lib/rich-text/mention-service", () => ({
+    like: (term: string) => ({ contains: term })
+}));
 
 /** Who has hidden themselves, and from whom. Everybody else is on the default,
  *  which is findable. */
 let hidden = new Set<string>();
 
+// No discovery policy stored: the defaults, whole username only.
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => {}
+}));
 vi.mock("@/lib/privacy-service", () => ({
     discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) =>
         new Set(userIds.filter((id) => !hidden.has(id)))
@@ -37,9 +44,27 @@ vi.mock("@/lib/privacy-service", () => ({
  *  none of these share anything. */
 const accounts = [
     { id: "ada", name: "Ada Lovelace", email: "ada@example.com", username: "ada", bannedAt: null },
-    { id: "grace", name: "Grace Hopper", email: "grace@example.com", username: "g1203", bannedAt: null },
-    { id: "turing", name: "Alan Turing", email: "alan@example.com", username: "alan", bannedAt: null },
-    { id: "gone", name: "Banned Person", email: "gone@example.com", username: "gone", bannedAt: new Date() }
+    {
+        id: "grace",
+        name: "Grace Hopper",
+        email: "grace@example.com",
+        username: "g1203",
+        bannedAt: null
+    },
+    {
+        id: "turing",
+        name: "Alan Turing",
+        email: "alan@example.com",
+        username: "alan",
+        bannedAt: null
+    },
+    {
+        id: "gone",
+        name: "Banned Person",
+        email: "gone@example.com",
+        username: "gone",
+        bannedAt: new Date()
+    }
 ];
 
 /** Who the searcher is friends with - the only people a few letters find. */
@@ -54,7 +79,9 @@ type Account = (typeof accounts)[number];
 function clauseMatches(person: Account, clause: Record<string, unknown>): boolean {
     for (const [field, rule] of Object.entries(clause)) {
         if (field === "OR") {
-            if (!(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))) {
+            if (
+                !(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))
+            ) {
                 return false;
             }
         } else if (field === "id") {
@@ -68,7 +95,9 @@ function clauseMatches(person: Account, clause: Record<string, unknown>): boolea
             const matched =
                 typeof rule === "string"
                     ? value === rule
-                    : value.toLowerCase().includes((rule as { contains: string }).contains.toLowerCase());
+                    : value
+                          .toLowerCase()
+                          .includes((rule as { contains: string }).contains.toLowerCase());
             if (!matched) return false;
         }
     }

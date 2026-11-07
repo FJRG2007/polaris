@@ -3367,6 +3367,29 @@
                 "nobody": "Nobody"
             }
         },
+        "discovery": {
+            "title": "Finding people",
+            "hint": "What lets someone who is not a friend or colleague find an account. Friends and colleagues are always found by part of their name or username. Each person's own privacy setting and blocks still apply.",
+            "saved": "Saved.",
+            "rules": {
+                "usernameExact": {
+                    "label": "Whole username",
+                    "hint": "Typing @ada finds Ada."
+                },
+                "usernamePartial": {
+                    "label": "Part of a username",
+                    "hint": "A few letters list every match on this instance."
+                },
+                "namePartial": {
+                    "label": "Part of a name",
+                    "hint": "A few letters list every match on this instance."
+                },
+                "emailExact": {
+                    "label": "Whole email address",
+                    "hint": "Finds the account. The address is shown only if its owner allows it."
+                }
+            }
+        },
         "errors": {
             "invalidInput": "Invalid input",
             "unknownAccount": "Unknown account.",

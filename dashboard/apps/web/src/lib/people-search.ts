@@ -12,16 +12,26 @@
  * where everybody may know everybody.
  *
  * **Only friends autocomplete.** A few letters find a friend by their name or
- * their handle; anybody else is found only by typing their whole username. A
- * partial match on strangers is a directory with extra steps - two letters at a
- * time, it lists every account on the instance.
+ * their handle; anybody else is found only by what the operator's discovery
+ * policy allows (`discovery-policy.ts`) - by default, typing their whole
+ * username. A partial match on strangers is a directory with extra steps - two
+ * letters at a time, it lists every account on the instance - which is why it is
+ * an instance decision and off unless somebody turns it on.
  */
 
 import { prisma, VISIBLE_USER } from "@polaris/db";
+import type { Prisma } from "@polaris/db";
 import { blockedBetween } from "@/lib/blocks";
 import { friendIds } from "@/lib/friends-service";
 import { discoverableBy } from "@/lib/privacy-service";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { like } from "@/lib/rich-text/mention-service";
+import {
+    DEFAULT_DISCOVERY_POLICY,
+    DISCOVERY_POLICY_KEY,
+    readDiscoveryPolicy,
+    type DiscoveryPolicy
+} from "@/lib/discovery-policy";
 
 /**
  * The fewest characters that count as looking for somebody.
@@ -42,23 +52,87 @@ export interface FoundPeople {
     readonly withheld: number;
 }
 
+/** The operator's discovery policy, with the defaults for anything unset. */
+export async function discoveryPolicy(): Promise<DiscoveryPolicy> {
+    return readDiscoveryPolicy(await getSetting(DISCOVERY_POLICY_KEY));
+}
+
+export async function setDiscoveryPolicy(policy: DiscoveryPolicy): Promise<void> {
+    await setSetting(DISCOVERY_POLICY_KEY, JSON.stringify(policy));
+}
+
+/**
+ * How `term` may match somebody who is neither a friend nor a colleague, by the
+ * operator's policy. Nothing under `SHORTEST_SEARCH` characters, and nothing
+ * partial on fewer than that either, so a single letter after "@" is not a page
+ * of the directory.
+ *
+ * The address only ever as a whole, and only to find - whether it is printed
+ * back is still the account's own email setting, decided by whoever renders it.
+ */
+export function strangerMatches(term: string, policy: DiscoveryPolicy): Prisma.UserWhereInput[] {
+    if (term.length < SHORTEST_SEARCH) return [];
+    // Usernames and addresses are stored lowercased, so an exact match is a
+    // plain equality.
+    const handle = term.replace(/^@/, "").toLowerCase();
+    return [
+        ...(policy.usernameExact && handle ? [{ username: handle }] : []),
+        ...(policy.usernamePartial && handle.length >= SHORTEST_SEARCH
+            ? [{ username: like(handle) }]
+            : []),
+        ...(policy.namePartial ? [{ name: like(term) }] : []),
+        ...(policy.emailExact && term.includes("@", 1) ? addressMatches(term.toLowerCase()) : [])
+    ];
+}
+
+/** An account by its main address or one it added and proved, as a whole. */
+function addressMatches(address: string): Prisma.UserWhereInput[] {
+    return [
+        { email: address },
+        { emails: { some: { email: address, verifiedAt: { not: null } } } }
+    ];
+}
+
 /**
  * Who a search for `term` may match: a friend by any part of their name or
- * handle, and anybody else only by their whole username. Never the address -
- * matching on it would confirm a guessed one.
+ * handle, and anybody else only by what the discovery policy allows - by
+ * default their whole username.
  */
-export function matchingPeople(term: string, friends: readonly string[]) {
+export function matchingPeople(
+    term: string,
+    friends: readonly string[],
+    policy: DiscoveryPolicy = DEFAULT_DISCOVERY_POLICY
+): { OR: Prisma.UserWhereInput[] } {
     const contains = like(term);
-    // Usernames are stored lowercased, so an exact match is a plain equality.
-    const handle = term.replace(/^@/, "").toLowerCase();
     return {
         OR: [
             ...(friends.length > 0
                 ? [{ id: { in: [...friends] }, OR: [{ name: contains }, { username: contains }] }]
                 : []),
-            { username: handle }
+            ...strangerMatches(term, policy)
         ]
     };
+}
+
+/**
+ * Which of these accounts `viewerId` may be shown: their own "who can find me"
+ * allows it, and there is no block between the two in either direction.
+ *
+ * The second half of every people search, kept here so a field that names
+ * somebody and the friend search cannot drift apart. A block is read in both
+ * directions and as absence rather than refusal - see `findPeople`.
+ */
+export async function findableBy(
+    viewerId: string,
+    userIds: readonly string[]
+): Promise<Set<string>> {
+    const wanted = [...new Set(userIds)];
+    if (wanted.length === 0) return new Set();
+    const [visible, blocked] = await Promise.all([
+        discoverableBy({ id: viewerId, isAdmin: false }, wanted),
+        blockedBetween(viewerId, wanted)
+    ]);
+    return new Set(wanted.filter((id) => visible.has(id) && !blocked.has(id)));
 }
 
 export async function findPeople(
@@ -78,12 +152,12 @@ export async function findPeople(
     const term = query.trim();
     if (term.length < SHORTEST_SEARCH) return { people: [], withheld: 0 };
 
-    const friends = await friendIds(viewer.id);
+    const [friends, policy] = await Promise.all([friendIds(viewer.id), discoveryPolicy()]);
     const found = await prisma.user.findMany({
         where: {
             id: { not: viewer.id },
             ...VISIBLE_USER,
-            ...matchingPeople(term, [...friends])
+            ...matchingPeople(term, [...friends], policy)
         },
         select: { id: true, name: true, username: true },
         orderBy: { name: "asc" },
@@ -100,17 +174,11 @@ export async function findPeople(
     // block announcing itself. Somebody this searcher blocked is left out for
     // the plainer reason that picking them would open a conversation their own
     // decision refuses to carry.
-    const [visible, blocked] = await Promise.all([
-        discoverableBy(
-            { id: viewer.id, isAdmin: false },
-            found.map((person) => person.id)
-        ),
-        blockedBetween(
-            viewer.id,
-            found.map((person) => person.id)
-        )
-    ]);
-    const candidates = found.filter((person) => visible.has(person.id) && !blocked.has(person.id));
+    const findable = await findableBy(
+        viewer.id,
+        found.map((person) => person.id)
+    );
+    const candidates = found.filter((person) => findable.has(person.id));
 
     const allowed =
         options.reachableOnly && options.reachable

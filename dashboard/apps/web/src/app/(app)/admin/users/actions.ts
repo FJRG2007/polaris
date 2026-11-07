@@ -20,6 +20,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { setProfilesPublic } from "@/lib/profile-service";
 import { FOLLOWERS_DEFAULT_KEY, setDefaultFollowerAudience } from "@/lib/privacy-service";
 import { setSharingPolicy } from "@/lib/sharing-policy";
+import { setDiscoveryPolicy } from "@/lib/people-search";
+import { DISCOVERY_POLICY_KEY, discoveryPolicySchema } from "@/lib/discovery-policy";
 import {
     accessRulesSchema,
     createInviteSchema,
@@ -349,6 +351,27 @@ export async function setFollowerDefaultAction(audience: unknown): Promise<{ err
     return {};
 }
 
+/**
+ * Which identifiers find somebody who is not a friend or a colleague. Each
+ * account's own "who can find me" still applies on top of whatever this says.
+ */
+export async function setDiscoveryPolicyAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = discoveryPolicySchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("users.errors.checkSettings") };
+    await setDiscoveryPolicy(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.people-discovery",
+        targetType: "setting",
+        targetId: DISCOVERY_POLICY_KEY,
+        metadata: parsed.data
+    });
+    revalidatePath("/admin/users");
+    return {};
+}
+
 export async function setSharingPolicyAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = sharingPolicySchema.safeParse(input);
@@ -378,7 +401,8 @@ export async function listUserDirectoryAction(
 ): Promise<Page<DirectoryUser> | { error: string }> {
     await requireAdmin();
     const parsed = directoryQuerySchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("users.directory.loadFailed") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("users.directory.loadFailed") };
     try {
         return await listUserDirectoryPage(parsed.data);
     } catch (caught) {
