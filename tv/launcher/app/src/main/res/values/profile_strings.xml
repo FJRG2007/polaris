@@ -53,6 +53,4 @@
     <string name="profile_pin_set">Set a PIN</string>
     <string name="profile_pin_change">Change PIN</string>
     <string name="profile_pin_remove">Remove PIN</string>
-    <string name="profile_pin_saved">PIN saved</string>
-    <string name="profile_pin_removed">PIN removed</string>
 </resources>
