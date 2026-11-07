@@ -19,6 +19,9 @@ const STEPS: Partial<Record<TvPhase, string>> = {
     closing: "Turning off debugging on the TV..."
 };
 
+const LINKING =
+    "The TV now shows a code to link it to your Polaris. Scan it with your phone, or open the address it shows and type the code.";
+
 const OUTCOMES: Record<TvOutcome, string> = {
     installed: "Polaris TV is installed. Find it among the TV's apps.",
     "installed-home": "Polaris TV is installed and is now the Home screen.",
@@ -168,7 +171,8 @@ function render(state: TvInstallState): void {
     say(step, state.usbListing ? "Looking for TVs plugged in by USB..." : (STEPS[state.phase] ?? null));
     say(waitingNote, waitingText(state.waiting));
     say(homeRule, state.home && state.home !== "offered" ? HOME_RULES[state.home] : null);
-    say(result, state.outcome ? OUTCOMES[state.outcome] : null);
+    const linking = state.phase === "done" && state.linking ? ` ${LINKING}` : "";
+    say(result, state.outcome ? OUTCOMES[state.outcome] + linking : null);
     heading.textContent = state.phase === "done" ? "Installed" : "Install on a TV";
     say(backup, state.backup ? `Backup kept on this computer: ${state.backup}` : null);
     say(

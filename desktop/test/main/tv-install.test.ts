@@ -31,7 +31,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
+const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
     await import(
     "../../src/main/tv-install"
 );
@@ -292,6 +292,31 @@ describe("a failure part way through", () => {
         expect(lateFailure("send")).toBe("connection-lost");
         expect(lateFailure("install")).toBe("install-interrupted");
         expect(lateFailure("home")).toBe("installed-home-unknown");
+    });
+});
+
+describe("the link screen after the install", () => {
+    it("opens the shell-only alias with this app's Polaris as a bare origin", () => {
+        expect(linkCommand("https://polaris.example.com/home?x=1")).toBe(
+            "am start -n app.polaris.tv/.LinkFromInstall --es origin https://polaris.example.com"
+        );
+        expect(linkCommand("http://192.168.1.20:3000")).toBe(
+            "am start -n app.polaris.tv/.LinkFromInstall --es origin http://192.168.1.20:3000"
+        );
+    });
+
+    it("does nothing without a Polaris, or with an address that is not plain http(s)", () => {
+        expect(linkCommand(null)).toBeNull();
+        expect(linkCommand("not a url")).toBeNull();
+        expect(linkCommand("file:///etc/passwd")).toBeNull();
+        expect(linkCommand("javascript:alert(1)")).toBeNull();
+    });
+
+    it("tells a started activity from am's errors", () => {
+        expect(opened("Starting: Intent { cmp=app.polaris.tv/.LinkFromInstall (has extras) }\n")).toBe(true);
+        expect(opened("Error type 3\nError: Activity class {app.polaris.tv/app.polaris.tv.LinkFromInstall} does not exist.")).toBe(false);
+        expect(opened("java.lang.SecurityException: Permission Denial")).toBe(false);
+        expect(opened("")).toBe(false);
     });
 });
 

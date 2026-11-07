@@ -356,6 +356,9 @@ function InstallSteps({
                         {t(`downloads.tv.dialog.outcomes.${outcome}` as never)}
                     </p>
                 ) : null}
+                {state.phase === "done" && state.linking ? (
+                    <p className="text-sm text-foreground">{t("downloads.tv.dialog.linking")}</p>
+                ) : null}
                 {asksCode ? (
                     <div className="flex min-w-0 flex-col gap-1.5">
                         <label htmlFor="tv-code" className="text-sm font-medium">

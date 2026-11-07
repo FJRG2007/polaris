@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { connect as tcp } from "node:net";
 import { networkInterfaces } from "node:os";
+import { serverAddress } from "./settings";
 import { openLocalWindow } from "./windows";
 import { repository } from "../../package.json";
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
@@ -215,6 +216,28 @@ export const PRIVATE_DNS_READ =
  * TV's own back when it does not work. Neither is ever revoked here: the launcher's own scripts may
  * have granted the second for another switch.
  */
+/**
+ * Opens the TV's link screen with this app's Polaris filled in, so it shows the code to scan without anything
+ * typed on a remote. Null when there is no Polaris yet, or its address is not a plain http(s) origin: the
+ * value goes into a shell command line, so nothing else is let through.
+ */
+export function linkCommand(server: string | null): string | null {
+    if (!server) return null;
+    let origin: string;
+    try {
+        origin = new URL(server).origin;
+    } catch {
+        return null;
+    }
+    if (!/^https?:\/\/[A-Za-z0-9.:[\]-]+$/.test(origin)) return null;
+    return `am start -n ${PACKAGE}/.LinkFromInstall --es origin ${origin}`;
+}
+
+/** Whether `am start` reported the activity started rather than an error. */
+export function opened(output: string): boolean {
+    return output.trim().length > 0 && !/Error|Exception/i.test(output);
+}
+
 export function grantCommands(blockAds: boolean): readonly string[] {
     const grants = [`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`];
     if (blockAds) grants.push(`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`);
@@ -253,6 +276,7 @@ let state: TvInstallState = {
     closed: null,
     waiting: null,
     home: null,
+    linking: null,
     named: {}
 };
 
@@ -357,7 +381,7 @@ async function overWirelessDebugging(
 }
 
 async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, code: string | null = null): Promise<void> {
-    publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null });
+    publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null, linking: null });
     const release = await latestApk().catch((caught: unknown) => {
         console.error("[tv]", caught);
         return undefined;
@@ -489,6 +513,8 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
             );
             outcome = homeIsOurs(resolved) ? "installed-home" : "installed-home-refused";
         }
+        const link = linkCommand(serverAddress());
+        if (link) publish({ linking: opened(await adb.shell(link).catch(() => "Error")) });
         await finish(adb, target, outcome);
     } catch (caught) {
         console.error("[tv]", caught);

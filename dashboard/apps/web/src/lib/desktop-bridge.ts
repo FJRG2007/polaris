@@ -54,6 +54,8 @@ export interface DesktopTvState {
     readonly usbListing?: boolean;
     /** How it ended; an app newer than this page may name one it does not know. */
     readonly outcome: string | null;
+    /** Whether the TV was left on its link screen for this Polaris. Absent on older desktop apps. */
+    readonly linking?: boolean | null;
     /** The folder on the computer the TV's backup was written to. */
     readonly backup: string | null;
     /** Whether network debugging refused afterwards; null until checked. */

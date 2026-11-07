@@ -1463,6 +1463,7 @@
                     "list": "{items} and {last}",
                     "stop": "Stop"
                 },
+                "linking": "The TV now shows a code to link it to this Polaris. Scan it with your phone, or open the address it shows and type the code.",
                 "outcomes": {
                     "installed": "Polaris TV is installed. Find it among the TV's apps.",
                     "installed-home": "Polaris TV is installed and is now the Home screen.",
