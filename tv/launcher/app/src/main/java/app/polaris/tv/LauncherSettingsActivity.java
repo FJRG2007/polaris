@@ -65,6 +65,18 @@ public final class LauncherSettingsActivity extends Activity {
     private boolean advancedEffects;
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        ProfileSession.guardResumed(this);   // a profile's PIN is owed: back to "Who's watching?"
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        ProfileSession.guardPaused(this);
+    }
+
+    @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_launcher_settings);
@@ -564,9 +576,9 @@ public final class LauncherSettingsActivity extends Activity {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         labels.add(getString(R.string.profile_rename));
-        actions.add(() -> askProfileName(profile));
+        actions.add(() -> PinPad.check(this, profile, () -> askProfileName(profile)));
         labels.add(getString(R.string.profile_change_avatar));
-        actions.add(() -> pickAvatar(profile, null));
+        actions.add(() -> PinPad.check(this, profile, () -> pickAvatar(profile, null)));
         if (at > 0) {
             labels.add(getString(R.string.profile_move_up));
             actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, -1)));
@@ -575,8 +587,23 @@ public final class LauncherSettingsActivity extends Activity {
             labels.add(getString(R.string.profile_move_down));
             actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, 1)));
         }
+        // A PIN is set freely, but changing or removing one asks for it first, as do a new name or colour.
+        if (Profiles.hasPin(this, profile.id)) {
+            labels.add(getString(R.string.profile_pin_change));
+            actions.add(() -> PinPad.check(this, profile, () -> PinPad.create(this, profile,
+                    () -> openProfile(profile))));
+            labels.add(getString(R.string.profile_pin_remove));
+            actions.add(() -> PinPad.check(this, profile, () -> {
+                Profiles.savePin(this, profile.id, null);
+                openProfile(profile);
+            }));
+        } else {
+            labels.add(getString(R.string.profile_pin_set));
+            actions.add(() -> PinPad.create(this, profile, () -> openProfile(profile)));
+        }
         labels.add(getString(R.string.profile_delete));
-        actions.add(() -> deleteProfile(profile));
+        // Deleting a profile with a PIN asks for it too (PinPad.check goes straight on without one).
+        actions.add(() -> PinPad.check(this, profile, () -> deleteProfile(profile)));
         new AlertDialog.Builder(this)
                 .setTitle(ProfilePicker.displayName(this, profile))
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
@@ -665,6 +692,7 @@ public final class LauncherSettingsActivity extends Activity {
                     }
                     if (profile.id.equals(Profiles.linkedId(this))) Profiles.setLinked(this, null);
                     deleteSharedPreferences(Profiles.recentsFile(profile.id));
+                    Profiles.savePin(this, profile.id, null);
                     saveProfiles(left);
                 })
                 .setNegativeButton(android.R.string.cancel, null)

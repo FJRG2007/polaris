@@ -37,6 +37,9 @@ final class Profiles {
     /** The profile the TV's existing single link belongs to; slice 3 moves links per profile and host. */
     private static final String LINKED = "linkedId";
     private static final String LEGACY_RECENTS = "last_opened";
+    /** A profile's PIN record lives beside the roster, so a wrong try never rewrites the roster. */
+    private static final String PIN_PREFIX = "pin_";
+    private static final String PIN_ITERATIONS = "pin_iters";
 
     private Profiles() {
     }
@@ -247,6 +250,32 @@ final class Profiles {
 
     static void setActive(Context ctx, String id) {
         prefs(ctx).edit().putString(ACTIVE, id).commit();
+    }
+
+    /** The profile's PIN record (see {@link PinHash.Record}), or null when it has none. */
+    static PinHash.Record pin(Context ctx, String profileId) {
+        return PinHash.decode(prefs(ctx).getString(PIN_PREFIX + profileId, null));
+    }
+
+    static boolean hasPin(Context ctx, String profileId) {
+        return pin(ctx, profileId) != null;
+    }
+
+    /** Keeps or, with {@code record} null, removes the profile's PIN. */
+    static void savePin(Context ctx, String profileId, PinHash.Record record) {
+        SharedPreferences.Editor edit = prefs(ctx).edit();
+        if (record == null) edit.remove(PIN_PREFIX + profileId);
+        else edit.putString(PIN_PREFIX + profileId, PinHash.encode(record));
+        edit.commit();
+    }
+
+    /** PBKDF2 rounds tuned for this TV, 0 before the first PIN was set. */
+    static int pinIterations(Context ctx) {
+        return prefs(ctx).getInt(PIN_ITERATIONS, 0);
+    }
+
+    static void setPinIterations(Context ctx, int iters) {
+        prefs(ctx).edit().putInt(PIN_ITERATIONS, iters).commit();
     }
 
     /** The prefs file that holds a profile's recents. */
