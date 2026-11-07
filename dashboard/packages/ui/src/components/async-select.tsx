@@ -165,10 +165,14 @@ function AsyncPicker<T>({
     }, [fixed, query]);
     const rows = list.items.length + (list.loadingMore ? 1 : 0);
 
-    const scroller = useRef<HTMLDivElement | null>(null);
+    // The list is drawn in a portal that mounts after this renders - on every
+    // opening - so a ref would still be empty when the virtualizer looks, and it
+    // would keep measuring and listening to the list of the last opening. As
+    // state, each new list renders this again and the virtualizer takes it up.
+    const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
     const virtual = useVirtualizer({
         count: rows,
-        getScrollElement: () => scroller.current,
+        getScrollElement: () => scroller,
         estimateSize: () => ROW_HEIGHT,
         overscan: 6,
         // Laid out before the menu has measured itself, so the first page is
@@ -283,7 +287,7 @@ function AsyncPicker<T>({
                     </p>
                 ) : (
                     <div
-                        ref={scroller}
+                        ref={setScroller}
                         aria-busy={list.loadingMore}
                         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
                     >

@@ -464,11 +464,13 @@ export function ShareDialog({
     };
 
     // --- Virtualized list ----------------------------------------------------------
-    const scroller = useRef<HTMLDivElement>(null);
+    // State, not a ref: the list is drawn in the dialog's portal, which mounts
+    // after this renders, and the virtualizer only takes up a list it is handed.
+    const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
     const people = rows ?? [];
     const virtualizer = useVirtualizer({
         count: people.length,
-        getScrollElement: () => scroller.current,
+        getScrollElement: () => scroller,
         estimateSize: () => ROW_HEIGHT,
         overscan: 6,
         initialRect: { width: 480, height: ROW_HEIGHT * 5 }
@@ -904,7 +906,7 @@ export function ShareDialog({
                                         </p>
                                     ) : (
                                         <div
-                                            ref={scroller}
+                                            ref={setScroller}
                                             className="max-h-72 min-w-0 overflow-y-auto overscroll-contain"
                                             role="list"
                                         >
