@@ -9,12 +9,15 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +42,7 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView advancedChoice;
     private TextView followThemeChoice;
     private TextView openOnStartChoice;
+    private TextView dnsChoice;
     private int columns;
     private int rowsBelowDock;
     private int dockOpacity;
@@ -60,6 +64,8 @@ public final class LauncherSettingsActivity extends Activity {
         });
         findViewById(R.id.polarisChoice).setOnClickListener(
                 v -> startActivity(new Intent(this, PolarisActivity.class)));
+        dnsChoice = findViewById(R.id.dnsChoice);
+        dnsChoice.setOnClickListener(v -> openDns());
         columns = config.columns;
         rowsBelowDock = config.rowsBelowDock;
         dockOpacity = config.dockOpacity;
@@ -177,6 +183,89 @@ public final class LauncherSettingsActivity extends Activity {
         refresh();
         if (config.launcherSettingsButton) reorderChoice.requestFocus();
         else columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
+    }
+
+    /** On: offers to turn it off. Off: asks for the hostname, filled in from the Polaris when it has one. */
+    private void openDns() {
+        PrivateDns dns = PrivateDnsSwitch.of(this);
+        if (!dns.available()) {
+            say(getString(R.string.dns_unavailable));
+            return;
+        }
+        String ours = dns.ours();
+        if (ours != null) {
+            new AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.dns_row, getString(R.string.dns_state_on, ours)))
+                    .setMessage(R.string.dns_intro)
+                    .setPositiveButton(R.string.dns_turn_off, (dialog, which) -> runDns(null))
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
+        EditText field = new EditText(this);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        field.setHint(R.string.dns_hostname_hint);
+        field.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        String intro = getString(R.string.dns_intro) + "\n\n" + getString(R.string.dns_type_hostname);
+        AlertDialog ask = new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.dns_row, getString(R.string.off)))
+                .setMessage(intro)
+                .setView(field)
+                .setPositiveButton(R.string.dns_turn_on, (dialog, which) -> runDns(field.getText().toString()))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+        // The Polaris's own filter, when it publishes one, fills the field unless something was typed first.
+        new Thread(() -> {
+            String found = null;
+            try {
+                PolarisLink link = PolarisLink.load(this);
+                if (link != null) found = link.networkFilterHostname();
+            } catch (IOException unreachable) {
+                // No filter to offer: the person types a resolver of their own.
+            }
+            String host = found;
+            runOnUiThread(() -> {
+                if (host == null || !ask.isShowing() || field.length() > 0) return;
+                field.setText(host);
+                ask.setMessage(getString(R.string.dns_intro) + "\n\n" + getString(R.string.dns_from_polaris));
+            });
+        }).start();
+    }
+
+    /** Turns it on with {@code typed}, or off when null, and says what happened. */
+    private void runDns(String typed) {
+        String host = typed == null ? null : PrivateDns.normalize(typed);
+        AlertDialog waiting = host == null ? null : new AlertDialog.Builder(this)
+                .setMessage(getString(R.string.dns_checking, host))
+                .setCancelable(false)
+                .show();
+        new Thread(() -> {
+            PrivateDns.Result result = typed == null ? PrivateDnsSwitch.turnOff(this)
+                    : PrivateDnsSwitch.turnOn(this, typed);
+            runOnUiThread(() -> {
+                if (waiting != null) waiting.dismiss();
+                if (isFinishing() || isDestroyed()) return;
+                refresh();
+                say(dnsMessage(result, host));
+            });
+        }).start();
+    }
+
+    private String dnsMessage(PrivateDns.Result result, String host) {
+        switch (result) {
+            case ON: return getString(R.string.dns_on, host);
+            case REVERTED: return getString(R.string.dns_reverted, host);
+            case BAD_HOSTNAME: return getString(R.string.dns_bad_hostname);
+            case NO_PERMISSION: return getString(R.string.dns_no_permission);
+            case UNAVAILABLE: return getString(R.string.dns_unavailable);
+            case LEFT_AS_SET: return getString(R.string.dns_left_as_set);
+            default: return getString(R.string.dns_off);
+        }
+    }
+
+    private void say(String message) {
+        new AlertDialog.Builder(this).setMessage(message).setPositiveButton(android.R.string.ok, null).show();
     }
 
     private void reverseRow(TextView[] views) {
@@ -320,6 +409,9 @@ public final class LauncherSettingsActivity extends Activity {
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
         followThemeChoice.setSelected(!hasOnTvChoices());
+        String dnsHost = PrivateDnsSwitch.of(this).ours();
+        dnsChoice.setText(getString(R.string.dns_row,
+                dnsHost == null ? getString(R.string.off) : getString(R.string.dns_state_on, dnsHost)));
     }
 
     private boolean hasOnTvChoices() {

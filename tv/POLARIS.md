@@ -18,3 +18,9 @@ that cannot take it.
   An alternate address sees the key only after signing a fresh nonce with the instance's Ed25519 key, which
   `PolarisEd25519` verifies because the platform only has it from API 33. A change to that protocol changes
   both files.
+- **Block ads and trackers.** A Launcher settings row on Android 9+ that points Private DNS at a filtering
+  resolver: the Polaris Network filter's hostname from `/api/tv/network-filter` when it publishes one, or any
+  hostname typed there. `PrivateDns` saves the TV's own setting first, keeps the new one only when Android
+  validates it and a name resolves through it within 30 s, and puts the old one back otherwise, on Off, and
+  when Home finds names no longer resolving. It needs `WRITE_SECURE_SETTINGS`, which the desktop installer
+  grants only when its "block ads and trackers" box is ticked; the installer's backup keeps the DNS from before.

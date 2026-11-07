@@ -218,6 +218,23 @@ final class PolarisLink {
         }
     }
 
+    /**
+     * The hostname of the Network filter's encrypted DNS, when the instance publishes one and it answers. Null
+     * when it has none (or is older than this question), so the person types a resolver of their own.
+     */
+    String networkFilterHostname() throws IOException {
+        PolarisFailover.Reply reply = failover.request("GET", "/api/tv/network-filter", null, token);
+        if (reply.status == 404) return null;
+        if (!reply.ok()) throw new IOException("Refused: " + reply.status);
+        try {
+            JSONObject answer = new JSONObject(reply.body);
+            if (!answer.optBoolean("available", false) || answer.isNull("dotHostname")) return null;
+            return PrivateDns.normalize(answer.optString("dotHostname", null));
+        } catch (JSONException notPolaris) {
+            throw new IOException("Not a Polaris", notPolaris);
+        }
+    }
+
     boolean onLocalAddress() {
         return failover.local();
     }

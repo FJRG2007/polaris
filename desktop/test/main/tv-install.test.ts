@@ -29,7 +29,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { connectFailure, homeIsOurs, lateFailure, latestApk, registerTvInstall, tvRefusal } = await import(
+const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, PRIVATE_DNS_READ, registerTvInstall, tvRefusal } = await import(
     "../../src/main/tv-install"
 );
 
@@ -230,6 +230,26 @@ describe("a failure part way through", () => {
         expect(lateFailure("send")).toBe("connection-lost");
         expect(lateFailure("install")).toBe("install-interrupted");
         expect(lateFailure("home")).toBe("installed-home-unknown");
+    });
+});
+
+describe("the grants after the install", () => {
+    it("grants location always, and secure settings only when ad blocking was asked for", () => {
+        expect(grantCommands(false)).toEqual(["pm grant app.polaris.tv android.permission.ACCESS_FINE_LOCATION"]);
+        expect(grantCommands(true)).toEqual([
+            "pm grant app.polaris.tv android.permission.ACCESS_FINE_LOCATION",
+            "pm grant app.polaris.tv android.permission.WRITE_SECURE_SETTINGS"
+        ]);
+    });
+
+    it("never revokes or writes a setting", () => {
+        for (const command of grantCommands(true)) expect(command).not.toMatch(/revoke|settings put/);
+    });
+
+    it("backs up the Private DNS mode and hostname by name, and only reads them", () => {
+        expect(PRIVATE_DNS_READ).toContain("private_dns_mode=$(settings get global private_dns_mode)");
+        expect(PRIVATE_DNS_READ).toContain("private_dns_specifier=$(settings get global private_dns_specifier)");
+        expect(PRIVATE_DNS_READ).not.toMatch(/settings (put|delete)/);
     });
 });
 
