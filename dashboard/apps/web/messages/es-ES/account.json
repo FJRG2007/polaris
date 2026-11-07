@@ -1703,7 +1703,7 @@
             "noRelease": "Aún no hay una actualización del TV.",
             "empty": "No hay ningún TV conectado a tu cuenta.",
             "updateAll": "Actualizar todos",
-            "allCurrent": "Todos al día o ya avisados.",
+            "allCurrent": "Ningún TV se puede actualizar desde aquí ahora.",
             "runs": "Usa la {version}",
             "versionUnknown": "Versión aún sin informar",
             "seen": "visto",
@@ -1711,6 +1711,7 @@
             "update": "Actualizar",
             "retry": "Reintentar",
             "alreadyAsked": "Ya pedido; esperando al TV.",
+            "updateOnTv": "Actualiza este en el propio TV.",
             "state": {
                 "queued": "En cola para {version} - empieza cuando el TV conecte",
                 "downloading": "Descargando {version}",

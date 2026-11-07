@@ -112,6 +112,11 @@ describe("the state a TV reads", () => {
         expect(noted).toEqual([{ keyId: "key-1", version: { versionName: "3.4" } }]);
     });
 
+    it("falls back to the user agent when the query's version is malformed", async () => {
+        await GET(asked("GET", "?versionName=3.5%3Bx", "polaris-tv/3.4"));
+        expect(noted).toEqual([{ keyId: "key-1", version: { versionName: "3.4" } }]);
+    });
+
     it("ignores a malformed version without refusing the poll", async () => {
         const response = await GET(asked("GET", "?versionName=3.5%3Bx%3D1&versionCode=-1"));
         expect(response.status).toBe(200);

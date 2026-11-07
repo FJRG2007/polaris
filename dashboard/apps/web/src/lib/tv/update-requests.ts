@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
-import { compareTvVersions } from "@/lib/tv/version-order";
+import { compareTvVersions, tvTakesUpdates } from "@/lib/tv/version-order";
 
 export const TV_UPDATE_STATES = [
     "queued",
@@ -142,8 +142,8 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Ask the given TVs (all of the account's, when `only` is null) to install
- * `versionName`. Idempotent: a TV with a request still pending, or already on
- * that version or newer, is left alone. Returns the ids that were queued.
+ * `versionName`. Idempotent: a TV with a request still pending, already on that
+ * version or newer, or that cannot carry a request out, is left alone. Returns the ids that were queued.
  */
 export async function requestTvUpdates(
     userId: string,
@@ -156,12 +156,14 @@ export async function requestTvUpdates(
         select: {
             id: true,
             clientVersion: true,
+            clientBuild: true,
             tvUpdate: { select: { requestId: true, state: true, updatedAt: true } }
         },
         take: MAX_TVS
     });
     const queued: string[] = [];
     for (const key of keys) {
+        if (!tvTakesUpdates(key.clientBuild)) continue;
         if (key.clientVersion && compareTvVersions(key.clientVersion, versionName) >= 0) continue;
         const held = key.tvUpdate;
         const fresh = held && now.getTime() - held.updatedAt.getTime() < TV_UPDATE_STALE_MS;

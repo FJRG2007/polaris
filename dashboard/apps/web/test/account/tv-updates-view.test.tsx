@@ -44,6 +44,7 @@ describe("which TVs can be updated", () => {
         expect(canUpdate(tv({ update: update("downloading") }), "3.5")).toBe(false);
         expect(canUpdate(tv({ update: update("failed") }), "3.5")).toBe(true);
         expect(canUpdate(tv(), null)).toBe(false);
+        expect(canUpdate(tv({ versionCode: null }), "3.5")).toBe(false);
     });
 
     it("counts an unreported version as not current", () => {
@@ -78,6 +79,12 @@ describe("the rows", () => {
     it("marks a current TV instead of offering the button", () => {
         const markup = draw([tv({ versionName: "3.5", update: update("done") })], "3.5");
         expect(markup).toContain("Up to date");
+        expect(markup).not.toContain(">Update now<");
+    });
+
+    it("tells a TV that cannot take an update from here to update on the TV", () => {
+        const markup = draw([tv({ versionCode: null })], "3.5");
+        expect(markup).toContain("Update this one on the TV itself.");
         expect(markup).not.toContain(">Update now<");
     });
 

@@ -114,6 +114,12 @@ describe("asking for an update", () => {
         expect(await updates.requestTvUpdates("user-1", [TV_A], "3.5")).toEqual([TV_A]);
     });
 
+    it("leaves alone a TV that names its version only in its user agent", async () => {
+        keys.get(TV_A)!.clientBuild = null;
+        expect(await updates.requestTvUpdates("user-1", null, "3.5")).toEqual([]);
+        expect(rows.size).toBe(0);
+    });
+
     it("reaches only the account's own TVs", async () => {
         expect(await updates.requestTvUpdates("user-2", [TV_A], "3.5")).toEqual([]);
         expect(rows.size).toBe(0);

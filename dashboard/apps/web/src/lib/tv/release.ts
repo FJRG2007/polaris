@@ -211,6 +211,8 @@ async function download(info: TvReleaseInfo, target: string): Promise<number> {
     if (!reader) throw new TvReleaseError("unreachable");
     const part = join(cacheDir(), `.${randomUUID()}.part`);
     const out = createWriteStream(part);
+    const failed = new Promise<never>((_, reject) => out.on("error", reject));
+    failed.catch(() => undefined);
     const hash = createHash("sha256");
     let total = 0;
     try {
@@ -220,11 +222,16 @@ async function download(info: TvReleaseInfo, target: string): Promise<number> {
             total += value.length;
             if (total > APK_MAX_BYTES) throw new TvReleaseError("too-large");
             hash.update(value);
-            if (!out.write(value)) await new Promise((resolve) => out.once("drain", resolve));
+            if (!out.write(value)) {
+                await Promise.race([new Promise((resolve) => out.once("drain", resolve)), failed]);
+            }
         }
-        await new Promise<void>((resolve, reject) =>
-            out.end((error?: Error | null) => (error ? reject(error) : resolve()))
-        );
+        await Promise.race([
+            new Promise<void>((resolve, reject) =>
+                out.end((error?: Error | null) => (error ? reject(error) : resolve()))
+            ),
+            failed
+        ]);
         if (hash.digest("hex") !== info.sha256) throw new TvReleaseError("mismatch");
         await rename(part, target);
         return total;
@@ -234,6 +241,12 @@ async function download(info: TvReleaseInfo, target: string): Promise<number> {
         await rm(part, { force: true }).catch(() => undefined);
         throw caught instanceof TvReleaseError ? caught : new TvReleaseError("unreachable");
     }
+}
+
+/** A partial download older than any download may run is left from a crash. */
+async function abandoned(part: string): Promise<boolean> {
+    const held = await stat(part).catch(() => null);
+    return Boolean(held && Date.now() - held.mtimeMs > APK_TIMEOUT_MS * 2);
 }
 
 async function prepare(info: TvReleaseInfo): Promise<TvApk> {
@@ -257,6 +270,7 @@ async function prepare(info: TvReleaseInfo): Promise<TvApk> {
     // Only the newest verified build is kept.
     for (const name of await readdir(dir).catch(() => [] as string[])) {
         if (join(dir, name) === path) continue;
+        if (name.endsWith(".part") && !(await abandoned(join(dir, name)))) continue;
         await rm(join(dir, name), { force: true }).catch(() => undefined);
         verified.delete(join(dir, name));
     }

@@ -5,6 +5,8 @@
  * Also how a TV learns it was asked to update (`updateRequest`), and where it says
  * what it runs: `?versionName=&versionCode=`, or failing those the version in its
  * user agent (`polaris-tv/<version>`). A malformed version is ignored, never refused.
+ * Reporting `versionCode` is how a TV says it carries out `updateRequest`; one that
+ * names only its version is never offered an update from /account/tv.
  */
 
 import { prisma } from "@polaris/db";
@@ -16,17 +18,20 @@ import * as updates from "@/lib/tv/update-requests";
 /** What this TV says it runs, from the query or its user agent; null when neither reads. */
 function reportedVersion(request: Request): updates.TvVersion | null {
     const query = new URL(request.url).searchParams;
-    const named =
-        query.get("versionName") ?? updates.versionFromUserAgent(request.headers.get("user-agent"));
-    if (!named) return null;
-    const parsed = updates.tvVersionSchema.safeParse({
-        versionName: named,
-        versionCode: query.get("versionCode") ?? undefined
-    });
-    if (parsed.success) return parsed.data;
-    // A bad build number does not cost the version beside it.
-    const nameOnly = updates.tvVersionSchema.safeParse({ versionName: named });
-    return nameOnly.success ? nameOnly.data : null;
+    const versionCode = query.get("versionCode") ?? undefined;
+    const candidates = [
+        query.get("versionName"),
+        updates.versionFromUserAgent(request.headers.get("user-agent"))
+    ];
+    for (const named of candidates) {
+        if (!named) continue;
+        const parsed = updates.tvVersionSchema.safeParse({ versionName: named, versionCode });
+        if (parsed.success) return parsed.data;
+        // A bad build number does not cost the version beside it.
+        const nameOnly = updates.tvVersionSchema.safeParse({ versionName: named });
+        if (nameOnly.success) return nameOnly.data;
+    }
+    return null;
 }
 
 export const runtime = "nodejs";

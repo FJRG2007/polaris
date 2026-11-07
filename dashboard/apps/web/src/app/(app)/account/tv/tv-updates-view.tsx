@@ -10,7 +10,7 @@ import { Tv } from "lucide-react";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
-import { compareTvVersions } from "@/lib/tv/version-order";
+import { compareTvVersions, tvTakesUpdates } from "@/lib/tv/version-order";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TvRow, TvUpdateState } from "@/lib/tv/update-requests";
@@ -46,7 +46,9 @@ export function upToDate(row: TvRow, latest: string | null): boolean {
 
 /** Whether the Update button has anything to do for this TV. */
 export function canUpdate(row: TvRow, latest: string | null): boolean {
-    return Boolean(latest) && !upToDate(row, latest) && !pending(row);
+    return (
+        Boolean(latest) && tvTakesUpdates(row.versionCode) && !upToDate(row, latest) && !pending(row)
+    );
 }
 
 /** The row with a request queued, as the server will show it once it lands. */
@@ -216,6 +218,13 @@ function TvUpdateRow({
                 <Badge variant="success" className="shrink-0">
                     {t("tv.updates.current")}
                 </Badge>
+            ) : !tvTakesUpdates(row.versionCode) ? (
+                <span
+                    className="min-w-0 max-w-[45%] shrink truncate text-right text-xs text-muted-foreground"
+                    title={t("tv.updates.updateOnTv")}
+                >
+                    {t("tv.updates.updateOnTv")}
+                </span>
             ) : (
                 <Button
                     size="sm"

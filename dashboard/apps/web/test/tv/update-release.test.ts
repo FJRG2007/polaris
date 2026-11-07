@@ -7,7 +7,8 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { Writable } from "node:stream";
+import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let dataDir = "";
@@ -16,6 +17,21 @@ let listed = "";
 let release: unknown = null;
 const fetched: string[] = [];
 const redirects = new Map<string, string>();
+let diskFull = false;
+
+vi.mock("node:fs", async (original) => {
+    const actual = await original<typeof import("node:fs")>();
+    return {
+        ...actual,
+        createWriteStream: (...args: Parameters<typeof actual.createWriteStream>) =>
+            diskFull
+                ? new Writable({
+                      write: (_chunk, _encoding, done) =>
+                          done(Object.assign(new Error("no space"), { code: "ENOSPC" }))
+                  })
+                : actual.createWriteStream(...args)
+    };
+});
 
 vi.mock("@polaris/config", () => ({
     loadEnv: () => ({ POLARIS_DATA_DIR: dataDir, POLARIS_REPO: "sample/polaris" })
@@ -60,6 +76,7 @@ beforeEach(async () => {
     };
     fetched.length = 0;
     redirects.clear();
+    diskFull = false;
     tv.resetTvReleaseCache();
 });
 
@@ -155,6 +172,27 @@ describe("the APK served from the instance", () => {
         const names = await readdir(join(dataDir, "tv-updates"));
         expect(names).toHaveLength(1);
         expect(names[0]).toContain("3.6");
+    });
+});
+
+describe("the APK cache on disk", () => {
+    it("refuses a download the disk cannot hold instead of crashing or hanging", async () => {
+        diskFull = true;
+        await expect(tv.preparedTvApk()).rejects.toMatchObject({ reason: "unreachable" });
+        expect(await readdir(join(dataDir, "tv-updates"))).toEqual([]);
+    });
+
+    it("leaves another download's partial file alone, and clears an abandoned one", async () => {
+        const dir = join(dataDir, "tv-updates");
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, ".running.part"), "partial");
+        await writeFile(join(dir, ".crashed.part"), "partial");
+        const old = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        await utimes(join(dir, ".crashed.part"), old, old);
+        await tv.preparedTvApk();
+        const names = await readdir(dir);
+        expect(names).toContain(".running.part");
+        expect(names).not.toContain(".crashed.part");
     });
 });
 

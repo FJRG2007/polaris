@@ -1703,7 +1703,7 @@
             "noRelease": "No TV update is published yet.",
             "empty": "No TV is connected to your account.",
             "updateAll": "Update all TVs",
-            "allCurrent": "Every TV is current or already asked.",
+            "allCurrent": "No TV can be updated from here now.",
             "runs": "Runs {version}",
             "versionUnknown": "Version not reported yet",
             "seen": "seen",
@@ -1711,6 +1711,7 @@
             "update": "Update now",
             "retry": "Try again",
             "alreadyAsked": "Already asked; waiting on the TV.",
+            "updateOnTv": "Update this one on the TV itself.",
             "state": {
                 "queued": "Queued for {version} - starts when the TV checks in",
                 "downloading": "Downloading {version}",

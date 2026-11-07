@@ -1,6 +1,6 @@
 /**
  * Ordering Polaris TV versions. Client-safe: /account/tv decides with it which
- * TVs are current.
+ * TVs are current, and which can be updated from there.
  */
 
 /** Dotted numeric comparison of two TV versions ("3.10" is newer than "3.9").
@@ -17,4 +17,11 @@ export function compareTvVersions(left: string, right: string): number {
         if (order !== 0) return Math.sign(order);
     }
     return 0;
+}
+
+/** Whether a TV carries out an update request. Only a launcher that does reports
+ *  its build number (`versionCode`); one that names its version only in its user
+ *  agent never collects the request. */
+export function tvTakesUpdates(versionCode: number | null): boolean {
+    return versionCode !== null;
 }
