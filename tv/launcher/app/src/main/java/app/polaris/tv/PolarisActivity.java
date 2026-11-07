@@ -2,6 +2,7 @@ package app.polaris.tv;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -10,6 +11,7 @@ import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -76,6 +78,8 @@ public final class PolarisActivity extends Activity {
             connect();
             return true;
         });
+        // A TV's on-screen keyboard covers most of the screen and stays up after Go unless it is put away.
+        address.setOnFocusChangeListener((view, focused) -> { if (!focused) hideKeyboard(); });
         if (PolarisLink.connected(this)) {
             showConnected();
             return;
@@ -118,7 +122,14 @@ public final class PolarisActivity extends Activity {
         address.requestFocus();
     }
 
+    /** Puts the on-screen keyboard away, so the code and QR it would cover are seen. */
+    private void hideKeyboard() {
+        InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (keyboard != null) keyboard.hideSoftInputFromWindow(address.getWindowToken(), 0);
+    }
+
     private void connect() {
+        hideKeyboard();
         String origin = PolarisFailover.readTyped(address.getText().toString());
         if (origin == null) {
             say(getString(R.string.polaris_bad_address));
@@ -140,6 +151,8 @@ public final class PolarisActivity extends Activity {
     }
 
     private void showPairing(int mine, String origin, String instance, PolarisLink.Pairing pairing) {
+        hideKeyboard();
+        address.clearFocus();
         show(pairingPanel);
         say(plainWarning(origin));
         String shown = pairing.userCode.length() == 8
@@ -170,13 +183,26 @@ public final class PolarisActivity extends Activity {
             main.post(() -> {
                 if (mine != attempt) return;
                 switch (answer) {
-                    case "approved": showConnected(); break;
+                    case "approved": goHome(); break;
                     case "denied": showForm(getString(R.string.polaris_denied)); break;
                     case "expired": showForm(getString(R.string.polaris_expired)); break;
                     default: main.postDelayed(() -> poll(mine, origin, instance, pairing), pairing.pollMs);
                 }
             });
         }, "polaris-claim").start();
+    }
+
+    /**
+     * Linked: back to Home rather than this screen, which has nothing left to do. Home greets by the account's
+     * name and, unless a language was picked on the TV, switches to the account's on its first answer.
+     */
+    private void goHome() {
+        attempt++;
+        hideKeyboard();
+        // Opened from the installer this screen may be the only one in its task: bring Home up, not just close.
+        startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+        finish();
     }
 
     private static Bitmap qrOf(String text) {
