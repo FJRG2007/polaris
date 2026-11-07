@@ -66,15 +66,15 @@ describe("tvGallerySources", () => {
                 screenshot: "theme-dock-glass.jpg"
             }
         });
-        expect(byId.default.item.screenshot).toBe("theme-default.png");
-        expect(byId.weather.item).toMatchObject({
+        expect(byId.default?.item.screenshot).toBe("theme-default.png");
+        expect(byId.weather?.item).toMatchObject({
             name: "Weather",
             description: "The forecast",
             network: true,
             minSdk: 23,
             screenshot: "addon-weather.jpg"
         });
-        expect(byId.tatami.item).toMatchObject({ network: false, minSdk: null });
+        expect(byId.tatami?.item).toMatchObject({ network: false, minSdk: null });
     });
 
     it("leaves out a row without a screenshot of its own or a plain id", () => {

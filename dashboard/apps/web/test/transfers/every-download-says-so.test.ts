@@ -45,9 +45,11 @@ function routes(directory: string): { path: string; source: string }[] {
  *
  * Found by the header that says so, because that is the thing that makes a browser
  * save rather than draw: a route with `attachment` in its disposition is a download
- * whatever it is called.
+ * whatever it is called. A route that answers through `servedFile`
+ * (`lib/tv/served-file.ts`) sets that header there instead, so it counts too.
  */
 function handsBackAFile(source: string): boolean {
+    if (/\bservedFile\(/.test(source)) return true;
     return /["'][Cc]ontent-[Dd]isposition["']\s*:/.test(source) && /attachment/.test(source);
 }
 
@@ -69,6 +71,10 @@ const NOT_DOWNLOADS = new Map<string, string>([
     [
         "system/local-ca/route.ts",
         "this instance's certificate, fetched by a machine being set up rather than by a reader waiting at a screen"
+    ],
+    [
+        "tv/catalog/route.ts",
+        "the TV's themes and add-ons, fetched by the TV itself with its API key rather than by a reader waiting at a screen"
     ],
     [
         "tv/update/apk/route.ts",
