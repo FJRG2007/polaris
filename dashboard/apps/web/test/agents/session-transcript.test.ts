@@ -21,7 +21,12 @@ import {
 const EXEC_CAP = 16 * 1024;
 
 function transcriptFile(): string {
-    const dir = join(mkdtempSync(join(tmpdir(), "polaris-transcript-")), ".claude", "projects", "-session-repo");
+    const dir = join(
+        mkdtempSync(join(tmpdir(), "polaris-transcript-")),
+        ".claude",
+        "projects",
+        "-session-repo"
+    );
     mkdirSync(dir, { recursive: true });
     return join(dir, "a1b2.jsonl").replace(/\\/g, "/");
 }
@@ -151,8 +156,12 @@ describe("transcript scripts", () => {
 
     it("only open a transcript where the agents keep one", () => {
         expect(readableTranscriptPath("/root/.claude/projects/-session-repo/9f.jsonl")).toBe(true);
-        expect(readableTranscriptPath("/root/.claude/accounts/work/projects/-x/9f.jsonl")).toBe(true);
-        expect(readableTranscriptPath("/home/u/.codex/sessions/2026/11/07/rollout-1.jsonl")).toBe(true);
+        expect(readableTranscriptPath("/root/.claude/accounts/work/projects/-x/9f.jsonl")).toBe(
+            true
+        );
+        expect(readableTranscriptPath("/home/u/.codex/sessions/2026/11/07/rollout-1.jsonl")).toBe(
+            true
+        );
         for (const bad of [
             null,
             "relative/.claude/projects/x/y.jsonl",

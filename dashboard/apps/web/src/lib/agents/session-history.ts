@@ -179,7 +179,10 @@ export async function syncSessionHistorySoon(
  */
 export async function syncFinalSessionHistory(sessionId: string, run?: Run): Promise<void> {
     await syncSessionHistory(sessionId, { run, final: true }).catch((error) => {
-        console.error(`[agent-session] ${sessionId}: could not read the transcript at the end`, error);
+        console.error(
+            `[agent-session] ${sessionId}: could not read the transcript at the end`,
+            error
+        );
     });
 }
 
@@ -225,7 +228,9 @@ export async function storeHistoryRows(
         const at = new Date(Math.max(one.at ?? now.getTime() + index, last + 1));
         last = at.getTime();
         const key = one.role === "user" && one.kind === "text" ? promptKey(one.body) : null;
-        const match = key ? [...typed].reverse().find((candidate) => candidate.key === key) : undefined;
+        const match = key
+            ? [...typed].reverse().find((candidate) => candidate.key === key)
+            : undefined;
         if (!match) {
             insert.push({ row: one, at });
             continue;

@@ -3,11 +3,7 @@ import { SessionShareButton } from "./share-button";
 import { notFound } from "next/navigation";
 import { SessionDetail } from "./session-detail";
 import { requirePermission, sessionCan } from "@/lib/session";
-import {
-    getSession,
-    sessionEvents,
-    sharedSession
-} from "@/lib/agents/session-service";
+import { getSession, sessionEvents, sharedSession } from "@/lib/agents/session-service";
 import { historyPage } from "@/lib/agents/session-history";
 import { getTranslations } from "@/lib/i18n/request";
 import { readSessionWaiting } from "@/lib/agents/agent-notices";

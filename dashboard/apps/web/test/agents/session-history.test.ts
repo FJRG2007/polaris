@@ -35,10 +35,14 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock("@polaris/db", () => {
-    const matchesSession = (row: Record<string, unknown>, where: Record<string, unknown>): boolean => {
+    const matchesSession = (
+        row: Record<string, unknown>,
+        where: Record<string, unknown>
+    ): boolean => {
         if (where.id !== row.id) return false;
         if ("transcriptFile" in where && where.transcriptFile !== row.transcriptFile) return false;
-        if ("transcriptOffset" in where && where.transcriptOffset !== row.transcriptOffset) return false;
+        if ("transcriptOffset" in where && where.transcriptOffset !== row.transcriptOffset)
+            return false;
         if (Array.isArray(where.OR)) {
             const at = row.transcriptSyncedAt as Date | null;
             return where.OR.some((one: Record<string, unknown>) =>
@@ -53,42 +57,85 @@ vi.mock("@polaris/db", () => {
         prisma: {
             agentSession: {
                 findUnique: vi.fn(async () => (db.session ? { ...db.session } : null)),
-                updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-                    if (!db.session || !matchesSession(db.session, where)) return { count: 0 };
-                    Object.assign(db.session, data);
-                    return { count: 1 };
-                })
+                updateMany: vi.fn(
+                    async ({
+                        where,
+                        data
+                    }: {
+                        where: Record<string, unknown>;
+                        data: Record<string, unknown>;
+                    }) => {
+                        if (!db.session || !matchesSession(db.session, where)) return { count: 0 };
+                        Object.assign(db.session, data);
+                        return { count: 1 };
+                    }
+                )
             },
             agentSessionMessage: {
-                findMany: vi.fn(async ({ where, take }: { where: Record<string, unknown>; take?: number }) => {
-                    let rows = db.messages.filter((one) => one.sessionId === where.sessionId);
-                    const vendor = where.vendorId as { in?: string[] } | null | undefined;
-                    if (vendor && "in" in vendor) rows = rows.filter((one) => vendor.in!.includes(one.vendorId ?? ""));
-                    if (vendor === null) rows = rows.filter((one) => one.vendorId === null);
-                    if (where.role) rows = rows.filter((one) => one.role === where.role);
-                    if (where.authorId) rows = rows.filter((one) => one.authorId !== null);
-                    rows = [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1));
-                    return rows.slice(0, take ?? rows.length);
-                }),
-                findFirst: vi.fn(async () => null),
-                updateMany: vi.fn(async ({ where, data }: { where: { id: string }; data: { vendorId: string; createdAt?: Date } }) => {
-                    const row = db.messages.find((one) => one.id === where.id && one.vendorId === null);
-                    if (!row) return { count: 0 };
-                    if (db.messages.some((one) => one.sessionId === row.sessionId && one.vendorId === data.vendorId))
-                        throw new Error("unique violation");
-                    row.vendorId = data.vendorId;
-                    if (data.createdAt) row.createdAt = data.createdAt;
-                    return { count: 1 };
-                }),
-                createMany: vi.fn(async ({ data }: { data: Omit<Message, "id" | "authorId">[] }) => {
-                    let count = 0;
-                    for (const one of data) {
-                        if (db.messages.some((m) => m.sessionId === one.sessionId && m.vendorId === one.vendorId)) continue;
-                        db.messages.push({ ...one, authorId: null, id: `m-${String(++db.seq).padStart(4, "0")}` });
-                        count++;
+                findMany: vi.fn(
+                    async ({ where, take }: { where: Record<string, unknown>; take?: number }) => {
+                        let rows = db.messages.filter((one) => one.sessionId === where.sessionId);
+                        const vendor = where.vendorId as { in?: string[] } | null | undefined;
+                        if (vendor && "in" in vendor)
+                            rows = rows.filter((one) => vendor.in!.includes(one.vendorId ?? ""));
+                        if (vendor === null) rows = rows.filter((one) => one.vendorId === null);
+                        if (where.role) rows = rows.filter((one) => one.role === where.role);
+                        if (where.authorId) rows = rows.filter((one) => one.authorId !== null);
+                        rows = [...rows].sort(
+                            (a, b) =>
+                                b.createdAt.getTime() - a.createdAt.getTime() ||
+                                (a.id < b.id ? 1 : -1)
+                        );
+                        return rows.slice(0, take ?? rows.length);
                     }
-                    return { count };
-                })
+                ),
+                findFirst: vi.fn(async () => null),
+                updateMany: vi.fn(
+                    async ({
+                        where,
+                        data
+                    }: {
+                        where: { id: string };
+                        data: { vendorId: string; createdAt?: Date };
+                    }) => {
+                        const row = db.messages.find(
+                            (one) => one.id === where.id && one.vendorId === null
+                        );
+                        if (!row) return { count: 0 };
+                        if (
+                            db.messages.some(
+                                (one) =>
+                                    one.sessionId === row.sessionId &&
+                                    one.vendorId === data.vendorId
+                            )
+                        )
+                            throw new Error("unique violation");
+                        row.vendorId = data.vendorId;
+                        if (data.createdAt) row.createdAt = data.createdAt;
+                        return { count: 1 };
+                    }
+                ),
+                createMany: vi.fn(
+                    async ({ data }: { data: Omit<Message, "id" | "authorId">[] }) => {
+                        let count = 0;
+                        for (const one of data) {
+                            if (
+                                db.messages.some(
+                                    (m) =>
+                                        m.sessionId === one.sessionId && m.vendorId === one.vendorId
+                                )
+                            )
+                                continue;
+                            db.messages.push({
+                                ...one,
+                                authorId: null,
+                                id: `m-${String(++db.seq).padStart(4, "0")}`
+                            });
+                            count++;
+                        }
+                        return { count };
+                    }
+                )
             }
         }
     };
@@ -98,20 +145,31 @@ vi.mock("@/lib/agents/session-runtime", () => ({
     // here it is a throwaway file wherever this machine keeps them.
     runInSession: vi.fn(async (_id: string, script: string) => ({
         code: 0,
-        output: execFileSync("sh", ["-c", script.split(db.virtual).join(db.real)], { encoding: "utf8" })
+        output: execFileSync("sh", ["-c", script.split(db.virtual).join(db.real)], {
+            encoding: "utf8"
+        })
     }))
 }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/github-service", () => ({}));
-vi.mock("@/lib/github-access", () => ({ credentialFor: vi.fn(), githubCredentialsForUser: vi.fn(async () => []) }));
-vi.mock("@/lib/github-app-reach", () => ({ githubInstallGapForRepo: vi.fn(), installGapMessage: vi.fn() }));
+vi.mock("@/lib/github-access", () => ({
+    credentialFor: vi.fn(),
+    githubCredentialsForUser: vi.fn(async () => [])
+}));
+vi.mock("@/lib/github-app-reach", () => ({
+    githubInstallGapForRepo: vi.fn(),
+    installGapMessage: vi.fn()
+}));
 vi.mock("@/lib/agents/session-work", () => ({ saveSessionWork: vi.fn() }));
 vi.mock("@/lib/agents/session-review", () => ({}));
 vi.mock("@/lib/agents/repo-options", () => ({}));
 vi.mock("@/lib/tasks/access", () => ({}));
 vi.mock("@/lib/tasks/task-detail-service", () => ({ addComment: vi.fn() }));
-vi.mock("@/lib/agents/agent-readiness", () => ({ agentChoicesFor: vi.fn(), agentOptionsFor: vi.fn() }));
+vi.mock("@/lib/agents/agent-readiness", () => ({
+    agentChoicesFor: vi.fn(),
+    agentOptionsFor: vi.fn()
+}));
 vi.mock("@/lib/agents/session-capacity", () => ({}));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: vi.fn() }));
 vi.mock("@/lib/agents/words", () => ({ agentText: vi.fn(), knownAgentText: vi.fn() }));
@@ -138,15 +196,32 @@ import {
 const SESSION = "0196f0a0-0000-7000-8000-000000000001";
 
 function transcript(): string {
-    const dir = join(mkdtempSync(join(tmpdir(), "polaris-history-")), ".claude", "projects", "-session-repo");
+    const dir = join(
+        mkdtempSync(join(tmpdir(), "polaris-history-")),
+        ".claude",
+        "projects",
+        "-session-repo"
+    );
     mkdirSync(dir, { recursive: true });
     return join(dir, "6f1c.jsonl").replace(/\\/g, "/");
 }
 
 const user = (uuid: string, text: string, timestamp?: string) =>
-    JSON.stringify({ type: "user", uuid, timestamp, isSidechain: false, message: { role: "user", content: text } });
+    JSON.stringify({
+        type: "user",
+        uuid,
+        timestamp,
+        isSidechain: false,
+        message: { role: "user", content: text }
+    });
 const reply = (uuid: string, text: string, timestamp?: string) =>
-    JSON.stringify({ type: "assistant", uuid, timestamp, isSidechain: false, message: { role: "assistant", content: [{ type: "text", text }] } });
+    JSON.stringify({
+        type: "assistant",
+        uuid,
+        timestamp,
+        isSidechain: false,
+        message: { role: "assistant", content: [{ type: "text", text }] }
+    });
 
 let path = "";
 beforeEach(() => {
@@ -177,19 +252,27 @@ describe("syncSessionHistory", () => {
             ["user", "fix the login bug"],
             ["agent", "On it."]
         ]);
-        const size = Buffer.byteLength(`${user("u-1", "fix the login bug")}\n${reply("a-1", "On it.")}\n`);
+        const size = Buffer.byteLength(
+            `${user("u-1", "fix the login bug")}\n${reply("a-1", "On it.")}\n`
+        );
         expect(db.session!.transcriptOffset).toBe(BigInt(size));
         expect(db.session!.transcriptFile).toBe(db.virtual);
 
         // Read again from the start - a replaced file, a lost cursor - and
         // nothing is stored twice.
         db.session!.transcriptOffset = 0n;
-        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS + 1) })).toBe("synced");
+        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS + 1) })).toBe(
+            "synced"
+        );
         expect(db.messages).toHaveLength(2);
 
         appendFileSync(path, `${reply("a-2", "Done.")}\n`);
         await syncSessionHistory(SESSION, { now: later(2 * SYNC_DEBOUNCE_MS + 2) });
-        expect(db.messages.map((one) => one.body)).toEqual(["fix the login bug", "On it.", "Done."]);
+        expect(db.messages.map((one) => one.body)).toEqual([
+            "fix the login bug",
+            "On it.",
+            "Done."
+        ]);
     });
 
     it("is one read per few seconds however many ask", async () => {
@@ -197,7 +280,9 @@ describe("syncSessionHistory", () => {
         const now = later(0);
         expect(await syncSessionHistory(SESSION, { now })).toBe("synced");
         appendFileSync(path, `${reply("a-1", "hi")}\n`);
-        expect(await syncSessionHistory(SESSION, { now: new Date(now.getTime() + 500) })).toBe("skipped");
+        expect(await syncSessionHistory(SESSION, { now: new Date(now.getTime() + 500) })).toBe(
+            "skipped"
+        );
         expect(db.messages).toHaveLength(1);
     });
 
@@ -214,7 +299,10 @@ describe("syncSessionHistory", () => {
             vendorId: null,
             createdAt: new Date(Date.now() - 1000)
         });
-        writeFileSync(path, `${user("u-1", "run the tests")}\n${user("u-2", "typed in the terminal")}\n`);
+        writeFileSync(
+            path,
+            `${user("u-1", "run the tests")}\n${user("u-2", "typed in the terminal")}\n`
+        );
         await syncSessionHistory(SESSION, { now: later(0) });
         expect(db.messages.map((one) => [one.id, one.body, one.vendorId, one.authorId])).toEqual([
             ["typed-1", "run the tests", "u-1:0", "owner"],
@@ -230,13 +318,19 @@ describe("syncSessionHistory", () => {
         expect(db.messages.map((one) => one.body)).toEqual(["new conversation"]);
 
         db.session!.state = "stopped";
-        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 3) })).toBe("skipped");
+        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 3) })).toBe(
+            "skipped"
+        );
         db.session!.state = "idle";
         db.session!.transcriptPath = "/etc/passwd";
-        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 4) })).toBe("skipped");
+        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 4) })).toBe(
+            "skipped"
+        );
         db.session!.transcriptPath = db.virtual;
         db.session!.cli = "codex";
-        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 5) })).toBe("skipped");
+        expect(await syncSessionHistory(SESSION, { now: later(SYNC_DEBOUNCE_MS * 5) })).toBe(
+            "skipped"
+        );
     });
 });
 
@@ -252,11 +346,15 @@ describe("the end of a session", () => {
 
     it("drains a backlog larger than one read in one sync", async () => {
         const count = MAX_ROWS_PER_SYNC * 2 + 25;
-        const lines = Array.from({ length: count }, (_, index) => reply(`a-${index}`, `line ${index}`));
+        const lines = Array.from({ length: count }, (_, index) =>
+            reply(`a-${index}`, `line ${index}`)
+        );
         writeFileSync(path, `${lines.join("\n")}\n`);
         expect(await syncSessionHistory(SESSION, { now: later(0) })).toBe("synced");
         expect(db.messages).toHaveLength(count);
-        expect(db.session!.transcriptOffset).toBe(BigInt(Buffer.byteLength(`${lines.join("\n")}\n`)));
+        expect(db.session!.transcriptOffset).toBe(
+            BigInt(Buffer.byteLength(`${lines.join("\n")}\n`))
+        );
     }, 120_000);
 
     it("reads once more after the debounce when a read came too soon", async () => {
@@ -292,7 +390,11 @@ describe("order", () => {
         );
         await syncSessionHistory(SESSION, { now: later(60_000) });
         const page = await historyPage(SESSION);
-        expect(page.messages.map((one) => one.body)).toEqual(["Tests pass.", "now the docs", "Docs updated."]);
+        expect(page.messages.map((one) => one.body)).toEqual([
+            "Tests pass.",
+            "now the docs",
+            "Docs updated."
+        ]);
         expect(db.messages.find((one) => one.id === "typed-b")!.vendorId).toBe("u-b:0");
     });
 
@@ -331,6 +433,8 @@ describe("sessionHistoryAction", () => {
 
     it("refuses an input that does not parse", async () => {
         expect((await sessionHistoryAction({ sessionId: "../x" })).error).toBeTruthy();
-        expect((await sessionHistoryAction({ sessionId: SESSION, before: "not-a-uuid" })).error).toBeTruthy();
+        expect(
+            (await sessionHistoryAction({ sessionId: SESSION, before: "not-a-uuid" })).error
+        ).toBeTruthy();
     });
 });

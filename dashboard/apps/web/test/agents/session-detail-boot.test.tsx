@@ -34,9 +34,8 @@ vi.mock("../../src/app/(app)/apps/agents/sessions/actions", () => ({
 }));
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 
-const { SessionDetail } = await import(
-    "../../src/app/(app)/apps/agents/sessions/[sessionId]/session-detail"
-);
+const { SessionDetail } =
+    await import("../../src/app/(app)/apps/agents/sessions/[sessionId]/session-detail");
 
 function workspaceSession(overrides: Partial<SessionView> = {}): SessionView {
     return {
@@ -75,7 +74,14 @@ afterEach(() => {
 
 describe("the boot progress card", () => {
     it("reads the session's own terminal and turns it into a bar and a step list", async () => {
-        render(<SessionDetail session={workspaceSession()} events={[]} history={{ messages: [], older: false }} />, { wrapper: MessagesWrapper });
+        render(
+            <SessionDetail
+                session={workspaceSession()}
+                events={[]}
+                history={{ messages: [], older: false }}
+            />,
+            { wrapper: MessagesWrapper }
+        );
 
         await waitFor(() => expect(screen.getByText("Getting the machine ready.")).toBeTruthy());
 
@@ -96,7 +102,9 @@ describe("the boot progress card", () => {
                 session={workspaceSession({ state: "working" })}
                 events={[]}
                 history={{ messages: [], older: false }}
-            />, { wrapper: MessagesWrapper });
+            />,
+            { wrapper: MessagesWrapper }
+        );
 
         await waitFor(() => expect(sessionScreenAction).not.toHaveBeenCalled());
         expect(screen.queryByText("Getting the machine ready.")).toBeNull();

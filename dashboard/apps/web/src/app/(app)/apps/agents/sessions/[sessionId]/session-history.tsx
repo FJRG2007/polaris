@@ -140,7 +140,8 @@ export function SessionHistory({ sessionId, initial, live, pending, onUserBodies
         return byRef;
     }, [messages]);
     const calls = useMemo(
-        () => new Set(messages.filter((one) => one.kind === "tool" && one.ref).map((one) => one.ref)),
+        () =>
+            new Set(messages.filter((one) => one.kind === "tool" && one.ref).map((one) => one.ref)),
         [messages]
     );
 
@@ -149,7 +150,10 @@ export function SessionHistory({ sessionId, initial, live, pending, onUserBodies
             {older || loadingOlder ? (
                 <div className="flex flex-col items-center gap-2">
                     {loadingOlder ? (
-                        <div className="w-full space-y-2" aria-label={t("session.history.loadingOlder")}>
+                        <div
+                            className="w-full space-y-2"
+                            aria-label={t("session.history.loadingOlder")}
+                        >
                             <Skeleton className="h-4 w-1/3" />
                             <Skeleton className="h-12 w-full" />
                             <Skeleton className="h-4 w-1/4" />
@@ -176,7 +180,11 @@ export function SessionHistory({ sessionId, initial, live, pending, onUserBodies
                         <ToolCall
                             key={message.id}
                             call={message.kind === "tool" ? message : null}
-                            result={message.kind === "tool" ? (results.get(message.ref) ?? null) : message}
+                            result={
+                                message.kind === "tool"
+                                    ? (results.get(message.ref) ?? null)
+                                    : message
+                            }
                         />
                     );
                 if (message.kind === "marker")
@@ -190,13 +198,15 @@ export function SessionHistory({ sessionId, initial, live, pending, onUserBodies
                 return (
                     <div key={message.id} className="min-w-0 space-y-1">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                            {message.role === "user"
-                                ? message.authorId
-                                    ? t("session.you")
-                                    : t("session.history.fromTerminal")
-                                : message.role === "agent"
-                                  ? t("sessions.form.agent")
-                                  : "Polaris" /* i18n-ignore the product's name */}
+                            {
+                                message.role === "user"
+                                    ? message.authorId
+                                        ? t("session.you")
+                                        : t("session.history.fromTerminal")
+                                    : message.role === "agent"
+                                      ? t("sessions.form.agent")
+                                      : "Polaris" /* i18n-ignore the product's name */
+                            }
                         </p>
                         {/* Only Polaris's own lines are its words to translate;
                             what a person or the agent said stays as said. */}
@@ -233,8 +243,12 @@ function fenceLanguage(info: string): string | null {
 }
 
 /** Text, with its fenced code blocks painted. */
-export function messageParts(text: string): ({ code: false; text: string } | { code: true; text: string; language: string | null })[] {
-    const parts: ({ code: false; text: string } | { code: true; text: string; language: string | null })[] = [];
+export function messageParts(
+    text: string
+): ({ code: false; text: string } | { code: true; text: string; language: string | null })[] {
+    const parts: (
+        { code: false; text: string } | { code: true; text: string; language: string | null }
+    )[] = [];
     const fence = /```([^\n`]*)\n([\s\S]*?)(?:\n```|$)/g;
     let at = 0;
     for (let match = fence.exec(text); match; match = fence.exec(text)) {
@@ -265,7 +279,13 @@ function MessageText({ text }: { text: string }) {
 }
 
 /** A tool the agent ran, folded to one line, with what it answered inside. */
-function ToolCall({ call, result }: { call: HistoryMessage | null; result: HistoryMessage | null }) {
+function ToolCall({
+    call,
+    result
+}: {
+    call: HistoryMessage | null;
+    result: HistoryMessage | null;
+}) {
     const t = useTranslations("agents");
     const failed = result?.subject === "error";
     const name = call?.subject ?? "";
@@ -290,7 +310,11 @@ function ToolCall({ call, result }: { call: HistoryMessage | null; result: Histo
             <div className="space-y-2 px-2 pb-2">
                 {call?.body ? (
                     <div className="max-w-full overflow-x-auto rounded-md bg-muted">
-                        <CodeSurface code={call.body} language={name === "Bash" ? "bash" : null} readOnly />
+                        <CodeSurface
+                            code={call.body}
+                            language={name === "Bash" ? "bash" : null}
+                            readOnly
+                        />
                     </div>
                 ) : null}
                 <p className="text-muted-foreground">

@@ -16,9 +16,8 @@ vi.mock("../../src/app/(app)/apps/agents/sessions/sessions-polls", () => ({
     sessionHistory: (...args: unknown[]) => sessionHistory(...args)
 }));
 
-const { SessionHistory, messageParts } = await import(
-    "../../src/app/(app)/apps/agents/sessions/[sessionId]/session-history"
-);
+const { SessionHistory, messageParts } =
+    await import("../../src/app/(app)/apps/agents/sessions/[sessionId]/session-history");
 
 beforeEach(() => {
     Element.prototype.scrollIntoView = () => undefined;
@@ -52,7 +51,12 @@ describe("SessionHistory", () => {
             message({ role: "system", kind: "marker", subject: "compacted" })
         ];
         render(
-            <SessionHistory sessionId="s" initial={{ messages, older: false }} live={false} pending={[]} />,
+            <SessionHistory
+                sessionId="s"
+                initial={{ messages, older: false }}
+                live={false}
+                pending={[]}
+            />,
             { wrapper: MessagesWrapper }
         );
         expect(screen.getByText("from the dashboard")).toBeTruthy();
@@ -66,9 +70,17 @@ describe("SessionHistory", () => {
 
     it("loads an older page above, asking for the page before the first one shown", async () => {
         const first = message({ body: "newest page" });
-        sessionHistory.mockResolvedValue({ messages: [message({ body: "older page" })], older: false });
+        sessionHistory.mockResolvedValue({
+            messages: [message({ body: "older page" })],
+            older: false
+        });
         render(
-            <SessionHistory sessionId="s" initial={{ messages: [first], older: true }} live={false} pending={[]} />,
+            <SessionHistory
+                sessionId="s"
+                initial={{ messages: [first], older: true }}
+                live={false}
+                pending={[]}
+            />,
             { wrapper: MessagesWrapper }
         );
         fireEvent.click(screen.getByText("Load earlier messages"));
@@ -80,11 +92,18 @@ describe("SessionHistory", () => {
     it("says so when an older page did not load", async () => {
         sessionHistory.mockResolvedValue(null);
         render(
-            <SessionHistory sessionId="s" initial={{ messages: [message({ body: "x" })], older: true }} live={false} pending={[]} />,
+            <SessionHistory
+                sessionId="s"
+                initial={{ messages: [message({ body: "x" })], older: true }}
+                live={false}
+                pending={[]}
+            />,
             { wrapper: MessagesWrapper }
         );
         fireEvent.click(screen.getByText("Load earlier messages"));
-        await waitFor(() => expect(screen.getByText("Earlier messages did not load. Try again.")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("Earlier messages did not load. Try again.")).toBeTruthy()
+        );
     });
 });
 
@@ -95,8 +114,12 @@ describe("messageParts", () => {
             { code: true, text: "npm test", language: "bash" },
             { code: false, text: "\nThen push." }
         ]);
-        expect(messageParts("```<script>\nx\n```")).toEqual([{ code: true, text: "x", language: null }]);
+        expect(messageParts("```<script>\nx\n```")).toEqual([
+            { code: true, text: "x", language: null }
+        ]);
         // Still being written: an unclosed fence is code to the end.
-        expect(messageParts("```ts\nconst a = 1;")).toEqual([{ code: true, text: "const a = 1;", language: "ts" }]);
+        expect(messageParts("```ts\nconst a = 1;")).toEqual([
+            { code: true, text: "const a = 1;", language: "ts" }
+        ]);
     });
 });

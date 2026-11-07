@@ -111,7 +111,8 @@ const claudeLineSchema = z.object({
 });
 
 /** What Claude Code puts in a user turn that nobody typed. */
-const INJECTED = /^<(local-command-stdout|local-command-stderr|system-reminder|command-message|bash-stdout|bash-stderr)>/;
+const INJECTED =
+    /^<(local-command-stdout|local-command-stderr|system-reminder|command-message|bash-stdout|bash-stderr)>/;
 const INTERRUPTED = /^\[Request interrupted by user[^\]]*\]$/;
 
 /** A slash command reads as what was typed: `/name args`. */
@@ -132,9 +133,19 @@ export function toolInputSummary(input: unknown): string {
     if (typeof input === "string") return clip(input, MAX_TOOL_INPUT_CHARS);
     if (!input || typeof input !== "object") return "";
     const record = input as Record<string, unknown>;
-    for (const key of ["command", "file_path", "pattern", "path", "url", "query", "description", "prompt"]) {
+    for (const key of [
+        "command",
+        "file_path",
+        "pattern",
+        "path",
+        "url",
+        "query",
+        "description",
+        "prompt"
+    ]) {
         const value = record[key];
-        if (typeof value === "string" && value.trim()) return clip(value.trim(), MAX_TOOL_INPUT_CHARS);
+        if (typeof value === "string" && value.trim())
+            return clip(value.trim(), MAX_TOOL_INPUT_CHARS);
     }
     try {
         return clip(JSON.stringify(input), MAX_TOOL_INPUT_CHARS);
@@ -150,7 +161,11 @@ function resultText(content: unknown): string {
     const parts: string[] = [];
     for (const item of content) {
         if (typeof item === "string") parts.push(item);
-        else if (item && typeof item === "object" && typeof (item as { text?: unknown }).text === "string")
+        else if (
+            item &&
+            typeof item === "object" &&
+            typeof (item as { text?: unknown }).text === "string"
+        )
             parts.push((item as { text: string }).text);
     }
     return parts.join("\n");
@@ -177,7 +192,8 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
         { vendorId: `${id}:0`, role: "system", kind: "marker", subject, ref: "", body: "", at }
     ];
 
-    if (record.type === "system") return record.subtype === "compact_boundary" ? marker("compacted") : [];
+    if (record.type === "system")
+        return record.subtype === "compact_boundary" ? marker("compacted") : [];
     if (record.type !== "user" && record.type !== "assistant") return [];
     if (record.type === "user" && record.isCompactSummary) return [];
     if (record.type === "user" && record.interruptedMessageId) return marker("interrupted");
@@ -195,15 +211,41 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
             if (record.type === "user") {
                 if (record.isMeta) return;
                 if (INTERRUPTED.test(value.text.trim())) {
-                    rows.push({ vendorId, role: "system", kind: "marker", subject: "interrupted", ref: "", body: "", at });
+                    rows.push({
+                        vendorId,
+                        role: "system",
+                        kind: "marker",
+                        subject: "interrupted",
+                        ref: "",
+                        body: "",
+                        at
+                    });
                     return;
                 }
                 const text = userText(value.text);
-                if (text) rows.push({ vendorId, role: "user", kind: "text", subject: "", ref: "", body: clip(text, MAX_TEXT_CHARS), at });
+                if (text)
+                    rows.push({
+                        vendorId,
+                        role: "user",
+                        kind: "text",
+                        subject: "",
+                        ref: "",
+                        body: clip(text, MAX_TEXT_CHARS),
+                        at
+                    });
                 return;
             }
             const text = value.text.trim();
-            if (text) rows.push({ vendorId, role: "agent", kind: "text", subject: "", ref: "", body: clip(text, MAX_TEXT_CHARS), at });
+            if (text)
+                rows.push({
+                    vendorId,
+                    role: "agent",
+                    kind: "text",
+                    subject: "",
+                    ref: "",
+                    body: clip(text, MAX_TEXT_CHARS),
+                    at
+                });
             return;
         }
         if (value.type === "tool_use" && "name" in value && record.type === "assistant") {
