@@ -17,6 +17,15 @@ import { reachOf, type TvFilterReach } from "@/lib/tv/filter-reach";
 import { listTvs, requestTvUpdates, type TvRow } from "@/lib/tv/update-requests";
 import { tvNameSchema } from "@/lib/tv/tv-name";
 import { renameTv, setTvBlocking } from "@/lib/tv/preferences";
+import {
+    readTvCatalog,
+    setTvAddons,
+    setTvTheme,
+    tvAddonsPickSchema,
+    tvThemePickSchema,
+    type TvCatalogEntry,
+    type TvPickOutcome
+} from "@/lib/tv/catalog-picks";
 
 const LIMIT = 30;
 
@@ -144,6 +153,71 @@ export async function renameTvAction(input: unknown): Promise<TvUpdatesView & { 
     if (refusal || !renamed)
         return { tvs, latest, error: t(refusal ?? "tv.updates.errors.notATv") };
     return { tvs, latest };
+}
+
+/** The themes and add-ons of the newest TV release, for the picker. Null when there is no catalog to read. */
+export async function tvCatalogAction(): Promise<TvCatalogEntry[] | null> {
+    await requireUser();
+    return readTvCatalog().catch((caught: unknown) => {
+        console.error("[account/tv] reading the TV catalog failed", caught);
+        return null;
+    });
+}
+
+const PICK_REFUSALS = {
+    notATv: "tv.updates.errors.notATv",
+    tooOld: "tv.catalog.status.updateFirst",
+    notInCatalog: "tv.catalog.errors.notInCatalog"
+} as const satisfies Record<Exclude<TvPickOutcome, "done">, string>;
+
+async function pickAction(
+    kind: "theme" | "addons",
+    input: unknown
+): Promise<TvUpdatesView & { error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("account");
+    const throttle = await rateLimit(`tv-prefs:${user.id}`, LIMIT, WINDOW_MS);
+    let outcome: TvPickOutcome = "notATv";
+    let keyId: string | null = null;
+    let metadata: Record<string, unknown> = {};
+    if (throttle.ok && kind === "theme") {
+        const parsed = tvThemePickSchema.safeParse(input);
+        if (parsed.success) {
+            keyId = parsed.data.keyId;
+            metadata = { theme: parsed.data.theme };
+            outcome = await setTvTheme(user.id, keyId, parsed.data.theme);
+        }
+    } else if (throttle.ok) {
+        const parsed = tvAddonsPickSchema.safeParse(input);
+        if (parsed.success) {
+            keyId = parsed.data.keyId;
+            metadata = { addons: parsed.data.addons };
+            outcome = await setTvAddons(user.id, keyId, parsed.data.addons);
+        }
+    }
+    if (outcome === "done" && keyId) {
+        await recordAudit({
+            actorId: user.id,
+            action: kind === "theme" ? "account.tv.theme.changed" : "account.tv.addons.changed",
+            targetType: "apiKey",
+            targetId: keyId,
+            metadata
+        });
+    }
+    const [tvs, latest] = await Promise.all([listTvs(user.id), latestVersion()]);
+    if (!throttle.ok) return { tvs, latest, error: t("tv.prefs.errors.tooMany") };
+    if (outcome !== "done") return { tvs, latest, error: t(PICK_REFUSALS[outcome]) };
+    return { tvs, latest };
+}
+
+/** Pick the theme one TV wears. The TV applies it on its next check-in. */
+export async function setTvThemeAction(input: unknown) {
+    return pickAction("theme", input);
+}
+
+/** Pick the add-ons one TV has. The TV opens Android's install for each one it lacks. */
+export async function setTvAddonsAction(input: unknown) {
+    return pickAction("addons", input);
 }
 
 /**

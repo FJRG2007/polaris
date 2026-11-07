@@ -111,7 +111,6 @@ describe("the desired block", () => {
     });
 
     it.each([
-        {},
         { blocking: "yes" },
         { blocking: true, extra: 1 },
         { blocking: true, theme: "aurora" }

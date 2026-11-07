@@ -15,7 +15,10 @@ import {
     connectedTvWhere,
     readDesired,
     readReport,
-    type TvBlockingReport
+    type TvAddonsReport,
+    type TvBlockingReport,
+    type TvDesired,
+    type TvThemeReport
 } from "@/lib/tv/preferences";
 
 export const TV_UPDATE_STATES = [
@@ -79,6 +82,17 @@ export function isPendingTvUpdate(state: string): boolean {
 }
 
 /** One connected TV, as /account/tv lists it. */
+function catalogOf(desired: TvDesired | null): TvRow["catalog"] {
+    return {
+        theme: desired?.theme
+            ? { id: desired.theme.id, applied: desired.theme.applied ?? null }
+            : null,
+        addons: desired?.addons
+            ? { ids: desired.addons.ids, applied: desired.addons.applied ?? null }
+            : null
+    };
+}
+
 export interface TvRow {
     readonly id: string;
     readonly name: string;
@@ -97,6 +111,14 @@ export interface TvRow {
         readonly desired: boolean | null;
         readonly applied: TvBlockingReport | null;
         readonly askedAt: string | null;
+    };
+    /** The theme and add-ons picked for it (null: never picked), and what the TV said (null: nothing yet). */
+    readonly catalog: {
+        readonly theme: { readonly id: string; readonly applied: TvThemeReport | null } | null;
+        readonly addons: {
+            readonly ids: readonly string[];
+            readonly applied: TvAddonsReport | null;
+        } | null;
     };
     /** The address the TV last called from, as this instance saw it. */
     readonly address: string | null;
@@ -145,6 +167,7 @@ export async function listTvs(userId: string, now = new Date()): Promise<TvRow[]
             applied: readReport(key.tvPreference?.applied),
             askedAt: key.tvPreference?.askedAt?.toISOString() ?? null
         },
+        catalog: catalogOf(readDesired(key.tvPreference?.desired)),
         address: key.lastUsedIp ?? null
     }));
 }

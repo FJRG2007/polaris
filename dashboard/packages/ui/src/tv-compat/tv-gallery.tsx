@@ -5,7 +5,7 @@
  * served from, so the site and the dashboard can each point at their own copy.
  */
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "../i18n";
 import { Badge } from "../components/badge";
 import { Button } from "../components/button";
@@ -48,12 +48,16 @@ const ANDROID_VERSION: Readonly<Record<number, string>> = {
 
 export function TvGallery({
     items,
-    screenshotSrc
+    screenshotSrc,
+    action
 }: {
     items: readonly TvGalleryItem[];
     screenshotSrc: (item: TvGalleryItem) => string;
+    /** What a card offers under its text, such as picking it for a TV. */
+    action?: (item: TvGalleryItem) => ReactNode;
 }) {
     const t = useTranslations("tvCompat");
+    const titleId = useId();
     const [filter, setFilter] = useState<Filter>("all");
     const counts = useMemo(
         () => ({
@@ -65,9 +69,9 @@ export function TvGallery({
     );
     const shown = filter === "all" ? items : items.filter((item) => item.kind === filter);
     return (
-        <section className="flex min-w-0 flex-col gap-4" aria-labelledby="tv-gallery-title">
+        <section className="flex min-w-0 flex-col gap-4" aria-labelledby={titleId}>
             <div className="flex min-w-0 flex-col gap-1">
-                <h2 id="tv-gallery-title" className="text-xl font-semibold">
+                <h2 id={titleId} className="text-xl font-semibold">
                     {t("gallery.title")}
                 </h2>
                 <p className="text-sm text-muted-foreground">{t("gallery.intro")}</p>
@@ -130,6 +134,7 @@ export function TvGallery({
                                         </span>
                                     ) : null}
                                 </p>
+                                {action ? action(item) : null}
                             </div>
                         </li>
                     ))}

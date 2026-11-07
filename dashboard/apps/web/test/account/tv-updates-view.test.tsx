@@ -10,6 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { TvRow } from "@/lib/tv/update-requests";
 import { renderToStaticMarkup } from "react-dom/server";
 
+// The gallery renders in its own test (packages/ui); here only the picker around it is under test.
+vi.mock("@polaris/ui/tv-gallery", () => ({ TvGallery: () => null }));
 vi.mock("@/app/(app)/account/tv/actions", () => ({
     tvUpdatesAction: async () => ({ tvs: [], latest: null }),
     requestTvUpdateAction: async () => ({ tvs: [], latest: null }),

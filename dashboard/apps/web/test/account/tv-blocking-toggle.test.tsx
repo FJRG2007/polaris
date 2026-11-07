@@ -46,6 +46,8 @@ const tvUpdatesAction = vi.fn(async () => ({
     latest: "3.5"
 }));
 
+// The gallery renders in its own test (packages/ui); here only the picker around it is under test.
+vi.mock("@polaris/ui/tv-gallery", () => ({ TvGallery: () => null }));
 vi.mock("@/app/(app)/account/tv/actions", () => ({
     tvUpdatesAction,
     requestTvUpdateAction: async () => ({ tvs: [], latest: "3.5" }),

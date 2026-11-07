@@ -27,12 +27,58 @@ export const TV_BLOCKING_REPORTS = [
 export type TvBlockingReport = (typeof TV_BLOCKING_REPORTS)[number];
 export const tvBlockingReportSchema = z.enum(TV_BLOCKING_REPORTS);
 
-/** What a TV is asked to be. */
-export const tvDesiredSchema = z.object({ blocking: z.boolean() }).strict();
+/** A theme or add-on id as the catalog spells it (tv/tools/catalog.py). */
+export const tvCatalogIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/);
+/** The most add-ons one TV is asked to have. */
+export const TV_ADDONS_MAX = 64;
+
+/** What the TV can say about a theme it was asked to wear. */
+export const TV_THEME_REPORTS = ["applied", "failed", "unavailable"] as const;
+export type TvThemeReport = (typeof TV_THEME_REPORTS)[number];
+/** What the TV can say about the add-ons it was asked to have: all there, Android
+ *  is asking on the TV, one could not be installed, or one is not for this TV. */
+export const TV_ADDONS_REPORTS = ["installed", "asked", "failed", "unavailable"] as const;
+export type TvAddonsReport = (typeof TV_ADDONS_REPORTS)[number];
+
+const choiceSchema = z.string().uuid();
+
+/** A theme the owner picked, the id of that choice, and what the TV said about it. */
+const themePickSchema = z
+    .object({
+        id: tvCatalogIdSchema,
+        choice: choiceSchema,
+        applied: z.enum(TV_THEME_REPORTS).nullable().optional()
+    })
+    .strict();
+const addonsPickSchema = z
+    .object({
+        ids: z.array(tvCatalogIdSchema).max(TV_ADDONS_MAX),
+        choice: choiceSchema,
+        applied: z.enum(TV_ADDONS_REPORTS).nullable().optional()
+    })
+    .strict();
+
+/**
+ * What a TV is asked to be. Each part is its own choice with its own id, so a
+ * new Block ads and trackers choice does not make the TV apply its theme again.
+ * A row written before themes and add-ons (`{ blocking }`) still reads.
+ */
+export const tvDesiredSchema = z
+    .object({
+        blocking: z.boolean().optional(),
+        theme: themePickSchema.optional(),
+        addons: addonsPickSchema.optional()
+    })
+    .strict();
 export type TvDesired = z.infer<typeof tvDesiredSchema>;
 
-/** What a TV reads on its poll: the choice, and the id it names when it reports on it. */
-export type TvDesiredForTv = TvDesired & { readonly choice: string | null };
+/** What a TV reads on its poll: each choice and the id it names when it reports on it. */
+export interface TvDesiredForTv {
+    readonly blocking?: boolean;
+    readonly choice: string | null;
+    readonly theme?: { readonly id: string; readonly choice: string };
+    readonly addons?: { readonly ids: readonly string[]; readonly choice: string };
+}
 
 /** A stored row read back whole: anything that no longer parses counts as no choice. */
 export function readDesired(stored: unknown): TvDesired | null {
@@ -52,8 +98,6 @@ export interface TvBlockingReported {
     readonly choice: string | null;
 }
 
-const choiceSchema = z.string().uuid();
-
 /** The report a TV puts on its poll; anything malformed is ignored, never refused. */
 export function reportedBlocking(request: Request): TvBlockingReported | null {
     const query = new URL(request.url).searchParams;
@@ -70,7 +114,15 @@ export async function desiredFor(keyId: string): Promise<TvDesiredForTv | null> 
         select: { desired: true, choice: true }
     });
     const desired = readDesired(row?.desired);
-    return desired ? { ...desired, choice: row?.choice ?? null } : null;
+    if (!desired) return null;
+    const { blocking, theme, addons } = desired;
+    if (blocking === undefined && !theme && !addons) return null;
+    return {
+        ...(blocking === undefined ? {} : { blocking }),
+        choice: row?.choice ?? null,
+        ...(theme ? { theme: { id: theme.id, choice: theme.choice } } : {}),
+        ...(addons ? { addons: { ids: addons.ids, choice: addons.choice } } : {})
+    };
 }
 
 function isUniqueViolation(caught: unknown): boolean {
@@ -138,11 +190,12 @@ export async function setTvBlocking(
 ): Promise<"done" | "notATv" | "tooOld"> {
     const key = await prisma.apiKey.findFirst({
         where: { ...connectedTvWhere(userId, now), id: keyId },
-        select: { clientBuild: true }
+        select: { clientBuild: true, tvPreference: { select: { desired: true } } }
     });
     if (!key) return "notATv";
     if (!tvTakesBlocking(key.clientBuild)) return "tooOld";
-    const desired: TvDesired = { blocking };
+    // The theme and add-ons asked before are kept as they are.
+    const desired: TvDesired = { ...readDesired(key.tvPreference?.desired), blocking };
     const choice = { desired, choice: randomUUID(), askedAt: now, applied: null, appliedAt: null };
     await prisma.tvPreference.upsert({
         where: { apiKeyId: keyId },

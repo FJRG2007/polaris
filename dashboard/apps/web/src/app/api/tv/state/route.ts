@@ -21,6 +21,7 @@ import { requestOrigin } from "@/lib/domain-service";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
 import * as updates from "@/lib/tv/update-requests";
 import * as preferences from "@/lib/tv/preferences";
+import * as picks from "@/lib/tv/catalog-picks";
 
 /** What this TV says it runs, from the query or its user agent; null when neither reads. */
 function reportedVersion(request: Request): updates.TvVersion | null {
@@ -51,6 +52,8 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     if (version) await updates.noteTvVersion(caller.keyId, version);
     const blocking = preferences.reportedBlocking(request);
     if (blocking) await preferences.noteTvBlocking(caller.keyId, caller.userId, blocking);
+    const catalog = picks.reportedCatalog(request);
+    if (catalog) await picks.noteTvCatalog(caller.keyId, catalog);
     const unreadWhere = { userId: caller.userId, readAt: null };
     const [user, unread, alerts, updateRequest, desired] = await Promise.all([
         prisma.user.findUnique({ where: { id: caller.userId }, select: { name: true } }),

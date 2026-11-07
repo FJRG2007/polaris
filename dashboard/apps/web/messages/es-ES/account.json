@@ -1741,6 +1741,30 @@
                 "tooMany": "Demasiadas solicitudes. Espera un minuto."
             }
         },
+        "catalog": {
+            "title": "Temas y complementos",
+            "open": "Temas y complementos",
+            "close": "Cerrar",
+            "loading": "Cargando temas y complementos",
+            "none": "No hay temas ni complementos en la versión más nueva del TV.",
+            "useTheme": "Usar este tema",
+            "themeInUse": "Tema en uso",
+            "addAddon": "Añadir a este TV",
+            "removeAddon": "Quitar de la lista",
+            "status": {
+                "updateFirst": "Actualiza este TV para elegir temas y complementos aquí.",
+                "notAsked": "Aún no se ha elegido nada aquí.",
+                "waiting": "Enviado. El TV lo aplica en su próxima conexión.",
+                "applied": "Tema aplicado.",
+                "installed": "Todos los complementos están instalados.",
+                "asked": "Confirma la instalación en el TV.",
+                "failed": "El TV no pudo aplicarlo. Inténtalo de nuevo.",
+                "unavailable": "No disponible para este TV."
+            },
+            "errors": {
+                "notInCatalog": "Eso no está en la versión más nueva del TV. Recarga la lista."
+            }
+        },
         "prefs": {
             "blocking": "Sin anuncios ni rastreo",
             "rename": "Renombrar",

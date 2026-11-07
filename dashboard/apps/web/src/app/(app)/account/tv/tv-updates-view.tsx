@@ -18,10 +18,14 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TvFilterReach } from "@/lib/tv/filter-reach";
 import type { TvRow, TvUpdateState } from "@/lib/tv/update-requests";
 import { blockingWaiting, TvName, TvPreferences } from "./tv-preferences";
+import { catalogWaiting, TvCatalogPicker } from "./tv-catalog-picker";
 import {
     renameTvAction,
     requestTvUpdateAction,
+    setTvAddonsAction,
     setTvBlockingAction,
+    setTvThemeAction,
+    tvCatalogAction,
     tvFilterReachAction,
     tvUpdatesAction,
     type TvUpdatesView
@@ -85,8 +89,11 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
     const [busy, setBusy] = useState(false);
     const [reach, setReach] = useState<Record<string, TvFilterReach> | null>(null);
     const waitingOn = view.tvs
-        .filter(blockingWaiting)
-        .map((row) => `${row.id}:${row.blocking.askedAt ?? ""}`)
+        .filter((row) => blockingWaiting(row) || catalogWaiting(row))
+        .map(
+            (row) =>
+                `${row.id}:${row.blocking.askedAt ?? ""}:${row.catalog.theme?.id ?? ""}:${row.catalog.addons?.ids.join("+") ?? ""}`
+        )
         .join(",");
     const [waitedOut, setWaitedOut] = useState<string | null>(null);
     const anyPending = view.tvs.some(pending) || (waitingOn !== "" && waitingOn !== waitedOut);
@@ -177,6 +184,30 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
         setView({ tvs: answer.tvs, latest: answer.latest });
     }
 
+    /** Shown at once; that row's pick goes back if it is refused. */
+    async function changeCatalog(
+        row: TvRow,
+        next: Partial<TvRow["catalog"]>,
+        call: () => Promise<TvUpdatesView & { error?: string }>
+    ) {
+        const restore = (tvs: TvRow[]) =>
+            tvs.map((r) => (r.id === row.id ? { ...r, catalog: row.catalog } : r));
+        setView((current) => ({
+            ...current,
+            tvs: current.tvs.map((r) =>
+                r.id === row.id ? { ...r, catalog: { ...r.catalog, ...next } } : r
+            )
+        }));
+        setError(null);
+        const answer = await runAction(call, setError);
+        if (!answer || answer.error) {
+            setView((current) => ({ ...current, tvs: restore(current.tvs) }));
+            if (answer?.error) setError(answer.error);
+            return;
+        }
+        setView({ tvs: answer.tvs, latest: answer.latest });
+    }
+
     async function rename(row: TvRow, name: string): Promise<boolean> {
         setError(null);
         const answer = await runAction(() => renameTvAction({ keyId: row.id, name }), setError);
@@ -233,6 +264,16 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
                                 onUpdate={() => void update({ keyId: row.id })}
                                 onBlocking={(next) => void changeBlocking(row, next)}
                                 onRename={(name) => rename(row, name)}
+                                onTheme={(id) =>
+                                    void changeCatalog(row, { theme: { id, applied: null } }, () =>
+                                        setTvThemeAction({ keyId: row.id, theme: id })
+                                    )
+                                }
+                                onAddons={(ids) =>
+                                    void changeCatalog(row, { addons: { ids, applied: null } }, () =>
+                                        setTvAddonsAction({ keyId: row.id, addons: ids })
+                                    )
+                                }
                             />
                         ))}
                     </CardBody>
@@ -249,7 +290,9 @@ function TvUpdateRow({
     reach,
     onUpdate,
     onBlocking,
-    onRename
+    onRename,
+    onTheme,
+    onAddons
 }: {
     row: TvRow;
     latest: string | null;
@@ -258,6 +301,8 @@ function TvUpdateRow({
     onUpdate: () => void;
     onBlocking: (next: boolean) => void;
     onRename: (name: string) => Promise<boolean>;
+    onTheme: (id: string) => void;
+    onAddons: (ids: string[]) => void;
 }) {
     const t = useTranslations("account");
     const current = upToDate(row, latest);
@@ -336,8 +381,14 @@ function TvUpdateRow({
                     </Button>
                 )}
             </div>
-            <div className="pl-7">
+            <div className="flex min-w-0 flex-col gap-3 pl-7">
                 <TvPreferences row={row} reach={reach} onBlocking={onBlocking} />
+                <TvCatalogPicker
+                    row={row}
+                    load={tvCatalogAction}
+                    onTheme={onTheme}
+                    onAddons={onAddons}
+                />
             </div>
         </div>
     );
