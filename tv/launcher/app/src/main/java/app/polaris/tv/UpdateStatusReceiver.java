@@ -14,6 +14,7 @@ import android.widget.Toast;
 public final class UpdateStatusReceiver extends BroadcastReceiver {
 
     @Override
+    @SuppressWarnings("deprecation")
     public void onReceive(Context context, Intent intent) {
         if (!SelfUpdateRun.ACTION_STATUS.equals(intent.getAction())) return;
         int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, SelfUpdate.STATUS_FAILURE);

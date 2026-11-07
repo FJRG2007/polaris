@@ -456,9 +456,7 @@ public final class LauncherSettingsActivity extends Activity {
     }
 
     private String updatesText(String status) {
-        return getString(R.string.update_installed, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE) + "
-
-" + status;
+        return getString(R.string.update_installed, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE) + "\n\n" + status;
     }
 
     private String checkMessage(SelfUpdate.Result result) {

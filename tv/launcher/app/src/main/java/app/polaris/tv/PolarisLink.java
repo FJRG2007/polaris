@@ -21,6 +21,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -41,7 +42,7 @@ final class PolarisLink {
     private static final int GCM_IV_BYTES = 12;
     private static final int GCM_TAG_BITS = 128;
     private static final int MAX_BODY = 64 * 1024;
-    private static final java.util.regex.Pattern UUID = java.util.regex.Pattern.compile(
+    private static final Pattern UUID = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     /** Home asks at most this often, so a TV left on the launcher is not polling. */
     static final long STATE_MS = 5 * 60_000;
