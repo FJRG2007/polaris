@@ -56,6 +56,7 @@ const address = byId<HTMLInputElement>("address");
 const addressError = byId<HTMLParagraphElement>("address-error");
 const found = byId<HTMLDivElement>("found");
 const home = byId<HTMLInputElement>("home");
+const blockAds = byId<HTMLInputElement>("block-ads");
 const find = byId<HTMLButtonElement>("find");
 const start = byId<HTMLButtonElement>("start");
 const step = byId<HTMLParagraphElement>("step");
@@ -99,6 +100,7 @@ function render(state: TvInstallState): void {
     const idle = IDLE.has(state.phase) && !state.usbListing;
     address.disabled = !idle;
     home.disabled = !idle;
+    blockAds.disabled = !idle;
     // A search can be stopped from the same button that started it.
     const searching = state.phase === "searching";
     available(find, idle || searching);
@@ -180,7 +182,8 @@ findUsb.addEventListener("click", () => {
 start.addEventListener("click", () => {
     if (start.getAttribute("aria-disabled") === "true") return;
     const usb = latest && overUsb ? usbTarget(latest) : null;
-    const input = usb ? { usb, home: home.checked } : { host: address.value.trim(), home: home.checked };
+    const choices = { home: home.checked, blockAds: blockAds.checked };
+    const input = usb ? { usb, ...choices } : { host: address.value.trim(), ...choices };
     void bridge.start(input).then((started) => {
         notStarted = !started;
         if (latest) render(latest);

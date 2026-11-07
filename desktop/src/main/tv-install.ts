@@ -174,6 +174,22 @@ export function targetLabel(target: TvTarget): string {
     return target.kind === "network" ? target.host : `usb-${target.id.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 64)}`;
 }
 
+/** The TV's Private DNS before anything changed, named, so a missing key reads as "null" rather than a blank line. */
+export const PRIVATE_DNS_READ =
+    "echo private_dns_mode=$(settings get global private_dns_mode); echo private_dns_specifier=$(settings get global private_dns_specifier)";
+
+/**
+ * The runtime grants after the install. Location names the Wi-Fi in the launcher's network row;
+ * WRITE_SECURE_SETTINGS, only when asked, lets "Block ads and trackers" set Private DNS and put the
+ * TV's own back when it does not work. Neither is ever revoked here: the launcher's own scripts may
+ * have granted the second for another switch.
+ */
+export function grantCommands(blockAds: boolean): readonly string[] {
+    const grants = [`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`];
+    if (blockAds) grants.push(`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`);
+    return grants;
+}
+
 async function backUp(adb: AdbConnection, target: TvTarget): Promise<string> {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const folder = join(app.getPath("userData"), "tv-backups", `${targetLabel(target)}-${stamp}`);
@@ -184,7 +200,8 @@ async function backUp(adb: AdbConnection, target: TvTarget): Promise<string> {
         ["getprop.txt", "getprop"],
         ["settings-global.txt", "settings list global"],
         ["settings-secure.txt", "settings list secure"],
-        ["settings-system.txt", "settings list system"]
+        ["settings-system.txt", "settings list system"],
+        ["private-dns.txt", PRIVATE_DNS_READ]
     ];
     for (const [name, command] of reads) await writeFile(join(folder, name), await adb.shell(command));
     return folder;
@@ -226,7 +243,7 @@ export function lateFailure(stage: TvStage): TvOutcome {
     return stage === "home" ? "installed-home-unknown" : "connection-lost";
 }
 
-async function install(target: TvTarget, makeHome: boolean): Promise<void> {
+async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): Promise<void> {
     publish({ phase: "download", outcome: null, backup: null, closed: null });
     const release = await latestApk().catch((caught: unknown) => {
         console.error("[tv]", caught);
@@ -285,7 +302,7 @@ async function install(target: TvTarget, makeHome: boolean): Promise<void> {
             return;
         }
         stage = "home";
-        await adb.shell(`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`).catch(() => "");
+        for (const grant of grantCommands(blockAds)) await adb.shell(grant).catch(() => "");
 
         let outcome: TvOutcome = "installed";
         if (makeHome) {
@@ -335,8 +352,8 @@ export function openTvInstall(): void {
 }
 
 const startSchema = z.union([
-    z.object({ host: z.unknown().transform(readTvAddress).pipe(z.string()), home: z.boolean() }),
-    z.object({ usb: z.string().trim().min(1).max(200), home: z.boolean() })
+    z.object({ host: z.unknown().transform(readTvAddress).pipe(z.string()), home: z.boolean(), blockAds: z.boolean().optional() }),
+    z.object({ usb: z.string().trim().min(1).max(200), home: z.boolean(), blockAds: z.boolean().optional() })
 ]);
 
 /** Where a start asked to install; a USB id only counts if it was listed. */
@@ -396,7 +413,7 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         const target = startTarget(input.data, state.usb);
         if (!target) return false;
         busy = true;
-        void install(target, input.data.home).finally(() => {
+        void install(target, input.data.home, input.data.blockAds === true).finally(() => {
             busy = false;
         });
         return true;

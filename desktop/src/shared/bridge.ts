@@ -303,8 +303,13 @@ export interface TvInstallBridge {
     findUsb(): Promise<TvInstallState>;
     /** Stops a search; an install already under way runs to its end. */
     cancel(): Promise<TvInstallState>;
-    /** `host` for a TV on the network, `usb` for one from `TvInstallState.usb`. */
-    start(input: { readonly host: string; readonly home: boolean } | { readonly usb: string; readonly home: boolean }): Promise<boolean>;
+    /** `host` for a TV on the network, `usb` for one from `TvInstallState.usb`. `blockAds` grants what
+     *  the launcher's "Block ads and trackers" needs; left out, it is not granted. */
+    start(
+        input:
+            | { readonly host: string; readonly home: boolean; readonly blockAds?: boolean }
+            | { readonly usb: string; readonly home: boolean; readonly blockAds?: boolean }
+    ): Promise<boolean>;
     onState(listener: (state: TvInstallState) => void): () => void;
 }
 

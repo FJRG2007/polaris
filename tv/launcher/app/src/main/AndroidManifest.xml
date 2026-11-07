@@ -17,7 +17,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
         tools:ignore="CoarseFineLocation" />
     <!-- Puts the remote's accessibility helpers back after a force stop of this app took them off the enabled
-         list (ServiceRepair). Granted with pm grant by build-and-install when a helper is enabled. -->
+         list (ServiceRepair). Granted with pm grant by build-and-install when a helper is enabled. Also sets and
+         undoes Private DNS for "Block ads and trackers" (PrivateDns), granted by the desktop installer when asked. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
     <!-- YaOS (Yandex TV OS): HDMI, AV and the tuner all play in com.yandex.tv.live, whose activities require

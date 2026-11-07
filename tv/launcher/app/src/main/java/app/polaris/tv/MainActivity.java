@@ -1113,11 +1113,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }, "polaris-home").start();
     }
 
+    /**
+     * Home is where somebody lands when an app stops loading: if the ad-blocking resolver set from Launcher
+     * settings stopped answering, the TV goes back to its own DNS and the screen says so.
+     */
+    private void watchPrivateDns() {
+        new Thread(() -> {
+            String undone = PrivateDnsSwitch.watch(this);
+            if (undone != null) runOnUiThread(() -> Toast.makeText(this,
+                    getString(R.string.dns_watch_reverted, undone), Toast.LENGTH_LONG).show());
+        }).start();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         resumed = true;
         refreshPolaris();
+        watchPrivateDns();
         // A festival that started or ended while Home was in the background: rebuild with or without it.
         if (festive != festival.active(LocalDate.now())) {
             recreate();
