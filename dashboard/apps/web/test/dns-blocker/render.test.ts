@@ -9,7 +9,9 @@
 import { describe, expect, it } from "vitest";
 import { ENV_VALUE_MAX } from "@polaris/core";
 import * as dns from "@/lib/dns-blocker/settings";
+import * as dot from "@/lib/dns-blocker/dot";
 import * as render from "@/lib/dns-blocker/render";
+import * as publish from "@/lib/dns-blocker/publish";
 
 type Blocking = {
     denylists: Record<string, string[]>;
@@ -401,5 +403,91 @@ describe("engine settings", () => {
                 cacheMaxMinutes: 10
             }).success
         ).toBe(false);
+    });
+});
+
+describe("encrypted DNS", () => {
+    const certificate = {
+        base: "plr.example.com",
+        certPem: "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n",
+        keyPem: "-----BEGIN PRIVATE KEY-----\nfixture\n-----END PRIVATE KEY-----\n"
+    };
+    const tls = dot.engineTlsFor(certificate, "192.168.1.10");
+
+    it("serves nothing on 853 and names no certificate while it is off", () => {
+        const config = render.blockyConfig(settings(), undefined, tls);
+        expect(config.ports).toEqual({ dns: 53, http: render.DNS_ENGINE_HTTP_PORT });
+        expect(config.certFile).toBeUndefined();
+        expect(config.keyFile).toBeUndefined();
+        expect(config.customDNS).toBeUndefined();
+    });
+
+    it("renders exactly as before when it is on but there is no certificate", () => {
+        const on = settings({ encryptedDns: true });
+        expect(render.encodeBlockyConfig(on, undefined, null)).toBe(
+            render.encodeBlockyConfig(settings(), undefined, null)
+        );
+    });
+
+    it("serves 853 with the certificate's files on the engine's volume when on", () => {
+        const config = render.blockyConfig(settings({ encryptedDns: true }), undefined, tls);
+        expect(config.ports).toEqual({ dns: 53, http: render.DNS_ENGINE_HTTP_PORT, tls: 853 });
+        expect(config.certFile).toBe(tls.certFile);
+        expect(config.keyFile).toBe(tls.keyFile);
+        expect(tls.certFile).toMatch(/^\/logs\/dot-[0-9a-f]{16}\.crt$/);
+        expect(tls.keyFile).toMatch(/^\/logs\/dot-[0-9a-f]{16}\.key$/);
+        expect([...dot.dotFiles(certificate)]).toEqual([
+            [tls.certFile, certificate.certPem],
+            [tls.keyFile, certificate.keyPem]
+        ]);
+    });
+
+    it("answers its own hostname with this server's address", () => {
+        const config = render.blockyConfig(settings({ encryptedDns: true }), undefined, tls);
+        expect(tls.hostname).toBe("dns.plr.example.com");
+        expect((config.customDNS as { mapping: Record<string, string> }).mapping).toEqual({
+            "dns.plr.example.com": "192.168.1.10"
+        });
+    });
+
+    it("names a renewed certificate's files anew, so the old configuration reads as stale", () => {
+        const renewed = dot.engineTlsFor({ ...certificate, certPem: "renewed" }, "192.168.1.10");
+        expect(renewed.certFile).not.toBe(tls.certFile);
+    });
+
+    it("publishes 853 only when on, and rebinds an engine whose ports differ", () => {
+        expect(publish.dnsPublishSpec("192.168.1.10").extra).toEqual([
+            { host: 53, container: 53, protocol: "tcp" }
+        ]);
+        expect(publish.dnsPublishSpec("192.168.1.10", true).extra).toContainEqual({
+            host: 853,
+            container: 853,
+            protocol: "tcp"
+        });
+        const plain = JSON.stringify({
+            imageRef: "x",
+            hostIp: "192.168.1.10",
+            extraPorts: [{ host: 53, container: 53, protocol: "tcp" }]
+        });
+        expect(publish.boundSource(plain, "192.168.1.10")).toBeNull();
+        const withTls = publish.boundSource(plain, "192.168.1.10", true);
+        expect(JSON.parse(withTls ?? "{}").extraPorts).toContainEqual({
+            host: 853,
+            container: 853,
+            protocol: "tcp"
+        });
+        expect(publish.boundSource(withTls ?? "", "192.168.1.10", true)).toBeNull();
+        expect(publish.sourcePublishesTls(withTls ?? "")).toBe(true);
+        expect(publish.sourcePublishesTls(plain)).toBe(false);
+        expect(publish.sourcePublishesTls("not json")).toBe(false);
+        expect(
+            JSON.parse(publish.boundSource(withTls ?? "", "192.168.1.10") ?? "{}").extraPorts
+        ).toEqual([{ host: 53, container: 53, protocol: "tcp" }]);
+    });
+
+    it("is off in settings stored before it existed", () => {
+        expect(dns.readDnsSettings({ logDays: 7 }).encryptedDns).toBe(false);
+        expect(dns.readDnsSettings({ encryptedDns: "yes" }).encryptedDns).toBe(false);
+        expect(dns.readDnsSettings({ encryptedDns: true }).encryptedDns).toBe(true);
     });
 });

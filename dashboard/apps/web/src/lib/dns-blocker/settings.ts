@@ -610,7 +610,11 @@ export const dnsSettingsSchema = z.object({
     engine: dnsEngineSchema,
     /** Domains blocked by what Dymo says about them, per category. Off until
      *  chosen, and only acted on while the Dymo integration has a key. */
-    reputation: dnsReputationSchema
+    reputation: dnsReputationSchema,
+    /** Answer encrypted DNS (DNS over TLS, port 853) for devices that ask for it,
+     *  such as a TV set to Private DNS. Off until chosen, so an engine already
+     *  running keeps the ports and configuration it has. */
+    encryptedDns: z.boolean().default(false)
 });
 
 export type DnsSettings = z.infer<typeof dnsSettingsSchema>;
@@ -644,7 +648,8 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     serviceDomains: {},
     namesFrom: "",
     engine: DEFAULT_DNS_ENGINE,
-    reputation: DEFAULT_DNS_REPUTATION
+    reputation: DEFAULT_DNS_REPUTATION,
+    encryptedDns: false
 };
 
 /** The categories that have a list on, in category order: the only ones the
@@ -727,6 +732,7 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         ),
         namesFrom: field("namesFrom"),
         engine: field("engine"),
-        reputation: field("reputation")
+        reputation: field("reputation"),
+        encryptedDns: field("encryptedDns")
     };
 }

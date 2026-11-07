@@ -19,6 +19,7 @@
  */
 
 import { encodeBlockyConfig } from "./render";
+import { servedTlsFiles, type EngineTls } from "./dot";
 import type { DnsSettings } from "./settings";
 import { zoneOffsetMinutes } from "./schedules";
 
@@ -41,6 +42,8 @@ export interface ClockChangeInput {
     readonly stored: string | null;
     readonly settings: DnsSettings;
     readonly now: Date;
+    /** The encrypted DNS the engine serves, as the deploy renders it. */
+    readonly tls?: EngineTls | null;
 }
 
 /** One instant for each offset `zone` took in the year before `now`, other than
@@ -62,7 +65,7 @@ export function clockChangeDecision(input: ClockChangeInput): ClockChangeDecisio
     if (!input.engine.running) return { apply: false, reason: "engineDown" };
     let encoded: string;
     try {
-        encoded = encodeBlockyConfig(input.settings, input.now);
+        encoded = encodeBlockyConfig(input.settings, input.now, input.tls);
     } catch {
         return { apply: false, reason: "unrendered" };
     }
@@ -70,7 +73,34 @@ export function clockChangeDecision(input: ClockChangeInput): ClockChangeDecisio
     if (input.stored === null || input.settings.schedules.length === 0)
         return { apply: false, reason: "notClock" };
     const clockOnly = otherOffsetInstants(input.settings.timeZone, input.now).some(
-        (at) => encodeBlockyConfig(input.settings, at) === input.stored
+        (at) => encodeBlockyConfig(input.settings, at, input.tls) === input.stored
     );
     return clockOnly ? { apply: true, encoded } : { apply: false, reason: "notClock" };
+}
+
+/**
+ * Whether the engine should be given its configuration again because the
+ * encrypted DNS certificate was renewed: it runs exactly what these settings
+ * render to with the files of the certificate it was given, and a device in
+ * strict mode would be cut off once that one expires. Any other difference is
+ * left to the screen, as with the clock. Pure.
+ */
+export function certificateRenewalDecision(input: ClockChangeInput): ClockChangeDecision {
+    if (!input.engine) return { apply: false, reason: "noEngine" };
+    if (!input.engine.running) return { apply: false, reason: "engineDown" };
+    const tls = input.tls ?? null;
+    const served = servedTlsFiles(input.stored);
+    if (!tls || !served || served.certFile === tls.certFile)
+        return { apply: false, reason: "notClock" };
+    let encoded: string;
+    try {
+        encoded = encodeBlockyConfig(input.settings, input.now, tls);
+        if (encoded === input.stored) return { apply: false, reason: "current" };
+        const before = encodeBlockyConfig(input.settings, input.now, { ...tls, ...served });
+        return before === input.stored
+            ? { apply: true, encoded }
+            : { apply: false, reason: "notClock" };
+    } catch {
+        return { apply: false, reason: "unrendered" };
+    }
 }

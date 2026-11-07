@@ -25,7 +25,7 @@ const PRIMED_MS = 10_000;
 type Answer = Awaited<ReturnType<typeof polls.dnsInsights>>;
 
 /** What of the status is kept: the settings arrive with the page anyway. */
-type KeptStatus = Pick<DnsBlockerStatus, "state" | "address" | "stale">;
+type KeptStatus = Pick<DnsBlockerStatus, "state" | "address" | "stale" | "encryptedDns">;
 
 function load<T>(key: string): T | null {
     try {
@@ -60,7 +60,12 @@ export function lastStatus(settings: DnsBlockerStatus["settings"]): DnsBlockerSt
 }
 
 export function keepStatus(status: DnsBlockerStatus): void {
-    keep(STATUS_KEY, { state: status.state, address: status.address, stale: status.stale });
+    keep(STATUS_KEY, {
+        state: status.state,
+        address: status.address,
+        stale: status.stale,
+        encryptedDns: status.encryptedDns
+    });
 }
 
 /** The last unfiltered numbers this tab saw, for a filter that is that. */

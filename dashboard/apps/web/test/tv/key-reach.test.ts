@@ -29,9 +29,28 @@ vi.mock("@/lib/request-context", () => ({
     clientUserAgent: async () => "polaris-tv/3.3"
 }));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
-vi.mock("@/lib/api-usage/recorder", () => ({ noteKeyCall: () => undefined }));
+vi.mock("@/lib/api-usage/recorder", () => ({
+    noteKeyCall: () => undefined,
+    withKeyUsage: (handler: unknown) => handler
+}));
+vi.mock("@/lib/i18n/translate", () => ({ translatorFor: () => (key: string) => key }));
+vi.mock("@/lib/rate-limit-service", () => ({
+    rateLimit: async () => ({ ok: true, retryAfterMs: 0 })
+}));
+vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "192.168.1.10" }));
+vi.mock("@/lib/dns-blocker/service", () => ({
+    readSettings: async () => ({}),
+    engineRow: async () => ({ status: "running" }),
+    encryptedDnsStatus: async () => ({
+        enabled: true,
+        hostname: "dns.plr.example.com",
+        blocker: null,
+        listening: true
+    })
+}));
 
 const { authenticateApiKey, requireApiKey } = await import("@/lib/api-key-auth");
+const networkFilter = await import("@/app/api/tv/network-filter/route");
 
 function asked(): Request {
     return new Request("https://polaris.example/api/mcp", {
@@ -52,6 +71,14 @@ describe("how far a TV's key reaches", () => {
 
     it("is a key to a TV route", async () => {
         expect(await authenticateApiKey(asked(), { tv: true })).toMatchObject({ kind: "tv" });
+    });
+
+    it("is a key to the network filter's TV route, and no other kind is", async () => {
+        expect((await networkFilter.GET(asked())).status).toBe(200);
+        kind = "cli";
+        expect((await networkFilter.GET(asked())).status).toBe(401);
+        kind = "key";
+        expect((await networkFilter.GET(asked())).status).toBe(401);
     });
 
     it("leaves every other kind as it was", async () => {

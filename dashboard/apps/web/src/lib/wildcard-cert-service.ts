@@ -70,6 +70,34 @@ export async function wildcardCertState(): Promise<WildcardCertState> {
     };
 }
 
+/**
+ * The stored certificate and its key, while the certificate is inside its validity
+ * window and still for the base it was issued for: what the network filter serves
+ * encrypted DNS with. Null when there is none to serve.
+ */
+export async function wildcardCertificate(): Promise<{
+    base: string;
+    certPem: string;
+    keyPem: string;
+} | null> {
+    const base = await getSetting(ISSUED_FOR_SETTING);
+    if (!base) return null;
+    try {
+        const [certPem, keyPem] = await Promise.all([
+            readFile(join(dynamicDir(), DYNAMIC_CRT), "utf8"),
+            readFile(join(dynamicDir(), DYNAMIC_KEY), "utf8")
+        ]);
+        const parsed = new X509Certificate(certPem);
+        const now = Date.now();
+        if (new Date(parsed.validFrom).getTime() > now) return null;
+        if (new Date(parsed.validTo).getTime() <= now) return null;
+        if (!parsed.checkHost(`dns.${base}`)) return null;
+        return { base, certPem, keyPem };
+    } catch {
+        return null;
+    }
+}
+
 /** The stored certificate, parsed, or null when there is none to read. */
 async function readStoredCert(): Promise<X509Certificate | null> {
     try {
@@ -131,8 +159,14 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
 
 /** Run the ACME order for `*.base` (and the base itself, which a wildcard does not
  *  cover) against the DNS-01 challenge. */
-async function orderWildcard(base: string, token: string): Promise<{ certificate: string; key: string }> {
-    return orderDns01Certificate({ names: [`*.${base}`, base], provider: await cloudflareDns01(token, base) });
+async function orderWildcard(
+    base: string,
+    token: string
+): Promise<{ certificate: string; key: string }> {
+    return orderDns01Certificate({
+        names: [`*.${base}`, base],
+        provider: await cloudflareDns01(token, base)
+    });
 }
 
 /**

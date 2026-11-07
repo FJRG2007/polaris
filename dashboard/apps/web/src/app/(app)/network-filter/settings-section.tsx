@@ -5,6 +5,7 @@
  * and how long it keeps what it saw and how often it reads its lists again.
  */
 
+import Link from "next/link";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Switch } from "@polaris/ui";
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -26,6 +27,12 @@ export function DnsSettingsSection() {
     const [engine, setEngine] = useField("engine");
     const [cacheMinText, setCacheMinText] = useField("cacheMinText");
     const [cacheMaxText, setCacheMaxText] = useField("cacheMaxText");
+    const [encryptedDns, setEncryptedDns] = useField("encryptedDns");
+    const status = useDnsBlocker().status;
+    // An older status (cached before this existed) has none: nothing is known yet.
+    const dot = status?.encryptedDns ?? null;
+    // Turning it off is always allowed; on, only with a certificate to serve.
+    const dotLocked = !encryptedDns && (dot === null || dot.blocker !== null);
 
     const { badUpstreams, customEmpty, daysValid, namesFromValid, hoursValid, engineIssue } =
         useDnsBlocker().checks;
@@ -264,6 +271,44 @@ export function DnsSettingsSection() {
                         />
                         <span>{t("engine.dnssec")}</span>
                     </label>
+                </CardBody>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("encrypted.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("encrypted.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-2 text-sm">
+                    <label className="flex items-center gap-2">
+                        <Switch
+                            checked={encryptedDns}
+                            onChange={setEncryptedDns}
+                            disabled={dotLocked}
+                        />
+                        <span>{t("encrypted.toggle")}</span>
+                    </label>
+                    {dot?.blocker === "noCertificate" ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("encrypted.noCertificate")}{" "}
+                            <Link href="/admin/domains" className="text-primary underline">
+                                {t("encrypted.openDomains")}
+                            </Link>
+                        </p>
+                    ) : dot?.blocker === "noAddress" ||
+                      dot?.blocker === "nameTaken" ||
+                      dot?.blocker === "portTaken" ? (
+                        <p className="min-w-0 break-words text-xs text-muted-foreground">
+                            {t(`encrypted.${dot.blocker}`, { hostname: dot.hostname ?? "" })}
+                        </p>
+                    ) : dot?.hostname ? (
+                        <p className="min-w-0 break-all text-xs text-muted-foreground">
+                            {encryptedDns && dot.enabled
+                                ? dot.listening
+                                    ? t("encrypted.serving", { hostname: dot.hostname })
+                                    : t("encrypted.notAnswering", { hostname: dot.hostname })
+                                : t("encrypted.ready", { hostname: dot.hostname })}
+                        </p>
+                    ) : null}
                 </CardBody>
             </Card>
             <DnsTransferCard />

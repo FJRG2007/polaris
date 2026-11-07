@@ -64,6 +64,7 @@ export interface DnsForm {
     cacheMinText: string;
     cacheMaxText: string;
     reputation: dns.DnsReputation;
+    encryptedDns: boolean;
 }
 
 export function formFrom(settings: dns.DnsSettings): DnsForm {
@@ -90,7 +91,8 @@ export function formFrom(settings: dns.DnsSettings): DnsForm {
         engine: settings.engine,
         cacheMinText: String(settings.engine.cacheMinMinutes),
         cacheMaxText: String(settings.engine.cacheMaxMinutes),
-        reputation: settings.reputation
+        reputation: settings.reputation,
+        encryptedDns: settings.encryptedDns
     };
 }
 
@@ -299,7 +301,8 @@ export function DnsBlockerProvider({
                 cacheMinMinutes: Number(form.cacheMinText),
                 cacheMaxMinutes: Number(form.cacheMaxText)
             },
-            reputation: form.reputation
+            reputation: form.reputation,
+            encryptedDns: form.encryptedDns
         }),
         [form, saved.serviceDomains, saved.timeZone]
     );
