@@ -15,13 +15,16 @@ com.google.android.tvlauncher, the Android TV default this projector does not sh
 Home off after an undo.
 """
 import re
+import sys
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_thomson_40fg2s14w_note import launcher_manifest  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
 FOLDER = ROOT / "examples" / "hy320"
-MANIFEST = ROOT / "launcher" / "app" / "src" / "main" / "AndroidManifest.xml"
 INSTALL = ROOT / "launcher" / "build-and-install.sh"
 
 HOME_JM = "android.intent.category.HOME.JM"
@@ -78,7 +81,7 @@ class Hy320FolderTest(unittest.TestCase):
     def setUp(self):
         self.readme = (FOLDER / "README.md").read_text(encoding="utf-8")
         self.list = (FOLDER / "debloat.txt").read_text(encoding="utf-8")
-        self.categories = filter_categories(MANIFEST.read_text(encoding="utf-8"))
+        self.categories = filter_categories(launcher_manifest())
         # A reader that found nothing would let the comparisons below pass on any page.
         self.assertIn(HOME, self.categories,
                       "MainActivity's HOME filter is the one this folder's Home key goes through")

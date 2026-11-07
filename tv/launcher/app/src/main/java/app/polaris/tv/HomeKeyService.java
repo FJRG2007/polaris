@@ -195,7 +195,6 @@ public class HomeKeyService extends AccessibilityService {
         appKeys = RemoteKeys.parseAppKeys(config.appKeys);
         appScancodes = RemoteKeys.parseAppScancodes(config.appKeys);
         RemoteKeys.applyKeyFilter(this, config.keyFilter);
-        homeLongPressHome = config.homeLongPressHome;
         frontAppKeys = RemoteKeys.parseFrontAppKeys(config.appKeys);
         frontAppScancodes = RemoteKeys.parseFrontAppScancodes(config.appKeys);
         boolean watchFront = !frontAppKeys.isEmpty() || !frontAppScancodes.isEmpty();
@@ -208,6 +207,9 @@ public class HomeKeyService extends AccessibilityService {
                 stockHome.add(ri.activityInfo.name);
             }
         }
+        // The Home key edition with no stock home to send back (Android would show its chooser) takes the key the
+        // same way.
+        homeLongPressHome = config.homeLongPressHome || (!BuildConfig.HOME_CATEGORY && stockHome.isEmpty());
         // power_on_home, off by default. Not with boot_to_live_tv, or with Live TV picked as the Open on start app:
         // those open Live TV on purpose at boot.
         String openOnStart = config.openOnStartChoice
@@ -279,10 +281,8 @@ public class HomeKeyService extends AccessibilityService {
         }
         if (RemoteKeys.handle(this, event, inFront(appKeys, frontAppKeys, event.getKeyCode()),
                 holdAppKeys.get(event.getKeyCode()))) return true;
-        // home_long_press_home: Android never sees the Home key, so a held press cannot turn into ALL_APPS. The Home key
-        // edition with no stock home to send back (Android would show its chooser) takes the key the same way.
-        if ((homeLongPressHome || (!BuildConfig.HOME_CATEGORY && stockHome.isEmpty()))
-                && event.getKeyCode() == KeyEvent.KEYCODE_HOME) {
+        // home_long_press_home: Android never sees the Home key, so a held press cannot turn into ALL_APPS.
+        if (homeLongPressHome && event.getKeyCode() == KeyEvent.KEYCODE_HOME) {
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) openHome();
             return true;
         }

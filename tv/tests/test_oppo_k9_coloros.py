@@ -10,8 +10,12 @@ Run from the repository root: python3 -m unittest tests.test_oppo_k9_coloros -v
 """
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_thomson_40fg2s14w_note import launcher_manifest  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +24,6 @@ LIST = ROOT / "examples" / "oppo-k9-55-oppocnm632" / "debloat.txt"
 EXTRA = ROOT / "examples" / "oppo-k9-55-oppocnm632" / "debloat-extra.txt"
 TV_JSON = ROOT / "examples" / "oppo-k9-55-oppocnm632" / "tv.json"
 INDEX = ROOT / "examples" / "README.md"
-MANIFEST = ROOT / "launcher" / "app" / "src" / "main" / "AndroidManifest.xml"
 INSTALL_SH = ROOT / "launcher" / "build-and-install.sh"
 INSTALL_PS1 = ROOT / "launcher" / "build-and-install.ps1"
 TROUBLESHOOTING = ROOT / "docs" / "TROUBLESHOOTING.md"
@@ -70,7 +73,7 @@ class OppoK9ColorOsTest(unittest.TestCase):
         self.assertIn(f"]({NOTE_LINK})", INDEX.read_text(encoding="utf-8"))
 
     def test_home_filter_declares_modern_home(self):
-        blocks = FILTER.findall(MANIFEST.read_text(encoding="utf-8"))
+        blocks = FILTER.findall(launcher_manifest())
         homes = [CATEGORY.findall(block) for block in blocks if HOME in CATEGORY.findall(block)]
         self.assertTrue(homes, "MainActivity's HOME intent-filter was not found")
         self.assertIn(MODERN_HOME, homes[0])
