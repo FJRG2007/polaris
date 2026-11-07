@@ -303,6 +303,8 @@
             "denied": "La VPN necesita tu permiso una vez para instalarse. Pulsa Conectar y acepta el aviso.",
             "failed": "Este ordenador no pudo iniciar la VPN. Inténtalo de nuevo.",
             "noAnswer": "Ese servidor no respondió. Prueba otra ubicación.",
+            "portBlocked": "Nada llega al puerto UDP {port} de {address}. Permite UDP {port} entrante en el firewall de su proveedor, o redirígelo en su router.",
+            "portOpen": "{address} responde, pero esta red puede bloquear el puerto UDP {port} saliente. Inténtalo de nuevo o usa otra red.",
             "unreachable": "No se encontró la dirección de ese servidor. Prueba otra ubicación."
         },
         "remoteAccess": "Tailscale y otras formas de entrar en este servidor",

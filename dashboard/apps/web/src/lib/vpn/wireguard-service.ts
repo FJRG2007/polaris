@@ -16,6 +16,7 @@ import { prisma } from "@polaris/db";
 import { edgeHostnameTaken } from "@/lib/app-edge";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
+import { createSocket } from "node:dgram";
 import { loadEnv } from "@polaris/config";
 import * as proxy from "@/lib/vpn/browser-proxy";
 import { proxyLogin, type ProxyLogin } from "@/lib/vpn/browser-proxy-login";
@@ -579,6 +580,69 @@ export async function connectClient(
         throw new WireGuardRefusal("unreachable");
     });
     return answer(peer.id, peer.hostIndex);
+}
+
+/** Why a node did not answer, with the address and port the reader has to open. */
+export interface NodeAnswerCheck {
+    readonly verdict: wg.ArrivalVerdict | "unknown";
+    readonly endpoint: string;
+    readonly port: number;
+}
+
+/** One check per node at a time; a check asked for again soon gets the same answer. */
+const answerChecks = new Map<string, { at: number; check: Promise<NodeAnswerCheck> }>();
+const ANSWER_CHECK_REUSE_MS = 20_000;
+const KNOCK_EVERY_MS = 400;
+
+/** Datagrams at the node's port until `done`: what a device's first packet does. */
+async function knock(endpoint: string, port: number, done: Promise<unknown>): Promise<void> {
+    const socket = createSocket(isIP(endpoint) === 6 ? "udp6" : "udp4");
+    socket.on("error", () => undefined);
+    const timer = setInterval(() => socket.send("polaris-vpn-knock", port, endpoint), KNOCK_EVERY_MS);
+    try {
+        await done.catch(() => undefined);
+    } finally {
+        clearInterval(timer);
+        socket.close();
+    }
+}
+
+async function checkAnswer(node: NodeRow): Promise<NodeAnswerCheck> {
+    const place = { endpoint: node.endpoint, port: node.port };
+    try {
+        const connection = await connectionOf(node.hostId);
+        const counting = runAsRoot(connection, wg.renderArrivalCount(node.port));
+        await knock(node.endpoint, node.port, counting);
+        const verdict = wg.arrivalVerdict(await counting);
+        // Packets arrive but no handshake came of them: the peer list is put right
+        // so the next try finds this device on it.
+        if (verdict === "open") await syncNode(node).catch(() => undefined);
+        return { ...place, verdict: verdict ?? "unknown" };
+    } catch (error) {
+        console.error("polaris: a VPN node's port could not be checked:", error);
+        return { ...place, verdict: "unknown" };
+    }
+}
+
+/**
+ * After an app's tunnel got no answer: does anything reach the node's WireGuard
+ * port at all. `blocked` means a firewall in front of the machine (its hosting
+ * provider's, or its router without a forward) drops it, which only the operator
+ * can open.
+ */
+export async function checkNodeAnswer(
+    user: { id: string; isAdmin: boolean },
+    nodeId: string
+): Promise<NodeAnswerCheck> {
+    const access = await accessOf(user);
+    if (!access || !wg.mayUseNode(access, nodeId)) throw new WireGuardRefusal("noAccess");
+    const node = await nodeRow(nodeId);
+    if (!node?.publicKey) throw new WireGuardRefusal("nodeNotReady");
+    const known = answerChecks.get(nodeId);
+    if (known && Date.now() - known.at < ANSWER_CHECK_REUSE_MS) return known.check;
+    const check = checkAnswer(node);
+    answerChecks.set(nodeId, { at: Date.now(), check });
+    return check;
 }
 
 export async function removeDevice(

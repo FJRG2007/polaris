@@ -59,7 +59,12 @@ export function useVpnRead<T>(
                 const before = JSON.stringify(last.get(key) ?? null);
                 if (JSON.stringify(answer) !== before) set(answer as T);
             })
-            .catch(() => live && setError(failure))
+            .catch((error: unknown) => {
+                // The action never answered (the page outlived an update, or the
+                // connection dropped): the cause is only ever seen here.
+                console.error(`polaris: the VPN's ${key} read failed:`, error);
+                if (live) setError(failure);
+            })
             .finally(() => {
                 asking.current -= 1;
             });

@@ -139,3 +139,36 @@ describe("the browser proxy", () => {
         ]);
     });
 });
+
+describe("a node that does not answer", () => {
+    const script = wg.renderArrivalCount(51820);
+
+    it("parses as shell", () => {
+        expect(() => execFileSync("sh", ["-n"], { input: script, stdio: "pipe" })).not.toThrow();
+    });
+
+    it("counts only its own port, adding the counter on a node set up before it", () => {
+        expect(script).toContain("nft list counter inet polaris_vpn arrivals_51820");
+        expect(script).toContain(
+            "nft insert rule inet polaris_vpn input udp dport 51820 counter name arrivals_51820"
+        );
+        expect(wg.renderArrivalCount(40000)).toContain("udp dport 40000 counter name arrivals_40000");
+    });
+
+    it("reads nft's own counter output", () => {
+        const listed = "table inet polaris_vpn {\n\tcounter arrivals_51820 {\n\t\tpackets 7 bytes 91\n\t}\n}\n";
+        const count = script.split("\n").find((line) => line.startsWith("count()")) ?? "";
+        const said = execFileSync("sh", ["-c", `nft() { printf '%s' "$LISTED"; }\n${count}\ncount`], {
+            env: { ...process.env, LISTED: listed },
+            stdio: "pipe"
+        });
+        expect(said.toString().trim()).toBe("7");
+    });
+
+    it("tells a port nothing reaches from one that is reached", () => {
+        expect(wg.arrivalVerdict("before=12\nafter=12\n")).toBe("blocked");
+        expect(wg.arrivalVerdict("before=12\nafter=19\n")).toBe("open");
+        expect(wg.arrivalVerdict("")).toBeNull();
+        expect(wg.arrivalVerdict("before=3\n")).toBeNull();
+    });
+});

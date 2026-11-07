@@ -78,6 +78,18 @@ export async function connectThisDeviceAction(
     }
 }
 
+/** After the app's tunnel got no answer: whether anything reaches that server's port. */
+export async function checkVpnNodeAnswerAction(
+    input: unknown
+): Promise<Result<{ check: service.NodeAnswerCheck }>> {
+    const user = await requireUser();
+    try {
+        return { check: await service.checkNodeAnswer(user, z.string().uuid().parse(input)) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
 export async function removeVpnDeviceAction(input: unknown): Promise<Result> {
     const user = await requireUser();
     try {

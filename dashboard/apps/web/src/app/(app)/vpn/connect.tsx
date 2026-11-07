@@ -102,8 +102,22 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
             if (result.error !== undefined) return setError(result.error);
             const up = await desktop.up({ ...result.connection, nodeId: node.id });
             if (!up.ok) setError(tunnelError(up.error));
+            if (!up.ok && up.error === "noAnswer") setError(await whyNoAnswer(node.id));
             setTunnel(await desktop.status());
             read.reload();
+        });
+    }
+
+    /** Polaris knocks on the server's port itself, to say what is in the way. */
+    async function whyNoAnswer(nodeId: string): Promise<string> {
+        const answer = await actions.checkVpnNodeAnswerAction(nodeId).catch(() => null);
+        if (!answer || answer.error !== undefined || answer.check.verdict === "unknown") {
+            return t("connect.tunnel.noAnswer");
+        }
+        const { verdict, endpoint, port } = answer.check;
+        return t(`connect.tunnel.${verdict === "blocked" ? "portBlocked" : "portOpen"}`, {
+            address: endpoint,
+            port: String(port)
         });
     }
 

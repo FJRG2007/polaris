@@ -417,6 +417,39 @@ export const NODE_READ = `#!/bin/sh
 wg show ${DEVICE} dump 2>/dev/null
 `;
 
+/** How long the node counts arrivals while Polaris knocks on its port. */
+export const ARRIVAL_WINDOW_SECONDS = 4;
+
+/**
+ * Counts what reaches a node's WireGuard port across a short window, so a server
+ * that never answers can be told apart from one whose port nothing reaches. The
+ * counter lives in the node's own table and is added the first time it is asked
+ * for, so a node set up before it existed needs nothing redeployed.
+ */
+export function renderArrivalCount(port: number): string {
+    const counter = `arrivals_${port}`;
+    return `#!/bin/sh
+nft list counter inet polaris_vpn ${counter} >/dev/null 2>&1 || {
+    nft add counter inet polaris_vpn ${counter} &&
+    nft insert rule inet polaris_vpn input udp dport ${port} counter name ${counter}
+} || exit 4
+count() { nft list counter inet polaris_vpn ${counter} | sed -n 's/.*packets \\([0-9]*\\).*/\\1/p'; }
+echo "before=$(count)"
+sleep ${ARRIVAL_WINDOW_SECONDS}
+echo "after=$(count)"
+`;
+}
+
+/** Whether anything reached the port: `blocked` when nothing did, null when unreadable. */
+export type ArrivalVerdict = "blocked" | "open";
+
+export function arrivalVerdict(output: string): ArrivalVerdict | null {
+    const before = /^before=(\d+)$/m.exec(output)?.[1];
+    const after = /^after=(\d+)$/m.exec(output)?.[1];
+    if (before === undefined || after === undefined) return null;
+    return Number(after) > Number(before) ? "open" : "blocked";
+}
+
 export interface PeerCounters {
     readonly publicKey: string;
     readonly lastHandshake: Date | null;
