@@ -17,6 +17,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { scanTarget } from "@/lib/scan-target";
 import { decideQrSignInAction } from "./actions";
 import { codeDigits } from "@/components/code-input";
 import { RelativeTime } from "@/components/relative-time";
@@ -44,18 +45,6 @@ export function ScanView({
     return <ReadCard stale={scanned} />;
 }
 
-/** Pull the code out of whatever the camera read: the link the QR encodes, or
- *  the bare code if somebody generated one another way. */
-function codeFromScan(text: string): string | null {
-    try {
-        const fromLink = new URL(text).searchParams.get("code");
-        if (fromLink) return fromLink;
-    } catch {
-        // Not a URL; fall through to treating the payload as the code itself.
-    }
-    return /^[A-Za-z0-9-]{6,13}$/.test(text.trim()) ? text.trim() : null;
-}
-
 /** The camera, and the typed code for when it is not an option. */
 function ReadCard({ stale }: { stale: boolean }) {
     const router = useRouter();
@@ -65,8 +54,9 @@ function ReadCard({ stale }: { stale: boolean }) {
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
 
-    function open(code: string) {
-        router.push(`/account/scan?code=${encodeURIComponent(code)}`);
+    // A TV's QR opens the TV's approval page; anything else is a sign-in code.
+    function open(target: string) {
+        router.push(target);
     }
 
     // The camera runs only while it is asked for, and its track is stopped on the
@@ -108,10 +98,10 @@ function ReadCard({ stale }: { stale: boolean }) {
                 const found = jsQR(frame.data, frame.width, frame.height, {
                     inversionAttempts: "dontInvert"
                 });
-                const code = found ? codeFromScan(found.data) : null;
-                if (code) {
+                const target = found ? scanTarget(found.data) : null;
+                if (target) {
                     window.clearInterval(timer);
-                    open(code);
+                    open(target);
                 }
             }, SCAN_INTERVAL_MS);
         }
@@ -127,12 +117,12 @@ function ReadCard({ stale }: { stale: boolean }) {
 
     function onSubmit(event: FormEvent) {
         event.preventDefault();
-        const code = codeFromScan(typed);
-        if (!code) {
+        const target = scanTarget(typed);
+        if (!target) {
             setError(t("scan.errors.notACode"));
             return;
         }
-        open(code);
+        open(target);
     }
 
     return (
@@ -168,7 +158,10 @@ function ReadCard({ stale }: { stale: boolean }) {
                     )}
                 </div>
 
-                <form onSubmit={onSubmit} className="flex flex-col gap-2 border-t border-border pt-4">
+                <form
+                    onSubmit={onSubmit}
+                    className="flex flex-col gap-2 border-t border-border pt-4"
+                >
                     <label className="text-sm" htmlFor="qr-code">
                         {t("scan.typeCode")}
                     </label>
@@ -270,17 +263,24 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
         <Card className="border-warning-edge">
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-start gap-3">
-                    <ShieldQuestion className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                    <ShieldQuestion
+                        className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                        aria-hidden
+                    />
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("scan.decide.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("scan.decide.description")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("scan.decide.description")}
+                        </p>
                     </div>
                 </div>
 
                 <dl className="grid gap-2 rounded-md border border-border p-3 text-sm">
                     <Detail label={t("scan.decide.device")} value={request.device} />
                     <Detail label={t("scan.decide.from")} value={request.origin} />
-                    {request.host ? <Detail label={t("scan.decide.openedOn")} value={request.host} /> : null}
+                    {request.host ? (
+                        <Detail label={t("scan.decide.openedOn")} value={request.host} />
+                    ) : null}
                     <div className="flex justify-between gap-3">
                         <dt className="text-muted-foreground">{t("scan.decide.asked")}</dt>
                         <dd className="text-right">
@@ -324,7 +324,10 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                         <X className="size-4" />
                         {t("scan.decide.refuse")}
                     </Button>
-                    <Button disabled={busy || !hasPin || pin.length < 4} onClick={() => void decide(true)}>
+                    <Button
+                        disabled={busy || !hasPin || pin.length < 4}
+                        onClick={() => void decide(true)}
+                    >
                         <Check className="size-4" />
                         {busy ? t("scan.decide.checking") : t("scan.decide.allow")}
                     </Button>

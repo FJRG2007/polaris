@@ -684,7 +684,9 @@ final class Config {
         int dockOpacity = json == null ? 100 : integer(json, "dock_opacity", 100, 30, 100);
         dockOpacity = chosenDockOpacity(choices.getInt(DOCK_OPACITY_KEY, -1), dockOpacity);
         clockFormat = choices.getString(CLOCK_FORMAT_KEY, clockFormat);
-        locale = choices.getString(LANGUAGE_KEY, locale);
+        // An explicit choice on the TV wins; otherwise a linked TV speaks its account's language.
+        locale = LauncherLocale.resolve(choices.contains(LANGUAGE_KEY) ? choices.getString(LANGUAGE_KEY, "") : null,
+                PolarisLink.accountLocale(ctx), locale);
         String wallpaperOrder = json == null ? WallpaperRotation.ORDER_SHUFFLE
                 : string(json, "wallpaper_order", WallpaperRotation.ORDER_SHUFFLE);
         // An unknown order must not silently change how an existing collection rotates.

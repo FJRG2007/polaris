@@ -30,4 +30,27 @@ public class LauncherLocaleTest {
         assertNull(LauncherLocale.parse("vi-"));
         assertNull(LauncherLocale.parse("vi--VN"));
     }
+
+    @Test
+    public void aLanguagePickedOnTheTvWins() {
+        assertEquals("fr", LauncherLocale.resolve("fr", "es-ES", "vi"));
+        assertEquals("fr", LauncherLocale.resolve(" fr ", null, ""));
+    }
+
+    @Test
+    public void aLinkedTvFollowsItsAccountUnlessSomethingWasPicked() {
+        assertEquals("es-ES", LauncherLocale.resolve(null, "es-ES", "vi"));
+        // "Same as the TV" means the account's while linked.
+        assertEquals("es-ES", LauncherLocale.resolve("", "es-ES", "vi"));
+        // A malformed choice is no choice.
+        assertEquals("es-ES", LauncherLocale.resolve("vi_VN", "es-ES", ""));
+    }
+
+    @Test
+    public void anUnlinkedTvKeepsTheThemeOrTheTvsLanguage() {
+        assertEquals("vi", LauncherLocale.resolve(null, "", "vi"));
+        assertEquals("vi", LauncherLocale.resolve(null, null, "vi"));
+        assertEquals("", LauncherLocale.resolve("", "", "vi"));
+        assertEquals("", LauncherLocale.resolve(null, "not a tag", null));
+    }
 }

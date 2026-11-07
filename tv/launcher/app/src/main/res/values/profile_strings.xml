@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Profiles ("Who's watching?"). English and Spanish only for now; every other launcher language falls back
+     to these English strings until they are translated. -->
+<resources>
+    <string name="profile_picker_title">Who\'s watching?</string>
+    <string name="profile_default_name">Me</string>
+    <string name="profile_add">Add profile</string>
+    <string name="profile_manage">Manage profiles</string>
+    <string name="profile_switch">Switch profile</string>
+    <string name="profile_switch_hint">Now: %1$s</string>
+    <string name="profiles_row">Profiles</string>
+    <string name="profiles_row_count">Profiles: %1$d</string>
+    <string name="profile_name_title">Profile name</string>
+    <string name="profile_name_hint">Up to 20 characters</string>
+    <string name="profile_avatar_title">Choose a color</string>
+    <string name="profile_rename">Rename</string>
+    <string name="profile_change_avatar">Change color</string>
+    <string name="profile_move_up">Move earlier</string>
+    <string name="profile_move_down">Move later</string>
+    <string name="profile_delete">Delete profile</string>
+    <string name="profile_delete_confirm">Delete %1$s? Its recent apps on this TV go with it. Apps and settings stay.</string>
+    <string name="profile_delete_last">A TV always keeps one profile, so this one can\'t be deleted.</string>
+    <string name="profile_full">This TV has the most profiles it can hold (6). Delete one to add another.</string>
+    <string name="profile_name_empty">Type a name for the profile.</string>
+    <string name="profile_linked_note">Linked to Polaris</string>
+    <string name="profile_avatar_blue">Blue</string>
+    <string name="profile_avatar_teal">Teal</string>
+    <string name="profile_avatar_green">Green</string>
+    <string name="profile_avatar_lime">Lime</string>
+    <string name="profile_avatar_amber">Amber</string>
+    <string name="profile_avatar_orange">Orange</string>
+    <string name="profile_avatar_red">Red</string>
+    <string name="profile_avatar_pink">Pink</string>
+    <string name="profile_avatar_purple">Purple</string>
+    <string name="profile_avatar_indigo">Indigo</string>
+    <string name="profile_avatar_slate">Gray</string>
+    <string name="profile_avatar_brown">Brown</string>
+</resources>

@@ -99,7 +99,7 @@ describe("the state a TV reads", () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({
             instance: { name: "polaris.example" },
-            account: { name: "Sample Person" },
+            account: { name: "Sample Person", firstName: "Sample", locale: null },
             unread: 4,
             alerts: 1,
             updateRequest: null,

@@ -31,6 +31,17 @@ public final class LauncherSettingsActivity extends Activity {
     }
 
     static final String EXTRA_REORDER = "app.polaris.tv.extra.REORDER_FROM_SETTINGS";
+    /** From "Who's watching?": open straight on Add profile or on the profile list. */
+    static final String EXTRA_PROFILES = "app.polaris.tv.extra.PROFILES";
+    static final String PROFILES_ADD = "add";
+    static final String PROFILES_MANAGE = "manage";
+    private TextView profilesChoice;
+    /** The colour names, in the order of Profiles.AVATARS. */
+    private static final int[] AVATAR_NAMES = {R.string.profile_avatar_blue, R.string.profile_avatar_teal,
+            R.string.profile_avatar_green, R.string.profile_avatar_lime, R.string.profile_avatar_amber,
+            R.string.profile_avatar_orange, R.string.profile_avatar_red, R.string.profile_avatar_pink,
+            R.string.profile_avatar_purple, R.string.profile_avatar_indigo, R.string.profile_avatar_slate,
+            R.string.profile_avatar_brown};
     private SharedPreferences choices;
     private final TextView[] columnChoices = new TextView[4];
     private final TextView[] rowChoices = new TextView[4];
@@ -67,6 +78,12 @@ public final class LauncherSettingsActivity extends Activity {
         });
         findViewById(R.id.polarisChoice).setOnClickListener(
                 v -> startActivity(new Intent(this, PolarisActivity.class)));
+        profilesChoice = findViewById(R.id.profilesChoice);
+        profilesChoice.setOnClickListener(v -> openProfiles());
+        refreshProfilesRow();
+        String profilesAsk = getIntent().getStringExtra(EXTRA_PROFILES);
+        if (state == null && PROFILES_ADD.equals(profilesAsk)) askProfileName(null);
+        else if (state == null && PROFILES_MANAGE.equals(profilesAsk)) openProfiles();
         languageChoice = findViewById(R.id.languageChoice);
         languageChoice.setOnClickListener(v -> openLanguages());
         findViewById(R.id.tvSettingsChoice).setOnClickListener(v ->
@@ -419,7 +436,8 @@ public final class LauncherSettingsActivity extends Activity {
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
         followThemeChoice.setSelected(!hasOnTvChoices());
-        languageChoice.setText(getString(R.string.language_row, languageLabel(Config.load(this).locale)));
+        languageChoice.setText(getString(R.string.language_row, followsAccount()
+                ? accountLanguageLabel() : languageLabel(Config.load(this).locale)));
         String dnsHost = PrivateDnsSwitch.of(this).ours();
         dnsChoice.setText(getString(R.string.dns_row,
                 dnsHost == null ? getString(R.string.off) : getString(R.string.dns_state_on, dnsHost)));
@@ -501,12 +519,174 @@ public final class LauncherSettingsActivity extends Activity {
         return name.isEmpty() ? tag : name.substring(0, 1).toUpperCase(locale) + name.substring(1);
     }
 
+    /** Linked, with no language picked here: the launcher speaks the account's (LauncherLocale#resolve). */
+    private boolean followsAccount() {
+        return LauncherLocale.parse(choices.getString(Config.LANGUAGE_KEY, null)) == null
+                && LauncherLocale.parse(PolarisLink.accountLocale(this)) != null;
+    }
+
+    private String accountLanguageLabel() {
+        return getString(R.string.language_account, languageLabel(PolarisLink.accountLocale(this)));
+    }
+
+    private void refreshProfilesRow() {
+        int count = Profiles.load(this).size();
+        profilesChoice.setText(count < 2 ? getString(R.string.profiles_row)
+                : getString(R.string.profiles_row_count, count));
+    }
+
+    /** The profiles on this TV, then Add profile while there is room. */
+    private void openProfiles() {
+        List<Profiles.Profile> roster = Profiles.load(this);
+        String linked = PolarisLink.connected(this) ? Profiles.linkedId(this) : null;
+        List<String> names = new ArrayList<>();
+        for (Profiles.Profile p : roster) {
+            String name = ProfilePicker.displayName(this, p);
+            names.add(p.id.equals(linked) ? name + " - " + getString(R.string.profile_linked_note) : name);
+        }
+        boolean room = Profiles.canAdd(roster);
+        if (room) names.add(getString(R.string.profile_add));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.profile_manage)
+                .setItems(names.toArray(new String[0]), (dialog, which) -> {
+                    if (which < roster.size()) openProfile(roster.get(which));
+                    else askProfileName(null);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** Rename, colour, move and delete for one profile. */
+    private void openProfile(Profiles.Profile profile) {
+        List<Profiles.Profile> roster = Profiles.load(this);
+        int at = Profiles.indexOf(roster, profile.id);
+        if (at < 0) return;
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        labels.add(getString(R.string.profile_rename));
+        actions.add(() -> askProfileName(profile));
+        labels.add(getString(R.string.profile_change_avatar));
+        actions.add(() -> pickAvatar(profile, null));
+        if (at > 0) {
+            labels.add(getString(R.string.profile_move_up));
+            actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, -1)));
+        }
+        if (at < roster.size() - 1) {
+            labels.add(getString(R.string.profile_move_down));
+            actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, 1)));
+        }
+        labels.add(getString(R.string.profile_delete));
+        actions.add(() -> deleteProfile(profile));
+        new AlertDialog.Builder(this)
+                .setTitle(ProfilePicker.displayName(this, profile))
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** The name for a new profile ({@code profile} null, then the colour) or a new name for one. */
+    private void askProfileName(Profiles.Profile profile) {
+        if (profile == null && !Profiles.canAdd(Profiles.load(this))) {
+            say(getString(R.string.profile_full));
+            return;
+        }
+        EditText field = new EditText(this);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        field.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(Profiles.NAME_MAX)});
+        field.setHint(R.string.profile_name_hint);
+        field.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        if (profile != null) {
+            field.setText(profile.name);
+            field.setSelection(field.length());
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.profile_name_title)
+                .setView(field)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    String name = Profiles.cleanName(field.getText().toString());
+                    if (name.isEmpty()) {
+                        say(getString(R.string.profile_name_empty));
+                    } else if (profile == null) {
+                        pickAvatar(null, name);
+                    } else if (!name.equals(profile.name) || !profile.named) {
+                        Profiles.Profile now = Profiles.active(Profiles.load(this), profile.id);
+                        if (now != null && now.id.equals(profile.id)) {
+                            saveProfiles(Profiles.replace(Profiles.load(this), now.renamed(name)));
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** The colour for a new profile called {@code newName}, or a new colour for {@code profile}. */
+    private void pickAvatar(Profiles.Profile profile, String newName) {
+        String[] names = new String[Profiles.AVATARS.length];
+        int checked = 0;
+        for (int i = 0; i < names.length; i++) {
+            names[i] = getString(AVATAR_NAMES[i]);
+            if (profile != null && Profiles.AVATARS[i].equals(profile.avatar)) checked = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.profile_avatar_title)
+                .setSingleChoiceItems(names, profile == null ? -1 : checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    String key = Profiles.AVATARS[which];
+                    List<Profiles.Profile> roster = Profiles.load(this);
+                    if (profile == null) {
+                        List<Profiles.Profile> added = Profiles.add(roster, java.util.UUID.randomUUID().toString(),
+                                newName, key);
+                        if (added == null) say(getString(R.string.profile_full));
+                        else saveProfiles(added);
+                        return;
+                    }
+                    Profiles.Profile now = Profiles.active(roster, profile.id);
+                    if (now != null && now.id.equals(profile.id) && !key.equals(now.avatar)) {
+                        saveProfiles(Profiles.replace(roster, now.withAvatar(key)));
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void deleteProfile(Profiles.Profile profile) {
+        if (Profiles.load(this).size() <= 1) {
+            say(getString(R.string.profile_delete_last));
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setMessage(getString(R.string.profile_delete_confirm, ProfilePicker.displayName(this, profile)))
+                .setPositiveButton(R.string.profile_delete, (dialog, which) -> {
+                    List<Profiles.Profile> left = Profiles.remove(Profiles.load(this), profile.id);
+                    if (left == null) {
+                        say(getString(R.string.profile_delete_last));
+                        return;
+                    }
+                    if (profile.id.equals(Profiles.linkedId(this))) Profiles.setLinked(this, null);
+                    deleteSharedPreferences(Profiles.recentsFile(profile.id));
+                    saveProfiles(left);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** Keeps the roster, has the launcher read the active profile again, and goes back to the list. */
+    private void saveProfiles(List<Profiles.Profile> roster) {
+        Profiles.save(this, roster);
+        ProfileSession.reload();
+        refreshProfilesRow();
+        openProfiles();
+    }
+
     private void openLanguages() {
-        String current = Config.load(this).locale;
+        // Following the account is the first entry's doing, so that is the one marked.
+        String current = followsAccount() ? "" : Config.load(this).locale;
         String[] names = new String[LANGUAGES.length];
         int checked = 0;
         for (int i = 0; i < LANGUAGES.length; i++) {
-            names[i] = languageLabel(LANGUAGES[i]);
+            names[i] = i == 0 && LauncherLocale.parse(PolarisLink.accountLocale(this)) != null
+                    ? accountLanguageLabel() : languageLabel(LANGUAGES[i]);
             if (LANGUAGES[i].equalsIgnoreCase(current == null ? "" : current.trim())) checked = i;
         }
         final int was = checked;

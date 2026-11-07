@@ -104,6 +104,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private static final int LAUNCHER_SETTINGS_REQUEST = 42;
     /** Sent by QuickSettingsActivity: open Launcher settings from here so Home rebuilds when they close. */
     static final String ACTION_LAUNCHER_SETTINGS = "app.polaris.tv.action.LAUNCHER_SETTINGS";
+    /** Quick settings' Switch profile: "Who's watching?" over Home, Back returns. */
+    static final String ACTION_SWITCH_PROFILE = "app.polaris.tv.action.SWITCH_PROFILE";
     /** Sent by the "library" action word of app_keys: open the App library over Home (needs app_library). */
     static final String ACTION_APP_LIBRARY = "app.polaris.tv.action.APP_LIBRARY";
     /** The system input switcher, forwarded here by InputsRequestActivity while handle_view_inputs is on. */
@@ -216,6 +218,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean shamsi;
     /** greeting_name: said after the greeting, which is shown in capitals. */
     private String greetingName = "";
+    /** The theme's greeting_name, which wins over the linked account's first name. */
+    private String themeGreetingName = "";
+    /** The linked account's language this screen was built in; home rebuilds when the account's changes. */
+    private String accountLocaleShown = "";
     /** Optional time-of-day backdrop (config.xml, sky_intensity); 0 keeps it hidden. */
     private SkyView sky;
     private String vpnApp;
@@ -299,6 +305,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             Intent i = startPending;
             startPending = null;
             open(i);
+        }
+    };
+    /** "Who's watching?" while it is up. */
+    private Dialog profilePicker;
+    /** The active profile's initial before the greeting; shown with two or more profiles. */
+    private TextView profileAvatar;
+    /** Screen off and on: the picker asks again after a long time off (Profiles.PICKER_AFTER_OFF_MS). */
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long now = SystemClock.elapsedRealtime();
+            if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) ProfileSession.screenOff(now);
+            else ProfileSession.screenOn(now);
+            if (resumed) showProfilePickerIfDue();
         }
     };
     private final BroadcastReceiver wakeReceiver = new BroadcastReceiver() {
@@ -465,6 +485,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
+        // Before anything reads the recents or greets: a TV from before profiles gets profile #1, unchanged.
+        Profiles.migrate(this, cfg.greetingName);
         homeAppKeys = RemoteKeys.parseAppKeys(cfg.appKeys);
         clockFormat = cfg.clockFormat;
         ClockFormat.apply(getWindow().getDecorView(), clockFormat);
@@ -545,6 +567,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // still follows the dock.
         if (!cfg.dockTitle) hero.setVisibility(View.GONE);
         greeting = findViewById(R.id.greeting);
+        profileAvatar = findViewById(R.id.profileAvatar);
+        profileAvatar.setTextColor(Color.WHITE);
+        profileAvatar.setGravity(Gravity.CENTER);
+        profileAvatar.setTextSize(12);
+        profileAvatar.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        profileAvatar.setOnClickListener(v -> showProfilePicker(true));
         clockBlock = findViewById(R.id.leftBlock);
         clockRefresh = new ClockRefresh(clockBlock);
         greetingColor = greeting.getCurrentTextColor();
@@ -596,7 +624,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         lunar = cfg.lunarDate;
         lunarOffset = Lunar.offsetFor(cfg.lunarUtcOffset, Locale.getDefault());
         if (lunar) lunarDate.setVisibility(View.VISIBLE);
-        greetingName = cfg.greetingName;
+        themeGreetingName = cfg.greetingName;
+        greetingName = greetingNameNow();
+        accountLocaleShown = PolarisLink.accountLocale(this);
         if (cfg.dateBelowClock) moveDateBelowClock();
         if (cfg.dateBelowClock && cfg.iconOnlyButtons && !cfg.topMenu
                 && !getResources().getBoolean(R.bool.rtl_menu_bar)) {
@@ -834,7 +864,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         launcherSettingsButton = cfg.launcherSettingsButton;
         if (launcherSettingsButton) {
             ((TextView) btnSettings).setText(R.string.launcher_settings);
-            ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_home_settings_pill, 0, 0, 0);
+            // The gear, like every Settings button: the house-and-gear read as a second, different action.
+            ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_settings, 0, 0, 0);
         }
         btnSettings.setOnClickListener(v -> {
             if (launcherSettingsButton) startActivityForResult(
@@ -914,9 +945,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
             int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
             int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && v.getId() == leftButton
+                    && profileAvatar.getVisibility() == View.VISIBLE) {
+                profileAvatar.requestFocus();
+                return true;
+            }
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
             return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == rightButton;
         };
+        // The profile's initial sits left of the pills: Right goes back to them, Down to the tiles.
+        profileAvatar.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
+                View next = findViewById(rtlMenuBar ? R.id.btnSettings : firstButton);
+                if (next != null) next.requestFocus();
+                return true;
+            }
+            return keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_LEFT;
+        });
         btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
         btnVpn.setOnKeyListener(pillKeys);
@@ -953,6 +1004,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             registerReceiver(packageReceiver, packageFilter);
+        }
+        IntentFilter screenFilter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+        screenFilter.addAction(Intent.ACTION_SCREEN_ON);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenReceiver, screenFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(screenReceiver, screenFilter);
         }
         if (openOnStartOnWake) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1043,6 +1101,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         return true;
     }
 
+    private boolean switchProfileIfAsked(Intent intent) {
+        if (intent == null || !ACTION_SWITCH_PROFILE.equals(intent.getAction())) return false;
+        setIntent(new Intent(Intent.ACTION_MAIN));
+        getWindow().getDecorView().post(() -> showProfilePicker(true));
+        return true;
+    }
+
     private boolean openLauncherSettingsIfAsked(Intent intent) {
         if (intent == null || !ACTION_LAUNCHER_SETTINGS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
@@ -1059,6 +1124,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (openLauncherSettingsIfAsked(intent)) return;
+        if (switchProfileIfAsked(intent)) return;
         if (openLibraryIfAsked(intent)) return;
         if (openInputsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
@@ -1112,6 +1178,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (link == null) return;
             try {
                 PolarisLink.State state = link.state();
+                if (state != null) runOnUiThread(() -> {
+                    // The account's language changed: rebuild in it (an explicit choice on the TV still wins).
+                    if (state.localeChanged && resumed && !isFinishing()) recreate();
+                    else greetWith(greetingNameNow());
+                });
                 // An update asked for from Polaris starts the same flow as Update now, once per request.
                 if (state != null && state.updateRequestId != null) SelfUpdateRun.onRequest(this, state.updateRequestId);
                 int count = state == null ? 0 : state.unread + state.alerts;
@@ -1178,6 +1249,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             recreate();
             return;
         }
+        // Linked, unlinked, or the account's language changed elsewhere: rebuild in the language that now applies.
+        if (!accountLocaleShown.equals(PolarisLink.accountLocale(this))) {
+            recreate();
+            return;
+        }
+        // Just linked: greet by the name the approval handed over, before the first answer from Polaris.
+        greetWith(greetingNameNow());
+        refreshProfileAvatar();
+        showProfilePickerIfDue();
         restartIdleClock();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
@@ -1460,6 +1540,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (gameDay != null) gameDay.shutdown();
         unregisterReceiver(packageReceiver);
         if (openOnStartOnWake) unregisterReceiver(wakeReceiver);
+        unregisterReceiver(screenReceiver);
+        if (profilePicker != null) profilePicker.dismiss();
         wallpaperPlayer.close();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
@@ -2796,6 +2878,87 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    /**
+     * The name the greeting adds: the active profile's when it was named on the TV, else the theme's
+     * greeting_name, else the linked account's first name when the link is this profile's, else none.
+     */
+    private String greetingNameNow() {
+        Profiles.Profile profile = ProfileSession.active(this);
+        String linkedId = Profiles.linkedId(this);
+        return Profiles.greetingName(profile, Profiles.linkedHere(profile, linkedId), themeGreetingName,
+                PolarisLink.accountFirstName(this));
+    }
+
+    /** "Who's watching?" when it is owed: a cold start or a long screen-off, and only with two or more profiles. */
+    private void showProfilePickerIfDue() {
+        if (profilePicker != null && profilePicker.isShowing()) return;
+        if (!ProfileSession.pickerDue(Profiles.load(this).size())) return;
+        showProfilePicker(false);
+    }
+
+    /** {@code backReturns}: opened from Switch profile, so Back goes back to the profile in use. */
+    private void showProfilePicker(boolean backReturns) {
+        if (isFinishing() || isDestroyed()) return;
+        if (profilePicker != null && profilePicker.isShowing()) return;
+        profilePicker = ProfilePicker.show(this, backReturns, new ProfilePicker.Listener() {
+            @Override
+            public void onPicked(Profiles.Profile profile) {
+                profilePicker = null;
+                ProfileSession.choose(MainActivity.this, profile.id);
+                greetWith(greetingNameNow());
+                refreshProfileAvatar();
+            }
+
+            @Override
+            public void onAdd() {
+                profilePicker = null;
+                openProfileSettings(LauncherSettingsActivity.PROFILES_ADD);
+            }
+
+            @Override
+            public void onManage() {
+                profilePicker = null;
+                openProfileSettings(LauncherSettingsActivity.PROFILES_MANAGE);
+            }
+        });
+        profilePicker.setOnDismissListener(d -> {
+            if (profilePicker == d) profilePicker = null;
+        });
+    }
+
+    private void openProfileSettings(String what) {
+        startActivityForResult(new Intent(this, LauncherSettingsActivity.class)
+                .putExtra(LauncherSettingsActivity.EXTRA_PROFILES, what), LAUNCHER_SETTINGS_REQUEST);
+    }
+
+    /** The initial before the greeting, in the active profile's colour; hidden while the TV has one profile. */
+    private void refreshProfileAvatar() {
+        if (profileAvatar == null) return;
+        List<Profiles.Profile> roster = Profiles.load(this);
+        Profiles.Profile profile = Profiles.active(roster, ProfileSession.activeId(this));
+        if (roster.size() < 2 || profile == null) {
+            profileAvatar.setVisibility(View.GONE);
+            return;
+        }
+        String name = ProfilePicker.displayName(this, profile);
+        profileAvatar.setText(name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(Locale.getDefault()));
+        profileAvatar.setContentDescription(getString(R.string.profile_switch_hint, name));
+        GradientDrawable dot = ProfilePicker.circle(Profiles.avatarColor(profile.avatar));
+        GradientDrawable lit = ProfilePicker.circle(Profiles.avatarColor(profile.avatar));
+        lit.setStroke((int) (2 * density), Color.WHITE);
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, lit);
+        states.addState(new int[]{}, dot);
+        profileAvatar.setBackground(states);
+        profileAvatar.setVisibility(View.VISIBLE);
+    }
+
+    private void greetWith(String name) {
+        if (name.equals(greetingName)) return;
+        greetingName = name;
+        updateGreeting();
+    }
+
     private void updateGreeting() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         int res;
@@ -2997,6 +3160,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.invalidate();   // a resume that changes nothing on screen still draws once, so the refresh runs
     }
 
+    /** The Wi-Fi icon by signal, as a phone's status bar draws it: index 0 is offline, 1 to 4 the bars lit. */
+    private static final int[] WIFI_BARS = {R.drawable.ic_wifi_0, R.drawable.ic_wifi_1, R.drawable.ic_wifi_2,
+            R.drawable.ic_wifi_3, R.drawable.ic_wifi_4};
+
     /** Shows the Wi-Fi network name on the button when we can read it, otherwise the connection type. */
     @SuppressWarnings("deprecation")
     private void updateWifiLabel() {
@@ -3027,6 +3194,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             if (!online) {
                 text = getString(R.string.offline);
+                icon = WIFI_BARS[0];
                 vpn = false;
             } else if (ethernet) {
                 text = getString(R.string.ethernet);
@@ -3038,6 +3206,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
                 String ssid = info != null ? info.getSSID() : null;
                 flame = info != null ? Math.max(1, Math.min(4, WifiManager.calculateSignalLevel(info.getRssi(), 5))) : 3;
+                icon = WIFI_BARS[flame];
                 if (ssid != null) {
                     ssid = ssid.replace("\"", "").trim();
                     if (!ssid.isEmpty() && !ssid.contains("unknown") && !ssid.equals("0x")) text = ssid;

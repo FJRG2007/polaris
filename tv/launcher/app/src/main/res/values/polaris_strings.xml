@@ -109,4 +109,6 @@
     <string name="catalog_why_checksum">the download did not match the catalog.</string>
     <string name="catalog_why_refused">the theme has files Polaris TV does not read.</string>
     <string name="catalog_why_unreachable">the download stopped. Try again.</string>
+    <!-- The first Language entry on a linked TV: it follows the Polaris account. %1$s: that language. -->
+    <string name="language_account">Same as your account (%1$s)</string>
 </resources>

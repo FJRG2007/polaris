@@ -38,6 +38,8 @@ final class PolarisLink {
 
     private static final String PREFS = "polaris";
     private static final String ASKED_AT = "instanceAskedAt";
+    private static final String ACCOUNT_FIRST_NAME = "accountFirstName";
+    private static final String ACCOUNT_LOCALE = "accountLocale";
     private static final String KEYSTORE = "AndroidKeyStore";
     private static final String KEY_ALIAS = "polaris-tv";
     private static final int GCM_IV_BYTES = 12;
@@ -146,10 +148,12 @@ final class PolarisLink {
         /** The theme and add-ons picked from Polaris ({@link RemoteCatalog}), or null when none was. */
         final RemoteCatalog.Pick desiredTheme;
         final RemoteCatalog.Pick desiredAddons;
+        /** Whether the account's language (kept with its first name, {@link #accountFirstName}) differs from the one this TV had kept, so screens redraw in it. */
+        final boolean localeChanged;
 
         State(String instanceName, String accountName, int unread, int alerts, String updateRequestId,
                 String updateRequestVersion, Boolean desiredBlocking, String desiredChoice,
-                RemoteCatalog.Pick desiredTheme, RemoteCatalog.Pick desiredAddons) {
+                RemoteCatalog.Pick desiredTheme, RemoteCatalog.Pick desiredAddons, boolean localeChanged) {
             this.instanceName = instanceName;
             this.accountName = accountName;
             this.unread = unread;
@@ -160,6 +164,7 @@ final class PolarisLink {
             this.desiredChoice = desiredChoice;
             this.desiredTheme = desiredTheme;
             this.desiredAddons = desiredAddons;
+            this.localeChanged = localeChanged;
         }
     }
 
@@ -191,12 +196,40 @@ final class PolarisLink {
         return new PolarisLink(context, origin, token, instanceFrom(prefs.getString("instance", null)));
     }
 
+    /** A string field, or null when it is missing, JSON null or not a string (optString would say "null"). */
+    private static String text(JSONObject json, String name) {
+        Object value = json.opt(name);
+        return value instanceof String ? (String) value : null;
+    }
+
+    /** The linked account's first name as last heard, for the home greeting; "" when not linked or none. */
+    static String accountFirstName(Context context) {
+        return prefs(context).getString(ACCOUNT_FIRST_NAME, "");
+    }
+
+    /** The linked account's language tag as last heard; "" when not linked or it has none. Unlinking clears it. */
+    static String accountLocale(Context context) {
+        return prefs(context).getString(ACCOUNT_LOCALE, "");
+    }
+
+    /** Keeps what the instance said about the account; true when the language is not the one kept before. */
+    private static boolean rememberAccount(Context context, String firstName, String locale) {
+        SharedPreferences prefs = prefs(context);
+        // Only while still linked: a poll answered after Disconnect must not write the account back.
+        if (!prefs.contains("token")) return false;
+        boolean changed = !locale.equals(prefs.getString(ACCOUNT_LOCALE, ""));
+        prefs.edit().putString(ACCOUNT_FIRST_NAME, firstName).putString(ACCOUNT_LOCALE, locale).commit();
+        return changed;
+    }
+
     static boolean connected(Context context) {
         return prefs(context).contains("token");
     }
 
     private static SharedPreferences prefs(Context context) {
-        return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        // Read from attachBaseContext too (LauncherLocale via Config), where the application may not be attached yet.
+        Context app = context.getApplicationContext();
+        return (app != null ? app : context).getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private static PolarisFailover.Instance instanceFrom(String stored) {
@@ -245,8 +278,14 @@ final class PolarisLink {
             if (!status.equals("approved")) return status;
             String sealed = seal(answer.getString("token"));
             if (sealed == null) throw new IOException("This TV could not store the sign-in");
+            JSONObject account = answer.optJSONObject("account");
+            String firstName = account == null ? "" : LinkedAccount.firstName(null, text(account, "name"));
             prefs(context).edit().putString("origin", origin).putString("token", sealed)
-                    .putString("instance", instance).putLong(ASKED_AT, System.currentTimeMillis()).commit();
+                    .putString("instance", instance).putLong(ASKED_AT, System.currentTimeMillis())
+                    .putString(ACCOUNT_FIRST_NAME, firstName).commit();
+            // The link is the profile's that made it, so only that profile greets by the account's name.
+            String profile = ProfileSession.activeId(context);
+            if (profile != null) Profiles.setLinked(context, profile);
             return status;
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
@@ -295,11 +334,14 @@ final class PolarisLink {
             JSONObject request = answer.optJSONObject("updateRequest");
             String requestId = request == null ? null : request.optString("id", "");
             if (requestId != null && !UUID.matcher(requestId).matches()) requestId = null;
+            // firstName and locale are newer than the rest: an older instance leaves them out, and either may be null.
+            String firstName = LinkedAccount.firstName(text(account, "firstName"), text(account, "name"));
+            boolean localeChanged = rememberAccount(context, firstName, LinkedAccount.locale(text(account, "locale")));
             return new State(instance.optString("name"), account.optString("name"),
                     Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")), requestId,
                     requestId == null ? null : request.optString("versionName", null),
                     RemoteBlocking.desiredBlocking(answer), RemoteBlocking.desiredChoice(answer),
-                    RemoteCatalog.desiredTheme(answer), RemoteCatalog.desiredAddons(answer));
+                    RemoteCatalog.desiredTheme(answer), RemoteCatalog.desiredAddons(answer), localeChanged);
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }

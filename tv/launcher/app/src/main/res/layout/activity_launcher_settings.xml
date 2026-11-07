@@ -35,6 +35,11 @@
             android:text="@string/polaris_settings_row" />
 
         <TextView
+            android:id="@+id/profilesChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+
+        <TextView
             android:id="@+id/languageChoice"
             style="@style/SettingsRow"
             android:layout_marginTop="10dp" />
