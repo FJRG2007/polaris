@@ -53,7 +53,9 @@ describe("dimension repair", () => {
         put(join(data, `${level}_the_end`, "DIM1", "data", "raids.dat"));
 
         expect(world.dimensionsRepaired(repair(data, level))).toBe(true);
-        expect(readFileSync(join(data, level, "DIM-1", "region", "r.0.0.mca"), "utf8")).toBe("nether");
+        expect(readFileSync(join(data, level, "DIM-1", "region", "r.0.0.mca"), "utf8")).toBe(
+            "nether"
+        );
         expect(existsSync(join(data, level, "DIM1", "data", "raids.dat"))).toBe(true);
         expect(existsSync(join(data, `${level}_nether`))).toBe(false);
         expect(existsSync(join(data, `${level}_the_end`))).toBe(false);
@@ -75,7 +77,11 @@ describe("dimension repair", () => {
         const level = "world-20261107-203624";
         put(join(data, level, "level.dat"));
         put(
-            join(data, level, "dimensions/minecraft/overworld/data/minecraft/world_gen_settings.dat"),
+            join(
+                data,
+                level,
+                "dimensions/minecraft/overworld/data/minecraft/world_gen_settings.dat"
+            ),
             "settings"
         );
         put(join(data, level, "dimensions/minecraft/the_nether/region/r.0.0.mca"));
@@ -84,7 +90,13 @@ describe("dimension repair", () => {
         expect(world.dimensionsRepaired(repair(data, level))).toBe(true);
         expect(readFileSync(join(data, level, NETHER_SETTINGS), "utf8")).toBe("settings");
         expect(
-            existsSync(join(data, level, "dimensions/minecraft/the_end/data/minecraft/world_gen_settings.dat"))
+            existsSync(
+                join(
+                    data,
+                    level,
+                    "dimensions/minecraft/the_end/data/minecraft/world_gen_settings.dat"
+                )
+            )
         ).toBe(true);
         // Nothing left to do the second time, so a healthy boot is never touched.
         expect(world.dimensionsRepaired(repair(data, level))).toBe(false);
