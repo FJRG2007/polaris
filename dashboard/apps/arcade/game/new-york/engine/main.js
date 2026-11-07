@@ -459,9 +459,10 @@ async function initApp() {
     // Keyboard guide for each mode: [keys, action] (the action is a key of controls.<mode>; 'Drag' is the mouse)
     const controlHints = {
         person: [
-            [["W", "S"], "move"],
-            [["A", "D"], "turn"],
+            [["W", "A", "S", "D"], "move"],
+            [["Shift"], "sprint"],
             [["Space"], "up"],
+            [["Click"], "lock"],
             [["Drag"], "orbit"]
         ],
         car: [
@@ -483,7 +484,8 @@ async function initApp() {
             [["Shift"], "turbo"]
         ]
     };
-    const keyName = (key) => (key === "Drag" ? t("controls.drag") : key);
+    const keyName = (key) =>
+        key === "Drag" ? t("controls.drag") : key === "Click" ? t("controls.click") : key;
     const modeHints = (mode) =>
         (controlHints[mode] || []).map(([keys, action]) => [
             keys.map(keyName),
@@ -525,7 +527,12 @@ async function initApp() {
                           [["L3"], t("controls.helicopter.turbo")]
                       ]
                     : []),
-                ...(mode === "person" ? [[["A"], t("controls.padJump")]] : []),
+                ...(mode === "person"
+                    ? [
+                          [["A"], t("controls.padJump")],
+                          [["L3"], t("controls.person.sprint")]
+                      ]
+                    : []),
                 ...(mode === "car" ? [[["X"], t("controls.car.horn")]] : []),
                 [["Y"], t("controls.padCamera")],
                 [["LB", "RB"], t("controls.padModes")],
@@ -833,7 +840,11 @@ async function initApp() {
             startScreen?.isOpen ||
             mapSystem.isFullMapOpen ||
             (supportsPopover && document.querySelector(".popover:popover-open") !== null),
-        onOpenChange: setPaused
+        onOpenChange: setPaused,
+        look: {
+            get: () => cameraSystem.lookSensitivity,
+            set: (value) => cameraSystem.setLookSensitivity(value)
+        }
     });
     gamepadControls.callbacks.menu = gameMenu;
     // The menu and the start screen both hold the city still while they are open
@@ -846,7 +857,11 @@ async function initApp() {
         audioSystem.setPaused(open);
         // A frame that ran before the pause must not count the menu's time as one long step
         lastTime = performance.now();
+        if (open && document.pointerLockElement) document.exitPointerLock?.();
     }
+    // The mouse is captured for on-foot look only while nothing else on screen needs the pointer
+    cameraSystem.lockAllowed = () =>
+        playing && !paused && !startScreen?.isOpen && !mapSystem.isFullMapOpen;
     // Before anything moves, the reader picks how they play (start-screen.js); it opens once the city is on screen
     startScreen = new StartScreen({
         gamepad: () => gamepadControls,

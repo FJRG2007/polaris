@@ -159,8 +159,10 @@
         "person": {
             "move": "Walk",
             "turn": "Turn",
+            "sprint": "Sprint",
             "up": "Jump",
-            "orbit": "Look around"
+            "orbit": "Look around",
+            "lock": "Look with the mouse"
         },
         "car": {
             "move": "Drive / Reverse",
@@ -181,6 +183,7 @@
             "turbo": "Turbo"
         },
         "drag": "Drag",
+        "click": "Click",
         "general": "Everywhere",
         "modes": "Change mode",
         "camera": "Switch camera",
@@ -218,6 +221,7 @@
         "on": "On",
         "off": "Off",
         "volume": "Volume",
+        "lookSensitivity": "Look sensitivity",
         "soundOn": "Play sound",
         "noAudio": "{surface, select, app {Sound is not available in this app.} other {Sound is not available in this browser.}}",
         "callMute": "Mute microphone",
