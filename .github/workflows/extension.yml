@@ -86,8 +86,12 @@ jobs:
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: echo "ready=$([ -n "$AMO_JWT_ISSUER" ] && [ -n "$AMO_JWT_SECRET" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
+      # Only a release tag signs: AMO takes each version once, so a manual run
+      # would spend the version the tag needs. A refusal or an AMO outage leaves
+      # Firefox on the manual steps instead of holding the whole release back.
       - name: Sign the Firefox package
-        if: steps.amo.outputs.ready == 'true'
+        if: steps.amo.outputs.ready == 'true' && startsWith(github.ref, 'refs/tags/extension-v')
+        continue-on-error: true
         env:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}

@@ -10,12 +10,10 @@
 import { loadEnv } from "@polaris/config";
 import { extensionDownload } from "@/lib/app-releases";
 import { signedFirefoxFile } from "@polaris/ui/account-downloads/extension-install";
-import { isReleaseAsset, XPI_CONTENT_TYPE, XPI_MAX_BYTES } from "@/lib/extension-package";
+import { isReleaseAsset, packageBytes, XPI_CONTENT_TYPE } from "@/lib/extension-package";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const FETCH_TIMEOUT_MS = 30_000;
 
 export async function GET(): Promise<Response> {
     const repo = loadEnv().POLARIS_REPO;
@@ -23,19 +21,8 @@ export async function GET(): Promise<Response> {
     const file = found ? signedFirefoxFile(found.files) : null;
     if (!file || !isReleaseAsset(file.url, repo)) return new Response(null, { status: 404 });
 
-    const upstream = await fetch(file.url, {
-        redirect: "follow",
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    }).catch(() => null);
-    if (!upstream?.ok) return new Response(null, { status: 502 });
-    // Refused before reading, when GitHub says up front that it is too big.
-    if (Number(upstream.headers.get("content-length") ?? 0) > XPI_MAX_BYTES) {
-        return new Response(null, { status: 502 });
-    }
-    const body = await upstream.arrayBuffer().catch(() => null);
-    if (!body || body.byteLength === 0 || body.byteLength > XPI_MAX_BYTES) {
-        return new Response(null, { status: 502 });
-    }
+    const body = await packageBytes(file.url);
+    if (!body) return new Response(null, { status: 502 });
     return new Response(body, {
         headers: {
             "content-type": XPI_CONTENT_TYPE,

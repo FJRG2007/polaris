@@ -34,3 +34,59 @@ export function isReleaseAsset(url: string, repo: string): boolean {
         .toLowerCase()
         .startsWith(`/${repo.trim().toLowerCase()}/releases/download/`);
 }
+
+const FETCH_TIMEOUT_MS = 30_000;
+
+/** How long a failed download is remembered before it is tried again. */
+export const PACKAGE_RETRY_MS = 2 * 60 * 1000;
+
+/**
+ * The newest package, held in memory. A release asset's address names its tag,
+ * so the bytes behind one address never change: one slot holds them until the
+ * release moves on, and a failure is held for `PACKAGE_RETRY_MS` so a stream of
+ * requests does not become a stream of downloads from GitHub.
+ */
+let held: { url: string; body: ArrayBuffer | null; at: number } | null = null;
+let pending: { url: string; body: Promise<ArrayBuffer | null> } | null = null;
+
+async function download(url: string): Promise<ArrayBuffer | null> {
+    const upstream = await fetch(url, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    }).catch(() => null);
+    if (!upstream?.ok) return null;
+    // Refused before reading, when GitHub says up front that it is too big.
+    if (Number(upstream.headers.get("content-length") ?? 0) > XPI_MAX_BYTES) {
+        await upstream.body?.cancel().catch(() => undefined);
+        return null;
+    }
+    const body = await upstream.arrayBuffer().catch(() => null);
+    if (!body || body.byteLength === 0 || body.byteLength > XPI_MAX_BYTES) return null;
+    return body;
+}
+
+/**
+ * The bytes of the package at `url`, or null when it could not be fetched or is
+ * not the size of an extension. Concurrent callers share one download.
+ */
+export async function packageBytes(url: string): Promise<ArrayBuffer | null> {
+    if (held?.url === url && (held.body || Date.now() - held.at < PACKAGE_RETRY_MS)) {
+        return held.body;
+    }
+    if (pending?.url === url) return pending.body;
+    const body = download(url);
+    pending = { url, body };
+    try {
+        const result = await body;
+        held = { url, body: result, at: Date.now() };
+        return result;
+    } finally {
+        if (pending?.body === body) pending = null;
+    }
+}
+
+/** Forgets the held package. For tests. */
+export function forgetPackage(): void {
+    held = null;
+    pending = null;
+}
