@@ -96,4 +96,42 @@ public class PinLockoutTest {
         assertSame(s, lockout.observe(s));
         assertEquals(0L, lockout.remainingMs(s));
     }
+
+    @Test
+    public void aClockSetForwardDoesNotEndTheWaitWithinOneBoot() {
+        long[] elapsed = {5_000L};
+        PinLockout booted = new PinLockout(() -> now, () -> elapsed[0], 7);
+        PinLockout.State s = PinLockout.State.NONE;
+        for (int i = 0; i < 6; i++) s = booted.fail(s);   // a minute owed
+        now += 24L * 60L * 60L * 1000L;   // a day forward
+        elapsed[0] += 10_000L;
+        assertEquals(50_000L, booted.remainingMs(booted.observe(s)));
+        elapsed[0] += 50_000L;
+        assertEquals(0L, booted.remainingMs(booted.observe(s)));
+    }
+
+    @Test
+    public void aRebootKeepsTheWallClockWait() throws Exception {
+        PinLockout before = new PinLockout(() -> now, () -> 900_000L, 7);
+        PinLockout.State s = PinLockout.State.NONE;
+        for (int i = 0; i < 6; i++) s = before.fail(s);
+        PinHash.Record record = PinHash.create("1234", 100_000, new byte[16], derived -> derived).withLockout(s);
+        PinHash.Record back = PinHash.decode(PinHash.encode(record));
+        assertNotNull(back);
+        assertEquals(7, back.lockout.boot);
+        assertEquals(960_000L, back.lockout.elapsedUntil);
+        now += 20_000L;
+        PinLockout after = new PinLockout(() -> now, () -> 1_000L, 8);
+        assertEquals(40_000L, after.remainingMs(after.observe(back.lockout)));
+    }
+
+    @Test
+    public void theRightPinDropsTheBootWait() {
+        PinLockout booted = new PinLockout(() -> now, () -> 1_000L, 3);
+        PinLockout.State s = PinLockout.State.NONE;
+        for (int i = 0; i < 6; i++) s = booted.fail(s);
+        s = booted.success(s);
+        assertEquals(0L, s.elapsedUntil);
+        assertEquals(0L, booted.remainingMs(s));
+    }
 }

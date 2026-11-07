@@ -34,6 +34,7 @@ public class HomeSettingsActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        ProfileSession.guardPaused(this);
         left = true;
     }
 
@@ -42,5 +43,6 @@ public class HomeSettingsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (left) finish();
+        else ProfileSession.guardResumed(this);
     }
 }

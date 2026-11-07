@@ -27,7 +27,7 @@ public final class QuickSettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        ProfileSession.sendHomeIfLocked(this);   // a profile's PIN is owed: back to "Who's watching?"
+        ProfileSession.guardResumed(this);   // a profile's PIN is owed: back to "Who's watching?"
     }
 
     @Override
@@ -74,6 +74,7 @@ public final class QuickSettingsActivity extends Activity {
     @SuppressWarnings("deprecation")
     protected void onPause() {
         super.onPause();
+        ProfileSession.guardPaused(this);
         finish();
         overridePendingTransition(0, 0);
     }

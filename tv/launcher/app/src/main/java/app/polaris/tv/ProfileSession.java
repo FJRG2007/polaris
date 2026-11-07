@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Who is watching right now, for the whole process: the active profile, whether "Who's watching?" is still owed
  * for this cold start, and how long the screen was off. Main thread, apart from {@link #activeId} reads.
@@ -15,6 +18,8 @@ final class ProfileSession {
     /** The screen came back after at least {@link Profiles#PICKER_AFTER_OFF_MS} off. */
     private static boolean afterLongOff;
     private static long screenOffAt;
+    /** The guarded screens that are resumed now, checked again when the screen comes back on. */
+    private static final List<Activity> guarded = new ArrayList<>();
 
     private ProfileSession() {
     }
@@ -54,6 +59,24 @@ final class ProfileSession {
     static void screenOn(long elapsedNow) {
         if (screenOffAt != 0 && elapsedNow - screenOffAt >= Profiles.PICKER_AFTER_OFF_MS) afterLongOff = true;
         screenOffAt = 0;
+        if (!afterLongOff) return;
+        for (Activity activity : new ArrayList<>(guarded)) {
+            if (sendHomeIfLocked(activity)) guarded.remove(activity);
+        }
+    }
+
+    /**
+     * For the screens past Home (Polaris, Launcher settings and the screens it opens, Quick settings) in onResume:
+     * sends the viewer home while locked, and otherwise keeps watching until {@link #guardPaused}, since the
+     * screen-on broadcast that locks it can arrive after this onResume.
+     */
+    static void guardResumed(Activity activity) {
+        if (sendHomeIfLocked(activity)) return;
+        if (!guarded.contains(activity)) guarded.add(activity);
+    }
+
+    static void guardPaused(Activity activity) {
+        guarded.remove(activity);
     }
 
     /**
@@ -82,8 +105,8 @@ final class ProfileSession {
     }
 
     /**
-     * For the screens past Home (Polaris, Launcher settings, Quick settings) in onResume: while locked, the viewer
-     * goes back to Home, which asks "Who's watching?". True when it did, and the screen is finishing.
+     * While locked, the viewer goes back to Home, which asks "Who's watching?". True when it did, and the screen is
+     * finishing.
      */
     static boolean sendHomeIfLocked(Activity activity) {
         if (!locked(activity)) return false;

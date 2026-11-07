@@ -45,7 +45,7 @@ final class PinHash {
     private PinHash() {
     }
 
-    /** The stored PIN: {@code {v:1, iters, salt, mac, len, fails, lockedUntil, lastWall}}. */
+    /** The stored PIN: {@code {v:1, iters, salt, mac, len, fails, lockedUntil, lastWall, boot, elapsedUntil}}. */
     static final class Record {
         final int iters;
         final byte[] salt;
@@ -122,7 +122,8 @@ final class PinHash {
         try {
             return new JSONObject().put("v", 1).put("iters", r.iters).put("salt", b64.encodeToString(r.salt))
                     .put("mac", b64.encodeToString(r.mac)).put("len", r.len).put("fails", r.lockout.fails)
-                    .put("lockedUntil", r.lockout.lockedUntil).put("lastWall", r.lockout.lastWall).toString();
+                    .put("lockedUntil", r.lockout.lockedUntil).put("lastWall", r.lockout.lastWall)
+                    .put("boot", r.lockout.boot).put("elapsedUntil", r.lockout.elapsedUntil).toString();
         } catch (JSONException cannotHappen) {
             throw new IllegalStateException(cannotHappen);
         }
@@ -142,7 +143,8 @@ final class PinHash {
             if (salt.length != SALT_BYTES || mac.length != 32 || iters < MIN_ITERATIONS
                     || len < MIN_LENGTH || len > MAX_LENGTH) return null;
             PinLockout.State lockout = new PinLockout.State(Math.max(0, o.optInt("fails", 0)),
-                    o.optLong("lockedUntil", 0L), o.optLong("lastWall", 0L));
+                    o.optLong("lockedUntil", 0L), o.optLong("lastWall", 0L),
+                    o.optInt("boot", PinLockout.NO_BOOT), Math.max(0L, o.optLong("elapsedUntil", 0L)));
             return new Record(iters, salt, mac, len, lockout);
         } catch (JSONException | IllegalArgumentException malformed) {
             return null;

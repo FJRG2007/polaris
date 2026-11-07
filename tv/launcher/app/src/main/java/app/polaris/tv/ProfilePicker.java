@@ -113,6 +113,7 @@ final class ProfilePicker {
                     pinned);
             tile.setOnClickListener(v -> {
                 Runnable pick = () -> {
+                    if (!dialog.isShowing()) return;
                     dialog.dismiss();
                     listener.onPicked(profile);
                 };

@@ -56,7 +56,13 @@ public final class PolarisActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        ProfileSession.sendHomeIfLocked(this);   // a profile's PIN is owed: back to "Who's watching?"
+        ProfileSession.guardResumed(this);   // a profile's PIN is owed: back to "Who's watching?"
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        ProfileSession.guardPaused(this);
     }
 
     @Override

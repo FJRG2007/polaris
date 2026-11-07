@@ -10,6 +10,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -32,6 +34,8 @@ import java.util.concurrent.Executors;
 final class PinPad {
     /** One thread for every hash, so two tries never race over the same record. */
     private static final ExecutorService HASHING = Executors.newSingleThreadExecutor();
+    /** The pad on screen, so a second press of OK does not stack another one over it. Main thread. */
+    private static Dialog showing;
 
     private enum Step { CHECK, NEW, CONFIRM }
 
@@ -140,12 +144,14 @@ final class PinPad {
             typed.setLength(0);
         });
         dialog.show();
+        showing = dialog;
         enter(step);
         if (one != null) one.requestFocus();
     }
 
     /** Asks for the profile's PIN; {@code onUnlocked} runs once it is right. Back closes the pad. */
     static void check(Activity activity, Profiles.Profile profile, Runnable onUnlocked) {
+        if (padShowing()) return;
         if (Profiles.pin(activity, profile.id) == null) {
             onUnlocked.run();
             return;
@@ -155,7 +161,16 @@ final class PinPad {
 
     /** Asks for a new PIN twice and keeps it; {@code onSaved} runs after. */
     static void create(Activity activity, Profiles.Profile profile, Runnable onSaved) {
+        if (padShowing()) return;
         new PinPad(activity, profile, Step.NEW, onSaved);
+    }
+
+    private static boolean padShowing() {
+        if (showing != null) {
+            Activity owner = showing.getOwnerActivity();
+            if (!showing.isShowing() || owner == null || owner.isDestroyed()) showing = null;
+        }
+        return showing != null;
     }
 
     static int digitOf(int keyCode) {
@@ -279,7 +294,7 @@ final class PinPad {
             if (showing) finish();
             return;
         }
-        PinLockout lockout = new PinLockout(System::currentTimeMillis);
+        PinLockout lockout = lockout();
         if (right == null) {
             if (showing) error(activity.getString(R.string.pin_check_failed));
             return;
@@ -340,11 +355,17 @@ final class PinPad {
         ObjectAnimator.ofFloat(dots, "translationX", 0, 24, -24, 16, -16, 8, -8, 0).setDuration(360).start();
     }
 
+    private PinLockout lockout() {
+        int boot = Settings.Global.getInt(activity.getContentResolver(), Settings.Global.BOOT_COUNT,
+                PinLockout.NO_BOOT);
+        return new PinLockout(System::currentTimeMillis, SystemClock::elapsedRealtime, boot);
+    }
+
     private long lockoutMs() {
         if (step != Step.CHECK) return 0L;
         PinHash.Record record = Profiles.pin(activity, profile.id);
         if (record == null) return 0L;
-        PinLockout lockout = new PinLockout(System::currentTimeMillis);
+        PinLockout lockout = lockout();
         PinLockout.State observed = lockout.observe(record.lockout);
         if (observed != record.lockout) Profiles.savePin(activity, profile.id, record.withLockout(observed));
         return lockout.remainingMs(observed);

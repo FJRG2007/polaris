@@ -44,6 +44,18 @@ public class ThemesAddonsActivity extends Activity {
     private Catalog.Item current;
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        ProfileSession.guardResumed(this);   // a profile's PIN is owed: back to "Who's watching?"
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        ProfileSession.guardPaused(this);
+    }
+
+    @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         LinearLayout root = new LinearLayout(this);
