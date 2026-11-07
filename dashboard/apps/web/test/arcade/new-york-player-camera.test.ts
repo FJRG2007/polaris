@@ -12,7 +12,14 @@ import * as rules from "../../../arcade/game/new-york/engine/player-rules.js";
 const { PERSON_CAMERA, PERSON_MOVE } = rules;
 
 // A 20 m tall block whose near face is the plane z = wallZ, running 40 m either side of x = 0
-const wallAt = (wallZ: number) => ({ minX: -40, maxX: 40, minZ: wallZ - 30, maxZ: wallZ, minY: 0, maxY: 20 });
+const wallAt = (wallZ: number) => ({
+    minX: -40,
+    maxX: 40,
+    minZ: wallZ - 30,
+    maxZ: wallZ,
+    minY: 0,
+    maxY: 20
+});
 
 describe("spring arm", () => {
     const look = { yaw: 0, pitch: 0 }; // looking along +z, so the arm reaches back towards -z
@@ -51,12 +58,34 @@ describe("spring arm", () => {
     });
 
     it("finds an oriented box and a polygon footprint", () => {
-        const obb = { minX: -10, maxX: 10, minZ: -6, maxZ: -2, minY: 0, maxY: 9, obb: { cx: 0, cz: -4, hx: 10, hz: 2, cs: 1, sn: 0 } };
-        const polygon = {
-            minX: -10, maxX: 10, minZ: -6, maxZ: -2, minY: 0, maxY: 9,
-            polygon: { outer: [{ x: -10, z: -6 }, { x: 10, z: -6 }, { x: 10, z: -2 }, { x: -10, z: -2 }], holes: [] }
+        const obb = {
+            minX: -10,
+            maxX: 10,
+            minZ: -6,
+            maxZ: -2,
+            minY: 0,
+            maxY: 9,
+            obb: { cx: 0, cz: -4, hx: 10, hz: 2, cs: 1, sn: 0 }
         };
-        const from = { x: 0, y: 1, z: 0 }, to = { x: 0, y: 1, z: -5 };
+        const polygon = {
+            minX: -10,
+            maxX: 10,
+            minZ: -6,
+            maxZ: -2,
+            minY: 0,
+            maxY: 9,
+            polygon: {
+                outer: [
+                    { x: -10, z: -6 },
+                    { x: 10, z: -6 },
+                    { x: 10, z: -2 },
+                    { x: -10, z: -2 }
+                ],
+                holes: []
+            }
+        };
+        const from = { x: 0, y: 1, z: 0 },
+            to = { x: 0, y: 1, z: -5 };
         expect(rules.clearLength([obb], from, to)).toBeCloseTo(2 - PERSON_CAMERA.probe, 5);
         expect(rules.clearLength([polygon], from, to)).toBeCloseTo(2 - PERSON_CAMERA.probe, 5);
     });
@@ -166,7 +195,8 @@ describe("jump timing", () => {
     it("does not jump in mid-air once coyote time is over", () => {
         const state = rules.createJumpState();
         rules.stepJump(state, true, false, dt);
-        for (let t = 0; t < PERSON_MOVE.coyote + 2 * dt; t += dt) rules.stepJump(state, false, false, dt);
+        for (let t = 0; t < PERSON_MOVE.coyote + 2 * dt; t += dt)
+            rules.stepJump(state, false, false, dt);
         expect(rules.stepJump(state, false, true, dt)).toBe(false);
     });
 
@@ -175,7 +205,8 @@ describe("jump timing", () => {
         rules.stepJump(state, false, false, dt);
         state.coyote = 0;
         expect(rules.stepJump(state, false, true, dt)).toBe(false);
-        for (let t = 0; t < PERSON_MOVE.buffer - 3 * dt; t += dt) rules.stepJump(state, false, true, dt);
+        for (let t = 0; t < PERSON_MOVE.buffer - 3 * dt; t += dt)
+            rules.stepJump(state, false, true, dt);
         expect(rules.stepJump(state, true, true, dt)).toBe(true);
     });
 
@@ -183,7 +214,8 @@ describe("jump timing", () => {
         const state = rules.createJumpState();
         state.coyote = 0;
         rules.stepJump(state, false, true, dt);
-        for (let t = 0; t < PERSON_MOVE.buffer + 2 * dt; t += dt) rules.stepJump(state, false, true, dt);
+        for (let t = 0; t < PERSON_MOVE.buffer + 2 * dt; t += dt)
+            rules.stepJump(state, false, true, dt);
         expect(rules.stepJump(state, true, true, dt)).toBe(false);
     });
 });
