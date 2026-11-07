@@ -303,6 +303,11 @@ final class RemoteKeys {
      */
     static final int XIAOMI_SHORT_MENU_FLAGS = 0x7531;
 
+    /** Channel Up or Down, for home_ignore_channel_keys. */
+    static boolean isChannelKey(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_CHANNEL_UP || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN;
+    }
+
     /** True for the UP that ends a Menu press: not cancelled, or cancelled only as Xiaomi's injected short press is. */
     static boolean menuReleased(int action, int flags) {
         if (action != KeyEvent.ACTION_UP) return false;
@@ -434,6 +439,16 @@ final class RemoteKeys {
                     .setDataAndType(TvContract.buildChannelUriForPassthroughInput(inputId),
                             "vnd.android.cursor.item/channel")
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            // Aimed at the Live TV app first, as the Inputs menu does: an app that also claims the channel URI
+            // (the Fluffy file manager on a TCL G03) turned the press into a chooser.
+            String liveTv = Config.load(ctx).liveTvPackage;
+            if (liveTv != null && !liveTv.isEmpty()) {
+                try {
+                    ctx.startActivity(new Intent(view).setPackage(liveTv));
+                    return;
+                } catch (ActivityNotFoundException | SecurityException ignored) {
+                }
+            }
             try {
                 ctx.startActivity(view);
             } catch (ActivityNotFoundException ignored) {

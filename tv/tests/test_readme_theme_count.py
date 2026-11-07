@@ -57,26 +57,36 @@ ROW_START = "| **Themes** |"
 # Every feature row that names themes/ and states how many ship there, whatever language it is in:
 # English "eleven ship in", German "Zehn liegen in", Dutch "staan tien thema's", Ukrainian
 # "постачається чотирнадцять". The words come from the four languages whose front pages write the
-# count as a word (the Turkish page wrote digits), two to twenty each; one is left out because
+# count as a word (the Turkish page wrote digits), two to thirty each; one is left out because
 # "een" and "ein" are also the articles those languages put before a noun, so an English "one" would
 # read a Dutch sentence as a claim of one theme.
 NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
                 "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
                 "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
                 "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+                "twenty-one": 21, "twenty-two": 22, "twenty-three": 23, "twenty-four": 24, "twenty-five": 25,
+                "twenty-six": 26, "twenty-seven": 27, "twenty-eight": 28, "twenty-nine": 29, "thirty": 30,
                 "zwei": 2, "drei": 3, "vier": 4, "fünf": 5, "sechs": 6, "sieben": 7, "acht": 8,
                 "neun": 9, "zehn": 10, "elf": 11, "zwölf": 12, "dreizehn": 13, "vierzehn": 14,
                 "fünfzehn": 15, "sechzehn": 16, "siebzehn": 17, "achtzehn": 18, "neunzehn": 19,
-                "zwanzig": 20,
+                "zwanzig": 20, "einundzwanzig": 21, "zweiundzwanzig": 22, "dreiundzwanzig": 23,
+                "vierundzwanzig": 24, "fünfundzwanzig": 25, "sechsundzwanzig": 26, "siebenundzwanzig": 27,
+                "achtundzwanzig": 28, "neunundzwanzig": 29, "dreißig": 30,
                 "twee": 2, "drie": 3, "vijf": 5, "zes": 6, "zeven": 7, "negen": 9, "tien": 10,
                 "twaalf": 12, "dertien": 13, "veertien": 14, "vijftien": 15, "zestien": 16,
                 "zeventien": 17, "achttien": 18, "negentien": 19, "twintig": 20,
+                "eenentwintig": 21, "tweeëntwintig": 22, "drieëntwintig": 23, "vierentwintig": 24,
+                "vijfentwintig": 25, "zesentwintig": 26, "zevenentwintig": 27, "achtentwintig": 28,
+                "negenentwintig": 29, "dertig": 30,
                 # Ukrainian, the Ukrainian page's row as it was written. The apostrophe is the page's
                 # own: п'ять, дев'ять and п'ятнадцять carry a straight one there.
                 "два": 2, "три": 3, "чотири": 4, "п'ять": 5, "шість": 6, "сім": 7, "вісім": 8,
                 "дев'ять": 9, "десять": 10, "одинадцять": 11, "дванадцять": 12, "тринадцять": 13,
                 "чотирнадцять": 14, "п'ятнадцять": 15, "шістнадцять": 16, "сімнадцять": 17,
-                "вісімнадцять": 18, "дев'ятнадцять": 19, "двадцять": 20}
+                "вісімнадцять": 18, "дев'ятнадцять": 19, "двадцять": 20,
+                "двадцять одна": 21, "двадцять дві": 22, "двадцять три": 23, "двадцять чотири": 24,
+                "двадцять п'ять": 25, "двадцять шість": 26, "двадцять сім": 27, "двадцять вісім": 28,
+                "двадцять дев'ять": 29, "тридцять": 30}
 # The row is read through that same table, so a thirteenth theme is "thirteen ship in themes/" and not
 # a row that states nothing. A second table for the row - one that stopped at twelve while this one
 # carried twenty - is what made the thirteenth theme fail as "the Themes row states no count".
@@ -233,6 +243,13 @@ class CountTest(unittest.TestCase):
     def test_a_digits_count_is_read_in_any_sentence(self):
         self.assertEqual([({12}, "| **Themes** | 12 liegen in [`themes/`](themes/) |")],
                          claims("| **Themes** | 12 liegen in [`themes/`](themes/) |"))
+
+    def test_a_portuguese_row_in_digits_is_read(self):
+        """A Portuguese row as such a page writes it: the count in digits, before the link."""
+        portuguese = ("| **Temas** | Plano de fundo, papel de parede e layout definidos em um "
+                      "`config.json` enviado pelo Wi-Fi, sem recompilação. 21 temas estão incluídos em "
+                      "[`themes/`](themes/), incluindo o `default/` integrado. |")
+        self.assertEqual([({21}, portuguese)], claims(portuguese))
 
     def test_a_row_that_does_not_state_a_count_is_not_a_claim(self):
         tools = "| [`theme.sh`](tools/theme.sh) | Push a folder from [`themes/`](themes/) |"

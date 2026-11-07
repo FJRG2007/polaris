@@ -21,18 +21,21 @@ JSON object is named before the key is written, and a write it cannot make says 
 set's own arguments are read first: a switch without a value, a --theme without the folder behind it, and a word
 left over are answered with the usage line and exit 2 before a theme folder is read or written. list, status,
 show, install and remove read their own words the same way, before anything is read from this checkout or asked
-of the TV. A --theme folder that is not there is refused by name, not made: set starts a config.json in a folder
+of the TV. install then reads the add-on's entry: extra arguments are passed to its custom installer, but an
+add-on without one takes only its name and refuses extra arguments before anything is built, pushed or installed.
+A --theme folder that is not there is refused by name, not made: set starts a config.json in a folder
 of your own that exists, and the push it ends with replaces the theme on the TV and empties that theme's
 wallpapers, so a mistyped path would leave a one-key theme behind.
 
 On Windows, theme install and set use PowerShell (pwsh, or powershell when pwsh is not on PATH), without loading
-profiles or changing execution policy. Add-ons with their own shell installer still need Bash. A theme install
+profiles or changing execution policy. Add-ons with their own shell installer still need Bash; an install whose bash
+or Gradle wrapper cannot start says which and what to install, and exits 1 before anything is built or pushed. A theme install
 takes only its name; script arguments belong to add-ons. If set saves the local file but the push fails, it
 reports that separately: the TV may have received only part of the theme.
 
 Exit status: 0 the command ran, 1 a command on the TV or a script this checkout runs failed, 2 the command line
 asked for something this script does not do - a command it does not have, or a word the command would drop - which
-is answered before the READMEs are read or the TV is asked anything. 2 is also a run that ends with nothing asked of
+is answered before a script is started or the TV is asked anything. 2 is also a run that ends with nothing asked of
 the TV: no TV_HOST, a checkout with no tools/venv, and a TV tools/tv.py answered 2 for because it never reached it
 (a refused port, a Wireless debugging port that answers TLS, an address with no route to it). check.py answers the
 first two of those with 2 as well, and b64push.py the second.
@@ -106,7 +109,9 @@ def package(folder):
         f = folder / "app" / name
         if f.is_file():
             m = re.search(r"applicationId\s*=?\s*['\"]([^'\"]+)['\"]", f.read_text(encoding="utf-8"))
-            if m:
+            # The id goes into `pm uninstall` on the TV's shell, so only a package-shaped name
+            # (the shape disable.sh's PKG_RE accepts) counts; anything else reads as no package.
+            if m and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+", m.group(1)):
                 return m.group(1)
     return None
 
@@ -398,15 +403,37 @@ def push_theme(command):
         return 1
 
 
+def cannot_start(program, error, fix):
+    """A build or installer that never started: nothing ran, so name the program, why, and what to do."""
+    sys.stderr.write(f"cannot start {program}: {reason(error)}. {fix} Nothing was built, pushed or installed.\n")
+    return 1
+
+
 def install_addon(item, extra):
     folder = ROOT / "addons" / item["id"]
     if item["script"]:
         # The creator's own script, as their README says to run it.
-        return run(["bash", str(folder / item["script"])] + extra, ROOT)
+        try:
+            return run(["bash", str(folder / item["script"])] + extra, ROOT)
+        except OSError as e:
+            where = ("on Windows, install Git for Windows (it brings Git Bash) or WSL"
+                     if sys.platform == "win32" else "install it with your package manager")
+            return cannot_start("bash", e, f"{item['id']}'s installer is {item['script']}, a Bash script: "
+                                           f"{where}, and put bash on PATH.")
+    if extra:
+        sys.stderr.write(f"{item['id']} has no custom installer, so install takes only its name, "
+                         f"not {' '.join(extra)!r}: {USAGE_LINES['install']}. "
+                         "Nothing was built, pushed or installed.\n")
+        return 2
     # No script: the steps addons/README.md gives for every add-on.
     # Windows resolves a relative program against this process's directory, not cwd, so give the full path.
     gradlew = str(folder / "gradlew.bat") if os.name == "nt" else "./gradlew"
-    code = run([gradlew, "assembleRelease"], folder)
+    try:
+        code = run([gradlew, "assembleRelease"], folder)
+    except OSError as e:
+        return cannot_start(gradlew, e, f"{item['id']} builds with the Gradle wrapper in addons/{item['id']}/, "
+                                        f"so restore it from this checkout (git checkout -- addons/{item['id']}) "
+                                        f"and make sure it is executable.")
     if code:
         return code
     apk = folder / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
