@@ -89,6 +89,6 @@ describe("TvGallery", () => {
         render(wrap(<TvGallery items={ITEMS} screenshotSrc={src} />, "es-ES"));
         expect(screen.getByRole("button", { name: "Complementos (1)" })).toBeTruthy();
         expect(screen.getByAltText("Weather en un televisor")).toBeTruthy();
-        expect(screen.getAllByText("Funciona sin conexión")).toHaveLength(2);
+        expect(screen.getAllByText("Va sin conexión")).toHaveLength(2);
     });
 });

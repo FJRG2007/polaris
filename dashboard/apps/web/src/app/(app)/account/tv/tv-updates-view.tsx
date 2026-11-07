@@ -387,6 +387,7 @@ function TvUpdateRow({
                 <TvPreferences row={row} reach={reach} onBlocking={onBlocking} />
                 <TvCatalogPicker
                     row={row}
+                    newestRelease={current || !latest}
                     load={tvCatalogAction}
                     onTheme={onTheme}
                     onAddons={onAddons}

@@ -27,6 +27,7 @@ function tv(blocking: Omit<TvRow["blocking"], "askedAt"> & { askedAt?: string | 
             ...blocking,
             askedAt: blocking.askedAt ?? (blocking.desired === null ? null : ASKED)
         },
+        catalog: { theme: null, addons: null },
         address: "192.168.1.20"
     };
 }
@@ -53,6 +54,9 @@ vi.mock("@/app/(app)/account/tv/actions", () => ({
     requestTvUpdateAction: async () => ({ tvs: [], latest: "3.5" }),
     renameTvAction: async () => ({ tvs: [], latest: "3.5" }),
     setTvBlockingAction,
+    tvCatalogAction: async () => [],
+    setTvThemeAction: async () => ({ tvs: [], latest: "3.5" }),
+    setTvAddonsAction: async () => ({ tvs: [], latest: "3.5" }),
     tvFilterReachAction: async () => reach
 }));
 

@@ -17,6 +17,7 @@ import { TvGallery, type TvGalleryItem } from "@polaris/ui/tv-gallery";
 
 export type TvCatalogStatus =
     | "updateFirst"
+    | "nextUpdate"
     | "notAsked"
     | "waiting"
     | "applied"
@@ -27,10 +28,12 @@ export type TvCatalogStatus =
 
 /**
  * Where the latest pick stands. A problem with either pick is what is shown; else
- * one still waiting; else what the TV last confirmed.
+ * one still waiting; else what the TV last confirmed. A launcher too old to take
+ * a pick is sent to its update, or, when no newer release is published for it
+ * (`newestRelease`), told the picks come with the next one.
  */
-export function catalogStatus(row: TvRow): TvCatalogStatus {
-    if (!tvTakesCatalog(row.versionCode)) return "updateFirst";
+export function catalogStatus(row: TvRow, newestRelease = false): TvCatalogStatus {
+    if (!tvTakesCatalog(row.versionCode)) return newestRelease ? "nextUpdate" : "updateFirst";
     const { theme, addons } = row.catalog;
     const reports = [theme, addons].flatMap((pick) => (pick ? [pick.applied] : []));
     if (reports.length === 0) return "notAsked";
@@ -58,11 +61,14 @@ function shotSrc(item: TvGalleryItem): string {
 
 export function TvCatalogPicker({
     row,
+    newestRelease = false,
     load,
     onTheme,
     onAddons
 }: {
     row: TvRow;
+    /** The TV runs the newest release there is (or none is published), so no update is on offer. */
+    newestRelease?: boolean;
     /** The catalog, asked once when the picker first opens. */
     load: () => Promise<TvCatalogEntry[] | null>;
     onTheme: (id: string) => void;
@@ -71,7 +77,7 @@ export function TvCatalogPicker({
     const t = useTranslations("account");
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState<TvCatalogEntry[] | null | undefined>(undefined);
-    const status = catalogStatus(row);
+    const status = catalogStatus(row, newestRelease);
     const statusId = `tv-catalog-${row.id}`;
     const problem = status === "failed" || status === "unavailable" || status === "asked";
     const addons = row.catalog.addons?.ids ?? [];
@@ -106,7 +112,7 @@ export function TvCatalogPicker({
                     size="sm"
                     variant="outline"
                     className="shrink-0"
-                    disabled={status === "updateFirst"}
+                    disabled={status === "updateFirst" || status === "nextUpdate"}
                     aria-expanded={open}
                     aria-describedby={statusId}
                     onClick={toggle}

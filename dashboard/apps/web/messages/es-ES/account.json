@@ -1753,6 +1753,7 @@
             "removeAddon": "Quitar de la lista",
             "status": {
                 "updateFirst": "Actualiza este TV para elegir temas y complementos aquí.",
+                "nextUpdate": "Los temas y complementos llegan con la próxima actualización.",
                 "notAsked": "Aún no se ha elegido nada aquí.",
                 "waiting": "Enviado. El TV lo aplica en su próxima conexión.",
                 "applied": "Tema aplicado.",

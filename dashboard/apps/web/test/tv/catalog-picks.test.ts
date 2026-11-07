@@ -165,6 +165,9 @@ describe("the line under the picker", () => {
 
     it("says what stands", () => {
         expect(catalogStatus(row({ theme: null, addons: null }, 14))).toBe("updateFirst");
+        // No newer release to send it to: not a dead end pointing at an update that does not exist.
+        expect(catalogStatus(row({ theme: null, addons: null }, 14), true)).toBe("nextUpdate");
+        expect(catalogStatus(row({ theme: null, addons: null }), true)).toBe("notAsked");
         expect(catalogStatus(row({ theme: null, addons: null }))).toBe("notAsked");
         expect(catalogStatus(row({ theme: { id: "a", applied: null }, addons: null }))).toBe(
             "waiting"

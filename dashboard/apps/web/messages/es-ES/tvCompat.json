@@ -117,10 +117,10 @@
         },
         "kind": {
             "theme": "Tema",
-            "addon": "Complemento"
+            "addon": "Extra"
         },
         "network": "Usa internet",
-        "offline": "Funciona sin conexión",
+        "offline": "Va sin conexión",
         "minSdk": "Android {version}+",
         "screenshot": "{name} en un televisor",
         "empty": "Todavía no hay nada que mostrar."

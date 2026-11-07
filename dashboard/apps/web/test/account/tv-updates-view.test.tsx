@@ -17,6 +17,9 @@ vi.mock("@/app/(app)/account/tv/actions", () => ({
     requestTvUpdateAction: async () => ({ tvs: [], latest: null }),
     setTvBlockingAction: async () => ({ tvs: [], latest: null }),
     renameTvAction: async () => ({ tvs: [], latest: null }),
+    tvCatalogAction: async () => [],
+    setTvThemeAction: async () => ({ tvs: [], latest: null }),
+    setTvAddonsAction: async () => ({ tvs: [], latest: null }),
     tvFilterReachAction: async () => ({})
 }));
 
@@ -34,6 +37,7 @@ function tv(overrides: Partial<TvRow> = {}): TvRow {
         lastSeenAt: null,
         update: null,
         blocking: { desired: null, applied: null, askedAt: null },
+        catalog: { theme: null, addons: null },
         address: "192.168.1.20",
         ...overrides
     };
@@ -185,5 +189,34 @@ describe("Block ads and trackers", () => {
         expect(draw([at(true, null)], "3.5", "es-ES")).toContain(
             "Esperando a que el TV lo aplique"
         );
+    });
+});
+
+describe("Themes and add-ons on a launcher before build 15", () => {
+    /** The picker's button, by the id of the line that says why it is off. */
+    function pickerButton(markup: string): string {
+        return markup.match(/<button[^>]*aria-describedby="tv-catalog-[^"]*"[^>]*>/)?.[0] ?? "";
+    }
+
+    it("turns the picker off, says why, and keeps Update now beside it", () => {
+        const markup = draw([tv({ versionName: "3.5", versionCode: 14 })], "3.6");
+        expect(markup).toContain("Update this TV to pick themes and add-ons here.");
+        expect(pickerButton(markup)).toContain(' disabled=""');
+        expect(markup).toContain(">Update now<");
+    });
+
+    it("does not send a current TV to an update there is none of", () => {
+        for (const latest of ["3.5", null]) {
+            const markup = draw([tv({ versionName: "3.5", versionCode: 14 })], latest);
+            expect(markup).toContain("Themes and add-ons come with the next TV update.");
+            expect(markup).not.toContain("Update this TV to pick themes and add-ons here.");
+            expect(pickerButton(markup)).toContain(' disabled=""');
+        }
+    });
+
+    it("opens the picker for build 15", () => {
+        const markup = draw([tv({ versionName: "3.6", versionCode: 15 })], "3.6");
+        expect(markup).toContain("Nothing picked here yet.");
+        expect(pickerButton(markup)).not.toContain(' disabled=""');
     });
 });
