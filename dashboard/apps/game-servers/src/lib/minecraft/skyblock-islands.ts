@@ -188,11 +188,7 @@ class Builder {
             .sort();
         for (let placed = 0; placed < count && candidates.length > 0; placed += 1) {
             const [key] = candidates.splice(Math.floor(this.random() * candidates.length), 1);
-            const [dx, dy, dz] = (key as string).split(",").map(Number) as [
-                number,
-                number,
-                number
-            ];
+            const [dx, dy, dz] = (key as string).split(",").map(Number) as [number, number, number];
             this.put(dx, dy, dz, block);
         }
     }
@@ -247,14 +243,19 @@ class Builder {
             .filter((one) => {
                 if (one.attached) return false;
                 const above = this.cells.get(
-                    this.key(one.x - this.center.x, one.y - this.center.y + 1, one.z - this.center.z)
+                    this.key(
+                        one.x - this.center.x,
+                        one.y - this.center.y + 1,
+                        one.z - this.center.z
+                    )
                 );
                 return !above || (!FALLING.has(above.block) && !above.attached);
             })
             .sort(
                 (a, b) =>
                     a.y - b.y ||
-                    Math.abs(a.x - this.center.x) + Math.abs(a.z - this.center.z) -
+                    Math.abs(a.x - this.center.x) +
+                        Math.abs(a.z - this.center.z) -
                         (Math.abs(b.x - this.center.x) + Math.abs(b.z - this.center.z)) ||
                     a.x - b.x ||
                     a.z - b.z
@@ -278,10 +279,20 @@ function frost(): Island {
     const b = new Builder("frost", { x: 0, y: 72, z: -90 });
     b.body(5, 5, "minecraft:snow_block", "minecraft:snow_block", "minecraft:packed_ice");
     b.scatter("minecraft:blue_ice", 2, -3);
-    for (const [dx, dz] of [[2, 1], [3, 1], [2, 2], [3, 2]] as const)
+    for (const [dx, dz] of [
+        [2, 1],
+        [3, 1],
+        [2, 2],
+        [3, 2]
+    ] as const)
         b.put(dx, 0, dz, "minecraft:ice");
     b.tree(-2, -1, "minecraft:spruce_log", "minecraft:spruce_leaves", 5);
-    for (const [dx, dz] of [[1, -3], [-3, 2], [0, 3], [3, -1]] as const)
+    for (const [dx, dz] of [
+        [1, -3],
+        [-3, 2],
+        [0, 3],
+        [3, -1]
+    ] as const)
         b.attach(dx, 1, dz, "minecraft:snow[layers=1]");
     return b.build();
 }
@@ -348,8 +359,17 @@ function beach(): Island {
     const b = new Builder("beach", { x: -20, y: 64, z: 100 });
     b.body(6, 5, "minecraft:sand", "minecraft:sandstone", "minecraft:stone");
     b.scatter("minecraft:clay", 6, -2);
-    for (const [dx, dz] of [[3, 2], [4, 2], [3, 3]] as const) b.put(dx, 0, dz, "minecraft:gravel");
-    for (const [dx, dz] of [[2, -3], [3, -3]] as const) b.put(dx, 0, dz, "minecraft:clay");
+    for (const [dx, dz] of [
+        [3, 2],
+        [4, 2],
+        [3, 3]
+    ] as const)
+        b.put(dx, 0, dz, "minecraft:gravel");
+    for (const [dx, dz] of [
+        [2, -3],
+        [3, -3]
+    ] as const)
+        b.put(dx, 0, dz, "minecraft:clay");
     b.attach(-2, 0, 1, "minecraft:water");
     b.attach(-1, 1, 1, "minecraft:sugar_cane");
     b.attach(-1, 2, 1, "minecraft:sugar_cane");
@@ -366,11 +386,18 @@ function nether(): Island {
     b.scatter("minecraft:glowstone", 2, -2);
     b.scatter("minecraft:shroomlight", 1, -2);
     b.put(-3, 0, 1, "minecraft:magma_block");
-    for (const [dx, dz] of [[-2, -2], [-1, -2]] as const) {
+    for (const [dx, dz] of [
+        [-2, -2],
+        [-1, -2]
+    ] as const) {
         b.put(dx, 0, dz, "minecraft:soul_sand");
         b.attach(dx, 1, dz, "minecraft:nether_wart[age=3]");
     }
-    for (const [dx, dz] of [[1, -3], [2, -3], [1, -2]] as const)
+    for (const [dx, dz] of [
+        [1, -3],
+        [2, -3],
+        [1, -2]
+    ] as const)
         b.put(dx, 0, dz, "minecraft:crimson_nylium");
     b.attach(1, 1, -3, "minecraft:crimson_fungus");
     b.attach(2, 0, 2, "minecraft:lava");
@@ -441,12 +468,26 @@ function ruins(): Island {
             b.put(dx, 0, dz, floor[Math.floor(b.random() * floor.length)] as string);
     }
     const walls: [number, number, number][] = [
-        [-3, -3, 3], [-2, -3, 2], [-1, -3, 1], [1, -3, 1], [3, -3, 2],
-        [-3, -2, 2], [-3, 0, 1], [-3, 2, 2], [3, -1, 1], [3, 2, 3], [2, 3, 1]
+        [-3, -3, 3],
+        [-2, -3, 2],
+        [-1, -3, 1],
+        [1, -3, 1],
+        [3, -3, 2],
+        [-3, -2, 2],
+        [-3, 0, 1],
+        [-3, 2, 2],
+        [3, -1, 1],
+        [3, 2, 3],
+        [2, 3, 1]
     ];
     for (const [dx, dz, height] of walls) {
         for (let dy = 1; dy <= height; dy += 1)
-            b.put(dx, dy, dz, dy === height ? "minecraft:mossy_cobblestone" : "minecraft:stone_bricks");
+            b.put(
+                dx,
+                dy,
+                dz,
+                dy === height ? "minecraft:mossy_cobblestone" : "minecraft:stone_bricks"
+            );
     }
     b.put(0, 1, 0, "minecraft:chest[facing=south]");
     b.put(-2, 1, 1, "minecraft:chest[facing=east]");
@@ -508,7 +549,8 @@ export function overlaps(a: Area, b: Area): boolean {
  */
 export function placeLines(island: Island): string[] {
     const { anchor } = island;
-    const isAnchor = (cell: Cell) => cell.x === anchor.x && cell.y === anchor.y && cell.z === anchor.z;
+    const isAnchor = (cell: Cell) =>
+        cell.x === anchor.x && cell.y === anchor.y && cell.z === anchor.z;
     const lines: string[] = [];
     for (const attached of [false, true]) {
         const cells = island.cells.filter((cell) => cell.attached === attached && !isAnchor(cell));
@@ -526,7 +568,7 @@ function layerLines(cells: readonly Cell[]): string[] {
     const runs: { x1: number; x2: number; z: number; y: number; block: string }[] = [];
     for (const [z, row] of [...byRow.entries()].sort((a, b) => a[0] - b[0])) {
         row.sort((a, b) => a.x - b.x);
-        for (let at = 0; at < row.length; ) {
+        for (let at = 0; at < row.length;) {
             let end = at;
             while (
                 end + 1 < row.length &&

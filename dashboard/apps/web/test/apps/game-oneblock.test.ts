@@ -57,9 +57,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-announcements-service",
     levelOf: async () => "world"
 }));
 
-const { applyOneBlockSetup } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/oneblock-service"
-);
+const { applyOneBlockSetup } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/oneblock-service");
 
 beforeEach(() => {
     install = { config: JSON.stringify({ blueprintId: "oneblock" }) };
@@ -161,7 +160,9 @@ describe("setting it up from the walk", () => {
     });
 
     it("sets the plugin up again on a new world", async () => {
-        install = { config: JSON.stringify({ blueprintId: "oneblock", oneblockWorld: "world-old" }) };
+        install = {
+            config: JSON.stringify({ blueprintId: "oneblock", oneblockWorld: "world-old" })
+        };
         file = CONFIGURED.replace("world: world", "world: world-old");
         await applyOneBlockSetup("owner", "app", install.config);
         expect(sent).toEqual([oneblock.setupLines("world")]);

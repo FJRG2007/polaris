@@ -68,9 +68,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
         })
 }));
 
-const { applySkyblockIslands } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/skyblock-islands-service"
-);
+const { applySkyblockIslands } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/skyblock-islands-service");
 
 const walk = () => applySkyblockIslands("owner", "install", install.config);
 const stored = () => JSON.parse(install.config) as Record<string, unknown>;
@@ -147,12 +146,20 @@ describe("the islands", () => {
                 if (/ (fill|setblock) /.test(line)) expect(line.endsWith(" keep")).toBe(true);
             }
             for (const line of islands.placeLines(island)) {
-                const fill = / fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) minecraft:[a-z_]+(\[[a-z_=0-9,]+\])? keep$/.exec(line);
-                const set = / setblock -?\d+ -?\d+ -?\d+ minecraft:[a-z_]+(\[[a-z_=0-9,]+\])? keep$/.test(line);
+                const fill =
+                    / fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) minecraft:[a-z_]+(\[[a-z_=0-9,]+\])? keep$/.exec(
+                        line
+                    );
+                const set =
+                    / setblock -?\d+ -?\d+ -?\d+ minecraft:[a-z_]+(\[[a-z_=0-9,]+\])? keep$/.test(
+                        line
+                    );
                 expect(Boolean(fill) || set).toBe(true);
                 if (fill) {
                     const [x1, y1, z1, x2, y2, z2] = fill.slice(1, 7).map(Number) as number[];
-                    expect((x2! - x1! + 1) * (y2! - y1! + 1) * (z2! - z1! + 1)).toBeLessThanOrEqual(32768);
+                    expect((x2! - x1! + 1) * (y2! - y1! + 1) * (z2! - z1! + 1)).toBeLessThanOrEqual(
+                        32768
+                    );
                 }
             }
         }
@@ -163,16 +170,29 @@ describe("the islands", () => {
             const keys = island.cells.map((cell) => `${cell.x},${cell.y},${cell.z}`);
             expect(new Set(keys).size).toBe(keys.length);
             const solid = new Map(
-                island.cells.filter((cell) => !cell.attached).map((cell) => [`${cell.x},${cell.y},${cell.z}`, cell])
+                island.cells
+                    .filter((cell) => !cell.attached)
+                    .map((cell) => [`${cell.x},${cell.y},${cell.z}`, cell])
             );
-            expect(solid.has(`${island.anchor.x},${island.anchor.y},${island.anchor.z}`)).toBe(true);
+            expect(solid.has(`${island.anchor.x},${island.anchor.y},${island.anchor.z}`)).toBe(
+                true
+            );
             for (const cell of island.cells) {
                 const below = solid.get(`${cell.x},${cell.y - 1},${cell.z}`);
-                if (islands.isFalling(cell.block)) expect(below, `${island.id} ${cell.block}`).toBeDefined();
+                if (islands.isFalling(cell.block))
+                    expect(below, `${island.id} ${cell.block}`).toBeDefined();
                 if (islands.isFluid(cell.block)) {
                     // A source held in a pit of its own: nothing it can run out of.
-                    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const)
-                        expect(solid.has(`${cell.x + dx},${cell.y},${cell.z + dz}`), island.id).toBe(true);
+                    for (const [dx, dz] of [
+                        [1, 0],
+                        [-1, 0],
+                        [0, 1],
+                        [0, -1]
+                    ] as const)
+                        expect(
+                            solid.has(`${cell.x + dx},${cell.y},${cell.z + dz}`),
+                            island.id
+                        ).toBe(true);
                     expect(below).toBeDefined();
                 }
             }
@@ -181,9 +201,9 @@ describe("the islands", () => {
                 island.cells.some((cell) => cell.attached && line.includes(` ${cell.block} keep`))
             );
             const lastSolidY = Math.max(...[...solid.values()].map((cell) => cell.y));
-            const ys = lines.slice(0, firstAttached === -1 ? -1 : firstAttached).map((line) =>
-                Number(/ (?:fill|setblock) -?\d+ (-?\d+) /.exec(line)![1])
-            );
+            const ys = lines
+                .slice(0, firstAttached === -1 ? -1 : firstAttached)
+                .map((line) => Number(/ (?:fill|setblock) -?\d+ (-?\d+) /.exec(line)![1]));
             expect(ys).toEqual([...ys].sort((a, b) => a - b));
             expect(Math.max(...ys)).toBe(lastSolidY);
             const { x, y, z } = island.anchor;
@@ -193,7 +213,8 @@ describe("the islands", () => {
     });
 
     it("use only blocks the oldest release the map runs on has", () => {
-        const newer = /deepslate|copper|cherry|mangrove|mud|amethyst|short_grass|powder_snow|azalea|moss_block|bamboo_block/;
+        const newer =
+            /deepslate|copper|cherry|mangrove|mud|amethyst|short_grass|powder_snow|azalea|moss_block|bamboo_block/;
         for (const island of islands.ISLANDS) {
             for (const cell of island.cells) expect(cell.block).not.toMatch(newer);
         }
@@ -239,7 +260,9 @@ describe("the walk", () => {
     });
 
     it("adds only the missing ones, and never refills a standing island's chests", async () => {
-        standing = new Set(islands.ISLANDS.filter((one) => one.id !== "frost").map((one) => one.id));
+        standing = new Set(
+            islands.ISLANDS.filter((one) => one.id !== "frost").map((one) => one.id)
+        );
         await walk();
         const frost = islands.ISLANDS.find((one) => one.id === "frost")!;
         expect(placed()).toEqual(islands.placeLines(frost));
@@ -267,7 +290,9 @@ describe("the walk", () => {
         const lines = islands.placeLines(ruins);
         // Everything but the anchor went in before the pass stopped, so it still
         // answers that it is not there.
-        standing = new Set(islands.ISLANDS.filter((one) => one.id !== "ruins").map((one) => one.id));
+        standing = new Set(
+            islands.ISLANDS.filter((one) => one.id !== "ruins").map((one) => one.id)
+        );
         await walk();
         expect(placed()).toEqual(lines);
         expect(standing.has("ruins")).toBe(true);

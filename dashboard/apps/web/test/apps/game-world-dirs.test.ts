@@ -35,18 +35,28 @@ let storedConfig: string | null = null;
 function answer(argv: readonly string[]): { code: number; output: string } {
     const [command, ...rest] = argv;
     if (command === "stat" && rest.includes("/data")) return owner;
-    if (command === "ls") return { code: 0, output: rest[rest.length - 1] === "/data/.polaris-restore" ? unpacked : listing };
+    if (command === "ls")
+        return {
+            code: 0,
+            output: rest[rest.length - 1] === "/data/.polaris-restore" ? unpacked : listing
+        };
     if (command === "find" && rest.includes("level.dat")) {
         // A level put in place by a restore is on disk from that moment, so the
         // marker search has to find it too - the switch that follows looks for it.
-        const moved = ran.filter((entry) => entry[0] === "mv").map((entry) => `${entry[entry.length - 1]}/level.dat`);
+        const moved = ran
+            .filter((entry) => entry[0] === "mv")
+            .map((entry) => `${entry[entry.length - 1]}/level.dat`);
         return { code: 0, output: [markers, ...moved].join("\n") };
     }
     return { code: 0, output: "" };
 }
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
-    withServerContainer: async (_ownerId: string, installedAppId: string, work: (server: unknown) => Promise<unknown>) =>
+    withServerContainer: async (
+        _ownerId: string,
+        installedAppId: string,
+        work: (server: unknown) => Promise<unknown>
+    ) =>
         work({
             installedAppId,
             applicationId: "app-1",
@@ -95,7 +105,8 @@ vi.mock("@/lib/apps/install-config", () => ({
     readInstallConfig: (raw: string | null) => (raw ? JSON.parse(raw) : {})
 }));
 
-const { newWorld, restoreWorldBackup } = await import("@polaris-app/game-servers/src/lib/minecraft/world-service");
+const { newWorld, restoreWorldBackup } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/world-service");
 
 /** What was done to one path from the moment it was made, as verbs in order. */
 function verbsFor(path: string): string[] {
@@ -161,7 +172,12 @@ describe("a world folder made for the server", () => {
         markers = "/data/worlds/world-20260101-000000/level.dat";
         unpacked = "Bedrock level";
 
-        await restoreWorldBackup("owner-1", "install-1", "2026-01-01T00-00-00-000.tar.gz", "actor-1");
+        await restoreWorldBackup(
+            "owner-1",
+            "install-1",
+            "2026-01-01T00-00-00-000.tar.gz",
+            "actor-1"
+        );
 
         expect(verbsFor("/data/worlds").slice(0, 3)).toEqual(["mkdir", "chown", "chmod"]);
     });
@@ -171,16 +187,23 @@ describe("a new world on a OneBlock server", () => {
     it("keeps the void the island floats in, and has the plugin set up again", async () => {
         const { setEnvVars } = await import("@/lib/env-var-service");
         const { patchInstallConfig } = await import("@/lib/apps/install-config");
-        const { VOID_GENERATOR_SETTINGS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/oneblock"
-        );
+        const { VOID_GENERATOR_SETTINGS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/oneblock");
         vi.mocked(setEnvVars).mockClear();
         vi.mocked(patchInstallConfig).mockClear();
         storedConfig = JSON.stringify({ blueprintId: "oneblock", oneblockReady: true });
 
-        await newWorld("owner-1", "install-1", { levelType: "minecraft:flat", keepPlayers: false }, "actor-1");
+        await newWorld(
+            "owner-1",
+            "install-1",
+            { levelType: "minecraft:flat", keepPlayers: false },
+            "actor-1"
+        );
 
-        const written = vi.mocked(setEnvVars).mock.calls.at(-1)?.[3] as { key: string; value: string }[];
+        const written = vi.mocked(setEnvVars).mock.calls.at(-1)?.[3] as {
+            key: string;
+            value: string;
+        }[];
         expect(written.find((entry) => entry.key === "GENERATOR_SETTINGS")?.value).toBe(
             VOID_GENERATOR_SETTINGS
         );
@@ -195,9 +218,17 @@ describe("a new world on a OneBlock server", () => {
         vi.mocked(setEnvVars).mockClear();
         storedConfig = JSON.stringify({ blueprintId: "oneblock" });
 
-        await newWorld("owner-1", "install-1", { levelType: "minecraft:normal", keepPlayers: false }, "actor-1");
+        await newWorld(
+            "owner-1",
+            "install-1",
+            { levelType: "minecraft:normal", keepPlayers: false },
+            "actor-1"
+        );
 
-        const written = vi.mocked(setEnvVars).mock.calls.at(-1)?.[3] as { key: string; value: string }[];
+        const written = vi.mocked(setEnvVars).mock.calls.at(-1)?.[3] as {
+            key: string;
+            value: string;
+        }[];
         expect(written.find((entry) => entry.key === "GENERATOR_SETTINGS")?.value).toBe("");
     });
 });
