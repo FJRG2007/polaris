@@ -218,6 +218,24 @@ function approachVelocity(vx, vz, wantX, wantZ, rate, dt) {
   return { vx: vx + dx / gap * step, vz: vz + dz / gap * step };
 }
 
+/**
+ * The velocity left after a collision moved the body by (movedX, movedZ) this frame: the speed into a wall is lost and
+ * the slide along it kept, but a push out of an overlap or a shore clamp never adds speed beyond what it had.
+ */
+function slideVelocity(vx, vz, movedX, movedZ, dt) {
+  if (!(dt > 0)) return { vx: 0, vz: 0 };
+  const cap = Math.hypot(vx, vz);
+  let nx = movedX / dt, nz = movedZ / dt;
+  const speed = Math.hypot(nx, nz);
+  if (!Number.isFinite(speed)) return { vx: 0, vz: 0 };
+  if (speed > cap) {
+    const scale = cap > 0 ? cap / speed : 0;
+    nx *= scale;
+    nz *= scale;
+  }
+  return { vx: nx, vz: nz };
+}
+
 /** Jump timing state: coyote time left, buffered press left, and whether the button was down last frame. */
 function createJumpState() {
   return { coyote: 0, buffer: 0, held: false };
@@ -390,13 +408,13 @@ const KEY_BINDINGS = Object.freeze({
   right: ['KeyD', 'ArrowRight'],
   up: ['Space', 'KeyE'],
   down: ['KeyQ', 'KeyC', 'ControlLeft', 'ControlRight'],
-  turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's only; Shift+V still steps the camera back
+  turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's turbo and the walker's sprint; Shift+V still steps the camera back
 });
 
 export {
   BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
   approachVelocity, arrivalFor, bodyIsFinite, brakeLamp, cameraRelativeMove, clampSensitivity, clearLength,
   createJumpState, createTurnSignal, heliTopSpeed, hudReadout, lookCurve, lookDirection, personCameraPose,
-  rayEntersCollider, settleBody, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnLook,
+  rayEntersCollider, settleBody, slideVelocity, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnLook,
   turnToward, wrapAngle
 };

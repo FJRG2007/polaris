@@ -103,6 +103,27 @@ describe("movement relative to the camera", () => {
     });
 });
 
+describe("velocity after a collision", () => {
+    const dt = 1 / 120;
+
+    it("keeps the slide along a wall and drops the part into it", () => {
+        const v = rules.slideVelocity(3, 4, 3 * dt, 0, dt);
+        expect(v.vx).toBeCloseTo(3);
+        expect(v.vz).toBeCloseTo(0);
+    });
+
+    it("never turns a push out of an overlap into speed", () => {
+        const still = rules.slideVelocity(0, 0, 1, 0, dt);
+        expect(still).toEqual({ vx: 0, vz: 0 });
+        const walking = rules.slideVelocity(0, PERSON_MOVE.run, 1, 0, dt);
+        expect(Math.hypot(walking.vx, walking.vz)).toBeCloseTo(PERSON_MOVE.run);
+    });
+
+    it("stops on a frame with no time", () => {
+        expect(rules.slideVelocity(3, 4, 1, 1, 0)).toEqual({ vx: 0, vz: 0 });
+    });
+});
+
 describe("body turn rate", () => {
     it("never turns faster than the cap", () => {
         const dt = 1 / 60;

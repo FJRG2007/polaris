@@ -27,7 +27,7 @@ import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
   HELI_CRUISE_SPEED, KEY_BINDINGS, PERSON_MOVE, approachVelocity, arrivalFor, cameraRelativeMove, createJumpState, createTurnSignal,
-  heliTopSpeed, settleBody, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
+  heliTopSpeed, settleBody, slideVelocity, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
@@ -1196,8 +1196,9 @@ class ThirdPersonControllerManager {
     p.position.z += p.vz * dt;
     this.resolveHorizontalCollision(p.position, 0.48);
     // A wall takes the speed into it, so the body slides along instead of pressing on with a run
-    p.vx = (p.position.x - prevX) / dt;
-    p.vz = (p.position.z - prevZ) / dt;
+    const slid = slideVelocity(p.vx, p.vz, p.position.x - prevX, p.position.z - prevZ, dt);
+    p.vx = slid.vx;
+    p.vz = slid.vz;
     p.speed = Math.hypot(p.vx, p.vz);
 
     const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person');
