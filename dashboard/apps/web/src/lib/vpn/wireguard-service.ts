@@ -19,6 +19,8 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { DEFAULT_LOCALE } from "@polaris/core";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { prisma, VISIBLE_USER } from "@polaris/db";
+import { evaluateStatements } from "@polaris/core";
+import { resolveGlobalStatementsBySource } from "@polaris/auth";
 import { edgeHostnameTaken } from "@/lib/app-edge";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
@@ -120,14 +122,38 @@ const OPEN: Omit<wg.VpnAccess, "usedBytes"> = {
     suspended: false
 };
 
+/** What the permission system says about `vpn.use` for one account. */
+export async function vpnPermission(userId: string): Promise<{
+    permission: "allow" | "deny" | "implicit-deny";
+    accountAllows: boolean;
+}> {
+    const sourced = await resolveGlobalStatementsBySource(userId);
+    const statements = sourced.flatMap((entry) => entry.statements);
+    const own = sourced
+        .filter((entry) => entry.source.kind === "account")
+        .flatMap((entry) => entry.statements);
+    return {
+        permission: evaluateStatements(statements, "vpn.use", "*"),
+        accountAllows: evaluateStatements(own, "vpn.use", "*") === "allow"
+    };
+}
+
 /** What a person may do, or null for no access. An administrator always has it, unless
- *  somebody gave them limits of their own. */
+ *  somebody gave them limits of their own. `vpn.use` is read as `wg.vpnStanding` says. */
 export async function accessOf(user: {
     id: string;
     isAdmin: boolean;
 }): Promise<wg.VpnAccess | null> {
-    const row = await prisma.vpnAccess.findUnique({ where: { userId: user.id } });
-    if (row) {
+    const [row, open, granted] = await Promise.all([
+        prisma.vpnAccess.findUnique({ where: { userId: user.id } }),
+        openAccess(),
+        user.isAdmin
+            ? Promise.resolve({ permission: "allow" as const, accountAllows: false })
+            : vpnPermission(user.id)
+    ]);
+    const standing = wg.vpnStanding({ isAdmin: user.isAdmin, hasRow: row !== null, open, ...granted });
+    if (standing === "none") return null;
+    if (standing === "row" && row) {
         return {
             nodes: row.nodes,
             deviceLimit: row.deviceLimit,
@@ -137,7 +163,7 @@ export async function accessOf(user: {
             usedBytes: row.usedBytes
         };
     }
-    return user.isAdmin || (await openAccess()) ? { ...OPEN, usedBytes: 0n } : null;
+    return { ...OPEN, usedBytes: 0n };
 }
 
 /** The peers a node should let in: every device whose owner is in good standing. */
@@ -147,14 +173,28 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
         select: {
             publicKey: true,
             hostIndex: true,
+            userId: true,
             user: { select: { isAdmin: true, vpnAccess: true } }
         }
     });
     const open = await openAccess();
     const now = new Date();
-    return peers.flatMap(({ publicKey, hostIndex, user }) => {
+    // The node's peers' owners, each resolved once: bounded by the addresses one
+    // node hands out, and run from a sync, never from a page.
+    const owners = [...new Set(peers.filter((peer) => !peer.user.isAdmin).map((peer) => peer.userId))];
+    const granted = new Map(
+        await Promise.all(owners.map(async (id) => [id, await vpnPermission(id)] as const))
+    );
+    return peers.flatMap(({ publicKey, hostIndex, userId, user }) => {
         const row = user.vpnAccess;
-        if (!row) return user.isAdmin || open ? [{ publicKey, host: hostIndex }] : [];
+        const standing = wg.vpnStanding({
+            isAdmin: user.isAdmin,
+            hasRow: row !== null,
+            open,
+            ...(granted.get(userId) ?? { permission: "implicit-deny" as const, accountAllows: false })
+        });
+        if (standing === "none") return [];
+        if (standing === "open" || !row) return [{ publicKey, host: hostIndex }];
         const allowed = wg.accessStanding(row, now) === "active" && wg.mayUseNode(row, nodeId);
         return allowed ? [{ publicKey, host: hostIndex }] : [];
     });

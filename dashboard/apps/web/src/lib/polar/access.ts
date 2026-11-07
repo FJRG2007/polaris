@@ -9,6 +9,12 @@
  * identified at a share link and reaches no app) is in none of them unless the
  * audience says so or names them.
  *
+ * Both are also permissions (`polar.use`, `polar.spend`), managed like every
+ * other app's: a role, a group's policy or one account's override under
+ * Management > Users that names either one decides it, a deny over an allow.
+ * The audiences here answer only when none of those says anything, which is
+ * what keeps every install that predates the permissions where it was.
+ *
  * Every Polar route asks `polarCaller`, and every place Polar picks a credential
  * asks `polarKeySources` / `polarCredentialFor`, so the screen and the server
  * read one answer. The policy lives in the settings table: a deployment that
@@ -18,6 +24,8 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { resolveGlobalStatements } from "@polaris/auth";
+import { evaluateStatements, type AuthzDecision, type PolicyStatement } from "@polaris/core";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import type { SessionUser } from "@/lib/session";
@@ -120,6 +128,39 @@ export interface AccessFacts {
     isAdmin: boolean;
     guest: boolean;
     groupIds: readonly string[];
+    /** What this account's roles, group policies and own overrides say about
+     *  `polar.use` and `polar.spend`; absent is the same as nothing said. */
+    grants?: PolarGrants;
+}
+
+/** The permission system's word on each, before the audiences are asked. */
+export interface PolarGrants {
+    use: AuthzDecision;
+    spend: AuthzDecision;
+}
+
+/** Read the two decisions out of one account's global statements. Pure. */
+export function polarGrantsOf(statements: readonly PolicyStatement[]): PolarGrants {
+    return {
+        use: evaluateStatements(statements, "polar.use", "*"),
+        spend: evaluateStatements(statements, "polar.spend", "*")
+    };
+}
+
+/**
+ * Whether an account is in, with the permission system asked first: an explicit
+ * deny keeps it out and an explicit allow lets it in, whatever the audience
+ * says. An administrator is in regardless, as everywhere else in Polaris.
+ */
+function admitted(
+    decision: AuthzDecision | undefined,
+    audience: PolarAudience,
+    facts: AccessFacts
+): boolean {
+    if (facts.isAdmin) return true;
+    if (decision === "deny") return false;
+    if (decision === "allow") return true;
+    return audienceAdmits(audience, facts);
 }
 
 /** Whether one audience takes one account. Pure, so it can be asserted. */
@@ -144,11 +185,11 @@ export interface PolarAccess {
 
 /** One account's answer to both questions. Pure. */
 export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): PolarAccess {
-    const use = audienceAdmits(policy.use, facts);
+    const use = admitted(facts.grants?.use, policy.use, facts);
     const connectors = policy.connectors ?? DEFAULT_CONNECTOR_POLICY;
     return {
         use,
-        spend: use && audienceAdmits(policy.spend, facts),
+        spend: use && admitted(facts.grants?.spend, policy.spend, facts),
         web: use && policy.web,
         connectors:
             use && (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin))
@@ -179,9 +220,12 @@ function factsOf(row: {
 }
 
 async function factsFor(userId: string): Promise<AccessFacts> {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: FACTS_SELECT });
+    const [row, statements] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: FACTS_SELECT }),
+        resolveGlobalStatements(userId)
+    ]);
     if (!row) return { userId, isAdmin: false, guest: true, groupIds: [] };
-    return factsOf(row);
+    return { ...factsOf(row), grants: polarGrantsOf(statements) };
 }
 
 /** This account's Polar access. A store that cannot be read answers no. */
@@ -196,6 +240,26 @@ export async function polarAccessFor(userId: string): Promise<PolarAccess> {
 }
 
 /**
+ * What an account would have with `statements` in place of its own: the
+ * capabilities screen asks it with the account's overrides taken out, which is
+ * what "follow their role" leaves them with - the deployment's Polar access
+ * included, and not only what a role grants.
+ */
+export async function polarAccessWith(
+    userId: string,
+    statements: readonly PolicyStatement[]
+): Promise<PolarAccess> {
+    const [policy, row] = await Promise.all([
+        readPolarPolicy(),
+        prisma.user.findUnique({ where: { id: userId }, select: FACTS_SELECT })
+    ]);
+    const facts = row
+        ? factsOf(row)
+        : { userId, isAdmin: false, guest: true, groupIds: [] as string[] };
+    return decidePolarAccess(policy, { ...facts, grants: polarGrantsOf(statements) });
+}
+
+/**
  * The accounts among `userIds` that may use Polar, read with one policy and one
  * query. A store that cannot be read answers nobody.
  */
@@ -206,8 +270,18 @@ export async function polarUsersAmong(userIds: readonly string[]): Promise<Set<s
             readPolarPolicy(),
             prisma.user.findMany({ where: { id: { in: [...userIds] } }, select: FACTS_SELECT })
         ]);
+        // One resolution per account found, all at once: the list is a page of
+        // people-search results, never the directory.
+        const grants = await Promise.all(
+            rows.map(async (row) => polarGrantsOf(await resolveGlobalStatements(row.id)))
+        );
         return new Set(
-            rows.filter((row) => decidePolarAccess(policy, factsOf(row)).use).map((row) => row.id)
+            rows
+                .filter(
+                    (row, index) =>
+                        decidePolarAccess(policy, { ...factsOf(row), grants: grants[index] }).use
+                )
+                .map((row) => row.id)
         );
     } catch (error) {
         console.error("polar: could not read the access policy", error);

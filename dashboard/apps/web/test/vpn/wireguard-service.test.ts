@@ -26,6 +26,7 @@ const db = vi.hoisted(() => ({
 const script = vi.hoisted(() => ({ run: vi.fn(), setting: vi.fn(), taken: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
+vi.mock("@polaris/auth", () => ({ resolveGlobalStatementsBySource: async () => [] }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: script.setting, setSetting: vi.fn() }));
 vi.mock("@/lib/deploy/server-edge", () => ({ edgeLauncher: () => "sh" }));
 vi.mock("@/lib/app-edge", () => ({ edgeHostnameTaken: script.taken }));

@@ -355,6 +355,27 @@ switch reset the picture to its lowest quality.
 - Test the two-interfaces-on-one-subnet case. A degraded call is checked for
   "switched pair" in the media server's log before anything else.
 
+## Every app is a permission
+
+Who may open an app is managed in one place: roles, group policies and one
+person's Capabilities under Management > Users. **An app or a section that
+people can be given must have a permission in `PERMISSIONS`
+(`packages/core/src/permissions.ts`), and its access check must read it.**
+Polar shipped with an audience of its own on the Agents screen and no
+permission, so it could not be given to anybody from where every other app is
+given; the VPN listed `vpn.use` in Capabilities and never read it, so switching
+it off did nothing.
+
+- An app with an audience of its own (Polar, the VPN) keeps it as the default,
+  and the permission decides over it: an explicit deny shuts the app, an allow
+  set on the account opens it. Existing installs keep the access they had.
+- A new permission is also listed in every table typed over `Permission` (API
+  key scopes, MCP categories, the minors presets) and labelled in both locales.
+- `apps/web/test/access/app-route-guards.test.ts` fails for an app closed per
+  person whose permission is missing or never read.
+- A surface outside the dashboard (the browser extension, desktop, TV) offers
+  an app only when the same check says yes.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started

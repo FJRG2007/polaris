@@ -23,6 +23,7 @@ import {
     parseResource,
     type Permission
 } from "@polaris/core";
+import { polarAccessWith } from "@/lib/polar/access";
 import { installedPermissionApps } from "@/lib/permission-presence";
 import { explainUserAccess, type AccessExplanation } from "@/lib/access-explain-service";
 import {
@@ -148,6 +149,15 @@ export async function userCapabilitiesAction(
         .filter((entry) => entry.source.kind !== "account")
         .flatMap((entry) => entry.statements);
     const set = new Map(overrides.map((row) => [row.permission, row.effect]));
+    // Polar falls back to the deployment's own Polar access, not to nothing, so
+    // its "role allows" is that whole answer.
+    const polar = await polarAccessWith(parsed.data, inheritedStatements);
+    const inheritedOf = (permission: Permission): boolean =>
+        permission === "polar.use"
+            ? polar.use
+            : permission === "polar.spend"
+              ? polar.spend
+              : isAllowed(inheritedStatements, permission, "*");
 
     return {
         isAdmin: account.isAdmin,
@@ -157,7 +167,7 @@ export async function userCapabilitiesAction(
             permission,
             area: PERMISSION_META[permission].area,
             label: PERMISSION_META[permission].label,
-            inherited: isAllowed(inheritedStatements, permission, "*"),
+            inherited: inheritedOf(permission),
             override: set.get(permission) === "deny" ? "deny" : set.has(permission) ? "allow" : null
         }))
     };

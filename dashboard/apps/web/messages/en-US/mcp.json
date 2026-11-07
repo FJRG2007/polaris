@@ -72,6 +72,8 @@
         "chat_call": "Join chat calls",
         "arcade_open": "Open Games",
         "arcade_calls": "Play games in calls",
+        "polar_use": "Talk to Polar",
+        "polar_spend": "Spend the deployment's keys on Polar",
         "chat_meetings": "Create meeting links",
         "deploy_read": "See apps, deployments and logs",
         "deploy_manage": "Deploy, restart and change apps",

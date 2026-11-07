@@ -22,6 +22,7 @@ const db = vi.hoisted(() => ({
     }[]
 }));
 
+vi.mock("@polaris/auth", () => ({ resolveGlobalStatementsBySource: async () => [] }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {

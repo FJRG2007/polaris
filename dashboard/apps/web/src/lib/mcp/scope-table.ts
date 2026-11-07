@@ -82,6 +82,8 @@ export const PERMISSION_CATEGORIES: Readonly<Record<Permission, McpCategory>> = 
     "chat.meetings": "chat",
     "arcade.open": "productivity",
     "arcade.calls": "chat",
+    "polar.use": "polaris",
+    "polar.spend": "polaris",
     "deploy.read": "development",
     "deploy.manage": "development",
     "games.read": "games",

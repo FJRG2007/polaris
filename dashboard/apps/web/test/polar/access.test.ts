@@ -5,6 +5,7 @@ import {
     DEFAULT_POLAR_POLICY,
     audienceAdmits,
     decidePolarAccess,
+    polarGrantsOf,
     polarPolicySchema,
     unsavedPolarPolicy,
     type AccessFacts,
@@ -14,6 +15,7 @@ import {
 vi.mock("@/lib/api-session", () => ({ apiUser: async () => null }));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/agents/model-keys", () => ({}));
+vi.mock("@polaris/auth", () => ({ resolveGlobalStatements: async () => [] }));
 
 const GROUP = "00000000-0000-4000-8000-0000000000a1";
 const OTHER = "00000000-0000-4000-8000-0000000000a2";
@@ -162,5 +164,46 @@ describe("Polar access policy", () => {
         expect(decidePolarAccess(admins, admin).connectors).toBe(true);
         const off = { ...saved, connectors: { ...saved.connectors, who: "off" as const } };
         expect(decidePolarAccess(off, admin).connectors).toBe(false);
+    });
+
+    describe("as permissions, like every other app", () => {
+        const allow = (action: string) => ({ effect: "allow" as const, actions: [action], resources: ["*"] });
+        const deny = (action: string) => ({ effect: "deny" as const, actions: [action], resources: ["*"] });
+        const restricted = {
+            ...DEFAULT_POLAR_POLICY,
+            use: audience({ who: "admins" }),
+            spend: audience({ who: "admins" })
+        };
+
+        it("lets an account's own On, a role or a group policy in past the deployment's audience", () => {
+            const grants = polarGrantsOf([allow("polar.use"), allow("polar.spend")]);
+            expect(decidePolarAccess(restricted, { ...member, grants })).toMatchObject({
+                use: true,
+                spend: true
+            });
+        });
+
+        it("keeps an account switched Off out even when the audience is everybody", () => {
+            const grants = polarGrantsOf([allow("polar.use"), deny("polar.use")]);
+            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).use).toBe(false);
+        });
+
+        it("falls back to the audience when nothing names Polar, so existing installs keep it", () => {
+            const grants = polarGrantsOf([allow("chat.use")]);
+            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants })).toMatchObject({
+                use: true,
+                spend: false
+            });
+            expect(decidePolarAccess(restricted, { ...member, grants }).use).toBe(false);
+        });
+
+        it("never spends for somebody denied Polar itself, and an administrator is always in", () => {
+            const grants = polarGrantsOf([deny("polar.use"), allow("polar.spend")]);
+            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).spend).toBe(false);
+            expect(decidePolarAccess(restricted, { ...admin, grants })).toMatchObject({
+                use: true,
+                spend: true
+            });
+        });
     });
 });
