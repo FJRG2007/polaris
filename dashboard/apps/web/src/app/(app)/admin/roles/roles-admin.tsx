@@ -117,6 +117,10 @@ function RoleCard({ role }: { role: RoleView }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [held, setHeld] = useState<Set<Permission>>(() => new Set(role.permissions));
+    // Counted over what this instance lists, so an app that is not installed does
+    // not add permissions nobody can see to either number.
+    const listed = useContext(Listed);
+    const shownHeld = [...held].filter((permission) => listed.has(permission)).length;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -200,11 +204,11 @@ function RoleCard({ role }: { role: RoleView }) {
                         />
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">
-                                {held.size === 0
+                                {shownHeld === 0
                                     ? t("roles.held.none")
                                     : t("roles.held.count", {
-                                          held: held.size,
-                                          total: PERMISSIONS.length
+                                          held: shownHeld,
+                                          total: listed.size
                                       })}
                             </p>
                             <Button

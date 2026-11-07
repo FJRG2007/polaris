@@ -156,6 +156,10 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
     const [held, setHeld] = useState<Set<string>>(
         () => new Set(role.permissions.filter((permission) => permission !== "org.read"))
     );
+    // Counted over what this instance lists, so an app that is not installed does
+    // not add permissions nobody can see to either number.
+    const listed = useContext(Listed);
+    const shownHeld = [...held].filter((permission) => listed.has(permission)).length;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -234,17 +238,17 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-muted-foreground text-xs">
                                 {role.restricted
-                                    ? held.size === 0
+                                    ? shownHeld === 0
                                         ? t("roles.restrictedNone")
                                         : t("roles.restrictedSome", {
-                                              held: held.size,
-                                              total: GRANTABLE.length
+                                              held: shownHeld,
+                                              total: listed.size
                                           })
-                                    : held.size === 0
+                                    : shownHeld === 0
                                       ? t("roles.plainNone")
                                       : t("roles.plainSome", {
-                                            held: held.size,
-                                            total: GRANTABLE.length
+                                            held: shownHeld,
+                                            total: listed.size
                                         })}
                             </p>
                             <Button
