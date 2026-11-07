@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const CHOICE = "0190a000-0000-7000-8000-0000000000aa";
 let stored: { desired: unknown } | null = null;
-let clientBuild: number | null = 15;
+let clientBuild: number | null = 16;
 let catalogBody: string | null = null;
 const written: unknown[] = [];
 
@@ -59,7 +59,7 @@ function entry(kind: string, id: string, extra: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     stored = null;
-    clientBuild = 15;
+    clientBuild = 16;
     written.length = 0;
     catalogBody = JSON.stringify({
         version: 1,
@@ -143,7 +143,7 @@ describe("picking for a TV", () => {
             "notInCatalog"
         );
         expect(await picks.setTvTheme("user-1", "key-1", "weather")).toBe("notInCatalog");
-        clientBuild = 14;
+        clientBuild = 15;
         expect(await picks.setTvTheme("user-1", "key-1", "aerial")).toBe("tooOld");
         expect(written).toEqual([]);
     });
@@ -160,13 +160,13 @@ describe("picking for a TV", () => {
 });
 
 describe("the line under the picker", () => {
-    const row = (catalog: unknown, versionCode: number | null = 15) =>
+    const row = (catalog: unknown, versionCode: number | null = 16) =>
         ({ versionCode, catalog }) as Parameters<typeof catalogStatus>[0];
 
     it("says what stands", () => {
-        expect(catalogStatus(row({ theme: null, addons: null }, 14))).toBe("updateFirst");
+        expect(catalogStatus(row({ theme: null, addons: null }, 15))).toBe("updateFirst");
         // No newer release to send it to: not a dead end pointing at an update that does not exist.
-        expect(catalogStatus(row({ theme: null, addons: null }, 14), true)).toBe("nextUpdate");
+        expect(catalogStatus(row({ theme: null, addons: null }, 15), true)).toBe("nextUpdate");
         expect(catalogStatus(row({ theme: null, addons: null }), true)).toBe("notAsked");
         expect(catalogStatus(row({ theme: null, addons: null }))).toBe("notAsked");
         expect(catalogStatus(row({ theme: { id: "a", applied: null }, addons: null }))).toBe(

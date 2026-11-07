@@ -192,30 +192,30 @@ describe("Block ads and trackers", () => {
     });
 });
 
-describe("Themes and add-ons on a launcher before build 15", () => {
+describe("Themes and add-ons on a launcher before build 16", () => {
     /** The picker's button, by the id of the line that says why it is off. */
     function pickerButton(markup: string): string {
         return markup.match(/<button[^>]*aria-describedby="tv-catalog-[^"]*"[^>]*>/)?.[0] ?? "";
     }
 
     it("turns the picker off, says why, and keeps Update now beside it", () => {
-        const markup = draw([tv({ versionName: "3.5", versionCode: 14 })], "3.6");
+        const markup = draw([tv({ versionName: "3.6", versionCode: 15 })], "3.7");
         expect(markup).toContain("Update this TV to pick themes and add-ons here.");
         expect(pickerButton(markup)).toContain(' disabled=""');
         expect(markup).toContain(">Update now<");
     });
 
     it("does not send a current TV to an update there is none of", () => {
-        for (const latest of ["3.5", null]) {
-            const markup = draw([tv({ versionName: "3.5", versionCode: 14 })], latest);
+        for (const latest of ["3.6", null]) {
+            const markup = draw([tv({ versionName: "3.6", versionCode: 15 })], latest);
             expect(markup).toContain("Themes and add-ons come with the next TV update.");
             expect(markup).not.toContain("Update this TV to pick themes and add-ons here.");
             expect(pickerButton(markup)).toContain(' disabled=""');
         }
     });
 
-    it("opens the picker for build 15", () => {
-        const markup = draw([tv({ versionName: "3.6", versionCode: 15 })], "3.6");
+    it("opens the picker for build 16", () => {
+        const markup = draw([tv({ versionName: "3.7", versionCode: 16 })], "3.7");
         expect(markup).toContain("Nothing picked here yet.");
         expect(pickerButton(markup)).not.toContain(' disabled=""');
     });

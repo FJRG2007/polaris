@@ -37,7 +37,7 @@ export function tvTakesBlocking(versionCode: number | null): boolean {
 
 /** The first launcher build that applies a theme and installs add-ons asked from
  *  Polaris and says how it went. */
-export const TV_CATALOG_MIN_CODE = 15;
+export const TV_CATALOG_MIN_CODE = 16;
 
 /** Whether a TV acts on a theme or add-ons picked from /account/tv. */
 export function tvTakesCatalog(versionCode: number | null): boolean {
