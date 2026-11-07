@@ -36,11 +36,9 @@ export default async function PolarisAppPage({ params }: { params: Promise<{ app
     if (storeScope(app) !== "polaris") redirect(listingHref(app));
     return (
         <AppDetail appId={app.id}>
-            {app.settingsAt ? (
-                <Suspense fallback={null}>
-                    <AppSettingsLink app={app} user={user} />
-                </Suspense>
-            ) : null}
+            <Suspense fallback={null}>
+                <AppSettingsLink app={app} user={user} />
+            </Suspense>
             <Suspense fallback={<AppInstallPanelSkeleton />}>
                 <AppInstallState appId={app.id} user={user} />
             </Suspense>

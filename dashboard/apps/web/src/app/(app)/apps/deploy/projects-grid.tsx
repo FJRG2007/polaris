@@ -13,7 +13,6 @@ import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RecycleBinButton } from "./recycle-bin";
 import { ImportSiteButton } from "./import-site";
 import { VariableGroupsButton } from "./variable-groups";
-import { useShowManaged } from "./show-managed";
 import { createProjectAction, deleteProjectAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -60,7 +59,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Input,
-    Switch,
     cn,
     MenuShortcut,
     ShortcutHint,
@@ -71,9 +69,6 @@ import {
 export interface ProjectCardData {
     id: string;
     name: string;
-    /** Polaris runs it for itself - the Marketplace project, or one holding only
-     *  its mail server. Kept behind a switch on the list. */
-    managed: boolean;
     environmentName: string;
     services: ServiceKind[];
     online: number;
@@ -108,17 +103,11 @@ export function ProjectsGrid({
     projects,
     canManage,
     localReady,
-    viewerId,
-    hideManagedByDefault = false,
     canCreateHere = canManage
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
     localReady: boolean;
-    /** Whose choice the switch below remembers. */
-    viewerId: string;
-    /** Whether the projects Polaris runs for itself start hidden. */
-    hideManagedByDefault?: boolean;
     /** Whether the reader may make a project on the open shelf - the import's own check. */
     canCreateHere?: boolean;
 }) {
@@ -128,7 +117,6 @@ export function ProjectsGrid({
     const tRegistries = useTranslations("deployRegistries");
     const t2 = useTranslations("deployConfig");
     const [layout, setLayout] = useState<"grid" | "list">("grid");
-    const [showManaged, setShowManaged] = useShowManaged(viewerId, !hideManagedByDefault);
     const [search, setSearch] = useState("");
     const [tag, setTag] = useState<string | null>(null);
     // Projects whose delete is in flight. Deleting one now takes its services off
@@ -169,11 +157,6 @@ export function ProjectsGrid({
         () => projects.filter((project) => !removing.includes(project.id)),
         [projects, removing]
     );
-    const managedCount = kept.filter((project) => project.managed).length;
-    const visible = useMemo(
-        () => (showManaged ? kept : kept.filter((project) => !project.managed)),
-        [kept, showManaged]
-    );
     const allTags = useMemo(
         () =>
             [
@@ -184,10 +167,10 @@ export function ProjectsGrid({
     // A tag that no project carries any more stops filtering instead of emptying the list.
     const activeTag = tag !== null && allTags.includes(tag) ? tag : null;
     const filtered = useMemo(
-        () => searchItems(filterByTag(visible, activeTag), search, PROJECT_FIELDS),
-        [visible, search, activeTag]
+        () => searchItems(filterByTag(kept, activeTag), search, PROJECT_FIELDS),
+        [kept, search, activeTag]
     );
-    const count = visible.length;
+    const count = kept.length;
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -284,19 +267,6 @@ export function ProjectsGrid({
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )}
-                    {/* Only when there is something it would hide. */}
-                    {managedCount > 0 && (
-                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                            <Switch
-                                checked={showManaged}
-                                onChange={setShowManaged}
-                                aria-label={t("projects.showManaged")}
-                            />
-                            <span className="hidden sm:inline">
-                                {t("projects.showManagedCount", { count: managedCount })}
-                            </span>
-                        </label>
-                    )}
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                         <button
                             type="button"
@@ -318,18 +288,7 @@ export function ProjectsGrid({
                 </div>
             </div>
 
-            {count === 0 && managedCount > 0 && !showManaged ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">
-                    {t("projects.onlyManaged", { count: managedCount })}{" "}
-                    <button
-                        type="button"
-                        onClick={() => setShowManaged(true)}
-                        className="font-medium text-primary hover:underline"
-                    >
-                        {t("projects.showThem")}
-                    </button>
-                </p>
-            ) : count === 0 ? (
+            {count === 0 ? (
                 <div
                     className="relative flex flex-col items-center gap-3 overflow-hidden rounded-xl border border-border/60 px-6 py-24 text-center"
                     style={DOT_CANVAS}

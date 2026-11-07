@@ -24,6 +24,8 @@
 import { prisma } from "@polaris/db";
 import { findApp, installedAppHref } from "@/lib/apps/catalog";
 import { visibleProjectIds } from "@/lib/deploy-service";
+import { appSettingsPath } from "@/lib/apps/app-settings";
+import { MAIL_SERVER_APP_ID, polarisProjectIds } from "@/lib/deploy/managed-projects";
 import type { Consumption } from "@/app/(app)/admin/consumption/types";
 import { localDockerDriver, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
 import {
@@ -121,7 +123,7 @@ export async function readConsumption(viewerId: string): Promise<Consumption> {
  * those rows they may open is a separate question, and the one `visible` settles.
  */
 async function readIndex(viewerId: string): Promise<ClaimIndex> {
-    const [applications, databases, installs, visible] = await Promise.all([
+    const [applications, databases, installs, visible, hidden, mail] = await Promise.all([
         prisma.application.findMany({
             select: {
                 id: true,
@@ -154,8 +156,15 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
             where: { status: { not: "removed" } },
             select: { id: true, name: true, catalogId: true, applicationId: true, ownerId: true }
         }),
-        visibleProjectIds(viewerId)
+        visibleProjectIds(viewerId),
+        polarisProjectIds(),
+        prisma.mailServer.findMany({
+            where: { applicationId: { not: null } },
+            select: { applicationId: true }
+        })
     ]);
+    const mailApplications = new Set(mail.map((row) => row.applicationId));
+    const mailApp = findApp(MAIL_SERVER_APP_ID);
 
     const owners = await ownerNames([
         ...applications.map((application) => application.environment.project.ownerId),
@@ -172,6 +181,24 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
 
     for (const application of applications) {
         const project = application.environment.project;
+        // A service Polaris runs for one of its apps is that app's, not a project's:
+        // it is listed under the app by name and opens at the app's settings.
+        // Installs are claimed below and replace this; the mail server stays here.
+        if (hidden.has(application.environment.projectId)) {
+            const isMail = mailApplications.has(application.id);
+            index.applications.set(subjectHash(application.id), {
+                key: isMail ? `app:${MAIL_SERVER_APP_ID}` : `service:${application.id}`,
+                bucket: {
+                    id: application.id,
+                    name: isMail ? (mailApp?.name ?? application.name) : application.name,
+                    detail: "",
+                    owner: owners.get(project.ownerId) ?? null,
+                    group: "apps",
+                    href: isMail ? appSettingsPath(MAIL_SERVER_APP_ID) : null
+                }
+            });
+            continue;
+        }
         index.applications.set(subjectHash(application.id), {
             key: `service:${application.id}`,
             bucket: {

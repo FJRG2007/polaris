@@ -169,5 +169,38 @@
         "builtInBy": "Viene con cada Polaris",
         "cannotUninstall": "Incluida - todo Polaris la necesita",
         "developer": "Polaris"
+    },
+    "services": {
+        "title": "Servicios",
+        "description": "Lo que Polaris ejecuta para esta app.",
+        "empty": "Esta app no ejecuta servicios ahora.",
+        "usage": "CPU {cpu} - Memoria {memory}",
+        "logs": "Logs",
+        "hideLogs": "Ocultar logs",
+        "refresh": "Actualizar",
+        "restart": "Reiniciar",
+        "restarting": "Reiniciando...",
+        "restartTitle": "¿Reiniciar {name}?",
+        "restartDescription": "Su contenedor se reinicia en el sitio. Queda sin servicio unos segundos; no se elimina nada.",
+        "restartFailed": "No se pudo reiniciar. Prueba de nuevo en un momento.",
+        "logsFailed": "No se pudo leer su salida. Prueba de nuevo en un momento.",
+        "notFound": "Ese servicio no es de esta app.",
+        "waitingOutput": "Esperando salida...",
+        "notRunning": "No está en marcha.",
+        "appSettings": "Abrir los ajustes de {name}",
+        "state": {
+            "running": "En marcha",
+            "stopped": "Parado",
+            "queued": "En cola",
+            "building": "Compilando",
+            "deploying": "Desplegando",
+            "success": "Hecho",
+            "deployed": "Desplegado",
+            "failed": "Fallido",
+            "cancelled": "Cancelado",
+            "rolled_back": "Revertido",
+            "removed": "Eliminado",
+            "unknown": "Sin datos"
+        }
     }
 }

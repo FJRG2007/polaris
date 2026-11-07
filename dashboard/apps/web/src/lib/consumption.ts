@@ -87,9 +87,9 @@ export const GROUPS: ReadonlyArray<{ id: ConsumptionGroupId; label: string; desc
         {
             id: "apps",
             // i18n-ignore said in the reader's words by admin/consumption's stateLabel
-            label: "Marketplace apps",
+            label: "Apps",
             // i18n-ignore said in the reader's words by admin/consumption's stateLabel
-            description: "Everything installed from the marketplace, game servers included."
+            description: "What each app runs, by app: Game servers, VPN, Places and the rest."
         },
         {
             id: "services",

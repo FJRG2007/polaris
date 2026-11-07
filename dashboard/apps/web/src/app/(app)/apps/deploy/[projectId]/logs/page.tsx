@@ -1,3 +1,4 @@
+import { leaveIfPolarisProject } from "../polaris-redirect";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
 import { getProjectFull } from "@/lib/deploy-service";
@@ -20,6 +21,7 @@ export default async function ProjectLogsPage({
 }) {
     const { projectId } = await params;
     const query = await searchParams;
+    await leaveIfPolarisProject(projectId, query.service);
     const user = await requirePermission("deploy.read");
 
     try {
@@ -36,7 +38,11 @@ export default async function ProjectLogsPage({
     // opens on the environment holding it, with that service selected.
     const service = pick(query.service);
     const environment =
-        (service ? project.environments.find((entry) => entry.applications.some((app) => app.id === service)) : undefined) ??
+        (service
+            ? project.environments.find((entry) =>
+                  entry.applications.some((app) => app.id === service)
+              )
+            : undefined) ??
         project.environments.find((entry) => entry.id === requested) ??
         project.environments.find((entry) => entry.isDefault) ??
         project.environments[0];
