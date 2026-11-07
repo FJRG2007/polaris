@@ -187,6 +187,20 @@
         "notFound": "That service is not one of this app's.",
         "waitingOutput": "Waiting for output...",
         "notRunning": "Not running.",
-        "appSettings": "Open the {name} settings"
+        "appSettings": "Open the {name} settings",
+        "state": {
+            "running": "Running",
+            "stopped": "Stopped",
+            "queued": "Queued",
+            "building": "Building",
+            "deploying": "Deploying",
+            "success": "Done",
+            "deployed": "Deployed",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "rolled_back": "Rolled back",
+            "removed": "Removed",
+            "unknown": "Unknown"
+        }
     }
 }

@@ -20,7 +20,7 @@ const db = vi.hoisted(() => ({
         applications: string[];
         databases: number;
     }>,
-    installs: [] as Array<{ applicationId: string | null; catalogId: string }>,
+    installs: [] as Array<{ applicationId: string | null; catalogId: string; status?: string }>,
     mail: [] as Array<{ applicationId: string | null }>,
     applications: [] as Array<{ id: string; projectId: string }>
 }));
@@ -35,19 +35,19 @@ vi.mock("@polaris/db", () => {
         prisma: {
             project: {
                 findMany: async ({ where }: { where: Record<string, unknown> }) => {
-                    if (where.slug) {
+                    if (typeof where.slug === "string") {
                         return db.projects
                             .filter((project) => project.slug === where.slug)
                             .map(({ id }) => ({ id }));
                     }
-                    const skip = (where.id as { notIn: string[] }).notIn;
+                    const skip = (where.slug as { not: string } | undefined)?.not;
                     const managed = (
                         where.environments as {
                             some: { applications: { some: { id: { in: string[] } } } };
                         }
                     ).some.applications.some.id.in;
                     return db.projects
-                        .filter((project) => !skip.includes(project.id))
+                        .filter((project) => project.slug !== skip)
                         .filter((project) => project.applications.some((id) => managed.includes(id)))
                         .map((project) => ({
                             id: project.id,
@@ -64,8 +64,14 @@ vi.mock("@polaris/db", () => {
                 }
             },
             installedApp: {
-                findMany: async ({ where }: { where?: { applicationId?: { in?: string[] } } }) =>
-                    db.installs.filter(inIds(where))
+                findMany: async ({
+                    where
+                }: {
+                    where?: { applicationId?: { in?: string[] }; status?: { not: string } };
+                }) =>
+                    db.installs
+                        .filter(inIds(where))
+                        .filter((row) => !where?.status || row.status !== where.status.not)
             },
             mailServer: {
                 findMany: async ({ where }: { where?: { applicationId?: { in?: string[] } } }) =>
@@ -167,6 +173,12 @@ describe("the projects every Deploy listing leaves out", () => {
         expect([...hidden].sort()).toEqual(["mail", "market-ada", "market-bob"]);
     });
 
+    it("gives back a project whose install was removed", async () => {
+        db.projects = [{ id: "old", slug: "old-world", applications: ["old-app"], databases: 0 }];
+        db.installs = [{ applicationId: "old-app", catalogId: "minecraft", status: "removed" }];
+        expect([...(await polarisProjectIds())]).toEqual([]);
+    });
+
     it("hides only the Marketplace projects when Polaris set up no service elsewhere", async () => {
         db.projects = [
             { id: "market", slug: MARKETPLACE_PROJECT_SLUG, applications: [], databases: 0 },
@@ -176,26 +188,30 @@ describe("the projects every Deploy listing leaves out", () => {
     });
 });
 
+const VPN_APP = "00000000-0000-4000-8000-000000000001";
+const MC_APP = "00000000-0000-4000-8000-000000000002";
+const SITE_APP = "00000000-0000-4000-8000-000000000003";
+
 describe("an address into one of those projects", () => {
     beforeEach(() => {
         db.projects = [
-            { id: "market", slug: MARKETPLACE_PROJECT_SLUG, applications: ["vpn-app", "mc-app"], databases: 0 },
-            { id: "site", slug: "site", applications: ["site-app"], databases: 0 }
+            { id: "market", slug: MARKETPLACE_PROJECT_SLUG, applications: [VPN_APP, MC_APP], databases: 0 },
+            { id: "site", slug: "site", applications: [SITE_APP], databases: 0 }
         ];
         db.installs = [
-            { applicationId: "vpn-app", catalogId: "vpn-engine" },
-            { applicationId: "mc-app", catalogId: "minecraft" }
+            { applicationId: VPN_APP, catalogId: "vpn-engine" },
+            { applicationId: MC_APP, catalogId: "minecraft" }
         ];
         db.applications = [
-            { id: "vpn-app", projectId: "market" },
-            { id: "mc-app", projectId: "market" },
-            { id: "site-app", projectId: "site" }
+            { id: VPN_APP, projectId: "market" },
+            { id: MC_APP, projectId: "market" },
+            { id: SITE_APP, projectId: "site" }
         ];
     });
 
     it("goes to the settings of the app that runs the service it names", async () => {
-        expect(await polarisProjectRedirect("market", "vpn-app")).toBe("/admin/apps/vpn/settings");
-        expect(await polarisProjectRedirect("market", "mc-app")).toBe(
+        expect(await polarisProjectRedirect("market", VPN_APP)).toBe("/admin/apps/vpn/settings");
+        expect(await polarisProjectRedirect("market", MC_APP)).toBe(
             "/admin/apps/game-servers/settings"
         );
     });
@@ -204,8 +220,12 @@ describe("an address into one of those projects", () => {
         expect(await polarisProjectRedirect("market")).toBe("/admin/apps");
     });
 
+    it("ignores a service id that is not one, rather than failing", async () => {
+        expect(await polarisProjectRedirect("market", "abc")).toBe("/admin/apps");
+    });
+
     it("leaves a project somebody deployed exactly as it was", async () => {
-        expect(await polarisProjectRedirect("site", "site-app")).toBeNull();
+        expect(await polarisProjectRedirect("site", SITE_APP)).toBeNull();
     });
 });
 

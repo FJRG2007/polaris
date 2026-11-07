@@ -187,6 +187,20 @@
         "notFound": "Ese servicio no es de esta app.",
         "waitingOutput": "Esperando salida...",
         "notRunning": "No está en marcha.",
-        "appSettings": "Abrir los ajustes de {name}"
+        "appSettings": "Abrir los ajustes de {name}",
+        "state": {
+            "running": "En marcha",
+            "stopped": "Parado",
+            "queued": "En cola",
+            "building": "Compilando",
+            "deploying": "Desplegando",
+            "success": "Hecho",
+            "deployed": "Desplegado",
+            "failed": "Fallido",
+            "cancelled": "Cancelado",
+            "rolled_back": "Revertido",
+            "removed": "Eliminado",
+            "unknown": "Sin datos"
+        }
     }
 }

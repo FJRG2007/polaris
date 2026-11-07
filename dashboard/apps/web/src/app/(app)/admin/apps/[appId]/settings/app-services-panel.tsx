@@ -15,7 +15,44 @@ import type { AppService } from "@/lib/apps/app-services";
 import { readAppServiceLogAction, restartAppServiceAction } from "./service-actions";
 import { RefreshCw, RotateCw, ScrollText } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { StatusPill, dbTone } from "@/app/(app)/apps/deploy/status-pill";
+import { StatusPill } from "@/app/(app)/apps/deploy/status-pill";
+
+const RELEASE_STATES = [
+    "running",
+    "stopped",
+    "queued",
+    "building",
+    "deploying",
+    "success",
+    "deployed",
+    "failed",
+    "cancelled",
+    "rolled_back",
+    "removed"
+] as const;
+
+type ServiceState = (typeof RELEASE_STATES)[number] | "unknown";
+
+type Tone = "success" | "warning" | "danger" | "idle";
+
+const IN_FLIGHT: ReadonlySet<string> = new Set(["queued", "building", "deploying"]);
+
+/**
+ * What the pill says: a release under way while it is, otherwise whether a
+ * container is up right now, with the last release only when the engine could
+ * not be read.
+ */
+function serviceState(service: AppService): { state: ServiceState; tone: Tone } {
+    const status = service.status.toLowerCase();
+    if (IN_FLIGHT.has(status)) return { state: status as ServiceState, tone: "warning" };
+    if (service.running === true) return { state: "running", tone: "success" };
+    if (service.running === false)
+        return { state: status === "failed" ? "failed" : "stopped", tone: "danger" };
+    const known = (RELEASE_STATES as readonly string[]).includes(status);
+    const state = known ? (status as ServiceState) : "unknown";
+    const tone: Tone = state === "running" ? "success" : state === "failed" ? "danger" : "idle";
+    return { state, tone };
+}
 
 function ServicesHeading() {
     const t = useTranslations("marketplace");
@@ -70,7 +107,8 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
     const [showLogs, setShowLogs] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [restarting, startRestart] = useTransition();
-    const running = service.status.toLowerCase() === "running";
+    const { state, tone } = serviceState(service);
+    const running = state === "running";
     const { log, logError, refresh } = useServiceLog(appId, service.applicationId, showLogs);
     const title = service.installName ?? service.name;
 
@@ -103,7 +141,11 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                             </p>
                         ) : null}
                     </div>
-                    <StatusPill tone={dbTone(service.status)} label={service.status} />
+                    <StatusPill
+                        tone={tone}
+                        label={t(`services.state.${state}`)}
+                        capitalize={false}
+                    />
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                         {t("services.usage", {
                             cpu: service.cpuPercent === null ? "-" : `${service.cpuPercent}%`,

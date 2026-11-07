@@ -32,9 +32,9 @@ export default async function ProjectLayout({
     const project = await getProject(projectId, user.id);
     if (!project) notFound();
     // A project Polaris runs for one of its apps draws no shell and reads nothing
-    // more: the page under it sends the reader to that app's settings, and only
-    // the page can see which service the address named.
-    if (await polarisProjectIds().then((hidden) => hidden.has(project.id))) return children;
+    // more for an administrator: the page under it sends them to that app's
+    // settings, and only the page can see which service the address named.
+    if (user.isAdmin && (await polarisProjectIds()).has(project.id)) return children;
 
     // The switcher in this shell lists the shelf the project itself is on, not
     // whichever one happens to be open: a project reached by link must not offer

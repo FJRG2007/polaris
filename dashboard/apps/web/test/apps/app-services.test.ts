@@ -13,22 +13,50 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => ({
     restarted: [] as Array<[string, string]>,
-    logs: [] as Array<[string, string, number]>
+    logs: [] as Array<[string, string, number]>,
+    containers: null as Array<{ id: string; name: string; state: string; composeProject: string }> | null,
+    binned: [] as string[]
 }));
+
+const installs = [
+    { id: "i-vpn", name: "VPN control server", catalogId: "vpn-engine", applicationId: "vpn-app", status: "running" },
+    { id: "i-mc", name: "Survival", catalogId: "minecraft", applicationId: "mc-app", status: "running" },
+    { id: "i-old", name: "Old world", catalogId: "minecraft", applicationId: "old-app", status: "removed" }
+];
+
+type InstallWhere = {
+    applicationId?: string | { not: null };
+    status?: { not: string };
+    catalogId?: { in: string[] };
+};
+
+function matching(where: InstallWhere) {
+    return installs.filter(
+        (row) =>
+            (!where.catalogId || where.catalogId.in.includes(row.catalogId)) &&
+            (!where.status || row.status !== where.status.not) &&
+            (typeof where.applicationId !== "string" || row.applicationId === where.applicationId)
+    );
+}
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            findMany: async () => [
-                { id: "i-vpn", name: "VPN control server", catalogId: "vpn-engine", applicationId: "vpn-app" },
-                { id: "i-mc", name: "Survival", catalogId: "minecraft", applicationId: "mc-app" }
-            ]
+            findMany: async ({ where }: { where: InstallWhere }) => matching(where),
+            findFirst: async ({ where }: { where: InstallWhere }) => matching(where)[0] ?? null
         },
-        mailServer: { findMany: async () => [{ applicationId: "mail-app" }] },
+        mailServer: {
+            findMany: async () => [{ applicationId: "mail-app" }],
+            findFirst: async ({ where }: { where: { applicationId?: string | { not: null } } }) =>
+                typeof where.applicationId !== "string" || where.applicationId === "mail-app"
+                    ? { id: "mail" }
+                    : null
+        },
         application: {
-            findUnique: async ({ where }: { where: { id: string } }) => ({
-                environment: { project: { ownerId: `owner-of-${where.id}` } }
-            }),
+            findFirst: async ({ where }: { where: { id: string; binnedAt: null } }) =>
+                calls.binned.includes(where.id)
+                    ? null
+                    : { environment: { project: { ownerId: `owner-of-${where.id}` } } },
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
                 where.id.in.map((id) => ({ id, name: `${id}-service`, currentDeploymentId: null }))
         }
@@ -43,17 +71,32 @@ vi.mock("@/lib/deploy-service", () => ({
     getApplicationDeployStatuses: async (apps: Array<{ id: string }>) =>
         Object.fromEntries(apps.map((app) => [app.id, "running"]))
 }));
-vi.mock("@/lib/consumption-service", () => ({
-    readConsumption: async () => {
-        throw new Error("engine unreachable");
-    }
+vi.mock("@/lib/docker-service", () => ({
+    LOCAL_DOCKER_CONNECTION_ID: "local",
+    localDockerDriver: () => ({
+        listContainers: async () => {
+            if (!calls.containers) throw new Error("engine unreachable");
+            return calls.containers;
+        },
+        dispose: async () => undefined
+    })
+}));
+vi.mock("@/lib/container-stats-cache", () => ({
+    STATS_TTL_MS: 60_000,
+    cachedSamples: () =>
+        new Map([["c-mc", { at: Date.now(), stats: { cpuPercent: 12.34, memUsage: 2048 } }]]),
+    oldestSampleAt: () => Date.now(),
+    refreshSamples: () => undefined
 }));
 
 const services = await import("@/lib/apps/app-services");
+const { subjectHash } = await import("@/lib/consumption");
 
 beforeEach(() => {
     calls.restarted = [];
     calls.logs = [];
+    calls.containers = null;
+    calls.binned = [];
 });
 
 describe("an app's services", () => {
@@ -67,8 +110,26 @@ describe("an app's services", () => {
     it("still list with their state when the engine's figures cannot be read", async () => {
         const [vpn] = await services.listAppServices("vpn", "admin");
         expect(vpn?.applicationId).toBe("vpn-app");
+        expect(vpn?.running).toBeNull();
         expect(vpn?.cpuPercent).toBeNull();
         expect(vpn?.memUsedBytes).toBeNull();
+    });
+
+    it("say whether a container is up from the engine, not from the last release", async () => {
+        calls.containers = [
+            { id: "c-mc", name: "mc", state: "running", composeProject: `polaris-${subjectHash("mc-app")}` },
+            { id: "c-vpn", name: "vpn", state: "exited", composeProject: `polaris-${subjectHash("vpn-app")}` },
+            { id: "c-other", name: "site", state: "running", composeProject: "polaris-0badc0de" }
+        ];
+        const [mc] = await services.listAppServices("game-servers", "admin");
+        expect(mc).toMatchObject({ running: true, cpuPercent: 12.3, memUsedBytes: 2048 });
+        const [vpn] = await services.listAppServices("vpn", "admin");
+        expect(vpn).toMatchObject({ status: "running", running: false, cpuPercent: null });
+    });
+
+    it("leave out an install that was removed", async () => {
+        const list = await services.listAppServices("game-servers", "admin");
+        expect(list.map((one) => one.applicationId)).not.toContain("old-app");
     });
 
     it("include the mail server's for the mail server app", async () => {
@@ -95,8 +156,15 @@ describe("restarting and reading one", () => {
         expect(await services.restartAppService("vpn", "mc-app")).toBe(false);
         expect(await services.restartAppService("vpn", "somebodys-site")).toBe(false);
         expect(await services.readAppServiceLog("game-servers", "vpn-app", 500)).toBeNull();
+        expect(await services.restartAppService("game-servers", "old-app")).toBe(false);
         expect(calls.restarted).toEqual([]);
         expect(calls.logs).toEqual([]);
+    });
+
+    it("refuses a service that was binned", async () => {
+        calls.binned = ["vpn-app"];
+        expect(await services.restartAppService("vpn", "vpn-app")).toBe(false);
+        expect(calls.restarted).toEqual([]);
     });
 });
 

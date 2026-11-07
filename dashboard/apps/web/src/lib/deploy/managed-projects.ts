@@ -17,8 +17,10 @@
  * operator happened to call "Mail" is theirs.
  */
 
+import { z } from "zod";
+import { cache } from "react";
 import { prisma } from "@polaris/db";
-import { findApp } from "@/lib/apps/catalog";
+import { catalogApps, findApp } from "@/lib/apps/catalog";
 import { appSettingsPath } from "@/lib/apps/app-settings";
 import { POLARIS_APPS_PATH } from "@/lib/apps/marketplace-store";
 
@@ -46,32 +48,6 @@ export function isManagedProject(project: ProjectShape, managed: ReadonlySet<str
     return project.applicationIds.every((id) => managed.has(id));
 }
 
-/**
- * The services among these that back something Polaris installed: a
- * marketplace app or the mail server. Two indexed reads, whatever the count.
- */
-export async function polarisManagedApplications(
-    applicationIds: readonly string[]
-): Promise<Set<string>> {
-    if (applicationIds.length === 0) return new Set();
-    const ids = [...new Set(applicationIds)];
-    const [installs, mail] = await Promise.all([
-        prisma.installedApp.findMany({
-            where: { applicationId: { in: ids } },
-            select: { applicationId: true }
-        }),
-        prisma.mailServer.findMany({
-            where: { applicationId: { in: ids } },
-            select: { applicationId: true }
-        })
-    ]);
-    return new Set(
-        [...installs, ...mail]
-            .map((row) => row.applicationId)
-            .filter((id): id is string => id !== null)
-    );
-}
-
 /** The app the mail server's services belong to. */
 export const MAIL_SERVER_APP_ID = "mail-server";
 
@@ -81,19 +57,27 @@ export function owningAppId(catalogId: string): string {
     return findApp(catalogId)?.ownedBy ?? catalogId;
 }
 
+/** Every catalog id whose installs belong to this app - the inverse of `owningAppId`. */
+export function ownedCatalogIds(appId: string): string[] {
+    const ids = catalogApps()
+        .filter((app) => (app.ownedBy ?? app.id) === appId)
+        .map((app) => app.id);
+    return findApp(appId) ? ids : [...ids, appId];
+}
+
 /**
  * The projects no Deploy listing shows: every Marketplace project, and every one
  * holding nothing but services Polaris set up. Three indexed reads plus one over
  * the few projects that hold such a service, whatever the instance's size.
  */
-export async function polarisProjectIds(): Promise<Set<string>> {
+export const polarisProjectIds = cache(async (): Promise<Set<string>> => {
     const [marketplace, installs, mail] = await Promise.all([
         prisma.project.findMany({
             where: { slug: MARKETPLACE_PROJECT_SLUG },
             select: { id: true }
         }),
         prisma.installedApp.findMany({
-            where: { applicationId: { not: null } },
+            where: { applicationId: { not: null }, status: { not: "removed" } },
             select: { applicationId: true }
         }),
         prisma.mailServer.findMany({
@@ -110,7 +94,7 @@ export async function polarisProjectIds(): Promise<Set<string>> {
     if (managed.size === 0) return hidden;
     const candidates = await prisma.project.findMany({
         where: {
-            id: { notIn: [...hidden] },
+            slug: { not: MARKETPLACE_PROJECT_SLUG },
             environments: { some: { applications: { some: { id: { in: [...managed] } } } } }
         },
         select: {
@@ -135,7 +119,7 @@ export async function polarisProjectIds(): Promise<Set<string>> {
         if (isManagedProject(shape, managed)) hidden.add(project.id);
     }
     return hidden;
-}
+});
 
 /** The app each of these services belongs to, for those Polaris set up. */
 export async function owningApps(applicationIds: readonly string[]): Promise<Map<string, string>> {
@@ -165,16 +149,17 @@ export async function owningApps(applicationIds: readonly string[]): Promise<Map
  * Where a Deploy address into one of these projects goes instead: the settings of
  * the app that runs the service (or the project's only app), else the Polaris
  * apps list. Null for a project somebody deployed, which opens as it always did.
- * Only an address is decided here; the settings page asks for an administrator
- * itself, so nobody else is shown anything by following it.
+ * Only an address is decided here; the caller sends only an administrator on,
+ * since those settings are an administrator's screen.
  */
 export async function polarisProjectRedirect(
     projectId: string,
     serviceId?: string | null
 ): Promise<string | null> {
     if (!(await polarisProjectIds()).has(projectId)) return null;
+    const service = z.string().uuid().safeParse(serviceId);
     const services = await prisma.application.findMany({
-        where: { environment: { projectId }, ...(serviceId ? { id: serviceId } : {}) },
+        where: { environment: { projectId }, ...(service.success ? { id: service.data } : {}) },
         select: { id: true }
     });
     const apps = new Set((await owningApps(services.map((service) => service.id))).values());
