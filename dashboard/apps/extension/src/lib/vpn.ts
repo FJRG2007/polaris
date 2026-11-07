@@ -19,6 +19,7 @@
  */
 
 import { EVERY_SITE } from "@/lib/injection";
+import { countryCode } from "@/lib/vpn-places";
 
 /** A server this account may leave through. */
 export interface VpnNode {
@@ -31,6 +32,10 @@ export interface VpnNode {
     /** Why not, while `browser` is false; null when the host did not say, as one
      *  older than this reason does. */
     readonly browserIssue: VpnBrowserIssue | null;
+    /** Where traffic comes out, as a two-letter country code and a city; null where
+     *  the host has not placed it or is too old to say. */
+    readonly country: string | null;
+    readonly city: string | null;
 }
 
 export type VpnBrowserIssue = "edge" | "address" | "failed";
@@ -183,7 +188,9 @@ export function readNodes(value: unknown): VpnNode[] {
                       name: node.name,
                       exit: node.exit === "tor" ? "tor" : "direct",
                       browser: node.browser === true,
-                      browserIssue: node.browser === true ? null : browserIssueOf(node.browserIssue)
+                      browserIssue: node.browser === true ? null : browserIssueOf(node.browserIssue),
+                      country: countryCode(typeof node.country === "string" ? node.country : null),
+                      city: typeof node.city === "string" && node.city.trim() ? node.city.trim().slice(0, 120) : null
                   }
               ]
             : []

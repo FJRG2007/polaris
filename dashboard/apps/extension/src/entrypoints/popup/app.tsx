@@ -14,6 +14,7 @@ import { Picker } from "./picker";
 import { CheckMark, CopyMark, EyeMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
 import { addable, AddressNote, useAddressCheck } from "./server-check";
+import { VpnPanel } from "./vpn-panel";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useWords } from "./words";
 import type { Words } from "@/lib/words";
@@ -395,6 +396,11 @@ export function App(): React.JSX.Element {
                 <>
                     <SectionBar title={t("shell.settings")} onBack={() => setSection("home")} />
                     <Settings canPolar={status.canPolar !== false} />
+                </>
+            ) : section === "vpn" ? (
+                <>
+                    <SectionBar title={t("vpn.title")} onBack={() => setSection("home")} />
+                    <VpnPanel />
                 </>
             ) : section === "servers" ? (
                 <>

@@ -129,7 +129,17 @@ describe("readNodes", () => {
             readNodes({
                 nodes: [{ id: "a", name: "A", exit: "x", browser: true }, { id: 1 }, null]
             })
-        ).toEqual([{ id: "a", name: "A", exit: "direct", browser: true, browserIssue: null }]);
+        ).toEqual([
+            {
+                id: "a",
+                name: "A",
+                exit: "direct",
+                browser: true,
+                browserIssue: null,
+                country: null,
+                city: null
+            }
+        ]);
         expect(readNodes(null)).toEqual([]);
     });
 
@@ -144,6 +154,19 @@ describe("readNodes", () => {
                 ]
             }).map((node) => node.browserIssue)
         ).toEqual(["edge", null, null, null]);
+    });
+
+    it("reads where a server is, and nothing where an older host says nothing", () => {
+        const [placed, bare, odd] = readNodes({
+            nodes: [
+                { id: "a", name: "A", browser: true, country: "es", city: " Madrid " },
+                { id: "b", name: "B", browser: true },
+                { id: "c", name: "C", browser: true, country: "Spain", city: "  " }
+            ]
+        });
+        expect([placed?.country, placed?.city]).toEqual(["ES", "Madrid"]);
+        expect([bare?.country, bare?.city]).toEqual([null, null]);
+        expect([odd?.country, odd?.city]).toEqual([null, null]);
     });
 });
 
