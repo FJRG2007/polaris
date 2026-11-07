@@ -188,7 +188,6 @@
                 <!-- The active profile's initial, before the greeting: shown with two or more profiles, OK opens
                      "Who's watching?". -->
                 <LinearLayout
-                    android:id="@+id/greetingRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
