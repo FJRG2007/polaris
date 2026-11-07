@@ -38,7 +38,9 @@ const idSchema = z.string().uuid();
 
 /** Everything this account can do, and why. Loaded after the page paints: it is
  *  a resolution per source per permission, and the shell has nothing to wait for. */
-export async function userAccessAction(userId: string): Promise<{ access?: AccessExplanation; error?: string }> {
+export async function userAccessAction(
+    userId: string
+): Promise<{ access?: AccessExplanation; error?: string }> {
     await requireAdmin();
     const t = await getTranslations("admin");
     const parsed = idSchema.safeParse(userId);
@@ -46,7 +48,9 @@ export async function userAccessAction(userId: string): Promise<{ access?: Acces
     try {
         return { access: await explainUserAccess(parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : t("usersDetail.errors.accessFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : t("usersDetail.errors.accessFailed")
+        };
     }
 }
 
@@ -58,7 +62,8 @@ export async function setUserGroupAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ userId: idSchema, groupId: idSchema }).safeParse({ userId, groupId });
-    if (!parsed.success) return { error: (await getTranslations("admin"))("usersDetail.errors.unknownGroup") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("usersDetail.errors.unknownGroup") };
     if (member) await addGroupMember(parsed.data.groupId, parsed.data.userId);
     else await removeGroupMember(parsed.data.groupId, parsed.data.userId);
     await recordAudit({
@@ -80,8 +85,11 @@ export async function setUserPolicyAction(
     attached: boolean
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const parsed = z.object({ userId: idSchema, policyId: idSchema }).safeParse({ userId, policyId });
-    if (!parsed.success) return { error: (await getTranslations("admin"))("usersDetail.errors.unknownPolicy") };
+    const parsed = z
+        .object({ userId: idSchema, policyId: idSchema })
+        .safeParse({ userId, policyId });
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("usersDetail.errors.unknownPolicy") };
     if (attached) await attachPolicy(parsed.data.policyId, "user", parsed.data.userId);
     else await detachPolicy(parsed.data.policyId, "user", parsed.data.userId);
     await recordAudit({
@@ -176,7 +184,8 @@ export async function setUserPermissionAction(
             state: z.enum(["inherit", "allow", "deny"])
         })
         .safeParse({ userId, permission, state });
-    if (!parsed.success) return { error: (await getTranslations("admin"))("usersDetail.errors.notCapability") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("usersDetail.errors.notCapability") };
 
     if (parsed.data.state === "inherit") {
         await prisma.userPermission.deleteMany({

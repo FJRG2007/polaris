@@ -24,10 +24,7 @@ export default async function RolesAdminPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("roles.page.title")}
-                description={t("roles.page.description")}
-            />
+            <PageHeader title={t("roles.page.title")} description={t("roles.page.description")} />
             <RolesAdmin roles={roles} listed={listedPermissions(installed)} />
         </>
     );
