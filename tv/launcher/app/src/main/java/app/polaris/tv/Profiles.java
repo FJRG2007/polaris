@@ -207,6 +207,14 @@ final class Profiles {
         return linkedHere && accountFirstName != null ? accountFirstName : "";
     }
 
+    /**
+     * Whether the TV's Polaris link is this profile's. With no roster the link is the TV's; with one, only the
+     * recorded profile's, so none is once the profile it belonged to was deleted.
+     */
+    static boolean linkedHere(Profile profile, String linkedId) {
+        return profile == null || profile.id.equals(linkedId);
+    }
+
     // ---- On the TV ----
 
     private static SharedPreferences prefs(Context ctx) {

@@ -28,6 +28,12 @@ describe("the account a TV is told about", () => {
         expect(tvAccount({ name: "A".repeat(200) }).firstName).toHaveLength(40);
     });
 
+    it("caps a name of astral characters without refusing it", () => {
+        const first = tvAccount({ name: "\u{1F600}".repeat(60) }).firstName ?? "";
+        expect(Array.from(first)).toHaveLength(40);
+        expect(tvAccount({ name: "x", firstName: "\u{20000}".repeat(25) }).firstName).toBe("\u{20000}".repeat(25));
+    });
+
     it("drops a locale Polaris does not have", () => {
         expect(tvAccount({ name: "Sample", locale: "xx-YY" }).locale).toBeNull();
         expect(tvAccount({ name: "Sample", locale: null }).locale).toBeNull();

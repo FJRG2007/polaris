@@ -44,6 +44,18 @@ public class ProfilesTest {
     }
 
     @Test
+    public void onlyTheLinkedProfileGreetsByTheAccount() {
+        Profiles.Profile one = Profiles.first("a", "Sam", "");
+        Profiles.Profile two = new Profiles.Profile("b", "", "red", false, "");
+        assertTrue(Profiles.linkedHere(null, null));
+        assertTrue(Profiles.linkedHere(one, "a"));
+        assertFalse(Profiles.linkedHere(two, "a"));
+        // The linked profile was deleted: no one left greets by the account's name.
+        assertFalse(Profiles.linkedHere(two, null));
+        assertEquals("", Profiles.greetingName(two, Profiles.linkedHere(two, null), "", "Sam"));
+    }
+
+    @Test
     public void theRosterIsCappedAtSix() {
         assertTrue(Profiles.canAdd(roster(5)));
         assertFalse(Profiles.canAdd(roster(6)));

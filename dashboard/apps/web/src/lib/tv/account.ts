@@ -25,7 +25,11 @@ function cleaned(value: string | null | undefined): string {
 
 export const tvAccountSchema = z.object({
     name: z.string(),
-    firstName: z.string().min(1).max(FIRST_NAME_MAX).nullable(),
+    firstName: z
+        .string()
+        .min(1)
+        .refine((value) => Array.from(value).length <= FIRST_NAME_MAX)
+        .nullable(),
     locale: z
         .string()
         .refine((value) => isLocale(value))
