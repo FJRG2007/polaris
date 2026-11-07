@@ -142,6 +142,75 @@ describe("switching mode", () => {
     });
 });
 
+describe("switching mode never leaves NaN", () => {
+    const MODES = ["person", "car", "cyclist", "helicopter"];
+    const START = { x: 3.6, y: 0, z: 412, heading: 0 };
+    // Where the player is when they switch: at rest right after start, moving, airborne, and already broken
+    const leaving = {
+        "right after start": { position: { ...START }, heading: 0, speed: 0 },
+        moving: { position: { x: 120, y: 0, z: -300 }, heading: 2.4, speed: 31 },
+        airborne: { position: { x: -110, y: 240, z: 352 }, heading: 0.62, speed: 52, verticalSpeed: 12 },
+        "with a NaN heading": { position: { x: 5, y: 0, z: 8 }, heading: Number.NaN, speed: 4 },
+        "with a NaN place": { position: { x: Number.NaN, y: 0, z: 1 }, heading: 1, speed: Number.NaN }
+    };
+
+    /** The switch as controllers.js runs it: settle, arrive (arrivalFor -> placeArrival), settle the new body. */
+    function switchTo(from: Record<string, any>, next: string) {
+        rules.settleBody(from, from.last, START);
+        const body: Record<string, any> = { position: { ...START }, heading: 0, speed: 0, verticalSpeed: 0 };
+        const last = { ...START };
+        const arrival = rules.arrivalFor({ ...from.position, heading: from.heading }, next);
+        if (arrival) {
+            const spot = placement.placeArrival({ ...arrival, onRoad: next !== "person", edges: [], clear: () => true });
+            if (spot) {
+                body.position.x = spot.x;
+                body.position.z = spot.z;
+                body.heading = spot.heading;
+                body.position.y = next === "helicopter" ? Math.max(0.25, arrival.altitude ?? 92) : 0;
+            }
+        }
+        rules.settleBody(body, last, START);
+        return body;
+    }
+
+    for (const [when, state] of Object.entries(leaving)) {
+        for (const from of MODES) {
+            for (const to of MODES.filter((m) => m !== from)) {
+                it(`${from} -> ${to}, ${when}`, () => {
+                    const body = switchTo(
+                        { ...state, position: { ...state.position }, last: { ...START }, type: from },
+                        to
+                    );
+                    expect([body.position.x, body.position.y, body.position.z, body.heading, body.speed].every(Number.isFinite)).toBe(true);
+                    expect(rules.hudReadout(Math.abs(body.speed) * 2.237)).not.toContain("NaN");
+                    expect(rules.hudReadout(body.position.y * 3.281)).not.toContain("NaN");
+                });
+            }
+        }
+    }
+
+    it("puts a broken body back where it last was, at rest, and says what it repaired", () => {
+        const body = { position: { x: Number.NaN, y: 4, z: 2 }, heading: Number.POSITIVE_INFINITY, speed: 9, vx: Number.NaN };
+        const repaired = rules.settleBody(body, { x: 1, y: 0, z: 2, heading: 0.5 });
+        expect(body).toEqual({ position: { x: 1, y: 0, z: 2 }, heading: 0.5, speed: 0, vx: 0 });
+        expect(repaired).toEqual(["x", "heading"]);
+    });
+
+    it("zeroes a NaN speed without moving a body that is in place", () => {
+        const last = { x: 0, y: 0, z: 0, heading: 0 };
+        const body = { position: { x: 7, y: 1, z: 3 }, heading: 2, speed: Number.NaN };
+        expect(rules.settleBody(body, last)).toEqual(["speed"]);
+        expect(body).toEqual({ position: { x: 7, y: 1, z: 3 }, heading: 2, speed: 0 });
+        expect(last).toEqual({ x: 7, y: 1, z: 3, heading: 2 });
+    });
+
+    it("shows a dash, never NaN, for a readout with no number", () => {
+        expect(rules.hudReadout(Number.NaN)).toBe("-");
+        expect(rules.hudReadout(Number.POSITIVE_INFINITY)).toBe("-");
+        expect(rules.hudReadout(41.6)).toBe("42");
+    });
+});
+
 describe("arrival placement", () => {
     // A northbound avenue (north = -z) along x = 0, lanes 2 m and 5 m right of its centre line, 200 m long
     const avenue = { sx: 0, sz: 100, dx: 0, dz: -1, rx: 1, rz: 0, len: 200, lanes: [2, 5] };
