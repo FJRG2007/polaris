@@ -266,6 +266,23 @@ function createExtrudedPolygonMesh(pts, bottomY, height, material, receiveShadow
   return mesh;
 }
 
+/**
+ * Whether (x, z) is covered by `pts` as createExtrudedPolygonMesh fills it. An inset of a thin or ragged outline can
+ * cross itself, and the triangulation then covers a different area than an even-odd test calls inside: a tree placed
+ * by the test alone can stand over the walk beside the bed. Returns a predicate, triangulating once per outline.
+ */
+function drawnPolygonTest(pts) {
+  let contour = createWorldXZShape(pts).extractPoints(1).shape;
+  if (!THREE.ShapeUtils.isClockWise(contour)) contour = contour.reverse();
+  const faces = THREE.ShapeUtils.triangulateShape(contour, []);
+  const side = (a, b, x, y) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+  return (x, z) => faces.some(([i, j, k]) => {
+    const a = contour[i], b = contour[j], c = contour[k];
+    const d1 = side(a, b, x, -z), d2 = side(b, c, x, -z), d3 = side(c, a, x, -z);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  });
+}
+
 function createFlatPolygonMesh(pts, y, material, receiveShadow = true) {
   const shape = createWorldXZShape(pts);
   const geo = new THREE.ShapeGeometry(shape, 1);
@@ -2056,7 +2073,7 @@ function buildCityGrid(scene) {
   };
 
   // Scatters trees on a jittered grid inside polygon `pts` (kept `margin` m from its edges)
-  function scatterParkTrees(pts, spacing, y, margin, speciesMix) {
+  function scatterParkTrees(pts, spacing, y, margin, speciesMix, onLawn = () => true) {
     const inner = offsetConvexPolygon(pts, -margin);
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const p of inner) {
@@ -2066,7 +2083,7 @@ function buildCityGrid(scene) {
       for (let gz = z0; gz <= z1; gz += spacing) {
         const tx = gx + (prand(gx, gz) - 0.5) * spacing * 0.7;
         const tz = gz + (prand(gz, gx, 1) - 0.5) * spacing * 0.7;
-        if (!inPolygon(tx, tz, inner)) continue;
+        if (!inPolygon(tx, tz, inner) || !onLawn(tx, tz)) continue;
         const r = prand(tx, tz, 2);
         const species = r < speciesMix[0] ? 0 : (r < speciesMix[0] + speciesMix[1] ? 1 : 2);
         treeSites.push({ x: tx, y, z: tz, scale: 0.95 + prand(tx, tz, 3) * 0.35, species });
@@ -2130,7 +2147,7 @@ function buildCityGrid(scene) {
         return [p.x, p.z, q.x, q.z];
       }), BED_Y - 0.01, 0.5));
       lineBedEdges(bed);
-      scatterParkTrees(bed, cell.treeSpacing ?? 9.0, BED_Y, 2.0, speciesMix);
+      scatterParkTrees(bed, cell.treeSpacing ?? 9.0, BED_Y, 2.0, speciesMix, drawnPolygonTest(lawn));
     }
     // Paved hub plaza (bluestone) with an optional granite-rimmed fountain basin
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(hubR + 0.6, hubR + 0.6, 0.03, 40), pavingMat);
@@ -2331,15 +2348,16 @@ function buildCityGrid(scene) {
       parkLawnGeos.push(createExtrudedPolygonMesh(lawnTop, 0.3, BED_Y - 0.3, cpLawnMat).geometry);
       addStreetGround(lawnTop, BED_Y);
     }
-    // trees on a jittered grid inside the bed
+    // trees on a jittered grid inside the bed, on the lawn as drawn
     const SP = 11;
+    const onLawn = drawnPolygonTest(lawnTop || bed);
     for (let gx = b.minX + SP * 0.5; gx < b.maxX; gx += SP) {
       for (let gz = b.minZ + SP * 0.5; gz < b.maxZ; gz += SP) {
         const tx = gx + (prand(gx, gz) - 0.5) * SP * 0.7;
         const tz = gz + (prand(gz, gx, 1) - 0.5) * SP * 0.7;
         if (prand(tx, tz, 9) < 0.3) continue; // glades
         const inner = lawnTop || bed;
-        if (!inPolygon(tx, tz, inner)) continue;
+        if (!inPolygon(tx, tz, inner) || !onLawn(tx, tz)) continue;
         const r = prand(tx, tz, 2);
         treeSites.push({ x: tx, y: BED_Y, z: tz, scale: 0.9 + prand(tx, tz, 3) * 0.4, species: r < 0.55 ? 0 : (r < 0.75 ? 1 : 2) });
       }
@@ -2823,8 +2841,12 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
         if (blocked(r, d) || (key === 'river' && blocked(r, a)) || hash(z, d) < 0.1) continue;
         // belt() lays the lawn between two rows that both carry it: past the last one there is no lawn to stand on
         const i0 = Math.floor((z - z0) / STEP);
-        if (!lawnDrawn(rows[i0], key, d) || !lawnDrawn(rows[i0 + 1], key, d)) continue;
-        treeSites.push({ x: X(r, d), y: LAWN_Y, z, scale: s0 + hash(d, z) * (s1 - s0), species: pickSpecies(hash(z * 0.37, d), mix), tier });
+        const ra = rows[i0];
+        const rb = rows[i0 + 1];
+        if (!lawnDrawn(ra, key, d) || !lawnDrawn(rb, key, d)) continue;
+        // and the quad runs straight from one row's shore offset to the next: the tree follows it, not the nearer row
+        const t = (z - ra.z) / (rb.z - ra.z);
+        treeSites.push({ x: X(ra, d) + (X(rb, d) - X(ra, d)) * t, y: LAWN_Y, z, scale: s0 + hash(d, z) * (s1 - s0), species: pickSpecies(hash(z * 0.37, d), mix), tier });
       }
     }
   }

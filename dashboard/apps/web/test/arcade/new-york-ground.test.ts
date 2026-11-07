@@ -161,10 +161,7 @@ describe("New York trees", () => {
         // The full list, for a sweep run by hand: NEW_YORK_GROUND_DUMP=<file> npx vitest run <this file>
         if (process.env.NEW_YORK_GROUND_DUMP) writeFileSync(process.env.NEW_YORK_GROUND_DUMP, JSON.stringify(floating));
         expect(sites.length).toBeGreaterThan(1000);
-        // Central Park South, Fifth Avenue and Grand Army Plaza, where an operator saw them hovering: none at all
-        expect(floating.filter((s) => s.x > -900 && s.x < 40 && s.z > -1500 && s.z < -1250)).toEqual([]);
-        // The rest of the city, ratcheted: 404 before the fix. What remains is the river-belt lawn at a few pier cuts
-        // and three bed trees 15 cm up; the count may only go down
-        expect(floating.length).toBeLessThanOrEqual(34);
+        // 404 before the fix, 44 of them along Central Park South, Fifth Avenue and Grand Army Plaza: none anywhere now
+        expect(floating).toEqual([]);
     }, 600_000);
 });
