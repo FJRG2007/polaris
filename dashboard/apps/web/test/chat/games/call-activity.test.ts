@@ -199,6 +199,60 @@ describe("a position from the game's frame", () => {
     });
 });
 
+describe("car lamps in a position", () => {
+    const lamps = { brake: 0.6, reverse: false, signal: 1 as const };
+
+    it("are optional, so a position from before them still reads with every lamp off", () => {
+        const old = activity.readActivityMessage({ kind: "pose", game: "new-york", pose });
+        expect(old?.pose).toEqual(pose);
+        expect(old?.pose.lamps).toBeUndefined();
+        expect(activity.readFramePose({ type: "polaris-game:state", ...pose, speed: 3 })).toEqual(
+            pose
+        );
+    });
+
+    it("are carried when one is lit, and left out when none is", () => {
+        expect(activity.readFramePose({ ...pose, lamps })).toEqual({ ...pose, lamps });
+        expect(
+            activity.readActivityMessage({
+                kind: "pose",
+                game: "new-york",
+                pose: { ...pose, lamps }
+            })?.pose.lamps
+        ).toEqual(lamps);
+        const off = activity.readFramePose({
+            ...pose,
+            lamps: { brake: 0, reverse: false, signal: 0 }
+        });
+        expect(off).toEqual(pose);
+        expect(off && "lamps" in off).toBe(false);
+    });
+
+    it("drop a position whose lamps do not fit", () => {
+        for (const bad of [
+            { ...lamps, brake: 2 },
+            { ...lamps, brake: -0.1 },
+            { ...lamps, brake: Number.NaN },
+            { ...lamps, reverse: 1 },
+            { ...lamps, signal: 0.5 },
+            { ...lamps, signal: 2 },
+            { ...lamps, extra: 1 },
+            { brake: 1 },
+            "on",
+            null
+        ]) {
+            expect(activity.readFramePose({ ...pose, lamps: bad })).toBeNull();
+            expect(
+                activity.readActivityMessage({
+                    kind: "pose",
+                    game: "new-york",
+                    pose: { ...pose, lamps: bad }
+                })
+            ).toBeNull();
+        }
+    });
+});
+
 describe("a heading", () => {
     it("is wrapped between -pi and pi", () => {
         for (const heading of [0, 3, -3, 7, -7, 1e6]) {

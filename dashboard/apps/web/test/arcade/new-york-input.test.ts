@@ -13,6 +13,7 @@ import * as rules from "../../../arcade/game/new-york/engine/player-rules.js";
 import * as guards from "../../../arcade/game/new-york/engine/browser-defaults.js";
 import * as gamepad from "../../../arcade/game/new-york/engine/gamepad-controls.js";
 import * as placement from "../../../arcade/game/new-york/engine/arrival-placement.js";
+import * as embed from "../../../arcade/game/new-york/engine/embed.js";
 
 // The gamepad module reads only the field check from the city config, which otherwise needs the city data
 vi.mock("../../../arcade/game/new-york/engine/city-config.js", () => ({
@@ -275,5 +276,38 @@ describe("player turn signals", () => {
         const fast = run(rules.createTurnSignal(), -1, 6, 0.3);
         run(fast, -1, 20, 0.05);
         expect(fast.side).toBe(0);
+    });
+});
+
+describe("car lamps shared in a call", () => {
+    const car = (x: number, w: number, side = 0) => ({
+        carState: { value: { x, y: 0, z: 0, w } },
+        turnSignal: { side }
+    });
+
+    it("are shared only while one is lit, and only from a car", () => {
+        expect(embed.carLamps(car(0, 0), "car")).toBeNull();
+        expect(embed.carLamps(car(0.6, 0, 1), "car")).toEqual({
+            brake: 0.6,
+            reverse: false,
+            signal: 1
+        });
+        expect(embed.carLamps(car(0, 1), "car")).toEqual({ brake: 0, reverse: true, signal: 0 });
+        expect(embed.carLamps(car(1, 1), "cyclist")).toBeNull();
+        expect(embed.carLamps({}, "car")).toBeNull();
+    });
+
+    it("read from another player as off when missing or out of range", () => {
+        const off = { brake: 0, reverse: false, signal: 0 };
+        expect(embed.readLamps(undefined)).toEqual(off);
+        expect(embed.readLamps({ brake: 5, reverse: "yes", signal: 3 })).toEqual({
+            ...off,
+            brake: 1
+        });
+        expect(embed.readLamps({ brake: 0.6, reverse: true, signal: -1 })).toEqual({
+            brake: 0.6,
+            reverse: true,
+            signal: -1
+        });
     });
 });

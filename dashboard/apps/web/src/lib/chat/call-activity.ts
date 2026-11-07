@@ -65,13 +65,28 @@ export function wrapHeading(heading: number): number {
     return Math.atan2(Math.sin(heading), Math.cos(heading));
 }
 
+/** The lamps a car shows: brake (0 off to 1 full), reverse, and the
+ *  indicator side (1 left, -1 right, 0 none; the receiver makes it blink). */
+export const lampsSchema = z
+    .object({
+        brake: z.number().finite().min(0).max(1),
+        reverse: z.boolean(),
+        signal: z.union([z.literal(-1), z.literal(0), z.literal(1)])
+    })
+    .strict();
+
+export type Lamps = z.infer<typeof lampsSchema>;
+
 export const poseSchema = z
     .object({
         x: coordinate,
         y: coordinate,
         z: coordinate,
         heading: z.number().finite().min(-Math.PI).max(Math.PI),
-        mode: z.enum(VEHICLES)
+        mode: z.enum(VEHICLES),
+        // Missing is every lamp off. Only sent while one is lit, so a pose
+        // with nothing lit stays the shape a browser from before reads.
+        lamps: lampsSchema.optional()
     })
     .strict();
 
@@ -184,18 +199,24 @@ export function reportPoseFailure(cause: unknown): void {
 
 /** The reader's own position as the game's frame reports it
  *  (`polaris-game:state`, see `apps/arcade/game/<game>/engine/embed.js`), or
- *  null for anything that does not fit. The heading is wrapped first. */
+ *  null for anything that does not fit. The heading is wrapped first, and
+ *  lamps that are all off are left out. */
 export function readFramePose(payload: unknown): Pose | null {
     if (!payload || typeof payload !== "object") return null;
-    const { x, y, z, heading, mode } = payload as Record<string, unknown>;
+    const { x, y, z, heading, mode, lamps } = payload as Record<string, unknown>;
     const pose = poseSchema.safeParse({
         x,
         y,
         z,
         heading: typeof heading === "number" ? wrapHeading(heading) : heading,
-        mode
+        mode,
+        ...(lamps === undefined ? {} : { lamps })
     });
-    return pose.success ? pose.data : null;
+    if (!pose.success) return null;
+    const { lamps: lit, ...rest } = pose.data;
+    return lit && (lit.brake > 0 || lit.reverse || lit.signal !== 0)
+        ? { ...rest, lamps: lit }
+        : rest;
 }
 
 /** What the call hands the frame: everybody else in the game, where they are. */

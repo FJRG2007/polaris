@@ -7,6 +7,7 @@ import * as THREE from 'three/webgpu';
 import { onPlayers } from './embed.js';
 import { colorFor, cssColor } from './player-markers.js';
 import { BODY_SPECS, buildCarGeometry, createLoftedCarMaterial } from './cars.js';
+import { TURN_SIGNAL } from './player-rules.js';
 import {
   buildHelicopterBodyGeometry,
   buildHelicopterMainRotorGeometry,
@@ -54,10 +55,12 @@ function buildModel(mode, paint) {
   const root = new THREE.Group();
   const rotors = [];
   let owned = null;
+  let lamps = null;
   if (mode === 'car') {
     const body = new THREE.Mesh(carGeometry(), createLoftedCarMaterial(BODY_SPECS.sedan, paint));
     body.castShadow = true;
     root.add(body);
+    lamps = body.material.userData.carState; // brake, left & right indicators, reverse (cars.js)
   } else if (mode === 'helicopter') {
     const heli = heliGeometry();
     const material = createLoftedHelicopterMaterial();
@@ -84,7 +87,7 @@ function buildModel(mode, paint) {
       }
     }
   }
-  return { root, owned, rotors };
+  return { root, owned, rotors, lamps };
 }
 
 export function createRemotePlayers(scene) {
@@ -135,12 +138,17 @@ export function createRemotePlayers(scene) {
         const label = document.createElement('div');
         label.className = 'remote-label';
         labels.appendChild(label);
-        marker = { root, label, name: '', paint: colorFor(player.id), model: null, mode: null, target: new THREE.Vector3(), heading: player.heading };
+        marker = {
+          root, label, name: '', paint: colorFor(player.id), model: null, mode: null, target: new THREE.Vector3(),
+          heading: player.heading, lamps: player.lamps, blinkClock: 0
+        };
         markers.set(player.id, marker);
       }
       if (marker.mode !== player.mode) dress(marker, player.mode);
       marker.target.set(player.x, player.y, player.z);
       marker.heading = player.heading;
+      if (player.lamps.signal !== marker.lamps.signal) marker.blinkClock = 0;
+      marker.lamps = player.lamps;
       marker.name = player.name;
       marker.label.textContent = player.name;
     }
@@ -168,6 +176,14 @@ export function createRemotePlayers(scene) {
         const turn = marker.heading - marker.root.rotation.y;
         marker.root.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * ease;
         for (const rotor of marker.model?.rotors ?? []) rotor.mesh.rotation[rotor.axis] += rotor.speed * dt;
+        const carState = marker.model?.lamps;
+        if (carState) {
+          // The indicator side arrives, not its phase: it blinks here on the player's own cycle
+          const { brake, reverse, signal } = marker.lamps;
+          marker.blinkClock = signal ? marker.blinkClock + dt : 0;
+          const on = signal !== 0 && marker.blinkClock % TURN_SIGNAL.period < TURN_SIGNAL.period / 2;
+          carState.value.set(brake, on && signal > 0 ? 1 : 0, on && signal < 0 ? 1 : 0, reverse ? 1 : 0);
+        }
         marker.root.updateMatrixWorld(); // the scene does not update world matrices on its own (main.js)
         projected.copy(marker.root.position);
         projected.y += LABEL_HEIGHT[marker.mode] ?? LABEL_HEIGHT.car;

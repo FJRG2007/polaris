@@ -7,11 +7,12 @@
 //      polaris-game:progress { stage: 'data' | 'build' | 'compile', done: 0..1 }
 //      polaris-game:ready                                      (once; takes back a failed sent before it)
 //      polaris-game:failed { reason: 'graphics' | 'data' | 'error' }
-//      polaris-game:state { x, y, z, heading, mode, speed }   (10 a second, while joined)
+//      polaris-game:state { x, y, z, heading, mode, speed, lamps? }   (10 a second, while joined)
+//                                                              lamps: { brake 0..1, reverse, signal -1|0|1 }, only while one is lit
 //      polaris-game:exit                                       (the reader chose Exit game in the menu)
 // In:  polaris-game:setup { locale, messages, exit }            (the reader's words; whether Exit game is offered)
 //      polaris-game:join { self: { id, name } }
-//      polaris-game:players { players: [{ id, name, x, y, z, heading, mode }] }   (everyone else, replaces the last list)
+//      polaris-game:players { players: [{ id, name, x, y, z, heading, mode, lamps? }] }   (everyone else, replaces the last list)
 //      polaris-game:leave
 
 import { applyCatalog, keepFallback, readCatalog } from './i18n.js';
@@ -100,7 +101,25 @@ function readPlayer(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const { id, name, x, y, z, heading, mode } = raw;
   if (!text(id, 128) || !text(name, 64) || ![x, y, z, heading].every(finite) || !MODES.has(mode)) return null;
-  return { id, name, x, y, z, heading, mode };
+  return { id, name, x, y, z, heading, mode, lamps: readLamps(raw.lamps) };
+}
+
+/** A player's car lamps; anything missing or out of range is off. */
+export function readLamps(raw) {
+  if (!raw || typeof raw !== 'object') return LAMPS_OFF;
+  const brake = finite(raw.brake) ? Math.min(Math.max(raw.brake, 0), 1) : 0;
+  const signal = raw.signal === 1 || raw.signal === -1 ? raw.signal : 0;
+  return { brake, reverse: raw.reverse === true, signal };
+}
+
+const LAMPS_OFF = Object.freeze({ brake: 0, reverse: false, signal: 0 });
+
+/** What the player's car shows, to share: null with every lamp off (left out of the state, as before lamps existed). */
+export function carLamps(entity, mode) {
+  const state = mode === 'car' ? entity.carState?.value : null;
+  if (!state) return null;
+  const lamps = { brake: Math.min(Math.max(state.x, 0), 1), reverse: state.w > 0, signal: entity.turnSignal?.side ?? 0 };
+  return lamps.brake > 0 || lamps.reverse || lamps.signal !== 0 ? lamps : null;
 }
 
 window.addEventListener('message', (event) => {
@@ -133,7 +152,8 @@ export function shareState(now, entity, mode) {
   nextState = now + 100;
   const { x, y, z } = entity.position;
   const heading = Math.atan2(Math.sin(entity.heading), Math.cos(entity.heading));
-  tellHost({ type: 'polaris-game:state', x, y, z, heading, mode, speed: entity.speed || 0 });
+  const lamps = carLamps(entity, mode);
+  tellHost({ type: 'polaris-game:state', x, y, z, heading, mode, speed: entity.speed || 0, ...(lamps && { lamps }) });
 }
 
 if (embedded) {
