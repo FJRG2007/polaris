@@ -304,6 +304,9 @@ class GamepadControls {
       drive = buttonValue(pad, 7) - buttonValue(pad, 6);
     } else if (mode === 'helicopter') {
       ({ vertical, turbo } = helicopterPadInput(pad, held));
+    } else if (mode === 'person') {
+      // On foot the left stick's click sprints, as Shift does on the keyboard
+      turbo = held(10) ? 1 : 0;
     }
     this.controller.setGamepadInput('forward', Math.max(0, drive));
     this.controller.setGamepadInput('backward', Math.max(0, -drive));
