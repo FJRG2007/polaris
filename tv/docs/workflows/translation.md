@@ -10,13 +10,14 @@
 2. A language may also need one of the other files `values/` carries. Add it only when `values/` has the
    same file, and only the names that file defines: `tests/test_translation_recipe_files.py` holds both.
    - `bools.xml`: `date_single_line` false when the language's weekday and month names do not fit on one
-     line (German, Spanish, Portuguese, Russian and Ukrainian set it), and `rtl_app_grid`/`rtl_menu_bar`
-     true for a right-to-left language (`values-iw`).
+     line (`values-de`, `values-es`, `values-b+es+419`, `values-ast`, `values-pt`, `values-ru` and
+     `values-uk` set it), and `rtl_app_grid`/`rtl_menu_bar` true for a right-to-left language
+     (`values-iw`).
    - `fonts.xml`: point `font_body`, `font_regular` and the other `font_*` at the system families when the
      bundled Outfit has no glyphs for the language's letters (`values-vi`, #833).
    - `lunar.xml`: the lunar date format, the leap-month wording and the stem and branch names, for a
-     language that names them itself (`values-zh-rCN`, `values-vi`, `values-ko`). Keep `lunar_stems` at ten
-     items and `lunar_branches` at twelve: `Lunar.java` indexes both by position, so a short list crashes
+     language that names them itself (`values-zh-rCN`, `values-zh-rTW`, `values-vi`, `values-ko`). Keep
+     `lunar_stems` at ten items and `lunar_branches` at twelve: `Lunar.java` indexes both by position, so a short list crashes
      the launcher on a TV running that language and nothing anywhere else.
    - `polaris_strings.xml`: the words of the Polaris connection screens, for a language that translates them
      (`values-es`). A missing name falls back to English.
