@@ -5,7 +5,6 @@ import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './ve
 import { signalPhase, walkSignal } from './city-config.js';
 import { cityUniforms, createContactShadowMaterial, createCarFlareMaterial } from './tsl-materials.js';
 import { HEADLIGHTS, brakeLamp, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
-import { lightBudget } from './quality.js';
 import {
   BODY_SPECS,
   buildCarGeometry,
@@ -1773,7 +1772,9 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     const beamScale = clamp((glow - 0.60) * 1.45, 0.0, 1.28);
     const tailScale = clamp(0.18 + glow * 0.66, 0.24, 1.22);
 
-    const headlightBudget = lightBudget(HEADLIGHT_POOL_SIZE); // quality.js: fewer lit on lower levels, same pool
+    // Every quality level lights as many cars as the reference game does: a third of the city's headlights going dark on
+    // a lower level is what made night driving read as unlit. The street lamps and shop spots carry the saving instead.
+    const headlightBudget = HEADLIGHT_POOL_SIZE;
     const maxDualVehicles = headlightBudget >> 1;
     const vehCutoff = litVehicleCount > maxDualVehicles
       ? Math.min(MAX_LIGHT_DIST, litVehicles[maxDualVehicles]._effDist)
@@ -1815,7 +1816,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
 
     // 1. NYPD emergency roof lightbar flashes (smoothly pulsing red/blue 360° PointLights on nearby patrol cruisers)
     let policeLightsUsed = 0;
-    const policeBudget = lightBudget(POLICE_LIGHT_POOL_SIZE);
+    const policeBudget = POLICE_LIGHT_POOL_SIZE;
     for (let i = 0; i < litVehicleCount && policeLightsUsed < policeBudget; i++) {
       const v = litVehicles[i];
       if (!v.isPolice || v._effDist >= 88) continue;
@@ -2436,7 +2437,7 @@ function createHighwayTraffic(scene, lanes) {
     }
     const glow = cityUniforms && cityUniforms.uInteriorGlow ? cityUniforms.uInteriorGlow.value : 0.48;
     const beamScale = clamp((glow - 0.60) * 1.45, 0.0, 1.28);
-    const hwyBudget = lightBudget(HWY_SPOT_POOL);
+    const hwyBudget = HWY_SPOT_POOL;
     const maxHwyVeh = hwyBudget >> 1;
     const hwyCutoff = hwyLitCount > maxHwyVeh
       ? Math.min(HWY_LIGHT_DIST, hwyLitCars[maxHwyVeh]._effDist)
