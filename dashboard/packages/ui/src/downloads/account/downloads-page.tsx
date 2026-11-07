@@ -51,6 +51,7 @@ export function DownloadsPage({
 }) {
     const t = useTranslations("account");
     const tc = useTranslations("components");
+    const compat = useTranslations("tvCompat");
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
             <div className="flex flex-col items-center gap-1 text-center">
@@ -110,6 +111,12 @@ export function DownloadsPage({
                         <p className="text-xs text-muted-foreground">
                             {t("downloads.tv.supported")}
                         </p>
+                        <a
+                            href="#tv-compatibility"
+                            className="self-start text-sm text-primary underline"
+                        >
+                            {compat("title")}
+                        </a>
                     </DownloadCard>
                 )}
 

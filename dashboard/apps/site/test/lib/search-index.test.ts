@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { searchRecords, type SiteData } from "../../src/data/builders";
+import enTvCompat from "../../../web/messages/en-US/tvCompat.json" with { type: "json" };
+import esTvCompat from "../../../web/messages/es-ES/tvCompat.json" with { type: "json" };
 import {
     chunkIndex,
     joinIndex,
@@ -144,5 +146,48 @@ describe("recent searches", () => {
                 ])
             ).map((one) => one.title)
         ).toEqual(["ok"]);
+    });
+});
+
+describe("the TV models in the docs search", () => {
+    const tv = {
+        ...data,
+        docs: {
+            en: [
+                page("polaris-tv-compatibility", "Does it work on my TV?", []),
+                page("polaris-tv-privacy", "Privacy switches", [])
+            ],
+            es: []
+        },
+        downloadsPage: {
+            messages: { en: { tvCompat: enTvCompat }, es: { tvCompat: esTvCompat } }
+        }
+    } as unknown as Pick<SiteData, "docs" | "api" | "downloadsPage">;
+    const records = searchRecords(tv, "en", "API reference");
+
+    it("sends a model number to the checker with the model filled in", () => {
+        const hit = searchIndex(records, "TCL 32ES570F")[0]!.records[0]!;
+        expect(hit.page).toBe("Does it work on my TV?");
+        expect(hit.href).toMatch(/^en\/docs\/polaris-tv-compatibility\/\?q=TCL%2032ES570F/);
+    });
+
+    it("sends a brand's privacy switches to its section", () => {
+        const hit = searchIndex(records, "Viewing Information Services")[0]!.records[0]!;
+        expect(hit.href).toBe("en/docs/polaris-tv-privacy/#samsung");
+    });
+
+    it("searches a brand's privacy switches in the reader's language", () => {
+        const es = {
+            ...tv,
+            docs: { en: [], es: [page("polaris-tv-privacy", "Interruptores de privacidad", [])] }
+        } as unknown as Pick<SiteData, "docs" | "api" | "downloadsPage">;
+        const hit = searchIndex(searchRecords(es, "es", "Referencia"), "retira el consentimiento");
+        expect(hit[0]!.records[0]!.href).toBe("es/docs/polaris-tv-privacy/#tcl");
+    });
+
+    it("adds no TV records to a locale without the checker page", () => {
+        expect(searchRecords(tv, "es", "Referencia").every((r) => !r.href.includes("?q="))).toBe(
+            true
+        );
     });
 });

@@ -416,9 +416,11 @@ const inventory = apiInventory(
 const downloadMessages = (locale: string): site.DownloadsData["messages"]["en"] => {
     const account = JSON.parse(read(join(web, "messages", locale, "account.json")));
     const components = JSON.parse(read(join(web, "messages", locale, "components.json")));
+    const tvCompat = JSON.parse(read(join(web, "messages", locale, "tvCompat.json")));
     return {
         account: { downloads: account.downloads },
-        components: { installApp: components.installApp, downloads: components.downloads }
+        components: { installApp: components.installApp, downloads: components.downloads },
+        tvCompat
     };
 };
 // The same lookup the dashboard's Downloads makes, so the files offered match.

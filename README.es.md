@@ -33,6 +33,10 @@ página con todas sus funciones. Las versiones para móvil están en
 [Agentes](docs/features/agents.es.md) y [CRM](docs/features/crm.es.md) tienen
 también su propia página.
 
+Polaris TV: [¿funciona en mi tele?](docs/features/polaris-tv-compatibility.es.md),
+[configuración](docs/features/polaris-tv-setup.es.md), [privacidad por marca](docs/features/polaris-tv-privacy.es.md),
+[Fire TV](docs/features/polaris-tv-fire.es.md) y [bloqueo de anuncios en cualquier tele](docs/features/polaris-tv-network.es.md).
+
 ### En todas partes
 
 <p align="center">

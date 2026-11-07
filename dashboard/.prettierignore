@@ -16,3 +16,6 @@ apps/extension/.wxt
 # Symbiote's sources as its port left them: a mod's data and assets, formatted
 # the way its own tools write them, not part of the dashboard's code.
 resources/minecraft/symbiote
+# The TV models list, written by scripts/tv-compat-import.mjs as JSON.stringify
+# lays it out; its --check compares byte for byte, so a formatter must not touch it.
+packages/core/src/tv-compat/models.json

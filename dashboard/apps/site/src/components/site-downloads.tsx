@@ -13,6 +13,7 @@
 import type { ReactNode } from "react";
 import type { DownloadsData } from "@/data/builders";
 import { EXAMPLE_ORIGIN } from "@/lib/example-origin";
+import { SiteTvChecker } from "@/components/site-tv-checker";
 import type { Locale, Namespaces } from "@polaris/core";
 import { I18nContext } from "@polaris/ui/i18n";
 import { AppHrefProvider } from "@polaris/ui/account-downloads/app-link";
@@ -71,6 +72,12 @@ export function SiteDownloads({
                     desktopFiles={<DesktopFilesOffer download={files.desktop} />}
                 />
             </AppHrefProvider>
+            <section
+                id="tv-compatibility"
+                className="mx-auto mt-10 w-full min-w-0 max-w-6xl scroll-mt-20 px-4"
+            >
+                <SiteTvChecker locale={locale} messages={data.messages[locale].tvCompat} />
+            </section>
         </Messages>
     );
 }

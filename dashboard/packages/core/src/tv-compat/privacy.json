@@ -1,0 +1,170 @@
+{
+    "read": "2026-11-07",
+    "brands": [
+        {
+            "id": "samsung",
+            "brand": "Samsung",
+            "matches": ["samsung"],
+            "platforms": ["tizen"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "samsung-viewing",
+                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy (older sets: Privacy Choices)"
+                },
+                {
+                    "id": "samsung-ads",
+                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy"
+                },
+                {
+                    "id": "samsung-voice",
+                    "path": "Settings > All Settings > General & Privacy > Advanced Features > Voice > Bixby Settings"
+                }
+            ]
+        },
+        {
+            "id": "lg",
+            "brand": "LG",
+            "matches": ["lg"],
+            "platforms": ["webos"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "lg-live-plus",
+                    "path": "Hold Settings > System > Additional settings (2026); 2021-2024: All Settings > General > System > Additional Settings"
+                },
+                {
+                    "id": "lg-agreements",
+                    "path": "Settings > Privacy & Terms > User Agreements"
+                },
+                {
+                    "id": "lg-ad-tracking",
+                    "path": "Support > Privacy & Terms > Advertisement"
+                },
+                {
+                    "id": "lg-home",
+                    "path": "Home Settings"
+                }
+            ]
+        },
+        {
+            "id": "roku",
+            "brand": "Roku",
+            "matches": ["roku"],
+            "platforms": ["roku"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "roku-acr",
+                    "path": "Home > Settings > Privacy > Smart TV Experience (also at my.roku.com)"
+                },
+                {
+                    "id": "roku-ads",
+                    "path": "Home > Settings > Privacy > Advertising"
+                },
+                {
+                    "id": "roku-microphone",
+                    "path": "Home > Settings > Privacy > Microphone"
+                }
+            ]
+        },
+        {
+            "id": "vizio",
+            "brand": "Vizio",
+            "matches": ["vizio"],
+            "platforms": ["vizio"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "vizio-viewing",
+                    "path": "All Settings > Privacy & Legal (or Admin & Privacy)"
+                },
+                {
+                    "id": "vizio-ad-tracking",
+                    "path": "All Settings > Privacy & Legal > Advertising"
+                }
+            ]
+        },
+        {
+            "id": "hisense-vidaa",
+            "brand": "Hisense VIDAA",
+            "matches": ["hisense", "toshiba"],
+            "platforms": ["vidaa"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "vidaa-viewing",
+                    "path": "Settings > Advanced Settings > Enhanced Viewing Settings"
+                },
+                {
+                    "id": "vidaa-ads",
+                    "path": "Settings > System > Advanced Settings"
+                }
+            ]
+        },
+        {
+            "id": "google-tv",
+            "brand": "Google TV / Android TV",
+            "matches": [],
+            "platforms": ["android-tv", "google-tv", "android"],
+            "source": "https://github.com/Gathin23/cleanyourtv/blob/main/docs/faq.md",
+            "steps": [
+                {
+                    "id": "google-ads",
+                    "path": "Settings > Privacy > Ads (Android TV: About > Legal information > Ads)"
+                },
+                {
+                    "id": "google-location",
+                    "path": "Settings > Privacy > Location"
+                },
+                {
+                    "id": "google-diagnostics",
+                    "path": "Settings > Privacy > Usage & diagnostics"
+                },
+                {
+                    "id": "google-scanning",
+                    "path": "Settings > Network & Internet"
+                }
+            ]
+        },
+        {
+            "id": "sony",
+            "brand": "Sony (Google TV)",
+            "matches": ["sony"],
+            "platforms": ["google-tv", "android-tv"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "sony-samba",
+                    "path": "Settings > All Settings > Privacy"
+                }
+            ]
+        },
+        {
+            "id": "tcl",
+            "brand": "TCL (Google TV)",
+            "matches": ["tcl"],
+            "platforms": ["google-tv", "android-tv"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "tcl-improvement",
+                    "path": "Settings > Privacy > User Agreements"
+                }
+            ]
+        },
+        {
+            "id": "fire-tv",
+            "brand": "Fire TV",
+            "matches": ["amazon"],
+            "platforms": ["fire-os"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "id": "fire-data",
+                    "path": "Settings > Preferences > Privacy Settings"
+                }
+            ]
+        }
+    ]
+}
