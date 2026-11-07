@@ -31,6 +31,7 @@ import { editionOf } from "./minecraft/service";
 import { formatMemory, hasCrossplay } from "./minecraft/blueprints";
 import { parseMemoryMb } from "./games-service";
 import { DEFAULT_LEVEL_TYPE } from "./minecraft/world";
+import { ONEBLOCK_READY_KEY } from "./minecraft/oneblock";
 import type { ResetMinecraftServerInput } from "./games-schema";
 import { parseProjectList, projectSlug } from "./minecraft/modrinth";
 import {
@@ -195,7 +196,10 @@ export async function resetMinecraftServer(
     await patchInstallConfig(installedAppId, {
         [BLUEPRINT_KEY]: blueprint.id,
         [MAP_KEY]: input.mapId ?? "",
-        [RELEASE_KEY]: env.get("VERSION") ?? ""
+        [RELEASE_KEY]: env.get("VERSION") ?? "",
+        // A new world is looked at again: the plugin's file is what says whether
+        // OneBlock still knows where its islands go.
+        [ONEBLOCK_READY_KEY]: false
     });
 
     // And the worlds this server will not be able to open.

@@ -1022,6 +1022,11 @@
                 "summary": "Islands in the void, one block at a time.",
                 "setup": "The island worlds are the plugin's own and it creates them on its first start. The world the server generates is only the lobby people land in."
             },
+            "oneblock": {
+                "name": "OneBlock",
+                "summary": "One block in the void that turns into the next when you break it. Installs OneBlock.",
+                "setup": "Polaris places the first block once the plugin has loaded, and each player lands on a block of their own."
+            },
             "parkour": {
                 "name": "Infinite parkour",
                 "summary": "A course that generates as you run it, with times to beat.",
