@@ -185,14 +185,17 @@ export async function vpnPermissionsAmong(
         }
         return answers;
     }
-    const own = new Map(overrides.map((row) => [row.userId, row.effect === "deny" ? "deny" : "allow"]));
+    const own = new Map(
+        overrides.map((row) => [row.userId, row.effect === "deny" ? "deny" : "allow"])
+    );
     return new Map(
         unique.map((id) => {
             const effect = own.get(id);
             return [
                 id,
                 {
-                    permission: effect === "deny" ? "deny" : effect === "allow" ? "allow" : "implicit-deny",
+                    permission:
+                        effect === "deny" ? "deny" : effect === "allow" ? "allow" : "implicit-deny",
                     accountAllows: effect === "allow"
                 }
             ];
@@ -213,7 +216,12 @@ export async function accessOf(user: {
             ? Promise.resolve({ permission: "allow" as const, accountAllows: false })
             : vpnPermission(user.id)
     ]);
-    const standing = wg.vpnStanding({ isAdmin: user.isAdmin, hasRow: row !== null, open, ...granted });
+    const standing = wg.vpnStanding({
+        isAdmin: user.isAdmin,
+        hasRow: row !== null,
+        open,
+        ...granted
+    });
     if (standing === "none") return null;
     if (standing === "row" && row) {
         return {
@@ -250,7 +258,10 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
             isAdmin: user.isAdmin,
             hasRow: row !== null,
             open,
-            ...(granted.get(userId) ?? { permission: "implicit-deny" as const, accountAllows: false })
+            ...(granted.get(userId) ?? {
+                permission: "implicit-deny" as const,
+                accountAllows: false
+            })
         });
         if (standing === "none") return [];
         if (standing === "open" || !row) return [{ publicKey, host: hostIndex }];

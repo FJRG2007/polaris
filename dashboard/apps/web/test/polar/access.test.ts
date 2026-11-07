@@ -167,8 +167,16 @@ describe("Polar access policy", () => {
     });
 
     describe("as permissions, like every other app", () => {
-        const allow = (action: string) => ({ effect: "allow" as const, actions: [action], resources: ["*"] });
-        const deny = (action: string) => ({ effect: "deny" as const, actions: [action], resources: ["*"] });
+        const allow = (action: string) => ({
+            effect: "allow" as const,
+            actions: [action],
+            resources: ["*"]
+        });
+        const deny = (action: string) => ({
+            effect: "deny" as const,
+            actions: [action],
+            resources: ["*"]
+        });
         const restricted = {
             ...DEFAULT_POLAR_POLICY,
             use: audience({ who: "admins" }),
@@ -210,7 +218,9 @@ describe("Polar access policy", () => {
 
         it("never spends for somebody denied Polar itself, and an administrator is always in", () => {
             const grants = polarGrantsOf([deny("polar.use"), allow("polar.spend")]);
-            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).spend).toBe(false);
+            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).spend).toBe(
+                false
+            );
             expect(decidePolarAccess(restricted, { ...admin, grants })).toMatchObject({
                 use: true,
                 spend: true

@@ -292,9 +292,9 @@ async function grantedMembers(known: ReadonlySet<string>): Promise<string[] | nu
         orderBy: { createdAt: "asc" },
         take: POLICY_MEMBERS
     });
-    const candidates = [
-        ...new Set([...active, ...switchedOn.map((row) => row.userId)])
-    ].filter((id) => known.has(rules.headscaleUserName(id)));
+    const candidates = [...new Set([...active, ...switchedOn.map((row) => row.userId)])].filter(
+        (id) => known.has(rules.headscaleUserName(id))
+    );
     const shut = await shutByPermission(candidates, false);
     return candidates
         .filter((id) => !shut.has(id))
@@ -310,8 +310,14 @@ async function grantedMembers(known: ReadonlySet<string>): Promise<string[] | nu
 async function shutByPermission(ids: readonly string[], open: boolean): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
     const [admins, withRow, granted] = await Promise.all([
-        prisma.user.findMany({ where: { id: { in: [...ids] }, isAdmin: true }, select: { id: true } }),
-        prisma.vpnAccess.findMany({ where: { userId: { in: [...ids] } }, select: { userId: true } }),
+        prisma.user.findMany({
+            where: { id: { in: [...ids] }, isAdmin: true },
+            select: { id: true }
+        }),
+        prisma.vpnAccess.findMany({
+            where: { userId: { in: [...ids] } },
+            select: { userId: true }
+        }),
         vpnPermissionsAmong(ids)
     ]);
     const isAdmin = new Set(admins.map((row) => row.id));
