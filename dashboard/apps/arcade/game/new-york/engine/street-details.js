@@ -83,7 +83,9 @@ function createStreetNameBlades() {
     const col = mod(cell, BLADE_COLS);
     const row = floor(cell.div(BLADE_COLS));
     const u = uv().x.mul(2).sub(right);
-    mat.colorNode = texture(tex, vec2(col.add(u).div(BLADE_COLS), float(1).sub(row.add(1).div(rows)).add(uv().y.div(rows))));
+    const footprint = vec2(uv().x.mul(2 / BLADE_COLS), uv().y.div(rows));
+    mat.colorNode = texture(tex, vec2(col.add(u).div(BLADE_COLS), float(1).sub(row.add(1).div(rows)).add(uv().y.div(rows))))
+      .grad(footprint.dFdx(), footprint.dFdy());
     return mat;
   }
 
