@@ -49,20 +49,49 @@ export function BackupAccessCard() {
     /** The view as last drawn, for a save that comes back after other changes. */
     const latest = useRef(view);
     latest.current = view;
-    const busyNow = useRef(busy);
-    busyNow.current = busy;
+    /** Changes drawn on screen whose save has not answered yet, oldest first. */
+    const pending = useRef<Partial<BackupConfig>[]>([]);
+    /** The config the server last confirmed, which every queued save starts from. */
+    const settled = useRef<BackupConfig | null>(null);
+    if (view && pending.current.length === 0) settled.current = view.config;
+    const queue = useRef<Promise<void>>(Promise.resolve());
+
+    function withPending(shown: BackupView): BackupView {
+        return { ...shown, config: Object.assign({ ...shown.config }, ...pending.current) };
+    }
+
+    /**
+     * Draws a change at once and saves it behind any save still running, so each
+     * request carries the config the server last confirmed plus this change and
+     * no answer can undo another one. A failed save takes back only its own change.
+     */
+    function enqueue(change: Partial<BackupConfig>, done: () => void): Promise<void> {
+        pending.current = [...pending.current, change];
+        if (latest.current) live.replace(withPending(latest.current));
+        const run = async () => {
+            const base = settled.current ?? latest.current?.config;
+            const result = base
+                ? await runAction(() => saveBackupAccessAction({ ...base, ...change }), setError)
+                : null;
+            pending.current = pending.current.filter((entry) => entry !== change);
+            if (result) settled.current = result.config;
+            const now = latest.current;
+            if (result) live.replace(withPending(result));
+            else if (now) live.replace(withPending({ ...now, config: settled.current ?? now.config }));
+            done();
+        };
+        const next = queue.current.then(run);
+        queue.current = next;
+        return next;
+    }
 
     async function save(change: Partial<BackupConfig>) {
         if (!view) return;
         const next = { ...view.config, ...change };
         if (JSON.stringify(next) === JSON.stringify(view.config)) return;
-        const before = view;
-        live.replace({ ...view, config: next });
         setBusy(true);
         setError("");
-        const result = await runAction(() => saveBackupAccessAction(next), setError);
-        setBusy(false);
-        live.replace(result ?? before);
+        await enqueue(change, () => setBusy(false));
     }
 
     /**
@@ -72,20 +101,9 @@ export function BackupAccessCard() {
      */
     async function saveDataSaver(on: boolean) {
         if (!view || view.config.dataSaver === on) return;
-        const next = { ...view.config, dataSaver: on };
-        live.replace({ ...view, config: next });
         setSavingSaver(true);
         setError("");
-        const result = await runAction(() => saveBackupAccessAction(next), setError);
-        setSavingSaver(false);
-        const now = latest.current;
-        if (result) {
-            // Another change still being saved owns what is drawn; its answer
-            // carries this one too.
-            if (!busyNow.current) live.replace(result);
-            return;
-        }
-        if (now) live.replace({ ...now, config: { ...now.config, dataSaver: !on } });
+        await enqueue({ dataSaver: on }, () => setSavingSaver(false));
     }
 
     async function recheck() {
@@ -95,7 +113,7 @@ export function BackupAccessCard() {
         const result = await runAction(recheckBackupAccessAction, setError);
         setRechecking(false);
         setBusy(false);
-        if (result) live.replace(result);
+        if (result) live.replace(withPending(result));
     }
 
     async function freePorts() {
@@ -124,7 +142,7 @@ export function BackupAccessCard() {
         const result = await runAction(action, setError);
         setBusy(false);
         if (!result) return;
-        live.replace(result.view);
+        live.replace(withPending(result.view));
         if (result.failure) setError(t(`domains.backup.repairFailed.${result.failure}`));
     }
 

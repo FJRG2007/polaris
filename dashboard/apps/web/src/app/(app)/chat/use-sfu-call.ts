@@ -675,7 +675,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const sharingRef = useRef(false);
     /** The republish of a shared screen waiting to happen, and how many tries
      *  this one has spent - see `call-share-heal`. */
-    const shareRepair = useRef<{ timer: ReturnType<typeof setTimeout> | null; attempt: number }>({
+    const shareRepair = useRef<{
+        timer: ReturnType<typeof setTimeout> | null;
+        attempt: number;
+        /** The screen's publication sid when the connection began to drop,
+         *  until the reconnection that follows has been judged. */
+        dropped?: string | null;
+        /** The sid to compare against in the repair waiting to run, when it
+         *  follows a reconnection rather than a failed publish. */
+        since?: string | null;
+    }>({
         timer: null,
         attempt: 0
     });
@@ -1690,6 +1699,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 stopLocalTrackOnUnpublish: false
             });
             room.current = joined;
+            const noteShareDrop = () => {
+                const held = shareRepair.current;
+                if (!screen.current || held.dropped !== undefined) return;
+                held.dropped = joined.localParticipant.getTrackPublication(SCREEN)?.trackSid ?? null;
+            };
 
             joined
                 // Both, because a track arriving is also the first thing that
@@ -1739,9 +1753,17 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // republished it by itself, and that is the publication the server
                 // has been seen to refuse. It is put up again cleanly - once per
                 // reconnection, on a backoff - see `healShare`.
+                .on(RoomEvent.Reconnecting, noteShareDrop)
+                .on(RoomEvent.SignalReconnecting, noteShareDrop)
                 .on(RoomEvent.Reconnected, () => {
+                    const held = shareRepair.current;
+                    const dropped = held.dropped;
+                    held.dropped = undefined;
                     if (!screen.current) return;
-                    if (!shareRepair.current.timer) shareRepair.current.attempt = 0;
+                    if (!held.timer) {
+                        held.attempt = 0;
+                        held.since = dropped;
+                    }
                     healShareRef.current();
                 })
                 .on(RoomEvent.LocalTrackPublished, () => {
@@ -2863,6 +2885,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             if (!track || track.readyState !== "live") return;
             // Not connected now: the next reconnection starts this again.
             if (!current || current.state !== CONNECTED) return;
+            const since = held.since;
+            held.since = undefined;
+            if (since !== undefined) {
+                const sid = current.localParticipant.getTrackPublication(SCREEN)?.trackSid;
+                if (!shareHeal.republishAfterReconnect(since, sid)) return;
+            }
             held.attempt += 1;
             void publish(SCREEN, track, { again: true }).then((done) => {
                 if (screen.current !== track) return;

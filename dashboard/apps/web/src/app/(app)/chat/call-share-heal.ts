@@ -27,6 +27,23 @@ export function republishDelay(attempt: number): number | null {
     return SHARE_REPUBLISH_DELAYS_MS[attempt] ?? null;
 }
 
+/**
+ * Whether a reconnection left the shared screen needing a clean republish.
+ *
+ * `before` is the screen's publication sid when the connection started to
+ * drop (undefined when that was not seen), `now` the one it has after. A
+ * resume keeps the publication it had, which is still delivering, so putting
+ * it up again would only blank every viewer for nothing. A full reconnect has
+ * the client publish it again under a new sid, and that is the one to replace.
+ */
+export function republishAfterReconnect(
+    before: string | null | undefined,
+    now: string | null | undefined
+): boolean {
+    if (!before || !now) return true;
+    return before !== now;
+}
+
 /** How long a subscription may go without its first decoded frame before it is
  *  taken again. Each further try waits one more of these. */
 export const SHARE_STALL_MS = 5_000;

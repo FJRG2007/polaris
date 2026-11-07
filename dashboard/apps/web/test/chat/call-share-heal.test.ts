@@ -14,12 +14,21 @@ import {
     SHARE_REPUBLISH_DELAYS_MS,
     SHARE_RESUBSCRIBE_TRIES,
     SHARE_STALL_MS,
+    republishAfterReconnect,
     republishDelay,
     watchShare,
     type ShareWatch
 } from "@/app/(app)/chat/call-share-heal";
 
 describe("republishing a shared screen", () => {
+    it("leaves a share a resume kept alone and replaces one a full reconnect republished", () => {
+        expect(republishAfterReconnect("TR_screen", "TR_screen")).toBe(false);
+        expect(republishAfterReconnect("TR_screen", "TR_again")).toBe(true);
+        expect(republishAfterReconnect("TR_screen", undefined)).toBe(true);
+        expect(republishAfterReconnect(null, "TR_again")).toBe(true);
+        expect(republishAfterReconnect(undefined, "TR_screen")).toBe(true);
+    });
+
     it("waits longer each try and stops once the tries are spent", () => {
         const waits = SHARE_REPUBLISH_DELAYS_MS.map((_, attempt) => republishDelay(attempt));
         expect(waits).toEqual([...SHARE_REPUBLISH_DELAYS_MS]);
