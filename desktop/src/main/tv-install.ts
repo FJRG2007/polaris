@@ -27,7 +27,8 @@ import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents 
 import { usbDevices, usbLink } from "./usb-link";
 import { AdbConnection, newAdbKey } from "./adb-client";
 import { waitForTv, type TvWaitResult, type TvWaitStep } from "./tv-wait";
-import { choosePath, type TvPath, type TvSighting } from "./tv-path";
+import { choosePath, type TvPath } from "./tv-path";
+import { browseTvs, mergeFound, namesOf, sightingOf, type TvAnnouncement } from "./tv-mdns";
 import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { readTvAddress } from "@/shared/tv-address";
@@ -51,6 +52,9 @@ const DOWNLOAD_MS = 300_000;
 /** How often the port is tried while the person turns debugging on, and for how long in all. */
 const WAIT_EVERY_MS = 2_000;
 const WAIT_FOR_MS = 600_000;
+/** How long a search listens for TVs announcing themselves, and how long an install does when the address was typed. */
+const BROWSE_MS = 3_000;
+const INSTALL_BROWSE_MS = 1_500;
 
 /** What a failed connection means, in terms the person can act on. */
 export function connectFailure(error: { code?: string; message?: string; }): TvOutcome {
@@ -104,6 +108,10 @@ function answersOn(host: string, port: number, timeoutMs: number): Promise<"open
 let search = 0;
 /** Bumped by a cancel and when a wait ends, so a wait for the TV stops polling. */
 let waitRun = 0;
+/** What TVs announced in the last search, by address. */
+let announced = new Map<string, TvAnnouncement>();
+/** The connection waiting on the TV's prompt, closed by a cancel so the wait ends now rather than at the prompt's timeout. */
+let pending: AdbConnection | null = null;
 
 /** The one instruction for this TV while the install waits on it. */
 export function waitingFor(step: TvWaitStep, path: TvPath): TvWaiting {
@@ -117,17 +125,18 @@ export function waitOutcome(waited: Exclude<TvWaitResult<unknown>, { kind: "conn
     return waited.step === "prompt" ? "not-allowed" : "adb-off";
 }
 
-async function findTvs(run: number): Promise<string[]> {
+async function findTvs(run: number): Promise<{ found: string[]; heard: Map<string, TvAnnouncement>; }> {
     const queue = neighbours();
     const open: string[] = [];
-    await Promise.all(
+    const sweep = Promise.all(
         Array.from({ length: SCAN_WIDTH }, async () => {
             for (let host = queue.pop(); host && run === search; host = queue.pop()) {
                 if ((await answersOn(host, ADB_PORT, SCAN_MS)) === "open") open.push(host);
             }
         })
     );
-    return open.sort();
+    const [heard] = await Promise.all([browseTvs(BROWSE_MS, () => run !== search).catch(() => new Map<string, TvAnnouncement>()), sweep]);
+    return { found: mergeFound(open, heard), heard };
 }
 
 async function adbKey(): Promise<string> {
@@ -240,7 +249,8 @@ let state: TvInstallState = {
     backup: null,
     closed: null,
     waiting: null,
-    home: null
+    home: null,
+    named: {}
 };
 
 function publish(next: Partial<TvInstallState>): void {
@@ -292,10 +302,17 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): 
     }
 
     publish({ phase: "connecting" });
-    const sighting: TvSighting = {
-        services: [],
-        adbOpen: target.kind === "network" && (await answersOn(target.host, ADB_PORT, SCAN_MS)) === "open"
-    };
+    // A typed address nobody searched for is asked about here, so a pairing-only TV is known at once.
+    const [adbOpen, heard] =
+        target.kind === "network"
+            ? await Promise.all([
+                  answersOn(target.host, ADB_PORT, SCAN_MS).then((verdict) => verdict === "open"),
+                  announced.has(target.host)
+                      ? Promise.resolve(announced)
+                      : browseTvs(INSTALL_BROWSE_MS).catch(() => new Map<string, TvAnnouncement>())
+              ])
+            : [false, new Map<string, TvAnnouncement>()];
+    const sighting = sightingOf(target.kind === "network" ? heard.get(target.host) : undefined, adbOpen);
     const before = choosePath(sighting);
     if (target.kind === "network" && before.route === "pairing") {
         publish({ phase: "failed", outcome: "needs-pairing" });
@@ -314,12 +331,15 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): 
                 commandMs: 60_000,
                 onPrompt: () => publish({ phase: "allow", waiting: waitingFor("prompt", before) })
             });
+            pending = adb;
             try {
                 await adb.open();
                 return adb;
             } catch (caught) {
                 adb.close();
                 throw caught;
+            } finally {
+                pending = null;
             }
         },
         classify: (caught) => connectFailure(caught as NodeJS.ErrnoException),
@@ -400,7 +420,11 @@ async function finish(adb: AdbConnection, target: TvTarget, outcome: TvOutcome):
 
 /** Stops a search, or a wait for the TV, under way; an install is never stopped once the TV let this in. */
 function stopSearch(by?: WebContents): void {
-    if (state.waiting) waitRun += 1;
+    if (state.waiting) {
+        waitRun += 1;
+        // A prompt nobody answered would otherwise hold the cancel until it times out.
+        pending?.close();
+    }
     if (state.phase !== "searching" || (by && searcher !== by)) return;
     searcher = null;
     search += 1;
@@ -459,12 +483,13 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         searcher = event.sender;
         const run = search;
         publish({ phase: "searching", found: [] });
-        const found = await findTvs(run).catch(() => []);
+        const { found, heard } = await findTvs(run).catch(() => ({ found: [], heard: new Map<string, TvAnnouncement>() }));
         // A cancelled search has already handed the controls back.
         if (run !== search) return state;
         busy = false;
         searcher = null;
-        publish({ phase: "ready", found });
+        announced = heard;
+        publish({ phase: "ready", found, named: namesOf(heard) });
         return state;
     });
     ipcMain.handle(CHANNELS.tvFindUsb, async (event) => {

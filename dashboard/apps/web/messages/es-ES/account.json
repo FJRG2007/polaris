@@ -1451,6 +1451,16 @@
                     "home": "Haciéndola la pantalla de inicio...",
                     "closing": "Apagando la depuración en la TV..."
                 },
+                "waiting": {
+                    "loader": "Esperando a la TV...",
+                    "debugging": "En la TV, abre {about} y pulsa OK sobre {press} {presses} veces. Luego en {developer}, activa {switches}.",
+                    "before": "Antes de empezar, en la TV: abre {about} y pulsa OK sobre {press} {presses} veces; luego en {developer} activa {switches}.",
+                    "carriesOn": "La instalación sigue sola en cuanto esté activado.",
+                    "pairing": "Si la TV solo ofrece Depuración inalámbrica, pide un código de vinculación que la app aún no usa. Un cable USB sí sirve.",
+                    "prompt": "En la TV, elige Permitir. Marca Permitir siempre desde este ordenador para que no vuelva a preguntar.",
+                    "list": "{items} y {last}",
+                    "stop": "Parar"
+                },
                 "outcomes": {
                     "installed": "Polaris TV está instalada. Búscala entre las apps de la TV.",
                     "installed-home": "Polaris TV está instalada y ya es la pantalla de inicio.",

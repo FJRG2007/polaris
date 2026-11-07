@@ -58,6 +58,20 @@ export interface DesktopTvState {
     readonly backup: string | null;
     /** Whether network debugging refused afterwards; null until checked. */
     readonly closed: boolean | null;
+    /** While the install waits on the TV: the one thing to do there. Absent on an app older than that. */
+    readonly waiting?: DesktopTvWaiting | null;
+    /** The name a found TV announced, by address. Absent on an app older than that. */
+    readonly named?: Readonly<Record<string, string>>;
+}
+
+/** The instruction for this TV while the install waits: its menus, from the TV checker's data. */
+export interface DesktopTvWaiting {
+    readonly step: "debugging" | "prompt";
+    readonly about: string;
+    readonly press: string;
+    readonly presses: number;
+    readonly developer: string;
+    readonly switches: readonly string[];
 }
 
 /** Installing on a TV from a dialog on this page, through the app. */

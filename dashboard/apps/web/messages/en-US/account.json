@@ -1451,6 +1451,16 @@
                     "home": "Making it the Home screen...",
                     "closing": "Turning off debugging on the TV..."
                 },
+                "waiting": {
+                    "loader": "Waiting for the TV...",
+                    "debugging": "On the TV, open {about} and press OK on {press} {presses} times. Then in {developer}, turn on {switches}.",
+                    "before": "Before you start, on the TV: open {about} and press OK on {press} {presses} times, then in {developer} turn on {switches}.",
+                    "carriesOn": "The install carries on by itself once it is on.",
+                    "pairing": "If the TV only offers Wireless debugging, it needs a pairing code the app cannot use yet. A USB cable works instead.",
+                    "prompt": "On the TV, choose Allow. Tick Always allow from this computer so it does not ask again.",
+                    "list": "{items} and {last}",
+                    "stop": "Stop"
+                },
                 "outcomes": {
                     "installed": "Polaris TV is installed. Find it among the TV's apps.",
                     "installed-home": "Polaris TV is installed and is now the Home screen.",

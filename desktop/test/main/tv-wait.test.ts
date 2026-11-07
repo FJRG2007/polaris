@@ -100,6 +100,19 @@ describe("waitForTv", () => {
         expect(polls).toBe(2);
     });
 
+    it("ends as cancelled when a cancel closes the attempt under way, with no step shown for it", async () => {
+        let stopped = false;
+        const wait = script(["open"], {
+            connect: async () => {
+                stopped = true;
+                throw new Error("unreachable");
+            },
+            cancelled: () => stopped
+        });
+        expect(await wait.run()).toEqual({ kind: "cancelled" });
+        expect(wait.steps).toEqual([]);
+    });
+
     it("reads each failure as the step it leaves the person at", () => {
         expect(stepAfter("not-allowed")).toBe("prompt");
         expect(stepAfter("adb-off")).toBe("debugging");

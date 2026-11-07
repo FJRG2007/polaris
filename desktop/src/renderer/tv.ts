@@ -168,7 +168,8 @@ function render(state: TvInstallState): void {
         ...state.found.map((host) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.textContent = host;
+            const name = state.named?.[host];
+            button.textContent = name ? `${name} - ${host}` : host;
             button.addEventListener("click", () => {
                 address.value = host;
                 render(state);

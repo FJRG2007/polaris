@@ -334,5 +334,7 @@ export class AdbConnection {
         const link = this.link;
         this.link = null;
         link?.close();
+        // Nothing can answer a closed connection: whatever waits on it ends now, not at its timeout.
+        this.fail(new Error("The connection was closed."));
     }
 }

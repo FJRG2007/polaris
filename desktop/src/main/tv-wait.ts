@@ -61,6 +61,8 @@ export async function waitForTv<T>(options: TvWaitOptions<T>): Promise<TvWaitRes
         try {
             return { kind: "connected", connection: await options.connect() };
         } catch (caught) {
+            // A cancel closes the attempt under way; that is not the TV failing.
+            if (options.cancelled()) return { kind: "cancelled" };
             const failure = options.classify(caught);
             const next = stepAfter(failure);
             if (!next) return { kind: "failed", outcome: failure };

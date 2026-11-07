@@ -154,6 +154,41 @@ describe("a session", () => {
         expect(pushed.data.includes(apk.subarray(0, 60_000))).toBe(true);
         adb.close();
     });
+
+    it("ends a wait on the TV's prompt as soon as it is closed, not when the prompt times out", async () => {
+        const AUTH = 0x48545541;
+        let events: { data(chunk: Buffer): void; } | null = null;
+        // A TV that never accepts: every handshake packet is answered with a fresh token, and the key with nothing.
+        const link = async (opened: { data(chunk: Buffer): void; }) => {
+            events = opened;
+            return {
+                send: (header: Buffer) => {
+                    if (header.readUInt32LE(0) !== AUTH || header.readUInt32LE(4) !== 3) {
+                        queueMicrotask(() => events?.data(encodePacket(AUTH, 1, 0, Buffer.alloc(20, 7))));
+                    }
+                },
+                close: () => undefined
+            };
+        };
+        let prompt = () => undefined as void;
+        const prompted = new Promise<void>((resolve) => {
+            prompt = resolve;
+        });
+        const adb = new AdbConnection({
+            link,
+            key: KEY,
+            connectMs: 2000,
+            approveMs: 60_000,
+            commandMs: 2000,
+            onPrompt: () => prompt()
+        });
+        const opening = adb.open();
+        await prompted;
+        const started = Date.now();
+        adb.close();
+        await expect(opening).rejects.toThrow("The connection was closed.");
+        expect(Date.now() - started).toBeLessThan(1000);
+    });
 });
 
 describe("what it agrees to touch", () => {

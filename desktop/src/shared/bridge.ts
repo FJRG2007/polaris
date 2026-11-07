@@ -374,6 +374,8 @@ export interface TvInstallState {
     readonly waiting?: TvWaiting | null;
     /** Whether this TV lets Polaris TV be Home, once it is known. Absent on older apps. */
     readonly home?: "offered" | "app-only" | "refused-by-maker" | null;
+    /** The name a found TV announced (its Cast name or model), by address. Absent on older apps. */
+    readonly named?: Readonly<Record<string, string>>;
 }
 
 /** The instruction shown while waiting: turn on debugging (the menu path for this TV's platform), or accept the prompt. */
