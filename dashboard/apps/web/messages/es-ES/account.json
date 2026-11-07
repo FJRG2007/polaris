@@ -1425,7 +1425,13 @@
                 "find": "Buscar TVs",
                 "stopSearch": "Parar búsqueda",
                 "noneFound": "Ninguna TV respondió en esta red. Escribe su dirección.",
-                "makeHome": "Hacerla la pantalla de inicio. La de la TV sigue instalada.",
+                "mode": {
+                    "label": "Cómo instalarla",
+                    "system": "Como sistema de la TV",
+                    "systemHint": "Pasa a ser la pantalla de inicio y recibe cada permiso que la TV permite. La de la TV sigue instalada.",
+                    "app": "Solo como app",
+                    "appHint": "La instala y no cambia nada más en la TV."
+                },
                 "backupNote": "Primero se guarda en este equipo una copia de los ajustes de la TV. No se desinstala nada y la depuración de red se apaga al final.",
                 "notStarted": "No se pudo iniciar la instalación. Revisa la dirección y vuelve a intentarlo.",
                 "start": "Instalar",
@@ -1451,6 +1457,7 @@
                     "download": "Descargando Polaris TV...",
                     "install": "Instalando...",
                     "home": "Haciéndola la pantalla de inicio...",
+                    "control": "Pidiendo a la TV cada permiso...",
                     "closing": "Apagando la depuración en la TV..."
                 },
                 "waiting": {
@@ -1464,6 +1471,22 @@
                     "stop": "Parar"
                 },
                 "linking": "La TV muestra ahora este Polaris en su pantalla de vínculo. Pulsa OK en el mando para ver el código y escanéalo con el móvil.",
+                "control": {
+                    "title": "Lo que esta TV permitió",
+                    "appOnly": "Instalada solo como app. No se cambió nada más en la TV.",
+                    "rungs": {
+                        "home": "Inicio",
+                        "secure-settings": "Cambiar ajustes del sistema",
+                        "notification-listener": "Reabrirse al cerrarla",
+                        "install-packages": "Actualizarse sola",
+                        "battery": "Seguir activa al ahorrar"
+                    },
+                    "states": {
+                        "got": "Permitido",
+                        "refused": "Rechazado por la TV",
+                        "skipped": "No probado aquí"
+                    }
+                },
                 "outcomes": {
                     "installed": "Polaris TV está instalada. Búscala entre las apps de la TV.",
                     "installed-home": "Polaris TV está instalada y ya es la pantalla de inicio.",

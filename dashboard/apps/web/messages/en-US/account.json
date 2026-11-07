@@ -1425,7 +1425,13 @@
                 "find": "Find TVs",
                 "stopSearch": "Stop search",
                 "noneFound": "No TV answered on this network. Type its address instead.",
-                "makeHome": "Make it the Home screen. The TV's own stays installed.",
+                "mode": {
+                    "label": "How to install it",
+                    "system": "As the TV's system",
+                    "systemHint": "Becomes the Home screen and gets every permission this TV allows. The TV's own stays installed.",
+                    "app": "Only as an app",
+                    "appHint": "Installs it and changes nothing else on the TV."
+                },
                 "backupNote": "A backup of the TV's settings is saved on this computer first. Nothing is uninstalled, and network debugging is turned off at the end.",
                 "notStarted": "The install could not start. Check the address and try again.",
                 "start": "Install",
@@ -1451,6 +1457,7 @@
                     "download": "Downloading Polaris TV...",
                     "install": "Installing...",
                     "home": "Making it the Home screen...",
+                    "control": "Asking the TV for each permission...",
                     "closing": "Turning off debugging on the TV..."
                 },
                 "waiting": {
@@ -1464,6 +1471,22 @@
                     "stop": "Stop"
                 },
                 "linking": "The TV now shows this Polaris on its link screen. Press OK on the remote to get the code, then scan it with your phone.",
+                "control": {
+                    "title": "What this TV allowed",
+                    "appOnly": "Installed only as an app. Nothing else on the TV was changed.",
+                    "rungs": {
+                        "home": "Home screen",
+                        "secure-settings": "Change system settings",
+                        "notification-listener": "Restart itself when closed",
+                        "install-packages": "Update itself",
+                        "battery": "Keep running in power saving"
+                    },
+                    "states": {
+                        "got": "Allowed",
+                        "refused": "Refused by this TV",
+                        "skipped": "Not tried here"
+                    }
+                },
                 "outcomes": {
                     "installed": "Polaris TV is installed. Find it among the TV's apps.",
                     "installed-home": "Polaris TV is installed and is now the Home screen.",

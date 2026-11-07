@@ -34,7 +34,7 @@ import { browseTvs, mergeFound, namesOf, sightingOf, type TvAnnouncement } from 
 import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { readTvAddress } from "@/shared/tv-address";
-import { CHANNELS, type TvInstallState, type TvOutcome, type TvWaiting } from "@/shared/bridge";
+import { CHANNELS, type TvControl, type TvControlRung, type TvInstallMode, type TvInstallState, type TvOutcome, type TvWaiting } from "@/shared/bridge";
 
 const PACKAGE = "app.polaris.tv";
 const HOME_ACTIVITY = `${PACKAGE}/.MainActivity`;
@@ -267,9 +267,10 @@ export function opened(output: string): boolean {
 
 /**
  * The runtime grants after the install. Location names the Wi-Fi in the launcher's network row;
- * WRITE_SECURE_SETTINGS, only when asked, lets "Block ads and trackers" set Private DNS and put the
- * TV's own back when it does not work. Neither is ever revoked here: the launcher's own scripts may
- * have granted the second for another switch.
+ * WRITE_SECURE_SETTINGS lets "Block ads and trackers" set Private DNS and put the TV's own back when it
+ * does not work; here it is granted only when that was asked for, though system mode grants it anyway
+ * as one of its control levels. Neither is ever revoked here: the launcher's own scripts may have
+ * granted the second for another switch.
  */
 export function grantCommands(blockAds: boolean): readonly string[] {
     const grants = [`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`];
@@ -326,6 +327,138 @@ export function homeKeyOn(read: string): boolean {
     return (accessibilityEntries(list) ?? []).some(isHomeKey) && enabled.trim() === "1";
 }
 
+/** What an install was asked to do: `mode` when the page sends it, else what `home` meant before it existed. */
+export function installMode(input: { readonly mode?: TvInstallMode; readonly home?: boolean; }): TvInstallMode {
+    return input.mode ?? (input.home === false ? "app" : "system");
+}
+
+/** The Home level, from how the Home step ended: skipped where the TV keeps its own Home. */
+export function homeControl(offered: boolean, outcome: TvOutcome): TvControl {
+    if (!offered) return { rung: "home", state: "skipped" };
+    return { rung: "home", state: outcome === "installed-home" || outcome === "installed-home-key" ? "got" : "refused" };
+}
+
+const LISTENER_LIST = "enabled_notification_listeners";
+const GUARD_REVIVAL = `${PACKAGE}/.GuardRevival`;
+
+function isGuardRevival(entry: string): boolean {
+    return entry === GUARD_REVIVAL || entry === `${PACKAGE}/${PACKAGE}.GuardRevival`;
+}
+
+/**
+ * One level of control past Home. `before` is read first where the command has to keep what is
+ * there; `commands` answers null when that read is not what it should be, so nothing is written.
+ * `check` is read afterwards and `got` says whether it shows the level in place.
+ */
+export interface TvControlGrant {
+    readonly rung: Exclude<TvControlRung, "home">;
+    readonly before?: string;
+    readonly commands: (before: string) => readonly string[] | null;
+    readonly check: string;
+    readonly got: (check: string) => boolean;
+}
+
+/**
+ * The listener list with GuardRevival after whatever is there, never in place of it; nothing
+ * when it is listed already, and null when the list is not a list of components. Only for a TV
+ * older than Android 8, which has no `cmd notification` and binds listeners from this setting.
+ */
+export function listenerCommands(read: string): string[] | null {
+    const entries = accessibilityEntries(read);
+    if (!entries) return null;
+    if (entries.some(isGuardRevival)) return [];
+    return [`settings put secure ${LISTENER_LIST} ${settingValue([...entries, GUARD_REVIVAL].join(":"))}`];
+}
+
+/** The first Android with `cmd notification`, where the service approves listeners rather than the setting. */
+const NOTIFICATION_CMD_SDK = 26;
+
+/** Whether `dumpsys notification` shows GuardRevival among the listeners the service enabled or bound. */
+export function listenerEnabled(check: string): boolean {
+    return check.includes(`ComponentInfo{${PACKAGE}/${PACKAGE}.GuardRevival}`) || check.includes(`ComponentInfo{${GUARD_REVIVAL}}`);
+}
+
+/** GuardRevival as a notification listener: through the service where it has a command, else through the setting. */
+function listenerGrant(sdk: number | null): TvControlGrant {
+    if (sdk !== null && sdk < NOTIFICATION_CMD_SDK) {
+        return {
+            rung: "notification-listener",
+            before: `settings get secure ${LISTENER_LIST}`,
+            commands: listenerCommands,
+            check: `settings get secure ${LISTENER_LIST}`,
+            got: (check) => (accessibilityEntries(check) ?? []).some(isGuardRevival)
+        };
+    }
+    return {
+        rung: "notification-listener",
+        commands: () => [`cmd notification allow_listener ${GUARD_REVIVAL}`],
+        check: "dumpsys notification | grep -F GuardRevival",
+        got: listenerEnabled
+    };
+}
+
+/** Whether `dumpsys package` lines show WRITE_SECURE_SETTINGS granted. */
+export function secureSettingsGranted(check: string): boolean {
+    return /android\.permission\.WRITE_SECURE_SETTINGS: granted=true/.test(check);
+}
+
+/** Whether `appops get` answers that installing apps is allowed. */
+export function installPackagesAllowed(check: string): boolean {
+    return /^\s*REQUEST_INSTALL_PACKAGES: allow\b/m.test(check);
+}
+
+/** Whether `dumpsys deviceidle whitelist` lists the launcher (lines like `user,app.polaris.tv,10123`). */
+export function batteryWhitelisted(check: string): boolean {
+    return check.split(/\r?\n/).some((line) => line.trim().split(",")[1] === PACKAGE);
+}
+
+/**
+ * What the system mode asks for past Home, strongest first. Only what the launcher declares or
+ * implements (tv/launcher/app/src/main/AndroidManifest.xml): it has no usage-stats or overlay
+ * permission, so those app-ops are not asked for.
+ */
+export function controlGrants(sdk: number | null): readonly TvControlGrant[] {
+    return [
+        {
+            rung: "secure-settings",
+            commands: () => [`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`],
+            check: `dumpsys package ${PACKAGE} | grep -F WRITE_SECURE_SETTINGS`,
+            got: secureSettingsGranted
+        },
+        // GuardRevival brings the launcher back after the firmware force-stops it; it reads no notification.
+        listenerGrant(sdk),
+        {
+            rung: "install-packages",
+            commands: () => [`appops set ${PACKAGE} REQUEST_INSTALL_PACKAGES allow`],
+            check: `appops get ${PACKAGE} REQUEST_INSTALL_PACKAGES`,
+            got: installPackagesAllowed
+        },
+        {
+            rung: "battery",
+            commands: () => [`dumpsys deviceidle whitelist +${PACKAGE}`],
+            check: "dumpsys deviceidle whitelist",
+            got: batteryWhitelisted
+        }
+    ];
+}
+
+/** Runs each grant and reads it back; one the TV refuses, or that fails, is recorded and the next is tried. */
+export async function grantControl(adb: Pick<AdbConnection, "shell">, grants: readonly TvControlGrant[]): Promise<TvControl[]> {
+    const control: TvControl[] = [];
+    for (const grant of grants) {
+        let got = false;
+        try {
+            const commands = grant.commands(grant.before ? await adb.shell(grant.before) : "");
+            for (const command of commands ?? []) await adb.shell(command);
+            got = grant.got(await adb.shell(grant.check));
+        } catch (caught) {
+            console.error("[tv] control", grant.rung, caught);
+        }
+        control.push({ rung: grant.rung, state: got ? "got" : "refused" });
+    }
+    return control;
+}
+
 async function backUp(adb: AdbConnection, target: TvTarget): Promise<string> {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const folder = join(app.getPath("userData"), "tv-backups", `${targetLabel(target)}-${stamp}`);
@@ -359,7 +492,8 @@ let state: TvInstallState = {
     waiting: null,
     home: null,
     linking: null,
-    named: {}
+    named: {},
+    control: null
 };
 
 function publish(next: Partial<TvInstallState>): void {
@@ -462,8 +596,9 @@ async function overWirelessDebugging(
     return connectOn(tlsPort).catch((caught: NodeJS.ErrnoException) => (stopped() ? ("cancelled" as const) : connectFailure(caught)));
 }
 
-async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, code: string | null = null): Promise<void> {
-    publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null, linking: null });
+async function install(target: TvTarget, mode: TvInstallMode, blockAds: boolean, code: string | null = null): Promise<void> {
+    publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null, linking: null, control: null });
+    const makeHome = mode === "system";
     const release = await latestTvRelease().catch((caught: unknown) => {
         console.error("[tv]", caught);
         return undefined;
@@ -556,6 +691,7 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
     try {
         publish({ phase: "checking" });
         const sdk = await adb.shell("getprop ro.build.version.sdk");
+        const sdkLevel = Number.parseInt(sdk.trim(), 10) || null;
         const refusal = tvRefusal(sdk, await adb.shell("pm list features"));
         if (refusal) {
             await finish(adb, target, refusal);
@@ -564,7 +700,7 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
         const path = choosePath(sighting, {
             manufacturer: await adb.shell("getprop ro.product.manufacturer"),
             model: await adb.shell("getprop ro.product.model"),
-            sdk: Number.parseInt(sdk.trim(), 10) || null,
+            sdk: sdkLevel,
             homeGuard: listsPackage(await adb.shell(`pm list packages ${HOME_GUARD_PACKAGE}`), HOME_GUARD_PACKAGE)
         });
         publish({ home: path.home });
@@ -614,6 +750,11 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
             );
             outcome = homeIsOurs(resolved) ? "installed-home" : "installed-home-refused";
         }
+        if (mode === "system") {
+            // Each level past Home is tried and checked on its own; none of them can fail the install.
+            publish({ phase: "control" });
+            publish({ control: [homeControl(path.home === "offered", outcome), ...(await grantControl(adb, controlGrants(sdkLevel)))] });
+        } else publish({ control: [] });
         const link = linkCommand(serverAddress());
         if (link && !alreadyLinked(await adb.shell(LINK_STATE_READ).catch(() => ""))) {
             publish({ linking: opened(await adb.shell(link).catch(() => "Error")) });
@@ -662,16 +803,22 @@ export function openTvInstall(): void {
     });
 }
 
-const startSchema = z.union([
+/** `mode` from pages that know it; `home` alone from pages older than it. One of them is required. */
+const choiceShape = {
+    mode: z.enum(["system", "app"]).optional(),
+    home: z.boolean().optional(),
+    blockAds: z.boolean().optional()
+};
+
+export const startSchema = z.union([
     z.object({
         host: z.unknown().transform(readTvAddress).pipe(z.string()),
-        home: z.boolean(),
-        blockAds: z.boolean().optional(),
+        ...choiceShape,
         /** The Wireless debugging pairing code the TV shows; absent until it asked for one. */
         code: z.string().max(32).optional()
     }),
-    z.object({ usb: z.string().trim().min(1).max(200), home: z.boolean(), blockAds: z.boolean().optional() })
-]);
+    z.object({ usb: z.string().trim().min(1).max(200), ...choiceShape })
+]).refine((input) => input.mode !== undefined || input.home !== undefined);
 
 /** Where a start asked to install; a USB id only counts if it was listed. */
 export function startTarget(input: z.infer<typeof startSchema>, listed: readonly { readonly id: string; }[] | null): TvTarget | null {
@@ -733,7 +880,7 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         const code = typed === undefined ? null : readPairingCode(typed);
         if (!target || (typed !== undefined && !code)) return false;
         busy = true;
-        void install(target, input.data.home, input.data.blockAds === true, code).finally(() => {
+        void install(target, installMode(input.data), input.data.blockAds === true, code).finally(() => {
             busy = false;
         });
         return true;

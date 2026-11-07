@@ -24,7 +24,6 @@ import { Tv } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
     Button,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -32,13 +31,20 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    SegmentedControl,
     cn
 } from "@polaris/ui";
 import { TvChecker } from "@polaris/ui/tv-checker";
 import { debuggingById, debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
 import { DownloadCard } from "@polaris/ui/download-card";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { desktopBridge, type DesktopTv, type DesktopTvState } from "@/lib/desktop-bridge";
+import {
+    desktopBridge,
+    type DesktopTv,
+    type DesktopTvControl,
+    type DesktopTvInstallMode,
+    type DesktopTvState
+} from "@/lib/desktop-bridge";
 import { TvWaitingNote } from "./tv-waiting";
 
 type Reach = "browser" | "old-app" | "app";
@@ -63,8 +69,22 @@ const STEPS = new Set([
     "download",
     "install",
     "home",
+    "control",
     "closing"
 ]);
+const RUNGS = new Set([
+    "home",
+    "secure-settings",
+    "notification-listener",
+    "install-packages",
+    "battery"
+]);
+const CONTROL_STATES = new Set(["got", "refused", "skipped"]);
+
+/** The levels this page can name; one a newer app added is left out rather than shown as a raw code. */
+function knownControl(control: readonly DesktopTvControl[]): DesktopTvControl[] {
+    return control.filter((one) => RUNGS.has(one.rung) && CONTROL_STATES.has(one.state));
+}
 const OUTCOMES = new Set([
     "installed",
     "installed-home",
@@ -130,7 +150,7 @@ function InstallSteps({
     const locale = useLocale();
     const [state, setState] = useState<DesktopTvState | null>(null);
     const [address, setAddress] = useState("");
-    const [home, setHome] = useState(true);
+    const [mode, setMode] = useState<DesktopTvInstallMode>("system");
     const [searched, setSearched] = useState(false);
     const [usbId, setUsbId] = useState<string | null>(null);
     const [notStarted, setNotStarted] = useState(false);
@@ -317,15 +337,31 @@ function InstallSteps({
                     </div>
                 ) : null}
 
-                <label className="flex min-w-0 items-start gap-2 text-sm">
-                    <Checkbox
-                        checked={home}
-                        disabled={!idle}
-                        onChange={(event) => setHome(event.target.checked)}
-                        className="mt-0.5"
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <SegmentedControl
+                        aria-label={t("downloads.tv.dialog.mode.label")}
+                        value={mode}
+                        onValueChange={setMode}
+                        options={[
+                            {
+                                value: "system",
+                                label: t("downloads.tv.dialog.mode.system"),
+                                disabled: !idle
+                            },
+                            {
+                                value: "app",
+                                label: t("downloads.tv.dialog.mode.app"),
+                                disabled: !idle
+                            }
+                        ]}
+                        className="self-start"
                     />
-                    <span className="min-w-0">{t("downloads.tv.dialog.makeHome")}</span>
-                </label>
+                    <p className="text-xs text-muted-foreground">
+                        {mode === "system"
+                            ? t("downloads.tv.dialog.mode.systemHint")
+                            : t("downloads.tv.dialog.mode.appHint")}
+                    </p>
+                </div>
                 <p className="text-xs text-muted-foreground">
                     {t("downloads.tv.dialog.backupNote")}
                 </p>
@@ -358,6 +394,9 @@ function InstallSteps({
                     >
                         {t(`downloads.tv.dialog.outcomes.${outcome}` as never)}
                     </p>
+                ) : null}
+                {state.phase === "done" && state.control ? (
+                    <TvControlReport control={state.control} />
                 ) : null}
                 {state.phase === "done" && state.linking ? (
                     <p className="text-sm text-foreground">{t("downloads.tv.dialog.linking")}</p>
@@ -421,8 +460,13 @@ function InstallSteps({
                         void tv
                             .start(
                                 usbPicked
-                                    ? { usb: usbPicked, home }
-                                    : { host: address.trim(), home, ...(asksCode ? { code } : {}) }
+                                    ? { usb: usbPicked, mode, home: mode === "system" }
+                                    : {
+                                          host: address.trim(),
+                                          mode,
+                                          home: mode === "system",
+                                          ...(asksCode ? { code } : {})
+                                      }
                             )
                             .then((started) => setNotStarted(!started));
                     }}
@@ -431,6 +475,44 @@ function InstallSteps({
                 </Button>
             </DialogFooter>
         </>
+    );
+}
+
+/** What installing as the TV's system got, level by level, or that an app-only install changed nothing else. */
+function TvControlReport({ control }: { control: readonly DesktopTvControl[] }) {
+    const t = useTranslations("account");
+    const known = knownControl(control);
+    if (control.length === 0)
+        return (
+            <p className="text-xs text-muted-foreground">
+                {t("downloads.tv.dialog.control.appOnly")}
+            </p>
+        );
+    if (known.length === 0) return null;
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-sm font-medium">{t("downloads.tv.dialog.control.title")}</p>
+            <ul className="flex min-w-0 flex-col gap-0.5 text-xs">
+                {known.map((one) => (
+                    <li key={one.rung} className="flex min-w-0 justify-between gap-3">
+                        <span
+                            className="min-w-0 truncate"
+                            title={t(`downloads.tv.dialog.control.rungs.${one.rung}` as never)}
+                        >
+                            {t(`downloads.tv.dialog.control.rungs.${one.rung}` as never)}
+                        </span>
+                        <span
+                            className={cn(
+                                "shrink-0",
+                                one.state === "got" ? "text-foreground" : "text-muted-foreground"
+                            )}
+                        >
+                            {t(`downloads.tv.dialog.control.states.${one.state}` as never)}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 }
 
