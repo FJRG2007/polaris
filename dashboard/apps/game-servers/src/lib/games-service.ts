@@ -898,6 +898,11 @@ export async function syncFirewallBans(
         await import("./minecraft/oneblock-service")
             .then((service) => service.applyOneBlockSetup(ownerId, install.id, install.config))
             .catch(() => undefined);
+        // A server on the Skyblock 2.1 map gets the islands the map is missing,
+        // put into its sky once, with nobody stopping it.
+        await import("./minecraft/skyblock-islands-service")
+            .then((service) => service.applySkyblockIslands(ownerId, install.id, install.config))
+            .catch(() => undefined);
         const applied = await applyFirewallBans(ownerId, install.id).catch(() => null);
         if (applied === null) continue;
         servers += 1;
