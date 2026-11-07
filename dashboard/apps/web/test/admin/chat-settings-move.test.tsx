@@ -29,6 +29,14 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/session", () => ({ requireAdmin }));
 vi.mock("@/app/(app)/apps/marketplace/store-installs", () => ({ hasAppInstall }));
 vi.mock("@/app/(app)/vpn/vpn-admin-settings", () => ({ VpnAdminSettings: () => null }));
+vi.mock("@/lib/apps/app-services", () => ({
+    appHasServices: async () => false,
+    listAppServices: async () => []
+}));
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/app-services-panel", () => ({
+    AppServicesPanel: () => null,
+    AppServicesSkeleton: () => null
+}));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings

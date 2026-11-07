@@ -12,12 +12,15 @@ import * as activity from "@/lib/activity/activity";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import { appSettingsPath } from "@/lib/apps/app-settings";
-import { restartAppService } from "@/lib/apps/app-services";
+import { readAppServiceLog, restartAppService } from "@/lib/apps/app-services";
 
-const RestartInput = z.object({
+const ServiceInput = z.object({
     appId: z.string().trim().min(1).max(100),
     applicationId: z.string().trim().uuid()
 });
+
+/** How many lines a log view shows - the same as Deploy's. */
+const LOG_TAIL = 500;
 
 /** Restart one of this app's services in place. */
 export async function restartAppServiceAction(
@@ -26,7 +29,7 @@ export async function restartAppServiceAction(
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await readerWords("marketplace");
-    const input = RestartInput.safeParse({ appId, applicationId });
+    const input = ServiceInput.safeParse({ appId, applicationId });
     if (!input.success) return { error: t("services.notFound") };
     try {
         const restarted = await restartAppService(input.data.appId, input.data.applicationId);
@@ -53,4 +56,22 @@ export async function restartAppServiceAction(
     });
     revalidatePath(appSettingsPath(input.data.appId));
     return {};
+}
+
+/** The last lines one of this app's services printed. */
+export async function readAppServiceLogAction(
+    appId: string,
+    applicationId: string
+): Promise<{ log?: string; error?: string }> {
+    await requireAdmin();
+    const t = await readerWords("marketplace");
+    const input = ServiceInput.safeParse({ appId, applicationId });
+    if (!input.success) return { error: t("services.notFound") };
+    try {
+        const log = await readAppServiceLog(input.data.appId, input.data.applicationId, LOG_TAIL);
+        return log === null ? { error: t("services.notFound") } : { log };
+    } catch (caught) {
+        console.error("[app-services] log read failed", caught);
+        return { error: t("services.logsFailed") };
+    }
 }

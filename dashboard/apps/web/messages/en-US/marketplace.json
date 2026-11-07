@@ -183,6 +183,7 @@
         "restartTitle": "Restart {name}?",
         "restartDescription": "Its container restarts in place. It is offline for a few seconds; nothing is removed.",
         "restartFailed": "Could not restart it. Try again in a moment.",
+        "logsFailed": "Could not read its output. Try again in a moment.",
         "notFound": "That service is not one of this app's.",
         "waitingOutput": "Waiting for output...",
         "notRunning": "Not running.",

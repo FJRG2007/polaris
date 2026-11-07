@@ -13,7 +13,7 @@
 import { prisma } from "@polaris/db";
 import { readConsumption } from "@/lib/consumption-service";
 import type { ConsumptionRow } from "@/app/(app)/admin/consumption/types";
-import { getApplicationDeployStatuses, restartApplication } from "@/lib/deploy-service";
+import { getApplicationDeployStatuses, readAppRuntimeLog, restartApplication } from "@/lib/deploy-service";
 import { MAIL_SERVER_APP_ID, owningAppId } from "@/lib/deploy/managed-projects";
 
 /** One service of an app, as its settings list it. */
@@ -114,19 +114,39 @@ export async function listAppServices(appId: string, viewerId: string): Promise<
 }
 
 /**
- * Restart one of this app's services, the way Deploy restarted it.
- *
- * Refuses a service that is not this app's, so the settings of one app cannot be
- * used to restart another's - or a service somebody deployed. Returns false then.
+ * Who owns this service, when it is one of this app's - what every runtime call
+ * for it is made as. Null for a service that is not this app's, so the settings
+ * of one app cannot reach another's, or a service somebody deployed.
  */
-export async function restartAppService(appId: string, applicationId: string): Promise<boolean> {
+async function serviceOwner(appId: string, applicationId: string): Promise<string | null> {
     const refs = await serviceRefs(appId);
-    if (!refs.some((ref) => ref.applicationId === applicationId)) return false;
+    if (!refs.some((ref) => ref.applicationId === applicationId)) return null;
     const application = await prisma.application.findUnique({
         where: { id: applicationId },
         select: { environment: { select: { project: { select: { ownerId: true } } } } }
     });
-    if (!application) return false;
-    await restartApplication(applicationId, application.environment.project.ownerId);
+    return application?.environment.project.ownerId ?? null;
+}
+
+/** Restart one of this app's services, the way Deploy restarted it. False when it is not this app's. */
+export async function restartAppService(appId: string, applicationId: string): Promise<boolean> {
+    const ownerId = await serviceOwner(appId, applicationId);
+    if (!ownerId) return false;
+    await restartApplication(applicationId, ownerId);
     return true;
+}
+
+/**
+ * What one of this app's services printed last. Read as the project's owner, so
+ * any administrator sees it, not only the one who installed the app. Null when
+ * it is not this app's.
+ */
+export async function readAppServiceLog(
+    appId: string,
+    applicationId: string,
+    tail: number
+): Promise<string | null> {
+    const ownerId = await serviceOwner(appId, applicationId);
+    if (!ownerId) return null;
+    return readAppRuntimeLog(applicationId, ownerId, tail);
 }

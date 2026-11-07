@@ -37,6 +37,14 @@ vi.mock("@/lib/apps/install-service", () => ({
     )
 }));
 vi.mock("@/app/(app)/vpn/vpn-admin-settings", () => ({ VpnAdminSettings: () => null }));
+vi.mock("@/lib/apps/app-services", () => ({
+    appHasServices: async () => false,
+    listAppServices: async () => []
+}));
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/app-services-panel", () => ({
+    AppServicesPanel: () => null,
+    AppServicesSkeleton: () => null
+}));
 vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings: () => null
 }));

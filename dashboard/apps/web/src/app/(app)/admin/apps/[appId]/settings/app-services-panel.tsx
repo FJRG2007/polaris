@@ -7,27 +7,49 @@
 
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { LogViewer } from "@/components/log-viewer";
-import { Button, Card, CardBody } from "@polaris/ui";
+import { Button, Card, CardBody, Skeleton, pollWhileVisible } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { AppService } from "@/lib/apps/app-services";
-import { restartAppServiceAction } from "./service-actions";
+import { readAppServiceLogAction, restartAppServiceAction } from "./service-actions";
 import { RefreshCw, RotateCw, ScrollText } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StatusPill, dbTone } from "@/app/(app)/apps/deploy/status-pill";
-import { useRuntimeLog } from "@/app/(app)/apps/installed/[id]/use-runtime-log";
+
+function ServicesHeading() {
+    const t = useTranslations("marketplace");
+    return (
+        <div className="min-w-0">
+            <h2 id="app-services-title" className="text-base font-semibold">
+                {t("services.title")}
+            </h2>
+            <p className="text-sm text-muted-foreground">{t("services.description")}</p>
+        </div>
+    );
+}
+
+/** The section while its services are read: the heading now, a row's shape below. */
+export function AppServicesSkeleton() {
+    return (
+        <section className="flex min-w-0 flex-col gap-2" aria-labelledby="app-services-title" aria-busy>
+            <ServicesHeading />
+            <Card>
+                <CardBody className="flex min-w-0 items-center gap-3">
+                    <Skeleton className="h-4 min-w-0 flex-1" />
+                    <Skeleton className="h-5 w-16 shrink-0" />
+                    <Skeleton className="h-8 w-40 shrink-0" />
+                </CardBody>
+            </Card>
+        </section>
+    );
+}
 
 export function AppServicesPanel({ appId, services }: { appId: string; services: AppService[] }) {
     const t = useTranslations("marketplace");
     return (
         <section className="flex min-w-0 flex-col gap-2" aria-labelledby="app-services-title">
-            <div className="min-w-0">
-                <h2 id="app-services-title" className="text-base font-semibold">
-                    {t("services.title")}
-                </h2>
-                <p className="text-sm text-muted-foreground">{t("services.description")}</p>
-            </div>
+            <ServicesHeading />
             {services.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("services.empty")}</p>
             ) : (
@@ -49,7 +71,7 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
     const [error, setError] = useState<string | null>(null);
     const [restarting, startRestart] = useTransition();
     const running = service.status.toLowerCase() === "running";
-    const { log, refresh } = useRuntimeLog(service.applicationId, showLogs);
+    const { log, logError, refresh } = useServiceLog(appId, service.applicationId, showLogs);
     const title = service.installName ?? service.name;
 
     async function restart(): Promise<void> {
@@ -125,6 +147,11 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                                 {t("services.refresh")}
                             </Button>
                         </div>
+                        {logError ? (
+                            <p role="alert" className="text-sm text-danger-ink">
+                                {logError}
+                            </p>
+                        ) : null}
                         <LogViewer
                             log={log}
                             name={service.name}
@@ -140,4 +167,41 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
             {confirmDialog}
         </Card>
     );
+}
+
+const POLL_MS = 4000;
+
+/**
+ * The service's output, polled while it is open. Read through the app's settings
+ * rather than Deploy's log route, which answers only the project's own people:
+ * an administrator who did not install the app reads it here all the same.
+ */
+function useServiceLog(
+    appId: string,
+    applicationId: string,
+    active: boolean
+): { log: string; logError: string | null; refresh: () => Promise<void> } {
+    const [log, setLog] = useState("");
+    const [logError, setLogError] = useState<string | null>(null);
+
+    const refresh = useCallback(async () => {
+        try {
+            const result = await readAppServiceLogAction(appId, applicationId);
+            if (result.error) setLogError(result.error);
+            else {
+                setLogError(null);
+                setLog(result.log ?? "");
+            }
+        } catch {
+            // Transient; the next poll retries.
+        }
+    }, [appId, applicationId]);
+
+    useEffect(() => {
+        if (!active) return;
+        void refresh();
+        return pollWhileVisible(() => void refresh(), POLL_MS);
+    }, [active, refresh]);
+
+    return { log, logError, refresh };
 }

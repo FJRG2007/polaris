@@ -183,6 +183,7 @@
         "restartTitle": "¿Reiniciar {name}?",
         "restartDescription": "Su contenedor se reinicia en el sitio. Queda sin servicio unos segundos; no se elimina nada.",
         "restartFailed": "No se pudo reiniciar. Prueba de nuevo en un momento.",
+        "logsFailed": "No se pudo leer su salida. Prueba de nuevo en un momento.",
         "notFound": "Ese servicio no es de esta app.",
         "waitingOutput": "Esperando salida...",
         "notRunning": "No está en marcha.",

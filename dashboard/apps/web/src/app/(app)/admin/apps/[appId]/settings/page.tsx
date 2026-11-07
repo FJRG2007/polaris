@@ -14,11 +14,12 @@ import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { appSettingsPath, builtInHasSettings } from "@/lib/apps/app-settings";
 import { ChatAdminSettings } from "./_chat/chat-settings";
+import { Suspense } from "react";
 import { PageHeader } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
 import { requireAdmin } from "@/lib/session";
-import { listAppServices } from "@/lib/apps/app-services";
-import { AppServicesPanel } from "./app-services-panel";
+import { appHasServices, listAppServices } from "@/lib/apps/app-services";
+import { AppServicesPanel, AppServicesSkeleton } from "./app-services-panel";
 import { hasAppInstall } from "@/app/(app)/apps/marketplace/store-installs";
 import { findStoreApp } from "@/lib/apps/marketplace-store";
 import { getTranslations } from "@/lib/i18n/request";
@@ -37,9 +38,9 @@ export default async function PolarisAppSettingsPage({
     const app = findStoreApp(appId);
     if (!app) notFound();
     // The services Polaris runs for this app are shown here whatever else the app
-    // keeps on its own screens: Deploy no longer lists them.
-    const services = await listAppServices(app.id, user.id);
-    const ownsServices = services.length > 0;
+    // keeps on its own screens: Deploy no longer lists them. Whether there are any
+    // is one read; their state and figures load after the page is drawn.
+    const ownsServices = await appHasServices(app.id);
     if (!app.settingsAt && !ownsServices) notFound();
     if (!ownsServices && !(await hasAppInstall(user, app.id)))
         redirect(`/admin/apps/${encodeURIComponent(app.id)}`);
@@ -67,10 +68,20 @@ export default async function PolarisAppSettingsPage({
                     </Link>
                 ) : null}
                 {app.id === "vpn" ? <VpnAdminSettings /> : null}
-                {ownsServices ? <AppServicesPanel appId={app.id} services={services} /> : null}
+                {ownsServices ? (
+                    <Suspense fallback={<AppServicesSkeleton />}>
+                        <AppServices appId={app.id} viewerId={user.id} />
+                    </Suspense>
+                ) : null}
             </div>
         </Messages>
     );
+}
+
+/** The app's services with their state and what they use, read from the engine. */
+async function AppServices({ appId, viewerId }: { appId: string; viewerId: string }) {
+    const services = await listAppServices(appId, viewerId);
+    return <AppServicesPanel appId={appId} services={services} />;
 }
 
 /** The settings of an app every Polaris comes with. Only an administrator gets

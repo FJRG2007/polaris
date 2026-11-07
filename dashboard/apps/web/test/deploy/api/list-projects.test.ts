@@ -49,7 +49,12 @@ const projectAccess = vi.fn((projectId: string) => {
 const statuses = vi.fn(() => held({ "app-0": "running" }));
 
 vi.mock("@polaris/db", () => ({
-    prisma: { project: { findMany: async () => listed } }
+    prisma: {
+        project: {
+            findMany: async ({ where }: { where?: { id?: { in?: string[] } } } = {}) =>
+                listed.filter((entry) => !where?.id?.in || where.id.in.includes(entry.id))
+        }
+    }
 }));
 vi.mock("@/lib/deploy-project-access", () => ({
     projectAccess: (projectId: string) => projectAccess(projectId),
@@ -58,6 +63,8 @@ vi.mock("@/lib/deploy-project-access", () => ({
 }));
 vi.mock("@/lib/deploy-service", () => ({ getApplicationDeployStatuses: () => statuses() }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn() }));
+let hidden = new Set<string>();
+vi.mock("@/lib/deploy/managed-projects", () => ({ polarisProjectIds: async () => hidden }));
 vi.mock("@/lib/activity/activity", () => ({ record: async () => undefined }));
 
 const { listProjects } = await import("@/lib/deploy/api/surface");
@@ -107,5 +114,25 @@ describe("listing the projects", () => {
         expect(peak).toBe(8);
         expect(lines.map((line) => line.slug)).toEqual(listed.map((entry) => entry.slug));
         listed = PROJECTS;
+    });
+
+    it("leaves out the projects Polaris runs for its own apps, as the Deploy screen does", async () => {
+        hidden = new Set(["project-1"]);
+        projectAccess.mockClear();
+        pending.splice(0);
+        const listing = listProjects({
+            userId: "user-1",
+            scopes: ["deploy.read"],
+            keyId: "key-1",
+            projectId: null,
+            via: "api"
+        });
+        await vi.waitFor(() => expect(pending).toHaveLength(PROJECTS.length));
+        for (const release of pending.splice(0)) release();
+        const lines = await listing;
+        expect(projectAccess).not.toHaveBeenCalledWith("project-1");
+        expect(lines.map((line) => line.slug)).not.toContain("project-1");
+        expect(lines).toHaveLength(PROJECTS.length - 1);
+        hidden = new Set();
     });
 });
