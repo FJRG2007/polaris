@@ -281,6 +281,22 @@ describe("the larger view", () => {
         expect(within(empty.parentElement!).getByRole("button", { name: "Message" })).toBeDefined();
     });
 
+    it("keeps one size whichever tab is shown, scrolling only the list under the tabs", async () => {
+        const user = userEvent.setup();
+        conversation();
+        await user.click(screen.getByRole("button", { name: "Grace Hopper" }));
+        const card = await openCard();
+        await user.click(within(card).getByRole("button", { name: "View full profile" }));
+        const dialog = await screen.findByRole("dialog");
+        // A fixed height from the tablet width up, as Discord's profile: what a
+        // tab lists never grows or shrinks the dialog.
+        expect(dialog.className).toMatch(/(^|\s)md:h-\[/);
+        const tabs = within(dialog).getByRole("radiogroup", { name: /./ });
+        const list = tabs.nextElementSibling as HTMLElement;
+        expect(list.className).toContain("md:overflow-y-auto");
+        expect(list.className).toContain("flex-1");
+    });
+
     it("offers no page for somebody without an address", async () => {
         (profiles[GRACE] as { username: string }).username = "";
         const user = userEvent.setup();

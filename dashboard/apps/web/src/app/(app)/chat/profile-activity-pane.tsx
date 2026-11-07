@@ -79,7 +79,9 @@ export function ProfileActivityPane({
     ];
 
     return (
-        <div className="flex min-w-0 flex-col gap-4">
+        // The dialog keeps one size, as Discord's does: the tabs stay put and
+        // only the list under them scrolls, so switching tabs never resizes it.
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
             <SegmentedControl
                 aria-label={t("profilePane.sections")}
                 value={shown}
@@ -88,25 +90,27 @@ export function ProfileActivityPane({
                 size="sm"
                 // Clear of the dialog's close in the corner, without pushing
                 // everything under the tabs off centre.
-                className="self-start max-w-full overflow-x-auto md:max-w-[calc(100%-2.75rem)]"
+                className="shrink-0 self-start max-w-full overflow-x-auto md:max-w-[calc(100%-2.75rem)]"
             />
-            {shown === "activity" ? (
-                <ActivityTab
-                    personId={personId}
-                    name={name}
-                    profile={profile}
-                    loading={loading}
-                    messageAction={messageAction}
-                />
-            ) : shown === "friends" && friends ? (
-                <MutualList more={friends.total - friends.people.length}>
-                    <FriendRows people={friends.people} />
-                </MutualList>
-            ) : spaces ? (
-                <MutualList more={spaces.total - spaces.spaces.length}>
-                    <SpaceRows spaces={spaces.spaces} />
-                </MutualList>
-            ) : null}
+            <div className="min-h-0 min-w-0 flex-1 md:overflow-y-auto md:overscroll-contain">
+                {shown === "activity" ? (
+                    <ActivityTab
+                        personId={personId}
+                        name={name}
+                        profile={profile}
+                        loading={loading}
+                        messageAction={messageAction}
+                    />
+                ) : shown === "friends" && friends ? (
+                    <MutualList more={friends.total - friends.people.length}>
+                        <FriendRows people={friends.people} />
+                    </MutualList>
+                ) : spaces ? (
+                    <MutualList more={spaces.total - spaces.spaces.length}>
+                        <SpaceRows spaces={spaces.spaces} />
+                    </MutualList>
+                ) : null}
+            </div>
         </div>
     );
 }
