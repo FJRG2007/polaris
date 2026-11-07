@@ -45,7 +45,13 @@ vi.mock("@polaris/db", () => ({
                     applicationId: VPN,
                     ownerId: "ada"
                 },
-                { id: "install-vpn-app", name: "VPN", catalogId: "vpn", applicationId: null, ownerId: "ada" }
+                {
+                    id: "install-vpn-app",
+                    name: "VPN",
+                    catalogId: "vpn",
+                    applicationId: null,
+                    ownerId: "ada"
+                }
             ]
         },
         mailServer: { findMany: async () => [{ applicationId: MAIL }] },
@@ -87,7 +93,12 @@ const { readConsumption } = await import("@/lib/consumption-service");
 async function rows() {
     const { groups } = await readConsumption("ada");
     return groups.flatMap((group) =>
-        group.rows.map((row) => ({ group: group.id, name: row.name, detail: row.detail, href: row.href }))
+        group.rows.map((row) => ({
+            group: group.id,
+            name: row.name,
+            detail: row.detail,
+            href: row.href
+        }))
     );
 }
 

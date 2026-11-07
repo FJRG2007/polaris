@@ -15,8 +15,17 @@ import type { ContainerSummary } from "@polaris/docker";
 import { projectSubject, subjectHash } from "@/lib/consumption";
 import { localDockerDriver, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
 import { MAIL_SERVER_APP_ID, ownedCatalogIds } from "@/lib/deploy/managed-projects";
-import { getApplicationDeployStatuses, readAppRuntimeLog, restartApplication } from "@/lib/deploy-service";
-import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "@/lib/container-stats-cache";
+import {
+    getApplicationDeployStatuses,
+    readAppRuntimeLog,
+    restartApplication
+} from "@/lib/deploy-service";
+import {
+    cachedSamples,
+    oldestSampleAt,
+    refreshSamples,
+    STATS_TTL_MS
+} from "@/lib/container-stats-cache";
 
 /** One service of an app, as its settings list it. */
 export interface AppService {
@@ -121,7 +130,8 @@ async function readRuntimes(
     const running: ContainerSummary[] = [];
     for (const container of containers) {
         const subject = projectSubject(container.composeProject);
-        const applicationId = subject?.kind === "application" ? byHash.get(subject.hash) : undefined;
+        const applicationId =
+            subject?.kind === "application" ? byHash.get(subject.hash) : undefined;
         if (!subject || !applicationId) continue;
         const entry = totals.get(applicationId) ?? { running: false, cpu: null, mem: null };
         totals.set(applicationId, entry);

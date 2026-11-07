@@ -61,7 +61,9 @@ describe("an app's service actions", () => {
         expect(await actions.restartAppServiceAction("vpn", "../etc")).toEqual({
             error: "services.notFound"
         });
-        expect(await actions.readAppServiceLogAction("", ID)).toEqual({ error: "services.notFound" });
+        expect(await actions.readAppServiceLogAction("", ID)).toEqual({
+            error: "services.notFound"
+        });
         expect(state.restarted).toEqual([]);
         expect(state.read).toEqual([]);
     });

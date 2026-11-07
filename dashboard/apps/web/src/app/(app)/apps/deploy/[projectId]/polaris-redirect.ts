@@ -16,6 +16,9 @@ import { polarisProjectRedirect } from "@/lib/deploy/managed-projects";
 /** Send an administrator on when this project is one of Polaris's own; otherwise a no-op. */
 export async function leaveIfPolarisProject(projectId: string, service?: unknown): Promise<void> {
     if (!(await requireUser()).isAdmin) return;
-    const to = await polarisProjectRedirect(projectId, typeof service === "string" ? service : null);
+    const to = await polarisProjectRedirect(
+        projectId,
+        typeof service === "string" ? service : null
+    );
     if (to) redirect(to);
 }

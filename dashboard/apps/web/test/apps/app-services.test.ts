@@ -14,14 +14,37 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const calls = vi.hoisted(() => ({
     restarted: [] as Array<[string, string]>,
     logs: [] as Array<[string, string, number]>,
-    containers: null as Array<{ id: string; name: string; state: string; composeProject: string }> | null,
+    containers: null as Array<{
+        id: string;
+        name: string;
+        state: string;
+        composeProject: string;
+    }> | null,
     binned: [] as string[]
 }));
 
 const installs = [
-    { id: "i-vpn", name: "VPN control server", catalogId: "vpn-engine", applicationId: "vpn-app", status: "running" },
-    { id: "i-mc", name: "Survival", catalogId: "minecraft", applicationId: "mc-app", status: "running" },
-    { id: "i-old", name: "Old world", catalogId: "minecraft", applicationId: "old-app", status: "removed" }
+    {
+        id: "i-vpn",
+        name: "VPN control server",
+        catalogId: "vpn-engine",
+        applicationId: "vpn-app",
+        status: "running"
+    },
+    {
+        id: "i-mc",
+        name: "Survival",
+        catalogId: "minecraft",
+        applicationId: "mc-app",
+        status: "running"
+    },
+    {
+        id: "i-old",
+        name: "Old world",
+        catalogId: "minecraft",
+        applicationId: "old-app",
+        status: "removed"
+    }
 ];
 
 type InstallWhere = {
@@ -63,7 +86,8 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/deploy-service", () => ({
-    restartApplication: async (id: string, ownerId: string) => void calls.restarted.push([id, ownerId]),
+    restartApplication: async (id: string, ownerId: string) =>
+        void calls.restarted.push([id, ownerId]),
     readAppRuntimeLog: async (id: string, ownerId: string, tail: number) => {
         calls.logs.push([id, ownerId, tail]);
         return "ready\n";
@@ -117,8 +141,18 @@ describe("an app's services", () => {
 
     it("say whether a container is up from the engine, not from the last release", async () => {
         calls.containers = [
-            { id: "c-mc", name: "mc", state: "running", composeProject: `polaris-${subjectHash("mc-app")}` },
-            { id: "c-vpn", name: "vpn", state: "exited", composeProject: `polaris-${subjectHash("vpn-app")}` },
+            {
+                id: "c-mc",
+                name: "mc",
+                state: "running",
+                composeProject: `polaris-${subjectHash("mc-app")}`
+            },
+            {
+                id: "c-vpn",
+                name: "vpn",
+                state: "exited",
+                composeProject: `polaris-${subjectHash("vpn-app")}`
+            },
             { id: "c-other", name: "site", state: "running", composeProject: "polaris-0badc0de" }
         ];
         const [mc] = await services.listAppServices("game-servers", "admin");

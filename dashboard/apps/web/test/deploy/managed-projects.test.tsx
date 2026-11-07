@@ -48,16 +48,21 @@ vi.mock("@polaris/db", () => {
                     ).some.applications.some.id.in;
                     return db.projects
                         .filter((project) => project.slug !== skip)
-                        .filter((project) => project.applications.some((id) => managed.includes(id)))
+                        .filter((project) =>
+                            project.applications.some((id) => managed.includes(id))
+                        )
                         .map((project) => ({
                             id: project.id,
                             slug: project.slug,
                             environments: [
                                 {
                                     applications: project.applications.map((id) => ({ id })),
-                                    databases: Array.from({ length: project.databases }, (_, i) => ({
-                                        id: `db${i}`
-                                    }))
+                                    databases: Array.from(
+                                        { length: project.databases },
+                                        (_, i) => ({
+                                            id: `db${i}`
+                                        })
+                                    )
                                 }
                             ]
                         }));
@@ -78,7 +83,11 @@ vi.mock("@polaris/db", () => {
                     db.mail.filter(inIds(where))
             },
             application: {
-                findMany: async ({ where }: { where: { environment: { projectId: string }; id?: string } }) =>
+                findMany: async ({
+                    where
+                }: {
+                    where: { environment: { projectId: string }; id?: string };
+                }) =>
                     db.applications
                         .filter((app) => app.projectId === where.environment.projectId)
                         .filter((app) => !where.id || app.id === where.id)
@@ -151,7 +160,10 @@ describe("which projects are Polaris's own", () => {
         ).toBe(false);
         // A name is not evidence: only what backs the services is.
         expect(
-            isManagedProject({ slug: "polaris", applicationIds: ["mine"], databaseCount: 0 }, managed)
+            isManagedProject(
+                { slug: "polaris", applicationIds: ["mine"], databaseCount: 0 },
+                managed
+            )
         ).toBe(false);
     });
 });
@@ -159,7 +171,12 @@ describe("which projects are Polaris's own", () => {
 describe("the projects every Deploy listing leaves out", () => {
     it("hides every Marketplace project and a project of only Polaris's services, and nothing else", async () => {
         db.projects = [
-            { id: "market-ada", slug: MARKETPLACE_PROJECT_SLUG, applications: ["vpn-app"], databases: 0 },
+            {
+                id: "market-ada",
+                slug: MARKETPLACE_PROJECT_SLUG,
+                applications: ["vpn-app"],
+                databases: 0
+            },
             { id: "market-bob", slug: MARKETPLACE_PROJECT_SLUG, applications: [], databases: 0 },
             { id: "mail", slug: "mail-mx", applications: ["mail-app"], databases: 0 },
             { id: "mixed", slug: "shop", applications: ["mail-app", "shop-app"], databases: 0 },
@@ -195,7 +212,12 @@ const SITE_APP = "00000000-0000-4000-8000-000000000003";
 describe("an address into one of those projects", () => {
     beforeEach(() => {
         db.projects = [
-            { id: "market", slug: MARKETPLACE_PROJECT_SLUG, applications: [VPN_APP, MC_APP], databases: 0 },
+            {
+                id: "market",
+                slug: MARKETPLACE_PROJECT_SLUG,
+                applications: [VPN_APP, MC_APP],
+                databases: 0
+            },
             { id: "site", slug: "site", applications: [SITE_APP], databases: 0 }
         ];
         db.installs = [
@@ -245,7 +267,11 @@ describe("the Deploy list", () => {
     it("shows the projects it is given and no switch for Polaris's own", () => {
         render(
             <MessagesWrapper>
-                <ProjectsGrid projects={[card("p1", "Website"), card("p2", "Shop")]} canManage={false} localReady />
+                <ProjectsGrid
+                    projects={[card("p1", "Website"), card("p2", "Shop")]}
+                    canManage={false}
+                    localReady
+                />
             </MessagesWrapper>
         );
         expect(screen.getByText("Website")).toBeTruthy();

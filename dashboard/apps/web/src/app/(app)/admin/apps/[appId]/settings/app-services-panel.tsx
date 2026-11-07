@@ -69,7 +69,11 @@ function ServicesHeading() {
 /** The section while its services are read: the heading now, a row's shape below. */
 export function AppServicesSkeleton() {
     return (
-        <section className="flex min-w-0 flex-col gap-2" aria-labelledby="app-services-title" aria-busy>
+        <section
+            className="flex min-w-0 flex-col gap-2"
+            aria-labelledby="app-services-title"
+            aria-busy
+        >
             <ServicesHeading />
             <Card>
                 <CardBody className="flex min-w-0 items-center gap-3">
@@ -136,7 +140,10 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                             {title}
                         </p>
                         {service.installName && service.installName !== service.name ? (
-                            <p className="truncate text-xs text-muted-foreground" title={service.name}>
+                            <p
+                                className="truncate text-xs text-muted-foreground"
+                                title={service.name}
+                            >
                                 {service.name}
                             </p>
                         ) : null}
@@ -150,7 +157,9 @@ function ServiceRow({ appId, service }: { appId: string; service: AppService }) 
                         {t("services.usage", {
                             cpu: service.cpuPercent === null ? "-" : `${service.cpuPercent}%`,
                             memory:
-                                service.memUsedBytes === null ? "-" : formatBytes(service.memUsedBytes)
+                                service.memUsedBytes === null
+                                    ? "-"
+                                    : formatBytes(service.memUsedBytes)
                         })}
                     </span>
                     <div className="flex shrink-0 items-center gap-1">
