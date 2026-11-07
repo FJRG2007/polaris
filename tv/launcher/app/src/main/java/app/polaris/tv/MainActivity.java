@@ -2885,8 +2885,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private String greetingNameNow() {
         Profiles.Profile profile = ProfileSession.active(this);
         String linkedId = Profiles.linkedId(this);
-        return Profiles.greetingName(profile, Profiles.linkedHere(profile, linkedId), themeGreetingName,
-                PolarisLink.accountFirstName(this));
+        // A link made before the TV recorded whose it is (or with no roster at all) belongs to the one there is.
+        boolean linkedHere = profile == null || linkedId == null || profile.id.equals(linkedId);
+        return Profiles.greetingName(profile, linkedHere, themeGreetingName, PolarisLink.accountFirstName(this));
     }
 
     /** "Who's watching?" when it is owed: a cold start or a long screen-off, and only with two or more profiles. */
