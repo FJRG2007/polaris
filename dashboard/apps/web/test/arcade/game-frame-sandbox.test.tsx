@@ -35,6 +35,8 @@ describe("the game's frame", () => {
         expect(frame.getAttribute("sandbox")).toBe(FRAME_SANDBOX);
         expect(FRAME_SANDBOX.split(" ")).toContain("allow-scripts");
         expect(FRAME_SANDBOX).not.toContain("allow-same-origin");
+        // Mouse look on foot needs the pointer, and nothing more than that.
+        expect(FRAME_SANDBOX.split(" ").sort()).toEqual(["allow-pointer-lock", "allow-scripts"]);
     });
 
     it("keeps the page's origin, and so its storage, on its own page", () => {
