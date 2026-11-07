@@ -15,7 +15,10 @@ import type { InstallPlatform } from "./install-platform";
 
 export type DesktopTool = "extension" | "cli" | "deck";
 
-type InstallResult = { ok: true } | { ok: false; reason: string; said?: string };
+/** How an extension install landed, from an app that says: its store, or a folder. */
+export type InstallVia = "store-entry" | "unpacked";
+
+type InstallResult = { ok: true; via?: InstallVia } | { ok: false; reason: string; said?: string };
 
 interface DesktopInstaller {
     readonly platform: string;
@@ -35,6 +38,23 @@ const SYSTEMS: Readonly<Record<string, InstallPlatform>> = {
     linux: "linux"
 };
 
+/** Whether the desktop app can install here: false on the server, in a browser,
+ *  and in an app older than the button. */
+export function useDesktopInstallable(platform?: InstallPlatform): boolean {
+    // Read after mounting: there is no bridge on the server.
+    const [offered, setOffered] = useState(false);
+    useEffect(() => {
+        const bridge = desktopInstaller();
+        const system = SYSTEMS[bridge?.platform ?? ""];
+        setOffered(
+            Boolean(bridge?.installTool) &&
+                system !== undefined &&
+                (!platform || system === platform)
+        );
+    }, [platform]);
+    return offered;
+}
+
 export function DesktopInstall({
     tool,
     platform,
@@ -46,24 +66,15 @@ export function DesktopInstall({
      *  this one. Left out, it is this computer. */
     platform?: InstallPlatform;
     browser?: string;
-    /** What is left to do once it is installed. */
-    done: string;
+    /** What is left to do once it is installed, by how it was installed when that
+     *  depends on it. An app older than `via` answers without one. */
+    done: string | ((via: InstallVia | undefined) => string);
 }) {
     const t = useTranslations("account");
-    // Read after mounting: there is no bridge on the server.
-    const [offered, setOffered] = useState(false);
+    const offered = useDesktopInstallable(platform);
     const [state, setState] = useState<"idle" | "running" | "done">("idle");
+    const [via, setVia] = useState<InstallVia | undefined>(undefined);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const bridge = desktopInstaller();
-        const system = SYSTEMS[bridge?.platform ?? ""];
-        setOffered(
-            Boolean(bridge?.installTool) &&
-                system !== undefined &&
-                (!platform || system === platform)
-        );
-    }, [platform]);
 
     if (!offered) return null;
 
@@ -74,6 +85,7 @@ export function DesktopInstall({
             ?.installTool?.({ tool, browser })
             .catch((): InstallResult => ({ ok: false, reason: "failed" }));
         if (result?.ok) {
+            setVia(result.via);
             setState("done");
             return;
         }
@@ -92,7 +104,11 @@ export function DesktopInstall({
                     ? t("downloads.install.running")
                     : t("downloads.install.action")}
             </Button>
-            {state === "done" ? <p className="text-xs text-foreground">{done}</p> : null}
+            {state === "done" ? (
+                <p className="text-xs text-foreground">
+                    {typeof done === "string" ? done : done(via)}
+                </p>
+            ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
     );

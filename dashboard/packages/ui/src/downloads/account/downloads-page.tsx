@@ -29,7 +29,8 @@ export function DownloadsPage({
     extensionFiles,
     deck,
     desktopFiles,
-    tv
+    tv,
+    signedFirefox
 }: {
     repo: string;
     /** The address the CLI signs in to, or null for the one the page is on. */
@@ -48,6 +49,8 @@ export function DownloadsPage({
      * still says what Polaris TV is and what installing it takes.
      */
     tv?: ReactNode;
+    /** Where the signed Firefox package is served, when the release has one. */
+    signedFirefox?: Promise<string | null>;
 }) {
     const t = useTranslations("account");
     const tc = useTranslations("components");
@@ -120,7 +123,7 @@ export function DownloadsPage({
                     </DownloadCard>
                 )}
 
-                <ExtensionCard repo={repo} files={extensionFiles} />
+                <ExtensionCard repo={repo} files={extensionFiles} signedFirefox={signedFirefox} />
 
                 {deck}
 

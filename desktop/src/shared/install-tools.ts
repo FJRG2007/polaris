@@ -27,7 +27,10 @@ export type InstallRequest = z.infer<typeof installRequestSchema>;
  * is the script's own sentence for a refusal.
  */
 export type InstallFailure = "cancelled" | "unsupported" | "busy" | "refused" | "failed";
-export type InstallResult = { readonly ok: true; } | { readonly ok: false; readonly reason: InstallFailure; readonly said?: string; };
+/** How an extension install ended up in the browser: registered from its store, or
+ *  fetched to a folder for Load unpacked. */
+export type InstallVia = "store-entry" | "unpacked";
+export type InstallResult = { readonly ok: true; readonly via?: InstallVia; } | { readonly ok: false; readonly reason: InstallFailure; readonly said?: string; };
 
 const SCRIPTS: Readonly<Record<InstallTool, string>> = {
     extension: "dashboard/apps/extension/scripts",
@@ -198,4 +201,100 @@ export function extensionsPageLaunch(browser: ExtensionBrowser, platform: string
     }
     if (platform === "darwin") return { file: "/usr/bin/open", args: ["-a", program.mac, page] };
     return { file: program.linux, args: [page] };
+}
+
+/**
+ * Where the extension is listed. Empty until it is published: a browser handed an
+ * id that is not in its store installs nothing, so nothing here is guessed. The
+ * same ids as the page's `EXTENSION_LISTINGS` (dashboard/packages/ui).
+ */
+export interface StoreListings {
+    readonly chromeWebStore: string | null;
+    readonly edgeAddons: string | null;
+}
+
+export const STORE_LISTINGS: StoreListings = { chromeWebStore: null, edgeAddons: null };
+
+/** The update addresses the stores serve their items from. */
+export const CHROME_WEB_STORE_UPDATE = "https://clients2.google.com/service/update2/crx";
+export const EDGE_ADDONS_UPDATE = "https://edge.microsoft.com/extensionwebstorebase/v1/crx";
+
+const EXTENSION_ID = /^[a-p]{32}$/;
+
+/**
+ * A browser's "external extension" entry for the store listing: the documented way
+ * other software on a computer asks a browser to install an extension from its
+ * store. The browser asks the user to enable it the next time it opens, on
+ * Windows and macOS; nothing installs silently.
+ *
+ * Only the places that are both per-user (no administrator rights) and documented
+ * by the browser or read by its source: Chrome reads `HKCU` on Windows
+ * (external_registry_loader_win.cc) and a per-user folder on macOS; Edge documents
+ * per-user folders on macOS and Linux. Edge's Windows key, Brave and Opera have no
+ * documented per-user entry, so they get null and the unpacked way instead.
+ */
+export type ExternalEntry =
+    | { readonly kind: "registry"; readonly key: string; readonly updateUrl: string; }
+    | { readonly kind: "file"; readonly path: string; readonly contents: string; };
+
+export function externalEntry(
+    browser: ExtensionBrowser,
+    platform: string,
+    folders: Folders,
+    listings: StoreListings = STORE_LISTINGS
+): ExternalEntry | null {
+    const chrome = listings.chromeWebStore;
+    const edge = listings.edgeAddons;
+    const file = (path: string, updateUrl: string): ExternalEntry => ({
+        kind: "file",
+        path,
+        contents: `${JSON.stringify({ external_update_url: updateUrl }, null, 4)}\n`
+    });
+    if (browser === "chrome" && chrome && EXTENSION_ID.test(chrome)) {
+        if (platform === "win32") {
+            return { kind: "registry", key: `HKCU\\Software\\Google\\Chrome\\Extensions\\${chrome}`, updateUrl: CHROME_WEB_STORE_UPDATE };
+        }
+        if (platform === "darwin") {
+            const dir = [folders.home, "Library", "Application Support", "Google", "Chrome", "External Extensions"].join("/");
+            return file(`${dir}/${chrome}.json`, CHROME_WEB_STORE_UPDATE);
+        }
+        return null;
+    }
+    if (browser === "edge" && platform !== "win32") {
+        // Edge installs Chrome Web Store items too, from that store's address.
+        const id = edge && EXTENSION_ID.test(edge) ? edge : chrome && EXTENSION_ID.test(chrome) ? chrome : null;
+        if (!id) return null;
+        const updateUrl = id === edge ? EDGE_ADDONS_UPDATE : CHROME_WEB_STORE_UPDATE;
+        const dir = platform === "darwin"
+            ? [folders.home, "Library", "Application Support", "Microsoft Edge", "External Extensions"].join("/")
+            : [folders.home, ".config", "microsoft-edge", "External Extensions"].join("/");
+        return file(`${dir}/${id}.json`, updateUrl);
+    }
+    return null;
+}
+
+/** Writes a registry entry, replacing the same one: running it twice is running it once. */
+export function registryAddLaunch(entry: Extract<ExternalEntry, { kind: "registry"; }>): Launch {
+    return { file: "reg.exe", args: ["add", entry.key, "/v", "update_url", "/t", "REG_SZ", "/d", entry.updateUrl, "/f"] };
+}
+
+/** Removes a registry entry this app wrote. */
+export function registryDeleteLaunch(key: string): Launch {
+    return { file: "reg.exe", args: ["delete", key, "/f"] };
+}
+
+/** The entries the app may have written on Windows, for its uninstaller to take back. */
+export function windowsEntryKeys(listings: StoreListings = STORE_LISTINGS): string[] {
+    const entry = externalEntry("chrome", "win32", { home: "" }, listings);
+    return entry?.kind === "registry" ? [entry.key] : [];
+}
+
+/** How to open a browser as it is, for the confirmation it shows on opening. */
+export function browserLaunch(browser: ExtensionBrowser, platform: string): Launch {
+    const program = PROGRAMS[browser];
+    if (platform === "win32") {
+        return { file: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", `Start-Process '${program.windows}'`] };
+    }
+    if (platform === "darwin") return { file: "/usr/bin/open", args: ["-a", program.mac] };
+    return { file: program.linux, args: [] };
 }

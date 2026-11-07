@@ -1259,7 +1259,19 @@
             "wayDownload": "Download",
             "wayCommand": "Command",
             "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself.",
-            "rowFirefox": "Until Firefox closes"
+            "rowFirefox": "Until Firefox closes",
+            "auto": {
+                "storeChrome": "Add from the Chrome Web Store",
+                "storeEdge": "Add from Edge Add-ons",
+                "storeOpera": "Add from Opera add-ons",
+                "storeHint": "The store opens on its page. Press Add, then confirm in {browser}.",
+                "packageAction": "Install in Firefox",
+                "packageHint": "Firefox asks first: press Continue to Installation, then Add.",
+                "desktopStoreDone": "Done. Close {browser} and open it again, then press Enable extension when it asks.",
+                "manualChromium": "{browser} only adds an extension by itself from its store, and Polaris is not there yet. Open this page in the Polaris desktop app to install it with one press, or follow the steps below.",
+                "manualFirefox": "Firefox only keeps an extension Mozilla has signed, and this release is not signed yet. The steps below load it until Firefox closes.",
+                "safari": "Safari only takes extensions that come inside a Mac app signed by Apple, and Polaris has none yet. Chrome, Edge, Brave, Opera and Firefox work today."
+            }
         },
         "later": {
             "title": "Not here yet",

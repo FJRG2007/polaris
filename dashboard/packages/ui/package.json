@@ -167,6 +167,10 @@
             "types": "./src/downloads/account/deck-install-command.ts",
             "import": "./src/downloads/account/deck-install-command.ts"
         },
+        "./account-downloads/extension-install": {
+            "types": "./src/downloads/account/extension-install.ts",
+            "import": "./src/downloads/account/extension-install.ts"
+        },
         "./account-downloads/browser-guide": {
             "types": "./src/downloads/account/browser-guide.ts",
             "import": "./src/downloads/account/browser-guide.ts"
