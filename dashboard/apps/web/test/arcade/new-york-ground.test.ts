@@ -30,7 +30,11 @@ vi.mock("../../../arcade/game/new-york/engine/trees.js", async () => {
     return {
         createTreeField: (_scene: unknown, sites: Site[]) => {
             captured.sites = sites;
-            return { group: new THREE.Group(), sites: new Set(sites), stats: { trees: sites.length } };
+            return {
+                group: new THREE.Group(),
+                sites: new Set(sites),
+                stats: { trees: sites.length }
+            };
         }
     };
 });
@@ -49,10 +53,15 @@ function serveData() {
         document.head.append(meta);
     }
     // Textures are painted on 2D canvases jsdom does not draw: a context that takes every call is all the build needs
-    const pixels = (w: number, h: number) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
+    const pixels = (w: number, h: number) => ({
+        width: w,
+        height: h,
+        data: new Uint8ClampedArray(w * h * 4)
+    });
     const context: object = new Proxy(() => context, {
         get: (_target, key) => {
-            if (key === "getImageData") return (_x: number, _y: number, w: number, h: number) => pixels(w, h);
+            if (key === "getImageData")
+                return (_x: number, _y: number, w: number, h: number) => pixels(w, h);
             if (key === "createImageData") return (w: number, h: number) => pixels(w, h);
             if (key === "measureText") return () => ({ width: 10 });
             return context;
@@ -74,14 +83,21 @@ function groundIndex(triangles: Triangle[]) {
     const cells = new Map<string, Triangle[]>();
     const large: Triangle[] = [];
     for (const t of triangles) {
-        const x0 = Math.floor(Math.min(t[0], t[3], t[6]) / CELL), x1 = Math.floor(Math.max(t[0], t[3], t[6]) / CELL);
-        const z0 = Math.floor(Math.min(t[2], t[5], t[8]) / CELL), z1 = Math.floor(Math.max(t[2], t[5], t[8]) / CELL);
-        if ((x1 - x0 + 1) * (z1 - z0 + 1) > LARGE) { large.push(t); continue; }
-        for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) {
-            const key = `${i},${j}`;
-            const list = cells.get(key);
-            if (list) list.push(t); else cells.set(key, [t]);
+        const x0 = Math.floor(Math.min(t[0], t[3], t[6]) / CELL),
+            x1 = Math.floor(Math.max(t[0], t[3], t[6]) / CELL);
+        const z0 = Math.floor(Math.min(t[2], t[5], t[8]) / CELL),
+            z1 = Math.floor(Math.max(t[2], t[5], t[8]) / CELL);
+        if ((x1 - x0 + 1) * (z1 - z0 + 1) > LARGE) {
+            large.push(t);
+            continue;
         }
+        for (let i = x0; i <= x1; i++)
+            for (let j = z0; j <= z1; j++) {
+                const key = `${i},${j}`;
+                const list = cells.get(key);
+                if (list) list.push(t);
+                else cells.set(key, [t]);
+            }
     }
     const heightOn = (t: Triangle, x: number, z: number) => {
         const d = (t[5] - t[8]) * (t[0] - t[6]) + (t[6] - t[3]) * (t[2] - t[8]);
@@ -95,10 +111,11 @@ function groundIndex(triangles: Triangle[]) {
     return (x: number, z: number, ceiling: number) => {
         let best = -Infinity;
         const near = cells.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? [];
-        for (const list of [near, large]) for (const t of list) {
-            const h = heightOn(t, x, z);
-            if (h !== null && h <= ceiling && h > best) best = h;
-        }
+        for (const list of [near, large])
+            for (const t of list) {
+                const h = heightOn(t, x, z);
+                if (h !== null && h <= ceiling && h > best) best = h;
+            }
         return best;
     };
 }
@@ -114,19 +131,30 @@ async function buildCityOnce() {
     const { buildBoroughs } = await import("../../../arcade/game/new-york/engine/boroughs.js");
     const { buildLandmarks } = await import("../../../arcade/game/new-york/engine/landmarks.js");
     const { buildCityBlocks } = await import("../../../arcade/game/new-york/engine/buildings.js");
-    const { buildStreetDetails } = await import("../../../arcade/game/new-york/engine/street-details.js");
+    const { buildStreetDetails } =
+        await import("../../../arcade/game/new-york/engine/street-details.js");
     const scene = new THREE.Scene();
     const grid = buildCityGrid(scene);
     const boroughs = buildBoroughs(scene, { sidewalks: grid.sidewalks });
     const { colliders } = buildLandmarks(scene);
     const blocks = buildCityBlocks(scene, colliders);
-    buildStreetDetails(scene, [...colliders, ...blocks.colliders, ...boroughs.colliders, ...(grid.colliders || [])]);
+    buildStreetDetails(scene, [
+        ...colliders,
+        ...blocks.colliders,
+        ...boroughs.colliders,
+        ...(grid.colliders || [])
+    ]);
     scene.updateMatrixWorld(true);
 
     const triangles: Triangle[] = [];
-    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
-    const n = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
-    const world = new THREE.Matrix4(), instance = new THREE.Matrix4();
+    const a = new THREE.Vector3(),
+        b = new THREE.Vector3(),
+        c = new THREE.Vector3();
+    const n = new THREE.Vector3(),
+        e1 = new THREE.Vector3(),
+        e2 = new THREE.Vector3();
+    const world = new THREE.Matrix4(),
+        instance = new THREE.Matrix4();
     scene.traverseVisible((object: InstanceType<typeof THREE.Object3D>) => {
         const mesh = object as InstanceType<typeof THREE.Mesh>;
         if (!mesh.isMesh || !mesh.geometry?.attributes?.position) return;
@@ -134,7 +162,8 @@ async function buildCityOnce() {
         const index = mesh.geometry.index;
         const count = index ? index.count : position.count;
         const instanced = (mesh as InstanceType<typeof THREE.InstancedMesh>).isInstancedMesh
-            ? (mesh as InstanceType<typeof THREE.InstancedMesh>) : null;
+            ? (mesh as InstanceType<typeof THREE.InstancedMesh>)
+            : null;
         for (let k = 0; k < (instanced ? instanced.count : 1); k++) {
             world.copy(mesh.matrixWorld);
             if (instanced) world.multiply(instanced.getMatrixAt(k, instance) ?? instance);
@@ -164,10 +193,18 @@ describe("New York trees", () => {
     it("stand on the ground drawn under them, across the whole city", async () => {
         const { sites, ground } = await buildCity();
         const floating = hovering(sites, ground);
-        const sample = floating.slice(0, 12).map((s) => `(${s.x.toFixed(1)}, ${s.y.toFixed(2)}, ${s.z.toFixed(1)} +${s.gap.toFixed(2)})`);
-        console.info(`[new-york-ground] ${floating.length} of ${sites.length} trees hovering ${sample.join(" ")}`);
+        const sample = floating
+            .slice(0, 12)
+            .map(
+                (s) =>
+                    `(${s.x.toFixed(1)}, ${s.y.toFixed(2)}, ${s.z.toFixed(1)} +${s.gap.toFixed(2)})`
+            );
+        console.info(
+            `[new-york-ground] ${floating.length} of ${sites.length} trees hovering ${sample.join(" ")}`
+        );
         // The full list, for a sweep run by hand: NEW_YORK_GROUND_DUMP=<file> npx vitest run <this file>
-        if (process.env.NEW_YORK_GROUND_DUMP) writeFileSync(process.env.NEW_YORK_GROUND_DUMP, JSON.stringify(floating));
+        if (process.env.NEW_YORK_GROUND_DUMP)
+            writeFileSync(process.env.NEW_YORK_GROUND_DUMP, JSON.stringify(floating));
         expect(sites.length).toBeGreaterThan(1000);
         // 404 before the fix, 44 of them along Central Park South, Fifth Avenue and Grand Army Plaza: none anywhere now
         expect(floating).toEqual([]);
@@ -181,11 +218,22 @@ type Street = Named & { z: number; runs?: number[][] };
 describe("New York street-name signs", () => {
     it("name the avenue and street of the corner they stand at, across the whole city", async () => {
         const { scene } = await buildCity();
-        const { ALL_AVENUES, ALL_STREETS } = await import("../../../arcade/game/new-york/engine/city-config.js");
+        const { ALL_AVENUES, ALL_STREETS } =
+            await import("../../../arcade/game/new-york/engine/city-config.js");
         const blades = scene.getObjectByName("StreetNameBlades") as unknown as {
             count: number;
-            geometry: { getAttribute: (name: string) => { getX: (i: number) => number; getY: (i: number) => number } };
-            getMatrixAt: (i: number, m: InstanceType<typeof import("../../../arcade/node_modules/three/build/three.webgpu.js").Matrix4>) => void;
+            geometry: {
+                getAttribute: (name: string) => {
+                    getX: (i: number) => number;
+                    getY: (i: number) => number;
+                };
+            };
+            getMatrixAt: (
+                i: number,
+                m: InstanceType<
+                    typeof import("../../../arcade/node_modules/three/build/three.webgpu.js").Matrix4
+                >
+            ) => void;
             userData: { cells: { side: string; name: string }[] };
         };
         expect(blades).toBeDefined();
@@ -194,12 +242,22 @@ describe("New York street-name signs", () => {
         const THREE = await import("../../../arcade/node_modules/three/build/three.webgpu.js");
         const matrix = new THREE.Matrix4();
         // A pole stands at most ~19 m from the avenue's centre (Park Avenue's mall) and ~12 m from the street's
-        const nearestAvenue = (x: number, z: number) => (ALL_AVENUES as Avenue[])
-            .filter((a) => !a.isHighway && a.segs?.some((s) => z >= s.z0 - 15 && z <= s.z1 + 15))
-            .reduce<Avenue | null>((m, a) => (!m || Math.abs(a.x - x) < Math.abs(m.x - x) ? a : m), null);
-        const nearestStreet = (x: number, z: number) => (ALL_STREETS as Street[])
-            .filter((s) => s.runs?.some((r) => x >= r[0] - 25 && x <= r[1] + 25))
-            .reduce<Street | null>((m, s) => (!m || Math.abs(s.z - z) < Math.abs(m.z - z) ? s : m), null);
+        const nearestAvenue = (x: number, z: number) =>
+            (ALL_AVENUES as Avenue[])
+                .filter(
+                    (a) => !a.isHighway && a.segs?.some((s) => z >= s.z0 - 15 && z <= s.z1 + 15)
+                )
+                .reduce<Avenue | null>(
+                    (m, a) => (!m || Math.abs(a.x - x) < Math.abs(m.x - x) ? a : m),
+                    null
+                );
+        const nearestStreet = (x: number, z: number) =>
+            (ALL_STREETS as Street[])
+                .filter((s) => s.runs?.some((r) => x >= r[0] - 25 && x <= r[1] + 25))
+                .reduce<Street | null>(
+                    (m, s) => (!m || Math.abs(s.z - z) < Math.abs(m.z - z) ? s : m),
+                    null
+                );
         const wrong: string[] = [];
         let fifthAt59th = 0;
         for (let i = 0; i < blades.count; i++) {
@@ -207,11 +265,16 @@ describe("New York street-name signs", () => {
             const [x, z] = [matrix.elements[12], matrix.elements[14]];
             const avenue = cells[names.getX(i)];
             const street = cells[names.getY(i)];
-            const expected = [nearestAvenue(x, z)?.short.toUpperCase(), nearestStreet(x, z)?.short.toUpperCase()];
+            const expected = [
+                nearestAvenue(x, z)?.short.toUpperCase(),
+                nearestStreet(x, z)?.short.toUpperCase()
+            ];
             expect(avenue.side).toBe("avenue");
             expect(street.side).toBe("street");
             if (avenue.name !== expected[0] || street.name !== expected[1]) {
-                wrong.push(`(${x.toFixed(0)}, ${z.toFixed(0)}) reads ${avenue.name} · ${street.name}, stands at ${expected.join(" · ")}`);
+                wrong.push(
+                    `(${x.toFixed(0)}, ${z.toFixed(0)}) reads ${avenue.name} · ${street.name}, stands at ${expected.join(" · ")}`
+                );
             }
             if (avenue.name === "5TH AVE" && street.name === "59TH ST") fifthAt59th++;
         }
@@ -220,7 +283,10 @@ describe("New York street-name signs", () => {
         // The corner the operator looked at
         expect(fifthAt59th).toBeGreaterThan(0);
         // Not one name for the whole city: as many different blades as there are corners with a signal
-        expect(new Set(Array.from({ length: blades.count }, (_, i) => `${names.getX(i)}:${names.getY(i)}`)).size)
-            .toBeGreaterThan(blades.count / 3);
+        expect(
+            new Set(
+                Array.from({ length: blades.count }, (_, i) => `${names.getX(i)}:${names.getY(i)}`)
+            ).size
+        ).toBeGreaterThan(blades.count / 3);
     }, 600_000);
 });
