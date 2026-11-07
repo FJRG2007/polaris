@@ -67,6 +67,7 @@ let pavedPlazaRects;
 let sidewalkBlocks;
 let fdrViaduct;
 let streetGroundSurfaces = [];
+let seawallOutline = []; // the granite coping's outline: the esplanade walk ends at it, the river starts
 
 function addStreetGround(poly, height) {
   streetGroundSurfaces.push({
@@ -1537,6 +1538,7 @@ function buildCityGrid(scene) {
   }));
   const seawallMesh = createExtrudedPolygonMesh(seawallPolygon, -2.35, 2.31, seawallMat, true, false);
   group.add(seawallMesh);
+  seawallOutline = seawallPolygon;
 
   // Unified Manhattan Roadway Asphalt Deck (Y = 0.0) following true Manhattan coastline
   const roadMat = createRoadSurfaceMaterial();
@@ -2407,7 +2409,7 @@ function buildCityGrid(scene) {
         const pz = a.z + ((b.z - a.z) * t) / len;
         if (inTerminal(px, pz)) continue;
         if (k % 3 === 1) addLamp(px - o.x * 3.3, COPING_TOP, pz - o.z * 3.3);
-        else if (!nearCastle(px, pz, 4)) treeSites.push({ x: px - o.x * 4.0, y: COPING_TOP, z: pz - o.z * 4.0, scale: 0.85 + prand(px, pz, 7) * 0.25, species: prand(pz, px, 8) < 0.6 ? 0 : 1, tier: 1 });
+        else if (!nearCastle(px, pz, 4) && pointInPolygonXZ(seawallOutline, px - o.x * 4.0, pz - o.z * 4.0)) treeSites.push({ x: px - o.x * 4.0, y: COPING_TOP, z: pz - o.z * 4.0, scale: 0.85 + prand(px, pz, 7) * 0.25, species: prand(pz, px, 8) < 0.6 ? 0 : 1, tier: 1 });
       }
     }
     // Iron railing 0.6 m in from the bulkhead on the coping, gapped at the ferry terminal
@@ -2806,6 +2808,8 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   const MIX_PARK = [0.5, 0.3]; // London plane, honey locust, else elm / oak
   const MIX_RIVERSIDE = [0.35, 0.2];
   const pickSpecies = (h, mix) => (h < mix[0] ? 0 : (h < mix[0] + mix[1] ? 1 : 2));
+  const lawnDrawn = (r, key, d) => !!(r && r[key] && !(key === 'river' && blocked(r, r[key][0]))
+    && d > r[key][0] + 0.5 && d < r[key][1] - 0.5);
   function plantBelt(rows, key, spacing, rowGap, mix, tier, s0, s1) {
     const z0 = rows[0].z;
     for (let zt = z0; zt <= rows[rows.length - 1].z; zt += spacing) {
@@ -2817,6 +2821,9 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
         const d = a + 1.9 + k * rowGap + (hash(k, zt) - 0.5) * 1.0;
         if (d > b - 1.6) break;
         if (blocked(r, d) || (key === 'river' && blocked(r, a)) || hash(z, d) < 0.1) continue;
+        // belt() lays the lawn between two rows that both carry it: past the last one there is no lawn to stand on
+        const i0 = Math.floor((z - z0) / STEP);
+        if (!lawnDrawn(rows[i0], key, d) || !lawnDrawn(rows[i0 + 1], key, d)) continue;
         treeSites.push({ x: X(r, d), y: LAWN_Y, z, scale: s0 + hash(d, z) * (s1 - s0), species: pickSpecies(hash(z * 0.37, d), mix), tier });
       }
     }
@@ -2828,7 +2835,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
     for (let zt = z0 + 4; zt <= z1; zt += 16) {
       const z = zt + (hash(zt, 3.1) - 0.5) * 3;
       const r = rows[Math.round((z - z0) / STEP)];
-      if (!r || r.river || blocked(r, -4.4)) continue;
+      if (!r || r.river || blocked(r, -4.4) || !pointInPolygonXZ(seawallOutline, X(r, -4.4), z)) continue;
       treeSites.push({ x: X(r, -4.4), y: COPING_Y, z, scale: 0.8 + hash(z, 7.7) * 0.25, species: hash(z, 1.9) < 0.6 ? 0 : 1, tier: 1 });
     }
     for (let z = z0 + 12; z <= z1; z += 26) {

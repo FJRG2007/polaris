@@ -826,7 +826,7 @@ function buildStreetDetails(scene, colliders = []) {
   //    and its west end, framing the lawn the library's terrace looks out over (the lawn as fitted by landmarks.js)
   const bpl = bryantParkLawn;
   if (bpl) {
-    const ty = bpl.top - 0.2;
+    const ty = bpl.terrace;
     for (let tx = bpl.minX - 6; tx <= bpl.maxX + 6; tx += 6.5) {
       for (const tz of [bpl.minZ - 5, bpl.minZ - 11.5, bpl.maxZ + 5, bpl.maxZ + 11.5]) {
         treePositions.push({ x: tx, y: ty, z: tz, scale: 0.8, species: 0 });

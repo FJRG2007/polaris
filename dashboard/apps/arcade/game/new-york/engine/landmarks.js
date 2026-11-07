@@ -783,7 +783,9 @@ function buildLandmarks(scene) {
       fountainBasin, carouselBase, carouselRoof]) solid(p);
     bpGroup.updateMatrixWorld(true);
     const lb = new THREE.Box3().setFromObject(lawn);
-    bryantParkLawn = { minX: lb.min.x, maxX: lb.max.x, minZ: lb.min.z, maxZ: lb.max.z, top: lb.max.y };
+    // terrace: the raised walk the allées stand on, a step below the lawn
+    bryantParkLawn = { minX: lb.min.x, maxX: lb.max.x, minZ: lb.min.z, maxZ: lb.max.z, top: lb.max.y,
+      terrace: new THREE.Box3().setFromObject(lawnWall).max.y };
   }
 
   // =========================================================================
