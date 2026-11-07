@@ -397,7 +397,7 @@
             "memory": "Memoria"
         },
         "empty": {
-            "apps": "Aún no hay nada instalado desde el marketplace.",
+            "apps": "Ninguna app ejecuta nada en esta máquina aún.",
             "services": "Aún no hay nada desplegado aquí.",
             "leftover": "No ha quedado nada abandonado.",
             "other": "No hay nada más en marcha en esta máquina."
@@ -414,8 +414,8 @@
                 "description": "El plano de control: el panel, la base de datos, el edge y el resto del stack."
             },
             "apps": {
-                "label": "Apps del marketplace",
-                "description": "Todo lo instalado desde el marketplace, servidores de juego incluidos."
+                "label": "Apps",
+                "description": "Lo que ejecuta cada app, por app: Game servers, VPN, Places y el resto."
             },
             "services": {
                 "label": "Servicios desplegados",

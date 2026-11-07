@@ -169,5 +169,23 @@
         "builtInBy": "Part of every Polaris",
         "cannotUninstall": "Built in - every Polaris needs it",
         "developer": "Polaris"
+    },
+    "services": {
+        "title": "Services",
+        "description": "What Polaris runs for this app.",
+        "empty": "This app runs no services right now.",
+        "usage": "CPU {cpu} - Memory {memory}",
+        "logs": "Logs",
+        "hideLogs": "Hide logs",
+        "refresh": "Refresh",
+        "restart": "Restart",
+        "restarting": "Restarting...",
+        "restartTitle": "Restart {name}?",
+        "restartDescription": "Its container restarts in place. It is offline for a few seconds; nothing is removed.",
+        "restartFailed": "Could not restart it. Try again in a moment.",
+        "notFound": "That service is not one of this app's.",
+        "waitingOutput": "Waiting for output...",
+        "notRunning": "Not running.",
+        "appSettings": "Open the {name} settings"
     }
 }

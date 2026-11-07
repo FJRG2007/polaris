@@ -10,7 +10,8 @@ import { Settings } from "lucide-react";
 import { findApp } from "@/lib/apps/catalog";
 import { isNativeApp } from "@/lib/apps/native-apps";
 import { getTranslations } from "@/lib/i18n/request";
-import { appSettingsHref } from "@/lib/apps/app-settings";
+import { appHasServices } from "@/lib/apps/app-services";
+import { appSettingsHref, appSettingsPath } from "@/lib/apps/app-settings";
 import type { StoreInstallRow } from "./marketplace-view";
 import { AppInstallPanel } from "./[appId]/app-detail";
 import { uninstallAccess } from "@/lib/apps/install-access";
@@ -76,8 +77,11 @@ export async function AppSettingsLink({
     app: Parameters<typeof appSettingsHref>[0];
     user: SessionUser;
 }) {
-    const href = appSettingsHref(app);
-    if (!href || !(await hasAppInstall(user, app.id))) return null;
+    // An app with services Polaris runs for it has settings even when it names
+    // none: they are where those services are shown.
+    const services = user.isAdmin && (await appHasServices(app.id));
+    const href = appSettingsHref(app) ?? (services ? appSettingsPath(app.id) : null);
+    if (!href || (!services && !(await hasAppInstall(user, app.id)))) return null;
     const t = await getTranslations("marketplace");
     return (
         <Link

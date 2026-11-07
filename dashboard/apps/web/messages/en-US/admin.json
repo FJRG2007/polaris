@@ -397,7 +397,7 @@
             "memory": "Memory"
         },
         "empty": {
-            "apps": "Nothing installed from the marketplace yet.",
+            "apps": "No app runs anything on this machine yet.",
             "services": "Nothing deployed here yet.",
             "leftover": "Nothing has been left behind.",
             "other": "Nothing else is running on this machine."
@@ -414,8 +414,8 @@
                 "description": "The control plane: the dashboard, the database, the edge, and the rest of the stack."
             },
             "apps": {
-                "label": "Marketplace apps",
-                "description": "Everything installed from the marketplace, game servers included."
+                "label": "Apps",
+                "description": "What each app runs, by app: Game servers, VPN, Places and the rest."
             },
             "services": {
                 "label": "Deployed services",
