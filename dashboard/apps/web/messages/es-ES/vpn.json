@@ -303,7 +303,7 @@
             "denied": "La VPN necesita tu permiso una vez para instalarse. Pulsa Conectar y acepta el aviso.",
             "failed": "Este ordenador no pudo iniciar la VPN. Inténtalo de nuevo.",
             "noAnswer": "Ese servidor no respondió. Prueba otra ubicación.",
-            "portBlocked": "Nada llega al puerto UDP {port} de {address}. Permite UDP {port} entrante en el firewall de su proveedor, o redirígelo en su router.",
+            "portBlocked": "Nada llega al puerto UDP {port} de {address}. Permite UDP {port} entrante en el firewall de su proveedor y en el suyo propio, o redirígelo en su router.",
             "portOpen": "{address} responde, pero esta red puede bloquear el puerto UDP {port} saliente. Inténtalo de nuevo o usa otra red.",
             "unreachable": "No se encontró la dirección de ese servidor. Prueba otra ubicación."
         },
@@ -385,9 +385,9 @@
             "recheck": "Comprobar",
             "show": "Ver la regla a añadir",
             "hide": "Ocultar los pasos",
-            "blockedHint": "No llega nada a este puerto, así que ningún dispositivo puede conectarse. Añade esta regla delante del servidor.",
+            "blockedHint": "No llega nada a este puerto, así que ningún dispositivo puede conectarse. Añade esta regla delante del servidor, y permítela en el firewall del propio servidor si tiene uno.",
             "viaRouter": "Comprobado a través de tu router. Si no reenvía su propia dirección, sale bloqueado aunque desde fuera funcione.",
-            "unknownHint": "Polaris no pudo llegar al servidor para contar lo que llega.",
+            "unknownHint": "Polaris no pudo saberlo desde aquí. Puede que no llegue al servidor, o que se ejecute en él, y su comprobación no cruza los firewalls.",
             "where": "Dónde añadirla",
             "places": {
                 "cloud": "Firewall del proveedor",

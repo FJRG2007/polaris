@@ -2,7 +2,8 @@
 
 /**
  * Whether devices get through to a node, on the administrator's list: the last
- * known answer at once, a fresh check as the list opens, and when nothing gets
+ * known answer at once, a fresh check as the list opens only where there is none
+ * or it is too old (the schedule keeps the rest current), and when nothing gets
  * through, the one rule to add and where - the hosting provider's firewall or a
  * forward on the operator's own router - with the same guides Management uses
  * for its own ports. Only drawn under /admin, whose messages it borrows.
@@ -56,8 +57,10 @@ export function NodeReachStatus({ node }: { node: NodeRow }) {
     }, [node.id, t]);
 
     const ready = node.publicKey !== null;
-    // Asked again each time the list opens; the last answer stands meanwhile.
-    useEffect(() => (ready ? check() : undefined), [ready, check]);
+    const [stale] = useState(
+        () => reach.nodeReach(node.reachVerdict, node.reachCheckedAt, new Date()) === "unchecked"
+    );
+    useEffect(() => (ready && stale ? check() : undefined), [ready, stale, check]);
     if (!ready) return null;
 
     const state = reach.nodeReach(

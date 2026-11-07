@@ -423,31 +423,54 @@ export const ARRIVAL_WINDOW_SECONDS = 4;
 /**
  * Counts what reaches a node's WireGuard port across a short window, so a server
  * that never answers can be told apart from one whose port nothing reaches. The
- * counter lives in the node's own table and is added the first time it is asked
- * for, so a node set up before it existed needs nothing redeployed.
+ * count is taken after the machine's own firewall has had its say, so a port it
+ * drops reads as dropped, and twice: everything that arrived, and what arrived on
+ * the interface facing the outside world. A knock that reached the port only from
+ * inside the machine (Polaris running on the node itself) says nothing about the
+ * firewalls in front of it. The chain and its counters are added the first time
+ * they are asked for, so a node set up before them needs nothing redeployed.
  */
 export function renderArrivalCount(port: number): string {
-    const counter = `arrivals_${port}`;
+    const chain = `reach_${port}`;
+    const reached = `reached_${port}`;
+    const outside = `outside_${port}`;
     return `#!/bin/sh
-nft list counter inet polaris_vpn ${counter} >/dev/null 2>&1 || {
-    nft add counter inet polaris_vpn ${counter} &&
-    nft insert rule inet polaris_vpn input udp dport ${port} counter name ${counter}
-} || exit 4
-count() { nft list counter inet polaris_vpn ${counter} | sed -n 's/.*packets \\([0-9]*\\).*/\\1/p'; }
-echo "before=$(count)"
+wan=$( { ip -o route show default; ip -o -6 route show default; } 2>/dev/null |
+    awk '{ m = 0; d = ""; for (i = 1; i < NF; i++) { if ($i == "metric") m = $(i + 1); if ($i == "dev") d = $(i + 1) } if (d != "") print m, d }' |
+    sort -n | head -n 1 | cut -d ' ' -f 2)
+[ -n "$wan" ] || exit 4
+nft add counter inet polaris_vpn ${reached} &&
+nft add counter inet polaris_vpn ${outside} &&
+nft add chain inet polaris_vpn ${chain} '{ type filter hook input priority filter + 10; policy accept; }' &&
+nft flush chain inet polaris_vpn ${chain} &&
+nft add rule inet polaris_vpn ${chain} udp dport ${port} counter name ${reached} &&
+nft add rule inet polaris_vpn ${chain} iifname "$wan" udp dport ${port} counter name ${outside} || exit 4
+count() { nft list counter inet polaris_vpn "$1" | sed -n 's/.*packets \\([0-9]*\\).*/\\1/p'; }
+echo "before=$(count ${outside})"
+echo "any_before=$(count ${reached})"
 sleep ${ARRIVAL_WINDOW_SECONDS}
-echo "after=$(count)"
+echo "after=$(count ${outside})"
+echo "any_after=$(count ${reached})"
 `;
 }
 
-/** Whether anything reached the port: `blocked` when nothing did, null when unreadable. */
+/** Whether anything reached the port: `open` when something came in from outside,
+ *  `blocked` when nothing came in at all, null when unreadable or when the knock
+ *  only reached it from inside the machine. */
 export type ArrivalVerdict = "blocked" | "open";
 
 export function arrivalVerdict(output: string): ArrivalVerdict | null {
-    const before = /^before=(\d+)$/m.exec(output)?.[1];
-    const after = /^after=(\d+)$/m.exec(output)?.[1];
-    if (before === undefined || after === undefined) return null;
-    return Number(after) > Number(before) ? "open" : "blocked";
+    const read = (name: string) => {
+        const value = new RegExp(`^${name}=(\\d+)$`, "m").exec(output)?.[1];
+        return value === undefined ? null : Number(value);
+    };
+    const before = read("before");
+    const after = read("after");
+    const anyBefore = read("any_before");
+    const anyAfter = read("any_after");
+    if (before === null || after === null || anyBefore === null || anyAfter === null) return null;
+    if (after > before) return "open";
+    return anyAfter > anyBefore ? null : "blocked";
 }
 
 export interface PeerCounters {

@@ -614,26 +614,39 @@ const answerChecks = new Map<string, { at: number; check: Promise<NodeAnswerChec
 const ANSWER_CHECK_REUSE_MS = 20_000;
 const KNOCK_EVERY_MS = 400;
 
-/** Datagrams at the node's port until `done`: what a device's first packet does. */
-async function knock(endpoint: string, port: number, done: Promise<unknown>): Promise<void> {
-    const socket = createSocket(isIP(endpoint) === 6 ? "udp6" : "udp4");
+/** Datagrams at the node's port until `done`: what a device's first packet does.
+ *  Says how many of them left this machine. */
+async function knock(
+    target: { address: string; family: number },
+    port: number,
+    done: Promise<unknown>
+): Promise<number> {
+    const socket = createSocket(target.family === 6 ? "udp6" : "udp4");
     socket.on("error", () => undefined);
-    const timer = setInterval(() => socket.send("polaris-vpn-knock", port, endpoint), KNOCK_EVERY_MS);
+    let sent = 0;
+    const timer = setInterval(
+        () => socket.send("polaris-vpn-knock", port, target.address, (error) => error || sent++),
+        KNOCK_EVERY_MS
+    );
     try {
         await done.catch(() => undefined);
     } finally {
         clearInterval(timer);
         socket.close();
     }
+    return sent;
 }
 
 async function checkAnswer(node: NodeRow): Promise<NodeAnswerCheck> {
     const place = { endpoint: node.endpoint, port: node.port };
     try {
+        const target = isIP(node.endpoint)
+            ? { address: node.endpoint, family: isIP(node.endpoint) }
+            : await lookup(node.endpoint);
         const connection = await connectionOf(node.hostId);
         const counting = runAsRoot(connection, wg.renderArrivalCount(node.port));
-        await knock(node.endpoint, node.port, counting);
-        const verdict = wg.arrivalVerdict(await counting);
+        const sent = await knock(target, node.port, counting);
+        const verdict = sent > 0 ? wg.arrivalVerdict(await counting) : null;
         // Packets arrive but no handshake came of them: the peer list is put right
         // so the next try finds this device on it.
         if (verdict === "open") await syncNode(node).catch(() => undefined);
@@ -700,6 +713,11 @@ async function recordReach(node: NodeRow, verdict: wg.ArrivalVerdict): Promise<v
     if (verdict === node.reachVerdict) return;
     const values = { name: node.name, port: node.port, address: node.endpoint };
     if (verdict === "blocked") {
+        const host = await prisma.host.findUnique({
+            where: { id: node.hostId },
+            select: { address: true }
+        });
+        if (!host || !reach.blockedIsCertain(host.address)) return;
         const say = (t: NamespaceTranslator<"notices">) => ({
             title: t("vpnNode.blockedTitle", values),
             body: t("vpnNode.blockedBody", values)

@@ -534,7 +534,7 @@
     },
     "vpnNode": {
         "blockedTitle": "El servidor VPN {name} no es accesible",
-        "blockedBody": "No llega nada a UDP {port} en {address}, así que nadie puede conectarse. Ábrelo en el firewall delante del servidor.",
+        "blockedBody": "No llega nada a UDP {port} en {address}, así que nadie puede conectarse. Ábrelo en el firewall delante del servidor y en el suyo propio.",
         "backTitle": "El servidor VPN {name} vuelve a ser accesible",
         "backBody": "UDP {port} en {address} vuelve a recibir tráfico."
     }
