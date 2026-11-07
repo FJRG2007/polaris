@@ -54,12 +54,49 @@ jobs:
           path: tv/launcher/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
+  addons:
+    name: Add-on builds and the catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platforms;android-34 build-tools;34.0.0
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      # Every add-on in addons/, built as a release (debug-signed by its own build.gradle; the release job
+      # signs them again with the TV key), so the Themes & add-ons screen can install each one.
+      - name: Build every add-on
+        run: |
+          mkdir -p "$RUNNER_TEMP/apks"
+          for dir in tv/addons/*/; do
+            id=$(basename "$dir")
+            [ -f "$dir/gradlew" ] || continue
+            (cd "$dir" && chmod +x gradlew && ./gradlew --no-daemon -q assembleRelease)
+            apk=$(ls "$dir"app/build/outputs/apk/release/*.apk | head -n 1)
+            cp "$apk" "$RUNNER_TEMP/apks/$id.apk"
+          done
+      # The same generator the release runs: a theme without a screenshot or over the size cap fails here.
+      - name: Catalog
+        run: python3 -I tv/tools/catalog.py --apks "$RUNNER_TEMP/apks" --out "$RUNNER_TEMP/catalog"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: polaris-tv-addons
+          path: ${{ runner.temp }}/apks/*.apk
+          if-no-files-found: error
+
   release:
     name: Publish the signed APK
     # Runs on main only, and does nothing until the signing key exists: a key made per run would stop
     # every later version installing over the one before it.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [tools, launcher]
+    needs: [tools, launcher, addons]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -92,15 +129,33 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         with:
           packages: platforms;android-34 build-tools;34.0.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        if: steps.decide.outputs.publish == 'true'
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        if: steps.decide.outputs.publish == 'true'
+        with:
+          name: polaris-tv-addons
+          path: ${{ runner.temp }}/unsigned
+      # The add-ons are signed with the TV key too, so every later release installs over the one before it.
+      # catalog.json is written after signing: its checksums are of the files the TV downloads.
       - name: Build and publish
         if: steps.decide.outputs.publish == 'true'
         run: |
           export TV_KEYSTORE_PATH="$RUNNER_TEMP/tv.keystore"
           printf '%s' "$TV_KEYSTORE_BASE64" | base64 -d > "$TV_KEYSTORE_PATH"
           (cd tv/launcher && chmod +x gradlew && ./gradlew --no-daemon assembleRelease)
+          mkdir -p "$RUNNER_TEMP/apks"
+          for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
+            "$ANDROID_HOME/build-tools/34.0.0/apksigner" sign --ks "$TV_KEYSTORE_PATH" \
+              --ks-pass env:TV_KEYSTORE_PASSWORD --ks-key-alias "$TV_KEY_ALIAS" \
+              --out "$RUNNER_TEMP/apks/$(basename "$apk")" "$apk"
+          done
           rm -f "$TV_KEYSTORE_PATH"
           mkdir out
           cp tv/launcher/app/build/outputs/apk/release/app-release.apk out/polaris-tv.apk
-          (cd out && sha256sum polaris-tv.apk > SHA256SUMS)
-          gh release create "${{ steps.decide.outputs.tag }}" out/polaris-tv.apk out/SHA256SUMS \
+          python3 -I tv/tools/catalog.py --apks "$RUNNER_TEMP/apks" --out out
+          (cd out && sha256sum polaris-tv.apk catalog.json theme-*.zip addon-*.apk > SHA256SUMS)
+          gh release create "${{ steps.decide.outputs.tag }}" out/* \
             --title "Polaris TV ${{ steps.decide.outputs.tag }}" --notes "Android TV and Google TV." --latest=false
