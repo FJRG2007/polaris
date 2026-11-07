@@ -16,7 +16,14 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { TvGallery, type TvGalleryItem } from "@polaris/ui/tv-gallery";
 
 export type TvCatalogStatus =
-    "updateFirst" | "notAsked" | "waiting" | "applied" | "installed" | "asked" | "failed" | "unavailable";
+    | "updateFirst"
+    | "notAsked"
+    | "waiting"
+    | "applied"
+    | "installed"
+    | "asked"
+    | "failed"
+    | "unavailable";
 
 /**
  * Where the latest pick stands. A problem with either pick is what is shown; else
@@ -127,7 +134,9 @@ export function TvCatalogPicker({
                             item.kind === "theme" ? (
                                 <Button
                                     size="sm"
-                                    variant={row.catalog.theme?.id === item.id ? "primary" : "outline"}
+                                    variant={
+                                        row.catalog.theme?.id === item.id ? "primary" : "outline"
+                                    }
                                     aria-pressed={row.catalog.theme?.id === item.id}
                                     onClick={() => {
                                         if (row.catalog.theme?.id !== item.id) onTheme(item.id);

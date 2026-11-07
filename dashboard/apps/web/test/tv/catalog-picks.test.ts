@@ -139,7 +139,9 @@ describe("picking for a TV", () => {
     });
 
     it("refuses an id the catalog does not list, and a launcher too old to act", async () => {
-        expect(await picks.setTvAddons("user-1", "key-1", ["weather", "nope"])).toBe("notInCatalog");
+        expect(await picks.setTvAddons("user-1", "key-1", ["weather", "nope"])).toBe(
+            "notInCatalog"
+        );
         expect(await picks.setTvTheme("user-1", "key-1", "weather")).toBe("notInCatalog");
         clientBuild = 14;
         expect(await picks.setTvTheme("user-1", "key-1", "aerial")).toBe("tooOld");
@@ -164,7 +166,9 @@ describe("the line under the picker", () => {
     it("says what stands", () => {
         expect(catalogStatus(row({ theme: null, addons: null }, 14))).toBe("updateFirst");
         expect(catalogStatus(row({ theme: null, addons: null }))).toBe("notAsked");
-        expect(catalogStatus(row({ theme: { id: "a", applied: null }, addons: null }))).toBe("waiting");
+        expect(catalogStatus(row({ theme: { id: "a", applied: null }, addons: null }))).toBe(
+            "waiting"
+        );
         expect(
             catalogStatus(
                 row({

@@ -127,7 +127,11 @@ export async function noteTvCatalog(keyId: string, reported: TvCatalogReported):
             changed = true;
         }
     }
-    if (changed) await prisma.tvPreference.updateMany({ where: { apiKeyId: keyId }, data: { desired: next } });
+    if (changed)
+        await prisma.tvPreference.updateMany({
+            where: { apiKeyId: keyId },
+            data: { desired: next }
+        });
 }
 
 export const tvThemePickSchema = z.object({ keyId: z.string().uuid(), theme: tvCatalogIdSchema });
@@ -181,6 +185,11 @@ export function setTvTheme(userId: string, keyId: string, theme: string, now = n
     return pick(userId, keyId, "theme", [theme], now);
 }
 
-export function setTvAddons(userId: string, keyId: string, addons: readonly string[], now = new Date()) {
+export function setTvAddons(
+    userId: string,
+    keyId: string,
+    addons: readonly string[],
+    now = new Date()
+) {
     return pick(userId, keyId, "addon", addons, now);
 }

@@ -270,8 +270,10 @@ export function TvUpdatesView({ initial }: { initial: TvUpdatesView }) {
                                     )
                                 }
                                 onAddons={(ids) =>
-                                    void changeCatalog(row, { addons: { ids, applied: null } }, () =>
-                                        setTvAddonsAction({ keyId: row.id, addons: ids })
+                                    void changeCatalog(
+                                        row,
+                                        { addons: { ids, applied: null } },
+                                        () => setTvAddonsAction({ keyId: row.id, addons: ids })
                                     )
                                 }
                             />
