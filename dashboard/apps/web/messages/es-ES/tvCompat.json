@@ -105,5 +105,24 @@
         }
     },
     "install": "Instalar en esta tele",
-    "skip": "Sé que funciona"
+    "skip": "Sé que funciona",
+    "gallery": {
+        "title": "Temas y complementos",
+        "intro": "Se eligen en el televisor, en Ajustes, Temas y complementos. Sin escribir nada en un ordenador.",
+        "filter": {
+            "label": "Mostrar",
+            "all": "Todo ({count})",
+            "theme": "Temas ({count})",
+            "addon": "Complementos ({count})"
+        },
+        "kind": {
+            "theme": "Tema",
+            "addon": "Extra"
+        },
+        "network": "Usa internet",
+        "offline": "Va sin conexión",
+        "minSdk": "Android {version}+",
+        "screenshot": "{name} en un televisor",
+        "empty": "Todavía no hay nada que mostrar."
+    }
 }

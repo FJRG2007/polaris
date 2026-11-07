@@ -143,9 +143,13 @@ final class PolarisLink {
         final Boolean desiredBlocking;
         /** The id of that choice, or null. */
         final String desiredChoice;
+        /** The theme and add-ons picked from Polaris ({@link RemoteCatalog}), or null when none was. */
+        final RemoteCatalog.Pick desiredTheme;
+        final RemoteCatalog.Pick desiredAddons;
 
         State(String instanceName, String accountName, int unread, int alerts, String updateRequestId,
-                String updateRequestVersion, Boolean desiredBlocking, String desiredChoice) {
+                String updateRequestVersion, Boolean desiredBlocking, String desiredChoice,
+                RemoteCatalog.Pick desiredTheme, RemoteCatalog.Pick desiredAddons) {
             this.instanceName = instanceName;
             this.accountName = accountName;
             this.unread = unread;
@@ -154,6 +158,8 @@ final class PolarisLink {
             this.updateRequestVersion = updateRequestVersion;
             this.desiredBlocking = desiredBlocking;
             this.desiredChoice = desiredChoice;
+            this.desiredTheme = desiredTheme;
+            this.desiredAddons = desiredAddons;
         }
     }
 
@@ -272,11 +278,11 @@ final class PolarisLink {
     /**
      * What the instance says now. Null when the key is no longer accepted. Carries this build's version, which
      * is how Polaris knows what the TV runs and when an update it asked for has landed, and what came of Block ads
-     * and trackers ({@link RemoteBlocking}).
+     * and trackers ({@link RemoteBlocking}) and of the theme and add-ons picked ({@link RemoteCatalog}).
      */
     State state() throws IOException {
-        String path = RemoteBlockingRun.withReport(context,
-                "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+        String path = RemoteCatalogRun.withReport(context, RemoteBlockingRun.withReport(context,
+                "/api/tv/state" + SelfUpdate.versionQuery(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)));
         PolarisFailover.Reply reply = failover.request("GET", path, null, token);
         if (reply.status == 401) return null;
         if (!reply.ok()) throw new IOException("Refused: " + reply.status);
@@ -292,7 +298,8 @@ final class PolarisLink {
             return new State(instance.optString("name"), account.optString("name"),
                     Math.max(0, answer.optInt("unread")), Math.max(0, answer.optInt("alerts")), requestId,
                     requestId == null ? null : request.optString("versionName", null),
-                    RemoteBlocking.desiredBlocking(answer), RemoteBlocking.desiredChoice(answer));
+                    RemoteBlocking.desiredBlocking(answer), RemoteBlocking.desiredChoice(answer),
+                    RemoteCatalog.desiredTheme(answer), RemoteCatalog.desiredAddons(answer));
         } catch (JSONException notPolaris) {
             throw new IOException("Not a Polaris", notPolaris);
         }

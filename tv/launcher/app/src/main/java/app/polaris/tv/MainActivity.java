@@ -327,6 +327,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * reach Home after onPause, when that key opened another app, and must not start the clock over the app.
      */
     private boolean resumed;
+    /** A theme applied from Polaris while an app was in front: Home starts again to wear it once it is back. */
+    private boolean themeRestartPending;
     /** Rebuild the tiles on the way back to Home only when apps changed meanwhile (TileRefresh). */
     private final TileRefresh tileRefresh = new TileRefresh();
     /** PackageManager's change counter at the last rebuild, to catch a package broadcast that never arrived. */
@@ -1115,14 +1117,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 int count = state == null ? 0 : state.unread + state.alerts;
                 runOnUiThread(() -> btnPolaris.setText(count > 0
                         ? getString(R.string.polaris_title) + " " + count : getString(R.string.polaris_title)));
-                // Block ads and trackers as asked from Polaris; the outcome goes back at once, or on the next poll.
-                if (state != null && RemoteBlockingRun.apply(this, link, state.desiredBlocking, state.desiredChoice)) {
+                // Block ads and trackers, the theme and the add-ons as asked from Polaris; the outcome goes back at
+                // once, or on the next poll.
+                if (state == null) return;
+                boolean blocked = RemoteBlockingRun.apply(this, link, state.desiredBlocking, state.desiredChoice);
+                RemoteCatalogRun.Applied picked = RemoteCatalogRun.apply(this, state.desiredTheme, state.desiredAddons);
+                if (blocked || picked.acted) {
                     try {
                         link.state();
                     } catch (java.io.IOException later) {
                         // Reported on the next poll instead.
                     }
                 }
+                // Home reads a theme when it starts, so it starts again to wear the one just applied.
+                if (picked.themeApplied) runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (resumed) CatalogInstall.restartHome(this);
+                    else themeRestartPending = true;
+                });
             } catch (java.io.IOException unreachable) {
                 runOnUiThread(() -> btnPolaris.setText(R.string.polaris_title));
             }
@@ -1146,6 +1158,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        if (themeRestartPending) {
+            themeRestartPending = false;
+            CatalogInstall.restartHome(this);
+            return;
+        }
         refreshPolaris();
         SelfUpdateRun.dailyCheck(this);
         watchPrivateDns();

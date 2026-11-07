@@ -48,6 +48,7 @@ import {
 import * as site from "../src/data/builders";
 import * as docs from "../src/data/docs";
 import * as searchIndex from "../src/lib/search-index";
+import { tvGallerySources } from "../src/lib/tv-gallery";
 import enWords from "../src/messages/en.json";
 import esWords from "../src/messages/es.json";
 import { marked } from "marked";
@@ -423,6 +424,20 @@ const downloadMessages = (locale: string): site.DownloadsData["messages"]["en"] 
         tvCompat
     };
 };
+// The TV's themes and add-ons, from the README tables the release catalog is built from.
+const tvDir = join(root, "tv");
+const readIf = (path: string) => (existsSync(path) ? read(path) : null);
+const tvGallery = tvGallerySources({
+    themesReadme: read(join(tvDir, "themes", "README.md")),
+    addonsReadme: read(join(tvDir, "addons", "README.md")),
+    launcherGradle: readIf(join(tvDir, "launcher", "app", "build.gradle")),
+    addon: (id) => ({
+        gradle:
+            readIf(join(tvDir, "addons", id, "app", "build.gradle")) ??
+            readIf(join(tvDir, "addons", id, "app", "build.gradle.kts")),
+        manifest: readIf(join(tvDir, "addons", id, "app", "src", "main", "AndroidManifest.xml"))
+    })
+}).filter((source) => existsSync(join(tvDir, source.from)));
 // The same lookup the dashboard's Downloads makes, so the files offered match.
 const [desktop, extension, streamdeck, companion] = await Promise.all(
     [DESKTOP_TAG_PREFIX, EXTENSION_TAG_PREFIX, STREAMDECK_TAG_PREFIX, COMPANION_TAG_PREFIX].map(
@@ -607,6 +622,7 @@ const data: site.SiteData = {
     downloadsPage: {
         files: { desktop, extension, streamdeck, companion },
         storeUrl: STREAMDECK_MARKETPLACE_URL,
+        tvGallery: tvGallery.map((source) => source.item),
         messages: { en: downloadMessages("en-US"), es: downloadMessages("es-ES") }
     },
     api: {
@@ -623,6 +639,13 @@ mkdirSync(join(siteDir, "generated"), { recursive: true });
 mkdirSync(join(siteDir, "public", "media"), { recursive: true });
 mkdirSync(join(siteDir, "public", "logos"), { recursive: true });
 mkdirSync(join(siteDir, "public", "app-logos"), { recursive: true });
+rmSync(join(siteDir, "public", "tv-gallery"), { recursive: true, force: true });
+mkdirSync(join(siteDir, "public", "tv-gallery"), { recursive: true });
+for (const source of tvGallery)
+    copyFileSync(
+        join(tvDir, source.from),
+        join(siteDir, "public", "tv-gallery", source.item.screenshot)
+    );
 writeFileSync(join(siteDir, "generated", "site-data.json"), JSON.stringify(data));
 writeFileSync(join(siteDir, "public", "openapi.json"), JSON.stringify(openapi, null, 2) + "\n");
 // The docs search index per locale: a manifest of titles fetched when search

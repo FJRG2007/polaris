@@ -81,4 +81,30 @@
     <string name="language_row">Idioma: %1$s</string>
     <string name="language_title">Idioma</string>
     <string name="language_tv">El mismo que la TV</string>
+    <!-- Settings > Themes & add-ons (ThemesAddonsActivity). -->
+    <string name="catalog_row">Temas y complementos</string>
+    <string name="catalog_title">Temas y complementos</string>
+    <string name="catalog_all">Todo</string>
+    <string name="catalog_themes">Temas</string>
+    <string name="catalog_addons">Complementos</string>
+    <string name="catalog_loading">Cargando el catálogo...</string>
+    <string name="catalog_unreachable">No se pudo acceder al catálogo. Comprueba que este televisor tiene conexión y vuelve a intentarlo.</string>
+    <string name="catalog_retry">Reintentar</string>
+    <string name="catalog_empty">Todavía no hay nada en el catálogo para esta versión.</string>
+    <string name="catalog_apply">Aplicar tema</string>
+    <string name="catalog_install">Instalar complemento</string>
+    <string name="catalog_reinstall">Reinstalar complemento</string>
+    <string name="catalog_downloading">Descargando %1$s...</string>
+    <string name="catalog_applied">%1$s aplicado.</string>
+    <string name="catalog_failed">%1$s no se instaló: %2$s</string>
+    <string name="catalog_confirm">Confirma la instalación en la pantalla que muestra Android.</string>
+    <string name="catalog_addon_installed">%1$s instalado.</string>
+    <string name="catalog_busy">Todavía hay otra descarga en curso.</string>
+    <string name="catalog_network">Usa internet</string>
+    <string name="catalog_offline">Funciona sin conexión</string>
+    <string name="catalog_permissions">Permisos: %1$s</string>
+    <string name="catalog_too_old">Necesita una versión de Android más reciente que la de este televisor.</string>
+    <string name="catalog_why_checksum">la descarga no coincide con el catálogo.</string>
+    <string name="catalog_why_refused">el tema tiene archivos que Polaris TV no lee.</string>
+    <string name="catalog_why_unreachable">la descarga se detuvo. Vuelve a intentarlo.</string>
 </resources>

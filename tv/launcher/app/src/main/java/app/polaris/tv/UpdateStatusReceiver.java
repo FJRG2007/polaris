@@ -20,6 +20,11 @@ public final class UpdateStatusReceiver extends BroadcastReceiver {
         int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, SelfUpdate.STATUS_FAILURE);
         String requestId = intent.getStringExtra(SelfUpdateRun.EXTRA_REQUEST);
         Context app = context.getApplicationContext();
+        String addon = intent.getStringExtra(CatalogInstall.EXTRA_ADDON);
+        if (addon != null) {
+            CatalogInstall.onStatus(app, addon, status, intent);
+            return;
+        }
         if (status == SelfUpdate.STATUS_PENDING_USER_ACTION) {
             Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
             if (confirm != null) {

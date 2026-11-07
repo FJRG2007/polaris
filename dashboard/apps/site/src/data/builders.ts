@@ -9,6 +9,7 @@ import type { InventoryRoute } from "@/data/api-inventory";
 import type { DocPage, DocSection } from "@/data/docs";
 import type { SearchRecord } from "@/lib/search-index";
 import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
+import type { TvGalleryItem } from "@polaris/ui/tv-gallery";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { PLATFORM_NAMES, TV_MODELS, TV_PRIVACY } from "@polaris/core/tv-compat";
 
@@ -440,6 +441,8 @@ export interface DownloadsData {
         Record<"desktop" | "extension" | "streamdeck" | "companion", AppDownload | null>
     >;
     readonly storeUrl: string | null;
+    /** The TV's themes and add-ons, their screenshots under `tv-gallery/`. */
+    readonly tvGallery: readonly TvGalleryItem[];
     /** The dashboard's own catalogs, cut to the Downloads keys, per site locale. */
     readonly messages: Readonly<
         Record<

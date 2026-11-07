@@ -17,6 +17,7 @@ let listed = "";
 let release: unknown = null;
 const fetched: string[] = [];
 const redirects = new Map<string, string>();
+const assets = new Map<string, Buffer>();
 let diskFull = false;
 
 vi.mock("node:fs", async (original) => {
@@ -46,6 +47,8 @@ vi.mock("@/lib/safe-fetch", () => ({
         fetched.push(address);
         const next = redirects.get(address);
         if (next) return new Response(null, { status: 302, headers: { location: next } });
+        const asset = assets.get(address);
+        if (asset) return new Response(asset);
         if (address.endsWith("SHA256SUMS")) return new Response(listed);
         if (address.endsWith("polaris-tv.apk")) return new Response(apk);
         return new Response(null, { status: 404 });
@@ -76,6 +79,7 @@ beforeEach(async () => {
     };
     fetched.length = 0;
     redirects.clear();
+    assets.clear();
     diskFull = false;
     tv.resetTvReleaseCache();
 });
@@ -193,6 +197,96 @@ describe("the APK cache on disk", () => {
         const names = await readdir(dir);
         expect(names).toContain(".running.part");
         expect(names).not.toContain(".crashed.part");
+    });
+});
+
+describe("the Themes & add-ons catalog served from the instance", () => {
+    const RELEASE = "https://github.com/sample/polaris/releases/download/tv-v3.5/";
+    const catalog = Buffer.from('{"version":1,"items":[]}');
+    const zip = Buffer.from("sample theme zip");
+
+    function publish(files: Record<string, Buffer>, listing: Record<string, Buffer> = files): void {
+        const shaped = release as { files: { name: string; url: string }[] };
+        for (const [name, bytes] of Object.entries(files)) {
+            assets.set(RELEASE + name, bytes);
+            shaped.files.push({ name, url: RELEASE + name });
+        }
+        listed += Object.entries(listing)
+            .map(([name, bytes]) => `${sha(bytes)}  ${name}\n`)
+            .join("");
+    }
+
+    it("takes only the names the catalog generator writes", () => {
+        for (const name of [
+            "catalog.json",
+            "theme-aerial.zip",
+            "theme-aerial.jpg",
+            "addon-sleep-timer.apk",
+            "addon-sleep-timer.jpg"
+        ]) {
+            expect(tv.catalogFileName(name)).toBe(true);
+        }
+        for (const name of [
+            "polaris-tv.apk",
+            "SHA256SUMS",
+            "../catalog.json",
+            "theme-../x.zip",
+            "theme-aerial.apk",
+            "addon-x.zip",
+            ".catalog.json",
+            "theme-Aerial.zip",
+            null
+        ]) {
+            expect(tv.catalogFileName(name)).toBe(false);
+        }
+    });
+
+    it("downloads a file once, verifies it and keeps it under its release", async () => {
+        publish({ "catalog.json": catalog, "theme-aerial.zip": zip });
+        const first = await tv.preparedTvCatalogFile("theme-aerial.zip");
+        expect(first).toMatchObject({ versionName: "3.5", size: zip.length, sha256: sha(zip) });
+        expect(await readFile(first!.path)).toEqual(zip);
+        expect(first!.path).toBe(join(dataDir, "tv-catalog", "3.5", "theme-aerial.zip"));
+        await tv.preparedTvCatalogFile("theme-aerial.zip");
+        expect(fetched.filter((address) => address.endsWith("theme-aerial.zip"))).toHaveLength(1);
+        const listing = await tv.preparedTvCatalogFile("catalog.json");
+        expect(await readFile(listing!.path)).toEqual(catalog);
+    });
+
+    it("is null for a name that is not a catalog file, or one the release does not carry", async () => {
+        publish({ "catalog.json": catalog });
+        expect(await tv.preparedTvCatalogFile("polaris-tv.apk")).toBeNull();
+        expect(await tv.preparedTvCatalogFile("addon-weather.apk")).toBeNull();
+    });
+
+    it("is null for a file the checksum list leaves out", async () => {
+        publish({ "theme-aerial.zip": zip }, {});
+        expect(await tv.preparedTvCatalogFile("theme-aerial.zip")).toBeNull();
+        expect(fetched.some((address) => address.endsWith("theme-aerial.zip"))).toBe(false);
+    });
+
+    it("refuses and does not keep a file that does not match its checksum", async () => {
+        publish({ "theme-aerial.zip": zip }, { "theme-aerial.zip": Buffer.from("other") });
+        await expect(tv.preparedTvCatalogFile("theme-aerial.zip")).rejects.toMatchObject({
+            reason: "mismatch"
+        });
+        expect(await readdir(join(dataDir, "tv-catalog", "3.5"))).toEqual([]);
+    });
+
+    it("refuses a screenshot over its cap", async () => {
+        const big = Buffer.alloc(300 * 1024 + 1, 1);
+        publish({ "theme-aerial.jpg": big });
+        await expect(tv.preparedTvCatalogFile("theme-aerial.jpg")).rejects.toMatchObject({
+            reason: "too-large"
+        });
+    });
+
+    it("keeps only the newest release's files", async () => {
+        await mkdir(join(dataDir, "tv-catalog", "3.4"), { recursive: true });
+        await writeFile(join(dataDir, "tv-catalog", "3.4", "theme-aerial.zip"), "old");
+        publish({ "theme-aerial.zip": zip });
+        await tv.preparedTvCatalogFile("theme-aerial.zip");
+        expect(await readdir(join(dataDir, "tv-catalog"))).toEqual(["3.5"]);
     });
 });
 
