@@ -19,7 +19,7 @@ import {
     type PolarLimitHit
 } from "@/lib/polar/usage";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
-import { reasoningFor, resolvePolarModel, type ModelRefusal } from "@/lib/polar/models";
+import { answeredBy, reasoningFor, resolvePolarModel, type ModelRefusal } from "@/lib/polar/models";
 import {
     keepFor,
     pathTo,
@@ -64,6 +64,8 @@ export async function compactPolarThread(input: {
 
     let text: string;
     let spent: AnswerUsage;
+    // An Automatic choice may have been answered by its stand-in (`models.ts`).
+    let answered = resolved;
     try {
         const result = await generateText({
             model: resolved.model,
@@ -74,7 +76,8 @@ export async function compactPolarThread(input: {
             abortSignal: AbortSignal.timeout(TIMEOUT_MS)
         });
         text = result.text.trim().slice(0, POLAR_SUMMARY_MAX);
-        spent = answerUsage(result.totalUsage, resolved.option);
+        answered = { ...resolved, ...answeredBy(resolved) };
+        spent = answerUsage(result.totalUsage, answered.option);
     } catch (error) {
         console.warn(
             failureLogLine(
@@ -92,7 +95,7 @@ export async function compactPolarThread(input: {
         id: randomUUID(),
         role: "assistant",
         parts: [{ type: "text", text }],
-        metadata: { compaction, model: resolved.option.name, usage: spent }
+        metadata: { compaction, model: answered.option.name, usage: spent }
     };
     await prisma.$transaction([
         prisma.polarMessage.create({
@@ -115,9 +118,9 @@ export async function compactPolarThread(input: {
             userId: input.userId,
             threadId: input.threadId,
             messageId: message.id,
-            provider: resolved.option.provider,
-            model: resolved.option.model,
-            payer: resolved.credential.source === "instance" ? "instance" : "own",
+            provider: answered.option.provider,
+            model: answered.option.model,
+            payer: answered.credential.source === "instance" ? "instance" : "own",
             usage: spent
         });
     } catch (error) {

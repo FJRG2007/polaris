@@ -11,6 +11,7 @@
  * only reorders candidates, so losing it on a restart costs one slow retry.
  */
 
+import { isFreeModel } from "@/lib/polar/credit";
 import type { PolarModelOption, PolarProviderOption } from "@/lib/polar/models";
 
 /** What one turn carries, as far as choosing a model goes. */
@@ -33,6 +34,9 @@ export const LONG_MESSAGE_CHARS = 1_500;
 export const LONG_CONTEXT_CHARS = 24_000;
 /** How long a failed provider stays at the back of the line. */
 export const FAILURE_MS = 5 * 60_000;
+/** How long a provider that refused for want of credit is offered only its
+ *  free models: credit is added by hand, rarely within the hour. */
+export const UNPAID_MS = 30 * 60_000;
 /** Rough characters per token, to check a model's window can hold the turn. */
 const CHARS_PER_TOKEN = 4;
 
@@ -96,16 +100,23 @@ const byName = (a: PolarModelOption, b: PolarModelOption) =>
  * models that reason first, then the newest, then the most capable by price.
  * A turn with files only goes to models that read files, and a long one only
  * to models whose window holds it, unless no model qualifies - then the
- * filter is dropped rather than leaving the turn with nothing. Providers in
- * `failing` go last, in the same order among themselves.
+ * filter is dropped rather than leaving the turn with nothing. A provider in
+ * `unpaid` refused a call for want of credit a moment ago, so only its free
+ * models are offered while it has any. Providers in `failing` go last, in the
+ * same order among themselves.
  */
 export function automaticCandidates(
     providers: readonly PolarProviderOption[],
     signals: TurnSignals,
-    failing: ReadonlySet<string> = new Set()
+    failing: ReadonlySet<string> = new Set(),
+    unpaid: ReadonlySet<string> = new Set()
 ): PolarModelOption[] {
     const route = autoRoute(signals);
-    let models = providers.flatMap((provider) => provider.models);
+    let models = providers.flatMap((provider) =>
+        unpaid.has(provider.provider) && provider.models.some(isFreeModel)
+            ? provider.models.filter(isFreeModel)
+            : provider.models
+    );
     const keep = (test: (model: PolarModelOption) => boolean) => {
         const kept = models.filter(test);
         if (kept.length > 0) models = kept;
@@ -131,27 +142,52 @@ export function automaticCandidates(
     ];
 }
 
-const failures = new Map<string, number>();
-/** Most entries the memo keeps, so it cannot grow without end. */
-const FAILURE_MOST = 5_000;
+/** Most entries a memo keeps, so it cannot grow without end. */
+const MEMO_MOST = 5_000;
+
+/** A per-process memo of providers that refused one person a moment ago. */
+function providerMemo(ttl: number) {
+    const seen = new Map<string, number>();
+    return {
+        note(userId: string, provider: string, now: number): void {
+            if (seen.size >= MEMO_MOST) {
+                for (const [key, at] of seen) if (now - at > ttl) seen.delete(key);
+                if (seen.size >= MEMO_MOST) seen.clear();
+            }
+            seen.set(`${userId}\u0000${provider}`, now);
+        },
+        list(userId: string, now: number): Set<string> {
+            const prefix = `${userId}\u0000`;
+            const found = new Set<string>();
+            for (const [key, at] of seen) {
+                if (!key.startsWith(prefix)) continue;
+                if (now - at > ttl) seen.delete(key);
+                else found.add(key.slice(prefix.length));
+            }
+            return found;
+        }
+    };
+}
+
+const failures = providerMemo(FAILURE_MS);
+const unpaid = providerMemo(UNPAID_MS);
 
 /** Notes that a call to this provider failed for this person just now. */
 export function noteProviderFailure(userId: string, provider: string, now = Date.now()): void {
-    if (failures.size >= FAILURE_MOST) {
-        for (const [key, at] of failures) if (now - at > FAILURE_MS) failures.delete(key);
-        if (failures.size >= FAILURE_MOST) failures.clear();
-    }
-    failures.set(`${userId}\u0000${provider}`, now);
+    failures.note(userId, provider, now);
 }
 
 /** The providers whose calls failed for this person in the last few minutes. */
 export function failingProviders(userId: string, now = Date.now()): Set<string> {
-    const prefix = `${userId}\u0000`;
-    const found = new Set<string>();
-    for (const [key, at] of failures) {
-        if (!key.startsWith(prefix)) continue;
-        if (now - at > FAILURE_MS) failures.delete(key);
-        else found.add(key.slice(prefix.length));
-    }
-    return found;
+    return failures.list(userId, now);
+}
+
+/** Notes that this provider refused this person for want of credit just now. */
+export function noteNoCredit(userId: string, provider: string, now = Date.now()): void {
+    unpaid.note(userId, provider, now);
+}
+
+/** The providers that refused this person for want of credit lately. */
+export function unpaidProviders(userId: string, now = Date.now()): Set<string> {
+    return unpaid.list(userId, now);
 }

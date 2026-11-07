@@ -25,7 +25,9 @@ import {
     autoRoute,
     automaticCandidates,
     failingProviders,
+    noteNoCredit,
     PLAIN_TURN,
+    unpaidProviders,
     type AutoRoute,
     type TurnSignals
 } from "@/lib/polar/automatic";
@@ -37,7 +39,13 @@ import {
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
 import { providerWindows, WINDOW_PROVIDERS } from "@/lib/polar/provider-windows";
-import { creditMiddleware, freeVariantOf } from "@/lib/polar/credit";
+import {
+    creditMiddleware,
+    freeVariantOf,
+    isFreeModel,
+    standInMiddleware,
+    type LanguageModelV4
+} from "@/lib/polar/credit";
 import {
     polarAccessFor,
     polarCredentialFor,
@@ -239,6 +247,57 @@ export interface ResolvedModel {
     credential: ChatCredential;
     /** Set when Automatic picked the model: the kind of turn it saw. */
     automatic?: AutoRoute;
+    /** The models asked instead when this one is refused (`withStandIn`),
+     *  innermost first. */
+    standIns?: readonly StandIn[];
+}
+
+/** A model that may answer in place of the one chosen, and whether it did. */
+export interface StandIn {
+    option: PolarModelOption;
+    credential: ChatCredential;
+    used: () => boolean;
+}
+
+/**
+ * `resolved`, asking `standIn` once when its call is refused for want of
+ * credit or by a rate limit (`credit.ts`). Only for a model Polar chose: one
+ * the person pinned keeps its own refusal.
+ */
+export function withStandIn(
+    resolved: ResolvedModel,
+    standIn: Pick<ResolvedModel, "model" | "option" | "credential">
+): ResolvedModel {
+    let used = false;
+    const model = wrapLanguageModel({
+        model: resolved.model as LanguageModelV4,
+        middleware: standInMiddleware(
+            {
+                model: () => standIn.model as LanguageModelV4,
+                reasoning: standIn.option.reasoning
+            },
+            () => {
+                used = true;
+            }
+        )
+    });
+    return {
+        ...resolved,
+        model,
+        standIns: [
+            ...(resolved.standIns ?? []),
+            { option: standIn.option, credential: standIn.credential, used: () => used }
+        ]
+    };
+}
+
+/** The model that actually answered: the outermost stand-in that was asked,
+ *  else the one chosen. */
+export function answeredBy(
+    resolved: Pick<ResolvedModel, "option" | "credential" | "standIns">
+): Pick<ResolvedModel, "option" | "credential"> {
+    const asked = [...(resolved.standIns ?? [])].reverse().find((entry) => entry.used());
+    return asked ?? resolved;
 }
 
 /**
@@ -268,7 +327,8 @@ export async function resolvePolarModel(
         model: languageModel(
             credential,
             option.model,
-            freeVariantOf(option.model, provider.models)
+            freeVariantOf(option.model, provider.models),
+            () => noteNoCredit(userId, option.provider)
         ),
         option,
         credential
@@ -283,7 +343,8 @@ export async function resolvePolarModel(
 export function languageModel(
     credential: ChatCredential,
     model: string,
-    free: string | null = null
+    free: string | null = null,
+    onNoCredit?: () => void
 ): LanguageModel {
     const apiKey = credential.secret;
     switch (credential.provider) {
@@ -310,7 +371,7 @@ export function languageModel(
             if (credential.provider !== "openrouter") return client(model);
             return wrapLanguageModel({
                 model: client(model),
-                middleware: creditMiddleware(free ? () => client(free) : null)
+                middleware: creditMiddleware(free ? () => client(free) : null, onNoCredit)
             });
         }
     }
@@ -318,7 +379,11 @@ export function languageModel(
 
 /**
  * The model Automatic answers a turn with: the first candidate whose key can
- * be read. "no_key" when none can.
+ * be read, with the provider's next free candidate as its stand-in, so an
+ * account with no credit still gets an answer; a paid first pick falls back
+ * to the next paid one only when the provider lists nothing free.
+ * A provider that refused for want of credit lately is offered only its free
+ * models. "no_key" when no candidate's key can be read.
  */
 async function resolveAutomatic(
     userId: string,
@@ -326,31 +391,45 @@ async function resolveAutomatic(
     access: PolarAccess
 ): Promise<ResolvedModel | ModelRefusal> {
     const options = await polarModelOptions(userId, access);
-    const candidates = automaticCandidates(options, signals, failingProviders(userId));
+    const candidates = automaticCandidates(
+        options,
+        signals,
+        failingProviders(userId),
+        unpaidProviders(userId)
+    );
     const route = autoRoute(signals);
     const tried = new Map<string, ChatCredential | null>();
-    for (const option of candidates) {
-        if (!tried.has(option.provider)) {
-            tried.set(
-                option.provider,
-                await polarCredentialFor(userId, option.provider, null, access)
-            );
+    const credentialOf = async (provider: string) => {
+        if (!tried.has(provider)) {
+            tried.set(provider, await polarCredentialFor(userId, provider, null, access));
         }
-        const credential = tried.get(option.provider);
-        if (!credential) continue;
-        return {
-            model: languageModel(
-                credential,
-                option.model,
-                freeVariantOf(
-                    option.model,
-                    options.find((entry) => entry.provider === option.provider)?.models ?? []
-                )
-            ),
-            option,
+        return tried.get(provider) ?? null;
+    };
+    const build = (option: PolarModelOption, credential: ChatCredential) => ({
+        model: languageModel(
             credential,
-            automatic: route
-        };
+            option.model,
+            freeVariantOf(
+                option.model,
+                options.find((entry) => entry.provider === option.provider)?.models ?? []
+            ),
+            () => noteNoCredit(userId, option.provider)
+        ),
+        option,
+        credential
+    });
+    for (const [index, option] of candidates.entries()) {
+        const credential = await credentialOf(option.provider);
+        if (!credential) continue;
+        const chosen: ResolvedModel = { ...build(option, credential), automatic: route };
+        const free = isFreeModel(option);
+        // Same provider and key: the turn's provider tools and options are
+        // that provider's, and the purse its ceiling was checked against.
+        const later = candidates
+            .slice(index + 1)
+            .filter((entry) => entry.provider === option.provider);
+        const next = later.find(isFreeModel) ?? (free ? undefined : later[0]);
+        return next ? withStandIn(chosen, build(next, credential)) : chosen;
     }
     return "no_key";
 }

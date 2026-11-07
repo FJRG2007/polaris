@@ -10,13 +10,24 @@
  * with nothing to spend is moved to the model's `:free` variant when the
  * catalogue lists one, and otherwise the turn fails saying this model needs
  * credit, rather than looking like Polaris spent it.
+ *
+ * When Polar chose the model - Automatic, or the helper that names a thread -
+ * a refusal another model can get past is asked once more of a stand-in
+ * (`standInMiddleware`): a 402 the free variant could not settle, or a 429.
+ * A shared `:free` model is rate-limited upstream for everyone at once, and a
+ * zero-credit account cannot pay for the paid model Automatic ranked first, so
+ * neither is a reason for the person to see an error. A model the person
+ * pinned has no stand-in: they asked for that one, and the panel says why it
+ * did not answer.
  */
 
 import type { LanguageModelMiddleware } from "ai";
-import { PAID_MODEL_MARK, callError } from "@/lib/polar/provider-failure";
+import { PAID_MODEL_MARK, callError, isPaidModelError } from "@/lib/polar/provider-failure";
 
 /** The model a middleware is handed, as the SDK types it. */
-type LanguageModelV4 = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["model"];
+export type LanguageModelV4 = Parameters<
+    NonNullable<LanguageModelMiddleware["wrapStream"]>
+>[0]["model"];
 
 /** The longest answer a turn reserves when the model publishes no smaller
  *  limit: room for a long answer with its reasoning, a fraction of the 65536
@@ -44,6 +55,17 @@ export function polarOutputTokens(option: {
     if (option.provider !== "openrouter") return undefined;
     const declared = option.outputTokens ?? 0;
     return declared > 0 ? Math.min(declared, POLAR_OUTPUT_DEFAULT) : POLAR_OUTPUT_DEFAULT;
+}
+
+/** Whether a model costs nothing: OpenRouter's `:free` variants, or one the
+ *  catalogue prices at zero both ways. An unknown price is not free. Pure. */
+export function isFreeModel(option: {
+    model: string;
+    costInput: number | null;
+    costOutput?: number | null;
+}): boolean {
+    if (option.model.endsWith(FREE_SUFFIX)) return true;
+    return option.costInput === 0 && (option.costOutput ?? 0) === 0;
 }
 
 /** The `:free` variant of a model, when the provider's list carries one. Pure. */
@@ -95,7 +117,8 @@ async function settle<T>(
     again: (model: LanguageModelV4, tokens: number | undefined) => PromiseLike<T>,
     model: LanguageModelV4,
     requested: number | undefined,
-    free: (() => LanguageModelV4) | null
+    free: (() => LanguageModelV4) | null,
+    onNoCredit?: () => void
 ): Promise<T> {
     try {
         return await attempt();
@@ -103,13 +126,17 @@ async function settle<T>(
         const next = creditRetry(error, requested, free !== null);
         if (!next) throw error;
         if (next.kind === "afford") return again(model, next.tokens);
+        onNoCredit?.();
         if (next.kind === "free" && free) return again(free(), requested);
         throw new PaidModelError(error);
     }
 }
 
 /** The middleware that applies the above to every call a model makes. */
-export function creditMiddleware(free: (() => LanguageModelV4) | null): LanguageModelMiddleware {
+export function creditMiddleware(
+    free: (() => LanguageModelV4) | null,
+    onNoCredit?: () => void
+): LanguageModelMiddleware {
     return {
         wrapGenerate: ({ doGenerate, params, model }) =>
             settle(
@@ -117,7 +144,8 @@ export function creditMiddleware(free: (() => LanguageModelV4) | null): Language
                 (target, tokens) => target.doGenerate({ ...params, maxOutputTokens: tokens }),
                 model,
                 params.maxOutputTokens,
-                free
+                free,
+                onNoCredit
             ),
         wrapStream: ({ doStream, params, model }) =>
             settle(
@@ -125,7 +153,62 @@ export function creditMiddleware(free: (() => LanguageModelV4) | null): Language
                 (target, tokens) => target.doStream({ ...params, maxOutputTokens: tokens }),
                 model,
                 params.maxOutputTokens,
-                free
+                free,
+                onNoCredit
             )
+    };
+}
+
+/** Whether a refusal is one a stand-in model may answer instead: no credit
+ *  for this model, or a rate limit on it. A key refused, a provider down or a
+ *  dropped connection would fail the stand-in the same way. Pure. */
+export function standInRetry(error: unknown): boolean {
+    if (isPaidModelError(error)) return true;
+    const status = callError(error)?.statusCode;
+    return status === 402 || status === 429;
+}
+
+/** The model that answers when the first one is refused, and whether it may
+ *  be sent a reasoning level (some providers refuse one on a model that does
+ *  not reason). */
+export interface StandInTarget {
+    model: () => LanguageModelV4;
+    reasoning: boolean;
+}
+
+/**
+ * The middleware that asks the stand-in once when the first call is refused
+ * the way `standInRetry` says, and keeps asking the stand-in for the rest of
+ * the turn's steps, so one model answers and is billed for all of them.
+ * `onStandIn` runs before that call, so the turn can record which model
+ * answered. A stand-in that is refused too surfaces its own refusal.
+ */
+export function standInMiddleware(
+    target: StandInTarget,
+    onStandIn: () => void
+): LanguageModelMiddleware {
+    type Params = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
+    const adjust = (params: Params): Params =>
+        target.reasoning ? params : { ...params, reasoning: undefined };
+    let standing = false;
+    async function swap<T>(
+        attempt: () => PromiseLike<T>,
+        again: (model: LanguageModelV4) => PromiseLike<T>
+    ): Promise<T> {
+        if (standing) return again(target.model());
+        try {
+            return await attempt();
+        } catch (error) {
+            if (!standInRetry(error)) throw error;
+            standing = true;
+            onStandIn();
+            return again(target.model());
+        }
+    }
+    return {
+        wrapGenerate: ({ doGenerate, params }) =>
+            swap(doGenerate, (model) => model.doGenerate(adjust(params))),
+        wrapStream: ({ doStream, params }) =>
+            swap(doStream, (model) => model.doStream(adjust(params)))
     };
 }

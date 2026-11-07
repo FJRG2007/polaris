@@ -69,6 +69,10 @@ vi.mock("@/lib/polar/threads", () => ({
         state.owned && userId === USER.id && id === THREAD ? { id, messages: state.messages } : null
 }));
 vi.mock("@/lib/polar/models", () => ({
+    // The stand-in is covered on its own (`stand-in.test.ts`): here every
+    // call is answered by the model chosen.
+    answeredBy: <T>(resolved: T) => resolved,
+    withStandIn: <T>(resolved: T) => resolved,
     reasoningFor: () => undefined,
     resolvePolarModel: async () => ({
         model: new MockLanguageModelV4({

@@ -27,6 +27,10 @@ vi.mock("@/lib/polar/usage", () => ({
     recordPolarUsage: async (entry: unknown) => void state.recorded.push(entry)
 }));
 vi.mock("@/lib/polar/models", () => ({
+    // The stand-in is covered on its own (`stand-in.test.ts`): here every
+    // call is answered by the model chosen.
+    answeredBy: <T>(resolved: T) => resolved,
+    withStandIn: <T>(resolved: T) => resolved,
     reasoningFor: () => undefined,
     resolvePolarModel: async (_user: string, choice: { provider: string; model: string }) => {
         state.asked.push(`${choice.provider}/${choice.model}`);
