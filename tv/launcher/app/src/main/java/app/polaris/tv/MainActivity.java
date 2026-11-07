@@ -222,6 +222,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private String themeGreetingName = "";
     /** The linked account's language this screen was built in; home rebuilds when the account's changes. */
     private String accountLocaleShown = "";
+    /**
+     * The active kids profile's allowed apps, null for an adult: Home was built for this, and is built again
+     * (recreate) when the profile in use or its list changes.
+     */
+    private Set<String> kidsApps;
     /** Optional time-of-day backdrop (config.xml, sky_intensity); 0 keeps it hidden. */
     private SkyView sky;
     private String vpnApp;
@@ -487,6 +492,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         Config cfg = Config.load(this);
         // Before anything reads the recents or greets: a TV from before profiles gets profile #1, unchanged.
         Profiles.migrate(this, cfg.greetingName);
+        kidsApps = Profiles.kidsApps(ProfileSession.active(this));
         homeAppKeys = RemoteKeys.parseAppKeys(cfg.appKeys);
         clockFormat = cfg.clockFormat;
         ClockFormat.apply(getWindow().getDecorView(), clockFormat);
@@ -519,8 +525,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         openOnStartOnWake = OpenOnStart.onWake(cfg.openOnStartChoice, cfg.openOnStartOnWake);
         liveTvAction = cfg.liveTvAction;
         liveTvInputId = cfg.liveTvInputId;
-        appLibraryEnabled = cfg.appLibrary;
-        tileMenuEnabled = cfg.tileMenu;
+        // A kids profile gets no App library (every installed app) and no tile menu (app info, remove from Home).
+        appLibraryEnabled = cfg.appLibrary && kidsApps == null;
+        tileMenuEnabled = cfg.tileMenu && kidsApps == null;
         inputAction = cfg.inputAction;
         inputSources = cfg.inputSources;
         inputUriScheme = cfg.inputUriScheme;
@@ -729,6 +736,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     AnimationUtils.loadAnimation(this, R.anim.tile_enter), 0.06f));
         }
         adapter = new AppAdapter(this, this, COLUMNS, cfg);
+        adapter.setKidsApps(kidsApps);
         dockApps = cfg.dockApps;
         fillDockLeavesSlots = !cfg.fillDock;
         Order savedOrder = Order.load(Order.file(this));
@@ -930,6 +938,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             showSettingsMenu();
             return true;
         });
+        // A kids profile: no Settings, Inputs, Wi-Fi, VPN, Polaris, reorder, library or top-bar apps. The profile
+        // initial by the greeting stays, and is the way out (a parent PIN in the profile picker).
+        if (kidsApps != null) findViewById(R.id.topButtons).setVisibility(View.GONE);
 
         // Keep focus on the top bar at its ends and at the top: Android's focus finder would otherwise
         // jump to a tile far below when there is nothing in that direction.
@@ -1059,6 +1070,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean openInputsIfAsked(Intent intent) {
         if (intent == null || !ACTION_VIEW_INPUTS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
+        if (kidsApps != null) return true;   // no TV inputs for a kids profile: live TV has no rating the launcher sees
         View anchor = topMenu ? findViewById(R.id.btnSettings) : btnInputs;
         if (anchor.getVisibility() != View.VISIBLE) return true;
         if (anchor.isLaidOut()) {
@@ -1254,6 +1266,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             recreate();
             return;
         }
+        // A profile turned into a kids one, or its list changed, in Manage profiles: Home is built again for it.
+        if (kidsChanged()) {
+            recreate();
+            return;
+        }
         // Just linked: greet by the name the approval handed over, before the first answer from Polaris.
         greetWith(greetingNameNow());
         refreshProfileAvatar();
@@ -1423,6 +1440,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         cards = moduleCards ? CardFeature.run(() -> Cards.discover(this, hiddenApps,
                 () -> Cards.load(Cards.storeFile(this)), leanback), none) : none;
         adapter.reload(cards.isEmpty() ? none : CardFeature.run(() -> Cards.shown(cards), none), leanback);
+        if (kidsApps != null && adapter.appTiles() == 0) {
+            Toast.makeText(this, getString(R.string.kids_home_empty,
+                    ProfilePicker.displayName(this, ProfileSession.active(this))), Toast.LENGTH_LONG).show();
+        }
         lastFocusedKey = returnKey;
         lastFocused = returnSlot;
         packageSequence = currentPackageSequence(packageSequence);
@@ -1562,7 +1583,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         for (int code : settingsKeycodes) {
             if (event.getKeyCode() != code) continue;
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                open(settingsKeyPanel ? new Intent(this, QuickSettingsActivity.class)
+                // A kids profile always gets the panel, which offers it Switch profile and nothing else.
+                open(settingsKeyPanel || kidsApps != null ? new Intent(this, QuickSettingsActivity.class)
                         : systemIntent(Settings.ACTION_SETTINGS));
             }
             return true;
@@ -2909,6 +2931,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             public void onPicked(Profiles.Profile profile) {
                 profilePicker = null;
                 ProfileSession.choose(MainActivity.this, profile.id);
+                if (kidsChanged()) {
+                    recreate();   // into or out of a kids profile, or another list: Home is built again for it
+                    return;
+                }
                 greetWith(greetingNameNow());
                 refreshProfileAvatar();
             }
@@ -2928,6 +2954,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         profilePicker.setOnDismissListener(d -> {
             if (profilePicker == d) profilePicker = null;
         });
+    }
+
+    /** The profile in use is not the kind (or the list) Home was built for. */
+    private boolean kidsChanged() {
+        Set<String> now = Profiles.kidsApps(ProfileSession.active(this));
+        return now == null ? kidsApps != null : !now.equals(kidsApps);
     }
 
     private void openProfileSettings(String what) {
@@ -3483,6 +3515,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         int boot = OpenOnStart.boot(this);
         SharedPreferences prefs = getSharedPreferences(OpenOnStart.BOOT_PREFS, MODE_PRIVATE);
         String target = bootToLiveTv ? liveTvPkg : app;
+        if (kidsApps != null && (bootToLiveTv || !Profiles.onKidsList(kidsApps, app, getPackageName()))) return false;
         if (!OpenOnStart.due(boot, prefs.getInt(OpenOnStart.BOOT_KEY, -1), target, getPackageName())) return false;
         if (!prefs.edit().putInt(OpenOnStart.BOOT_KEY, boot).commit()) return false;
         Intent i = bootToLiveTv ? liveTvIntent() : OpenOnStart.intent(getPackageManager(), app);
@@ -3495,6 +3528,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void openStartAppOnWake() {
         String app = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).getString(OpenOnStart.KEY, "");
         if (app.isEmpty() || app.equals(getPackageName())) return;
+        if (!Profiles.onKidsList(kidsApps, app, getPackageName())) return;   // a kids profile: only from its list
         Intent i = OpenOnStart.intent(getPackageManager(), app);
         if (i != null) openWhenReady(i);
     }
@@ -4071,7 +4105,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onTileLongPress(int position, View card) {
-        if (reordering || openPopup != null) return;
+        if (reordering || openPopup != null || kidsApps != null) return;
         String key = adapter.keyAt(position);
         String pkg = adapter.packageAt(position);
         // Empty dock slots and the Default-home tile carry the launcher's own package: no menu for them.
@@ -4154,6 +4188,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * the next one follows as soon as this one is answered. Nothing is shown until the owner says Show.
      */
     private void showCardPrompt() {
+        if (kidsApps != null) return;   // a kids profile cannot answer it: it changes Home for everyone
         if (!moduleCards || !tilesReady || promptsPaused || cardPrompt != null || !hasWindowFocus() || isFinishing()
                 || reordering) return;
         if (cards.isEmpty() || !CardFeature.working()) return;

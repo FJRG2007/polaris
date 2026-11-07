@@ -72,6 +72,9 @@ final class ProfilePicker {
         String activeId = ProfileSession.activeId(activity);
         // While a PIN is owed nobody may reach settings from here; picking a profile comes first.
         boolean locked = ProfileSession.locked(activity);
+        // From a kids profile neither: adding and managing profiles is for the grown-ups.
+        Profiles.Profile current = Profiles.active(roster, activeId);
+        boolean kidsNow = current != null && current.kids;
 
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -110,21 +113,31 @@ final class ProfilePicker {
         for (Profiles.Profile profile : roster) {
             boolean pinned = Profiles.hasPin(activity, profile.id);
             View tile = tile(activity, density, avatar(activity, profile, avatarPx), displayName(activity, profile),
-                    pinned);
+                    pinned && !profile.kids, profile.kids);
             tile.setOnClickListener(v -> {
                 Runnable pick = () -> {
                     if (!dialog.isShowing()) return;
                     dialog.dismiss();
                     listener.onPicked(profile);
                 };
-                // Back to the profile already in use needs no PIN; any other with one asks for it.
-                if (profile.id.equals(activeId) && !ProfileSession.locked(activity)) pick.run();
-                else PinPad.check(activity, profile, pick);
+                // Back to the profile in use needs no PIN, nor does a kids profile; leaving a kids profile needs a
+                // parent PIN (D8); any other profile with a PIN asks for it.
+                switch (Profiles.gate(current, profile, Profiles.hasPin(activity, profile.id),
+                        ProfileSession.locked(activity))) {
+                    case PARENT_PIN:
+                        PinPad.checkParent(activity, pick);
+                        break;
+                    case OWN_PIN:
+                        PinPad.check(activity, profile, pick);
+                        break;
+                    default:
+                        pick.run();
+                }
             });
             row.addView(tile);
             if (focus == null || profile.id.equals(activeId)) focus = tile;   // the last active, else the first
         }
-        if (!locked && Profiles.canAdd(roster)) {
+        if (!locked && !kidsNow && Profiles.canAdd(roster)) {
             TextView plus = new TextView(activity);
             plus.setText("+");
             plus.setTextColor(Color.WHITE);
@@ -133,14 +146,14 @@ final class ProfilePicker {
             plus.setIncludeFontPadding(false);
             plus.setBackground(circle(0xFF374151));
             plus.setLayoutParams(new LinearLayout.LayoutParams(avatarPx, avatarPx));
-            View add = tile(activity, density, plus, activity.getString(R.string.profile_add), false);
+            View add = tile(activity, density, plus, activity.getString(R.string.profile_add), false, false);
             add.setOnClickListener(v -> {
                 dialog.dismiss();
                 listener.onAdd();
             });
             row.addView(add);
         }
-        if (!locked) addManage(activity, density, avatarPx, row, dialog, listener);
+        if (!locked && !kidsNow) addManage(activity, density, avatarPx, row, dialog, listener);
 
         dialog.show();
         if (focus != null) focus.requestFocus();
@@ -156,7 +169,7 @@ final class ProfilePicker {
         gear.setPadding(inset, inset, inset, inset);
         gear.setBackground(circle(0xFF374151));
         gear.setLayoutParams(new LinearLayout.LayoutParams(avatarPx, avatarPx));
-        View manage = tile(activity, density, gear, activity.getString(R.string.profile_manage), false);
+        View manage = tile(activity, density, gear, activity.getString(R.string.profile_manage), false, false);
         manage.setOnClickListener(v -> {
             dialog.dismiss();
             listener.onManage();
@@ -164,8 +177,11 @@ final class ProfilePicker {
         row.addView(manage);
     }
 
-    /** One focusable tile: the circle over the name (and a lock under it for a PIN), lit while focused. */
-    private static View tile(Context ctx, float density, View circle, String label, boolean pinned) {
+    /**
+     * One focusable tile: the circle over the name (and under it a lock for a PIN, or a Kids badge for a kids
+     * profile), lit while focused.
+     */
+    private static View tile(Context ctx, float density, View circle, String label, boolean pinned, boolean kids) {
         LinearLayout tile = new LinearLayout(ctx);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -205,6 +221,26 @@ final class ProfilePicker {
             LinearLayout.LayoutParams lockLp = new LinearLayout.LayoutParams(size, size);
             lockLp.topMargin = (int) (6 * density);
             tile.addView(lock, lockLp);
+        }
+        if (kids) {
+            TextView badge = new TextView(ctx);
+            badge.setText(R.string.kids_badge);
+            badge.setTextColor(Color.WHITE);
+            badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            badge.setTypeface(Typeface.DEFAULT_BOLD);
+            badge.setSingleLine(true);
+            badge.setEllipsize(TextUtils.TruncateAt.END);
+            badge.setMaxWidth((int) (130 * density));
+            int padX = (int) (8 * density), padY = (int) (2 * density);
+            badge.setPadding(padX, padY, padX, padY);
+            GradientDrawable pill = new GradientDrawable();
+            pill.setCornerRadius(10 * density);
+            pill.setColor(0xFF7C3AED);
+            badge.setBackground(pill);
+            LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            badgeLp.topMargin = (int) (6 * density);
+            tile.addView(badge, badgeLp);
         }
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);

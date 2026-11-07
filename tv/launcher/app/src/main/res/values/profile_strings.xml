@@ -53,4 +53,24 @@
     <string name="profile_pin_set">Set a PIN</string>
     <string name="profile_pin_change">Change PIN</string>
     <string name="profile_pin_remove">Remove PIN</string>
+    <!-- Kids profiles. -->
+    <string name="kids_badge">Kids</string>
+    <string name="kids_parent_pin">A grown-up\'s PIN is needed</string>
+    <string name="kids_parent_pick">Whose PIN will you type?</string>
+    <string name="kids_parent_pick_set">Which profile gets the PIN?</string>
+    <string name="kids_make_kids">Make it a kids profile</string>
+    <string name="kids_make_standard">Make it a standard profile</string>
+    <string name="kids_apps_row">Apps on Home: %1$d</string>
+    <string name="kids_apps_title">Apps for %1$s</string>
+    <string name="kids_apps_save">Save</string>
+    <string name="kids_apps_saved">%2$s sees %1$d apps on Home. What each app shows inside is set in that app.</string>
+    <string name="kids_apps_none_installed">No apps are installed that could be put on Home.</string>
+    <string name="kids_kind_title">Who is this profile for?</string>
+    <string name="kids_kind_standard">Standard profile</string>
+    <string name="kids_kind_kids">Kids profile</string>
+    <string name="kids_needs_parent_pin">Leaving %1$s will need a grown-up\'s PIN. Set a PIN on a profile that isn\'t a kids profile first.</string>
+    <string name="kids_needs_adult">A kids profile needs a grown-up\'s profile with a PIN to leave it by. Add one first.</string>
+    <string name="kids_last_parent_pin">This is the only grown-up\'s PIN, and a kids profile needs it to be left. Make the kids profile a standard one first, or set a PIN on another profile.</string>
+    <string name="kids_last_parent_delete">This profile has the only grown-up\'s PIN, and a kids profile needs it to be left. Set a PIN on another profile first.</string>
+    <string name="kids_home_empty">No apps on %1$s\'s Home yet. A grown-up can add them in Manage profiles.</string>
 </resources>

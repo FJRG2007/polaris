@@ -202,7 +202,11 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Set<String> libraryPreload;
     private final boolean animations;
     private final boolean advancedEffects;
-    private final boolean showLibrary;
+    private boolean showLibrary;
+    /** A kids profile's allowed apps; null for an adult. See {@link #setKidsApps}. */
+    private Set<String> kidsApps;
+    /** App and card tiles after the last reload, leaving out the Default-home tile and empty dock slots. */
+    private int appTiles;
     /** Packages with a leanback entry at the last reload(): their tiles launch with the leanback category. */
     private Set<String> leanbackPackages = new HashSet<>();
     private final boolean showHomeSettings;
@@ -257,6 +261,15 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
      * Rebuilds the tiles. A shown module card stands in for every tile of its package (same component,
      * so focus follows it); hidden_apps wins over a card, and a card's package in dock_apps takes that slot.
      */
+    /**
+     * A kids profile ({@code allowed} not null): only the apps on its list get a tile, phone apps on it included,
+     * and there is no App library row or Default-home tile. Set before the first {@link #reload}.
+     */
+    void setKidsApps(Set<String> allowed) {
+        kidsApps = allowed;
+        if (allowed != null) showLibrary = false;
+    }
+
     void reload(List<Cards.Card> cards, List<ResolveInfo> leanback) {
         PackageManager pm = ctx.getPackageManager();
         // The LEANBACK query is shared with the module-card check (MainActivity); copy it before adding
@@ -269,6 +282,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         Set<String> added = new HashSet<>(LibraryApps.load(ctx));
         added.addAll(libraryPreload);
         Set<String> removed = LibraryApps.loadRemoved(ctx);
+        // A kids list may hold phone apps the owner never added to the library: look them up as well.
+        if (kidsApps != null) added.addAll(kidsApps);
         if (!added.isEmpty()) {
             Set<String> seen = new HashSet<>(tvPackages);
             for (ResolveInfo ri : pm.queryIntentActivities(
@@ -286,8 +301,9 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         for (ResolveInfo ri : found) {
             if (ri.activityInfo == null) continue;
             String pkg = ri.activityInfo.packageName;
-            if (pkg.equals(ctx.getPackageName()) || !ri.activityInfo.exported
-                    || !LibraryApps.visible(tvPackages.contains(pkg), hidden.contains(pkg), added.contains(pkg), removed.contains(pkg))) continue;
+            if (pkg.equals(ctx.getPackageName()) || !ri.activityInfo.exported) continue;
+            if (kidsApps != null ? !Profiles.onKidsList(kidsApps, pkg, ctx.getPackageName())
+                    : !LibraryApps.visible(tvPackages.contains(pkg), hidden.contains(pkg), added.contains(pkg), removed.contains(pkg))) continue;
             ComponentName component = new ComponentName(pkg, ri.activityInfo.name);
             Cards.Card card = cardByPkg.get(pkg);
             if (card != null && !card.component.equals(component)) continue;   // the card stands in for this tile
@@ -326,8 +342,9 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             if (ca != cb) return ca ? -1 : 1;
             return a.label.compareToIgnoreCase(b.label);
         });
+        appTiles = fresh.size();
         // Retain the optional Default-home tile until dependent tile-ordering work is merged.
-        if (showHomeSettings
+        if (showHomeSettings && kidsApps == null
                 && pm.resolveActivity(new Intent(Settings.ACTION_HOME_SETTINGS), 0) != null) {
             fresh.add(new Entry(Entry.HOME_SETTINGS, ctx.getString(R.string.home_settings),
                     new ComponentName(ctx, HomeSettingsActivity.class), null,
@@ -568,6 +585,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     int appCount() { return items.size(); }
+
+    int appTiles() { return appTiles; }
 
     boolean isLibraryAt(int position) { return showLibrary && position == items.size(); }
 

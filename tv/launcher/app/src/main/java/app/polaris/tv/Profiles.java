@@ -8,16 +8,18 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
  * The people who watch this TV ("Who's watching?"). The TV holds the only copy: prefs {@code profiles} keep the
- * roster as JSON ({@code [{id, name, avatar, position, named, language?}]}), the active profile and which profile
+ * roster as JSON ({@code [{id, name, avatar, position, named, language?, kind?, apps?}]}), the active profile and which profile
  * the TV's Polaris link belongs to. The list logic is pure so it is tested off the TV; reading and writing the
  * prefs is the Context half below.
  */
@@ -40,6 +42,10 @@ final class Profiles {
     /** A profile's PIN record lives beside the roster, so a wrong try never rewrites the roster. */
     private static final String PIN_PREFIX = "pin_";
     private static final String PIN_ITERATIONS = "pin_iters";
+    /** The stored {@code kind} of a kids profile; a roster item without it (every roster before kids) is adult. */
+    static final String KIND_KIDS = "kids";
+    /** The most apps a kids profile's list keeps; more than a TV has installed. */
+    static final int KIDS_APPS_MAX = 300;
 
     private Profiles() {
     }
@@ -53,21 +59,42 @@ final class Profiles {
         final boolean named;
         /** A language tag chosen for this profile, "" for none (applied by a later slice). */
         final String language;
+        /** A kids profile: Home shows only {@link #apps}, settings stay out of reach, leaving needs a parent PIN. */
+        final boolean kids;
+        /** A kids profile's allowed apps (package names, sorted, no duplicates); empty for an adult. */
+        final List<String> apps;
 
         Profile(String id, String name, String avatar, boolean named, String language) {
+            this(id, name, avatar, named, language, false, null);
+        }
+
+        Profile(String id, String name, String avatar, boolean named, String language, boolean kids,
+                List<String> apps) {
             this.id = id;
             this.name = name == null ? "" : name;
             this.avatar = validAvatar(avatar) ? avatar : AVATARS[0];
             this.named = named;
             this.language = language == null ? "" : language;
+            this.kids = kids;
+            this.apps = kids ? cleanApps(apps) : Collections.<String>emptyList();
         }
 
         Profile renamed(String newName) {
-            return new Profile(id, cleanName(newName), avatar, true, language);
+            return new Profile(id, cleanName(newName), avatar, true, language, kids, apps);
         }
 
         Profile withAvatar(String key) {
-            return new Profile(id, name, key, named, language);
+            return new Profile(id, name, key, named, language, kids, apps);
+        }
+
+        /** The same profile as a kids one (keeping its list) or, {@code on} false, as an adult (the list goes). */
+        Profile asKids(boolean on) {
+            return new Profile(id, name, avatar, named, language, on, on ? apps : null);
+        }
+
+        Profile withApps(Collection<String> packages) {
+            return new Profile(id, name, avatar, named, language, kids,
+                    packages == null ? null : new ArrayList<>(packages));
         }
     }
 
@@ -89,8 +116,12 @@ final class Profiles {
             for (JSONObject item : items) {
                 String id = item.optString("id", "");
                 if (id.isEmpty() || !seen.add(id) || out.size() >= MAX) continue;
+                boolean kids = KIND_KIDS.equals(item.optString("kind", ""));
+                List<String> apps = new ArrayList<>();
+                JSONArray stored = item.optJSONArray("apps");
+                if (stored != null) for (int j = 0; j < stored.length(); j++) apps.add(stored.optString(j, ""));
                 out.add(new Profile(id, cleanName(item.optString("name", "")), item.optString("avatar", ""),
-                        item.optBoolean("named", false), item.optString("language", "")));
+                        item.optBoolean("named", false), item.optString("language", ""), kids, apps));
             }
         } catch (JSONException malformed) {
             out.clear();
@@ -106,6 +137,8 @@ final class Profiles {
                 JSONObject item = new JSONObject().put("id", p.id).put("name", p.name).put("avatar", p.avatar)
                         .put("position", i).put("named", p.named);
                 if (!p.language.isEmpty()) item.put("language", p.language);
+                // Adults are written as before, so what an older launcher reads back is unchanged for them.
+                if (p.kids) item.put("kind", KIND_KIDS).put("apps", new JSONArray(p.apps));
                 array.put(item);
             }
         } catch (JSONException cannotHappen) {
@@ -119,6 +152,76 @@ final class Profiles {
         String name = LinkedAccount.firstName(typed, null);
         int end = name.offsetByCodePoints(0, Math.min(NAME_MAX, name.codePointCount(0, name.length())));
         return name.substring(0, end).trim();
+    }
+
+    /** A package name as Android allows one: letters, digits, underscores and dots, at most 255 characters. */
+    static boolean validPackage(String pkg) {
+        return pkg != null && !pkg.isEmpty() && pkg.length() <= 255 && pkg.matches("[A-Za-z0-9_.]+");
+    }
+
+    /** A kids list as kept: valid package names only, sorted, no duplicates, at most {@link #KIDS_APPS_MAX}. */
+    static List<String> cleanApps(List<String> packages) {
+        TreeSet<String> kept = new TreeSet<>();
+        if (packages != null) for (String pkg : packages) if (validPackage(pkg)) kept.add(pkg);
+        List<String> out = new ArrayList<>(kept);
+        if (out.size() > KIDS_APPS_MAX) out = new ArrayList<>(out.subList(0, KIDS_APPS_MAX));
+        return Collections.unmodifiableList(out);
+    }
+
+    // ---- Kids profiles ----
+
+    /**
+     * The profiles whose PIN lets somebody leave a kids profile (D8): every adult that has a PIN. {@code pinned}
+     * holds the ids of the profiles with one.
+     */
+    static List<Profile> parents(List<Profile> roster, Set<String> pinned) {
+        List<Profile> out = new ArrayList<>();
+        for (Profile p : roster) if (!p.kids && pinned.contains(p.id)) out.add(p);
+        return out;
+    }
+
+    static boolean anyKids(List<Profile> roster) {
+        for (Profile p : roster) if (p.kids) return true;
+        return false;
+    }
+
+    /**
+     * Whether a roster and its PINs keep every kids profile closed: no kids profile, or at least one adult with a
+     * PIN. Every change to the roster or to a PIN is checked against this before it is kept, since a kids profile
+     * that nobody needs a PIN to leave is no kids profile at all.
+     */
+    static boolean kidsSafe(List<Profile> roster, Set<String> pinned) {
+        return !anyKids(roster) || !parents(roster, pinned).isEmpty();
+    }
+
+    /** What picking a profile in "Who's watching?" asks for. */
+    enum Gate { NONE, OWN_PIN, PARENT_PIN }
+
+    /**
+     * The switching rule: a kids profile never asks for its own PIN; leaving a kids profile asks for a parent PIN
+     * (going to an adult with a PIN, that adult's PIN, which is one); any other move asks for the picked profile's
+     * PIN when it has one. Back to the profile in use ({@code from}) asks nothing unless it is {@code locked}.
+     */
+    static Gate gate(Profile from, Profile to, boolean toPinned, boolean locked) {
+        boolean stay = from != null && from.id.equals(to.id);
+        if (stay && !locked) return Gate.NONE;
+        boolean leavingKids = from != null && from.kids && !stay;
+        if (to.kids) return leavingKids ? Gate.PARENT_PIN : Gate.NONE;
+        if (toPinned) return Gate.OWN_PIN;
+        return leavingKids ? Gate.PARENT_PIN : Gate.NONE;
+    }
+
+    /**
+     * Whether an app may show on Home: {@code allowed} null (an adult) leaves it to the usual rules; for a kids
+     * profile only an app on its list, and never the launcher itself.
+     */
+    static boolean onKidsList(Set<String> allowed, String pkg, String ownPkg) {
+        return allowed == null || (pkg != null && !pkg.equals(ownPkg) && allowed.contains(pkg));
+    }
+
+    /** The allowed set Home filters with: null for an adult (or no profile), the list for a kids profile. */
+    static Set<String> kidsApps(Profile profile) {
+        return profile != null && profile.kids ? new HashSet<>(profile.apps) : null;
     }
 
     static boolean validAvatar(String key) {
@@ -259,6 +362,13 @@ final class Profiles {
 
     static boolean hasPin(Context ctx, String profileId) {
         return pin(ctx, profileId) != null;
+    }
+
+    /** The ids of the profiles that have a PIN. */
+    static Set<String> pinnedIds(Context ctx, List<Profile> roster) {
+        Set<String> out = new HashSet<>();
+        for (Profile p : roster) if (hasPin(ctx, p.id)) out.add(p.id);
+        return out;
     }
 
     /** Keeps or, with {@code record} null, removes the profile's PIN. */

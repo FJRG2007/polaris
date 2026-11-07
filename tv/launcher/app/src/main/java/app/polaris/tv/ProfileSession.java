@@ -71,8 +71,36 @@ final class ProfileSession {
      * screen-on broadcast that locks it can arrive after this onResume.
      */
     static void guardResumed(Activity activity) {
+        guardResumed(activity, false);
+    }
+
+    /**
+     * {@code kidsMayStay}: Quick settings, which a kids profile sees with Switch profile as its only row. Every
+     * other guarded screen sends a kids profile home as well.
+     */
+    static void guardResumed(Activity activity, boolean kidsMayStay) {
         if (sendHomeIfLocked(activity)) return;
+        if (!kidsMayStay && sendHomeIfKids(activity)) return;
         if (!guarded.contains(activity)) guarded.add(activity);
+    }
+
+    /** The profile in use is a kids profile. */
+    static boolean kidsActive(Context ctx) {
+        Profiles.Profile profile = active(ctx);
+        return profile != null && profile.kids;
+    }
+
+    /**
+     * A kids profile may not be on Launcher settings, Manage profiles, Polaris, themes and add-ons, or Default home:
+     * back to Home. True when it was sent there. T-K2 adds the foreground guard for screens outside the launcher
+     * (Android Settings, apps not on the list) in HomeKeyService; this one covers only the launcher's own.
+     */
+    static boolean sendHomeIfKids(Activity activity) {
+        if (!kidsActive(activity)) return false;
+        activity.startActivity(new Intent(activity, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
+        activity.finish();
+        return true;
     }
 
     static void guardPaused(Activity activity) {
@@ -100,8 +128,9 @@ final class ProfileSession {
      */
     static boolean locked(Context ctx) {
         if (!coldStartPending && !afterLongOff) return false;
-        String id = activeId(ctx);
-        return id != null && Profiles.hasPin(ctx, id);
+        Profiles.Profile profile = active(ctx);
+        // A kids profile never asks for its own PIN, so it is never locked.
+        return profile != null && !profile.kids && Profiles.hasPin(ctx, profile.id);
     }
 
     /**
