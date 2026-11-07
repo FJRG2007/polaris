@@ -350,6 +350,7 @@
                 "tools": "Tools",
                 "tasks": "Tasks",
                 "inbox": "Inbox",
+                "family": "Family",
                 "administration": "Administration"
             }
         },
@@ -1824,6 +1825,29 @@
                 "badName": "Give the TV a name of up to 60 characters.",
                 "busy": "This TV changed at the same moment. Try again."
             }
+        }
+    },
+    "family": {
+        "stages": {
+            "baby": "Baby",
+            "child": "Child",
+            "preteen": "Older child",
+            "teen": "Young teen",
+            "olderTeen": "Older teen"
+        },
+        "stageAges": {
+            "baby": "0 to 3",
+            "child": "4 to 8",
+            "preteen": "9 to 12",
+            "teen": "13 to 15",
+            "olderTeen": "16 to 17"
+        },
+        "levels": {
+            "off": "Not yet",
+            "guardian": "Guardian decides",
+            "contacts": "Approved people",
+            "on": "On",
+            "floor": "Never"
         }
     }
 }
