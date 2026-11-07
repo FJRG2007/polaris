@@ -578,10 +578,10 @@ export async function POST(request: Request): Promise<Response> {
             await save(finished);
             if (spent) {
                 // Whether the stable prefix is being served from the cache.
-                console.info(
-                    `polar: turn input ${spent.inputTokens} tokens, ${spent.cachedTokens ?? "unreported"} cached (${resolved.option.provider})`
-                );
                 const answered = answeredBy(resolved);
+                console.info(
+                    `polar: turn input ${spent.inputTokens} tokens, ${spent.cachedTokens ?? "unreported"} cached (${answered.option.provider})`
+                );
                 try {
                     await recordPolarUsage({
                         userId: user.id,

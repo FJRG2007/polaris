@@ -379,8 +379,9 @@ export function languageModel(
 
 /**
  * The model Automatic answers a turn with: the first candidate whose key can
- * be read, with the provider's next candidate as its stand-in - a free one
- * when the first is free, so a free account is never sent to a paid model.
+ * be read, with the provider's next free candidate as its stand-in, so an
+ * account with no credit still gets an answer; a paid first pick falls back
+ * to the next paid one only when the provider lists nothing free.
  * A provider that refused for want of credit lately is offered only its free
  * models. "no_key" when no candidate's key can be read.
  */
@@ -424,9 +425,10 @@ async function resolveAutomatic(
         const free = isFreeModel(option);
         // Same provider and key: the turn's provider tools and options are
         // that provider's, and the purse its ceiling was checked against.
-        const next = candidates
+        const later = candidates
             .slice(index + 1)
-            .find((entry) => entry.provider === option.provider && (!free || isFreeModel(entry)));
+            .filter((entry) => entry.provider === option.provider);
+        const next = later.find(isFreeModel) ?? (free ? undefined : later[0]);
         return next ? withStandIn(chosen, build(next, credential)) : chosen;
     }
     return "no_key";

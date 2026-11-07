@@ -117,7 +117,8 @@ async function settle<T>(
     again: (model: LanguageModelV4, tokens: number | undefined) => PromiseLike<T>,
     model: LanguageModelV4,
     requested: number | undefined,
-    free: (() => LanguageModelV4) | null
+    free: (() => LanguageModelV4) | null,
+    onNoCredit?: () => void
 ): Promise<T> {
     try {
         return await attempt();
@@ -125,6 +126,7 @@ async function settle<T>(
         const next = creditRetry(error, requested, free !== null);
         if (!next) throw error;
         if (next.kind === "afford") return again(model, next.tokens);
+        onNoCredit?.();
         if (next.kind === "free" && free) return again(free(), requested);
         throw new PaidModelError(error);
     }
@@ -135,32 +137,24 @@ export function creditMiddleware(
     free: (() => LanguageModelV4) | null,
     onNoCredit?: () => void
 ): LanguageModelMiddleware {
-    const noted =
-        <T>(attempt: () => PromiseLike<T>) =>
-        async () => {
-            try {
-                return await attempt();
-            } catch (error) {
-                if (callError(error)?.statusCode === 402) onNoCredit?.();
-                throw error;
-            }
-        };
     return {
         wrapGenerate: ({ doGenerate, params, model }) =>
             settle(
-                noted(doGenerate),
+                doGenerate,
                 (target, tokens) => target.doGenerate({ ...params, maxOutputTokens: tokens }),
                 model,
                 params.maxOutputTokens,
-                free
+                free,
+                onNoCredit
             ),
         wrapStream: ({ doStream, params, model }) =>
             settle(
-                noted(doStream),
+                doStream,
                 (target, tokens) => target.doStream({ ...params, maxOutputTokens: tokens }),
                 model,
                 params.maxOutputTokens,
-                free
+                free,
+                onNoCredit
             )
     };
 }
@@ -184,9 +178,10 @@ export interface StandInTarget {
 
 /**
  * The middleware that asks the stand-in once when the first call is refused
- * the way `standInRetry` says. `onStandIn` runs before that call, so the turn
- * can record which model answered. A stand-in that is refused too surfaces its
- * own refusal.
+ * the way `standInRetry` says, and keeps asking the stand-in for the rest of
+ * the turn's steps, so one model answers and is billed for all of them.
+ * `onStandIn` runs before that call, so the turn can record which model
+ * answered. A stand-in that is refused too surfaces its own refusal.
  */
 export function standInMiddleware(
     target: StandInTarget,
@@ -195,14 +190,17 @@ export function standInMiddleware(
     type Params = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
     const adjust = (params: Params): Params =>
         target.reasoning ? params : { ...params, reasoning: undefined };
+    let standing = false;
     async function swap<T>(
         attempt: () => PromiseLike<T>,
         again: (model: LanguageModelV4) => PromiseLike<T>
     ): Promise<T> {
+        if (standing) return again(target.model());
         try {
             return await attempt();
         } catch (error) {
             if (!standInRetry(error)) throw error;
+            standing = true;
             onStandIn();
             return again(target.model());
         }

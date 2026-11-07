@@ -35,6 +35,7 @@ vi.mock("@/lib/agents/model-catalog", () => ({
     listCatalogModels: async () => [
         // Non-reasoning and paid: the fast route ranks it ahead of the free ones.
         catalogue("openai/gpt-mini", 0.1),
+        catalogue("openai/gpt-nano", 0.2),
         catalogue("liquid/lfm-3-1.7b:free", 0, true),
         catalogue("meta/llama:free", 0, true)
     ]
@@ -150,6 +151,25 @@ describe("standInMiddleware", () => {
         );
     });
 
+    it("keeps the stand-in for the turn's later steps", async () => {
+        const target = fakeModel("meta/llama:free", async () => "answer");
+        const first = vi.fn(() => Promise.reject(upstreamBusy()));
+        const middleware = standInMiddleware(
+            { model: () => target as never, reasoning: true },
+            () => undefined
+        );
+        for (let step = 0; step < 2; step++) {
+            await middleware.wrapGenerate!({
+                doGenerate: first,
+                doStream: vi.fn(),
+                params,
+                model: {} as never
+            });
+        }
+        expect(first).toHaveBeenCalledOnce();
+        expect(target.doGenerate).toHaveBeenCalledTimes(2);
+    });
+
     it("surfaces the stand-in's own refusal rather than asking a third time", async () => {
         const target = fakeModel("meta/llama:free", () => Promise.reject(upstreamBusy()));
         const failure = await standInMiddleware(
@@ -192,6 +212,29 @@ describe("creditMiddleware", () => {
         }).catch(() => undefined);
         expect(noCredit).toHaveBeenCalledOnce();
     });
+
+    it("does not mark the account unpaid when a smaller answer is affordable", async () => {
+        const noCredit = vi.fn();
+        const afford = Object.assign(new Error("Payment Required"), {
+            statusCode: 402,
+            responseBody: JSON.stringify({
+                error: {
+                    code: 402,
+                    message: "You requested up to 32000 tokens, but can only afford 4000."
+                }
+            })
+        });
+        const doGenerate = vi.fn().mockRejectedValueOnce(afford).mockResolvedValue("answer");
+        const model = { doGenerate } as never;
+        const result = await creditMiddleware(null, noCredit).wrapGenerate!({
+            doGenerate: () => doGenerate(),
+            doStream: vi.fn(),
+            params: { ...params, maxOutputTokens: 32000 },
+            model
+        });
+        expect(result).toBe("answer");
+        expect(noCredit).not.toHaveBeenCalled();
+    });
 });
 
 describe("withStandIn and answeredBy", () => {
@@ -213,7 +256,7 @@ describe("withStandIn and answeredBy", () => {
 });
 
 describe("Automatic for a free OpenRouter account", () => {
-    it("backs the first pick with the next one", async () => {
+    it("backs a paid first pick with a free one", async () => {
         const resolved = await resolvePolarModel("fresh-1", automaticChoice("fast"), PLAIN_TURN);
         if (typeof resolved === "string") throw new Error(resolved);
         expect(resolved.option.model).toBe("openai/gpt-mini");
