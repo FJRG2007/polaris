@@ -322,7 +322,7 @@ function ToolCall({
                 </p>
                 {result ? (
                     result.body ? (
-                        <div className="max-h-72 max-w-full overflow-auto rounded-md bg-muted">
+                        <div className="max-h-72 max-w-full overflow-auto overscroll-contain rounded-md bg-muted">
                             <CodeSurface code={result.body} language={null} readOnly />
                         </div>
                     ) : (
