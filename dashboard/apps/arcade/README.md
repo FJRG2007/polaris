@@ -15,10 +15,12 @@ load.
 
 ## Embed contract
 
-A game runs in an `<iframe>` sandboxed with `allow-scripts` only, so its page
-has an opaque origin and the browser can run it out of the dashboard's process:
-a same-origin frame shares the dashboard's main thread, and building the city
-froze the whole tab. The game and the page that frames it talk over
+A game runs in an `<iframe>`. In a call it is sandboxed with `allow-scripts`
+only, so its page has an opaque origin and the browser can run it out of the
+dashboard's process: a same-origin frame shares the dashboard's main thread, and
+building the city froze the call and the whole tab. On the game's own page the
+frame stays same-origin, since an opaque origin has no storage and the game
+keeps its saved place, quality and sound there. The game and the page that frames it talk over
 `window.postMessage`. The game posts to `location.origin` (its URL's origin, the
 dashboard's) and accepts only messages from `parent` at that origin; the host
 posts with `"*"` to the frame's own window and accepts only messages whose
