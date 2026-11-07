@@ -382,8 +382,19 @@ function stepArm(current, allowed, dt, rate = PERSON_CAMERA.armReturnRate) {
   return current + (allowed - current) * (1 - Math.exp(-rate * (dt > 0 ? dt : 0)));
 }
 
+// The keyboard, by action. Ctrl descends as well as Q and C: it is where flight games put "down".
+const KEY_BINDINGS = Object.freeze({
+  forward: ['KeyW', 'ArrowUp'],
+  backward: ['KeyS', 'ArrowDown'],
+  left: ['KeyA', 'ArrowLeft'],
+  right: ['KeyD', 'ArrowRight'],
+  up: ['Space', 'KeyE'],
+  down: ['KeyQ', 'KeyC', 'ControlLeft', 'ControlRight'],
+  turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's only; Shift+V still steps the camera back
+});
+
 export {
-  BODY_MOTION, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
+  BODY_MOTION, KEY_BINDINGS, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, LOOK_SENSITIVITY, PERSON_CAMERA, PERSON_MOVE, TURN_SIGNAL,
   approachVelocity, arrivalFor, bodyIsFinite, brakeLamp, cameraRelativeMove, clampSensitivity, clearLength,
   createJumpState, createTurnSignal, heliTopSpeed, hudReadout, lookCurve, lookDirection, personCameraPose,
   rayEntersCollider, settleBody, springArm, stepArm, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnLook,

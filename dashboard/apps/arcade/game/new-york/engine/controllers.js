@@ -26,7 +26,7 @@ import {
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
-  HELI_CRUISE_SPEED, PERSON_MOVE, approachVelocity, arrivalFor, cameraRelativeMove, createJumpState, createTurnSignal,
+  HELI_CRUISE_SPEED, KEY_BINDINGS, PERSON_MOVE, approachVelocity, arrivalFor, cameraRelativeMove, createJumpState, createTurnSignal,
   heliTopSpeed, settleBody, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
@@ -256,15 +256,7 @@ class ThirdPersonControllerManager {
   }
 
   bindKeyboard() {
-    const bindings = {
-      forward: ['KeyW', 'ArrowUp'],
-      backward: ['KeyS', 'ArrowDown'],
-      left: ['KeyA', 'ArrowLeft'],
-      right: ['KeyD', 'ArrowRight'],
-      up: ['Space', 'KeyE'],
-      down: ['KeyQ', 'KeyC'],
-      turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's only; Shift+V still steps the camera back
-    };
+    const bindings = KEY_BINDINGS;
     const actionsByCode = new Map(Object.entries(bindings).flatMap(([action, codes]) => codes.map((code) => [code, action])));
     this._pressedCodes = new Set();
     this._keyboardKeys = {};
@@ -274,6 +266,9 @@ class ThirdPersonControllerManager {
     const onKey = (e, isDown) => {
       const action = actionsByCode.get(e.code);
       if (!action || (isDown && isTypingInField(e))) return;
+      // Ctrl descends, so Ctrl with a flying key must not save, bookmark or select the page instead. The browser keeps
+      // Ctrl+W, Ctrl+T and Ctrl+N for itself whatever a page does; outside full screen those still reach it.
+      if (isDown && e.ctrlKey && !e.altKey && !e.metaKey) e.preventDefault();
       if (isDown) this._pressedCodes.add(e.code);
       else this._pressedCodes.delete(e.code);
       // Releasing one binding must not cancel another key held for the same action.
