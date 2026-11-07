@@ -122,7 +122,11 @@ export function VpnPanel(): React.JSX.Element {
         setNote(null);
         void askBackground({ kind: "vpnDisconnect" }).then((reply) => {
             if (reply.ok && "vpn" in reply) shareVpnState(reply.vpn);
-            else setError({ text: reply.ok ? t("errors.serverSilent") : reply.error, retry: disconnect });
+            else
+                setError({
+                    text: reply.ok ? t("errors.serverSilent") : reply.error,
+                    retry: disconnect
+                });
         });
     };
 
@@ -168,7 +172,7 @@ export function VpnPanel(): React.JSX.Element {
     const detail =
         status === "off"
             ? t("vpn.offHint")
-            : place ?? (where ? label(where) : state.active?.nodeName ?? "");
+            : (place ?? (where ? label(where) : (state.active?.nodeName ?? "")));
     const server = status !== "off" && place && where ? label(where) : null;
 
     return (
@@ -211,7 +215,11 @@ export function VpnPanel(): React.JSX.Element {
                         <button
                             className="vpn-main"
                             disabled={busy || !quick}
-                            title={quick ? t("vpn.connectTo", { name: label(quick) }) : t("vpn.noneUsable")}
+                            title={
+                                quick
+                                    ? t("vpn.connectTo", { name: label(quick) })
+                                    : t("vpn.noneUsable")
+                            }
                             onClick={() => quick && connect(quick, otherThan)}
                         >
                             {busy ? <span className="vpn-spinner" aria-hidden="true" /> : null}
@@ -294,21 +302,30 @@ export function VpnPanel(): React.JSX.Element {
                     ) : null}
                     <h2>{t("vpn.allPlaces")}</h2>
                     {shown.length === 0 ? (
-                        <p className="vpn-empty muted small">{t("vpn.noMatch", { query: query.trim() })}</p>
+                        <p className="vpn-empty muted small">
+                            {t("vpn.noMatch", { query: query.trim() })}
+                        </p>
                     ) : (
                         <ul>
                             {shown.map((country) => {
                                 const key = country.code ?? "-";
                                 const expanded = searching || open.has(key);
-                                const pick = places.randomPick(country.nodes, state.active?.nodeId ?? null);
-                                const here = country.nodes.some((node) => node.id === state.active?.nodeId);
+                                const pick = places.randomPick(
+                                    country.nodes,
+                                    state.active?.nodeId ?? null
+                                );
+                                const here = country.nodes.some(
+                                    (node) => node.id === state.active?.nodeId
+                                );
                                 const count = t("vpn.servers", { count: country.nodes.length });
                                 return (
                                     <li key={key} className="vpn-country-row">
                                         <div className="vpn-country">
                                             <button
                                                 className="vpn-pick"
-                                                aria-disabled={busy || country.usable === 0 || undefined}
+                                                aria-disabled={
+                                                    busy || country.usable === 0 || undefined
+                                                }
                                                 title={
                                                     pick
                                                         ? t("vpn.connectTo", { name: country.name })
@@ -317,9 +334,13 @@ export function VpnPanel(): React.JSX.Element {
                                                           : t("vpn.noneUsable")
                                                 }
                                                 onClick={() =>
-                                                    !busy && pick && connect(pick, (failed) =>
+                                                    !busy &&
+                                                    pick &&
+                                                    connect(pick, (failed) =>
                                                         places.randomPick(
-                                                            country.nodes.filter((node) => node.id !== failed.id),
+                                                            country.nodes.filter(
+                                                                (node) => node.id !== failed.id
+                                                            ),
                                                             state.active?.nodeId ?? null
                                                         )
                                                     )
@@ -339,17 +360,29 @@ export function VpnPanel(): React.JSX.Element {
                                                               })}
                                                     </span>
                                                 </span>
-                                                {here ? <span className="badge">{t("vpn.inUse")}</span> : null}
+                                                {here ? (
+                                                    <span className="badge">{t("vpn.inUse")}</span>
+                                                ) : null}
                                             </button>
                                             <button
                                                 className="icon vpn-expand"
                                                 aria-expanded={expanded}
-                                                aria-label={t("vpn.showServers", { country: country.name })}
-                                                title={t("vpn.showServers", { country: country.name })}
+                                                aria-label={t("vpn.showServers", {
+                                                    country: country.name
+                                                })}
+                                                title={t("vpn.showServers", {
+                                                    country: country.name
+                                                })}
                                                 onClick={() => toggle(key)}
                                             >
                                                 <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path d={expanded ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} />
+                                                    <path
+                                                        d={
+                                                            expanded
+                                                                ? "m6 15 6-6 6 6"
+                                                                : "m6 9 6 6 6-6"
+                                                        }
+                                                    />
                                                 </svg>
                                             </button>
                                         </div>
@@ -478,7 +511,13 @@ function ServerRow({
 }
 
 /** The screen's shape while the list is asked for, or why it could not be. */
-function PanelSkeleton({ failed, onRetry }: { failed: boolean; onRetry: () => void }): React.JSX.Element {
+function PanelSkeleton({
+    failed,
+    onRetry
+}: {
+    failed: boolean;
+    onRetry: () => void;
+}): React.JSX.Element {
     const t = useWords();
     if (failed)
         return (

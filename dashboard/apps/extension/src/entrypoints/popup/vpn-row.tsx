@@ -68,7 +68,15 @@ export function Flag({ code, large }: { code: string | null; large?: boolean }):
                 </svg>
             </span>
         );
-    return <img className={size} src={path} alt="" aria-hidden="true" onError={() => setBroken(true)} />;
+    return (
+        <img
+            className={size}
+            src={path}
+            alt=""
+            aria-hidden="true"
+            onError={() => setBroken(true)}
+        />
+    );
 }
 
 export function VpnRow({ onOpen }: { onOpen: () => void }): React.JSX.Element | null {
@@ -77,7 +85,7 @@ export function VpnRow({ onOpen }: { onOpen: () => void }): React.JSX.Element | 
     if (!state || (!state.available && !state.active)) return null;
     const node = activeNode(state);
     const where = state.active
-        ? (node ? placeOf(node, t.locale) : null) ?? state.active.nodeName
+        ? ((node ? placeOf(node, t.locale) : null) ?? state.active.nodeName)
         : null;
     const line = where ? t("vpn.connectedFrom", { place: where }) : t("vpn.off");
     return (

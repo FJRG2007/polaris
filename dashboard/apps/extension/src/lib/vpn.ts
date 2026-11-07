@@ -202,9 +202,13 @@ export function readNodes(value: unknown): VpnNode[] {
                       name: node.name,
                       exit: node.exit === "tor" ? "tor" : "direct",
                       browser: node.browser === true,
-                      browserIssue: node.browser === true ? null : browserIssueOf(node.browserIssue),
+                      browserIssue:
+                          node.browser === true ? null : browserIssueOf(node.browserIssue),
                       country: countryCode(typeof node.country === "string" ? node.country : null),
-                      city: typeof node.city === "string" && node.city.trim() ? node.city.trim().slice(0, 120) : null
+                      city:
+                          typeof node.city === "string" && node.city.trim()
+                              ? node.city.trim().slice(0, 120)
+                              : null
                   }
               ]
             : []
@@ -396,7 +400,8 @@ export class BrowserVpn {
     private async guardWebRtc(connected: boolean): Promise<void> {
         const policy = this.deps.api.privacy?.network?.webRTCIPHandlingPolicy;
         if (!policy) return;
-        const hold = connected && (await this.deps.webRtcGuard.getValue().catch(() => true)) !== false;
+        const hold =
+            connected && (await this.deps.webRtcGuard.getValue().catch(() => true)) !== false;
         await (
             hold
                 ? policy.set({ value: "disable_non_proxied_udp", scope: "regular" })

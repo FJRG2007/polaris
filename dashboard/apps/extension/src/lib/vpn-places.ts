@@ -49,11 +49,7 @@ export function placeOf(node: VpnNode, locale: string): string | null {
 
 /** Ignores case and accents, so "espana" finds España and "sao" finds São Paulo. */
 export function fold(text: string): string {
-    return text
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .trim();
+    return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 function byText(a: string, b: string, locale: string): number {
@@ -144,7 +140,9 @@ export function pushRecent(recents: readonly string[], id: string): string[] {
 export function readRecents(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
     return value
-        .filter((one): one is string => typeof one === "string" && one.length > 0 && one.length < 100)
+        .filter(
+            (one): one is string => typeof one === "string" && one.length > 0 && one.length < 100
+        )
         .slice(0, RECENT_LIMIT);
 }
 
@@ -168,7 +166,9 @@ export function elapsedMinutes(since: number | null, now: number): number | null
 /** A minute count or more, as "12 min", "2 h 5 min" or "3 days" in `locale`. */
 export function formatElapsed(minutes: number, locale: string): string {
     const unit = (value: number, name: "minute" | "hour" | "day"): string =>
-        new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "short" }).format(value);
+        new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "short" }).format(
+            value
+        );
     if (minutes < 60) return unit(Math.max(1, minutes), "minute");
     if (minutes < 24 * 60) {
         const rest = minutes % 60;

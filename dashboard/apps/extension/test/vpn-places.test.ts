@@ -75,7 +75,9 @@ describe("searchCountries", () => {
         const found = places.searchCountries(countries, "madr");
         expect(found[0]!.nodes.map((one) => one.id)).toEqual(["b"]);
         expect(places.searchCountries(countries, "sao").map((one) => one.code)).toEqual(["BR"]);
-        expect(places.searchCountries(countries, "server d").map((one) => one.code)).toEqual([null]);
+        expect(places.searchCountries(countries, "server d").map((one) => one.code)).toEqual([
+            null
+        ]);
     });
 
     it("finds by code, and nothing for nonsense; everything for no query", () => {
@@ -141,13 +143,23 @@ describe("time connected", () => {
 
     it("reads as minutes, hours and days in the popup's language", () => {
         const minute = (n: number, locale: string) =>
-            new Intl.NumberFormat(locale, { style: "unit", unit: "minute", unitDisplay: "short" }).format(n);
+            new Intl.NumberFormat(locale, {
+                style: "unit",
+                unit: "minute",
+                unitDisplay: "short"
+            }).format(n);
         const hour = (n: number, locale: string) =>
-            new Intl.NumberFormat(locale, { style: "unit", unit: "hour", unitDisplay: "short" }).format(n);
+            new Intl.NumberFormat(locale, {
+                style: "unit",
+                unit: "hour",
+                unitDisplay: "short"
+            }).format(n);
         expect(places.formatElapsed(12, "en-US")).toBe(minute(12, "en-US"));
         expect(places.formatElapsed(12, "en-US")).toMatch(/12/);
         expect(places.formatElapsed(120, "es-ES")).toBe(hour(2, "es-ES"));
-        expect(places.formatElapsed(125, "es-ES")).toBe(`${hour(2, "es-ES")} ${minute(5, "es-ES")}`);
+        expect(places.formatElapsed(125, "es-ES")).toBe(
+            `${hour(2, "es-ES")} ${minute(5, "es-ES")}`
+        );
         expect(places.formatElapsed(3 * 24 * 60 + 7, "en-US")).toBe("3 days");
         for (const minutes of [1, 59, 60, 61, 1439, 1440, 100_000])
             expect(places.formatElapsed(minutes, "en-US")).not.toMatch(/NaN|^0/);

@@ -407,7 +407,11 @@ describe("state", () => {
             }) as unknown as typeof fetch
         });
         route.box.value = { origin: ORIGIN, nodeId: "n", nodeName: "Madrid", host: "h", port: 443 };
-        expect((await vpn.state()).active).toEqual({ nodeId: "n", nodeName: "Madrid", since: null });
+        expect((await vpn.state()).active).toEqual({
+            nodeId: "n",
+            nodeName: "Madrid",
+            since: null
+        });
     });
 
     it("says when it connected, and nothing for a route saved before that was kept", async () => {
@@ -432,7 +436,10 @@ describe("the WebRTC setting", () => {
         const { vpn, webRtc } = harness();
         expect((await vpn.state()).webRtcGuard).toBe(true);
         await vpn.connect(NODE);
-        expect(webRtc.set).toHaveBeenCalledWith({ value: "disable_non_proxied_udp", scope: "regular" });
+        expect(webRtc.set).toHaveBeenCalledWith({
+            value: "disable_non_proxied_udp",
+            scope: "regular"
+        });
     });
 
     it("leaves WebRTC alone on connecting when it is off", async () => {
@@ -453,7 +460,10 @@ describe("the WebRTC setting", () => {
         expect(guard.box.value).toBe(false);
         expect(webRtc.clear).toHaveBeenCalledWith({ scope: "regular" });
         await vpn.setWebRtcGuard(true);
-        expect(webRtc.set).toHaveBeenCalledWith({ value: "disable_non_proxied_udp", scope: "regular" });
+        expect(webRtc.set).toHaveBeenCalledWith({
+            value: "disable_non_proxied_udp",
+            scope: "regular"
+        });
         expect(settings.set.mock.calls.length).toBe(proxied);
     });
 
