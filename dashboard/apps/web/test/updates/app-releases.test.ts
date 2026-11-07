@@ -521,6 +521,36 @@ describe("a release every member is offered", () => {
         }
     });
 
+    it("keeps the pages it read when GitHub refuses a later one", async () => {
+        const full = [
+            desktop,
+            ...Array.from({ length: 99 }, (_, index) =>
+                release({ tag_name: `dashboard-v0.${index}.0` })
+            )
+        ];
+        const fetching = vi
+            .fn()
+            .mockResolvedValueOnce(listed(full, '"a"'))
+            .mockResolvedValue(refused);
+        vi.stubGlobal("fetch", fetching);
+        try {
+            const repo = "example/partial-walk";
+            const found = await appLookup(repo, DESKTOP_TAG_PREFIX);
+            expect(found.reached).toBe(true);
+            expect(pickFile(found.download?.files ?? [], [".exe"])?.name).toBe(
+                "Polaris-Setup.exe"
+            );
+            // Not on the page that was read, and the rest was never answered.
+            expect(await appLookup(repo, TV_TAG_PREFIX)).toEqual({
+                download: null,
+                reached: false
+            });
+            expect(fetching).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     it("says GitHub was not reached, rather than that nothing is released, with no list yet", async () => {
         vi.stubGlobal(
             "fetch",

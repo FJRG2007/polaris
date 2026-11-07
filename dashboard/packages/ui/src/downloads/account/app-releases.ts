@@ -196,6 +196,9 @@ interface Held {
     readonly at: number;
     /** The first page's `etag` when this list was read, if it had one. */
     readonly etag: string | null;
+    /** False when the walk was cut short, so a prefix missing from `releases` may
+     *  only be further down than it read. */
+    readonly complete: boolean;
 }
 
 /** One app's release as a screen needs it: the download, and whether GitHub was
@@ -209,13 +212,18 @@ export interface AppLookup {
 const cache = new Map<string, Held>();
 const pending = new Map<string, Promise<Held>>();
 
-/** What a walk came back with: the releases seen, and the first page's `etag`. A
- *  `304` on that page is `unchanged`, meaning the list already held still stands,
- *  and `failed` is a walk that did not finish. */
+/** What a walk came back with: the releases seen, the first page's `etag`, and
+ *  whether it read as far as it meant to. A `304` on that page is `unchanged`,
+ *  meaning the list already held still stands, and `failed` is a walk that read
+ *  nothing. */
 type Asked =
     | { readonly unchanged: true }
     | { readonly failed: true }
-    | { readonly releases: readonly ReleaseListing[]; readonly etag: string | null };
+    | {
+          readonly releases: readonly ReleaseListing[];
+          readonly etag: string | null;
+          readonly complete: boolean;
+      };
 
 function everyPrefixSeen(releases: readonly ReleaseListing[]): boolean {
     return KNOWN_PREFIXES.every((prefix) => pickRelease(releases, prefix) !== null);
@@ -240,21 +248,36 @@ async function ask(repo: string, etag: string | null): Promise<Asked> {
             if (page === 1 && response.status === 304) return { unchanged: true };
             // A refusal - GitHub's hourly limit for an unauthenticated caller is
             // the usual one - is not an answer about what has been released.
-            if (!response.ok) return { failed: true };
+            if (!response.ok) return cutShort(seen, first);
             if (page === 1) first = response.headers?.get("etag") ?? null;
             const body = (await response.json()) as unknown;
-            if (!Array.isArray(body)) return { failed: true };
+            if (!Array.isArray(body)) return cutShort(seen, first);
             seen.push(...(body as ReleaseListing[]));
             if (everyPrefixSeen(seen)) break;
             // A page GitHub did not fill is the last page there is.
             if (body.length < PAGE_SIZE) break;
         }
-        return { releases: seen, etag: first };
+        return { releases: seen, etag: first, complete: true };
     } catch {
         // Unreachable, or too slow: the page draws without the files rather than
         // failing, and says why.
-        return { failed: true };
+        return cutShort(seen, first);
     }
+}
+
+/** A walk that stopped on a refusal keeps the pages it already read: what they
+ *  hold is still an answer, and only the rest is unknown. */
+function cutShort(seen: readonly ReleaseListing[], etag: string | null): Asked {
+    return seen.length > 0 ? { releases: seen, etag, complete: false } : { failed: true };
+}
+
+/** The newer list first, then whatever an older one held that it did not reach. */
+function merged(
+    newer: readonly ReleaseListing[],
+    older: readonly ReleaseListing[]
+): ReleaseListing[] {
+    const tags = new Set(newer.map((release) => release.tag_name));
+    return [...newer, ...older.filter((release) => !tags.has(release.tag_name))];
 }
 
 /**
@@ -274,7 +297,8 @@ export async function appLookup(repo: string, prefix: string): Promise<AppLookup
     if (!REPO.test(trimmed)) return { download: null, reached: true };
     const held = await heldList(trimmed);
     if (!held.releases) return { download: null, reached: false };
-    return { download: pickRelease(held.releases, prefix), reached: true };
+    const download = pickRelease(held.releases, prefix);
+    return { download, reached: download !== null || held.complete };
 }
 
 /** The newest release of one app, or null - not released, or not reachable. */
@@ -299,14 +323,24 @@ async function refresh(repo: string, held: Held | undefined): Promise<Held> {
     let next: Held;
     if ("unchanged" in asked && held?.releases) {
         next = { ...held, at: now };
+    } else if ("releases" in asked && asked.complete) {
+        next = { releases: asked.releases, etag: asked.etag, complete: true, at: now };
     } else if ("releases" in asked) {
-        next = { releases: asked.releases, etag: asked.etag, at: now };
+        // Cut short: keep what was read, fill the rest from the last list, and
+        // look again soon. No `etag`, so the next look reads every page again.
+        next = {
+            releases: held?.releases ? merged(asked.releases, held.releases) : asked.releases,
+            etag: null,
+            complete: held?.complete ?? false,
+            at: now - CACHE_TTL_MS + RETRY_MS
+        };
     } else {
         // Failed, or a 304 with no list held to keep: keep whatever list was last
         // read, and look again sooner than the usual two minutes.
         next = {
             releases: held?.releases ?? null,
             etag: held?.releases ? held.etag : null,
+            complete: held?.complete ?? false,
             at: now - CACHE_TTL_MS + RETRY_MS
         };
     }

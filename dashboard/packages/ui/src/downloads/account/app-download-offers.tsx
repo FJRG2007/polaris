@@ -218,15 +218,18 @@ function PlatformList({
                 role="status"
                 className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground"
             >
-                {t("downloads.unreachable")}{" "}
-                <a
-                    className="underline"
-                    href={`https://github.com/${unreachable}/releases`}
-                    target="_blank"
-                    rel="noreferrer"
-                >
-                    {t("downloads.openReleases")}
-                </a>
+                {t.rich("downloads.unreachable", {
+                    link: (chunks) => (
+                        <a
+                            className="underline"
+                            href={`https://github.com/${unreachable}/releases`}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            {chunks}
+                        </a>
+                    )
+                })}
             </p>
         );
     }
