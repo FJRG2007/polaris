@@ -438,6 +438,10 @@ flowchart LR
 
 [Qué comprobar](docs/features/troubleshooting.es.md) cuando una pantalla dice que no se puede acceder a Polaris. Nada de esto necesita una terminal.
 
+### Cuando un antivirus bloquea Polaris
+
+[Qué excluir](docs/features/antivirus.es.md), y dónde, en Microsoft Defender, Malwarebytes y los demás antivirus principales.
+
 ### Una petición a través del edge
 
 Cada router tiene una prioridad explícita, de mayor a menor. Las rutas con reglas de firewall pasan por el guard antes de llegar a la app.
