@@ -1,5 +1,5 @@
 // js/player-rules.js
-// Small rules of the player's bodies, kept free of the scene so they can be checked on their own.
+// Small rules of the player's bodies and the city's vehicles, kept free of the scene so they can be checked on their own.
 
 // The helicopter's cruise speed (m/s) and how many times faster it goes with turbo held
 const HELI_CRUISE_SPEED = 52.0;
@@ -32,4 +32,15 @@ function arrivalFor(from, nextMode) {
   return { x: from.x, z: from.z, heading, altitude: nextMode === 'helicopter' ? 0.25 : null };
 }
 
-export { HELI_CRUISE_SPEED, HELI_TURBO, arrivalFor, heliTopSpeed, stepTurbo };
+// Brake lamp level the car and bus materials read (their red scales with it): full while slowing down, dimmer when
+// only held at a standstill, so a car braking stands out from the queue it joins. Two fixed steps, so the per-instance
+// state changes only when a car starts or stops braking, not every frame.
+const BRAKE_LAMP = { slowing: 1, holding: 0.6, slowingAt: -0.8, standingBelow: 0.3 };
+
+/** The brake lamp level for a vehicle's acceleration (m/s^2) and speed (m/s). */
+function brakeLamp(acceleration, speed) {
+  if (acceleration < BRAKE_LAMP.slowingAt) return BRAKE_LAMP.slowing;
+  return Math.abs(speed) < BRAKE_LAMP.standingBelow ? BRAKE_LAMP.holding : 0;
+}
+
+export { BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, arrivalFor, brakeLamp, heliTopSpeed, stepTurbo };

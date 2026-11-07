@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { BRAKE_LAMP, brakeLamp } from './player-rules.js';
 
 // A restrained pair of low beams. Intensity is calibrated for inverse-square decay (the previous lights used 1.22).
 // Keep these ordinary, unshadowed spots so they stay in the clustered lighting path.
@@ -34,4 +35,4 @@ function placeVehicleHeadlight(spot, spec, side, matrix = null) {
   }
 }
 
-export { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight };
+export { BRAKE_LAMP, HEADLIGHTS, brakeLamp, createVehicleHeadlight, placeVehicleHeadlight };

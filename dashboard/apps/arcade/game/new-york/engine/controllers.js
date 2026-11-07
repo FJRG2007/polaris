@@ -24,7 +24,7 @@ import {
   createLoftedHelicopterMaterial
 } from './helicopter.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
-import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
+import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import { HELI_CRUISE_SPEED, arrivalFor, heliTopSpeed, stepTurbo } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
@@ -1251,8 +1251,10 @@ class ThirdPersonControllerManager {
     c.chassisPivot.position.y = c.heaveY;
 
     if (c.carState) {
-      // Lit while braking, and held at a standstill with no throttle (an automatic's foot on the brake), like traffic
-      c.carState.value.x = braking || (Math.abs(c.speed) < 0.3 && !throttle) ? 1 : 0;
+      // Full while braking, dimmer when held at a standstill with no throttle (an automatic's foot on the brake), like
+      // traffic (brakeLamp in vehicle-lights.js)
+      const holding = Math.abs(c.speed) < BRAKE_LAMP.standingBelow && !throttle;
+      c.carState.value.x = braking ? BRAKE_LAMP.slowing : holding ? BRAKE_LAMP.holding : 0;
       c.carState.value.w = c.speed < -0.2 ? 1 : 0;
     }
 

@@ -4,7 +4,7 @@ import { createPedestrianSystem } from './pedestrian-system.js';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { signalPhase, walkSignal } from './city-config.js';
 import { cityUniforms, createContactShadowMaterial, createCarFlareMaterial } from './tsl-materials.js';
-import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
+import { HEADLIGHTS, brakeLamp, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
   BODY_SPECS,
   buildCarGeometry,
@@ -1620,7 +1620,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   // v is heading for (left = +x)
   function writeLampState(v, array, o) {
     const blinkOn = v.blink !== 0 && (clock + v.blinkPhase) % 0.8 <= 0.4;
-    array[o] = v.acc < -0.8 || v.speed < 0.3 ? 1 : 0;
+    array[o] = brakeLamp(v.acc, v.speed);
     array[o + 1] = blinkOn && v.blink < 0 ? 1 : 0;
     array[o + 2] = blinkOn && v.blink > 0 ? 1 : 0;
   }
@@ -1661,7 +1661,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     const state = attrs.carState.array;
     const o4 = slot * 4;
     const blinkOn = c.blink !== 0 && (clock + c.blinkPhase) % 0.8 <= 0.4;
-    const b0 = c.acc < -0.8 || c.speed < 0.3 ? 1 : 0;
+    const b0 = brakeLamp(c.acc, c.speed);
     const b1 = blinkOn && c.blink < 0 ? 1 : 0;
     const b2 = blinkOn && c.blink > 0 ? 1 : 0;
     const b3 = c.style;
@@ -1748,7 +1748,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
         b._effDist = effDist;
         b._sinY = sinY;
         b._cosY = cosY;
-        b._braking = b.acc < -0.8 || b.speed < 0.3 ? 1 : 0;
+        b._braking = brakeLamp(b.acc, b.speed);
         litVehicles[litVehicleCount++] = b;
       }
     }

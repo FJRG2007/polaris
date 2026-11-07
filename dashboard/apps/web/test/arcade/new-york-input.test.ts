@@ -226,3 +226,12 @@ describe("arrival placement", () => {
         expect(placement.laneCandidates([avenue], 500, 0)).toEqual([]);
     });
 });
+
+describe("brake lamps", () => {
+    it("burn full while slowing down, dimmer held at a standstill, and not at all cruising", () => {
+        expect(rules.brakeLamp(-3, 8)).toBe(rules.BRAKE_LAMP.slowing);
+        expect(rules.brakeLamp(0, 0)).toBe(rules.BRAKE_LAMP.holding);
+        expect(rules.brakeLamp(0.5, 10)).toBe(0);
+        expect(rules.BRAKE_LAMP.slowing).toBeGreaterThan(rules.BRAKE_LAMP.holding);
+    });
+});
