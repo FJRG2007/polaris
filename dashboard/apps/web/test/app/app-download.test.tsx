@@ -238,3 +238,21 @@ describe("the extension's offer", () => {
         expect(html).not.toContain("href=");
     });
 });
+
+describe("when GitHub could not be asked", () => {
+    it("says so and links the release page, instead of claiming nothing is released", () => {
+        for (const html of [
+            renderToStaticMarkup(
+                withMessages(<DesktopFilesOffer download={null} unreachable="example/polaris" />)
+            ),
+            renderToStaticMarkup(
+                withMessages(<ExtensionFilesOffer download={null} unreachable="example/polaris" />)
+            )
+        ]) {
+            expect(html).toContain("GitHub did not answer just now");
+            expect(html).toContain('href="https://github.com/example/polaris/releases"');
+            expect(html).not.toContain("Not available yet");
+            expect(html).not.toContain("No version has been published yet");
+        }
+    });
+});

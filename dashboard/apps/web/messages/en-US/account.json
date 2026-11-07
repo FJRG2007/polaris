@@ -1343,9 +1343,12 @@
         },
         "web": {
             "title": "Or as an app, from your browser",
-            "name": "No download needed"
+            "name": "No download needed",
+            "lacks": "Lighter, but without what the desktop app adds: system notifications, the VPN, deploying from this computer and installing on a TV."
         },
         "desktop": {
+            "app": "Desktop app",
+            "recommended": "Recommended",
             "description": "Polaris on your computer, for Windows, macOS and Linux. Deploy from your own machine and keep an eye on your services in their own window."
         },
         "cards": {

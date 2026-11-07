@@ -233,3 +233,39 @@ export function PhonePreview() {
         </div>
     );
 }
+
+/** A TV's Home screen with Polaris TV on it: a row of apps, the first in focus. */
+export function TvPreview() {
+    return (
+        <div className="mx-auto h-full w-full max-w-sm rounded-t-lg border-[6px] border-b-0 border-neutral-800 bg-background dark:border-neutral-700">
+            <div className="flex h-full flex-col gap-3 p-3">
+                <div className="flex items-center justify-between gap-2">
+                    <Line className="w-12" />
+                    <Line className="w-8" />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                    {[0, 1, 2, 3].map((key) => (
+                        <span
+                            key={key}
+                            className={cn(
+                                "aspect-video rounded-md",
+                                key === 0
+                                    ? "bg-primary/70 ring-2 ring-primary ring-offset-2 ring-offset-background"
+                                    : "bg-foreground-subtle/15"
+                            )}
+                        />
+                    ))}
+                </div>
+                <Line className="w-16" />
+                <div className="grid grid-cols-5 gap-2">
+                    {[0, 1, 2, 3, 4].map((key) => (
+                        <span
+                            key={key}
+                            className="aspect-square rounded-md bg-foreground-subtle/10"
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}

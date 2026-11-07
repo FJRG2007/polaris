@@ -197,17 +197,39 @@ function PlatformList({
     rows,
     download,
     nothing,
-    name
+    name,
+    unreachable
 }: {
     rows: readonly PlatformRow[];
     download: AppDownload | null;
     nothing: string;
     name?: string;
+    /** The repository, when GitHub could not be asked: the list says so and links
+     *  to its releases instead of claiming there are none. */
+    unreachable?: string;
 }) {
     const t = useTranslations("components");
     const [os, setOs] = useInstallPlatform();
     const bySystem = rows.some((row) => row.os);
     const shown = bySystem ? rows.filter((row) => row.os === os) : rows;
+    if (!download && unreachable) {
+        return (
+            <p
+                role="status"
+                className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground"
+            >
+                {t("downloads.unreachable")}{" "}
+                <a
+                    className="underline"
+                    href={`https://github.com/${unreachable}/releases`}
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    {t("downloads.openReleases")}
+                </a>
+            </p>
+        );
+    }
     if (!download) {
         return (
             <p className="rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
@@ -251,19 +273,34 @@ function PlatformList({
 }
 
 /** The desktop app, one installer per platform. */
-export function DesktopFilesOffer({ download }: { download: AppDownload | null }) {
+export function DesktopFilesOffer({
+    download,
+    unreachable
+}: {
+    download: AppDownload | null;
+    /** The repository, when GitHub could not be asked. */
+    unreachable?: string;
+}) {
     const t = useTranslations("components");
     return (
         <PlatformList
             rows={DESKTOP_ROWS}
             download={download}
+            unreachable={unreachable}
             nothing={t("downloads.noDesktopVersion")}
         />
     );
 }
 
 /** The extension's package for the browser picked on its card, or one per browser. */
-export function ExtensionFilesOffer({ download }: { download: AppDownload | null }) {
+export function ExtensionFilesOffer({
+    download,
+    unreachable
+}: {
+    download: AppDownload | null;
+    /** The repository, when GitHub could not be asked. */
+    unreachable?: string;
+}) {
     const t = useTranslations("components");
     const browser = useContext(BrowserChoice);
     const build = browser === "firefox" ? "firefox" : "chromium";
@@ -272,6 +309,7 @@ export function ExtensionFilesOffer({ download }: { download: AppDownload | null
             rows={browser ? EXTENSION_ROWS.filter((row) => row.platform === build) : EXTENSION_ROWS}
             name={browser ? browserGuide(browser).label : undefined}
             download={download}
+            unreachable={unreachable}
             nothing={t("downloads.noExtensionVersion")}
         />
     );

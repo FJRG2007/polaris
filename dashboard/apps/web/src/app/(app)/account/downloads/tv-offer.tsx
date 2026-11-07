@@ -37,6 +37,7 @@ import {
 import { TvChecker } from "@polaris/ui/tv-checker";
 import { debuggingById, debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
 import { DownloadCard } from "@polaris/ui/download-card";
+import { TvPreview } from "@polaris/ui/account-downloads/download-previews";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     desktopBridge,
@@ -673,6 +674,7 @@ export function TvOffer({
             icon={<Tv className="size-4 shrink-0" />}
             title={t("downloads.tv.title")}
             description={t("downloads.tv.description")}
+            preview={<TvPreview />}
         >
             {available === false ? (
                 <p className="text-sm text-muted-foreground">{t("downloads.tv.notReleased")}</p>

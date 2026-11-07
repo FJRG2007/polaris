@@ -12,9 +12,10 @@
  * second consumer is where a shared GitHub call with its own cache stops being worth
  * writing twice.
  *
- * The answer is cached for two minutes per app INCLUDING "there is none". Without
- * that, each view of a screen mentioning them spends one of the sixty unauthenticated
- * calls an hour that the update card already spends from the same address. It used
+ * The list is cached for two minutes per repository INCLUDING "there is none", and
+ * read once for every app. Without that, each view of a screen mentioning them spends
+ * the sixty unauthenticated calls an hour that the update card already spends from
+ * the same address. It used
  * to be ten, and ten is how long somebody looking for a release that had just been
  * published was shown the one before it - by a screen that has no refresh of its own.
  *
@@ -175,27 +176,55 @@ export function pickRelease(
     };
 }
 
+/** Every prefix a screen asks about. One walk of the list answers all of them, so
+ *  it stops once each has been seen rather than once the first one has. */
+const KNOWN_PREFIXES = [
+    DESKTOP_TAG_PREFIX,
+    EXTENSION_TAG_PREFIX,
+    STREAMDECK_TAG_PREFIX,
+    COMPANION_TAG_PREFIX,
+    TV_TAG_PREFIX
+] as const;
+
+/** How soon a lookup that failed is tried again. Short, because the failure is
+ *  usually GitHub's hourly limit or a slow answer, and either passes. */
+const RETRY_MS = 30 * 1000;
+
 interface Held {
-    readonly found: AppDownload | null;
+    /** The releases the last walk that finished saw, or null when none has. */
+    readonly releases: readonly ReleaseListing[] | null;
     readonly at: number;
-    /** The first page's `etag` when this answer was worked out, if it had one. */
+    /** The first page's `etag` when this list was read, if it had one. */
     readonly etag: string | null;
 }
 
-const cache = new Map<string, Held>();
-const pending = new Map<string, Promise<AppDownload | null>>();
+/** One app's release as a screen needs it: the download, and whether GitHub was
+ *  reached at all. `reached: false` is "could not ask", which a screen says in
+ *  those words instead of claiming nothing has been released. */
+export interface AppLookup {
+    readonly download: AppDownload | null;
+    readonly reached: boolean;
+}
 
-/** What a walk came back with: the answer, and the first page's `etag`. A `304`
- *  on that page is `unchanged`, meaning the answer already held still stands. */
+const cache = new Map<string, Held>();
+const pending = new Map<string, Promise<Held>>();
+
+/** What a walk came back with: the releases seen, and the first page's `etag`. A
+ *  `304` on that page is `unchanged`, meaning the list already held still stands,
+ *  and `failed` is a walk that did not finish. */
 type Asked =
     | { readonly unchanged: true }
-    | { readonly found: AppDownload | null; readonly etag: string | null };
+    | { readonly failed: true }
+    | { readonly releases: readonly ReleaseListing[]; readonly etag: string | null };
 
-async function ask(repo: string, prefix: string, etag: string | null): Promise<Asked> {
+function everyPrefixSeen(releases: readonly ReleaseListing[]): boolean {
+    return KNOWN_PREFIXES.every((prefix) => pickRelease(releases, prefix) !== null);
+}
+
+async function ask(repo: string, etag: string | null): Promise<Asked> {
     const deadline = AbortSignal.timeout(LOOKUP_TIMEOUT_MS);
     const seen: ReleaseListing[] = [];
     let first: string | null = null;
-    const answer = (found: AppDownload | null): Asked => ({ found, etag: first });
     try {
         for (let page = 1; page <= MAX_PAGES; page++) {
             const headers: Record<string, string> = {
@@ -209,71 +238,80 @@ async function ask(repo: string, prefix: string, etag: string | null): Promise<A
                 { headers, signal: deadline }
             );
             if (page === 1 && response.status === 304) return { unchanged: true };
-            if (!response.ok) {
-                first = null;
-                break;
-            }
+            // A refusal - GitHub's hourly limit for an unauthenticated caller is
+            // the usual one - is not an answer about what has been released.
+            if (!response.ok) return { failed: true };
             if (page === 1) first = response.headers?.get("etag") ?? null;
             const body = (await response.json()) as unknown;
-            if (!Array.isArray(body)) {
-                first = null;
-                break;
-            }
-            if (body.length === 0) break;
+            if (!Array.isArray(body)) return { failed: true };
             seen.push(...(body as ReleaseListing[]));
-            const found = pickRelease(seen, prefix);
-            if (found) return answer(found);
+            if (everyPrefixSeen(seen)) break;
             // A page GitHub did not fill is the last page there is.
             if (body.length < PAGE_SIZE) break;
         }
-        return answer(null);
+        return { releases: seen, etag: first };
     } catch {
-        // A page must not fail because GitHub is unreachable. No answer reads as
-        // "not published", which understates at worst: the screen then points at
-        // whatever works without GitHub at all.
-        return { found: null, etag: null };
+        // Unreachable, or too slow: the page draws without the files rather than
+        // failing, and says why.
+        return { failed: true };
     }
 }
 
 /**
- * The newest release of one app for this deployment's repository, or null.
+ * The newest release of one app for this deployment's repository, and whether
+ * GitHub could be asked.
  *
- * A failure is cached the same as a genuine absence. Distinguishing them would buy
- * a fresher answer during a GitHub outage, for a button that is disabled either way.
+ * The list is cached per repository, so one call answers every app a page shows.
+ * Five apps used to be five calls a look, which is how a busy page spent the sixty
+ * an hour GitHub allows, and every failure was cached for two minutes as "there is
+ * none" - so whoever looked next was told the desktop app was not available yet
+ * while version after version sat on the release page. A failed look now keeps the
+ * last list that worked and tries again in thirty seconds; only with no list ever
+ * read does a screen hear `reached: false`.
  */
-export async function appDownload(repo: string, prefix: string): Promise<AppDownload | null> {
+export async function appLookup(repo: string, prefix: string): Promise<AppLookup> {
     const trimmed = repo.trim();
-    if (!REPO.test(trimmed)) return null;
+    if (!REPO.test(trimmed)) return { download: null, reached: true };
+    const held = await heldList(trimmed);
+    if (!held.releases) return { download: null, reached: false };
+    return { download: pickRelease(held.releases, prefix), reached: true };
+}
 
-    // "|" rather than a control character: the repository has already matched REPO,
-    // which admits no "|", and the prefixes are constants - so a visible separator
-    // separates exactly as well and leaves this file readable in a diff.
-    const key = `${trimmed}|${prefix}`;
-    const now = Date.now();
-    const held = cache.get(key);
-    if (held && now - held.at < CACHE_TTL_MS) return held.found;
+/** The newest release of one app, or null - not released, or not reachable. */
+export async function appDownload(repo: string, prefix: string): Promise<AppDownload | null> {
+    return (await appLookup(repo, prefix)).download;
+}
 
-    const running = pending.get(key);
+async function heldList(repo: string): Promise<Held> {
+    const held = cache.get(repo);
+    if (held && Date.now() - held.at < CACHE_TTL_MS) return held;
+
+    const running = pending.get(repo);
     if (running) return running;
-    const lookup = refresh(trimmed, prefix, key, held).finally(() => pending.delete(key));
-    pending.set(key, lookup);
+    const lookup = refresh(repo, held).finally(() => pending.delete(repo));
+    pending.set(repo, lookup);
     return lookup;
 }
 
-async function refresh(
-    repo: string,
-    prefix: string,
-    key: string,
-    held: Held | undefined
-): Promise<AppDownload | null> {
-    const asked = await ask(repo, prefix, held?.etag ?? null);
-    if ("unchanged" in asked && held) {
-        cache.set(key, { ...held, at: Date.now() });
-        return held.found;
+async function refresh(repo: string, held: Held | undefined): Promise<Held> {
+    const asked = await ask(repo, held?.releases ? held.etag : null);
+    const now = Date.now();
+    let next: Held;
+    if ("unchanged" in asked && held?.releases) {
+        next = { ...held, at: now };
+    } else if ("releases" in asked) {
+        next = { releases: asked.releases, etag: asked.etag, at: now };
+    } else {
+        // Failed, or a 304 with no list held to keep: keep whatever list was last
+        // read, and look again sooner than the usual two minutes.
+        next = {
+            releases: held?.releases ?? null,
+            etag: held?.releases ? held.etag : null,
+            at: now - CACHE_TTL_MS + RETRY_MS
+        };
     }
-    const fresh = "unchanged" in asked ? { found: null, etag: null } : asked;
-    cache.set(key, { found: fresh.found, etag: fresh.etag, at: Date.now() });
-    return fresh.found;
+    cache.set(repo, next);
+    return next;
 }
 
 /** The desktop app for Windows, macOS and Linux. */
