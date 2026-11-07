@@ -193,9 +193,15 @@ class Hub {
     /** Store the credentials as Stream Deck's global settings, which hold plain JSON only. */
     #keep(credentials: Credentials): Promise<void> {
         const { instance, ...rest } = credentials;
+        if (!instance) return streamDeck.settings.setGlobalSettings(rest);
+        const { localCaSha256, ...known } = instance;
         return streamDeck.settings.setGlobalSettings({
             ...rest,
-            ...(instance ? { instance: { ...instance, addresses: [...instance.addresses] } } : {})
+            instance: {
+                ...known,
+                addresses: [...instance.addresses],
+                ...(localCaSha256 ? { localCaSha256: [...localCaSha256] } : {})
+            }
         });
     }
 
