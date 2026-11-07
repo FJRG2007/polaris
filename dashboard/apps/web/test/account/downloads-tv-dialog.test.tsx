@@ -81,8 +81,8 @@ describe("TvWaitingNote", () => {
             )
         ).toBeTruthy();
         expect(screen.getByText("The install carries on by itself once it is on.")).toBeTruthy();
-        // Wireless debugging needs a pairing code the app cannot type in yet; a cable works.
-        expect(screen.getByText(/needs a pairing code/)).toBeTruthy();
+        // Wireless debugging pairs with a code, which the desktop app asks for after Install.
+        expect(screen.getByText(/asks for its code/)).toBeTruthy();
     });
 
     it("reads as a step before Install when nothing waits yet, with one switch and no pairing note", () => {
@@ -92,7 +92,7 @@ describe("TvWaitingNote", () => {
         expect(screen.getByText(/^Before you start, on the TV: open Settings > My Fire TV > About/)).toBeTruthy();
         expect(screen.getByText(/turn on ADB debugging\.$/)).toBeTruthy();
         expect(screen.queryByText(/carries on by itself/)).toBeNull();
-        expect(screen.queryByText(/pairing code/)).toBeNull();
+        expect(screen.queryByText(/asks for its code/)).toBeNull();
     });
 
     it("asks to accept the prompt, and says it in Spanish", () => {

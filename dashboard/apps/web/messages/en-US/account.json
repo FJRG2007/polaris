@@ -1456,7 +1456,7 @@
                     "debugging": "On the TV, open {about} and press OK on {press} {presses} times. Then in {developer}, turn on {switches}.",
                     "before": "Before you start, on the TV: open {about} and press OK on {press} {presses} times, then in {developer} turn on {switches}.",
                     "carriesOn": "The install carries on by itself once it is on.",
-                    "pairing": "If the TV only offers Wireless debugging, it needs a pairing code the app cannot use yet. A USB cable works instead.",
+                    "pairing": "If the TV only offers Wireless debugging, turn it on and press Install: the desktop app then asks for its code.",
                     "prompt": "On the TV, choose Allow. Tick Always allow from this computer so it does not ask again.",
                     "list": "{items} and {last}",
                     "stop": "Stop"

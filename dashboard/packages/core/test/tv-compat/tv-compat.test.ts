@@ -63,6 +63,16 @@ describe("tv-compat data", () => {
         expect(tv.debuggingFor("webos")).toBeUndefined();
     });
 
+    it("names the menus in Spanish for any Spanish locale, and in English otherwise", () => {
+        const english = tv.debuggingFor("fire-os");
+        expect(tv.debuggingFor("fire-os", "es-ES")?.switches).toEqual(["Depuración ADB"]);
+        expect(tv.debuggingFor("fire-os", "es-MX")?.developer).toBe(tv.debuggingFor("fire-os", "es-ES")?.developer);
+        expect(tv.debuggingFor("fire-os", "es-ES")).toMatchObject({ id: english?.id, presses: english?.presses, source: english?.source });
+        expect(tv.debuggingFor("fire-os", "en-US")).toEqual(english);
+        expect(tv.debuggingFor("fire-os", "fr-FR")).toEqual(english);
+        expect(tv.debuggingFor("webos", "es-ES")).toBeUndefined();
+    });
+
     it("words every privacy step in both languages", () => {
         const ids = tv.TV_PRIVACY.brands.flatMap((entry) => entry.steps.map((step) => step.id));
         expect(new Set(ids).size).toBe(ids.length);

@@ -16,6 +16,7 @@ import {
     PacketReader,
     signToken
 } from "../../src/main/adb-client";
+import { PairingError } from "../../src/main/adb-pairing";
 
 const handlers = vi.hoisted(() => new Map<string, (event: unknown, raw?: unknown) => unknown>());
 
@@ -29,7 +30,8 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, PRIVATE_DNS_READ, registerTvInstall, tvRefusal } = await import(
+const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal } =
+    await import(
     "../../src/main/tv-install"
 );
 
@@ -255,6 +257,21 @@ describe("who may use the window's channels", () => {
         expect(await call(CHANNELS.tvStart, "tv", { host: "8.8.8.8", home: true })).toBe(false);
         expect(await call(CHANNELS.tvStart, "tv", { host: "192.168.1.50" })).toBe(false);
         expect(await call(CHANNELS.tvStart, "tv", undefined)).toBe(false);
+    });
+
+    it("refuses a pairing code that is not the TV's six digits", async () => {
+        for (const code of ["", "12345", "1234567", "12ab56", "12 34 5"])
+            expect(await call(CHANNELS.tvStart, "tv", { host: "192.168.1.50", home: true, code })).toBe(false);
+    });
+});
+
+describe("a failed pairing", () => {
+    it("says a wrong code apart from a TV that could not be reached, and keeps a cancel quiet", () => {
+        expect(pairingFailure(new PairingError("wrong-code", "x"))).toBe("pairing-refused");
+        expect(pairingFailure(new PairingError("cancelled", "x"))).toBe("cancelled");
+        for (const reason of ["timeout", "unreachable", "protocol"] as const)
+            expect(pairingFailure(new PairingError(reason, "x"))).toBe("unreachable");
+        expect(pairingFailure(new Error("ECONNRESET"))).toBe("unreachable");
     });
 });
 

@@ -14,8 +14,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 /** A platform's menus, as both the desktop app and core's `debuggingFor()` give them. */
 export type TvMenus = Omit<DesktopTvWaiting, "step">;
 
-/** Wireless debugging only turns on with a pairing code, which the app cannot type in yet. */
-const PAIRING_SWITCH = "Wireless debugging";
+/** Wireless debugging, by the name the TV shows in each language core's menus come in: it pairs with a code. */
+const PAIRING_SWITCHES = new Set(["Wireless debugging", "Depuración inalámbrica"]);
 
 export function TvWaitingNote({
     menus,
@@ -63,7 +63,7 @@ export function TvWaitingNote({
                     {t("downloads.tv.dialog.waiting.carriesOn")}
                 </p>
             ) : null}
-            {menus.switches.includes(PAIRING_SWITCH) ? (
+            {menus.switches.some((name) => PAIRING_SWITCHES.has(name)) ? (
                 <p className="text-xs text-muted-foreground">
                     {t("downloads.tv.dialog.waiting.pairing")}
                 </p>
