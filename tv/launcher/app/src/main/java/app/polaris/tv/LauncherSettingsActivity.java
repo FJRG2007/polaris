@@ -570,9 +570,9 @@ public final class LauncherSettingsActivity extends Activity {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         labels.add(getString(R.string.profile_rename));
-        actions.add(() -> askProfileName(profile));
+        actions.add(() -> PinPad.check(this, profile, () -> askProfileName(profile)));
         labels.add(getString(R.string.profile_change_avatar));
-        actions.add(() -> pickAvatar(profile, null));
+        actions.add(() -> PinPad.check(this, profile, () -> pickAvatar(profile, null)));
         if (at > 0) {
             labels.add(getString(R.string.profile_move_up));
             actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, -1)));
@@ -581,7 +581,7 @@ public final class LauncherSettingsActivity extends Activity {
             labels.add(getString(R.string.profile_move_down));
             actions.add(() -> saveProfiles(Profiles.move(Profiles.load(this), profile.id, 1)));
         }
-        // A PIN is set freely, but changing or removing one asks for it first.
+        // A PIN is set freely, but changing or removing one asks for it first, as do a new name or colour.
         if (Profiles.hasPin(this, profile.id)) {
             labels.add(getString(R.string.profile_pin_change));
             actions.add(() -> PinPad.check(this, profile, () -> PinPad.create(this, profile,

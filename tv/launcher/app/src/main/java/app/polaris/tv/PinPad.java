@@ -204,7 +204,11 @@ final class PinPad {
     }
 
     private void type(char digit) {
-        if (busy || lockoutMs() > 0) return;
+        if (busy) return;
+        if (lockoutMs() > 0) {
+            if (!countingDown) showLockout();
+            return;
+        }
         if (typed.length() >= length()) return;
         typed.append(digit);
         if (!countingDown) message.setText("");
