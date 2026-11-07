@@ -79,7 +79,30 @@
         "read": "Rutas de menú leídas el {date}. Cambian con el firmware, así que las tuyas pueden variar.",
         "source": "Fuente",
         "setting": "Dónde",
-        "action": "Qué cambiar"
+        "action": "Qué cambiar",
+        "steps": {
+            "samsung-viewing": "Viewing Information Services: no",
+            "samsung-ads": "Interest-Based Advertisements, Customization Service, Improve personalized ads, Get news and special offers: no. Do not track: sí. Pulsa Reset PSID",
+            "samsung-voice": "Voice Wake-Up: no",
+            "lg-live-plus": "Live Plus: no",
+            "lg-agreements": "Viewing information, Voice information, Interest-based & Cross-device advertising, Marketing Communications, Who.Where.What?: no",
+            "lg-ad-tracking": "Limit AD Tracking: sí",
+            "lg-home": "Home Promotion, Content Recommendation: no",
+            "roku-acr": "ACR: no",
+            "roku-ads": "Personalize ads: no",
+            "roku-microphone": "Microphone access: no",
+            "vizio-viewing": "Viewing Data: no. Vínculo con Walmart: no",
+            "vizio-ad-tracking": "Limited Ad Tracking: sí",
+            "vidaa-viewing": "ACR, Personalized Ads, Content Recommendation: no",
+            "vidaa-ads": "Personalised Ads: no",
+            "google-ads": "Elimina el ID de publicidad, o activa Opt out of Ads Personalization",
+            "google-location": "Location: no",
+            "google-diagnostics": "Usage & diagnostics: no",
+            "google-scanning": "Scanning always available: no",
+            "sony-samba": "Samba Interactive TV: no",
+            "tcl-improvement": "User Experience Improvement Program: retira el consentimiento",
+            "fire-data": "Device Usage Data, Collect App Usage Data, Interest-based Ads: no. Over-the-air Viewing Data (teles Fire TV): no"
+        }
     },
     "install": "Instalar en esta tele",
     "skip": "Sé que funciona"

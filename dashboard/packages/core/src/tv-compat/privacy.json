@@ -9,16 +9,16 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy (older sets: Privacy Choices)",
-                    "action": "Viewing Information Services: off"
+                    "id": "samsung-viewing",
+                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy (older sets: Privacy Choices)"
                 },
                 {
-                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy",
-                    "action": "Interest-Based Advertisements, Customization Service, Improve personalized ads, Get news and special offers: off. Do not track: on. Reset PSID"
+                    "id": "samsung-ads",
+                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy"
                 },
                 {
-                    "path": "Settings > All Settings > General & Privacy > Advanced Features > Voice > Bixby Settings",
-                    "action": "Voice Wake-Up: off"
+                    "id": "samsung-voice",
+                    "path": "Settings > All Settings > General & Privacy > Advanced Features > Voice > Bixby Settings"
                 }
             ]
         },
@@ -30,18 +30,21 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Hold Settings > System > Additional settings (2026); 2021-2024: All Settings > General > System > Additional Settings",
-                    "action": "Live Plus: off"
+                    "id": "lg-live-plus",
+                    "path": "Hold Settings > System > Additional settings (2026); 2021-2024: All Settings > General > System > Additional Settings"
                 },
                 {
-                    "path": "Settings > Privacy & Terms > User Agreements",
-                    "action": "Viewing information, Voice information, Interest-based & Cross-device advertising, Marketing Communications, Who.Where.What?: off"
+                    "id": "lg-agreements",
+                    "path": "Settings > Privacy & Terms > User Agreements"
                 },
                 {
-                    "path": "Support > Privacy & Terms > Advertisement",
-                    "action": "Limit AD Tracking: on"
+                    "id": "lg-ad-tracking",
+                    "path": "Support > Privacy & Terms > Advertisement"
                 },
-                { "path": "Home Settings", "action": "Home Promotion, Content Recommendation: off" }
+                {
+                    "id": "lg-home",
+                    "path": "Home Settings"
+                }
             ]
         },
         {
@@ -52,16 +55,16 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Home > Settings > Privacy > Smart TV Experience (also at my.roku.com)",
-                    "action": "ACR: off"
+                    "id": "roku-acr",
+                    "path": "Home > Settings > Privacy > Smart TV Experience (also at my.roku.com)"
                 },
                 {
-                    "path": "Home > Settings > Privacy > Advertising",
-                    "action": "Personalize ads: off"
+                    "id": "roku-ads",
+                    "path": "Home > Settings > Privacy > Advertising"
                 },
                 {
-                    "path": "Home > Settings > Privacy > Microphone",
-                    "action": "Microphone access: off"
+                    "id": "roku-microphone",
+                    "path": "Home > Settings > Privacy > Microphone"
                 }
             ]
         },
@@ -73,12 +76,12 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "All Settings > Privacy & Legal (or Admin & Privacy)",
-                    "action": "Viewing Data: off. Walmart link: off"
+                    "id": "vizio-viewing",
+                    "path": "All Settings > Privacy & Legal (or Admin & Privacy)"
                 },
                 {
-                    "path": "All Settings > Privacy & Legal > Advertising",
-                    "action": "Limited Ad Tracking: on"
+                    "id": "vizio-ad-tracking",
+                    "path": "All Settings > Privacy & Legal > Advertising"
                 }
             ]
         },
@@ -90,12 +93,12 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Settings > Advanced Settings > Enhanced Viewing Settings",
-                    "action": "ACR, Personalized Ads, Content Recommendation: off"
+                    "id": "vidaa-viewing",
+                    "path": "Settings > Advanced Settings > Enhanced Viewing Settings"
                 },
                 {
-                    "path": "Settings > System > Advanced Settings",
-                    "action": "Personalised Ads: off"
+                    "id": "vidaa-ads",
+                    "path": "Settings > System > Advanced Settings"
                 }
             ]
         },
@@ -107,17 +110,20 @@
             "source": "https://github.com/Gathin23/cleanyourtv/blob/main/docs/faq.md",
             "steps": [
                 {
-                    "path": "Settings > Privacy > Ads (Android TV: About > Legal information > Ads)",
-                    "action": "Delete advertising ID, or Opt out of Ads Personalization: on"
-                },
-                { "path": "Settings > Privacy > Location", "action": "Location: off" },
-                {
-                    "path": "Settings > Privacy > Usage & diagnostics",
-                    "action": "Usage & diagnostics: off"
+                    "id": "google-ads",
+                    "path": "Settings > Privacy > Ads (Android TV: About > Legal information > Ads)"
                 },
                 {
-                    "path": "Settings > Network & Internet",
-                    "action": "Scanning always available: off"
+                    "id": "google-location",
+                    "path": "Settings > Privacy > Location"
+                },
+                {
+                    "id": "google-diagnostics",
+                    "path": "Settings > Privacy > Usage & diagnostics"
+                },
+                {
+                    "id": "google-scanning",
+                    "path": "Settings > Network & Internet"
                 }
             ]
         },
@@ -129,8 +135,8 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Settings > All Settings > Privacy",
-                    "action": "Samba Interactive TV: off"
+                    "id": "sony-samba",
+                    "path": "Settings > All Settings > Privacy"
                 }
             ]
         },
@@ -142,8 +148,8 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Settings > Privacy > User Agreements",
-                    "action": "User Experience Improvement Program: withdraw"
+                    "id": "tcl-improvement",
+                    "path": "Settings > Privacy > User Agreements"
                 }
             ]
         },
@@ -155,8 +161,8 @@
             "source": "https://cleanyour.tv/not-android",
             "steps": [
                 {
-                    "path": "Settings > Preferences > Privacy Settings",
-                    "action": "Device Usage Data, Collect App Usage Data, Interest-based Ads: off. Over-the-air Viewing Data (Fire TV sets): off"
+                    "id": "fire-data",
+                    "path": "Settings > Preferences > Privacy Settings"
                 }
             ]
         }

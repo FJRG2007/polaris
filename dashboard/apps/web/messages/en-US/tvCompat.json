@@ -79,7 +79,30 @@
         "read": "Menu paths read on {date}. They change with firmware, so yours may differ.",
         "source": "Source",
         "setting": "Where",
-        "action": "What to change"
+        "action": "What to change",
+        "steps": {
+            "samsung-viewing": "Viewing Information Services: off",
+            "samsung-ads": "Interest-Based Advertisements, Customization Service, Improve personalized ads, Get news and special offers: off. Do not track: on. Reset PSID",
+            "samsung-voice": "Voice Wake-Up: off",
+            "lg-live-plus": "Live Plus: off",
+            "lg-agreements": "Viewing information, Voice information, Interest-based & Cross-device advertising, Marketing Communications, Who.Where.What?: off",
+            "lg-ad-tracking": "Limit AD Tracking: on",
+            "lg-home": "Home Promotion, Content Recommendation: off",
+            "roku-acr": "ACR: off",
+            "roku-ads": "Personalize ads: off",
+            "roku-microphone": "Microphone access: off",
+            "vizio-viewing": "Viewing Data: off. Walmart link: off",
+            "vizio-ad-tracking": "Limited Ad Tracking: on",
+            "vidaa-viewing": "ACR, Personalized Ads, Content Recommendation: off",
+            "vidaa-ads": "Personalised Ads: off",
+            "google-ads": "Delete advertising ID, or Opt out of Ads Personalization: on",
+            "google-location": "Location: off",
+            "google-diagnostics": "Usage & diagnostics: off",
+            "google-scanning": "Scanning always available: off",
+            "sony-samba": "Samba Interactive TV: off",
+            "tcl-improvement": "User Experience Improvement Program: withdraw",
+            "fire-data": "Device Usage Data, Collect App Usage Data, Interest-based Ads: off. Over-the-air Viewing Data (Fire TV sets): off"
+        }
     },
     "install": "Install on this TV",
     "skip": "I know it works"

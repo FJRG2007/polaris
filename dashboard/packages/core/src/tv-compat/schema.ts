@@ -103,8 +103,14 @@ export const tvPrivacySchema = z
                     matches: z.array(z.string().min(1)),
                     platforms: z.array(z.enum(TV_PLATFORMS)),
                     source: z.string().url(),
+                    /** Each step's id names its action in the `tvCompat.privacy.steps` catalog. */
                     steps: z.array(
-                        z.object({ path: z.string().min(1), action: z.string().min(1) }).strict()
+                        z
+                            .object({
+                                id: z.string().regex(/^[a-z0-9-]+$/),
+                                path: z.string().min(1)
+                            })
+                            .strict()
                     )
                 })
                 .strict()

@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { majorVersion, tierFor } from "../packages/core/src/tv-compat/rules.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -72,27 +73,14 @@ export function parseOs(os) {
     return { platform: "other", osVersion: null };
 }
 
-const major = (version) => (version ? Number.parseInt(version, 10) : null);
-
 /** The tier, quirks and install route for one list, by the rules of `rules.ts`. */
 export function ruling(folder, entry) {
     const { platform, osVersion } = parseOs(entry.os);
     const brand = entry.brand.trim();
-    const level = major(osVersion);
-    const quirks = [];
-    let tier = "network";
-    if (platform === "android-tv" || platform === "google-tv") {
-        if (level !== null && level < 8) quirks.push("android-too-old");
-        else tier = "full";
-    } else if (platform === "fire-os") {
-        if (level !== null && level < 6) quirks.push("android-too-old");
-        else {
-            tier = "app";
-            quirks.push("fire-home-amazon");
-        }
-    } else if (platform === "android") {
-        quirks.push(level !== null && level < 8 ? "android-too-old" : "android-check");
-    }
+    const level = majorVersion(osVersion);
+    const base = tierFor(platform, osVersion);
+    const quirks = [...base.quirks];
+    let tier = base.tier;
     const pairing = /chromecast|streamer/i.test(`${folder} ${entry.tv}`);
     if (tier === "full" && pairing) quirks.push("google-pairing");
     if (tier === "full" && /^tcl$/i.test(brand)) quirks.push("tcl-autostart");
@@ -141,8 +129,15 @@ function folderDates() {
     return dates;
 }
 
-export function buildModels() {
-    const dates = folderDates();
+/** The dates models.json already holds, by folder. */
+function checkedInDates(text) {
+    const dates = new Map();
+    for (const model of text ? JSON.parse(text) : [])
+        if (model.tested?.by === "upstream-community") dates.set(model.id, model.tested.date);
+    return dates;
+}
+
+export function buildModels(dates = folderDates()) {
     const models = [];
     for (const folder of readdirSync(examples).sort()) {
         const file = join(examples, folder, "tv.json");
@@ -179,12 +174,12 @@ export function buildModels() {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === join(process.argv[1]);
 if (isMain) {
-    const text = `${JSON.stringify(buildModels(), null, 4)}\n`;
     if (process.argv.includes("--check")) {
         const current = existsSync(out) ? readFileSync(out, "utf8").replace(/\r\n/g, "\n") : "";
+        const text = `${JSON.stringify(buildModels(checkedInDates(current)), null, 4)}\n`;
         if (current !== text) {
             console.error("models.json is stale: run node scripts/tv-compat-import.mjs");
             process.exit(1);
         }
-    } else writeFileSync(out, text);
+    } else writeFileSync(out, `${JSON.stringify(buildModels(), null, 4)}\n`);
 }

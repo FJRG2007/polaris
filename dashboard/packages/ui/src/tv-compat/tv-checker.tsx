@@ -303,7 +303,7 @@ export function TvChecker({
                                 type="button"
                                 aria-pressed={on}
                                 onClick={() => pick(on ? null : chip.brand)}
-                                className={`inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${
+                                className={`inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-3 py-1 text-xs min-h-8 [@media(pointer:coarse)]:min-h-11 ${
                                     on
                                         ? "border-primary bg-primary/15 text-primary"
                                         : "border-border text-muted-foreground hover:text-foreground"
@@ -367,13 +367,15 @@ export function TvPrivacyGuide() {
                     <dl className="flex min-w-0 flex-col gap-2">
                         {entry.steps.map((step) => (
                             <div
-                                key={step.path + step.action}
+                                key={step.id}
                                 className="flex min-w-0 flex-col gap-0.5 rounded-md border border-border p-2"
                             >
                                 <dt className="sr-only">{t("privacy.setting")}</dt>
                                 <dd className="break-words font-mono text-xs">{step.path}</dd>
                                 <dt className="sr-only">{t("privacy.action")}</dt>
-                                <dd className="break-words text-sm">{step.action}</dd>
+                                <dd className="break-words text-sm">
+                                    {t(`privacy.steps.${step.id}`)}
+                                </dd>
                             </div>
                         ))}
                     </dl>

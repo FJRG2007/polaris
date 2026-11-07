@@ -10,6 +10,8 @@ import { execFileSync } from "node:child_process";
 import models from "../../src/tv-compat/models.json" with { type: "json" };
 import quirks from "../../src/tv-compat/quirks.json" with { type: "json" };
 import privacy from "../../src/tv-compat/privacy.json" with { type: "json" };
+import enWords from "../../../../apps/web/messages/en-US/tvCompat.json" with { type: "json" };
+import esWords from "../../../../apps/web/messages/es-ES/tvCompat.json" with { type: "json" };
 import * as tv from "../../src/tv-compat/index";
 
 const script = join(__dirname, "..", "..", "..", "..", "scripts", "tv-compat-import.mjs");
@@ -48,6 +50,13 @@ describe("tv-compat data", () => {
         expect(tcl.map((entry) => entry.id)).toEqual(["tcl", "google-tv"]);
         const fire = tv.privacyFor({ brand: "Amazon Fire TV", platform: "fire-os" });
         expect(fire.map((entry) => entry.id)).toEqual(["fire-tv"]);
+    });
+
+    it("words every privacy step in both languages", () => {
+        const ids = tv.TV_PRIVACY.brands.flatMap((entry) => entry.steps.map((step) => step.id));
+        expect(new Set(ids).size).toBe(ids.length);
+        for (const words of [enWords, esWords])
+            expect(Object.keys(words.privacy.steps).sort()).toEqual([...ids].sort());
     });
 
     it("is what the generator writes from tv/examples", () => {
@@ -128,5 +137,14 @@ describe("tv.tierFor, for a TV that is not listed", () => {
     it("agrees with the tier every listed model was given", () => {
         for (const model of tv.TV_MODELS.filter((one) => !one.quirks.includes("huawei-refusal")))
             expect(tv.tierFor(model.platform, model.osVersion).tier).toBe(model.tier);
+    });
+
+    it("says every listed model's platform quirks, and calls an old plain Android too old", () => {
+        for (const model of tv.TV_MODELS.filter((one) => one.tested.by === "upstream-community"))
+            expect(model.quirks).toEqual(
+                expect.arrayContaining([...tv.tierFor(model.platform, model.osVersion).quirks])
+            );
+        expect(tv.tierFor("android", "7.0").quirks).toEqual(["android-too-old"]);
+        expect(tv.tierFor("android", "11").quirks).toEqual(["android-check"]);
     });
 });

@@ -480,7 +480,7 @@ export interface SiteData {
  * sections, and every API operation, listed under the page they belong to.
  */
 export function searchRecords(
-    data: Pick<SiteData, "docs" | "api">,
+    data: Pick<SiteData, "docs" | "api"> & Partial<Pick<SiteData, "downloadsPage">>,
     locale: SiteLocale,
     apiTitle: string
 ): SearchRecord[] {
@@ -507,13 +507,17 @@ export function searchRecords(
                 text: `${model.brand} ${PLATFORM_NAMES[model.platform]} ${model.osVersion ?? ""}`
             });
     const privacy = data.docs[locale].find((page) => page.slug === TV_PRIVACY_SLUG);
+    const privacyWords = data.downloadsPage?.messages[locale].tvCompat.privacy as
+        { steps?: Record<string, string> } | undefined;
     if (privacy)
         for (const brand of TV_PRIVACY.brands)
             records.push({
                 title: brand.brand,
                 page: privacy.title,
                 href: `${locale}/docs/${TV_PRIVACY_SLUG}/#${brand.id}`,
-                text: brand.steps.map((step) => `${step.path} ${step.action}`).join(" ")
+                text: brand.steps
+                    .map((step) => `${step.path} ${privacyWords?.steps?.[step.id] ?? ""}`)
+                    .join(" ")
             });
     for (const group of data.api.groups)
         for (const op of group.operations)

@@ -37,7 +37,12 @@ export function tierFor(platform: TvPlatform, version?: string | null): TvRuling
                 ? { tier: "network", quirks: ["android-too-old"] }
                 : { tier: "full", quirks: [] };
         case "android":
-            return { tier: "network", quirks: ["android-check"] };
+            return {
+                tier: "network",
+                quirks: [
+                    major !== null && major < MIN_ANDROID ? "android-too-old" : "android-check"
+                ]
+            };
         case "fire-os":
             return major !== null && major < MIN_FIRE_OS
                 ? { tier: "network", quirks: ["android-too-old"] }
