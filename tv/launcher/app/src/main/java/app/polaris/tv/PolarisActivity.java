@@ -81,11 +81,14 @@ public final class PolarisActivity extends Activity {
             return;
         }
         showForm(null);
-        // Opened by the installer (the LinkFromInstall alias): its Polaris, so the code shows with nothing typed.
+        // Opened by the installer (the LinkFromInstall alias): its Polaris filled in, one press from the code. The
+        // press is the person's: an app holding the same permission could open the alias with an address of its own.
         String from = getIntent().getStringExtra(EXTRA_ORIGIN);
-        if (from != null && PolarisFailover.readTyped(from) != null) {
-            address.setText(from);
-            connect();
+        String origin = from == null ? null : PolarisFailover.readTyped(from);
+        if (origin != null) {
+            address.setText(origin);
+            say(getString(R.string.polaris_from_install, origin));
+            findViewById(R.id.polarisConnect).requestFocus();
         }
     }
 

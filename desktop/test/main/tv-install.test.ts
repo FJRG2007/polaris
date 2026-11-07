@@ -31,7 +31,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
+const { connectFailure, grantCommands, homeIsOurs, lateFailure, alreadyLinked, latestApk, LINK_STATE_READ, linkCommand, opened, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
     await import(
     "../../src/main/tv-install"
 );
@@ -310,6 +310,20 @@ describe("the link screen after the install", () => {
         expect(linkCommand("not a url")).toBeNull();
         expect(linkCommand("file:///etc/passwd")).toBeNull();
         expect(linkCommand("javascript:alert(1)")).toBeNull();
+    });
+
+    it("does nothing when the address is this computer's own loopback", () => {
+        for (const address of ["http://localhost:3000", "http://app.localhost", "http://127.0.0.1:3000", "http://127.1.2.3", "http://[::1]:3000", "http://0.0.0.0", "http://[::ffff:127.0.0.1]"]) {
+            expect(linkCommand(address)).toBeNull();
+        }
+    });
+
+    it("leaves a TV that is already linked alone", () => {
+        expect(LINK_STATE_READ).toBe("am broadcast -f 32 -n app.polaris.tv/.LinkState");
+        expect(alreadyLinked('Broadcasting: Intent { flg=0x20 cmp=app.polaris.tv/.LinkState }\nBroadcast completed: result=0, data="linked=true"\n')).toBe(true);
+        expect(alreadyLinked('Broadcast completed: result=0, data="linked=false"\n')).toBe(false);
+        expect(alreadyLinked("Broadcast completed: result=0\n")).toBe(false);
+        expect(alreadyLinked("")).toBe(false);
     });
 
     it("tells a started activity from am's errors", () => {

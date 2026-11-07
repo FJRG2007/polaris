@@ -144,8 +144,8 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <!-- The installer opens the link screen with its Polaris's address filled in (extra "origin"), over
-             adb right after the install. Only the shell holds WRITE_SECURE_SETTINGS, so no app on the TV can
-             open it, let alone point it at an address of its choosing. -->
+             adb right after the install. WRITE_SECURE_SETTINGS keeps ordinary apps out, but any app can be
+             granted it, so the address is only ever filled in: connecting to it takes a press on the TV. -->
         <activity-alias
             android:name=".LinkFromInstall"
             android:targetActivity=".PolarisActivity"
@@ -259,6 +259,12 @@
                 <action android:name="app.polaris.tv.GUARD" />
             </intent-filter>
         </receiver>
+
+        <!-- Whether this TV is linked to a Polaris, for the installer over adb ("linked=true" or "linked=false"). -->
+        <receiver
+            android:name=".LinkState"
+            android:exported="true"
+            android:permission="android.permission.WRITE_SECURE_SETTINGS" />
 
         <!-- PackageInstaller's status for a self-update (SelfUpdateRun.SystemInstaller). -->
         <receiver

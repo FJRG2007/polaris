@@ -211,15 +211,9 @@ export const PRIVATE_DNS_READ =
     "echo private_dns_mode=$(settings get global private_dns_mode); echo private_dns_specifier=$(settings get global private_dns_specifier)";
 
 /**
- * The runtime grants after the install. Location names the Wi-Fi in the launcher's network row;
- * WRITE_SECURE_SETTINGS, only when asked, lets "Block ads and trackers" set Private DNS and put the
- * TV's own back when it does not work. Neither is ever revoked here: the launcher's own scripts may
- * have granted the second for another switch.
- */
-/**
- * Opens the TV's link screen with this app's Polaris filled in, so it shows the code to scan without anything
- * typed on a remote. Null when there is no Polaris yet, or its address is not a plain http(s) origin: the
- * value goes into a shell command line, so nothing else is let through.
+ * Opens the TV's link screen with this app's Polaris filled in, one press on the remote from the code to scan.
+ * Null when there is no Polaris yet, when its address is this computer's own loopback (the TV would ask itself),
+ * or when it is not a plain http(s) origin: the value goes into a shell command line, so nothing else is let through.
  */
 export function linkCommand(server: string | null): string | null {
     if (!server) return null;
@@ -230,7 +224,22 @@ export function linkCommand(server: string | null): string | null {
         return null;
     }
     if (!/^https?:\/\/[A-Za-z0-9.:[\]-]+$/.test(origin)) return null;
+    if (loopback(new URL(origin).hostname)) return null;
     return `am start -n ${PACKAGE}/.LinkFromInstall --es origin ${origin}`;
+}
+
+function loopback(host: string): boolean {
+    const name = host.toLowerCase().replace(/\.$/, "");
+    return name === "localhost" || name.endsWith(".localhost") || /^127\./.test(name) || name === "0.0.0.0"
+        || name === "[::1]" || name === "[::]" || name.startsWith("[::ffff:7f");
+}
+
+/** Asks the installed launcher whether this TV is already linked; stopped packages included, as a fresh install is. */
+export const LINK_STATE_READ = `am broadcast -f 32 -n ${PACKAGE}/.LinkState`;
+
+/** Whether the launcher answered that it is linked; anything else, an error included, reads as not linked. */
+export function alreadyLinked(output: string): boolean {
+    return /data="linked=true"/.test(output);
 }
 
 /** Whether `am start` reported the activity started rather than an error. */
@@ -238,6 +247,12 @@ export function opened(output: string): boolean {
     return output.trim().length > 0 && !/Error|Exception/i.test(output);
 }
 
+/**
+ * The runtime grants after the install. Location names the Wi-Fi in the launcher's network row;
+ * WRITE_SECURE_SETTINGS, only when asked, lets "Block ads and trackers" set Private DNS and put the
+ * TV's own back when it does not work. Neither is ever revoked here: the launcher's own scripts may
+ * have granted the second for another switch.
+ */
 export function grantCommands(blockAds: boolean): readonly string[] {
     const grants = [`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`];
     if (blockAds) grants.push(`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`);
@@ -514,7 +529,9 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, c
             outcome = homeIsOurs(resolved) ? "installed-home" : "installed-home-refused";
         }
         const link = linkCommand(serverAddress());
-        if (link) publish({ linking: opened(await adb.shell(link).catch(() => "Error")) });
+        if (link && !alreadyLinked(await adb.shell(LINK_STATE_READ).catch(() => ""))) {
+            publish({ linking: opened(await adb.shell(link).catch(() => "Error")) });
+        }
         await finish(adb, target, outcome);
     } catch (caught) {
         console.error("[tv]", caught);

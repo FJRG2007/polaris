@@ -20,7 +20,7 @@ const STEPS: Partial<Record<TvPhase, string>> = {
 };
 
 const LINKING =
-    "The TV now shows a code to link it to your Polaris. Scan it with your phone, or open the address it shows and type the code.";
+    "The TV now shows your Polaris on its link screen. Press OK on the remote to get the code, then scan it with your phone.";
 
 const OUTCOMES: Record<TvOutcome, string> = {
     installed: "Polaris TV is installed. Find it among the TV's apps.",
