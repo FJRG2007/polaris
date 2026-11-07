@@ -51,12 +51,34 @@ export interface InstanceRecord {
     readonly publicKey: string;
     /** Every origin the instance says it answers on, the usual one included. */
     readonly addresses: readonly string[];
+    /**
+     * SHA-256 of the local CA certificate(s) that sign the instance's local-name
+     * certificates, as lowercase hex of the DER. Absent on a Polaris that predates
+     * it or has no local CA. Trusted only because it was learned over the usual,
+     * publicly trusted address: a client that can override certificate trust may
+     * accept, on a proven alternate only, a chain that ends in one of these.
+     */
+    readonly localCaSha256?: readonly string[];
 }
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const SIGNATURE_PATTERN = /^[A-Za-z0-9_-]{86}$/;
 const MAX_ADDRESSES = 16;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const MAX_LOCAL_CAS = 4;
+
+/** The local CA fingerprints in an answer: the well-formed ones only, at most a few. */
+function readLocalCas(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    const found: string[] = [];
+    for (const one of value.slice(0, MAX_LOCAL_CAS)) {
+        if (typeof one !== "string") continue;
+        const hex = one.trim().toLowerCase();
+        if (SHA256_PATTERN.test(hex) && !found.includes(hex)) found.push(hex);
+    }
+    return found;
+}
 
 /** An `http(s)` origin with no path, or null. */
 export function readOrigin(value: unknown): string | null {
@@ -90,7 +112,10 @@ export function readInstance(body: unknown): InstanceRecord | null {
         if (!origin) return null;
         if (!origins.includes(origin)) origins.push(origin);
     }
-    return { id, publicKey, addresses: origins };
+    const localCas = readLocalCas(record["localCaSha256"]);
+    return localCas.length > 0
+        ? { id, publicKey, addresses: origins, localCaSha256: localCas }
+        : { id, publicKey, addresses: origins };
 }
 
 /** The bytes the instance signs: context, id, origin and nonce, one per line. */

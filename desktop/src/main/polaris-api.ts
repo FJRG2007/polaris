@@ -40,6 +40,8 @@ export const KEY_REFUSED = "The API key was refused - it may have been revoked o
  * `@polaris/core/instance-fallback`.
  */
 const failovers = new Map<string, Failover>();
+/** What each server said about itself, as the failovers above were built from. */
+const records = new Map<string, InstanceRecord>();
 
 function instancesFile(): string {
     return join(app.getPath("userData"), "instances.json");
@@ -62,6 +64,7 @@ export async function learnServer(server: string): Promise<InstanceRecord | null
     const instance = await learnInstance(server, netFetch);
     if (!instance) return null;
     failovers.set(server, createFailover({ primary: server, instance, fetch: netFetch }));
+    records.set(server, instance);
     try {
         writeStoredInstance(instancesFile(), server, instance);
     } catch {
@@ -102,8 +105,19 @@ export function failoverFor(server: string): Failover | undefined {
     }
     const failover = createFailover({ primary: server, instance: stored.record, fetch: netFetch });
     failovers.set(server, failover);
+    records.set(server, stored.record);
     if (Date.now() - stored.learnedAt > RELEARN_MS) void learnServer(server).catch(() => undefined);
     return failover;
+}
+
+/**
+ * What was learned about a server over its own address - in memory, or read back
+ * from disk the first time - or null. Synchronous: the certificate check asks it
+ * on every verification.
+ */
+export function instanceRecordFor(server: string): InstanceRecord | null {
+    if (!records.has(server)) failoverFor(server);
+    return records.get(server) ?? null;
 }
 
 /** "Using your local network address" while on one, otherwise null. */

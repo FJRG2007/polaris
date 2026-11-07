@@ -37,4 +37,13 @@ describe("instance store", () => {
         writeFileSync(path, JSON.stringify({ [SERVER]: { record: { ...record, publicKey: "short" }, learnedAt: 1 } }));
         expect(readStoredInstance(path, SERVER)).toBeNull();
     });
+
+    it("keeps the local CA pin across a restart, and reads a record written before it as having none", () => {
+        const path = file();
+        const pinned = { ...record, localCaSha256: ["ab".repeat(32)] };
+        writeStoredInstance(path, SERVER, pinned, 1000);
+        expect(readStoredInstance(path, SERVER)).toEqual({ record: pinned, learnedAt: 1000 });
+        writeFileSync(path, JSON.stringify({ [SERVER]: { record, learnedAt: 2 } }));
+        expect(readStoredInstance(path, SERVER)?.record.localCaSha256).toBeUndefined();
+    });
 });

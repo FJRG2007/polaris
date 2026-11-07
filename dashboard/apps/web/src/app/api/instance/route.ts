@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { localCaFingerprints } from "@/lib/local-ca-service";
 import { ensureInstanceIdentity, instanceAddresses, OPEN_HEADERS } from "@/lib/instance-identity";
 
 export const runtime = "nodejs";
@@ -48,12 +49,19 @@ export async function GET(): Promise<Response> {
             { status: 503, headers: OPEN_HEADERS }
         );
     }
+    // The local CA's fingerprint, when there is one: what lets a client accept the
+    // local addresses' own certificate on a proven alternate, learned here only.
+    const [addresses, localCas] = await Promise.all([
+        instanceAddresses(),
+        localCaFingerprints().catch(() => [])
+    ]);
     return NextResponse.json(
         {
             version: 1,
             id: identity.id,
             publicKey: identity.publicKey,
-            addresses: await instanceAddresses()
+            addresses,
+            ...(localCas.length > 0 ? { localCaSha256: localCas } : {})
         },
         { headers: OPEN_HEADERS }
     );

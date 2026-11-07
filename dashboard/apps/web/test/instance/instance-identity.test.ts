@@ -8,7 +8,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createFailover, freshNonce, verifyChallenge } from "@polaris/core/instance-fallback";
 
 const rows = new Map<string, string>();
@@ -28,13 +31,18 @@ vi.mock("@polaris/db", () => ({
         }
     }
 }));
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: MASTER_KEY }) }));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_MASTER_KEY: MASTER_KEY, POLARIS_DATA_DIR: DATA_DIR })
+}));
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "192.168.1.50" }));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () =>
         limited ? { ok: false, retryAfterMs: 30_000 } : { ok: true, retryAfterMs: 0 }
 }));
-vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "192.168.1.20" }));
+vi.mock("@/lib/host-address", () => ({
+    getHostLanIp: async () => "192.168.1.20",
+    getHostLanIps: async () => ["192.168.1.20"]
+}));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => ["polaris.example.com"] }));
 vi.mock("@/lib/domain-service", () => ({
     appBaseUrl: async () => "https://polaris.example.com",
@@ -42,6 +50,9 @@ vi.mock("@/lib/domain-service", () => ({
 }));
 
 const MASTER_KEY = randomBytes(32).toString("base64");
+const DATA_DIR = mkdtempSync(join(tmpdir(), "polaris-instance-"));
+/** `openssl x509 -noout -fingerprint -sha256` of the fixture CA, independent of the code under test. */
+const FIXTURE_CA_SHA256 = "9f4f55c5188f09e449a8264efbbd36b8f4223b1f4b71411c4b748ce4bb897719";
 
 const identityModule = await import("@/lib/instance-identity");
 const instanceRoute = await import("@/app/api/instance/route");
@@ -102,6 +113,41 @@ describe("GET /api/instance", () => {
     it("is rate-limited", async () => {
         limited = true;
         expect((await instanceRoute.GET()).status).toBe(429);
+    });
+
+    it("publishes no local CA fingerprint while there is no local CA, and creates none", async () => {
+        rmSync(join(DATA_DIR, "ca"), { recursive: true, force: true });
+        const body = (await (await instanceRoute.GET()).json()) as Record<string, unknown>;
+        expect(body["id"]).toEqual(expect.any(String));
+        expect("localCaSha256" in body).toBe(false);
+        const { readLocalCaRoot } = await import("@/lib/local-ca-service");
+        expect(await readLocalCaRoot()).toBeNull();
+    });
+
+    it("publishes the existing local CA's SHA-256", async () => {
+        mkdirSync(join(DATA_DIR, "ca"), { recursive: true });
+        copyFileSync(
+            join(import.meta.dirname, "fixtures", "local-ca.crt"),
+            join(DATA_DIR, "ca", "ca.crt")
+        );
+        try {
+            const body = (await (await instanceRoute.GET()).json()) as Record<string, unknown>;
+            expect(body["localCaSha256"]).toEqual([FIXTURE_CA_SHA256]);
+        } finally {
+            rmSync(join(DATA_DIR, "ca"), { recursive: true, force: true });
+        }
+    });
+
+    it("publishes nothing for a CA file that is not a certificate", async () => {
+        mkdirSync(join(DATA_DIR, "ca"), { recursive: true });
+        writeFileSync(join(DATA_DIR, "ca", "ca.crt"), "not a certificate");
+        try {
+            const body = (await (await instanceRoute.GET()).json()) as Record<string, unknown>;
+            expect(body["id"]).toEqual(expect.any(String));
+            expect("localCaSha256" in body).toBe(false);
+        } finally {
+            rmSync(join(DATA_DIR, "ca"), { recursive: true, force: true });
+        }
     });
 });
 

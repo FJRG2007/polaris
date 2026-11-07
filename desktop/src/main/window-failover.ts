@@ -6,9 +6,10 @@
  * The address itself is picked by the failover in `polaris-api` (see
  * `@polaris/core/instance-fallback`): an alternate is used only after it signed
  * a fresh challenge with the instance key learned over the usual address, and
- * only over TLS this computer already trusts. Nothing here accepts a
- * certificate - an alternate whose certificate is not trusted is never proven,
- * so the window never goes there.
+ * only over TLS this computer trusts - the system's roots, or the instance's own
+ * local CA learned over the usual address (`local-ca-pin`). Nothing here
+ * accepts a certificate; an alternate whose certificate is neither is never
+ * proven, so the window never goes there.
  */
 
 import { isServerUrl } from "./navigation";

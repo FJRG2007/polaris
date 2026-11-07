@@ -46,7 +46,8 @@ import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalS
 import { app, BrowserWindow, dialog, net, screen, session, shell } from "electron";
 import { describeNetError, finishedLoad, isCertificateError, netErrorCode } from "./reachability";
 import { sameInstanceAs } from "./same-instance";
-import { addressWords, failoverFor } from "./polaris-api";
+import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
+import { pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
 import { createServerCheck, describeVerdict, type ServerVerdict } from "@/shared/server-identity";
@@ -221,7 +222,8 @@ function rememberPlace(window: BrowserWindow): void {
 /**
  * Where the same Polaris answers now, as the failover in `polaris-api` finds it:
  * a local address only after it signed a fresh challenge with the key learned
- * over the usual one, over TLS this computer already trusts. Null when nothing
+ * over the usual one, over TLS this computer trusts or that chains to the local
+ * CA learned over the usual address (`local-ca-pin`). Null when nothing
  * was learned about the server yet.
  */
 async function provenAddress(): Promise<{ readonly origin: string; readonly untrusted: boolean; } | null> {
@@ -589,6 +591,20 @@ function start(): void {
         setOpenAtLogin(settings.openAtLogin());
         if (app.isPackaged) app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
 
+        // The same Polaris's own local certificate, on its other addresses only and
+        // only when it chains to the CA learned over the usual address; every other
+        // verification keeps Chromium's verdict. The default session carries both
+        // the failover's proof (`net.fetch`) and the main window, so the proof and
+        // the page it unlocks see the same rule.
+        session.defaultSession.setCertificateVerifyProc((request, callback) => {
+            let verdict = -3;
+            try {
+                verdict = verifyDecision(request, pinScope(current, current ? instanceRecordFor(current) : null));
+            } catch {
+                // Anything unexpected keeps Chromium's own verdict.
+            }
+            callback(verdict);
+        });
         session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
             callback(allowPermission(permission, details.requestingUrl, server()));
         });
