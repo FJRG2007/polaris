@@ -210,6 +210,15 @@ export function wireMessages(
     return { messages, lit: lamps !== undefined };
 }
 
+/** How long lit lamps last with nothing heard about them. Lit lamps go out
+ *  with every position, so a lost "off" only holds them this long. */
+export const LAMPS_HOLD_MS = POSE_EVERY_MS * 4;
+
+/** Whether lamps last heard at `heardAt` still stand at `now`. */
+export function lampsCurrent(heardAt: number | undefined, now: number): boolean {
+    return heardAt !== undefined && now - heardAt <= LAMPS_HOLD_MS;
+}
+
 /** Whether lamps are worth drawing: any of them lit. */
 export function anyLampLit(lamps: Lamps): boolean {
     return lamps.brake > 0 || lamps.reverse || lamps.signal !== 0;

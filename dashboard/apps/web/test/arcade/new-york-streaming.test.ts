@@ -94,6 +94,21 @@ describe("blocks entering and leaving the radius", () => {
         expect(entering).toEqual([]);
         expect(leaving).toEqual([]);
     });
+
+    it("refills blocks a full pool cut short once a leaving block frees slots, closest first", () => {
+        const [a, b, c, d] = [{ n: "a" }, { n: "b" }, { n: "c" }, { n: "d" }];
+        const resident = new Map<object, unknown[]>([[a, []], [b, []], [c, []]]);
+        const { entering, leaving } = slots.diffResident(resident, [b, d, c], new Set([b]));
+        expect(leaving).toEqual([a, b]);
+        expect(entering).toEqual([b, d]);
+    });
+
+    it("leaves a cut-short block alone while nothing frees a slot", () => {
+        const [a, b] = [{ n: "a" }, { n: "b" }];
+        const { entering, leaving } = slots.diffResident(new Set([a, b]), [a, b], new Set([b]));
+        expect(entering).toEqual([]);
+        expect(leaving).toEqual([]);
+    });
 });
 
 describe("per-frame fill budget", () => {

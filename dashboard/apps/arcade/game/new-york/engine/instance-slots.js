@@ -62,13 +62,22 @@ export function dirtyRuns(dirty, limit, maxRuns = 16) {
 }
 
 // Which of `nearby` are new and which of `resident` (a Set, or a Map keyed by block) are gone. `nearby` keeps its
-// order (closest first), so the entering list is the order to fill them in.
-export function diffResident(resident, nearby) {
+// order (closest first), so the entering list is the order to fill them in. Blocks in `partial` were cut short by a
+// full pool: once a block leaves and frees slots, those still in range leave and enter again in range order, so the
+// freed slots go to the closest blocks.
+export function diffResident(resident, nearby, partial = null) {
   const keep = new Set(nearby);
   const leaving = [];
   for (const blk of resident.keys()) if (!keep.has(blk)) leaving.push(blk);
+  const refill = leaving.length > 0 && partial && partial.size > 0;
   const entering = [];
-  for (const blk of nearby) if (!resident.has(blk)) entering.push(blk);
+  for (const blk of nearby) {
+    if (!resident.has(blk)) entering.push(blk);
+    else if (refill && partial.has(blk)) {
+      leaving.push(blk);
+      entering.push(blk);
+    }
+  }
   return { entering, leaving };
 }
 

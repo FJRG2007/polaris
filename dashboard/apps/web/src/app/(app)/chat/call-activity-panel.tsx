@@ -450,6 +450,8 @@ function usePoseSync({
                 const known = message.kind === "pose" ? message.pose : poses.current.get(from);
                 if (!known) return;
                 const { lamps: _carried, ...position } = known;
+                if (!callGame.lampsCurrent(lampsHeardAt.current.get(from), at))
+                    lampsOf.current.delete(from);
                 const lamps = lampsOf.current.get(from);
                 poses.current.set(from, lamps ? { ...position, lamps } : position);
                 pushPlayers();

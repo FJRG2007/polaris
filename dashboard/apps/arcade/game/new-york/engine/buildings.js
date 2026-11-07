@@ -712,9 +712,12 @@ function buildCityBlocks(scene, landmarkColliders = []) {
   // Block -> flat [kind, owner, kind, owner, ...] of the slots it holds; owner.slot follows the instance when the pool
   // compacts. A block is resident from the frame it is filled until it leaves the radius.
   const resident = new Map();
+  const partial = new Set();
   let pending = [];
   let nearbyBlocks = [];
   const blockCost = (blk) => blk.cornices.length + blk.waterTowers.length * 3 + blk.hvacUnits.length
+    + blk.awnings.length * 2 + blk.scaffoldSheds.length;
+  const blockSlots = (blk) => blk.cornices.length + blk.waterTowers.length + blk.hvacUnits.length
     + blk.awnings.length * 2 + blk.scaffoldSheds.length;
 
   function hold(held, kind) {
@@ -818,6 +821,13 @@ function buildCityBlocks(scene, landmarkColliders = []) {
       shedInst.setMatrixAt(slot, dummy.matrix);
     }
     dummy.rotation.set(0, 0, 0);
+    if (held.length / 2 < blockSlots(blk)) partial.add(blk);
+  }
+
+  function evict(blk) {
+    release(resident.get(blk));
+    resident.delete(blk);
+    partial.delete(blk);
   }
 
   // Ranges stay queued until the renderer uploads them (it clears them after), so a frame that is not drawn loses
@@ -878,11 +888,8 @@ function buildCityBlocks(scene, landmarkColliders = []) {
         return da - db;
       });
 
-      const { entering, leaving } = diffResident(resident, nearbyBlocks);
-      for (const blk of leaving) {
-        release(resident.get(blk));
-        resident.delete(blk);
-      }
+      const { entering, leaving } = diffResident(resident, nearbyBlocks, partial);
+      for (const blk of leaving) evict(blk);
       pending = entering;
 
       activeAwnings.length = 0;

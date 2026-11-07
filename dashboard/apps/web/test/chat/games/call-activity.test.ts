@@ -255,6 +255,13 @@ describe("car lamps in a position", () => {
         });
     });
 
+    it("go out on their own when nothing keeps them lit, so a lost off message never sticks", () => {
+        expect(activity.lampsCurrent(undefined, 1000)).toBe(false);
+        expect(activity.lampsCurrent(1000, 1000 + activity.POSE_EVERY_MS)).toBe(true);
+        expect(activity.lampsCurrent(1000, 1000 + activity.LAMPS_HOLD_MS)).toBe(true);
+        expect(activity.lampsCurrent(1000, 1001 + activity.LAMPS_HOLD_MS)).toBe(false);
+    });
+
     it("drop a lamps message that does not fit", () => {
         for (const bad of [
             { kind: "lamps", game: "new-york" },
