@@ -20,5 +20,6 @@
     "inviteDenied": "An admin has turned off games in calls for your account.",
     "inviteMissing": "This game cannot be played together here.",
     "fullscreen": "Full screen",
-    "exitFullscreen": "Exit full screen"
+    "exitFullscreen": "Exit full screen",
+    "coverMissing": "No cover yet"
 }
