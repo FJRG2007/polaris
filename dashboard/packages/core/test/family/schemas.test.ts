@@ -26,7 +26,7 @@ const child = {
 
 describe("create a minor", () => {
     it("accepts a child with no email, normalized", () => {
-        const parsed = schemas.createMinorSchema.parse({ ...child, email: "" });
+        const parsed = schemas.createMinorSchema.parse({ ...child, email: "   " });
         expect(parsed.name).toBe("Mia López");
         expect(parsed.username).toBe("mia_2019");
         expect(parsed.email).toBeUndefined();
@@ -34,7 +34,7 @@ describe("create a minor", () => {
 
     it("accepts an email when there is one", () => {
         expect(schemas.createMinorSchema.parse({ ...child, email: " Mia@Example.test " }).email).toBe(
-            "Mia@Example.test"
+            "mia@example.test"
         );
     });
 
@@ -48,6 +48,10 @@ describe("create a minor", () => {
         for (const birthMonth of [monthsAgo(0), monthsAgo(18 * 12 - 1)]) {
             expect(schemas.createMinorSchema.safeParse({ ...child, birthMonth }).success).toBe(true);
         }
+    });
+
+    it("refuses an address that is not one", () => {
+        expect(schemas.createMinorSchema.safeParse({ ...child, email: "mia@" }).success).toBe(false);
     });
 
     it("refuses a password built from the child's name", () => {

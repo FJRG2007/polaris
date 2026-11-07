@@ -60,7 +60,11 @@ export const createMinorSchema = z
         username: usernameField,
         password: passwordField,
         birthMonth: minorBirthMonthField,
-        email: z.union([z.literal("").transform(() => undefined), emailField]).optional()
+        // Blank means none; an address is stored lowercased, as every account's is compared.
+        email: z.preprocess(
+            (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+            emailField.transform((value) => value.toLowerCase()).optional()
+        )
     })
     .superRefine((value, ctx) => {
         if (passwordMatchesIdentity(value.password, [value.name, value.username, value.email])) {
