@@ -199,7 +199,11 @@
         "padModes": "Cambiar modo",
         "padZoom": "Zoom",
         "padMap": "Callejero",
-        "padMenu": "Menú"
+        "padMenu": "Menú",
+        "gamepadNamed": "Mando: {name}",
+        "padConnected": "{name} conectado",
+        "padDisconnected": "{name} desconectado",
+        "padUnmapped": "Este mando no tiene el diseño estándar; algunos botones pueden variar"
     },
     "menu": {
         "title": "En pausa",

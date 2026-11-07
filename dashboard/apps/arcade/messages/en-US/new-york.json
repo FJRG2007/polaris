@@ -199,7 +199,11 @@
         "padModes": "Change mode",
         "padZoom": "Zoom",
         "padMap": "Street map",
-        "padMenu": "Menu"
+        "padMenu": "Menu",
+        "gamepadNamed": "Gamepad: {name}",
+        "padConnected": "{name} connected",
+        "padDisconnected": "{name} disconnected",
+        "padUnmapped": "This gamepad has no standard layout, so some buttons may differ"
     },
     "menu": {
         "title": "Paused",

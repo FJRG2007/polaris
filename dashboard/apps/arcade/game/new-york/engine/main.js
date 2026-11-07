@@ -198,7 +198,12 @@ async function initApp() {
   const touchControls = new TouchControls(controllerManager);
   const soundButton = document.getElementById('btn-sound');
   const audioSystem = new CityAudioSystem({ controllerManager, trafficSystem, highwayTraffic, streetDetails }, {
-    onStateChange: updateSoundButton
+    onStateChange: updateSoundButton,
+    // The player's own hits shake a gamepad that can (the listener sees every collision in the city)
+    onImpact: (impact) => {
+      const player = controllerManager.getActiveEntity();
+      if (player && (impact.a === player || impact.b === player)) gamepadControls?.impact(impact.speed);
+    }
   });
   function updateSoundButton() {
     if (!soundButton) return;
@@ -321,8 +326,35 @@ async function initApp() {
     },
     onCycleCamera: cycleCamera,
     onToggleMap: () => mapSystem.toggleFullMap(!mapSystem.isFullMapOpen),
-    onCloseMap: () => mapSystem.toggleFullMap(false)
+    onCloseMap: () => mapSystem.toggleFullMap(false),
+    onHorn: () => audioSystem.honk(controllerManager.getActiveEntity()),
+    onPadChange: ({ connected, name }) => {
+      showPadNotice(t(connected ? 'controls.padConnected' : 'controls.padDisconnected', { name: name || t('controls.gamepad') }));
+      gameMenu?.refresh();
+    }
   });
+  // A gamepad plugged in, paired or lost says so for a few seconds. It is a manual popover, shown afresh each time, so it
+  // lands in the top layer above the menu's modal dialog too.
+  const padNotice = document.getElementById('pad-notice');
+  let padNoticeTimer = 0;
+  function showPadNotice(text) {
+    if (!padNotice) return;
+    padNotice.textContent = text;
+    try {
+      if (padNotice.matches(':popover-open')) padNotice.hidePopover();
+      padNotice.showPopover();
+    } catch {
+      padNotice.hidden = false;
+    }
+    clearTimeout(padNoticeTimer);
+    padNoticeTimer = setTimeout(() => {
+      try {
+        padNotice.hidePopover();
+      } catch {
+        padNotice.hidden = true;
+      }
+    }, 4000);
+  }
 
   // Keyboard guide for each mode: [keys, action] (the action is a key of controls.<mode>; 'Drag' is the mouse)
   const controlHints = {
@@ -333,10 +365,11 @@ async function initApp() {
   };
   const keyName = (key) => (key === 'Drag' ? t('controls.drag') : key);
   const modeHints = (mode) => (controlHints[mode] || []).map(([keys, action]) => [keys.map(keyName), t(`controls.${mode}.${action}`)]);
-  // The menu's Controls page: this mode's keys, the ones that work everywhere, and the gamepad's
+  // The menu's Controls page: this mode's keys, the ones that work everywhere, and the gamepad's - first, under the pad's
+  // name, while one is connected
   function controlSections(mode) {
     const driving = mode === 'car' || mode === 'cyclist';
-    return [
+    const keyboard = [
       { title: t(`modes.${mode}`), rows: modeHints(mode) },
       {
         title: t('controls.general'),
@@ -349,25 +382,29 @@ async function initApp() {
           [['N'], t('controls.sound')],
           [['Esc'], t('controls.menu')]
         ]
-      },
-      {
-        title: t('controls.gamepad'),
-        rows: [
-          [[t('controls.leftStick')], t('controls.padMove')],
-          [[t('controls.rightStick')], t('controls.padLook')],
-          ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : []),
-          ...(mode === 'helicopter'
-            ? [[['RT', 'A'], t('controls.helicopter.up')], [['LT', 'B'], t('controls.helicopter.down')], [['L3'], t('controls.helicopter.turbo')]]
-            : []),
-          ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
-          [['Y'], t('controls.padCamera')],
-          [['LB', 'RB'], t('controls.padModes')],
-          [['↑', '↓'], t('controls.padZoom')],
-          [['Back'], t('controls.padMap')],
-          [['Start'], t('controls.padMenu')]
-        ]
       }
     ];
+    const pad = gamepadControls.connected;
+    const gamepad = {
+      title: pad && gamepadControls.padName ? t('controls.gamepadNamed', { name: gamepadControls.padName }) : t('controls.gamepad'),
+      rows: [
+        [[t('controls.leftStick')], t('controls.padMove')],
+        [[t('controls.rightStick')], t('controls.padLook')],
+        ...(driving ? [[['RT', 'LT'], t('controls.padThrottle')]] : []),
+        ...(mode === 'helicopter'
+          ? [[['RT', 'A'], t('controls.helicopter.up')], [['LT', 'B'], t('controls.helicopter.down')], [['L3'], t('controls.helicopter.turbo')]]
+          : []),
+        ...(mode === 'person' ? [[['A'], t('controls.padJump')]] : []),
+        ...(mode === 'car' ? [[['X'], t('controls.car.horn')]] : []),
+        [['Y'], t('controls.padCamera')],
+        [['LB', 'RB'], t('controls.padModes')],
+        [['↑', '↓'], t('controls.padZoom')],
+        [['Back'], t('controls.padMap')],
+        [['Start'], t('controls.padMenu')],
+        ...(pad && !gamepadControls.standard ? [[['?'], t('controls.padUnmapped')]] : [])
+      ]
+    };
+    return pad ? [gamepad, ...keyboard] : [...keyboard, gamepad];
   }
   // Top speeds in mph (controllers.js caps them at 8.2, 36, 19 & 52 m/s, the helicopter 83 with turbo): full scale of the
   // speed meter

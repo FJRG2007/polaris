@@ -71,11 +71,13 @@ describe("browser defaults over the game", () => {
 });
 
 describe("helicopter on a gamepad", () => {
-    it("climbs on RT and descends on LT by how far they are pulled", () => {
+    it("climbs on RT and descends on LT by how far they are pulled, past the triggers' dead zone", () => {
         const up = pad({ 7: 0.8 });
-        expect(gamepad.helicopterPadInput(up, heldFrom(up)).vertical).toBeCloseTo(0.8);
+        expect(gamepad.helicopterPadInput(up, heldFrom(up)).vertical).toBeCloseTo(0.75 / 0.95);
         const down = pad({ 6: 0.6 });
-        expect(gamepad.helicopterPadInput(down, heldFrom(down)).vertical).toBeCloseTo(-0.6);
+        expect(gamepad.helicopterPadInput(down, heldFrom(down)).vertical).toBeCloseTo(-0.55 / 0.95);
+        const resting = pad({ 7: 0.04 });
+        expect(gamepad.helicopterPadInput(resting, heldFrom(resting)).vertical).toBe(0);
     });
 
     it("descends on B and climbs on A at full rate", () => {
