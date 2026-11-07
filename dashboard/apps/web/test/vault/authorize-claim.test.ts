@@ -24,7 +24,13 @@ const claimVaultAuthorization = vi.fn(async () => ({
 const issueClientKey = vi.fn(async () => "pol.secret" as string | null);
 const issueVaultToken = vi.fn(async () => ({ access_token: "access", refresh_token: "refresh" }));
 
+const access = vi.hoisted(() => ({ vault: true }));
+
 vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@polaris/auth", async (actual) => ({
+    ...(await actual<typeof import("@polaris/auth")>()),
+    userHasPermission: vi.fn(async () => access.vault)
+}));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: true }),
@@ -62,6 +68,7 @@ function claim(): Parameters<typeof connectAuthorizeClaim>[0] {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    access.vault = true;
 });
 
 describe("collecting an approval", () => {
@@ -80,6 +87,14 @@ describe("collecting an approval", () => {
         issueVaultToken.mockRejectedValueOnce(new Error("the database was not there"));
 
         await expect(connectAuthorizeClaim(claim())).rejects.toThrow();
+        expect(issueClientKey).not.toHaveBeenCalled();
+    });
+
+    it("hands over nothing to an account that lost the vault after approving", async () => {
+        access.vault = false;
+        const response = await connectAuthorizeClaim(claim());
+        await expect(response.json()).resolves.toEqual({ status: "denied" });
+        expect(issueVaultToken).not.toHaveBeenCalled();
         expect(issueClientKey).not.toHaveBeenCalled();
     });
 });

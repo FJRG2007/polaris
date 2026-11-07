@@ -13,6 +13,7 @@
 
 import * as core from "@polaris/core";
 import { deviceSchema } from "@polaris/core";
+import { userHasPermission } from "@polaris/auth";
 import { preloginFor } from "@/lib/vault/account";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readExtensionToken } from "@/lib/extension/sessions";
@@ -267,6 +268,12 @@ export async function connectAuthorizeClaim(context: VaultContext): Promise<Resp
     const claim = await claimVaultAuthorization(deviceCode);
     if (claim.status !== "approved" || !claim.claimed) {
         return Response.json({ status: claim.status });
+    }
+    // Approving needed `vault.use`, and it can be taken away between the
+    // approval and this collection. The key is not handed over then: the
+    // request ends as refused, like one the account turned down.
+    if (!(await userHasPermission(claim.claimed.userId, "vault.use"))) {
+        return Response.json({ status: "denied" });
     }
 
     // The same credential the password grant issues, because it reaches the same
