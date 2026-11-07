@@ -219,7 +219,11 @@
         "off": "No",
         "volume": "Volumen",
         "soundOn": "Con sonido",
-        "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}"
+        "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}",
+        "callMute": "Silenciar micrófono",
+        "callUnmute": "Activar micrófono",
+        "callBack": "Volver a la llamada",
+        "callLeave": "Salir de la llamada"
     },
     "start": {
         "title": "¿Cómo quieres jugar?",

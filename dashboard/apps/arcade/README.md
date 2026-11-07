@@ -41,6 +41,7 @@ From the game to the host:
 | `polaris-game:failed`   | `reason`: `"graphics"` (no WebGPU or WebGL2), `"data"`, `"error"`              | Before `ready`, which takes it back        |
 | `polaris-game:state`    | `x`, `y`, `z`, `heading` (radians, -pi to pi), `mode`, `speed` (m/s), `lamps`? | Up to ten times a second, while joined     |
 | `polaris-game:exit`     |                                                                                | The reader chose Exit game in the menu     |
+| `polaris-game:call-action` | `action`: `"mic"`, `"leave-game"` or `"leave-call"`                      | The reader used a call control from the game's menu |
 
 From the host to the game:
 
@@ -50,6 +51,7 @@ From the host to the game:
 | `polaris-game:join`    | `self`: `{ id, name }`                                      | Starts sending `state`                                                                                                          |
 | `polaris-game:players` | `players`: `[{ id, name, x, y, z, heading, mode, lamps? }]` | Everyone else in the session. Replaces the previous list, so a missing player is removed                                        |
 | `polaris-game:leave`   |                                                             | Stops sending `state` and removes every marker                                                                                  |
+| `polaris-game:call`    | `controls` (boolean), `micOn`                               | Offers the call's microphone, Back to the call and Leave the call in the game's menu while `controls` is true. Sent once the game is ready and on every change of the microphone |
 
 `mode` is one of `person`, `car`, `cyclist` or `helicopter`. `id` is at most 128
 characters and `name` at most 64. The game draws at most 32 other players, skips

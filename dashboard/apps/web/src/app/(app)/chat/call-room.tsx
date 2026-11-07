@@ -655,6 +655,13 @@ export function CallRoom({
     // where it is heard wherever the reader is standing. This is left for the
     // guest page, which has no provider and no other screen to be on.
     const held = useHeldCall();
+    // A held call sounds it as the provider lets go (`leave` in
+    // `call-session`), whichever control hung up; the guest page has no
+    // provider, so it is sounded here.
+    const hangUp = () => {
+        if (!held) playCallSound("hangUp");
+        onLeave();
+    };
     /** Whether this screen may start a recording at all: the host - or, in a
      *  conversation of equals, anybody in it - in a browser that can record
      *  video, with the call held above it. The guest page has no provider and
@@ -1019,6 +1026,11 @@ export function CallRoom({
                                 focused={live === ACTIVITY_KEY}
                                 onFocus={() => focus(ACTIVITY_KEY)}
                                 away={!gameShown}
+                                controls={{
+                                    micOn: call.micOn,
+                                    toggleMic: call.toggleMic,
+                                    leaveCall: hangUp
+                                }}
                                 onInvite={() => {
                                     const game = activity.session?.game;
                                     if (!game) return;
@@ -1541,13 +1553,7 @@ export function CallRoom({
                         className="h-[2.625rem] w-[3.25rem] rounded-xl"
                         aria-label={t("callRoom.leaveTheCall")}
                         title={t("callRoom.leaveTheCall")}
-                        onClick={() => {
-                            // A held call sounds it as the provider lets go (`leave`
-                            // in `call-session`), whichever control hung up; the
-                            // guest page has no provider, so it is sounded here.
-                            if (!held) playCallSound("hangUp");
-                            onLeave();
-                        }}
+                        onClick={hangUp}
                     >
                         <PhoneOff className="size-4" />
                     </Button>

@@ -29,7 +29,7 @@ import {
 import { onActivityJoin, takeActivityJoin } from "./activity-join";
 import * as actions from "./call-activity-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { CallActivityHost } from "@/lib/app-extensions/types";
+import type { CallActivityControls, CallActivityHost } from "@/lib/app-extensions/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { Avatar } from "@/components/avatar";
@@ -714,6 +714,7 @@ export function CallGameView({
     activity,
     onInvite,
     onLeave,
+    controls,
     focused = activity.focused,
     onFocus = () => activity.setFocused(!activity.focused),
     away = false,
@@ -722,6 +723,8 @@ export function CallGameView({
     activity: CallActivity;
     onInvite?: () => void;
     onLeave?: () => void;
+    /** The call's microphone and hang-up, offered inside the game as well. */
+    controls?: Omit<CallActivityControls, "leaveGame">;
     focused?: boolean;
     onFocus?: () => void;
     /** Running out of sight while something else has the stage: nothing in it
@@ -732,9 +735,23 @@ export function CallGameView({
 }) {
     const t = useTranslations("chat");
     const [frame, setFrame] = useState<HTMLElement | null>(null);
+    const leaveGame = onLeave ?? activity.leave;
+    const micOn = controls?.micOn;
+    const toggleMic = controls?.toggleMic;
+    const leaveCall = controls?.leaveCall;
+    // The call's controls ride along with the host, so the game can offer them
+    // to a gamepad or a keyboard that the call's own bar is out of reach of.
+    const base = activity.host;
+    const host = useMemo(
+        () =>
+            base && toggleMic && leaveCall && micOn !== undefined
+                ? { ...base, controls: { micOn, toggleMic, leaveCall, leaveGame } }
+                : base,
+        [base, micOn, toggleMic, leaveCall, leaveGame]
+    );
     const played = playedGame(activity);
-    if (!played) return null;
-    const { session, host, offer } = played;
+    if (!played || !host) return null;
+    const { session, offer } = played;
     const game = activity.gameName(session.game) ?? t("callGames.someGame");
 
     return (
@@ -777,7 +794,7 @@ export function CallGameView({
                         <UserPlus className="size-4" />
                     </button>
                 )}
-                <Button size="sm" variant="ghost" onClick={onLeave ?? activity.leave}>
+                <Button size="sm" variant="ghost" onClick={leaveGame}>
                     <LogOut className="size-4" />
                     {t("callGames.leave")}
                 </Button>

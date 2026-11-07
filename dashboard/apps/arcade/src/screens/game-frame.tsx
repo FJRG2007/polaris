@@ -15,7 +15,9 @@
  *
  * The frame and its page talk over `postMessage`; the messages are listed in
  * the app's README ("Embed contract"). Inside a call, the call is the host: it
- * is told where the reader goes and hands back the other players.
+ * is told where the reader goes and hands back the other players, and lends the
+ * game its microphone and hang-up, so the game's menu can offer them to a
+ * gamepad, a keyboard or a touch screen that cannot reach the call's bar.
  *
  * In a call the frame is sandboxed without `allow-same-origin`, so its page
  * has an origin of its own (`"null"`) rather than the dashboard's. A
@@ -50,6 +52,11 @@ const fromGame = z.discriminatedUnion("type", [
         done: z.number().min(0).max(1)
     }),
     z.object({ type: z.literal("polaris-game:ready") }),
+    // The reader used one of the call's controls from the game's menu
+    z.object({
+        type: z.literal("polaris-game:call-action"),
+        action: z.enum(["mic", "leave-game", "leave-call"])
+    }),
     z.object({
         type: z.literal("polaris-game:failed"),
         reason: z.enum(["graphics", "data", "error"])
@@ -133,6 +140,12 @@ export function GameFrame({
             if (data.type === "polaris-game:state") host.current?.onState(data);
             else if (data.type === "polaris-game:hello") setup.current();
             else if (data.type === "polaris-game:exit") exit.current?.();
+            else if (data.type === "polaris-game:call-action") {
+                const controls = host.current?.controls;
+                if (data.action === "mic") controls?.toggleMic();
+                else if (data.action === "leave-game") controls?.leaveGame();
+                else controls?.leaveCall();
+            }
             else if (data.type === "polaris-game:ready") {
                 setLoad({ phase: "ready" });
                 // Keys go to the frame that has the focus: without this they stayed with the page
@@ -184,6 +197,19 @@ export function GameFrame({
             post({ type: "polaris-game:leave" });
         };
     }, [ready, seat, attempt]);
+
+    // The call's controls, offered in the game's menu: whether there are any,
+    // and the microphone as it is now, again whenever it changes.
+    const micOn = call?.controls?.micOn;
+    useEffect(() => {
+        if (!ready) return;
+        frame.current?.contentWindow?.postMessage(
+            micOn === undefined
+                ? { type: "polaris-game:call", controls: false }
+                : { type: "polaris-game:call", controls: true, micOn },
+            "*"
+        );
+    }, [ready, micOn, attempt]);
 
     const onFrameLoad = () => {
         window.clearTimeout(silence.current);

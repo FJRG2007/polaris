@@ -145,6 +145,19 @@ export interface CallActivityHost {
     /** Where the reader is, as the game's frame said it (`polaris-game:state`).
      *  Checked by the call before it is passed on. */
     readonly onState: (state: unknown) => void;
+    /** The call's own controls, for the game to offer inside its frame, where
+     *  the keyboard, a gamepad or a touch screen can reach them while the
+     *  call's bar cannot. Absent where there is no call to control (a lobby). */
+    readonly controls?: CallActivityControls;
+}
+
+/** What a game may do to the call it is played in. */
+export interface CallActivityControls {
+    readonly micOn: boolean;
+    readonly toggleMic: () => void;
+    /** Stop playing and go back to the call. */
+    readonly leaveGame: () => void;
+    readonly leaveCall: () => void;
 }
 
 export interface AppExtension {
