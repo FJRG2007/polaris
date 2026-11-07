@@ -29,7 +29,7 @@ import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
  * extension points, not something it does. The value keeps its old spelling so
  * a popup that was closed on that screen opens on it again.
  */
-export type Section = "home" | "vault" | "servers" | "settings";
+export type Section = "home" | "vault" | "servers" | "settings" | "vpn";
 
 const SECTION_KEY = "polaris.section";
 
@@ -44,7 +44,7 @@ export function useSection(): [Section, (next: Section) => void] {
     const [section, setSection] = useState<Section>(() => {
         try {
             const held = window.localStorage.getItem(SECTION_KEY);
-            return held === "vault" || held === "servers" ? held : "home";
+            return held === "vault" || held === "servers" || held === "vpn" ? held : "home";
         } catch {
             return "home";
         }
@@ -490,7 +490,7 @@ export function Home({
                 </li>
                 {status.canPolar === false ? null : <PolarRow status={status} />}
                 {status.canPolar === false ? null : <PolarBrowserRow />}
-                <VpnRow />
+                <VpnRow onOpen={() => onOpen("vpn")} />
             </ul>
         </main>
     );

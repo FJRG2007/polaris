@@ -1,113 +1,118 @@
 /**
- * The VPN on the home screen: where this browser leaves from, and the servers it
- * can switch to. Hidden where this Polaris has none for this account.
+ * The VPN on the home screen: whether this browser is connected and where from,
+ * one press away from its own screen. Hidden where this Polaris has none for
+ * this account.
+ *
+ * The state is held for the popup's lifetime, so opening the VPN screen from
+ * this row draws what the row already knows instead of loading it again.
  */
 
 import { useWords } from "./words";
 import { useEffect, useState } from "react";
-import { EVERY_SITE } from "@/lib/injection";
+import { flagPath, placeOf } from "@/lib/vpn-places";
+import { askBackground } from "@/lib/messages";
 import type { VpnNode, VpnState } from "@/lib/vpn";
-import { askBackground, type Request } from "@/lib/messages";
 
-export function VpnRow(): React.JSX.Element | null {
-    const t = useWords();
-    const [state, setState] = useState<VpnState | null>(null);
-    const [open, setOpen] = useState(false);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+let held: VpnState | null = null;
+const listeners = new Set<(state: VpnState) => void>();
 
-    useEffect(() => {
+/** Shares a fresh state with every part of the popup drawing the VPN. */
+export function shareVpnState(state: VpnState): void {
+    held = state;
+    for (const listener of listeners) listener(state);
+}
+
+/**
+ * The VPN's state: the last one this popup saw at once, asked again in the
+ * background. `failed` is a question the worker could not answer.
+ */
+export function useVpnState(): { state: VpnState | null; failed: boolean; reload: () => void } {
+    const [state, setState] = useState<VpnState | null>(held);
+    const [failed, setFailed] = useState(false);
+    const reload = (): void => {
+        setFailed(false);
         void askBackground({ kind: "vpn" }).then((reply) => {
-            if (reply.ok && "vpn" in reply) setState(reply.vpn);
+            if (reply.ok && "vpn" in reply) shareVpnState(reply.vpn);
+            else setFailed(true);
         });
+    };
+    useEffect(() => {
+        listeners.add(setState);
+        reload();
+        return () => {
+            listeners.delete(setState);
+        };
+        // Asked once per mount; `reload` is the way to ask again.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    return { state, failed, reload };
+}
 
-    const send = (request: Request): void => {
-        setBusy(true);
-        setError(null);
-        void askBackground(request).then((reply) => {
-            setBusy(false);
-            if (reply.ok && "vpn" in reply) setState(reply.vpn);
-            else setError(reply.ok ? t("errors.serverSilent") : reply.error);
-        });
-    };
+/** The node in use, from the list, where the list still has it. */
+export function activeNode(state: VpnState): VpnNode | null {
+    return state.nodes.find((node) => node.id === state.active?.nodeId) ?? null;
+}
 
-    /** The grant has to be asked for here, inside the click: the worker cannot. */
-    const connect = (nodeId: string): void => {
-        setBusy(true);
-        setError(null);
-        void browser.permissions
-            .request({ origins: [...EVERY_SITE] })
-            .catch(() => false)
-            .then((granted) => {
-                if (granted) return send({ kind: "vpnConnect", nodeId });
-                setBusy(false);
-                return setError(t("vpn.refused.noSites"));
-            });
-    };
+/** A country's flag, or a globe for a server nobody placed. Decorative: the
+ *  country's name is always written beside it. */
+export function Flag({ code, large }: { code: string | null; large?: boolean }): React.JSX.Element {
+    const [broken, setBroken] = useState(false);
+    const path = flagPath(code);
+    const size = large ? "vpn-flag large" : "vpn-flag";
+    if (!path || broken)
+        return (
+            <span className={`${size} globe`} aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+                </svg>
+            </span>
+        );
+    return (
+        <img
+            className={size}
+            src={path}
+            alt=""
+            aria-hidden="true"
+            onError={() => setBroken(true)}
+        />
+    );
+}
 
+export function VpnRow({ onOpen }: { onOpen: () => void }): React.JSX.Element | null {
+    const t = useWords();
+    const { state } = useVpnState();
     if (!state || (!state.available && !state.active)) return null;
-    const { active } = state;
-    const label = (node: VpnNode): string =>
-        node.exit === "tor" ? t("vpn.throughTor", { name: node.name }) : node.name;
-    /** Why a server cannot be picked, as the host said; the old sentence where it did not. */
-    const notForBrowsers = (node: VpnNode): string =>
-        node.browserIssue
-            ? t(`vpn.browserIssue.${node.browserIssue}`, { name: node.name })
-            : t("vpn.noBrowserRoute");
-
+    const node = activeNode(state);
+    const where = state.active
+        ? ((node ? placeOf(node, t.locale) : null) ?? state.active.nodeName)
+        : null;
+    const line = where ? t("vpn.connectedFrom", { place: where }) : t("vpn.off");
     return (
         <li className="section-row">
-            <button className="section" aria-expanded={open} onClick={() => setOpen(!open)}>
-                <span className="section-mark" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 3 5 6v5.5c0 4.3 2.9 7.8 7 9.5 4.1-1.7 7-5.2 7-9.5V6z" />
-                    </svg>
-                </span>
+            <button className="section" onClick={onOpen}>
+                {state.active ? (
+                    <span className="section-mark on" aria-hidden="true">
+                        <Flag code={node?.country ?? null} />
+                    </span>
+                ) : (
+                    <span className="section-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 3 5 6v5.5c0 4.3 2.9 7.8 7 9.5 4.1-1.7 7-5.2 7-9.5V6z" />
+                        </svg>
+                    </span>
+                )}
                 <span className="section-text">
                     <span className="strong">{t("vpn.title")}</span>
-                    <span className="muted small">
-                        {active ? t("vpn.on", { name: active.nodeName }) : t("vpn.off")}
+                    <span className="muted small section-sub" title={line}>
+                        {state.active ? <span className="vpn-dot" aria-hidden="true" /> : null}
+                        {line}
                     </span>
                 </span>
                 <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d={open ? "m6 9 6 6 6-6" : "m9 18 6-6-6-6"} />
+                    <path d="m9 18 6-6-6-6" />
                 </svg>
             </button>
-            {open ? (
-                <div className="section-text" style={{ padding: "4px 12px 8px", gap: 6 }}>
-                    {active ? (
-                        <button disabled={busy} onClick={() => send({ kind: "vpnDisconnect" })}>
-                            {t("vpn.disconnect")}
-                        </button>
-                    ) : null}
-                    {state.nodes.map((node) => (
-                        <button
-                            key={node.id}
-                            disabled={busy || !node.browser || node.id === active?.nodeId}
-                            title={node.browser ? undefined : notForBrowsers(node)}
-                            onClick={() => connect(node.id)}
-                        >
-                            {label(node)}
-                        </button>
-                    ))}
-                    {state.nodes.some((node) => !node.browser && !node.browserIssue) ? (
-                        <span className="muted small">{t("vpn.noBrowserRoute")}</span>
-                    ) : null}
-                    {state.nodes
-                        .filter((node) => !node.browser && node.browserIssue)
-                        .map((node) => (
-                            <span key={node.id} className="muted small">
-                                {notForBrowsers(node)}
-                            </span>
-                        ))}
-                    {error ? (
-                        <span role="alert" className="small">
-                            {error}
-                        </span>
-                    ) : null}
-                </div>
-            ) : null}
         </li>
     );
 }

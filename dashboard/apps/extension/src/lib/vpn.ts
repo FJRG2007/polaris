@@ -19,6 +19,7 @@
  */
 
 import { EVERY_SITE } from "@/lib/injection";
+import { countryCode } from "@/lib/vpn-places";
 
 /** A server this account may leave through. */
 export interface VpnNode {
@@ -31,6 +32,10 @@ export interface VpnNode {
     /** Why not, while `browser` is false; null when the host did not say, as one
      *  older than this reason does. */
     readonly browserIssue: VpnBrowserIssue | null;
+    /** Where traffic comes out, as a two-letter country code and a city; null where
+     *  the host has not placed it or is too old to say. */
+    readonly country: string | null;
+    readonly city: string | null;
 }
 
 export type VpnBrowserIssue = "edge" | "address" | "failed";
@@ -45,6 +50,9 @@ export interface VpnRoute {
     readonly nodeName: string;
     readonly host: string;
     readonly port: number;
+    /** When this connection was made, in milliseconds since the epoch. Missing on a
+     *  route saved before it was kept. */
+    readonly since?: number;
 }
 
 export interface VpnLogin {
@@ -58,7 +66,15 @@ export interface VpnState {
     /** False where this Polaris has no VPN for this account, or is too old to. */
     readonly available: boolean;
     readonly nodes: readonly VpnNode[];
-    readonly active: { readonly nodeId: string; readonly nodeName: string } | null;
+    readonly active: {
+        readonly nodeId: string;
+        readonly nodeName: string;
+        /** When it connected; null where the saved route predates keeping it. */
+        readonly since: number | null;
+    } | null;
+    /** Whether WebRTC is held to the proxy while connected; null where this browser
+     *  cannot be asked to. */
+    readonly webRtcGuard: boolean | null;
 }
 
 export type VpnRefusal =
@@ -119,6 +135,9 @@ export interface VpnDeps {
     readonly api: VpnApi;
     readonly route: Stored<VpnRoute | null>;
     readonly login: Stored<VpnLogin | null>;
+    /** Whether WebRTC is held to the proxy while connected. Its fallback is true, so
+     *  an install that never chose has it on. */
+    readonly webRtcGuard: Stored<boolean>;
     /** The connected Polaris and its token, as every other call reads them. */
     readonly link: () => Promise<{ origin: string | null; token: string | null }>;
     /** Every Polaris this browser knows, kept out of the tunnel. */
@@ -183,11 +202,25 @@ export function readNodes(value: unknown): VpnNode[] {
                       name: node.name,
                       exit: node.exit === "tor" ? "tor" : "direct",
                       browser: node.browser === true,
-                      browserIssue: node.browser === true ? null : browserIssueOf(node.browserIssue)
+                      browserIssue:
+                          node.browser === true ? null : browserIssueOf(node.browserIssue),
+                      country: countryCode(typeof node.country === "string" ? node.country : null),
+                      city:
+                          typeof node.city === "string" && node.city.trim()
+                              ? node.city.trim().slice(0, 120)
+                              : null
                   }
               ]
             : []
     );
+}
+
+/** A start time worth showing: a past instant, never one from a broken clock. */
+export function sinceOf(route: VpnRoute | null, now: number): number | null {
+    const since = route?.since;
+    return typeof since === "number" && Number.isFinite(since) && since > 0 && since <= now + 60_000
+        ? since
+        : null;
 }
 
 function readLogin(value: unknown): (VpnLogin & { host: string; port: number }) | null {
@@ -340,26 +373,46 @@ export class BrowserVpn {
 
     async state(): Promise<VpnState> {
         const route = await this.deps.route.getValue();
-        const active = route ? { nodeId: route.nodeId, nodeName: route.nodeName } : null;
+        const active = route
+            ? {
+                  nodeId: route.nodeId,
+                  nodeName: route.nodeName,
+                  since: sinceOf(route, (this.deps.now ?? Date.now)())
+              }
+            : null;
+        const webRtcGuard = this.deps.api.privacy?.network?.webRTCIPHandlingPolicy
+            ? await this.deps.webRtcGuard.getValue().catch(() => true)
+            : null;
         const { origin, token } = await this.deps.link();
-        if (!origin || !token) return { available: false, nodes: [], active };
+        if (!origin || !token) return { available: false, nodes: [], active, webRtcGuard };
         const reply = await this.send(`${origin}/api/extension/vpn`, {
             headers: { authorization: `Bearer ${token}` }
         });
-        if (!reply?.ok) return { available: false, nodes: [], active };
+        if (!reply?.ok) return { available: false, nodes: [], active, webRtcGuard };
         const nodes = readNodes(await reply.json().catch(() => null));
-        return { available: nodes.length > 0, nodes, active };
+        return { available: nodes.length > 0, nodes, active, webRtcGuard };
     }
 
-    /** Stops WebRTC from reaching out past the proxy and naming the real address. */
-    private async guardWebRtc(on: boolean): Promise<void> {
+    /**
+     * Stops WebRTC from reaching out past the proxy and naming the real address,
+     * while connected and the setting is on; lets it go otherwise.
+     */
+    private async guardWebRtc(connected: boolean): Promise<void> {
         const policy = this.deps.api.privacy?.network?.webRTCIPHandlingPolicy;
         if (!policy) return;
+        const hold =
+            connected && (await this.deps.webRtcGuard.getValue().catch(() => true)) !== false;
         await (
-            on
+            hold
                 ? policy.set({ value: "disable_non_proxied_udp", scope: "regular" })
                 : policy.clear({ scope: "regular" })
         ).catch(() => undefined);
+    }
+
+    /** The setting, kept and applied at once to a connection already up. */
+    async setWebRtcGuard(on: boolean): Promise<void> {
+        await this.deps.webRtcGuard.setValue(on);
+        if (await this.isConnected()) await this.guardWebRtc(true);
     }
 
     private async applyProxy(route: VpnRoute): Promise<boolean> {
@@ -400,7 +453,8 @@ export class BrowserVpn {
         const { login, refused } = await this.fetchLogin(node.id);
         if (!origin || !login) return { ok: false, code: refused ?? "unreachable" };
         const { host, port, ...held } = login;
-        const route = { origin, nodeId: node.id, nodeName: node.name, host, port };
+        const since = (this.deps.now ?? Date.now)();
+        const route = { origin, nodeId: node.id, nodeName: node.name, host, port, since };
         const previous = await this.deps.route.getValue();
         await this.deps.login.setValue(held);
         await this.deps.route.setValue(route);

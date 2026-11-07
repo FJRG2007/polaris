@@ -3096,6 +3096,7 @@ const vpn = new BrowserVpn({
     api: browser as unknown as VpnApi,
     route: storage.defineItem<VpnRoute | null>("local:vpn.route", { fallback: null }),
     login: storage.defineItem<VpnLogin | null>("session:vpn.login", { fallback: null }),
+    webRtcGuard: storage.defineItem<boolean>("local:vpn.webRtcGuard", { fallback: true }),
     link: async () => ({ origin: await reachOrigin(), token: await LINK_TOKEN.getValue() }),
     origins: polarisOrigins,
     changed: badge,
@@ -3796,6 +3797,12 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "vpnDisconnect":
                 if (!ours) return { ok: false, error: await say("errors.serverSilent") };
                 await vpn.disconnect();
+                return { ok: true, vpn: await vpn.state() };
+
+            case "vpnWebRtc":
+                if (!ours || typeof request.on !== "boolean")
+                    return { ok: false, error: await say("errors.serverSilent") };
+                await vpn.setWebRtcGuard(request.on);
                 return { ok: true, vpn: await vpn.state() };
 
             case "polarBrowser":

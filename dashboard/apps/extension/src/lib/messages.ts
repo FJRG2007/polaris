@@ -410,6 +410,8 @@ export type Request =
     | { readonly kind: "vpn" }
     | { readonly kind: "vpnConnect"; readonly nodeId: string }
     | { readonly kind: "vpnDisconnect" }
+    /** Whether WebRTC is held to the proxy while connected. */
+    | { readonly kind: "vpnWebRtc"; readonly on: boolean }
     /** Change how long an unlocked vault may sit unused before it locks itself. */
     | { readonly kind: "setTimeout"; readonly timeoutMs: number }
     /**
