@@ -147,6 +147,24 @@ describe("standIn", () => {
         expect(standIn({ ...failure, kind: "model" }, "llama-a", providers)?.model).toBe("llama-b");
     });
 
+    it("offers another free model of the same provider when a pinned free one is busy", () => {
+        const free = [
+            {
+                provider: "openrouter",
+                name: "OpenRouter",
+                payers: [],
+                models: [
+                    { provider: "openrouter", model: "paid/x", name: "Paid X", reasoning: false },
+                    { provider: "openrouter", model: "a/b:free", name: "A", reasoning: false },
+                    { provider: "openrouter", model: "c/d:free", name: "C", reasoning: false }
+                ]
+            }
+        ] as never;
+        const busy = { ...failure, kind: "busy" as const, slug: "openrouter" };
+        expect(standIn(busy, "a/b:free", free)?.model).toBe("c/d:free");
+        expect(standIn(busy, "paid/x", free)?.model).toBe("a/b:free");
+    });
+
     it("offers nothing when no other provider can serve", () => {
         expect(standIn(failure, "llama-a", [(providers as unknown[])[0]] as never)).toBeNull();
     });

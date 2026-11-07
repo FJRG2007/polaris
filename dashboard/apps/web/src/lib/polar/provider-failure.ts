@@ -14,8 +14,19 @@ import { z } from "zod";
 import type { UIMessage } from "ai";
 
 /** `paid`: the account has no credit and the model has no free variant to
- *  fall back on (`credit.ts`). */
-export const FAILURE_KINDS = ["key", "credit", "paid", "rate", "down", "model", "other"] as const;
+ *  fall back on (`credit.ts`). `busy`: the provider is fine but the model's
+ *  own upstream is saturated - OpenRouter's shared `:free` models say so with
+ *  a 429 - so another model answers where this one cannot. */
+export const FAILURE_KINDS = [
+    "key",
+    "credit",
+    "paid",
+    "rate",
+    "busy",
+    "down",
+    "model",
+    "other"
+] as const;
 export type FailureKind = (typeof FAILURE_KINDS)[number];
 
 export interface ProviderFailure {
@@ -26,6 +37,9 @@ export interface ProviderFailure {
 /** Out of credit, whatever status the provider chose to say it with. */
 const CREDIT =
     /payment[_ ]required|insufficient[_ ](quota|funds|balance|credits?)|credit balance|billing|out of credits/i;
+/** A 429 about the model's upstream, not about this key: OpenRouter's
+ *  `model_rate_limit_exceeded` with `limit_source: upstream_provider`. */
+const BUSY = /upstream|model[_ ]rate[_ ]limit/i;
 /** The model asked for is not one the provider serves. */
 const MODEL =
     /model[_ ]not[_ ]found|no such model|unknown model|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
@@ -70,7 +84,7 @@ export function classifyProviderFailure(error: unknown): ProviderFailure {
     if (status === 402 || CREDIT.test(said)) return { kind: "credit", status };
     if (status === 401 || status === 403) return { kind: "key", status };
     if (status === 404 || MODEL.test(said)) return { kind: "model", status };
-    if (status === 429) return { kind: "rate", status };
+    if (status === 429) return { kind: BUSY.test(said) ? "busy" : "rate", status };
     if (status >= 500) return { kind: "down", status };
     return { kind: "other", status };
 }

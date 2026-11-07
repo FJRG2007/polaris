@@ -80,7 +80,7 @@ import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
 import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
 import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
-import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
+import { answeredBy, polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
 import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
 import { goalCheckStream } from "@/lib/polar/goal-service";
@@ -483,6 +483,17 @@ export async function POST(request: Request): Promise<Response> {
         abortSignal: run.signal
     });
 
+    const standInMeta = () => {
+        const answered = answeredBy(resolved);
+        return answered.option === resolved.option
+            ? {}
+            : {
+                  model: answered.option.name,
+                  provider: answered.option.providerName,
+                  standInFor: resolved.option.name
+              };
+    };
+
     const answer = result.toUIMessageStream({
         sendReasoning: true,
         // A provider's own search reports what it read as sources.
@@ -500,12 +511,15 @@ export async function POST(request: Request): Promise<Response> {
                 : part.type === "finish"
                   ? // How long the turn worked, for the line its steps fold
                     // into, and what it spent, for the line under the answer.
+                    // A model Automatic picked may have handed the turn to its
+                    // stand-in (`models.ts`), which the answer then names.
                     {
                         workedMs: Date.now() - startedAt,
                         usage: (spent = {
-                            ...answerUsage(part.totalUsage, resolved.option),
+                            ...answerUsage(part.totalUsage, answeredBy(resolved).option),
                             ...stepContext(lastStep)
-                        })
+                        }),
+                        ...standInMeta()
                     }
                   : undefined;
         },
@@ -567,14 +581,15 @@ export async function POST(request: Request): Promise<Response> {
                 console.info(
                     `polar: turn input ${spent.inputTokens} tokens, ${spent.cachedTokens ?? "unreported"} cached (${resolved.option.provider})`
                 );
+                const answered = answeredBy(resolved);
                 try {
                     await recordPolarUsage({
                         userId: user.id,
                         threadId: body.data.threadId,
                         messageId: responseMessage?.id ?? null,
-                        provider: resolved.option.provider,
-                        model: resolved.option.model,
-                        payer: resolved.credential.source === "instance" ? "instance" : "own",
+                        provider: answered.option.provider,
+                        model: answered.option.model,
+                        payer: answered.credential.source === "instance" ? "instance" : "own",
                         usage: spent
                     });
                 } catch (error) {

@@ -21,7 +21,9 @@ type ModelEntry = ModelSelectorProvider["models"][number];
  * A model that can stand in for the one that failed. A refused key, an empty
  * balance, a rate limit or an outage is the provider's, so the stand-in comes
  * from another one; a model the provider no longer serves can be replaced by
- * any other, its own provider's first. Pure.
+ * any other, its own provider's first. A model busy upstream is the model's,
+ * not the provider's: another of the same provider can answer, a free one
+ * first when the busy one was free. Pure.
  */
 export function standIn(
     failure: PolarFailure,
@@ -32,6 +34,14 @@ export function standIn(
     if (failure.kind === "model") {
         const others = models.filter((model) => model.model !== failedModel);
         return others.find((model) => model.provider === failure.slug) ?? others[0] ?? null;
+    }
+    if (failure.kind === "busy") {
+        const others = models.filter((model) => model.model !== failedModel);
+        const mine = others.filter((model) => model.provider === failure.slug);
+        const free = failedModel?.endsWith(":free")
+            ? mine.find((model) => model.model.endsWith(":free"))
+            : undefined;
+        return free ?? mine[0] ?? others[0] ?? null;
     }
     if (failure.kind === "other") return null;
     return models.find((model) => model.provider !== failure.slug) ?? null;

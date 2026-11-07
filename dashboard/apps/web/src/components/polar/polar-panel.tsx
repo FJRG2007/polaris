@@ -3022,6 +3022,8 @@ function MessageView({
     const from = mine ? "user" : "assistant";
     const meta = (message.metadata ?? {}) as {
         fellBackFrom?: string | null;
+        /** The model Automatic picked that was refused, when another answered. */
+        standInFor?: string;
         workedMs?: number;
         model?: string;
         automatic?: boolean;
@@ -3149,6 +3151,11 @@ function MessageView({
         <Message from={from}>
             {meta.fellBackFrom ? (
                 <p className="text-xs text-warning-ink">{t("errors.modelGone")}</p>
+            ) : null}
+            {meta.standInFor && meta.model ? (
+                <p className="text-xs text-muted-foreground">
+                    {t("errors.stoodIn", { busy: meta.standInFor, model: meta.model })}
+                </p>
             ) : null}
             <AttachmentList
                 className={mine ? "justify-end" : undefined}

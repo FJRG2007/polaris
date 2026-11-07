@@ -12,7 +12,10 @@
  * cheapest). A chosen model whose key has gone, or that the catalogue no
  * longer carries, falls back to Automatic without a word - the settings show
  * that state - and when nothing else can be served the chat's own model does
- * the job, as Open WebUI falls back to the current chat model.
+ * the job, as Open WebUI falls back to the current chat model. The chat's
+ * model is also the stand-in when the helper is refused for want of credit or
+ * by a rate limit (`credit.ts`): it has just answered, so the job does not
+ * fail on a model the account cannot pay for.
  *
  * Compaction is not a small job and stays on the chat's model: its summary
  * replaces the history the next answers are written from, so a weaker model
@@ -27,7 +30,13 @@ import { automaticChoice } from "@/lib/polar/shared";
 import type { PolarAccess } from "@/lib/polar/access";
 import type { PolarHelperModel } from "@/lib/polar/display";
 import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
-import { reasoningFor, resolvePolarModel, type ResolvedModel } from "@/lib/polar/models";
+import {
+    answeredBy,
+    reasoningFor,
+    resolvePolarModel,
+    withStandIn,
+    type ResolvedModel
+} from "@/lib/polar/models";
 
 /** Where the helper came from: the person's pick, Automatic, or the chat. */
 export type HelperSource = "chosen" | "automatic" | "chat";
@@ -54,11 +63,26 @@ export async function polarHelperModel(
             PLAIN_TURN,
             access
         );
-        if (typeof picked !== "string") return { resolved: picked, source: "chosen" };
+        if (typeof picked !== "string") {
+            return { resolved: backedByChat(picked, chat), source: "chosen" };
+        }
     }
     const automatic = await resolvePolarModel(userId, automaticChoice("fast"), PLAIN_TURN, access);
-    if (typeof automatic !== "string") return { resolved: automatic, source: "automatic" };
+    if (typeof automatic !== "string") {
+        return { resolved: backedByChat(automatic, chat), source: "automatic" };
+    }
     return { resolved: chat, source: "chat" };
+}
+
+/** The helper with the chat's model as its stand-in, when the two differ and
+ *  are paid from the same purse - a job on a person's own key never spends
+ *  the shared one without its ceiling being checked. */
+function backedByChat(helper: ResolvedModel, chat: ResolvedModel): ResolvedModel {
+    const same =
+        helper.option.provider === chat.option.provider &&
+        helper.option.model === chat.option.model;
+    if (same || helper.credential.source !== chat.credential.source) return helper;
+    return withStandIn(helper, chat);
 }
 
 /** The least reasoning the helper takes, or none for a model that does not reason. */
@@ -83,7 +107,7 @@ export async function recordHelperUsage(
     helper: PolarHelper,
     usage: LanguageModelUsage | undefined
 ): Promise<void> {
-    const { option, credential } = helper.resolved;
+    const { option, credential } = answeredBy(helper.resolved);
     try {
         await recordPolarUsage({
             userId,

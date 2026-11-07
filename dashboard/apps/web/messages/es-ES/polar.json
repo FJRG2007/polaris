@@ -11,6 +11,7 @@
             "credit": "El modelo no respondió ({where}): la cuenta no tiene saldo. Añade saldo o elige otro modelo.",
             "paid": "El modelo no respondió ({where}): la cuenta no tiene saldo y este modelo no es gratuito. Elige uno gratuito.",
             "rate": "El modelo no respondió ({where}): demasiadas peticiones. Pregunta en un minuto o elige otro modelo.",
+            "busy": "El modelo no respondió ({where}): está saturado para todos ahora. Pregunta en un rato o elige otro modelo.",
             "down": "El modelo no respondió ({where}): el proveedor tiene problemas. Pregunta luego o elige otro modelo.",
             "model": "El modelo no respondió ({where}). Pregunta otra vez o elige otro modelo.",
             "other": "El modelo no respondió ({where}). Pregunta otra vez o elige otro modelo."
@@ -159,11 +160,13 @@
         "failed": "Polar no pudo responder. Reintenta o elige otro modelo.",
         "unanswered": "Polar paró sin dar una respuesta.",
         "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible.",
+        "stoodIn": "{busy} no estaba disponible, así que respondió {model}.",
         "provider": {
             "key": "{provider} rechazó la clave que usó Polar. Puede ser incorrecta, estar revocada o no tener un permiso.",
             "credit": "{provider} dice que la cuenta de esta clave se ha quedado sin crédito. Añade crédito o un método de pago en su facturación.",
             "paid": "{provider} no tiene crédito en esta cuenta y este modelo no es gratuito. Elige un modelo gratuito o añade crédito.",
             "rate": "{provider} está limitando cuántas veces se usa esta clave. Espera un minuto y vuelve a probar.",
+            "busy": "{provider} dice que este modelo está saturado para todos ahora. No es tu clave. Vuelve a probar en un rato o elige otro modelo.",
             "down": "{provider} tiene problemas para responder ahora mismo. Vuelve a probar en unos minutos.",
             "model": "{provider} ya no ofrece este modelo. Elige otro.",
             "other": "{provider} no pudo responder. Reintenta o elige otro modelo.",
