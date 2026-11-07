@@ -32,6 +32,57 @@ function arrivalFor(from, nextMode) {
   return { x: from.x, z: from.z, heading, altitude: nextMode === 'helicopter' ? 0.25 : null };
 }
 
+// What a body carries frame to frame that ends up in its transform, the camera or the HUD. A non-finite one of these
+// (NaN from a division by zero, or from a field a mode never set) would blank the view: three.js renders nothing
+// through a NaN matrix and the HUD reads "NaN".
+const BODY_MOTION = ['speed', 'verticalVel', 'verticalSpeed', 'vx', 'vz', 'angularVel', 'steerAngle', 'pitchVel',
+  'rollVel', 'heaveY', 'heaveVel', 'leanAngle', 'pitchAngle', 'rollAngle', 'turbo'];
+
+/** Whether a body's position and heading are all finite numbers. */
+function bodyIsFinite(body) {
+  const p = body?.position;
+  return !!p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z) && Number.isFinite(body.heading);
+}
+
+/** Whether a place { x, y, z, heading } is whole and finite. */
+const placeIsFinite = (place) => !!place && ['x', 'y', 'z', 'heading'].every((key) => Number.isFinite(place[key]));
+
+/**
+ * Keeps a body out of NaN. A body whose position and heading are finite becomes `last` (the place it is put back to);
+ * one that is not is put back at `last` (or `fallback` while `last` is not a whole finite place, else the origin) at
+ * rest, and any non-finite motion field is zeroed. Returns the names of the fields that were repaired (empty when there
+ * was nothing to do).
+ */
+function settleBody(body, last, fallback) {
+  const repaired = [];
+  if (!body?.position) return repaired;
+  const p = body.position;
+  if (bodyIsFinite(body)) {
+    if (last) Object.assign(last, { x: p.x, y: p.y, z: p.z, heading: body.heading });
+  } else {
+    for (const axis of ['x', 'y', 'z']) if (!Number.isFinite(p[axis])) repaired.push(axis);
+    if (!Number.isFinite(body.heading)) repaired.push('heading');
+    const to = [last, fallback].find(placeIsFinite) ?? { x: 0, y: 0, z: 0, heading: Math.PI };
+    p.x = to.x;
+    p.y = to.y;
+    p.z = to.z;
+    body.heading = to.heading;
+    for (const key of BODY_MOTION) if (key in body) body[key] = 0;
+  }
+  for (const key of BODY_MOTION) {
+    if (key in body && typeof body[key] === 'number' && !Number.isFinite(body[key])) {
+      body[key] = 0;
+      repaired.push(key);
+    }
+  }
+  return repaired;
+}
+
+/** A HUD readout: the number rounded, or "-" when there is no number to show (never "NaN"). */
+function hudReadout(value, format = String) {
+  return Number.isFinite(value) ? format(Math.round(value)) : '-';
+}
+
 // Brake lamp level the car and bus materials read (their red scales with it): full while slowing down, dimmer when
 // only held at a standstill, so a car braking stands out from the queue it joins. Two fixed steps, so the per-instance
 // state changes only when a car starts or stops braking, not every frame.
@@ -78,6 +129,6 @@ function turnLamps(signal) {
 }
 
 export {
-  BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, TURN_SIGNAL, arrivalFor, brakeLamp, createTurnSignal, heliTopSpeed,
-  stepTurbo, stepTurnSignal, turnLamps
+  BODY_MOTION, BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, TURN_SIGNAL, arrivalFor, bodyIsFinite, brakeLamp, createTurnSignal,
+  heliTopSpeed, hudReadout, settleBody, stepTurbo, stepTurnSignal, turnLamps
 };

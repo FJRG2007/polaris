@@ -51,6 +51,7 @@ import { CityAudioSystem } from "./audio-system.js";
 import { createRemotePlayers } from "./remote-players.js";
 import { reportFailure, reportProgress, reportReady, shareState } from "./embed.js";
 import { formatNumber, onLocaleChange, t } from "./i18n.js";
+import { hudReadout } from "./player-rules.js";
 import { GameMenu } from "./game-menu.js";
 import { installBrowserGuards } from "./browser-defaults.js";
 import { startRenderer } from "./graphics-start.js";
@@ -1103,10 +1104,11 @@ async function initApp() {
             const mph = Math.round(Math.abs(activeEnt.speed) * 2.237);
             const altFt = Math.max(0, Math.round(activeEnt.position.y * 3.281));
 
-            if (elSpeed) elSpeed.textContent = String(mph);
+            // A readout with no number shows "-", never "NaN"
+            if (elSpeed) elSpeed.textContent = hudReadout(mph);
             if (elSpeedMeter)
-                elSpeedMeter.style.transform = `scaleX(${Math.min(1, mph / (topSpeedMph[mode] || 80))})`;
-            if (elAltitude) elAltitude.textContent = formatNumber(altFt);
+                elSpeedMeter.style.transform = `scaleX(${Number.isFinite(mph) ? Math.min(1, mph / (topSpeedMph[mode] || 80)) : 0})`;
+            if (elAltitude) elAltitude.textContent = hudReadout(altFt, formatNumber);
             // The street corner of the player on the follow cameras, of the camera itself on the scenic ones
             const where =
                 cameraSystem.getActivePreset().category === "follow"

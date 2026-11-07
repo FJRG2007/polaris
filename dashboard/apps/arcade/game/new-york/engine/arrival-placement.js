@@ -45,15 +45,40 @@ function laneCandidates(edges, x, z, reach = LANE_REACH) {
 }
 
 /**
+ * The clamp placeArrival takes: keeps a point { x, z } inside `bounds` (minX/maxX/minZ/maxZ, widened by `margin`, the
+ * south edge `minZOffset` past minZ) and, given `shoreAt(z)` -> { westX, eastX }, `shoreGap` inside the shore. null
+ * where the shore leaves no room or the point is not a number.
+ */
+function mapClamp({ bounds, margin = 0, minZOffset = 0, shoreAt = null, shoreGap = 8 }) {
+  return ({ x, z }) => {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    const pz = Math.max(bounds.minZ + minZOffset, Math.min(bounds.maxZ + margin, z));
+    let px = Math.max(bounds.minX - margin, Math.min(bounds.maxX + margin, x));
+    if (shoreAt) {
+      const shore = shoreAt(pz);
+      const west = shore.westX + shoreGap, east = shore.eastX - shoreGap;
+      if (!(west <= east)) return null;
+      px = Math.max(west, Math.min(east, px));
+    }
+    return { x: px, z: pz };
+  };
+}
+
+/**
  * The arrival for a body leaving from (x, z) facing `heading`. A road vehicle (`onRoad`) takes the nearest clear lane
  * point, facing along the lane; otherwise, or with no clear lane in reach, the spot itself when clear, then the nearest
  * clear point on rings around it, facing the way the player faced. `clamp(point)` keeps a point on the map (null when
  * the shore leaves nowhere). Returns { x, z, heading } or null when nothing is clear: the caller then keeps the body
  * where it was, as before.
  */
-function placeArrival({ x, z, heading = Math.PI, onRoad = false, edges = [], clear, clamp = (p) => p }) {
+function placeArrival({ x, z, heading = Math.PI, onRoad = false, edges = [], clear, clamp: clampTo = (p) => p }) {
   if (!Number.isFinite(x) || !Number.isFinite(z) || typeof clear !== 'function') return null;
   if (!Number.isFinite(heading)) heading = Math.PI;
+  // A point the clamp could not place on the map is no point at all
+  const clamp = (point) => {
+    const p = clampTo(point);
+    return p && Number.isFinite(p.x) && Number.isFinite(p.z) ? p : null;
+  };
   if (onRoad) {
     for (const lane of laneCandidates(edges, x, z)) {
       const p = clamp({ x: lane.x, z: lane.z });
@@ -88,4 +113,4 @@ function overlapsFootprints(footprints, x, z, radius) {
   return false;
 }
 
-export { FAR_RING_MAX, LANE_REACH, headingOf, laneCandidates, overlapsBodies, overlapsFootprints, placeArrival };
+export { FAR_RING_MAX, LANE_REACH, headingOf, laneCandidates, mapClamp, overlapsBodies, overlapsFootprints, placeArrival };

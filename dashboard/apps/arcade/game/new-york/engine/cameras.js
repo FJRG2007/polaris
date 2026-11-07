@@ -363,6 +363,15 @@ class CameraSystem {
       this.currentLookAt.lerp(desiredLook, k);
     }
 
+    // A non-finite camera renders nothing at all: re-anchor on the next frame rather than keep a NaN framing
+    const p = this.currentPos, l = this.currentLookAt;
+    if (![p.x, p.y, p.z, l.x, l.y, l.z].every(Number.isFinite)) {
+      this.currentPos.copy(this.camera.position);
+      this.currentLookAt.set(0, 8, 440);
+      this.initialized = false;
+      this.followEntity = null;
+      return;
+    }
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentLookAt);
   }

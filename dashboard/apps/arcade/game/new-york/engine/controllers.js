@@ -26,11 +26,11 @@ import {
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
-  HELI_CRUISE_SPEED, arrivalFor, createTurnSignal, heliTopSpeed, stepTurbo, stepTurnSignal, turnLamps
+  HELI_CRUISE_SPEED, arrivalFor, createTurnSignal, heliTopSpeed, settleBody, stepTurbo, stepTurnSignal, turnLamps
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
-import { FAR_RING_MAX, overlapsBodies, overlapsFootprints, placeArrival } from './arrival-placement.js';
+import { FAR_RING_MAX, mapClamp, overlapsBodies, overlapsFootprints, placeArrival } from './arrival-placement.js';
 
 // Player models, animation and movement for walking, driving, cycling and flying.
 
@@ -219,6 +219,8 @@ class ThirdPersonControllerManager {
     };
 
     Object.values(this.entities).forEach((ent) => {
+      // Where a body goes back to if its very first state is not finite (settleBodies)
+      ent._spawn = { x: ent.position.x, y: ent.position.y, z: ent.position.z, heading: ent.heading };
       if (ent.mesh) {
         ent.mesh.traverse((child) => {
           if (
@@ -336,6 +338,8 @@ class ThirdPersonControllerManager {
     if (!this.entities[mode]) return;
     const previous = this.entities[this.activeMode];
     const switching = follow && mode !== this.activeMode;
+    // Both bodies are settled first, so the new one never arrives at (or keeps) a NaN place
+    this.settleBodies();
     this.activeMode = mode;
     // The new body arrives where the player is, not where it was last left; where nothing is clear it stays put
     const arrival = switching ? arrivalFor(previous?.position && { ...previous.position, heading: previous.heading }, mode) : null;
@@ -352,6 +356,22 @@ class ThirdPersonControllerManager {
     if (mode !== 'car' && car?.carState) {
       car.carState.value.set(0, 0, 0, 0); // brake, indicators & reverse off
       car.turnSignal = null;
+    }
+  }
+
+  /**
+   * Puts any body whose place or motion went non-finite back where it last was, at rest (settleBody), before its
+   * transform, the camera or the HUD read it: a NaN there renders an empty view. Says which, once per body and field.
+   */
+  settleBodies() {
+    for (const [mode, body] of Object.entries(this.entities)) {
+      body._lastGood ??= {};
+      const repaired = settleBody(body, body._lastGood, body._spawn);
+      if (!repaired.length) continue;
+      body._warned ??= new Set();
+      const fresh = repaired.filter((field) => !body._warned.has(field));
+      fresh.forEach((field) => body._warned.add(field));
+      if (fresh.length) console.warn('[controllers] non-finite body state repaired', { mode, active: this.activeMode, fields: fresh });
     }
   }
 
@@ -376,7 +396,7 @@ class ThirdPersonControllerManager {
     const heli = this.activeMode === 'helicopter';
     const altitude = heli ? Math.max(0.25, Math.min(380, savedAltitude ?? Math.max(92, ent.position.y))) : 0;
     const destination = this.findTeleportPosition(x, z, heading, altitude, preferLane);
-    if (destination) {
+    if (destination && Number.isFinite(destination.x) && Number.isFinite(destination.z)) {
       ent.position.x = destination.x;
       ent.position.z = destination.z;
       ent.heading = heading = destination.heading ?? heading;
@@ -412,6 +432,7 @@ class ThirdPersonControllerManager {
       ent.tiltPivot.rotation.x = ent.tiltPivot.rotation.z = 0;
       ent.tiltPivot.position.y = 0;
     }
+    this.settleBodies();
     ent.mesh.position.copy(ent.position);
     ent.mesh.rotation.y = ent.heading;
     return { x: ent.position.x, z: ent.position.z };
@@ -433,17 +454,9 @@ class ThirdPersonControllerManager {
     }));
     const cameraBack = Math.cos(0.09) * entity.chaseDistance;
     const cameraUp = entity.chaseHeight + Math.sin(0.09) * entity.chaseDistance * 0.85;
-    const clampPoint = (px, pz) => {
-      pz = Math.max(ISLAND_BOUNDS.minZ + (heli ? -6000 : 30), Math.min(ISLAND_BOUNDS.maxZ + margin, pz));
-      px = Math.max(ISLAND_BOUNDS.minX - margin, Math.min(ISLAND_BOUNDS.maxX + margin, px));
-      if (!heli && getIslandBoundsAtZ) {
-        const shore = getIslandBoundsAtZ(pz);
-        const west = shore.westX + 8, east = shore.eastX - 8;
-        if (west > east) return null;
-        px = Math.max(west, Math.min(east, px));
-      }
-      return { x: px, z: pz };
-    };
+    const clampPoint = mapClamp({
+      bounds: ISLAND_BOUNDS, margin, minZOffset: heli ? -6000 : 30, shoreAt: !heli && getIslandBoundsAtZ ? getIslandBoundsAtZ : null
+    });
     const context = this._arrival;
     // Traffic as circles round each vehicle's centre (a bus's covers its length); only on the ground, and read once
     const traffic = heli && altitude > 8 ? [] : (context?.vehicles() || []).map((v) => ({ x: v.x, z: v.z, radius: v.bus ? 6.5 : 2.6 }));
@@ -1123,6 +1136,7 @@ class ThirdPersonControllerManager {
       this.updateHelicopter(dt, elapsed);
     }
 
+    this.settleBodies();
     for (const key of Object.keys(this.entities)) {
       const e = this.entities[key];
       e.mesh.position.copy(e.position);
