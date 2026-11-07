@@ -19,8 +19,8 @@ android {
         applicationId providers.gradleProperty('launcherApplicationId').getOrElse('app.polaris.tv')
         minSdk 26
         targetSdk 34
-        versionCode 20
-        versionName '3.11'
+        versionCode 21
+        versionName '3.12'
         manifestPlaceholders = [homeCategory: homeCategory ? 'android.intent.category.HOME' : 'app.polaris.tv.category.HOME_KEY']
         buildConfigField 'boolean', 'HOME_CATEGORY', String.valueOf(homeCategory)
     }
