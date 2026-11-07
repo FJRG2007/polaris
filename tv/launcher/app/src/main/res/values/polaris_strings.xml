@@ -83,4 +83,30 @@
     <string name="language_row">Language: %1$s</string>
     <string name="language_title">Language</string>
     <string name="language_tv">Same as the TV</string>
+    <!-- Settings > Themes & add-ons (ThemesAddonsActivity). -->
+    <string name="catalog_row">Themes &amp; add-ons</string>
+    <string name="catalog_title">Themes &amp; add-ons</string>
+    <string name="catalog_all">All</string>
+    <string name="catalog_themes">Themes</string>
+    <string name="catalog_addons">Add-ons</string>
+    <string name="catalog_loading">Loading the catalog...</string>
+    <string name="catalog_unreachable">The catalog could not be reached. Check that this TV is online, then try again.</string>
+    <string name="catalog_retry">Try again</string>
+    <string name="catalog_empty">Nothing in the catalog for this version yet.</string>
+    <string name="catalog_apply">Apply theme</string>
+    <string name="catalog_install">Install add-on</string>
+    <string name="catalog_reinstall">Reinstall add-on</string>
+    <string name="catalog_downloading">Downloading %1$s...</string>
+    <string name="catalog_applied">%1$s applied.</string>
+    <string name="catalog_failed">%1$s was not installed: %2$s</string>
+    <string name="catalog_confirm">Confirm the install on the screen Android shows.</string>
+    <string name="catalog_addon_installed">%1$s installed.</string>
+    <string name="catalog_busy">Another download is still running.</string>
+    <string name="catalog_network">Uses the internet</string>
+    <string name="catalog_offline">Works offline</string>
+    <string name="catalog_permissions">Permissions: %1$s</string>
+    <string name="catalog_too_old">Needs a newer Android version than this TV has.</string>
+    <string name="catalog_why_checksum">the download did not match the catalog.</string>
+    <string name="catalog_why_refused">the theme has files Polaris TV does not read.</string>
+    <string name="catalog_why_unreachable">the download stopped. Try again.</string>
 </resources>

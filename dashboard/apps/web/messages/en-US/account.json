@@ -1741,6 +1741,33 @@
                 "tooMany": "Too many update requests. Wait a minute."
             }
         },
+        "catalog": {
+            "title": "Themes and add-ons",
+            "open": "Themes and add-ons",
+            "close": "Close",
+            "loading": "Loading themes and add-ons",
+            "none": "No themes or add-ons in the newest TV release.",
+            "useTheme": "Use this theme",
+            "themeInUse": "Theme in use",
+            "addAddon": "Add to this TV",
+            "removeAddon": "Remove from list",
+            "status": {
+                "updateFirst": "Update this TV to pick themes and add-ons here.",
+                "nextUpdate": "Themes and add-ons come with the next TV update.",
+                "notAsked": "Nothing picked here yet.",
+                "waiting": "Sent. The TV applies it on its next check-in.",
+                "applied": "Theme applied.",
+                "installed": "Every add-on is installed.",
+                "asked": "Confirm the install on the TV.",
+                "failed": "The TV could not apply it. Try again.",
+                "unavailable": "Not available for this TV."
+            },
+            "errors": {
+                "notInCatalog": "That is not in the newest TV release. Reload the list.",
+                "unreachable": "Could not reach the newest TV release. Try again in a minute."
+            },
+            "retry": "Try again"
+        },
         "prefs": {
             "blocking": "Block ads and trackers",
             "rename": "Rename",
@@ -1768,7 +1795,8 @@
             },
             "errors": {
                 "tooMany": "Too many changes. Wait a minute.",
-                "badName": "Give the TV a name of up to 60 characters."
+                "badName": "Give the TV a name of up to 60 characters.",
+                "busy": "This TV changed at the same moment. Try again."
             }
         }
     }

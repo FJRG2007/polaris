@@ -8,12 +8,17 @@
  * and kept only if it matches. A mismatch is refused, never served. Only the
  * newest verified APK is kept on disk.
  *
+ * The same release carries the Themes & add-ons catalog (`catalog.json`) and its
+ * files. Those are served from here too (`preparedTvCatalogFile`), each one
+ * checked against the same SHA256SUMS, so a TV that cannot reach GitHub can
+ * still browse and install them.
+ *
  * Every request to GitHub goes through the vetted dispatcher (`configuredRequest`)
  * with redirects followed by hand, one checked hop at a time, and only to
  * GitHub's own hosts.
  */
 
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { createHash, randomUUID } from "node:crypto";
 import { configuredRequest } from "@/lib/safe-fetch";
@@ -32,6 +37,10 @@ const FAILURE_TTL_MS = 60 * 1000;
 /** Ceilings on what GitHub may send: a checksum list is a line, an APK tens of MB. */
 const CHECKSUMS_MAX_BYTES = 64 * 1024;
 const APK_MAX_BYTES = 256 * 1024 * 1024;
+/** The catalog generator's own caps (tv/tools/catalog.py). */
+const CATALOG_JSON_MAX_BYTES = 512 * 1024;
+const CATALOG_FILE_MAX_BYTES = 64 * 1024 * 1024;
+const SCREENSHOT_MAX_BYTES = 300 * 1024;
 const CHECKSUMS_TIMEOUT_MS = 15_000;
 const APK_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_HOPS = 3;
@@ -63,11 +72,38 @@ export class TvReleaseError extends Error {
 
 /** The SHA-256 listed for one file in a `sha256sum` output, lowercased. */
 export function checksumFor(listing: string, file: string): string | null {
+    return checksumsOf(listing).get(file) ?? null;
+}
+
+/** Every file a `sha256sum` output lists, with its SHA-256 lowercased. The first line for a name wins. */
+export function checksumsOf(listing: string): Map<string, string> {
+    const sums = new Map<string, string>();
     for (const line of listing.split(/\r?\n/)) {
         const match = /^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$/.exec(line);
-        if (match && match[2] === file) return match[1]!.toLowerCase();
+        if (match && !sums.has(match[2]!)) sums.set(match[2]!, match[1]!.toLowerCase());
     }
-    return null;
+    return sums;
+}
+
+/** The catalog's own file. */
+export const TV_CATALOG_NAME = "catalog.json";
+
+const CATALOG_FILE =
+    /^(?:theme-[a-z0-9][a-z0-9_-]{0,63}\.(?:zip|jpg)|addon-[a-z0-9][a-z0-9_-]{0,63}\.(?:apk|jpg))$/;
+
+/**
+ * A file of the Themes & add-ons catalog by the only names tv/tools/catalog.py
+ * writes: `catalog.json`, `theme-<id>.zip|jpg`, `addon-<id>.apk|jpg`. Anything
+ * else - a path, a dot file, the launcher's own APK - is not one.
+ */
+export function catalogFileName(name: string | null | undefined): name is string {
+    return name === TV_CATALOG_NAME || CATALOG_FILE.test(name ?? "");
+}
+
+/** The most a catalog file may weigh, by its kind. */
+export function catalogFileCap(name: string): number {
+    if (name === TV_CATALOG_NAME) return CATALOG_JSON_MAX_BYTES;
+    return name.endsWith(".jpg") ? SCREENSHOT_MAX_BYTES : CATALOG_FILE_MAX_BYTES;
 }
 
 /** Only GitHub's own hosts are followed: the API names the asset on github.com,
@@ -131,10 +167,17 @@ interface Held<T> {
     readonly failure: TvReleaseError | null;
 }
 
-let infoHeld: Held<TvReleaseInfo> | null = null;
-let infoRunning: Promise<TvReleaseInfo | null> | null = null;
+/** The newest release as this instance knows it: what to install, and every file it lists a checksum for. */
+interface TvRelease {
+    readonly info: TvReleaseInfo;
+    readonly checksums: ReadonlyMap<string, string>;
+    readonly urls: ReadonlyMap<string, string>;
+}
 
-async function lookInfo(): Promise<TvReleaseInfo | null> {
+let infoHeld: Held<TvRelease> | null = null;
+let infoRunning: Promise<TvRelease | null> | null = null;
+
+async function lookRelease(): Promise<TvRelease | null> {
     const release = await tvDownload(loadEnv().POLARIS_REPO);
     if (!release || !tvInstallable(release)) return null;
     const versionName = release.version.trim();
@@ -145,9 +188,11 @@ async function lookInfo(): Promise<TvReleaseInfo | null> {
         await fromGitHub(sumsUrl, CHECKSUMS_TIMEOUT_MS),
         CHECKSUMS_MAX_BYTES
     );
-    const sha256 = checksumFor(listing, TV_APK_NAME);
+    const checksums = checksumsOf(listing);
+    const sha256 = checksums.get(TV_APK_NAME);
     if (!sha256) throw new TvReleaseError("mismatch");
-    return { versionName, sha256, apkUrl };
+    const urls = new Map(release.files.map((file) => [file.name, file.url] as const));
+    return { info: { versionName, sha256, apkUrl }, checksums, urls };
 }
 
 /**
@@ -155,6 +200,10 @@ async function lookInfo(): Promise<TvReleaseInfo | null> {
  * APK. Null when none is released. Cached for ten minutes, failures for one.
  */
 export async function tvReleaseInfo(): Promise<TvReleaseInfo | null> {
+    return (await tvRelease())?.info ?? null;
+}
+
+async function tvRelease(): Promise<TvRelease | null> {
     const now = Date.now();
     if (infoHeld) {
         const ttl = infoHeld.failure ? FAILURE_TTL_MS : RELEASE_TTL_MS;
@@ -164,7 +213,7 @@ export async function tvReleaseInfo(): Promise<TvReleaseInfo | null> {
         }
     }
     if (infoRunning) return infoRunning;
-    infoRunning = lookInfo()
+    infoRunning = lookRelease()
         .then((value) => {
             infoHeld = { at: Date.now(), value, failure: null };
             return value;
@@ -200,16 +249,22 @@ async function hashFile(path: string): Promise<string> {
 /** Paths whose contents were hashed and matched in this process. */
 const verified = new Map<string, { sha256: string; size: number }>();
 
-async function download(info: TvReleaseInfo, target: string): Promise<number> {
-    const response = await fromGitHub(info.apkUrl, APK_TIMEOUT_MS);
+/** One file of the release into `target`, kept only when it hashes to `sha256` and stays under `maxBytes`. */
+async function download(
+    url: string,
+    sha256: string,
+    target: string,
+    maxBytes: number
+): Promise<number> {
+    const response = await fromGitHub(url, APK_TIMEOUT_MS);
     const declared = Number(response.headers.get("content-length") ?? "0");
-    if (declared > APK_MAX_BYTES) {
+    if (declared > maxBytes) {
         await response.body?.cancel().catch(() => undefined);
         throw new TvReleaseError("too-large");
     }
     const reader = response.body?.getReader();
     if (!reader) throw new TvReleaseError("unreachable");
-    const part = join(cacheDir(), `.${randomUUID()}.part`);
+    const part = join(dirname(target), `.${randomUUID()}.part`);
     const out = createWriteStream(part);
     const failed = new Promise<never>((_, reject) => out.on("error", reject));
     failed.catch(() => undefined);
@@ -220,7 +275,7 @@ async function download(info: TvReleaseInfo, target: string): Promise<number> {
             const { done, value } = await reader.read();
             if (done) break;
             total += value.length;
-            if (total > APK_MAX_BYTES) throw new TvReleaseError("too-large");
+            if (total > maxBytes) throw new TvReleaseError("too-large");
             hash.update(value);
             if (!out.write(value)) {
                 await Promise.race([new Promise((resolve) => out.once("drain", resolve)), failed]);
@@ -232,7 +287,7 @@ async function download(info: TvReleaseInfo, target: string): Promise<number> {
             ),
             failed
         ]);
-        if (hash.digest("hex") !== info.sha256) throw new TvReleaseError("mismatch");
+        if (hash.digest("hex") !== sha256) throw new TvReleaseError("mismatch");
         await rename(part, target);
         return total;
     } catch (caught) {
@@ -263,7 +318,7 @@ async function prepare(info: TvReleaseInfo): Promise<TvApk> {
     if (existing && (await hashFile(path)) === info.sha256) size = existing.size;
     else {
         await rm(path, { force: true });
-        size = await download(info, path);
+        size = await download(info.apkUrl, info.sha256, path, APK_MAX_BYTES);
     }
     verified.set(path, { sha256: info.sha256, size });
 
@@ -303,10 +358,83 @@ export async function preparedTvApk(): Promise<TvApk | null> {
     return started;
 }
 
+export interface TvCatalogFile {
+    readonly versionName: string;
+    readonly name: string;
+    readonly sha256: string;
+    readonly path: string;
+    readonly size: number;
+}
+
+function catalogDir(): string {
+    return join(loadEnv().POLARIS_DATA_DIR, "tv-catalog");
+}
+
+async function prepareCatalogFile(
+    versionName: string,
+    name: string,
+    sha256: string,
+    url: string
+): Promise<TvCatalogFile> {
+    const root = catalogDir();
+    // A version is a folder name here: one that is all dots would leave the folder.
+    if (/^\.+$/.test(versionName)) throw new TvReleaseError("unreachable");
+    // One folder per release, named by its version, so a file is only ever
+    // trusted for the release whose checksum list it was checked against.
+    const dir = join(root, versionName);
+    await mkdir(dir, { recursive: true });
+    const path = join(dir, name);
+    const known = verified.get(path);
+    if (known?.sha256 === sha256) return { versionName, name, sha256, path, size: known.size };
+    const existing = await stat(path).catch(() => null);
+    let size: number;
+    if (existing && (await hashFile(path)) === sha256) size = existing.size;
+    else {
+        await rm(path, { force: true });
+        size = await download(url, sha256, path, catalogFileCap(name));
+    }
+    verified.set(path, { sha256, size });
+    // Only the newest release's files are kept.
+    for (const other of await readdir(root).catch(() => [] as string[])) {
+        if (other === versionName) continue;
+        await rm(join(root, other), { recursive: true, force: true }).catch(() => undefined);
+        for (const held of verified.keys()) {
+            if (held.startsWith(join(root, other))) verified.delete(held);
+        }
+    }
+    return { versionName, name, sha256, path, size };
+}
+
+const preparingCatalog = new Map<string, Promise<TvCatalogFile>>();
+
+/**
+ * One file of the newest release's Themes & add-ons catalog, downloaded once
+ * and verified on this instance. Null when no TV build is released, when the
+ * name is not a catalog file, or when the release does not carry it (one from
+ * before the catalog). Throws `TvReleaseError` when it does but cannot be served.
+ */
+export async function preparedTvCatalogFile(name: string): Promise<TvCatalogFile | null> {
+    if (!catalogFileName(name)) return null;
+    const release = await tvRelease();
+    if (!release) return null;
+    const sha256 = release.checksums.get(name);
+    const url = release.urls.get(name);
+    if (!sha256 || !url) return null;
+    const key = `${release.info.versionName}/${name}`;
+    const running = preparingCatalog.get(key);
+    if (running) return running;
+    const started = prepareCatalogFile(release.info.versionName, name, sha256, url).finally(() =>
+        preparingCatalog.delete(key)
+    );
+    preparingCatalog.set(key, started);
+    return started;
+}
+
 /** Forget every cached answer. For tests. */
 export function resetTvReleaseCache(): void {
     infoHeld = null;
     infoRunning = null;
     verified.clear();
     preparing.clear();
+    preparingCatalog.clear();
 }

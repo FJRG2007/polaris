@@ -56,6 +56,11 @@
             android:layout_marginTop="10dp" />
 
         <TextView
+            android:id="@+id/catalogChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"

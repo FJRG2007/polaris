@@ -19,6 +19,12 @@ on:
       - "dashboard/apps/web/src/lib/deploy/api/**"
       - "dashboard/apps/web/messages/*/catalog.json"
       - "dashboard/apps/web/messages/*/account.json"
+      - "dashboard/apps/web/messages/*/tvCompat.json"
+      # The TV's themes and add-ons gallery: its tables and screenshots.
+      - "tv/themes/README.md"
+      - "tv/themes/*/screenshot.*"
+      - "tv/addons/README.md"
+      - "tv/addons/*/screenshot.*"
       - ".github/workflows/site.yml"
   # Releases are published with each workflow's own token, which starts no
   # other workflow, so a release is noticed when the workflow that made it ends.

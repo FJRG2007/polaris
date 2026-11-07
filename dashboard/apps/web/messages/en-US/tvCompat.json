@@ -105,5 +105,24 @@
         }
     },
     "install": "Install on this TV",
-    "skip": "I know it works"
+    "skip": "I know it works",
+    "gallery": {
+        "title": "Themes and add-ons",
+        "intro": "Choose them on the TV in Settings, Themes & add-ons. Nothing to type on a computer.",
+        "filter": {
+            "label": "Show",
+            "all": "All ({count})",
+            "theme": "Themes ({count})",
+            "addon": "Add-ons ({count})"
+        },
+        "kind": {
+            "theme": "Theme",
+            "addon": "Add-on"
+        },
+        "network": "Uses the internet",
+        "offline": "Works offline",
+        "minSdk": "Android {version}+",
+        "screenshot": "{name} on a TV",
+        "empty": "Nothing to show yet."
+    }
 }

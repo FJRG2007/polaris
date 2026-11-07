@@ -11,7 +11,7 @@ import { href, siteData, words } from "@/lib/site";
 import { ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
 import { docNeighbors, type DocPage, type DocSection } from "@/data/docs";
 import { DocsSearch, type DocsSearchWords } from "@/components/docs-search";
-import { SiteTvChecker } from "@/components/site-tv-checker";
+import { SiteTvChecker, SiteTvGallery } from "@/components/site-tv-checker";
 import { TV_COMPAT_SLUG, TV_PRIVACY_SLUG } from "@/data/builders";
 
 /** The sidebar's groups in a locale, as the site was generated with them. */
@@ -284,6 +284,13 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
                         locale={locale}
                         messages={siteData().downloadsPage.messages[locale].tvCompat}
                         view={page.slug === TV_PRIVACY_SLUG ? "privacy" : "checker"}
+                    />
+                ) : null}
+                {page.slug === TV_COMPAT_SLUG ? (
+                    <SiteTvGallery
+                        locale={locale}
+                        messages={siteData().downloadsPage.messages[locale].tvCompat}
+                        items={siteData().downloadsPage.tvGallery ?? []}
                     />
                 ) : null}
                 <a

@@ -27,6 +27,7 @@ function tv(blocking: Omit<TvRow["blocking"], "askedAt"> & { askedAt?: string | 
             ...blocking,
             askedAt: blocking.askedAt ?? (blocking.desired === null ? null : ASKED)
         },
+        catalog: { theme: null, addons: null },
         address: "192.168.1.20"
     };
 }
@@ -46,11 +47,16 @@ const tvUpdatesAction = vi.fn(async () => ({
     latest: "3.5"
 }));
 
+// The gallery renders in its own test (packages/ui); here only the picker around it is under test.
+vi.mock("@polaris/ui/tv-gallery", () => ({ TvGallery: () => null }));
 vi.mock("@/app/(app)/account/tv/actions", () => ({
     tvUpdatesAction,
     requestTvUpdateAction: async () => ({ tvs: [], latest: "3.5" }),
     renameTvAction: async () => ({ tvs: [], latest: "3.5" }),
     setTvBlockingAction,
+    tvCatalogAction: async () => [],
+    setTvThemeAction: async () => ({ tvs: [], latest: "3.5" }),
+    setTvAddonsAction: async () => ({ tvs: [], latest: "3.5" }),
     tvFilterReachAction: async () => reach
 }));
 
