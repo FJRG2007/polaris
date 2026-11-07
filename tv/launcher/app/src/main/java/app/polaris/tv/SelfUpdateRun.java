@@ -285,15 +285,18 @@ final class SelfUpdateRun {
      */
     static final class Http implements SelfUpdate.Net {
         private final PolarisFailover failover;
+        private final PolarisLocalCa.Scope localCa;
         private final String token;
 
-        Http(PolarisFailover failover, String token) {
+        Http(PolarisFailover failover, PolarisLocalCa.Scope localCa, String token) {
             this.failover = failover;
+            this.localCa = localCa;
             this.token = token;
         }
 
         private HttpURLConnection open(String method, String path) throws IOException {
             HttpURLConnection connection = (HttpURLConnection) new URL(failover.origin() + path).openConnection();
+            PolarisLocalCa.apply(connection, localCa);
             connection.setConnectTimeout(PolarisFailover.TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
             connection.setRequestMethod(method);

@@ -199,4 +199,16 @@ public class PolarisFailoverTest {
         assertEquals(43, PolarisFailover.freshNonce(new java.security.SecureRandom())
                 .getBytes(StandardCharsets.US_ASCII).length);
     }
+
+    @Test
+    public void theRecordIsAskedForAgainOnlyWhenItIsDue() {
+        long now = 1_000_000_000_000L;
+        assertTrue(PolarisFailover.relearnDue(false, 0, now));
+        assertTrue(PolarisFailover.relearnDue(true, 0, now));
+        assertFalse(PolarisFailover.relearnDue(false, now - 5 * 60_000L, now));
+        assertTrue(PolarisFailover.relearnDue(false, now - PolarisFailover.UNPINNED_RELEARN_MS, now));
+        assertFalse(PolarisFailover.relearnDue(true, now - PolarisFailover.UNPINNED_RELEARN_MS, now));
+        assertTrue(PolarisFailover.relearnDue(true, now - PolarisFailover.RELEARN_MS, now));
+        assertTrue(PolarisFailover.relearnDue(true, now + 60_000L, now));
+    }
 }

@@ -18,6 +18,15 @@ that cannot take it.
   An alternate address sees the key only after signing a fresh nonce with the instance's Ed25519 key, which
   `PolarisEd25519` verifies because the platform only has it from API 33. A change to that protocol changes
   both files.
+- **Local certificate.** A Polaris's local https addresses (polaris.local, its LAN IP) carry a certificate from
+  the instance's own local CA. When `/api/instance`, read over an https usual address, publishes
+  `localCaSha256`, `PolarisLocalCa` (the copy of `desktop/src/main/local-ca-pin.ts`) accepts on those other
+  https hosts only - never the usual one - a chain whose leaf names the host and is not a CA, with every
+  certificate in date and each signed by the next up to a certificate with that SHA-256. Everything else keeps
+  the system's trust. With a pin the plain-http alternates are dropped, so the key never crosses the network
+  unencrypted; a record with no pin (an older Polaris, or an http usual address) keeps them. A TV paired before
+  its Polaris published the pin asks the usual address again once and keeps the new record only for the same
+  instance and key.
 - **Block ads and trackers.** A Launcher settings row on Android 9+ that points Private DNS at a filtering
   resolver: the Polaris Network filter's hostname from `/api/tv/network-filter` when it publishes one, or any
   hostname typed there. `PrivateDns` saves the TV's own setting first, keeps the new one only when Android

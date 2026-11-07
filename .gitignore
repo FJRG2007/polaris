@@ -100,6 +100,8 @@ secrets.*
 !**/secrets.tsx
 *.pem
 *.key
+# Public test certificates only (no keys): the TV's local CA pin fixtures.
+!tv/launcher/app/src/test/resources/polaris-local-ca/*.pem
 
 # Browser extension build output
 #
