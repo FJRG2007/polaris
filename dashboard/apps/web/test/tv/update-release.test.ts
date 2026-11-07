@@ -100,9 +100,7 @@ describe("the Home key edition", () => {
 
     it("is served from its own asset and kept beside the ordinary build", async () => {
         homeKeyApk = Buffer.from("home key apk bytes");
-        listed = `${sha(apk)}  polaris-tv.apk
-${sha(homeKeyApk)}  polaris-tv-home-key.apk
-`;
+        listed = `${sha(apk)}  polaris-tv.apk\n${sha(homeKeyApk)}  polaris-tv-home-key.apk\n`;
         const base = release as { files: { name: string; url: string }[] };
         release = { ...base, files: [...base.files, { name: "polaris-tv-home-key.apk", url: HOME_KEY_URL }] };
         const standard = await tv.preparedTvApk();
