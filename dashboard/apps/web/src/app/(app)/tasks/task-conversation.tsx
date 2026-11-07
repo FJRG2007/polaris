@@ -266,6 +266,7 @@ export function ActivityStream({
                             channelId={null}
                             divided={false}
                             rules={COMMENT_RULES}
+                            fixedLimits
                             disabled={busy}
                             placeholder={t("conversation.replyPlaceholder")}
                             onSend={(body, files) => post(body, comment.id, files)}
@@ -344,6 +345,7 @@ export function ActivityStream({
                 <Composer
                     channelId={null}
                     rules={COMMENT_RULES}
+                    fixedLimits
                     disabled={busy}
                     placeholder={t("conversation.commentPlaceholder")}
                     onSend={(body, files) => post(body, null, files)}

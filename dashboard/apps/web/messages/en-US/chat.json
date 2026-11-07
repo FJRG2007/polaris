@@ -650,6 +650,7 @@
             "noFiles": "Files cannot be sent here.",
             "tooMany": "A message can carry {count} files.",
             "tooBig": "{name} is {size} MB and files here can be up to {limit} MB. Send a shorter or compressed copy.",
+            "tooBigOthers": "{count, plural, one {One more file was} other {# more files were}} also over the limit and left out.",
             "recordingTooBig": "A recording here can be up to {limit} MB. Record a shorter one.",
             "raise": "An administrator can raise the limit in Polaris apps > Chat > Settings, under Biggest single file."
         }

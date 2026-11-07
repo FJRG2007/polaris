@@ -1007,7 +1007,7 @@ export function Composer({
         // Named, with its size: a phone's own recordings are routinely bigger
         // than the limit, and "files can be up to 25 MB" under a gallery pick
         // that put nothing in the box reads as the upload having failed.
-        const large = chosen.find((file) => file.size > maxBytes);
+        const [large, ...alsoLarge] = chosen.filter((file) => file.size > maxBytes);
         if (large) {
             notes.push(
                 t("composer.refused.tooBig", {
@@ -1016,6 +1016,8 @@ export function Composer({
                     limit: rules.maxAttachmentMib
                 })
             );
+            if (alsoLarge.length > 0)
+                notes.push(t("composer.refused.tooBigOthers", { count: alsoLarge.length }));
             if (!fixedLimits) notes.push(t("composer.refused.raise"));
         }
         if (accepted.length < small.length) {

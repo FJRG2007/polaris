@@ -650,6 +650,7 @@
             "noFiles": "Aquí no se pueden enviar archivos.",
             "tooMany": "Un mensaje puede llevar {count} archivos.",
             "tooBig": "{name} ocupa {size} MB y aquí los archivos pueden ocupar hasta {limit} MB. Envía una copia más corta o comprimida.",
+            "tooBigOthers": "{count, plural, one {Otro archivo también superaba el límite y se quedó fuera.} other {Otros # archivos también superaban el límite y se quedaron fuera.}}",
             "recordingTooBig": "Aquí una grabación puede ocupar hasta {limit} MB. Graba una más corta.",
             "raise": "Un administrador puede subir el límite en Apps de Polaris > Chat > Ajustes, en Archivo más grande."
         }
