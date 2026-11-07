@@ -118,8 +118,8 @@ let pairing: AbortController | null = null;
 
 /** The one instruction for this TV while the install waits on it. */
 export function waitingFor(step: TvWaitStep, path: TvPath): TvWaiting {
-    const { about, press, presses, developer, switches } = path.instruction;
-    return { step, about, press, presses, developer, switches };
+    const { id, about, press, presses, developer, switches } = path.instruction;
+    return { step, steps: id, about, press, presses, developer, switches };
 }
 
 /** What a wait that ended without a connection tells the person. */
@@ -325,8 +325,16 @@ async function overWirelessDebugging(
     const portsNow = async () => ({ ...heard.get(host)?.ports, ...(await browseTvs(INSTALL_BROWSE_MS).catch(() => new Map<string, TvAnnouncement>())).get(host)?.ports });
     let ports = heard.get(host)?.ports ?? {};
     if (!code) {
-        if (!ports["adb-tls-connect"]) return "needs-pairing";
-        return connectOn(ports["adb-tls-connect"]).catch(() => (stopped() ? ("cancelled" as const) : ("needs-pairing" as const)));
+        const remembered = ports["adb-tls-connect"];
+        if (remembered) {
+            const adb = await connectOn(remembered).catch(() => null);
+            if (adb) return adb;
+            if (stopped()) return "cancelled";
+        }
+        const fresh = (await portsNow())["adb-tls-connect"];
+        if (stopped()) return "cancelled";
+        if (!fresh || fresh === remembered) return "needs-pairing";
+        return connectOn(fresh).catch(() => (stopped() ? ("cancelled" as const) : ("needs-pairing" as const)));
     }
     ports = await portsNow();
     if (stopped()) return "cancelled";

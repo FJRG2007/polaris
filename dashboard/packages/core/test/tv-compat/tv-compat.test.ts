@@ -73,6 +73,16 @@ describe("tv-compat data", () => {
         expect(tv.debuggingFor("webos", "es-ES")).toBeUndefined();
     });
 
+    it("finds the same steps by the id the desktop app sends, in the reader's language", () => {
+        for (const steps of tv.TV_DEBUGGING.platforms) {
+            expect(tv.debuggingById(steps.id)).toEqual(steps);
+            const platform = steps.platforms[0];
+            if (platform) expect(tv.debuggingById(steps.id, "es-ES")).toEqual(tv.debuggingFor(platform, "es-ES"));
+        }
+        expect(tv.debuggingById("google-tv", "es-ES")?.switches).toContain("Depuración inalámbrica");
+        expect(tv.debuggingById("nothing-like-it")).toBeUndefined();
+    });
+
     it("words every privacy step in both languages", () => {
         const ids = tv.TV_PRIVACY.brands.flatMap((entry) => entry.steps.map((step) => step.id));
         expect(new Set(ids).size).toBe(ids.length);

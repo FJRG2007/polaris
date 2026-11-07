@@ -67,6 +67,8 @@ export interface DesktopTvState {
 /** The instruction for this TV while the install waits: its menus, from the TV checker's data. */
 export interface DesktopTvWaiting {
     readonly step: "debugging" | "prompt";
+    /** The `id` of these steps in core's TV checker data, read in the account's language. Absent on an app older than that. */
+    readonly steps?: string;
     readonly about: string;
     readonly press: string;
     readonly presses: number;
@@ -84,7 +86,12 @@ export interface DesktopTv {
     cancel(): Promise<DesktopTvState | null>;
     start(
         input:
-            | { readonly host: string; readonly home: boolean }
+            | {
+                  readonly host: string;
+                  readonly home: boolean;
+                  /** The six digits the TV shows for Wireless debugging, once it asked for them. */
+                  readonly code?: string;
+              }
             | { readonly usb: string; readonly home: boolean }
     ): Promise<boolean>;
     onState(listener: (state: DesktopTvState) => void): () => void;

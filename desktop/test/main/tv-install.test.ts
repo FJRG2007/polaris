@@ -17,6 +17,7 @@ import {
     signToken
 } from "../../src/main/adb-client";
 import { PairingError } from "../../src/main/adb-pairing";
+import { choosePath } from "../../src/main/tv-path";
 
 const handlers = vi.hoisted(() => new Map<string, (event: unknown, raw?: unknown) => unknown>());
 
@@ -30,7 +31,7 @@ vi.mock("../../src/main/windows", () => ({
     kindOf: (sender: { kind: string; }) => sender.kind
 }));
 
-const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal } =
+const { connectFailure, grantCommands, homeIsOurs, lateFailure, latestApk, pairingFailure, PRIVATE_DNS_READ, registerTvInstall, tvRefusal, waitingFor } =
     await import(
     "../../src/main/tv-install"
 );
@@ -272,6 +273,15 @@ describe("a failed pairing", () => {
         for (const reason of ["timeout", "unreachable", "protocol"] as const)
             expect(pairingFailure(new PairingError(reason, "x"))).toBe("unreachable");
         expect(pairingFailure(new Error("ECONNRESET"))).toBe("unreachable");
+    });
+});
+
+describe("the instruction while it waits", () => {
+    it("names the steps it took its menus from, so the dashboard can read them in its own language", () => {
+        const path = choosePath({ services: ["adb-tls-pairing"] }, null);
+        const waiting = waitingFor("debugging", path);
+        expect(waiting.steps).toBe(path.instruction.id);
+        expect(waiting).toMatchObject({ step: "debugging", about: path.instruction.about, switches: path.instruction.switches });
     });
 });
 

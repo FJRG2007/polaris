@@ -33,8 +33,8 @@ a backup of the TV's settings on the computer, installs Polaris TV and turns deb
 - **Older than Android 8, or not Android**: the app says so. These TVs can still
   [block ads for the whole home](polaris-tv-network.md).
 - **Chromecast with Google TV and Google TV Streamer** turn on debugging only with a Wireless debugging
-  pairing code, which the app cannot use yet. Install over a USB cable if the device has a data port, or
-  block ads for the whole home instead.
+  pairing code. When the TV shows its six-digit code, type it in the install window's Pairing code field
+  and press Pair and install. A computer paired once connects without a code after that.
 
 See also: [Does it work on my TV?](polaris-tv-compatibility.md) and the
 [privacy switches by brand](polaris-tv-privacy.md).

@@ -34,8 +34,9 @@ desactivar la depuración.
 - **Anteriores a Android 8, o sin Android**: la app lo dice. Estas teles pueden igualmente
   [bloquear anuncios en toda la casa](polaris-tv-network.md).
 - **Chromecast con Google TV y Google TV Streamer** solo activan la depuración con un código de
-  emparejamiento de depuración inalámbrica, que la app aún no puede usar. Instala por cable USB si el
-  dispositivo tiene puerto de datos, o bloquea anuncios en toda la casa.
+  emparejamiento de depuración inalámbrica. Cuando la tele muestre su código de seis cifras, escríbelo en
+  el campo del código de la ventana de instalación y pulsa Emparejar e instalar. Un ordenador
+  emparejado una vez se conecta sin código a partir de entonces.
 
 Mira también: [¿Funciona en mi tele?](polaris-tv-compatibility.md) y los
 [ajustes de privacidad por marca](polaris-tv-privacy.md).

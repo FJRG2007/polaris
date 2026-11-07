@@ -29,9 +29,19 @@ const FIRE_TV: TvMenus = {
     switches: ["ADB debugging"]
 };
 
-// The dialog reads platform menus through core's debuggingFor(); the checker is not under test here.
+const GOOGLE_TV_ES: TvMenus = {
+    about: "Ajustes > Sistema > Información",
+    press: "Compilación",
+    presses: 7,
+    developer: "Ajustes > Sistema > Opciones para desarrolladores",
+    switches: ["Depuración por USB", "Depuración inalámbrica"]
+};
+
+// The dialog reads platform menus through core's debuggingFor() and debuggingById(); the checker is not under test here.
 vi.mock("@polaris/core/tv-compat", () => ({
-    debuggingFor: (platform: string) => (platform === "fire-os" ? FIRE_TV : undefined)
+    debuggingFor: (platform: string) => (platform === "fire-os" ? FIRE_TV : undefined),
+    debuggingById: (id: string, locale?: string) =>
+        id === "google-tv" ? (locale?.startsWith("es") ? GOOGLE_TV_ES : GOOGLE_TV) : undefined
 }));
 vi.mock("@polaris/ui/tv-checker", () => ({ TvChecker: () => null }));
 vi.mock("@polaris/ui/download-card", () => ({
@@ -40,6 +50,7 @@ vi.mock("@polaris/ui/download-card", () => ({
 
 let listener: ((state: DesktopTvState) => void) | null = null;
 const cancel = vi.fn(async () => null);
+const start = vi.fn(async (_input: unknown) => true);
 const BASE: DesktopTvState = {
     phase: "ready",
     found: [],
@@ -55,7 +66,7 @@ vi.mock("@/lib/desktop-bridge", () => ({
             state: async () => BASE,
             find: async () => BASE,
             cancel,
-            start: async () => true,
+            start,
             onState: (next: (state: DesktopTvState) => void) => {
                 listener = next;
                 return () => (listener = null);
@@ -68,6 +79,7 @@ afterEach(() => {
     cleanup();
     listener = null;
     cancel.mockClear();
+    start.mockClear();
 });
 
 describe("TvWaitingNote", () => {
@@ -101,8 +113,8 @@ describe("TvWaitingNote", () => {
     });
 
     it("joins the switches in Spanish", () => {
-        render(withMessages(<TvWaitingNote menus={GOOGLE_TV} step="debugging" waiting />, "es-ES"));
-        expect(screen.getByText(/activa USB debugging y Wireless debugging\.$/)).toBeTruthy();
+        render(withMessages(<TvWaitingNote menus={GOOGLE_TV_ES} step="debugging" waiting />, "es-ES"));
+        expect(screen.getByText(/activa Depuración por USB y Depuración inalámbrica\.$/)).toBeTruthy();
     });
 });
 
@@ -127,11 +139,67 @@ describe("the install dialog", () => {
         expect(cancel).toHaveBeenCalled();
     });
 
+    it("reads the menus the app named in the account's language", async () => {
+        window.history.replaceState(null, "", "/account/downloads?tv=install");
+        const { TvOffer } = await import("@/app/(app)/account/downloads/tv-offer");
+        render(withMessages(<TvOffer download={null} released={Promise.resolve(true)} />, "es-ES"));
+        await screen.findByText("Polaris TV", { exact: false });
+        act(() =>
+            listener?.({
+                ...BASE,
+                phase: "connecting",
+                waiting: { step: "debugging", steps: "google-tv", ...GOOGLE_TV }
+            })
+        );
+        expect(await screen.findByText(/activa Depuración por USB y Depuración inalámbrica\.$/)).toBeTruthy();
+        expect(screen.queryByText(/USB debugging/)).toBeNull();
+    });
+
+    it("keeps the menus the app sent when their steps are not known here", async () => {
+        await openDialog();
+        act(() =>
+            listener?.({ ...BASE, phase: "connecting", waiting: { step: "debugging", steps: "unknown", ...GOOGLE_TV } })
+        );
+        expect(await screen.findByText(/press OK on Build 7 times/)).toBeTruthy();
+    });
+
     it("shows the prompt step instead of the phase text once the TV asks", async () => {
         await openDialog();
         act(() => listener?.({ ...BASE, phase: "allow", waiting: { step: "prompt", ...GOOGLE_TV } }));
         expect(await screen.findByText(/Tick Always allow from this computer/)).toBeTruthy();
         expect(screen.queryByText("On the TV, choose Allow when it asks to allow USB debugging.")).toBeNull();
+    });
+
+    it("asks for the TV's pairing code here, sends it, and takes a new one after a wrong code", async () => {
+        await openDialog();
+        await userEvent.type(screen.getByLabelText("TV address"), "192.168.1.40");
+        act(() => listener?.({ ...BASE, phase: "failed", outcome: "needs-pairing" }));
+        const field = await screen.findByLabelText("Pairing code");
+        const pair = screen.getByRole("button", { name: "Pair and install" });
+        expect(pair.hasAttribute("disabled")).toBe(true);
+        await userEvent.type(field, "12a3456");
+        expect((field as HTMLInputElement).value).toBe("123456");
+        await userEvent.click(pair);
+        expect(start).toHaveBeenLastCalledWith({ host: "192.168.1.40", home: true, code: "123456" });
+
+        act(() => listener?.({ ...BASE, phase: "connecting", outcome: null }));
+        act(() => listener?.({ ...BASE, phase: "failed", outcome: "pairing-refused" }));
+        expect((screen.getByLabelText("Pairing code") as HTMLInputElement).value).toBe("");
+        await userEvent.type(screen.getByLabelText("Pairing code"), "654321");
+        expect((screen.getByLabelText("Pairing code") as HTMLInputElement).value).toBe("654321");
+        await userEvent.click(screen.getByRole("button", { name: "Pair and install" }));
+        expect(start).toHaveBeenLastCalledWith({ host: "192.168.1.40", home: true, code: "654321" });
+    });
+
+    it("drops the code field for another address", async () => {
+        await openDialog();
+        await userEvent.type(screen.getByLabelText("TV address"), "192.168.1.40");
+        act(() => listener?.({ ...BASE, phase: "failed", outcome: "needs-pairing" }));
+        await screen.findByLabelText("Pairing code");
+        await userEvent.clear(screen.getByLabelText("TV address"));
+        await userEvent.type(screen.getByLabelText("TV address"), "192.168.1.41");
+        expect(screen.queryByLabelText("Pairing code")).toBeNull();
+        expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
     });
 
     it("lists a found TV by the name it announced, beside its address", async () => {

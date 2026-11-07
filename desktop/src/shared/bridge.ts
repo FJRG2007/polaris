@@ -382,6 +382,8 @@ export interface TvInstallState {
 /** The instruction shown while waiting: turn on debugging (the menu path for this TV's platform), or accept the prompt. */
 export interface TvWaiting {
     readonly step: "debugging" | "prompt";
+    /** The `id` of these steps in the TV checker's data, so a page can show them in its own language. */
+    readonly steps: string;
     readonly about: string;
     readonly press: string;
     readonly presses: number;

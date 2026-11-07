@@ -128,8 +128,6 @@ function asksCode(): boolean {
 
 function render(state: TvInstallState): void {
     const idle = IDLE.has(state.phase) && !state.usbListing;
-    if (state.outcome === "needs-pairing" || state.outcome === "pairing-refused") codeFor = readTvAddress(address.value);
-    if (state.outcome === "pairing-refused") code.value = "";
     const pairing = asksCode();
     codeField.hidden = !pairing;
     code.disabled = !idle;
@@ -197,7 +195,16 @@ function render(state: TvInstallState): void {
 }
 
 let latest: TvInstallState | null = null;
+
+/** Acts once on an outcome as it arrives, so typing afterwards is not undone by a re-render. */
+function arrived(previous: TvInstallState | null, next: TvInstallState): void {
+    if (next.outcome === previous?.outcome) return;
+    if (next.outcome === "needs-pairing" || next.outcome === "pairing-refused") codeFor = readTvAddress(address.value);
+    if (next.outcome === "pairing-refused") code.value = "";
+}
+
 bridge.onState((next) => {
+    arrived(latest, next);
     latest = next;
     render(next);
 });
@@ -241,6 +248,7 @@ start.addEventListener("click", () => {
     });
 });
 void bridge.state().then((state) => {
+    arrived(latest, state);
     latest = state;
     render(state);
 });

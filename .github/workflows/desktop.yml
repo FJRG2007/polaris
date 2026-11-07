@@ -34,10 +34,14 @@ on:
       - main
     paths:
       - "desktop/**"
+      - "dashboard/packages/core/src/tv-compat/**"
+      - "dashboard/packages/core/src/search-text.ts"
       - ".github/workflows/desktop.yml"
   pull_request:
     paths:
       - "desktop/**"
+      - "dashboard/packages/core/src/tv-compat/**"
+      - "dashboard/packages/core/src/search-text.ts"
       - ".github/workflows/desktop.yml"
   workflow_dispatch:
 

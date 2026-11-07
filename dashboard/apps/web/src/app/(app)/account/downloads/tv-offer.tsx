@@ -35,7 +35,7 @@ import {
     cn
 } from "@polaris/ui";
 import { TvChecker } from "@polaris/ui/tv-checker";
-import { debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
+import { debuggingById, debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
 import { DownloadCard } from "@polaris/ui/download-card";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { desktopBridge, type DesktopTv, type DesktopTvState } from "@/lib/desktop-bridge";
@@ -132,6 +132,20 @@ function InstallSteps({
     const [usbId, setUsbId] = useState<string | null>(null);
     const [notStarted, setNotStarted] = useState(false);
     const [refused, setRefused] = useState(false);
+    /** The address whose TV asked for a Wireless debugging pairing code. */
+    const [codeFor, setCodeFor] = useState<string | null>(null);
+    const [code, setCode] = useState("");
+    const typed = useRef(address);
+    const arrived = state?.outcome ?? null;
+
+    useEffect(() => {
+        typed.current = address;
+    }, [address]);
+    // Once per outcome as it arrives, so typing a new code afterwards is never undone.
+    useEffect(() => {
+        if (arrived === "needs-pairing" || arrived === "pairing-refused") setCodeFor(typed.current.trim());
+        if (arrived === "pairing-refused") setCode("");
+    }, [arrived]);
 
     useEffect(() => {
         const stop = tv.onState(setState);
@@ -177,6 +191,8 @@ function InstallSteps({
         : usbListed.length === 1 && !address.trim()
           ? (usbListed[0]?.id ?? null)
           : null;
+    const asksCode = !usbPicked && codeFor !== null && codeFor === address.trim();
+    const codeReady = !asksCode || /^\d{6}$/.test(code);
 
     return (
         <>
@@ -315,7 +331,11 @@ function InstallSteps({
                 ) : waiting ? (
                     <>
                         <TvLoader label={t("downloads.tv.dialog.waiting.loader")} />
-                        <TvWaitingNote menus={waiting} step={waiting.step} waiting />
+                        <TvWaitingNote
+                            menus={(waiting.steps ? debuggingById(waiting.steps, locale) : undefined) ?? waiting}
+                            step={waiting.step}
+                            waiting
+                        />
                     </>
                 ) : STEPS.has(state.phase) ? (
                     <TvLoader label={t(`downloads.tv.dialog.steps.${state.phase}` as never)} />
@@ -330,6 +350,25 @@ function InstallSteps({
                     >
                         {t(`downloads.tv.dialog.outcomes.${outcome}` as never)}
                     </p>
+                ) : null}
+                {asksCode ? (
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                        <label htmlFor="tv-code" className="text-sm font-medium">
+                            {t("downloads.tv.dialog.code")}
+                        </label>
+                        <Input
+                            id="tv-code"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            spellCheck={false}
+                            maxLength={6}
+                            placeholder="123456"
+                            value={code}
+                            disabled={!idle}
+                            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                            className="w-32 tabular-nums"
+                        />
+                    </div>
                 ) : null}
                 {showBefore ? (
                     <TvWaitingNote menus={menus} step="debugging" waiting={false} />
@@ -364,18 +403,18 @@ function InstallSteps({
                     </Button>
                 ) : null}
                 <Button
-                    disabled={!idle || (!valid && !usbPicked)}
+                    disabled={!idle || (!valid && !usbPicked) || !codeReady}
                     onClick={() => {
                         void tv
                             .start(
                                 usbPicked
                                     ? { usb: usbPicked, home }
-                                    : { host: address.trim(), home }
+                                    : { host: address.trim(), home, ...(asksCode ? { code } : {}) }
                             )
                             .then((started) => setNotStarted(!started));
                     }}
                 >
-                    {t("downloads.tv.dialog.start")}
+                    {asksCode ? t("downloads.tv.dialog.pairStart") : t("downloads.tv.dialog.start")}
                 </Button>
             </DialogFooter>
         </>
