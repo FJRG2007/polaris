@@ -153,8 +153,11 @@ async function initApp() {
   // 4. Initialize Third-Person Controllers (Person, Car, Cyclist, Helicopter) & Multi-Camera System
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
   // Reuse teleport placement so saved players return at rest, close to their last positions.
+  // A restart carries the player in its address (`?resume=`): framed in a call the page is sandboxed, has an opaque
+  // origin and so no storage, and the restart would otherwise put everybody back at the start
   try {
-    const saved = JSON.parse(localStorage.getItem('nyc-player-state'));
+    const resume = new URLSearchParams(location.search).get('resume');
+    const saved = JSON.parse(resume ?? localStorage.getItem('nyc-player-state'));
     if (saved?.version === 1) {
       for (const mode of Object.keys(controllerManager.entities)) {
         const p = saved.entities?.[mode];
@@ -166,12 +169,16 @@ async function initApp() {
     }
   } catch { /* Missing or unavailable storage does not prevent playing. */ }
 
+  function playerState() {
+    const entities = Object.fromEntries(Object.entries(controllerManager.entities).map(([mode, entity]) => [mode, {
+      x: entity.position.x, y: entity.position.y, z: entity.position.z, heading: entity.heading
+    }]));
+    return JSON.stringify({ version: 1, activeMode: controllerManager.activeMode, entities });
+  }
+
   function savePlayerState() {
     try {
-      const entities = Object.fromEntries(Object.entries(controllerManager.entities).map(([mode, entity]) => [mode, {
-        x: entity.position.x, y: entity.position.y, z: entity.position.z, heading: entity.heading
-      }]));
-      localStorage.setItem('nyc-player-state', JSON.stringify({ version: 1, activeMode: controllerManager.activeMode, entities }));
+      localStorage.setItem('nyc-player-state', playerState());
     } catch { /* Storage may be disabled or full. */ }
   }
 
@@ -499,8 +506,11 @@ async function initApp() {
       if (value === qualitySetting) return;
       saveQualitySetting(value);
       savePlayerState();
+      // In the address as well as in storage, which a sandboxed page has none of: the restart must not silently
+      // come back at the quality it left
       const url = new URL(location.href);
-      url.searchParams.delete('quality');
+      url.searchParams.set('quality', value);
+      url.searchParams.set('resume', playerState());
       location.replace(url.href);
     });
   });

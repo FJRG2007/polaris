@@ -69,7 +69,13 @@ import { Cue, SoundboardButton } from "./soundboard-picker";
 import { LiveBadge } from "./call-roster";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
-import { CallGamesButton, CallGamesPanel, useCallActivity } from "./call-activity-panel";
+import {
+    CallGameOffer,
+    CallGamesButton,
+    CallGameView,
+    drawsGame,
+    useCallActivity
+} from "./call-activity-panel";
 import { callSessionId } from "./activity-card-actions";
 import { GameInviteDialog } from "@/components/arcade/game-invite-dialog";
 import { useCallVolume } from "./call-volumes";
@@ -94,6 +100,7 @@ import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { AnnotateButton, AnnotateLayer, AnnotateProvider, AnnotateStrip } from "./call-annotate";
 import type { PickedPerson } from "@/components/people-picker";
 import {
+    ACTIVITY_KEY,
     canShareScreen,
     LOCAL_SCREEN_KEY,
     putAwayOf,
@@ -531,16 +538,23 @@ export function CallRoom({
         </>
     );
     const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
+    /** Whether this reader is playing a game here: it is a picture on the
+     *  stage, the way a shared screen is. */
+    const gameOn = Boolean(viewerId) && drawsGame(activity);
     const live =
-        focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
+        focused &&
+        [
+            ...stages.map((stage) => stage.key),
+            ...cameraKeys,
+            ...(gameOn ? [ACTIVITY_KEY] : [])
+        ].includes(focused)
             ? focused
             : null;
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
-    const { showing, staged: shareStaged, enlarged } = stagingOf(stages, live);
-    // A game somebody pulled up to the big place takes it the way a screen
-    // does: the faces become the strip under it.
-    const staged = shareStaged || activity.focused;
+    const { showing, staged, enlarged, activity: gameShown } = stagingOf(stages, live, gameOn);
+    /** The pictures on the stage: the game first, then the screens. */
+    const stageCount = showing.length + (gameShown ? 1 : 0);
 
     /**
      * Whether there is a camera sending anywhere in this call, this browser's
@@ -564,7 +578,7 @@ export function CallRoom({
     const bareFaces = callBareFaces(place, staged, pictures);
     /** How a direct message's call is laid out around what is being watched -
      *  see `directLayout` in `call-band`, which is where the reasoning lives. */
-    const layout = place === "direct" ? directLayout(stages.length > 0, enlarged) : null;
+    const layout = place === "direct" ? directLayout(stages.length > 0 || gameOn, enlarged) : null;
     /**
      * Whether the people are drawn under whatever is being watched.
      *
@@ -615,7 +629,7 @@ export function CallRoom({
      * nothing on the stage stays the size they asked for, and a face enlarged
      * and let go again is not a stream ending.
      */
-    const watching = stages.length > 0;
+    const watching = stages.length > 0 || gameOn;
     const seen = useRef({ watching, expanded: false });
     const expandedWatching = useRef(false);
     useEffect(() => {
@@ -809,18 +823,7 @@ export function CallRoom({
 
                 {/* A game somebody started in the call: offered to the others, and
                 played here by whoever joined. */}
-                {viewerId && (
-                    <CallGamesPanel
-                        activity={activity}
-                        onInvite={() => {
-                            const game = activity.session?.game;
-                            if (!game) return;
-                            void callSessionId(meetingId, game)
-                                .then((id) => id && setGameInvite({ id, game }))
-                                .catch(() => undefined);
-                        }}
-                    />
-                )}
+                {viewerId && <CallGameOffer activity={activity} />}
                 {gameInvite && (
                     <GameInviteDialog
                         sessionId={gameInvite.id}
@@ -996,13 +999,40 @@ export function CallRoom({
                 text, and text in a ninth of a window is not readable. Side by
                 side when there are several, rather than stacked - two shares
                 stacked in a panel this tall leave each of them a strip. */}
-                {showing.length > 0 && (
+                {/* A game this reader plays is one of them, first. It keeps running
+                while a screen or a face has the place instead, out of sight but
+                never closed - closing its frame would load the whole city again -
+                and at a pixel rather than at none, since a game drawn at no size
+                at all has nothing to draw into. */}
+                {(showing.length > 0 || gameOn) && (
                     <div
-                        className={cn(
-                            "grid min-h-0 min-w-0 flex-[3] gap-2",
-                            gridColumns(showing.length)
-                        )}
+                        className={
+                            stageCount === 0
+                                ? "contents"
+                                : cn("grid min-h-0 min-w-0 flex-[3] gap-2", gridColumns(stageCount))
+                        }
                     >
+                        {gameOn && (
+                            <CallGameView
+                                key={ACTIVITY_KEY}
+                                activity={activity}
+                                focused={live === ACTIVITY_KEY}
+                                onFocus={() => focus(ACTIVITY_KEY)}
+                                away={!gameShown}
+                                onInvite={() => {
+                                    const game = activity.session?.game;
+                                    if (!game) return;
+                                    void callSessionId(meetingId, game)
+                                        .then((id) => id && setGameInvite({ id, game }))
+                                        .catch(() => undefined);
+                                }}
+                                className={
+                                    gameShown
+                                        ? "size-full min-h-0"
+                                        : "pointer-events-none fixed left-0 top-0 size-px opacity-0"
+                                }
+                            />
+                        )}
                         {showing.map((stage) => (
                             <Tile
                                 key={stage.key}
