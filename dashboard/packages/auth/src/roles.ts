@@ -9,6 +9,7 @@
 import { can } from "./authz.js";
 import { prisma } from "@polaris/db";
 import {
+    ALL_PERMISSIONS,
     CHAT_CAPABILITIES,
     GAMES_CAPABILITIES,
     DEFAULT_ROLES,
@@ -26,8 +27,9 @@ export async function seedDefaultRoles(): Promise<void> {
             create: { name, permissions: JSON.stringify(permissions), isSystem: true }
         });
     }
-    await carryGrants(CHAT_CARRY_MARK, CHAT_CAPABILITIES);
-    await carryGrants(GAMES_CARRY_MARK, GAMES_CAPABILITIES);
+    await carryGrants(CHAT_CARRY_MARK, CHAT_CAPABILITIES, holdsChat);
+    await carryGrants(GAMES_CARRY_MARK, GAMES_CAPABILITIES, holdsChat);
+    await carryGrants(FAMILY_CARRY_MARK, FAMILY_CAPABILITIES, isMemberRole);
 }
 
 /** That the carry-forward below has already happened, so it happens once. */
@@ -35,6 +37,30 @@ const CHAT_CARRY_MARK = "roles.chatCapabilitiesCarried";
 
 /** The same, for the Games app's two grants. */
 const GAMES_CARRY_MARK = "roles.gamesCapabilitiesCarried";
+
+/** The same, for looking after a child's account. */
+const FAMILY_CARRY_MARK = "roles.familyCapabilitiesCarried";
+
+/** What the built-in `member` role gained with family accounts. */
+const FAMILY_CAPABILITIES: readonly Permission[] = ["family.manage"];
+
+/** The role a carry is for, as the seed stored it. */
+interface CarriedRole {
+    readonly name: string;
+    readonly grants: readonly GrantedPermission[];
+}
+
+/** A role holding the wildcard already holds the chat grants, and a role without
+ *  the chat is not being handed one. */
+function holdsChat(role: CarriedRole): boolean {
+    return role.grants.includes("chat.use");
+}
+
+/** Every adult member looks after their children by default, while a read-only
+ *  or guest account was never meant to create one. */
+function isMemberRole(role: CarriedRole): boolean {
+    return role.name === "member";
+}
 
 /**
  * Give the new chat grants to the roles that predate them.
@@ -51,21 +77,27 @@ const GAMES_CARRY_MARK = "roles.gamesCapabilitiesCarried";
  * any other - including the ones this added.
  *
  * The Games grants are carried the same way: a role holding the chat is a role
- * whose members a fresh install lets play.
+ * whose members a fresh install lets play. `family.manage` goes only to the
+ * built-in `member` role, the one a fresh install gives it to.
  */
-async function carryGrants(mark: string, carried: readonly Permission[]): Promise<void> {
+async function carryGrants(
+    mark: string,
+    carried: readonly Permission[],
+    appliesTo: (role: CarriedRole) => boolean
+): Promise<void> {
     const done = await prisma.setting.findUnique({
         where: { key: mark },
         select: { key: true }
     });
     if (done) return;
 
-    const roles = await prisma.role.findMany({ select: { id: true, permissions: true } });
+    const roles = await prisma.role.findMany({
+        select: { id: true, name: true, permissions: true }
+    });
     for (const role of roles) {
         const grants = parseGrants(role.permissions);
-        // A role holding the wildcard already holds these, and a role without
-        // the chat is not being handed one.
-        if (!grants.includes("chat.use")) continue;
+        if (grants.includes(ALL_PERMISSIONS)) continue;
+        if (!appliesTo({ name: role.name, grants })) continue;
         const missing = carried.filter((capability) => !grants.includes(capability));
         if (missing.length === 0) continue;
         await prisma.role.update({

@@ -350,6 +350,7 @@
                 "tools": "Herramientas",
                 "tasks": "Tareas",
                 "inbox": "Entrada",
+                "family": "Familia",
                 "administration": "Administración"
             }
         },
@@ -1824,6 +1825,29 @@
                 "badName": "Pon al TV un nombre de hasta 60 caracteres.",
                 "busy": "Este TV cambió en ese mismo momento. Inténtalo de nuevo."
             }
+        }
+    },
+    "family": {
+        "stages": {
+            "baby": "Bebé",
+            "child": "Niño",
+            "preteen": "Preadolescente",
+            "teen": "Adolescente",
+            "olderTeen": "Joven"
+        },
+        "stageAges": {
+            "baby": "0 a 3",
+            "child": "4 a 8",
+            "preteen": "9 a 12",
+            "teen": "13 a 15",
+            "olderTeen": "16 a 17"
+        },
+        "levels": {
+            "off": "Aún no",
+            "guardian": "Lo decide el tutor",
+            "contacts": "Personas aprobadas",
+            "on": "Sí",
+            "floor": "Nunca"
         }
     }
 }

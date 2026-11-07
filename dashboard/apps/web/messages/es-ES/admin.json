@@ -2898,6 +2898,7 @@
             "tools": "Útiles",
             "tasks": "Tareas",
             "inbox": "Bandeja",
+            "family": "Familia",
             "management": "Gestión",
             "crm": "CRM",
             "automations": "Automatizaciones",
@@ -2982,6 +2983,9 @@
             "inbox": {
                 "read": "Leer conversaciones",
                 "manage": "Responder y gestionar canales"
+            },
+            "family": {
+                "manage": "Crear y cuidar cuentas de menores"
             },
             "users": {
                 "manage": "Invitar a personas y cambiar cuentas"
