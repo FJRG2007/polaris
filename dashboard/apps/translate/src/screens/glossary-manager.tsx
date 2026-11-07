@@ -461,10 +461,12 @@ function GlossaryEditor({
             );
     }, [value.entries, filter]);
 
-    const scroller = useRef<HTMLDivElement | null>(null);
+    // State, not a ref: the list is drawn in the dialog's portal, which mounts
+    // after this renders, and the virtualizer only takes up a list it is handed.
+    const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
     const rowWindow = useVirtualizer({
         count: shownRows.length,
-        getScrollElement: () => scroller.current,
+        getScrollElement: () => scroller,
         estimateSize: () => ROW_HEIGHT,
         overscan: 8
     });
@@ -615,7 +617,7 @@ function GlossaryEditor({
                             onChange={(event) => setFilter(event.target.value)}
                         />
                     ) : null}
-                    <div ref={scroller} className="max-h-80 min-w-0 overflow-y-auto">
+                    <div ref={setScroller} className="max-h-80 min-w-0 overflow-y-auto">
                         <ul
                             className="relative min-w-0"
                             style={{ height: rowWindow.getTotalSize() }}
