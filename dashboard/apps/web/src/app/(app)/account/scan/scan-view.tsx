@@ -158,7 +158,10 @@ function ReadCard({ stale }: { stale: boolean }) {
                     )}
                 </div>
 
-                <form onSubmit={onSubmit} className="flex flex-col gap-2 border-t border-border pt-4">
+                <form
+                    onSubmit={onSubmit}
+                    className="flex flex-col gap-2 border-t border-border pt-4"
+                >
                     <label className="text-sm" htmlFor="qr-code">
                         {t("scan.typeCode")}
                     </label>
@@ -260,17 +263,24 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
         <Card className="border-warning-edge">
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-start gap-3">
-                    <ShieldQuestion className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                    <ShieldQuestion
+                        className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                        aria-hidden
+                    />
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">{t("scan.decide.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("scan.decide.description")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("scan.decide.description")}
+                        </p>
                     </div>
                 </div>
 
                 <dl className="grid gap-2 rounded-md border border-border p-3 text-sm">
                     <Detail label={t("scan.decide.device")} value={request.device} />
                     <Detail label={t("scan.decide.from")} value={request.origin} />
-                    {request.host ? <Detail label={t("scan.decide.openedOn")} value={request.host} /> : null}
+                    {request.host ? (
+                        <Detail label={t("scan.decide.openedOn")} value={request.host} />
+                    ) : null}
                     <div className="flex justify-between gap-3">
                         <dt className="text-muted-foreground">{t("scan.decide.asked")}</dt>
                         <dd className="text-right">
@@ -314,7 +324,10 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                         <X className="size-4" />
                         {t("scan.decide.refuse")}
                     </Button>
-                    <Button disabled={busy || !hasPin || pin.length < 4} onClick={() => void decide(true)}>
+                    <Button
+                        disabled={busy || !hasPin || pin.length < 4}
+                        onClick={() => void decide(true)}
+                    >
                         <Check className="size-4" />
                         {busy ? t("scan.decide.checking") : t("scan.decide.allow")}
                     </Button>

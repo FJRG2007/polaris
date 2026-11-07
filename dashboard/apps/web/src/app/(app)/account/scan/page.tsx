@@ -52,7 +52,9 @@ export default async function ScanPage({
     return (
         <div className="mx-auto flex max-w-xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("scan.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("scan.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("scan.page.intro")}</p>
             </div>
             <ScanView request={request} scanned={raw !== null} hasPin={security.hasPin} />
