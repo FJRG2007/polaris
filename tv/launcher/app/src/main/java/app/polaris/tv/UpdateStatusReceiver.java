@@ -33,14 +33,17 @@ public final class UpdateStatusReceiver extends BroadcastReceiver {
                 Toast.makeText(app, R.string.update_confirm_on_tv, Toast.LENGTH_LONG).show();
             }
         } else if (status != SelfUpdate.STATUS_SUCCESS) {
-            Toast.makeText(app, app.getString(R.string.update_failed, SelfUpdate.reasonFor(status)),
-                    Toast.LENGTH_LONG).show();
+            String why = SelfUpdateRun.why(app, SelfUpdate.failureFor(status));
+            Toast.makeText(app, app.getString(R.string.update_failed, why), Toast.LENGTH_LONG).show();
         }
-        if (requestId == null) return;
+        boolean installed = status == SelfUpdate.STATUS_SUCCESS;
+        if (requestId == null && !installed) return;
         int reported = status;
         PendingResult pending = goAsync();
         new Thread(() -> {
             try {
+                if (installed) SelfUpdateRun.discardDownload(app);
+                if (requestId == null) return;
                 SelfUpdate update = SelfUpdateRun.of(app);
                 if (update != null) update.onStatus(requestId, reported);
             } finally {

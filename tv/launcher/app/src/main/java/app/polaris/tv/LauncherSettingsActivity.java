@@ -476,7 +476,7 @@ public final class LauncherSettingsActivity extends Activity {
             case RATE_LIMITED: return getString(R.string.update_rate_limited);
             case MISMATCH: return getString(R.string.update_mismatch);
             case REFUSED: return getString(R.string.update_refused);
-            case FAILED: return getString(R.string.update_failed, result.reason);
+            case FAILED: return getString(R.string.update_failed, SelfUpdateRun.why(this, result.failure));
             case INSTALLING: return getString(R.string.update_installing);
             default: return getString(R.string.polaris_unreachable);
         }

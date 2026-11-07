@@ -204,6 +204,7 @@ public class SelfUpdateTest {
         assertTrue(net.ranges.isEmpty());
         assertEquals(0, installer.installs);
         assertTrue(net.reports.isEmpty());
+        assertTrue(file.deleted);
     }
 
     @Test
@@ -317,6 +318,14 @@ public class SelfUpdateTest {
         SelfUpdate.Result result = update("3.4", 13).update(REQUEST, file);
         assertEquals(SelfUpdate.Outcome.FAILED, result.outcome);
         assertTrue(result.reason.contains("checksum"));
+        assertEquals(SelfUpdate.Failure.RELEASE_MISMATCH, result.failure);
+    }
+
+    @Test
+    public void installerFailuresKeepTheirKindForTheTv() {
+        assertEquals(SelfUpdate.Failure.BLOCKED, SelfUpdate.failureFor(SelfUpdate.STATUS_FAILURE_BLOCKED));
+        assertEquals(SelfUpdate.Failure.NOT_INSTALLED, SelfUpdate.failureFor(SelfUpdate.STATUS_FAILURE));
+        assertEquals("This TV blocks installs from Polaris TV.", SelfUpdate.reasonFor(SelfUpdate.STATUS_FAILURE_BLOCKED));
     }
 
     @Test

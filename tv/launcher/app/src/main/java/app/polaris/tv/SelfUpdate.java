@@ -166,16 +166,46 @@ final class SelfUpdate {
         INSTALLING
     }
 
-    /** One run's result, with the newest release when it was learned and a reason for a failure. */
+    /** Why an update did not finish. The sentence is what the instance is told; the TV shows its own words. */
+    enum Failure {
+        NO_RELEASE("This Polaris has no TV build to install."),
+        RELEASE_MISMATCH("The release did not match its checksum, so Polaris did not offer it."),
+        RELEASE_TOO_LARGE("The release is larger than Polaris accepts."),
+        RELEASE_UNAVAILABLE("Polaris could not fetch the release."),
+        DOWNLOAD_STOPPED("The download stopped and could not be resumed."),
+        CHECKSUM("The download did not match its checksum."),
+        NOT_POLARIS_TV("The download is not a Polaris TV build."),
+        NOT_NEWER("That build is not newer than the one on this TV."),
+        NOT_STARTED("This TV could not start the install."),
+        CANCELLED("The update was cancelled on the TV."),
+        BLOCKED("This TV blocks installs from Polaris TV."),
+        CONFLICT("This TV refused the update: it is signed differently or older."),
+        STORAGE("This TV does not have enough free space for the update."),
+        INCOMPATIBLE("This build does not run on this TV."),
+        INVALID("The update file was not a valid package."),
+        TIMEOUT("The install took too long and was stopped."),
+        NOT_INSTALLED("The TV could not install the update.");
+
+        final String sentence;
+
+        Failure(String sentence) {
+            this.sentence = sentence;
+        }
+    }
+
+    /** One run's result, with the newest release when it was learned and why it failed when it did. */
     static final class Result {
         final Outcome outcome;
         final Release release;
+        final Failure failure;
+        /** The failure's sentence in English, as reported to the instance. */
         final String reason;
 
-        Result(Outcome outcome, Release release, String reason) {
+        Result(Outcome outcome, Release release, Failure failure) {
             this.outcome = outcome;
             this.release = release;
-            this.reason = reason;
+            this.failure = failure;
+            this.reason = failure == null ? null : failure.sentence;
         }
     }
 
@@ -243,7 +273,7 @@ final class SelfUpdate {
         }
         if (reply.status == 429) return new Result(Outcome.RATE_LIMITED, null, null);
         if (reply.status == 204) {
-            return fail(requestId, Outcome.NO_RELEASE, null, "This Polaris has no TV build to install.");
+            return fail(requestId, Outcome.NO_RELEASE, null, Failure.NO_RELEASE);
         }
         if (reply.status == 502) {
             return fail(requestId, Outcome.FAILED, null, releaseFailure(reply.body));
@@ -252,6 +282,7 @@ final class SelfUpdate {
         if (release == null) return new Result(Outcome.UNREACHABLE, null, null);
         if (!newer(release)) {
             // Already there (the update may have finished before this TV restarted): say so, never go back.
+            if (file != null) file.delete();
             if (requestId != null) report(requestId, DONE, null);
             return new Result(Outcome.UP_TO_DATE, release, null);
         }
@@ -261,27 +292,27 @@ final class SelfUpdate {
         Outcome fetched = fetch(release, file);
         if (fetched == Outcome.RATE_LIMITED || fetched == Outcome.UNREACHABLE) return new Result(fetched, release, null);
         if (fetched == Outcome.FAILED) {
-            return fail(requestId, Outcome.FAILED, release, "The download stopped and could not be resumed.");
+            return fail(requestId, Outcome.FAILED, release, Failure.DOWNLOAD_STOPPED);
         }
         if (!release.sha256.equals(sha256(file))) {
             file.delete();
-            return fail(requestId, Outcome.MISMATCH, release, "The download did not match its checksum.");
+            return fail(requestId, Outcome.MISMATCH, release, Failure.CHECKSUM);
         }
         Archive archive = installer.read(file);
         if (archive == null || !PACKAGE.equals(archive.packageName)) {
             file.delete();
-            return fail(requestId, Outcome.REFUSED, release, "The download is not a Polaris TV build.");
+            return fail(requestId, Outcome.REFUSED, release, Failure.NOT_POLARIS_TV);
         }
         if (archive.versionCode <= installedCode) {
             file.delete();
-            return fail(requestId, Outcome.REFUSED, release, "That build is not newer than the one on this TV.");
+            return fail(requestId, Outcome.REFUSED, release, Failure.NOT_NEWER);
         }
         // Before the commit: a silent install replaces this process, and no report after it would be sent.
         if (requestId != null) report(requestId, INSTALLING, null);
         try {
             installer.install(file, release.size, requestId);
         } catch (IOException refused) {
-            return fail(requestId, Outcome.FAILED, release, "This TV could not start the install.");
+            return fail(requestId, Outcome.FAILED, release, Failure.NOT_STARTED);
         }
         return new Result(Outcome.INSTALLING, release, null);
     }
@@ -384,9 +415,9 @@ final class SelfUpdate {
         return reply;
     }
 
-    private Result fail(String requestId, Outcome outcome, Release release, String reason) {
-        if (requestId != null) report(requestId, FAILED, reason);
-        return new Result(outcome, release, reason);
+    private Result fail(String requestId, Outcome outcome, Release release, Failure failure) {
+        if (requestId != null) report(requestId, FAILED, failure.sentence);
+        return new Result(outcome, release, failure);
     }
 
     /** The body of a report, or null for a state the instance does not take. */
@@ -430,18 +461,23 @@ final class SelfUpdate {
         return FAILED;
     }
 
-    /** A readable sentence for a failed install, shown on the TV and on Polaris. */
-    static String reasonFor(int status) {
+    /** Why a PackageInstaller status failed. */
+    static Failure failureFor(int status) {
         switch (status) {
-            case STATUS_FAILURE_ABORTED: return "The update was cancelled on the TV.";
-            case STATUS_FAILURE_BLOCKED: return "This TV blocks installs from Polaris TV.";
-            case STATUS_FAILURE_CONFLICT: return "This TV refused the update: it is signed differently or older.";
-            case STATUS_FAILURE_STORAGE: return "This TV does not have enough free space for the update.";
-            case STATUS_FAILURE_INCOMPATIBLE: return "This build does not run on this TV.";
-            case STATUS_FAILURE_INVALID: return "The update file was not a valid package.";
-            case STATUS_FAILURE_TIMEOUT: return "The install took too long and was stopped.";
-            default: return "The TV could not install the update.";
+            case STATUS_FAILURE_ABORTED: return Failure.CANCELLED;
+            case STATUS_FAILURE_BLOCKED: return Failure.BLOCKED;
+            case STATUS_FAILURE_CONFLICT: return Failure.CONFLICT;
+            case STATUS_FAILURE_STORAGE: return Failure.STORAGE;
+            case STATUS_FAILURE_INCOMPATIBLE: return Failure.INCOMPATIBLE;
+            case STATUS_FAILURE_INVALID: return Failure.INVALID;
+            case STATUS_FAILURE_TIMEOUT: return Failure.TIMEOUT;
+            default: return Failure.NOT_INSTALLED;
         }
+    }
+
+    /** The sentence Polaris is told for a failed install. */
+    static String reasonFor(int status) {
+        return failureFor(status).sentence;
     }
 
     /** Reports the installer's final word on a request from Polaris. */
@@ -469,15 +505,15 @@ final class SelfUpdate {
         }
     }
 
-    private static String releaseFailure(String body) {
+    private static Failure releaseFailure(String body) {
         String reason = null;
         try {
             reason = new JSONObject(body).optString("reason", null);
         } catch (JSONException unreadable) {
             // Fall through to the general sentence.
         }
-        if ("mismatch".equals(reason)) return "The release did not match its checksum, so Polaris did not offer it.";
-        if ("too-large".equals(reason)) return "The release is larger than Polaris accepts.";
-        return "Polaris could not fetch the release.";
+        if ("mismatch".equals(reason)) return Failure.RELEASE_MISMATCH;
+        if ("too-large".equals(reason)) return Failure.RELEASE_TOO_LARGE;
+        return Failure.RELEASE_UNAVAILABLE;
     }
 }

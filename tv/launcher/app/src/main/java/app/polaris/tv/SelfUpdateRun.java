@@ -11,7 +11,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -21,7 +20,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -50,8 +48,7 @@ final class SelfUpdateRun {
     private static final String NEWEST = "newest";
     private static final String NOTICED = "noticed";
     private static final long DAY_MS = 24 * 60 * 60_000L;
-    private static final int TIMEOUT_MS = 30_000;
-    private static final int MAX_BODY = 64 * 1024;
+    static final int TIMEOUT_MS = 30_000;
     static final String EXTRA_REQUEST = "app.polaris.tv.extra.UPDATE_REQUEST";
     static final String ACTION_STATUS = "app.polaris.tv.action.UPDATE_STATUS";
 
@@ -93,8 +90,38 @@ final class SelfUpdateRun {
             SelfUpdate.Result result = update == null
                     ? new SelfUpdate.Result(SelfUpdate.Outcome.UNREACHABLE, null, null) : update.check();
             remember(app, result);
+            if (result.outcome == SelfUpdate.Outcome.UP_TO_DATE) discardDownload(app);
             post(listener, result);
         }, "polaris-update-check").start();
+    }
+
+    /** Deletes the downloaded APK once it is installed or no longer newer than this build. */
+    static void discardDownload(Context context) {
+        partialFor(context).delete();
+    }
+
+    /** The TV's own words for why an update did not finish. */
+    static String why(Context context, SelfUpdate.Failure failure) {
+        if (failure == null) return context.getString(R.string.update_why_not_installed);
+        switch (failure) {
+            case NO_RELEASE: return context.getString(R.string.update_no_release);
+            case RELEASE_MISMATCH: return context.getString(R.string.update_why_release_mismatch);
+            case RELEASE_TOO_LARGE: return context.getString(R.string.update_why_release_too_large);
+            case RELEASE_UNAVAILABLE: return context.getString(R.string.update_why_release_unavailable);
+            case DOWNLOAD_STOPPED: return context.getString(R.string.update_why_download_stopped);
+            case CHECKSUM: return context.getString(R.string.update_mismatch);
+            case NOT_POLARIS_TV: return context.getString(R.string.update_why_not_polaris_tv);
+            case NOT_NEWER: return context.getString(R.string.update_refused);
+            case NOT_STARTED: return context.getString(R.string.update_why_not_started);
+            case CANCELLED: return context.getString(R.string.update_why_cancelled);
+            case BLOCKED: return context.getString(R.string.update_why_blocked);
+            case CONFLICT: return context.getString(R.string.update_why_conflict);
+            case STORAGE: return context.getString(R.string.update_why_storage);
+            case INCOMPATIBLE: return context.getString(R.string.update_why_incompatible);
+            case INVALID: return context.getString(R.string.update_why_invalid);
+            case TIMEOUT: return context.getString(R.string.update_why_timeout);
+            default: return context.getString(R.string.update_why_not_installed);
+        }
     }
 
     /**
@@ -252,18 +279,21 @@ final class SelfUpdateRun {
         }
     }
 
-    /** The update routes over HttpURLConnection, which follows the system's certificate trust. */
+    /**
+     * The update routes over HttpURLConnection, which follows the system's certificate trust. The JSON calls go
+     * through the failover; the download goes to the address the last of them was answered on.
+     */
     static final class Http implements SelfUpdate.Net {
-        private final String origin;
+        private final PolarisFailover failover;
         private final String token;
 
-        Http(String origin, String token) {
-            this.origin = origin;
+        Http(PolarisFailover failover, String token) {
+            this.failover = failover;
             this.token = token;
         }
 
         private HttpURLConnection open(String method, String path) throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(origin + path).openConnection();
+            HttpURLConnection connection = (HttpURLConnection) new URL(failover.origin() + path).openConnection();
             connection.setConnectTimeout(PolarisFailover.TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
             connection.setRequestMethod(method);
@@ -276,30 +306,17 @@ final class SelfUpdateRun {
 
         @Override
         public SelfUpdate.Reply get(String path) throws IOException {
-            return json(open("GET", path), null);
+            return json("GET", path, null);
         }
 
         @Override
         public SelfUpdate.Reply post(String path, String body) throws IOException {
-            return json(open("POST", path), body);
+            return json("POST", path, body);
         }
 
-        private static SelfUpdate.Reply json(HttpURLConnection connection, String body) throws IOException {
-            try {
-                connection.setRequestProperty("Accept", "application/json");
-                if (body != null) {
-                    connection.setDoOutput(true);
-                    connection.setRequestProperty("Content-Type", "application/json");
-                    try (OutputStream out = connection.getOutputStream()) {
-                        out.write(body.getBytes(StandardCharsets.UTF_8));
-                    }
-                }
-                int status = connection.getResponseCode();
-                InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
-                return new SelfUpdate.Reply(status, stream == null ? "" : read(stream), retryAfter(connection));
-            } finally {
-                connection.disconnect();
-            }
+        private SelfUpdate.Reply json(String method, String path, String body) throws IOException {
+            PolarisFailover.Reply reply = failover.request(method, path, body, token);
+            return new SelfUpdate.Reply(reply.status, reply.body, reply.retryAfterSeconds);
         }
 
         @Override
@@ -324,32 +341,10 @@ final class SelfUpdateRun {
                     }
                 };
                 if (body == null) connection.disconnect();
-                return new SelfUpdate.Download(status, retryAfter(connection), body);
+                return new SelfUpdate.Download(status, PolarisLink.retryAfter(connection), body);
             } catch (IOException failed) {
                 connection.disconnect();
                 throw failed;
-            }
-        }
-
-        private static long retryAfter(HttpURLConnection connection) {
-            String value = connection.getHeaderField("Retry-After");
-            if (value == null) return -1;
-            try {
-                return Math.max(0, Long.parseLong(value.trim()));
-            } catch (NumberFormatException httpDate) {
-                return -1;
-            }
-        }
-
-        private static String read(InputStream stream) throws IOException {
-            try (InputStream in = stream) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] chunk = new byte[4096];
-                for (int size; (size = in.read(chunk)) != -1; ) {
-                    if (out.size() + size > MAX_BODY) throw new IOException("The answer is too long");
-                    out.write(chunk, 0, size);
-                }
-                return out.toString("UTF-8");
             }
         }
     }
