@@ -17,6 +17,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { scanTarget } from "@/lib/scan-target";
 import { decideQrSignInAction } from "./actions";
 import { codeDigits } from "@/components/code-input";
 import { RelativeTime } from "@/components/relative-time";
@@ -44,18 +45,6 @@ export function ScanView({
     return <ReadCard stale={scanned} />;
 }
 
-/** Pull the code out of whatever the camera read: the link the QR encodes, or
- *  the bare code if somebody generated one another way. */
-function codeFromScan(text: string): string | null {
-    try {
-        const fromLink = new URL(text).searchParams.get("code");
-        if (fromLink) return fromLink;
-    } catch {
-        // Not a URL; fall through to treating the payload as the code itself.
-    }
-    return /^[A-Za-z0-9-]{6,13}$/.test(text.trim()) ? text.trim() : null;
-}
-
 /** The camera, and the typed code for when it is not an option. */
 function ReadCard({ stale }: { stale: boolean }) {
     const router = useRouter();
@@ -65,8 +54,9 @@ function ReadCard({ stale }: { stale: boolean }) {
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
 
-    function open(code: string) {
-        router.push(`/account/scan?code=${encodeURIComponent(code)}`);
+    // A TV's QR opens the TV's approval page; anything else is a sign-in code.
+    function open(target: string) {
+        router.push(target);
     }
 
     // The camera runs only while it is asked for, and its track is stopped on the
@@ -108,10 +98,10 @@ function ReadCard({ stale }: { stale: boolean }) {
                 const found = jsQR(frame.data, frame.width, frame.height, {
                     inversionAttempts: "dontInvert"
                 });
-                const code = found ? codeFromScan(found.data) : null;
-                if (code) {
+                const target = found ? scanTarget(found.data) : null;
+                if (target) {
                     window.clearInterval(timer);
-                    open(code);
+                    open(target);
                 }
             }, SCAN_INTERVAL_MS);
         }
@@ -127,12 +117,12 @@ function ReadCard({ stale }: { stale: boolean }) {
 
     function onSubmit(event: FormEvent) {
         event.preventDefault();
-        const code = codeFromScan(typed);
-        if (!code) {
+        const target = scanTarget(typed);
+        if (!target) {
             setError(t("scan.errors.notACode"));
             return;
         }
-        open(code);
+        open(target);
     }
 
     return (

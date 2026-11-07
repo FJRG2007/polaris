@@ -8,8 +8,16 @@
  * the browser: what is shown about the waiting sign-in has to come from the
  * request that opened it, and whether there is anything to decide at all is not
  * a question the client can be trusted to answer.
+ *
+ * A code that is no sign-in but a TV waiting to be connected - typed from the
+ * TV's screen, or read from a QR older than this page's own handling of it - is
+ * passed on to the TV's approval page with the code filled in.
  */
 
+import { redirect } from "next/navigation";
+import { tvApprovePath } from "@/lib/tv/scopes";
+import { readUserCode } from "@/lib/device-code";
+import { describeCliSignIn } from "@/lib/cli/sign-in";
 import { getTranslations } from "@/lib/i18n/request";
 import { ScanView } from "./scan-view";
 import { requireUser } from "@/lib/session";
@@ -35,6 +43,11 @@ export default async function ScanPage({
         getUserSecurity(user.id),
         listQrSignInAnswers(user.id, user.sessionId)
     ]);
+    if (raw && !request) {
+        const tvCode = readUserCode(raw);
+        if (tvCode && (await describeCliSignIn(tvCode, new Date(), "tv")))
+            redirect(tvApprovePath(tvCode));
+    }
 
     return (
         <div className="mx-auto flex max-w-xl flex-col gap-4">
