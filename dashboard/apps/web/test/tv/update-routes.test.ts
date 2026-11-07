@@ -13,6 +13,7 @@ let apk: Record<string, unknown> | null = null;
 let failure: unknown = null;
 let recorded = true;
 const reports: unknown[] = [];
+const editions: unknown[] = [];
 let dir = "";
 const BYTES = Buffer.from("0123456789");
 
@@ -24,7 +25,8 @@ vi.mock("@/lib/rate-limit-service", () => ({
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 vi.mock("@/lib/tv/release", async (original) => ({
     ...(await original<typeof import("@/lib/tv/release")>()),
-    preparedTvApk: async () => {
+    preparedTvApk: async (edition: unknown) => {
+        editions.push(edition);
         if (failure) throw failure;
         return apk;
     }
@@ -72,6 +74,7 @@ beforeEach(() => {
     failure = null;
     recorded = true;
     reports.length = 0;
+    editions.length = 0;
 });
 
 describe("GET /api/tv/update", () => {
@@ -83,8 +86,25 @@ describe("GET /api/tv/update", () => {
             versionCode: null,
             size: 10,
             sha256: "a".repeat(64),
+            edition: "standard",
             url: "/api/tv/update/apk?version=3.5"
         });
+        expect(editions).toEqual(["standard"]);
+    });
+
+    it("hands a Home key edition TV its own edition, and says which", async () => {
+        const response = await update.GET(asked("/api/tv/update?edition=home-key"));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+            edition: "home-key",
+            url: "/api/tv/update/apk?version=3.5&edition=home-key"
+        });
+        expect(editions).toEqual(["home-key"]);
+    });
+
+    it("offers nothing for an edition it does not know", async () => {
+        expect((await update.GET(asked("/api/tv/update?edition=other"))).status).toBe(204);
+        expect(editions).toEqual([]);
     });
 
     it("answers 204 when no TV build is released", async () => {
@@ -104,6 +124,13 @@ describe("GET /api/tv/update", () => {
 });
 
 describe("GET /api/tv/update/apk", () => {
+    it("streams the edition asked for", async () => {
+        const response = await download.GET(asked("/api/tv/update/apk?version=3.5&edition=home-key"));
+        expect(response.status).toBe(200);
+        expect(editions).toEqual(["home-key"]);
+        expect((await download.GET(asked("/api/tv/update/apk?edition=other"))).status).toBe(503);
+    });
+
     it("streams the whole file", async () => {
         const response = await download.GET(asked("/api/tv/update/apk?version=3.5"));
         expect(response.status).toBe(200);

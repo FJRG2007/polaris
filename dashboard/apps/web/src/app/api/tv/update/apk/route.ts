@@ -1,5 +1,6 @@
 /**
- * GET /api/tv/update/apk?version=<versionName> - the verified APK, streamed from
+ * GET /api/tv/update/apk?version=<versionName>[&edition=home-key] - the verified
+ * APK of that edition, streamed from
  * this instance. Honours a single `Range: bytes=` so an interrupted download on a
  * TV resumes. 409 when the version asked for is no longer the newest (ask
  * /api/tv/update again).
@@ -7,7 +8,7 @@
 
 import { tvCaller } from "@/lib/tv/auth";
 import { servedFile } from "@/lib/tv/served-file";
-import { preparedTvApk } from "@/lib/tv/release";
+import { editionOf, preparedTvApk } from "@/lib/tv/release";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
 
@@ -18,7 +19,8 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     const caller = await tvCaller(request);
     if (caller instanceof Response) return caller;
     const t = await readerWords("api");
-    const apk = await preparedTvApk().catch(() => null);
+    const edition = editionOf(request);
+    const apk = edition ? await preparedTvApk(edition).catch(() => null) : null;
     if (!apk) {
         return Response.json({ error: t("errors.tvUpdateUnavailable") }, { status: 503 });
     }
