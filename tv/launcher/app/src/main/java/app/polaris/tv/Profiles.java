@@ -19,9 +19,9 @@ import java.util.UUID;
 
 /**
  * The people who watch this TV ("Who's watching?"). The TV holds the only copy: prefs {@code profiles} keep the
- * roster as JSON ({@code [{id, name, avatar, position, named, language?, kind?, apps?}]}), the active profile and which profile
- * the TV's Polaris link belongs to. The list logic is pure so it is tested off the TV; reading and writing the
- * prefs is the Context half below.
+ * roster as JSON ({@code [{id, name, avatar, position, named, language?, kind?, apps?}]}), the active profile and
+ * which profile the TV's Polaris link belongs to. The list logic is pure so it is tested off the TV; reading and
+ * writing the prefs is the Context half below.
  */
 final class Profiles {
     static final String PREFS = "profiles";
