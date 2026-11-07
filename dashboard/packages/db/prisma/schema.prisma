@@ -1538,6 +1538,7 @@ model ApiKey {
     usage   ApiKeyUsage[]
     calls   ApiKeyCallHour[]
     tvUpdate TvUpdateRequest?
+    tvPreference TvPreference?
 
     @@index([userId])
     @@index([userId, kind])
@@ -1561,6 +1562,27 @@ model TvUpdateRequest {
     reason      String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
+
+    apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// What the owner of a connected TV asked it to do from /account/tv, and what
+// the TV says it did. One row per TV, created the first time either side has
+// something to say, gone with the key.
+model TvPreference {
+    apiKeyId  String    @id @db.Uuid
+    userId    String    @db.Uuid
+    // { blocking, theme?, addons? }, read back through lib/tv/preferences.
+    // Null until the owner chooses something, so the TV keeps its own setting.
+    desired   Json?
+    // What the TV last reported for Block ads and trackers: on | off | failed |
+    // unavailable | no-permission | no-filter | left-as-set.
+    applied   String?
+    appliedAt DateTime?
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
 
     apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
 

@@ -56,16 +56,33 @@ vi.mock("@/lib/tv/update-requests", async (original) => ({
     ...(await original<typeof import("@/lib/tv/update-requests")>()),
     reportTvUpdate: async () => true
 }));
-vi.mock("@polaris/db", () => ({ prisma: {} }));
+vi.mock("@/lib/domain-service", () => ({ requestOrigin: () => "https://polaris.example" }));
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        user: { findUnique: async () => ({ name: "Sample Person" }) },
+        notification: { count: async () => 0 },
+        tvUpdateRequest: { findUnique: async () => null },
+        tvPreference: {
+            findUnique: async () => ({ desired: { blocking: true }, applied: null }),
+            upsert: async () => ({})
+        }
+    }
+}));
 
 const { authenticateApiKey, requireApiKey } = await import("@/lib/api-key-auth");
 const networkFilter = await import("@/app/api/tv/network-filter/route");
+const stateRoute = await import("@/app/api/tv/state/route");
 const updateRoute = await import("@/app/api/tv/update/route");
 const apkRoute = await import("@/app/api/tv/update/apk/route");
 const reportRoute = await import("@/app/api/tv/update/report/route");
 
-/** Each update route, called the way a TV calls it. */
-const UPDATE_ROUTES: [string, () => Promise<Response>][] = [
+/** Each state and update route, called the way a TV calls it. */
+const TV_ROUTES: [string, () => Promise<Response>][] = [
+    ["GET /api/tv/state", () => stateRoute.GET(onRoute("/api/tv/state"))],
+    [
+        "GET /api/tv/state reporting what it did",
+        () => stateRoute.GET(onRoute("/api/tv/state?blocking=on"))
+    ],
     ["GET /api/tv/update", () => updateRoute.GET(onRoute("/api/tv/update"))],
     ["GET /api/tv/update/apk", () => apkRoute.GET(onRoute("/api/tv/update/apk"))],
     [
@@ -125,12 +142,28 @@ describe("how far a TV's key reaches", () => {
     });
 });
 
-describe("the update routes", () => {
-    it.each(UPDATE_ROUTES)("%s opens to a TV's key", async (_, call) => {
+describe("the state and update routes", () => {
+    it.each(TV_ROUTES)("%s opens to a TV's key", async (_, call) => {
         expect((await call()).status).not.toBe(401);
     });
 
-    it.each(UPDATE_ROUTES)("%s stays shut to any other kind", async (_, call) => {
+    it("hands a TV's key what its owner asked, and nothing of anybody else's", async () => {
+        const body = (await (await stateRoute.GET(onRoute("/api/tv/state"))).json()) as Record<
+            string,
+            unknown
+        >;
+        expect(Object.keys(body).sort()).toEqual([
+            "account",
+            "alerts",
+            "desired",
+            "instance",
+            "unread",
+            "updateRequest"
+        ]);
+        expect(body.desired).toEqual({ blocking: true });
+    });
+
+    it.each(TV_ROUTES)("%s stays shut to any other kind", async (_, call) => {
         for (const other of ["key", "cli", "streamdeck"]) {
             kind = other;
             expect((await call()).status).toBe(401);

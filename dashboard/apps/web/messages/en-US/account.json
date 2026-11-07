@@ -1725,6 +1725,35 @@
                 "notATv": "That TV is not connected to your account.",
                 "tooMany": "Too many update requests. Wait a minute."
             }
+        },
+        "prefs": {
+            "blocking": "Block ads and trackers",
+            "rename": "Rename",
+            "nameLabel": "TV name",
+            "save": "Save",
+            "cancel": "Cancel",
+            "status": {
+                "notAsked": "Set on the TV itself",
+                "waiting": "Waiting for the TV to apply it",
+                "on": "On for this TV",
+                "off": "Off for this TV",
+                "failed": "Not working here; the TV went back to its own DNS",
+                "unavailable": "This TV's Android is too old for it",
+                "noPermission": "Install the TV again from Polaris Desktop to allow it",
+                "noFilter": "No Network filter with encrypted DNS to use",
+                "leftAsSet": "Left off: the TV's own DNS was changed"
+            },
+            "reach": {
+                "reaching": "Reaching the Network filter",
+                "notReaching": "Not reaching the Network filter",
+                "notReachingHint": "No lookups from {address} in the last day",
+                "filterOff": "Network filter is off",
+                "unknown": "Network filter reach unknown"
+            },
+            "errors": {
+                "tooMany": "Too many changes. Wait a minute.",
+                "badName": "Give the TV a name of up to 60 characters."
+            }
         }
     }
 }

@@ -13,6 +13,8 @@ const revoked: { userId: string; id: string }[] = [];
 const counted: unknown[] = [];
 const noted: { keyId: string; version: unknown }[] = [];
 let pendingUpdate: { id: string; versionName: string } | null = null;
+let desired: unknown = null;
+const reported: { keyId: string; userId: string; report: string }[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -46,6 +48,12 @@ vi.mock("@/lib/tv/update-requests", async (original) => ({
     noteTvVersion: async (keyId: string, version: unknown) => void noted.push({ keyId, version }),
     pendingTvUpdate: async () => pendingUpdate
 }));
+vi.mock("@/lib/tv/preferences", async (original) => ({
+    ...(await original<typeof import("@/lib/tv/preferences")>()),
+    desiredFor: async () => desired,
+    noteTvBlocking: async (keyId: string, userId: string, report: string) =>
+        void reported.push({ keyId, userId, report })
+}));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 vi.mock("@/lib/cli/sign-in", () => ({
     openCliSignIn: async (input: { kind?: string; scopes: readonly string[] }) => {
@@ -78,6 +86,8 @@ beforeEach(() => {
     counted.length = 0;
     noted.length = 0;
     pendingUpdate = null;
+    desired = null;
+    reported.length = 0;
 });
 
 describe("the state a TV reads", () => {
@@ -89,7 +99,8 @@ describe("the state a TV reads", () => {
             account: { name: "Sample Person" },
             unread: 4,
             alerts: 1,
-            updateRequest: null
+            updateRequest: null,
+            desired: null
         });
         expect(counted).toContainEqual({ userId: "user-1", readAt: null });
     });
@@ -98,6 +109,23 @@ describe("the state a TV reads", () => {
         pendingUpdate = { id: "0190a000-0000-7000-8000-000000000001", versionName: "3.5" };
         const body = (await (await GET(asked())).json()) as { updateRequest: unknown };
         expect(body.updateRequest).toEqual(pendingUpdate);
+    });
+
+    it("hands over what the owner asked of the TV", async () => {
+        desired = { blocking: true };
+        const body = (await (await GET(asked())).json()) as { desired: unknown };
+        expect(body.desired).toEqual({ blocking: true });
+    });
+
+    it("keeps what the TV says it did with Block ads and trackers", async () => {
+        await GET(asked("GET", "?versionName=3.5&blocking=no-filter"));
+        expect(reported).toEqual([{ keyId: "key-1", userId: "user-1", report: "no-filter" }]);
+    });
+
+    it("ignores a malformed blocking report without refusing the poll", async () => {
+        const response = await GET(asked("GET", "?blocking=maybe"));
+        expect(response.status).toBe(200);
+        expect(reported).toEqual([]);
     });
 
     it("keeps the version a TV reports, from the query first", async () => {
