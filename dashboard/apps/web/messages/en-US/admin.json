@@ -2898,6 +2898,7 @@
             "tools": "Tools",
             "tasks": "Tasks",
             "inbox": "Inbox",
+            "family": "Family",
             "management": "Management",
             "crm": "CRM",
             "automations": "Automations",
@@ -2982,6 +2983,9 @@
             "inbox": {
                 "read": "Read conversations",
                 "manage": "Reply and manage channels"
+            },
+            "family": {
+                "manage": "Create and look after children's accounts"
             },
             "users": {
                 "manage": "Invite people and change accounts"

@@ -99,6 +99,7 @@
         "tasks_manage": "Create and change tasks",
         "inbox_read": "Read inbox conversations",
         "inbox_manage": "Reply and manage the inbox",
+        "family_manage": "Manage children's accounts",
         "users_manage": "Manage users",
         "settings_manage": "Change instance settings",
         "system_manage": "Run updates and system operations",

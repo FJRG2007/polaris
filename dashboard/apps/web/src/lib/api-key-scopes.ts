@@ -59,6 +59,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "tasks.manage": "Manage tasks",
     "inbox.read": "Read conversations",
     "inbox.manage": "Manage conversations",
+    "family.manage": "Manage children's accounts",
     "users.manage": "Manage users",
     "settings.manage": "Manage settings",
     "system.manage": "Manage the system"
@@ -119,6 +120,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "tasks.manage": "Create and change tasks, lists, and spaces.",
     "inbox.read": "Read conversations, contacts, and channel activity.",
     "inbox.manage": "Reply, assign, and connect or remove channels.",
+    "family.manage": "Create children's accounts and change what they may use.",
     "users.manage": "Invite, edit, and remove users.",
     "settings.manage": "Change instance settings.",
     "system.manage": "Run updates and system operations."
@@ -183,6 +185,8 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
+    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+    { title: "Family", scopes: ["family.manage"] },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }
 ];

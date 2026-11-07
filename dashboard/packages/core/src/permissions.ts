@@ -55,6 +55,7 @@ export const PERMISSIONS = [
     "tasks.manage",
     "inbox.read",
     "inbox.manage",
+    "family.manage",
     "users.manage",
     "settings.manage",
     "system.manage"
@@ -153,7 +154,11 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "tasks.read",
         "tasks.manage",
         "inbox.read",
-        "inbox.manage"
+        "inbox.manage",
+        // Creating and looking after a child's account. Every adult member by
+        // default (D3); a minor never holds it, whatever their role says
+        // (`MINOR_FLOOR` in minors.ts).
+        "family.manage"
     ],
     viewer: [
         "drive.read",
@@ -350,6 +355,7 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     "tasks.manage": { area: "Tasks", label: "Create and change tasks" },
     "inbox.read": { area: "Inbox", label: "Read conversations" },
     "inbox.manage": { area: "Inbox", label: "Reply and manage channels" },
+    "family.manage": { area: "Family", label: "Create and look after children's accounts" },
     "users.manage": { area: "Management", label: "Invite people and change accounts" },
     "settings.manage": { area: "Management", label: "Change instance settings" },
     "system.manage": { area: "Management", label: "Updates, backups and maintenance" }

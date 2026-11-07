@@ -99,6 +99,7 @@ export const PERMISSION_CATEGORIES: Readonly<Record<Permission, McpCategory>> = 
     "tasks.manage": "productivity",
     "inbox.read": "chat",
     "inbox.manage": "chat",
+    "family.manage": "account",
     "users.manage": "account",
     "settings.manage": "account",
     "system.manage": "account"
