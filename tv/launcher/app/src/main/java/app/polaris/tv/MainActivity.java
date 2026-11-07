@@ -1109,6 +1109,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 int count = state == null ? 0 : state.unread + state.alerts;
                 runOnUiThread(() -> btnPolaris.setText(count > 0
                         ? getString(R.string.polaris_title) + " " + count : getString(R.string.polaris_title)));
+                // Block ads and trackers as asked from Polaris; the outcome goes back on the next poll.
+                if (state != null) RemoteBlockingRun.apply(this, link, state.desiredBlocking);
             } catch (java.io.IOException unreachable) {
                 runOnUiThread(() -> btnPolaris.setText(R.string.polaris_title));
             }
@@ -1122,6 +1124,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void watchPrivateDns() {
         new Thread(() -> {
             String undone = PrivateDnsSwitch.watch(this);
+            if (undone != null) RemoteBlockingRun.noteReverted(this);
             if (undone != null) runOnUiThread(() -> Toast.makeText(this,
                     getString(R.string.dns_watch_reverted, undone), Toast.LENGTH_LONG).show());
         }).start();
