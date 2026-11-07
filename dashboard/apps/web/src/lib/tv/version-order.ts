@@ -1,0 +1,20 @@
+/**
+ * Ordering Polaris TV versions. Client-safe: /account/tv decides with it which
+ * TVs are current.
+ */
+
+/** Dotted numeric comparison of two TV versions ("3.10" is newer than "3.9").
+ *  Segments that are not numbers compare as text. */
+export function compareTvVersions(left: string, right: string): number {
+    const a = left.split(/[.+-]/);
+    const b = right.split(/[.+-]/);
+    for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+        const x = a[index] ?? "0";
+        const y = b[index] ?? "0";
+        const nx = Number(x);
+        const ny = Number(y);
+        const order = Number.isFinite(nx) && Number.isFinite(ny) ? nx - ny : x.localeCompare(y);
+        if (order !== 0) return Math.sign(order);
+    }
+    return 0;
+}

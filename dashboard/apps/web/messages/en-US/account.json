@@ -1696,6 +1696,34 @@
             "nothingWaiting": "Nothing is waiting on that code. Press Connect on the TV again for a new one.",
             "cannotAnswer": "That request cannot be answered.",
             "noScopes": "Your account cannot connect a TV."
+        },
+        "updates": {
+            "title": "Connected TVs",
+            "latest": "Newest version: {version}",
+            "noRelease": "No TV update is published yet.",
+            "empty": "No TV is connected to your account.",
+            "updateAll": "Update all TVs",
+            "allCurrent": "Every TV is current or already asked.",
+            "runs": "Runs {version}",
+            "versionUnknown": "Version not reported yet",
+            "seen": "seen",
+            "current": "Up to date",
+            "update": "Update now",
+            "retry": "Try again",
+            "alreadyAsked": "Already asked; waiting on the TV.",
+            "state": {
+                "queued": "Queued for {version} - starts when the TV checks in",
+                "downloading": "Downloading {version}",
+                "waitingConfirmation": "Confirm on the TV",
+                "installing": "Installing {version}",
+                "done": "Updated to {version}",
+                "failed": "Update to {version} failed"
+            },
+            "errors": {
+                "noRelease": "There is no TV update to install yet.",
+                "notATv": "That TV is not connected to your account.",
+                "tooMany": "Too many update requests. Wait a minute."
+            }
         }
     }
 }

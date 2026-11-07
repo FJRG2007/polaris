@@ -48,9 +48,47 @@ vi.mock("@/lib/dns-blocker/service", () => ({
         listening: true
     })
 }));
+vi.mock("@/lib/tv/release", async (original) => ({
+    ...(await original<typeof import("@/lib/tv/release")>()),
+    preparedTvApk: async () => null
+}));
+vi.mock("@/lib/tv/update-requests", async (original) => ({
+    ...(await original<typeof import("@/lib/tv/update-requests")>()),
+    reportTvUpdate: async () => true
+}));
+vi.mock("@polaris/db", () => ({ prisma: {} }));
 
 const { authenticateApiKey, requireApiKey } = await import("@/lib/api-key-auth");
 const networkFilter = await import("@/app/api/tv/network-filter/route");
+const updateRoute = await import("@/app/api/tv/update/route");
+const apkRoute = await import("@/app/api/tv/update/apk/route");
+const reportRoute = await import("@/app/api/tv/update/report/route");
+
+/** Each update route, called the way a TV calls it. */
+const UPDATE_ROUTES: [string, () => Promise<Response>][] = [
+    ["GET /api/tv/update", () => updateRoute.GET(onRoute("/api/tv/update"))],
+    ["GET /api/tv/update/apk", () => apkRoute.GET(onRoute("/api/tv/update/apk"))],
+    [
+        "POST /api/tv/update/report",
+        () =>
+            reportRoute.POST(
+                onRoute("/api/tv/update/report", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        id: "0190a000-0000-7000-8000-000000000001",
+                        state: "done"
+                    })
+                })
+            )
+    ]
+];
+
+function onRoute(path: string, init: RequestInit = {}): Request {
+    return new Request(`https://polaris.example${path}`, {
+        ...init,
+        headers: { authorization: "Bearer key" }
+    });
+}
 
 function asked(): Request {
     return new Request("https://polaris.example/api/mcp", {
@@ -84,5 +122,18 @@ describe("how far a TV's key reaches", () => {
     it("leaves every other kind as it was", async () => {
         kind = "cli";
         expect(await authenticateApiKey(asked())).toMatchObject({ kind: "cli" });
+    });
+});
+
+describe("the update routes", () => {
+    it.each(UPDATE_ROUTES)("%s opens to a TV's key", async (_, call) => {
+        expect((await call()).status).not.toBe(401);
+    });
+
+    it.each(UPDATE_ROUTES)("%s stays shut to any other kind", async (_, call) => {
+        for (const other of ["key", "cli", "streamdeck"]) {
+            kind = other;
+            expect((await call()).status).toBe(401);
+        }
     });
 });

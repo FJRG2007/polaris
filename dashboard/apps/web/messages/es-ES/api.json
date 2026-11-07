@@ -99,7 +99,12 @@
         "rangeBackwards": "El inicio del rango es posterior a su final.",
         "fileLargerThan": "Ese archivo supera los {megabytes} MB.",
         "deckSignInAsk": "Hace falta el nombre del equipo, y solo se pueden pedir los permisos que usa un Stream Deck.",
-        "tvSignInAsk": "Hace falta el nombre del equipo."
+        "tvSignInAsk": "Hace falta el nombre del equipo.",
+        "tvUpdateUnavailable": "No se pudo obtener la actualización del TV. Inténtalo más tarde.",
+        "tvUpdateMismatch": "La actualización del TV no coincide con su suma publicada y no se sirvió.",
+        "tvUpdateMoved": "Hay una actualización del TV más nueva. Vuelve a buscar actualizaciones.",
+        "tvUpdateReport": "Eso no es un informe de actualización.",
+        "tvUpdateStale": "Esa solicitud de actualización ya no está vigente."
     },
     "refusals": {
         "session": {

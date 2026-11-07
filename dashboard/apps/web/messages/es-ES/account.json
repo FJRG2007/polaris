@@ -1696,6 +1696,34 @@
             "nothingWaiting": "No hay nada pendiente con ese código. Pulsa Conectar en la TV para obtener otro.",
             "cannotAnswer": "No se puede responder a esa solicitud.",
             "noScopes": "Tu cuenta no puede conectar una TV."
+        },
+        "updates": {
+            "title": "TV conectados",
+            "latest": "Versión más nueva: {version}",
+            "noRelease": "Aún no hay una actualización del TV.",
+            "empty": "No hay ningún TV conectado a tu cuenta.",
+            "updateAll": "Actualizar todos",
+            "allCurrent": "Todos al día o ya avisados.",
+            "runs": "Usa la {version}",
+            "versionUnknown": "Versión aún sin informar",
+            "seen": "visto",
+            "current": "Al día",
+            "update": "Actualizar",
+            "retry": "Reintentar",
+            "alreadyAsked": "Ya pedido; esperando al TV.",
+            "state": {
+                "queued": "En cola para {version} - empieza cuando el TV conecte",
+                "downloading": "Descargando {version}",
+                "waitingConfirmation": "Confirma en el TV",
+                "installing": "Instalando {version}",
+                "done": "Actualizado a {version}",
+                "failed": "Falló la actualización a {version}"
+            },
+            "errors": {
+                "noRelease": "Aún no hay actualización del TV que instalar.",
+                "notATv": "Ese TV no está conectado a tu cuenta.",
+                "tooMany": "Demasiadas solicitudes. Espera un minuto."
+            }
         }
     }
 }
