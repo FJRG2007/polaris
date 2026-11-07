@@ -11,6 +11,7 @@
  */
 
 import { engineRule } from "./rules";
+import { DOT_PORT, type EngineTls } from "./dot";
 import { QUERY_LOG_DIR } from "./query-log";
 import { engineSchedules } from "./schedules";
 import { safeSearchAliases } from "./safe-search";
@@ -75,11 +76,15 @@ function upstreamsOf(settings: DnsSettings): { servers: string[]; bootstrap: str
 }
 
 /** The configuration as an object, before it is written out. Exported for tests.
- *  `now` places the schedules: they are written in UTC with the zone's offset then. */
+ *  `now` places the schedules: they are written in UTC with the zone's offset then.
+ *  `tls` is encrypted DNS, served only when the settings ask for it and there is a
+ *  certificate on the engine's volume to serve it with. */
 export function blockyConfig(
     settings: DnsSettings,
-    now: Date = new Date()
+    now: Date = new Date(),
+    tls: EngineTls | null = null
 ): Record<string, unknown> {
+    const dot = settings.encryptedDns ? tls : null;
     const enabled = new Set(settings.sources);
     const denylists: Record<string, string[]> = {};
     const add = (category: DnsCategory, entry: string) => {
@@ -165,6 +170,9 @@ export function blockyConfig(
         if (!addresses.includes(record.address)) addresses.push(record.address);
         mapping.set(record.name, addresses);
     }
+    // The encrypted DNS name answers with this server, for the devices that ask
+    // it: a device in strict mode looks the name up before it connects.
+    if (dot && !aliased.has(dot.hostname)) mapping.set(dot.hostname, [dot.address]);
 
     return {
         upstreams: {
@@ -234,7 +242,8 @@ export function blockyConfig(
             : {}),
         ...(settings.engine.fqdnOnly ? { fqdnOnly: { enable: true } } : {}),
         ...(settings.engine.dnssec ? { dnssec: { validate: true } } : {}),
-        ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT },
+        ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT, ...(dot ? { tls: DOT_PORT } : {}) },
+        ...(dot ? { certFile: dot.certFile, keyFile: dot.keyFile } : {}),
         // One file a day on the engine's own volume, read back by the screen;
         // a day more than asked, so the oldest day is still whole.
         queryLog: { type: "csv", target: QUERY_LOG_DIR, logRetentionDays: settings.logDays + 1 },
@@ -277,11 +286,19 @@ function zoneOf(aliases: readonly { name: string; target: string }[]): string {
 }
 
 /** The configuration file's text. */
-export function renderBlockyConfig(settings: DnsSettings, now?: Date): string {
-    return `${JSON.stringify(blockyConfig(settings, now), null, 1)}\n`;
+export function renderBlockyConfig(
+    settings: DnsSettings,
+    now?: Date,
+    tls: EngineTls | null = null
+): string {
+    return `${JSON.stringify(blockyConfig(settings, now, tls), null, 1)}\n`;
 }
 
 /** The configuration as the one environment value the image reads. */
-export function encodeBlockyConfig(settings: DnsSettings, now?: Date): string {
-    return Buffer.from(renderBlockyConfig(settings, now), "utf8").toString("base64");
+export function encodeBlockyConfig(
+    settings: DnsSettings,
+    now?: Date,
+    tls: EngineTls | null = null
+): string {
+    return Buffer.from(renderBlockyConfig(settings, now, tls), "utf8").toString("base64");
 }

@@ -1,7 +1,9 @@
 /**
  * What Polaris TV is allowed. Nothing a permission names: a TV's key carries no
  * scope, so it opens no API but `/api/tv`, which answers only with its owner's
- * own name and counts. A set in a living room is a poor place for anything more.
+ * own name and counts, and the network filter's encrypted DNS name and address
+ * (`/api/tv/network-filter`), which every device on the network can already ask
+ * for. A set in a living room is a poor place for anything more.
  *
  * Client-safe: the approval screen imports it.
  */

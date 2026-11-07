@@ -19,6 +19,7 @@
  */
 
 import { encodeBlockyConfig } from "./render";
+import type { EngineTls } from "./dot";
 import type { DnsSettings } from "./settings";
 import { zoneOffsetMinutes } from "./schedules";
 
@@ -41,6 +42,8 @@ export interface ClockChangeInput {
     readonly stored: string | null;
     readonly settings: DnsSettings;
     readonly now: Date;
+    /** The encrypted DNS the engine serves, as the deploy renders it. */
+    readonly tls?: EngineTls | null;
 }
 
 /** One instant for each offset `zone` took in the year before `now`, other than
@@ -62,7 +65,7 @@ export function clockChangeDecision(input: ClockChangeInput): ClockChangeDecisio
     if (!input.engine.running) return { apply: false, reason: "engineDown" };
     let encoded: string;
     try {
-        encoded = encodeBlockyConfig(input.settings, input.now);
+        encoded = encodeBlockyConfig(input.settings, input.now, input.tls);
     } catch {
         return { apply: false, reason: "unrendered" };
     }
@@ -70,7 +73,7 @@ export function clockChangeDecision(input: ClockChangeInput): ClockChangeDecisio
     if (input.stored === null || input.settings.schedules.length === 0)
         return { apply: false, reason: "notClock" };
     const clockOnly = otherOffsetInstants(input.settings.timeZone, input.now).some(
-        (at) => encodeBlockyConfig(input.settings, at) === input.stored
+        (at) => encodeBlockyConfig(input.settings, at, input.tls) === input.stored
     );
     return clockOnly ? { apply: true, encoded } : { apply: false, reason: "notClock" };
 }

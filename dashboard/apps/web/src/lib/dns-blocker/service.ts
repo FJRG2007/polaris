@@ -21,13 +21,15 @@ import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { isPortTaken } from "@polaris/deploy";
 import { ENV_VALUE_MAX } from "@polaris/core";
-import { boundAddress, boundSource, dnsPublishSpec } from "./publish";
+import { boundAddress, boundSource, dnsPublishSpec, sourcePublishesTls } from "./publish";
 import { getHostLanIp, getHostLanIps } from "@/lib/host-address";
 import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
 import { encodeBlockyConfig, ruleFiles } from "./render";
+import { wildcardCertificate } from "@/lib/wildcard-cert-service";
+import { DOT_PORT, dotFiles, dotHostname, engineTlsFor, type EngineTls } from "./dot";
 import { forgetEngineFiles, writeEngineFiles } from "./engine-files";
 import { DNS_CHECK_NAME } from "./settings";
 import { clockChangeDecision } from "./clock-change";
@@ -98,6 +100,24 @@ export interface DnsBlockerStatus {
      *  now: saved while it could not take them, rendered differently by a newer
      *  Polaris, or with schedules a daylight-saving change has since moved. */
     readonly stale: boolean;
+    /** Absent from a status a browser kept from before it existed. */
+    readonly encryptedDns?: EncryptedDnsStatus;
+}
+
+/**
+ * Encrypted DNS as the screen and a TV read it.
+ * - `hostname`: the name a device sets as its Private DNS, or null when there is
+ *   no certificate to serve it with.
+ * - `blocker`: why it cannot be switched on here (`noCertificate`: no deploy
+ *   domain with a wildcard certificate; `noAddress`: no address on the network;
+ *   `portTaken`: something other than the filter holds port 853 here).
+ * - `listening`: the filter publishes 853 and it answers on its address now.
+ */
+export interface EncryptedDnsStatus {
+    readonly enabled: boolean;
+    readonly hostname: string | null;
+    readonly blocker: "noCertificate" | "noAddress" | "portTaken" | null;
+    readonly listening: boolean;
 }
 
 interface EngineRow {
@@ -129,10 +149,18 @@ async function requireApp(): Promise<{ id: string; config: string | null }> {
     return row;
 }
 
+/** What the engine serves encrypted DNS with, answering at `address`, or null
+ *  when it is off, there is no address, or there is no certificate. */
+async function engineTls(settings: DnsSettings, address: string | null): Promise<EngineTls | null> {
+    if (!settings.encryptedDns || !address) return null;
+    const certificate = await wildcardCertificate().catch(() => null);
+    return certificate ? engineTlsFor(certificate, address) : null;
+}
+
 /** The engine's configuration, or a refusal when it would not fit the one
  *  environment value it travels in. */
-export function encodedConfig(settings: DnsSettings): string {
-    const encoded = encodeBlockyConfig(settings);
+export function encodedConfig(settings: DnsSettings, tls: EngineTls | null = null): string {
+    const encoded = encodeBlockyConfig(settings, undefined, tls);
     if (encoded.length > ENV_VALUE_MAX) throw new DnsBlockerRefusal("tooLarge");
     return encoded;
 }
@@ -152,7 +180,8 @@ export async function engineConfigCurrent(
             select: { value: true }
         })
     ]);
-    return stored?.value === encodeBlockyConfig(settings);
+    const tls = await engineTls(settings, await getHostLanIp().catch(() => null));
+    return stored?.value === encodeBlockyConfig(settings, undefined, tls);
 }
 
 /** Where the reputation pass stopped reading the query log, or null. Kept in
@@ -216,8 +245,42 @@ export async function dnsBlockerStatus(): Promise<DnsBlockerStatus> {
         state: stateOf({ address, engine: Boolean(engine), deployFailed, answer }),
         address,
         settings,
-        stale: !current
+        stale: !current,
+        encryptedDns: await encryptedDnsStatus(settings, address)
     };
+}
+
+/** Where encrypted DNS stands, for the screen and for a TV. */
+export async function encryptedDnsStatus(
+    settings: DnsSettings,
+    address: string | null
+): Promise<EncryptedDnsStatus> {
+    const [certificate, published] = await Promise.all([
+        wildcardCertificate().catch(() => null),
+        enginePublishesTls()
+    ]);
+    const hostname = certificate ? dotHostname(certificate.base) : null;
+    const answers = certificate && address ? await tcpListening(address, 1500, DOT_PORT) : false;
+    const blocker = !certificate
+        ? "noCertificate"
+        : !address
+          ? "noAddress"
+          : answers && !published
+            ? "portTaken"
+            : null;
+    const listening = settings.encryptedDns && published && answers;
+    return { enabled: settings.encryptedDns, hostname, blocker, listening };
+}
+
+/** Whether the engine as stored publishes port 853. */
+async function enginePublishesTls(): Promise<boolean> {
+    const engine = await engineRow();
+    if (!engine?.applicationId) return false;
+    const app = await prisma.application.findUnique({
+        where: { id: engine.applicationId },
+        select: { sourceConfig: true }
+    });
+    return app ? sourcePublishesTls(app.sourceConfig) : false;
 }
 
 function messageOf(error: unknown): string {
@@ -244,10 +307,17 @@ async function ensureLogVolume(engine: EngineRow): Promise<void> {
     });
 }
 
-/** Put the rules' files in the DNS server. Never the reason a save fails: the
- *  next save or pass writes them again. */
+/** Put the rules' files in the DNS server, and the encrypted DNS certificate
+ *  when it serves it - written again after every deploy and after a restart of
+ *  Polaris, so a volume that lost it gets it back. Never the reason a save fails:
+ *  the next save or pass writes them again. */
 async function syncRules(settings: DnsSettings): Promise<void> {
-    await writeEngineFiles(ruleFiles(settings)).catch((error: unknown) =>
+    const files = ruleFiles(settings);
+    if (settings.encryptedDns) {
+        const certificate = await wildcardCertificate().catch(() => null);
+        if (certificate) for (const [path, text] of dotFiles(certificate)) files.set(path, text);
+    }
+    await writeEngineFiles(files).catch((error: unknown) =>
         console.error("polaris: the network filter's rules were not written:", error)
     );
 }
@@ -258,7 +328,6 @@ async function syncRules(settings: DnsSettings): Promise<void> {
  *  and refused so the press that asked for it is not answered with success. */
 async function apply(
     engine: EngineRow,
-    encoded: string,
     actorId: string,
     address: string | null,
     settings: DnsSettings
@@ -266,8 +335,37 @@ async function apply(
     if (!engine.applicationId) return;
     // Written into the running server first, so a configuration that moves the
     // rules out of itself finds them there the moment it starts: no gap.
-    if (engine.status === "running") await syncRules(settings);
-    if (address) await bindEngineTo(engine, address);
+    const running = engine.status === "running";
+    if (running) await syncRules(settings);
+    // Encrypted DNS names its certificate's files, and an engine that cannot
+    // read them does not start: so it is served only by an engine that already
+    // had them written, and one that had not is deployed once without it first.
+    // And never on a port something else already holds: a deploy that cannot
+    // bind it would take every device's names down with it.
+    const wanted = await engineTls(settings, address);
+    const taken =
+        wanted !== null &&
+        address !== null &&
+        !(await enginePublishesTls()) &&
+        (await tcpListening(address, 1500, DOT_PORT));
+    const tls = taken ? null : wanted;
+    const served = running ? tls : null;
+    await deploy(engine, actorId, address, settings, served);
+    if (tls && !served)
+        await deploy({ ...engine, status: "running" }, actorId, address, settings, tls);
+}
+
+/** One deploy of the engine with `tls` (or none), its ports to match. */
+async function deploy(
+    engine: EngineRow,
+    actorId: string,
+    address: string | null,
+    settings: DnsSettings,
+    tls: EngineTls | null
+): Promise<void> {
+    if (!engine.applicationId) return;
+    const encoded = encodedConfig(settings, tls);
+    if (address) await bindEngineTo(engine, address, tls !== null);
     await ensureLogVolume(engine).catch((error: unknown) =>
         // History is worth keeping, never worth a resolver that does not start.
         console.error("polaris: could not give the network filter's log a volume:", error)
@@ -343,7 +441,8 @@ async function storeSettings(input: unknown, actorId: string): Promise<DnsSettin
     });
     const kept = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]).serviceDomains;
     const settings = { ...parsed, serviceDomains: await serviceNamesOrRefuse(parsed, kept) };
-    const encoded = encodedConfig(settings);
+    // Refused before anything is stored when it would not fit its one value.
+    encodedConfig(settings);
     await patchInstallConfig(row.id, { [CONFIG_KEY]: settings });
     const engine = await engineRow();
     if (!engine) return settings;
@@ -354,7 +453,7 @@ async function storeSettings(input: unknown, actorId: string): Promise<DnsSettin
         await syncRules(settings);
         return settings;
     }
-    await apply(engine, encoded, actorId, await getHostLanIp().catch(() => null), settings);
+    await apply(engine, actorId, await getHostLanIp().catch(() => null), settings);
     return settings;
 }
 
@@ -376,13 +475,13 @@ async function checkPort(address: string): Promise<void> {
 
 /** Bind an existing engine's ports to `address` before it deploys again, which is
  *  what lets an engine installed on every interface recover on Retry. */
-async function bindEngineTo(engine: EngineRow, address: string): Promise<void> {
+async function bindEngineTo(engine: EngineRow, address: string, tls: boolean): Promise<void> {
     if (!engine.applicationId) return;
     const app = await prisma.application.findUnique({
         where: { id: engine.applicationId },
         select: { sourceConfig: true }
     });
-    const next = app ? boundSource(app.sourceConfig, address) : null;
+    const next = app ? boundSource(app.sourceConfig, address, tls) : null;
     if (next === null) return;
     await prisma.application.update({
         where: { id: engine.applicationId },
@@ -407,7 +506,7 @@ export async function turnOn(actorId: string): Promise<void> {
     if (engine) {
         // A running engine holds port 53 itself; only a failed one is checked.
         if (await lastDeployFailed(engine)) await checkPort(address);
-        await apply(engine, encoded, actorId, address, settings);
+        await apply(engine, actorId, address, settings);
         return;
     }
     await checkPort(address);
@@ -435,9 +534,13 @@ export async function turnOn(actorId: string): Promise<void> {
         throw error;
     }
     // The rules are files the configuration only names: a new server has none.
-    if ((await engineRow())?.status !== "running") return;
+    const installed = await engineRow();
+    if (installed?.status !== "running") return;
     forgetEngineFiles();
     await syncRules(settings);
+    // Installed without encrypted DNS, since its files were not there yet; now
+    // they are, so once more with it.
+    if (await engineTls(settings, address)) await apply(installed, actorId, address, settings);
 }
 
 /**
@@ -469,12 +572,12 @@ export function followHostAddress(): Promise<{ from: string; to: string } | null
         const row = await appRow();
         if (!row) return null;
         const settings = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]);
-        const encoded = encodeBlockyConfig(settings);
+        const encoded = encodeBlockyConfig(settings, undefined, await engineTls(settings, address));
         if (encoded.length > ENV_VALUE_MAX) return null;
         console.info(
             `polaris: this machine moved from ${from} to ${address}; moving the network filter's DNS server with it`
         );
-        await apply(engine, encoded, engine.ownerId, address, settings);
+        await apply(engine, engine.ownerId, address, settings);
         return { from, to: address };
     });
 }
@@ -504,17 +607,27 @@ export async function reapplyAfterClockChange(
     const applicationId = engine?.applicationId;
     if (!engine || !applicationId) return { applied: false };
     const settings = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]);
+    // The files the configuration names, put back on the first pass after Polaris
+    // starts (and never again while they stand): an engine whose volume lost its
+    // certificate gets it back before it next restarts.
+    if (engine.status === "running" && settings.encryptedDns) await syncRules(settings);
     const storedValue = () =>
         prisma.envVar.findFirst({
             where: { scopeType: "application", scopeId: applicationId, key: DNS_CONFIG_ENV },
             select: { value: true }
         });
-    const [stored, deployFailed] = await Promise.all([storedValue(), lastDeployFailed(engine)]);
+    const address = await getHostLanIp().catch(() => null);
+    const [stored, deployFailed, tls] = await Promise.all([
+        storedValue(),
+        lastDeployFailed(engine),
+        engineTls(settings, address)
+    ]);
     const decision = clockChangeDecision({
         engine: { running: engine.status === "running" && !deployFailed },
         stored: stored?.value ?? null,
         settings,
-        now
+        now,
+        tls
     });
     if (!decision.apply || decision.encoded.length > ENV_VALUE_MAX) return { applied: false };
     // A save that landed while this was deciding applies itself; this one must
@@ -525,12 +638,6 @@ export async function reapplyAfterClockChange(
     console.info(
         `polaris: the network filter's schedules moved with the clock in ${settings.timeZone}; applying them again`
     );
-    await apply(
-        engine,
-        decision.encoded,
-        engine.ownerId,
-        await getHostLanIp().catch(() => null),
-        settings
-    );
+    await apply(engine, engine.ownerId, address, settings);
     return { applied: true };
 }

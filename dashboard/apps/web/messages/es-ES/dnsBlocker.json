@@ -547,5 +547,17 @@
         "allowed": "Permitido",
         "allow": "Permitir siempre {domain}",
         "recheck": "Volver a comprobar {domain}"
+    },
+    "encrypted": {
+        "title": "DNS cifrado para dispositivos",
+        "intro": "Móviles y televisores con DNS privado envían aquí sus consultas cifradas, por el puerto 853 de tu red.",
+        "toggle": "Responder DNS cifrado (puerto 853)",
+        "noCertificate": "Necesita un dominio de despliegue con certificado comodín, que Polaris pide al conectar tu cuenta de Cloudflare.",
+        "openDomains": "Abrir Dominios",
+        "noAddress": "Esta máquina aún no tiene dirección en tu red, así que los dispositivos no sabrían a dónde consultar.",
+        "ready": "Los dispositivos usarán {hostname} como nombre de DNS privado.",
+        "serving": "Los dispositivos pueden poner {hostname} como nombre de DNS privado.",
+        "notAnswering": "Guardado, pero nada responde aún en el puerto 853 para {hostname}. Pulsa Aplicar ya en Estado y vuelve a mirar en un minuto.",
+        "portTaken": "Otra cosa en esta máquina ya responde en el puerto 853, así que el filtro no puede servir DNS cifrado ahí."
     }
 }

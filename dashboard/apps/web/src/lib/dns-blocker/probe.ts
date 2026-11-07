@@ -119,9 +119,9 @@ export function answerBlocks(answer: DnsProbeAnswer): boolean {
  * misses a holder that listens but does not answer; a TCP listener, answering or
  * not, takes the connection, and the blocker publishes TCP 53 too.
  */
-export async function tcpListening(server: string, timeoutMs = 1500): Promise<boolean> {
+export async function tcpListening(server: string, timeoutMs = 1500, port = 53): Promise<boolean> {
     return new Promise((resolve) => {
-        const socket = connect({ host: server, port: 53 });
+        const socket = connect({ host: server, port });
         const done = (listening: boolean): void => {
             clearTimeout(timer);
             socket.destroy();
