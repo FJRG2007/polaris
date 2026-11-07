@@ -109,6 +109,10 @@ export function builtInScenes(appId: string): readonly string[] {
  * stay in `docs/`, read only by the public site.
  */
 export function builtInPreview(appId: string, locale: string): AppScreenshot | null {
-    const first = builtInScenes(appId)[0];
-    return first ? shotFiles(first, locale) : null;
+    return builtInScreenshots(appId, locale)[0] ?? null;
+}
+
+/** Every capture of built-in app `appId`, for its own page. */
+export function builtInScreenshots(appId: string, locale: string): AppScreenshot[] {
+    return builtInScenes(appId).map((slug) => shotFiles(slug, locale));
 }

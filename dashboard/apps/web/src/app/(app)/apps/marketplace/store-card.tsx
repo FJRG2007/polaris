@@ -13,7 +13,9 @@ import Link from "next/link";
 import { AppMark } from "@/components/app-mark";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
-import type { AppCategory } from "@/lib/apps";
+import { useCallback } from "react";
+import type { AppCategory, AppEntry } from "@/lib/apps";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { Loader2, Lock, MoreHorizontal, type LucideIcon } from "lucide-react";
 import type { AppScreenshot } from "@/lib/apps/app-screenshots";
 import { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame, StorePreview } from "@polaris/ui/store-card";
@@ -21,6 +23,7 @@ import { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame, StorePreview } from "@pola
 export { PREVIEW_HEIGHT, StatusBadge, StoreCardFrame };
 import type { PrimaryAction } from "@/lib/apps/marketplace-store";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import {
     AppLogo,
     Badge,
@@ -96,6 +99,26 @@ export interface BuiltInListing {
     readonly href: string;
     readonly icon: LucideIcon;
     readonly category: AppCategory;
+}
+
+/** The switcher entry as a built-in card draws it, in the reader's words. */
+export function useBuiltInListing(): (entry: AppEntry) => BuiltInListing {
+    const nav = useTranslations("nav");
+    const navLabel = useNavLabel();
+    return useCallback(
+        (entry: AppEntry) => {
+            const key = `apps.${entry.id}.description`;
+            return {
+                id: entry.id,
+                name: navLabel(entry.label),
+                summary: nav.has(key) ? nav(key as NamespaceKey<"nav">) : entry.description,
+                href: entry.href,
+                icon: entry.icon,
+                category: entry.category
+            };
+        },
+        [nav, navLabel]
+    );
 }
 
 /** A built-in app's preview: its first README capture, or the same placeholder a catalog app gets. */
@@ -186,6 +209,8 @@ export interface OverflowEntry {
     readonly onSelect: () => void;
     readonly danger?: boolean;
     readonly disabled?: boolean;
+    /** Why an entry is disabled, drawn under its label so it is read with it. */
+    readonly hint?: string;
 }
 
 /**
@@ -209,7 +234,14 @@ export function OverflowMenu({ label, entries }: { label: string; entries: Overf
                         disabled={entry.disabled}
                         variant={entry.danger ? "danger" : "default"}
                     >
-                        {entry.label}
+                        {entry.hint ? (
+                            <span className="flex min-w-0 flex-col">
+                                <span>{entry.label}</span>
+                                <span className="text-xs text-muted-foreground">{entry.hint}</span>
+                            </span>
+                        ) : (
+                            entry.label
+                        )}
                     </DropdownMenuItem>
                 ))}
             </DropdownMenuContent>
