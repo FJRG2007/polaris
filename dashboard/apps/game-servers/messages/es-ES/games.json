@@ -1018,17 +1018,17 @@
             },
             "skyblock": {
                 "name": "Skyblock",
-                "summary": "Islas en el vacío, bloque a bloque. Instala IridiumSkyblock.",
+                "summary": "Islas en el vacío, bloque a bloque.",
                 "setup": "Los mundos de las islas son del plugin y los crea en su primer arranque. El mundo que genera el servidor es solo el lobby al que llega la gente."
             },
             "parkour": {
                 "name": "Parkour infinito",
-                "summary": "Un recorrido que se genera mientras corres, con tiempos que batir. Instala InfiniteParkour.",
+                "summary": "Un recorrido que se genera mientras corres, con tiempos que batir.",
                 "setup": "Ejecuta /parkour en el juego para empezar un recorrido. El mundo que genera el servidor es el lobby; los recorridos se generan al correrlos."
             },
             "bedwars": {
                 "name": "Bed wars",
-                "summary": "Equipos, camas y muchos gritos. Instala BedWars1058.",
+                "summary": "Equipos, camas y muchos gritos.",
                 "setup": "BedWars1058 no trae arenas, así que hasta que añadas una el servidor es un lobby y nada más. Coge un mapa hecho de abajo, o construye uno y regístralo, y los jugadores entran con /bw join."
             },
             "luckyblock": {
@@ -1038,7 +1038,7 @@
             },
             "shrinking-world": {
                 "name": "Mundo menguante",
-                "summary": "Un borde que no para de moverse, para que nadie se asiente. Instala DynamicWorldBorder.",
+                "summary": "Un borde que no para de moverse, para que nadie se asiente.",
                 "setup": "El borde se mueve según el horario de la configuración del plugin, y /dwb on y /dwb off lo paran y lo arrancan."
             }
         },
