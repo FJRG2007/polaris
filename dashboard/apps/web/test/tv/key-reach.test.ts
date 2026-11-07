@@ -19,7 +19,10 @@ vi.mock("@polaris/auth", () => ({
     }),
     touchApiKey: async () => undefined
 }));
-vi.mock("@polaris/core", () => ({ userAgentAllowed: () => true }));
+vi.mock("@polaris/core", async (original) => ({
+    ...(await original<typeof import("@polaris/core")>()),
+    userAgentAllowed: () => true
+}));
 vi.mock("@/lib/cli/sessions", () => ({ cliAddressAllows: async () => true }));
 vi.mock("@/lib/network-rules", () => ({
     evaluateAccountAccess: async () => ({ allowed: true })

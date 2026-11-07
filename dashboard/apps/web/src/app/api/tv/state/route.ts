@@ -13,10 +13,14 @@
  * own setting. The TV acts once per `choice` and says what it did with
  * `?blocking=&blockingChoice=<choice>` (lib/tv/preferences); a malformed report
  * is ignored, never refused.
+ *
+ * `account` carries a `firstName` for the home greeting and the account's
+ * `locale`, both null when there is none (lib/tv/account).
  */
 
 import { prisma } from "@polaris/db";
 import { tvCaller } from "@/lib/tv/auth";
+import { tvAccount } from "@/lib/tv/account";
 import { requestOrigin } from "@/lib/domain-service";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
 import * as updates from "@/lib/tv/update-requests";
@@ -56,7 +60,10 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     if (catalog) await picks.noteTvCatalog(caller.keyId, caller.userId, catalog);
     const unreadWhere = { userId: caller.userId, readAt: null };
     const [user, unread, alerts, updateRequest, desired] = await Promise.all([
-        prisma.user.findUnique({ where: { id: caller.userId }, select: { name: true } }),
+        prisma.user.findUnique({
+            where: { id: caller.userId },
+            select: { name: true, firstName: true, locale: true }
+        }),
         prisma.notification.count({ where: unreadWhere }),
         prisma.notification.count({
             where: { ...unreadWhere, OR: [{ actionRequired: true }, { level: "danger" }] }
@@ -68,7 +75,7 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     return Response.json(
         {
             instance: { name: new URL(requestOrigin(request)).host },
-            account: { name: user.name },
+            account: tvAccount(user),
             unread,
             alerts,
             updateRequest,
