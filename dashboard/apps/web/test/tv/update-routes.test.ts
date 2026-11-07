@@ -125,7 +125,9 @@ describe("GET /api/tv/update", () => {
 
 describe("GET /api/tv/update/apk", () => {
     it("streams the edition asked for", async () => {
-        const response = await download.GET(asked("/api/tv/update/apk?version=3.5&edition=home-key"));
+        const response = await download.GET(
+            asked("/api/tv/update/apk?version=3.5&edition=home-key")
+        );
         expect(response.status).toBe(200);
         expect(editions).toEqual(["home-key"]);
         expect((await download.GET(asked("/api/tv/update/apk?edition=other"))).status).toBe(503);

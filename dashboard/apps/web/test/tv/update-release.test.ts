@@ -91,7 +91,8 @@ afterEach(async () => {
 });
 
 describe("the Home key edition", () => {
-    const HOME_KEY_URL = "https://github.com/sample/polaris/releases/download/tv-v3.5/polaris-tv-home-key.apk";
+    const HOME_KEY_URL =
+        "https://github.com/sample/polaris/releases/download/tv-v3.5/polaris-tv-home-key.apk";
 
     it("has none to offer from a release that does not publish it", async () => {
         expect(await tv.tvReleaseInfo("home-key")).toBeNull();
@@ -102,10 +103,17 @@ describe("the Home key edition", () => {
         homeKeyApk = Buffer.from("home key apk bytes");
         listed = `${sha(apk)}  polaris-tv.apk\n${sha(homeKeyApk)}  polaris-tv-home-key.apk\n`;
         const base = release as { files: { name: string; url: string }[] };
-        release = { ...base, files: [...base.files, { name: "polaris-tv-home-key.apk", url: HOME_KEY_URL }] };
+        release = {
+            ...base,
+            files: [...base.files, { name: "polaris-tv-home-key.apk", url: HOME_KEY_URL }]
+        };
         const standard = await tv.preparedTvApk();
         const homeKey = await tv.preparedTvApk("home-key");
-        expect(homeKey).toMatchObject({ edition: "home-key", sha256: sha(homeKeyApk), apkUrl: HOME_KEY_URL });
+        expect(homeKey).toMatchObject({
+            edition: "home-key",
+            sha256: sha(homeKeyApk),
+            apkUrl: HOME_KEY_URL
+        });
         expect(await readFile(homeKey!.path)).toEqual(homeKeyApk);
         // Preparing one edition never deletes the other's verified file.
         expect(await readFile(standard!.path)).toEqual(apk);

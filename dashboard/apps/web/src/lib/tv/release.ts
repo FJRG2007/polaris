@@ -223,7 +223,9 @@ async function lookRelease(): Promise<TvRelease | null> {
  * downloading the APK. Null when none is released, or when the release has no
  * APK of that edition. Cached for ten minutes, failures for one.
  */
-export async function tvReleaseInfo(edition: TvEdition = "standard"): Promise<TvReleaseInfo | null> {
+export async function tvReleaseInfo(
+    edition: TvEdition = "standard"
+): Promise<TvReleaseInfo | null> {
     const refusal = refused.get(edition);
     if (refusal && Date.now() - refusal.at < FAILURE_TTL_MS) throw refusal.failure;
     const release = await tvRelease();
@@ -279,7 +281,11 @@ function keptPrefix(edition: TvEdition): string {
 
 /** The edition a kept file belongs to, read back from its name. */
 function keptEdition(name: string): TvEdition {
-    return TV_EDITIONS.find((edition) => edition !== "standard" && name.startsWith(keptPrefix(edition))) ?? "standard";
+    return (
+        TV_EDITIONS.find(
+            (edition) => edition !== "standard" && name.startsWith(keptPrefix(edition))
+        ) ?? "standard"
+    );
 }
 
 async function hashFile(path: string): Promise<string> {
