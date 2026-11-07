@@ -31,6 +31,7 @@ import { reportFailure, reportProgress, reportReady, shareState } from './embed.
 import { formatNumber, onLocaleChange, t } from './i18n.js';
 import { GameMenu } from './game-menu.js';
 import { installBrowserGuards } from './browser-defaults.js';
+import { startRenderer } from './graphics-start.js';
 
 // js/main.js
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
@@ -53,18 +54,22 @@ async function initApp() {
   // Firefox WebGL2 incurs a heavy renderbufferStorageMultisample + blitFramebuffer stall
   // on multisampled floating-point MRT post-processing render targets, so disable MSAA on Firefox.
   const isFirefox = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
-  const renderer = new THREE.WebGPURenderer({
-    antialias: !isFirefox,
-    powerPreference: 'high-performance',
-    reversedDepthBuffer: true
-  });
-  renderer.setPixelRatio(1.0);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  // Point and spot lights alike are clustered (three.js r187 bins spot cones too): no lit shader unrolls the city's
-  // light pools, headlights and street lamps included
-  renderer.lighting = new ClusteredLighting(256, 32, 28, 48);
-  container.appendChild(renderer.domElement);
+  const createRenderer = (forceWebGL) => {
+    const made = new THREE.WebGPURenderer({
+      antialias: !isFirefox,
+      powerPreference: 'high-performance',
+      reversedDepthBuffer: true,
+      forceWebGL
+    });
+    made.setPixelRatio(1.0);
+    made.setSize(window.innerWidth, window.innerHeight);
+    made.shadowMap.enabled = true;
+    // Point and spot lights alike are clustered (three.js r187 bins spot cones too): no lit shader unrolls the city's
+    // light pools, headlights and street lamps included
+    made.lighting = new ClusteredLighting(256, 32, 28, 48);
+    container.appendChild(made.domElement);
+    return made;
+  };
 
   // Start-up phase timings (logged once as "[init] ...") to keep load-time regressions traceable
   let initTimings = [];
@@ -85,8 +90,10 @@ async function initApp() {
     return new Promise((resolve) => setTimeout(resolve, 0));
   };
 
+  let renderer;
   try {
-    await renderer.init();
+    // WebGPU, or WebGL 2 when WebGPU says no or never answers (graphics-start.js)
+    renderer = await startRenderer(createRenderer);
   } catch (e) {
     reportFailure('graphics');
     showFailure('graphics');
