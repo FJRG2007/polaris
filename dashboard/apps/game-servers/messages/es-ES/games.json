@@ -1022,6 +1022,11 @@
                 "summary": "Islas en el vacío, bloque a bloque.",
                 "setup": "Los mundos de las islas son del plugin y los crea en su primer arranque. El mundo que genera el servidor es solo el lobby al que llega la gente."
             },
+            "oneblock": {
+                "name": "OneBlock",
+                "summary": "Un bloque en el vacío que se convierte en otro al romperlo. Instala OneBlock.",
+                "setup": "Polaris coloca el primer bloque cuando carga el plugin, y cada jugador aparece en un bloque propio."
+            },
             "parkour": {
                 "name": "Parkour infinito",
                 "summary": "Un recorrido que se genera mientras corres, con tiempos que batir.",
@@ -1045,7 +1050,7 @@
         },
         "maps": {
             "skyblock-2-1": {
-                "summary": "La isla original en el vacío, un árbol y un cofre. Sobrevive con lo que puedas sacar de ella.",
+                "summary": "La isla original en el vacío, un árbol y un cofre, y diez islas temáticas más por alcanzar. Sobrevive con lo que puedas sacar de ella.",
                 "setup": "Todos empiezan en la misma isla. La lista de desafíos está en el cofre."
             },
             "parkour-spiral": {

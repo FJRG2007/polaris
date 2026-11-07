@@ -841,7 +841,7 @@ export async function syncFirewallBans(
 ): Promise<{ servers: number; banned: number; kicked: number; allowed: number }> {
     const installs = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" } },
-        select: { id: true, catalogId: true }
+        select: { id: true, catalogId: true, config: true }
     });
     let servers = 0;
     let banned = 0;
@@ -893,6 +893,16 @@ export async function syncFirewallBans(
         // whether or not anybody has the rules screen open. One indexed query
         // when there is nothing waiting.
         await applyPendingRules(ownerId, install.id).catch(() => undefined);
+        // A OneBlock server's plugin does nothing until it is told where the first
+        // block goes; this is the console visit that tells it, once.
+        await import("./minecraft/oneblock-service")
+            .then((service) => service.applyOneBlockSetup(ownerId, install.id, install.config))
+            .catch(() => undefined);
+        // A server on the Skyblock 2.1 map gets the islands the map is missing,
+        // put into its sky once, with nobody stopping it.
+        await import("./minecraft/skyblock-islands-service")
+            .then((service) => service.applySkyblockIslands(ownerId, install.id, install.config))
+            .catch(() => undefined);
         const applied = await applyFirewallBans(ownerId, install.id).catch(() => null);
         if (applied === null) continue;
         servers += 1;

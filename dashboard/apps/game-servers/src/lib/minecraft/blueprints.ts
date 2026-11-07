@@ -32,6 +32,7 @@
 import { gameMessage } from "../game-message";
 import { projectSlug } from "./modrinth";
 import { FLAT_LEVEL_TYPE } from "./world";
+import { VOID_GENERATOR_SETTINGS } from "./oneblock";
 import type { MapCategory } from "./maps";
 
 /** The size of world a blueprint expects, which changes what memory it needs. */
@@ -113,6 +114,22 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         docs: "https://docs.iridiumdevelopment.net/",
         mapCategory: "skyblock",
         weight: "normal"
+    },
+    {
+        id: "oneblock",
+        name: gameMessage("games", "lib.blueprints.oneblock.name"),
+        summary: gameMessage("games", "lib.blueprints.oneblock.summary"),
+        editions: ["java"],
+        software: "PAPER",
+        projects: ["oneblock_bukkit"],
+        // The plugin is told where the first block goes by Polaris itself, on the
+        // first pass after it loads (see `oneblock.ts`); this is only the world it
+        // floats in. Void rather than plain flat, so the island is the only ground.
+        levelType: FLAT_LEVEL_TYPE,
+        env: { GENERATOR_SETTINGS: VOID_GENERATOR_SETTINGS },
+        setup: gameMessage("games", "lib.blueprints.oneblock.setup"),
+        docs: "https://github.com/MrMarL/OneBlock",
+        weight: "light"
     },
     {
         id: "parkour",

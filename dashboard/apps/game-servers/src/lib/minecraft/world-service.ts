@@ -33,7 +33,9 @@ import { prisma } from "@polaris/db";
 import * as policy from "./backup-policy";
 import { EVENT_STATE_KEY } from "./events/catalog";
 import { formatBytes, gameOfServer } from "@polaris/core";
-import { OWNED_PROJECTS } from "../games-create";
+import { BLUEPRINT_KEY, OWNED_PROJECTS } from "../games-create";
+import { findBlueprint } from "./blueprints";
+import { ONEBLOCK_READY_KEY, ONEBLOCK_TRIES_KEY } from "./oneblock";
 import {
     containerFailure,
     onlinePlayers,
@@ -720,6 +722,24 @@ export async function newWorld(
             throw new Error(gameMessage("games", "lib.notBiome"));
     }
 
+    // The blueprint this server was made as, for the world it floats in: a shape
+    // chosen here is only a level type and a biome, and OneBlock's void is neither,
+    // so a new world on it would otherwise grow the ordinary flat grass under the
+    // island. Only while the shape asked for is still the blueprint's own.
+    const stored = readInstallConfig(
+        (
+            await prisma.installedApp.findFirst({
+                where: { id: installedAppId, ownerId },
+                select: { config: true }
+            })
+        )?.config ?? null
+    );
+    const storedBlueprint = stored[BLUEPRINT_KEY];
+    const blueprint =
+        typeof storedBlueprint === "string" ? findBlueprint(storedBlueprint) : undefined;
+    const blueprintSettings =
+        blueprint?.levelType === levelType ? blueprint.env?.GENERATOR_SETTINGS : undefined;
+
     // Copying what people are carrying reads the old level off the disk, which
     // only the container can see. Refusing a stopped server here told somebody to
     // go and press Start themselves and come back - a step with one possible
@@ -800,7 +820,7 @@ export async function newWorld(
             // was built in the void.
             ...Object.entries(
                 generating
-                    ? world.levelTypeEnv(server.edition, levelType, biome)
+                    ? world.levelTypeEnv(server.edition, levelType, biome, blueprintSettings)
                     : input.mapGenerator
                       ? world.levelTypeEnv(
                             server.edition,
@@ -817,6 +837,14 @@ export async function newWorld(
         ]);
         return { target, keep };
     });
+
+    // OneBlock is told where its islands go once per world, and this is a new one:
+    // the next walk looks at the plugin's file again (see `oneblock-service.ts`).
+    if (stored[ONEBLOCK_READY_KEY] !== undefined || stored[ONEBLOCK_TRIES_KEY] !== undefined)
+        await patchInstallConfig(installedAppId, {
+            [ONEBLOCK_READY_KEY]: null,
+            [ONEBLOCK_TRIES_KEY]: null
+        });
 
     await deployApplication(await applicationOf(ownerId, installedAppId), ownerId, actorId);
     return { level: planned.target, carried: planned.keep };
