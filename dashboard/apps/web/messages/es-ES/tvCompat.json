@@ -1,0 +1,86 @@
+{
+    "title": "¿Funciona en mi tele?",
+    "intro": "Si tu tele usa Android TV o Google TV, versión 8 o posterior, sí. Tu modelo no tiene que estar en la lista.",
+    "tiers": {
+        "full": {
+            "name": "Inicio",
+            "summary": "Polaris TV pasa a ser la pantalla de inicio, bloquea anuncios y rastreadores en la tele y se instala desde la app de escritorio.",
+            "rule": "Ajustes > Información dice Android TV o Google TV, versión 8 o posterior."
+        },
+        "app": {
+            "name": "App",
+            "summary": "Polaris TV se abre como una app y la tele mantiene su inicio. Fire TV también recibe la limpieza.",
+            "rule": "Fire TV con Fire OS 6 o posterior. Las apps para LG y Samsung están en camino."
+        },
+        "network": {
+            "name": "Solo red",
+            "summary": "Sin app. Con el router usando el Filtro de red como DNS, se bloquean anuncios y rastreadores en todas las teles de casa. Los ajustes de privacidad de la tele hacen el resto.",
+            "rule": "Roku, Vizio, VIDAA y, de momento, LG y Samsung."
+        }
+    },
+    "search": {
+        "label": "Busca por marca o modelo",
+        "placeholder": "TCL 55C71K, Sony, Fire TV",
+        "brands": "Marcas",
+        "allBrands": "Todas",
+        "count": "{count, plural, one {# modelo} other {# modelos}}",
+        "showMore": "Ver más",
+        "shown": "{shown} de {total}",
+        "results": "Modelos"
+    },
+    "model": {
+        "os": "SO",
+        "osUnknown": "Versión sin indicar",
+        "upstream-community": "Probado por su dueño con el launcher original, aún no con Polaris TV ({date})",
+        "community": "Informado a otro proyecto abierto ({date})",
+        "polaris": "Probado con Polaris TV ({date})",
+        "source": "Fuente",
+        "privacy": "Privacidad"
+    },
+    "quirks": {
+        "tcl-autostart": "Las teles TCL pueden impedir que un launcher arranque solo. La app de escritorio lo permite al instalar.",
+        "google-pairing": "Chromecast con Google TV y Google TV Streamer necesitan Depuración inalámbrica con código de vinculación, y se cierra al reiniciar.",
+        "tcl-private-dns-prime": "En una TCL 75QM751G, Prime Video no se reproducía con DNS privado activado. Si te pasa, bloquea desde el router.",
+        "fire-home-amazon": "Amazon conserva el botón de inicio: Polaris TV se abre como una app.",
+        "samsung-2023-signing": "Las teles de 2023 en adelante piden un certificado de cuenta Samsung para instalar apps desde un ordenador.",
+        "samsung-dev-refused": "Esta tele rechazó toda instalación de desarrollador.",
+        "huawei-refusal": "Ponerla como inicio dejó una tele así sin arrancar. Instala Polaris TV como app y no cambies el inicio.",
+        "android-check": "Figura como Android normal. Polaris TV solo se instala si la tele indica Android TV; la app de escritorio lo comprueba antes, así que probar es seguro.",
+        "android-too-old": "Más antigua de lo que admite Polaris TV (Android 8, Fire OS 6).",
+        "app-coming": "La app de Polaris TV para este sistema está en camino. Mientras, bloquea anuncios con el Filtro de red."
+    },
+    "platforms": {
+        "android-tv": "Android TV",
+        "google-tv": "Google TV",
+        "android": "Android (no Android TV)",
+        "fire-os": "Fire TV (Fire OS)",
+        "webos": "LG webOS",
+        "tizen": "Samsung Tizen",
+        "roku": "Roku",
+        "vizio": "Vizio SmartCast",
+        "vidaa": "Hisense VIDAA",
+        "other": "Otro"
+    },
+    "missing": {
+        "title": "¿No está en la lista?",
+        "intro": "Abre Ajustes > Información en la tele (Preferencias del dispositivo > Información en algunas). ¿Qué dice?",
+        "platform": "Sistema",
+        "version": "Versión",
+        "versionPlaceholder": "11",
+        "answer": "En esa tele:"
+    },
+    "guides": {
+        "setup": "Configúrala en tres pasos",
+        "fire": "Guía de Fire TV",
+        "network": "Sin anuncios en tu tele",
+        "privacy": "Ajustes de privacidad por marca"
+    },
+    "privacy": {
+        "read": "Rutas de menú leídas el {date}. Cambian con el firmware, así que las tuyas pueden variar.",
+        "source": "Fuente",
+        "setting": "Dónde",
+        "action": "Qué cambiar"
+    },
+    "install": "Instalar en esta tele",
+    "skip": "Sé que funciona"
+}

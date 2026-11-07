@@ -1,0 +1,164 @@
+{
+    "read": "2026-11-07",
+    "brands": [
+        {
+            "id": "samsung",
+            "brand": "Samsung",
+            "matches": ["samsung"],
+            "platforms": ["tizen"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy (older sets: Privacy Choices)",
+                    "action": "Viewing Information Services: off"
+                },
+                {
+                    "path": "Settings > All Settings > General & Privacy > Terms & Privacy",
+                    "action": "Interest-Based Advertisements, Customization Service, Improve personalized ads, Get news and special offers: off. Do not track: on. Reset PSID"
+                },
+                {
+                    "path": "Settings > All Settings > General & Privacy > Advanced Features > Voice > Bixby Settings",
+                    "action": "Voice Wake-Up: off"
+                }
+            ]
+        },
+        {
+            "id": "lg",
+            "brand": "LG",
+            "matches": ["lg"],
+            "platforms": ["webos"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Hold Settings > System > Additional settings (2026); 2021-2024: All Settings > General > System > Additional Settings",
+                    "action": "Live Plus: off"
+                },
+                {
+                    "path": "Settings > Privacy & Terms > User Agreements",
+                    "action": "Viewing information, Voice information, Interest-based & Cross-device advertising, Marketing Communications, Who.Where.What?: off"
+                },
+                {
+                    "path": "Support > Privacy & Terms > Advertisement",
+                    "action": "Limit AD Tracking: on"
+                },
+                { "path": "Home Settings", "action": "Home Promotion, Content Recommendation: off" }
+            ]
+        },
+        {
+            "id": "roku",
+            "brand": "Roku",
+            "matches": ["roku"],
+            "platforms": ["roku"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Home > Settings > Privacy > Smart TV Experience (also at my.roku.com)",
+                    "action": "ACR: off"
+                },
+                {
+                    "path": "Home > Settings > Privacy > Advertising",
+                    "action": "Personalize ads: off"
+                },
+                {
+                    "path": "Home > Settings > Privacy > Microphone",
+                    "action": "Microphone access: off"
+                }
+            ]
+        },
+        {
+            "id": "vizio",
+            "brand": "Vizio",
+            "matches": ["vizio"],
+            "platforms": ["vizio"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "All Settings > Privacy & Legal (or Admin & Privacy)",
+                    "action": "Viewing Data: off. Walmart link: off"
+                },
+                {
+                    "path": "All Settings > Privacy & Legal > Advertising",
+                    "action": "Limited Ad Tracking: on"
+                }
+            ]
+        },
+        {
+            "id": "hisense-vidaa",
+            "brand": "Hisense VIDAA",
+            "matches": ["hisense", "toshiba"],
+            "platforms": ["vidaa"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Settings > Advanced Settings > Enhanced Viewing Settings",
+                    "action": "ACR, Personalized Ads, Content Recommendation: off"
+                },
+                {
+                    "path": "Settings > System > Advanced Settings",
+                    "action": "Personalised Ads: off"
+                }
+            ]
+        },
+        {
+            "id": "google-tv",
+            "brand": "Google TV / Android TV",
+            "matches": [],
+            "platforms": ["android-tv", "google-tv", "android"],
+            "source": "https://github.com/Gathin23/cleanyourtv/blob/main/docs/faq.md",
+            "steps": [
+                {
+                    "path": "Settings > Privacy > Ads (Android TV: About > Legal information > Ads)",
+                    "action": "Delete advertising ID, or Opt out of Ads Personalization: on"
+                },
+                { "path": "Settings > Privacy > Location", "action": "Location: off" },
+                {
+                    "path": "Settings > Privacy > Usage & diagnostics",
+                    "action": "Usage & diagnostics: off"
+                },
+                {
+                    "path": "Settings > Network & Internet",
+                    "action": "Scanning always available: off"
+                }
+            ]
+        },
+        {
+            "id": "sony",
+            "brand": "Sony (Google TV)",
+            "matches": ["sony"],
+            "platforms": ["google-tv", "android-tv"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Settings > All Settings > Privacy",
+                    "action": "Samba Interactive TV: off"
+                }
+            ]
+        },
+        {
+            "id": "tcl",
+            "brand": "TCL (Google TV)",
+            "matches": ["tcl"],
+            "platforms": ["google-tv", "android-tv"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Settings > Privacy > User Agreements",
+                    "action": "User Experience Improvement Program: withdraw"
+                }
+            ]
+        },
+        {
+            "id": "fire-tv",
+            "brand": "Fire TV",
+            "matches": ["amazon"],
+            "platforms": ["fire-os"],
+            "source": "https://cleanyour.tv/not-android",
+            "steps": [
+                {
+                    "path": "Settings > Preferences > Privacy Settings",
+                    "action": "Device Usage Data, Collect App Usage Data, Interest-based Ads: off. Over-the-air Viewing Data (Fire TV sets): off"
+                }
+            ]
+        }
+    ]
+}

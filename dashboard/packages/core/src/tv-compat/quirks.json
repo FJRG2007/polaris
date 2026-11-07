@@ -1,0 +1,30 @@
+[
+    { "id": "tcl-autostart", "source": "https://github.com/simbasjungles/free-my-tv#install" },
+    { "id": "google-pairing", "source": "https://github.com/simbasjungles/free-my-tv#install" },
+    {
+        "id": "tcl-private-dns-prime",
+        "source": "https://github.com/FJRG2007/polaris/blob/main/tv/docs/devices/tcl-75qm751g-qm7.md"
+    },
+    {
+        "id": "fire-home-amazon",
+        "source": "https://github.com/FJRG2007/polaris/blob/main/tv/README.md"
+    },
+    {
+        "id": "samsung-2023-signing",
+        "source": "https://github.com/simbasjungles/free-my-tv#samsung-tvs-tizen"
+    },
+    {
+        "id": "samsung-dev-refused",
+        "source": "https://github.com/simbasjungles/free-my-tv#samsung-tvs-tizen"
+    },
+    { "id": "huawei-refusal", "source": "https://github.com/simbasjungles/free-my-tv#any-tv" },
+    {
+        "id": "android-check",
+        "source": "https://github.com/FJRG2007/polaris/blob/main/desktop/src/main/tv-install.ts"
+    },
+    {
+        "id": "android-too-old",
+        "source": "https://github.com/FJRG2007/polaris/blob/main/tv/README.md"
+    },
+    { "id": "app-coming", "source": "https://github.com/FJRG2007/polaris/blob/main/tv/README.md" }
+]

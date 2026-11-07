@@ -1,0 +1,86 @@
+{
+    "title": "Does it work on my TV?",
+    "intro": "If your TV runs Android TV or Google TV, version 8 or newer, yes. Your model does not need to be on the list.",
+    "tiers": {
+        "full": {
+            "name": "Home screen",
+            "summary": "Polaris TV becomes the TV's Home screen, blocks ads and trackers on the TV, and installs from the desktop app.",
+            "rule": "Settings > About says Android TV or Google TV, version 8 or newer."
+        },
+        "app": {
+            "name": "App",
+            "summary": "Polaris TV opens as an app and the TV keeps its own Home screen. Fire TV also gets the cleanup.",
+            "rule": "Fire TV on Fire OS 6 or newer. Apps for LG and Samsung are coming."
+        },
+        "network": {
+            "name": "Network only",
+            "summary": "No app. With your router using the Network filter for DNS, ads and trackers are blocked for every TV at home. The TV's privacy switches do the rest.",
+            "rule": "Roku, Vizio, VIDAA, and for now LG and Samsung."
+        }
+    },
+    "search": {
+        "label": "Search by brand or model",
+        "placeholder": "TCL 55C71K, Sony, Fire TV",
+        "brands": "Brands",
+        "allBrands": "All",
+        "count": "{count, plural, one {# model} other {# models}}",
+        "showMore": "Show more",
+        "shown": "{shown} of {total}",
+        "results": "Models"
+    },
+    "model": {
+        "os": "OS",
+        "osUnknown": "Version not given",
+        "upstream-community": "Tested by its owner with the upstream launcher, not yet with Polaris TV ({date})",
+        "community": "Reported to another open project ({date})",
+        "polaris": "Tested with Polaris TV ({date})",
+        "source": "Source",
+        "privacy": "Privacy switches"
+    },
+    "quirks": {
+        "tcl-autostart": "TCL sets can stop a launcher from starting on its own. The desktop app allows it during the install.",
+        "google-pairing": "Chromecast with Google TV and Google TV Streamer need Wireless debugging with a pairing code, and it closes again after a restart.",
+        "tcl-private-dns-prime": "On a TCL 75QM751G, Prime Video did not play with Private DNS on. Block on the router instead if it happens to you.",
+        "fire-home-amazon": "Amazon keeps the Home button: Polaris TV opens as an app.",
+        "samsung-2023-signing": "Sets from 2023 on need a Samsung account certificate to install apps from a computer.",
+        "samsung-dev-refused": "This set refused developer installs altogether.",
+        "huawei-refusal": "Making it the Home screen left a set like this unable to start. Install Polaris TV as an app and leave Home alone.",
+        "android-check": "Listed as plain Android. Polaris TV installs only where the TV reports Android TV; the desktop app checks first, so trying is safe.",
+        "android-too-old": "Older than Polaris TV supports (Android 8, Fire OS 6).",
+        "app-coming": "The Polaris TV app for this system is coming. Until then, block ads through the Network filter."
+    },
+    "platforms": {
+        "android-tv": "Android TV",
+        "google-tv": "Google TV",
+        "android": "Android (not Android TV)",
+        "fire-os": "Fire TV (Fire OS)",
+        "webos": "LG webOS",
+        "tizen": "Samsung Tizen",
+        "roku": "Roku",
+        "vizio": "Vizio SmartCast",
+        "vidaa": "Hisense VIDAA",
+        "other": "Something else"
+    },
+    "missing": {
+        "title": "Not on the list?",
+        "intro": "Open Settings > About on the TV (Device Preferences > About on some sets). What does it say?",
+        "platform": "System",
+        "version": "Version",
+        "versionPlaceholder": "11",
+        "answer": "On that TV:"
+    },
+    "guides": {
+        "setup": "Set up in three steps",
+        "fire": "Fire TV guide",
+        "network": "Block ads for any TV",
+        "privacy": "Privacy switches by brand"
+    },
+    "privacy": {
+        "read": "Menu paths read on {date}. They change with firmware, so yours may differ.",
+        "source": "Source",
+        "setting": "Where",
+        "action": "What to change"
+    },
+    "install": "Install on this TV",
+    "skip": "I know it works"
+}

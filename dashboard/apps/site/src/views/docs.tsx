@@ -11,6 +11,8 @@ import { href, siteData, words } from "@/lib/site";
 import { ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
 import { docNeighbors, type DocPage, type DocSection } from "@/data/docs";
 import { DocsSearch, type DocsSearchWords } from "@/components/docs-search";
+import { SiteTvChecker } from "@/components/site-tv-checker";
+import { TV_COMPAT_SLUG, TV_PRIVACY_SLUG } from "@/data/builders";
 
 /** The sidebar's groups in a locale, as the site was generated with them. */
 export function docSections(locale: SiteLocale): readonly DocSection[] {
@@ -277,6 +279,13 @@ export function DocView({ locale, page }: { locale: SiteLocale; page: DocPage })
                     // Rendered at build time from this repository's own Markdown.
                     dangerouslySetInnerHTML={{ __html: page.html }}
                 />
+                {page.slug === TV_COMPAT_SLUG || page.slug === TV_PRIVACY_SLUG ? (
+                    <SiteTvChecker
+                        locale={locale}
+                        messages={siteData().downloadsPage.messages[locale].tvCompat}
+                        view={page.slug === TV_PRIVACY_SLUG ? "privacy" : "checker"}
+                    />
+                ) : null}
                 <a
                     className="self-start text-sm text-muted-foreground underline"
                     href={`https://github.com/${repo}/blob/main/${page.source}`}

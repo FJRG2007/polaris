@@ -11,6 +11,11 @@
  * computer - or says plainly that a phone cannot do it. An app older than the
  * dialog has only the window it used to open, and is told to update.
  *
+ * The dialog opens on the compatibility checker: a TV that can take Polaris
+ * TV (the Home screen and App tiers) gets the install, and any other is sent
+ * to the guide that still helps it. A dialog opened by the desktop app's link
+ * skips the check, since it was answered in the browser before.
+ *
  * Until a TV release carrying the APK exists on GitHub, the card says so and
  * offers no install, the same as every other card on Downloads.
  */
@@ -29,11 +34,14 @@ import {
     Input,
     cn
 } from "@polaris/ui";
+import { TvChecker } from "@polaris/ui/tv-checker";
 import { DownloadCard } from "@polaris/ui/download-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { desktopBridge, type DesktopTv, type DesktopTvState } from "@/lib/desktop-bridge";
 
 type Reach = "browser" | "old-app" | "app";
+/** The dialog's two steps: whether the TV can take Polaris TV, then the install. */
+type Step = "check" | "install";
 
 /** The query that opens the dialog, which the desktop app's menu and its link use. */
 const OPEN_PARAM = "tv";
@@ -439,11 +447,13 @@ export function TvOffer({
     released: Promise<boolean>;
 }) {
     const t = useTranslations("account");
+    const compat = useTranslations("tvCompat");
     // Null while GitHub has not answered: the desktop app checks again anyway.
     const [available, setAvailable] = useState<boolean | null>(null);
     const [reach, setReach] = useState<Reach>("browser");
     const [tv, setTv] = useState<DesktopTv | null>(null);
     const [open, setOpen] = useState(false);
+    const [step, setStep] = useState<Step>("check");
 
     useEffect(() => {
         const bridge = desktopBridge();
@@ -452,7 +462,10 @@ export function TvOffer({
         setTv(driven);
         // The desktop app's menu and its link land here asking for the dialog.
         const params = new URLSearchParams(window.location.search);
-        if (params.get(OPEN_PARAM) === OPEN_VALUE) setOpen(true);
+        if (params.get(OPEN_PARAM) === OPEN_VALUE) {
+            setStep("install");
+            setOpen(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -474,7 +487,10 @@ export function TvOffer({
 
     const press = () => {
         if (reach === "old-app") void desktopBridge()?.openTvInstall?.();
-        else setOpen(true);
+        else {
+            setStep("check");
+            setOpen(true);
+        }
     };
 
     return (
@@ -498,18 +514,48 @@ export function TvOffer({
             <p className="text-xs text-muted-foreground">{t("downloads.tv.supported")}</p>
 
             <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
-                <DialogContent className="flex max-h-[85vh] max-w-md flex-col overflow-y-auto overscroll-contain">
+                <DialogContent
+                    className={cn(
+                        "flex max-h-[85vh] flex-col overflow-y-auto overscroll-contain",
+                        step === "check" ? "max-w-2xl" : "max-w-md"
+                    )}
+                >
                     <DialogHeader>
-                        <DialogTitle>{t("downloads.tv.dialog.title")}</DialogTitle>
+                        <DialogTitle>
+                            {step === "check" ? compat("title") : t("downloads.tv.dialog.title")}
+                        </DialogTitle>
                         <DialogDescription>
-                            {available === false
-                                ? t("downloads.tv.notReleased")
-                                : tv
-                                  ? t("downloads.tv.dialog.intro")
-                                  : t("downloads.tv.needsApp")}
+                            {step === "check"
+                                ? compat("intro")
+                                : available === false
+                                  ? t("downloads.tv.notReleased")
+                                  : tv
+                                    ? t("downloads.tv.dialog.intro")
+                                    : t("downloads.tv.needsApp")}
                         </DialogDescription>
                     </DialogHeader>
-                    {available === false ? (
+                    {step === "check" ? (
+                        <>
+                            <TvChecker
+                                heading={false}
+                                action={(tier) =>
+                                    tier === "network" ? null : (
+                                        <Button size="sm" onClick={() => setStep("install")}>
+                                            {compat("install")}
+                                        </Button>
+                                    )
+                                }
+                            />
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={close}>
+                                    {t("downloads.tv.dialog.cancel")}
+                                </Button>
+                                <Button variant="outline" onClick={() => setStep("install")}>
+                                    {compat("skip")}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    ) : available === false ? (
                         <DialogFooter>
                             <Button variant="ghost" onClick={close}>
                                 {t("downloads.tv.dialog.close")}

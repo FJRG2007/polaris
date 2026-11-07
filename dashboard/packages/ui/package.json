@@ -171,6 +171,10 @@
             "types": "./src/downloads/account/browser-guide.ts",
             "import": "./src/downloads/account/browser-guide.ts"
         },
+        "./tv-checker": {
+            "types": "./src/tv-compat/tv-checker.tsx",
+            "import": "./src/tv-compat/tv-checker.tsx"
+        },
         "./i18n": {
             "types": "./src/i18n.tsx",
             "import": "./src/i18n.tsx"

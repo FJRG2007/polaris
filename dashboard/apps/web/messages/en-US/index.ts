@@ -54,6 +54,7 @@ import containers from "./containers.json";
 import deployData from "./deployData.json";
 import mailServer from "./mailServer.json";
 import dnsBlocker from "./dnsBlocker.json";
+import tvCompat from "./tvCompat.json";
 import vpn from "./vpn.json";
 import router from "./router.json";
 import tasksViews from "./tasksViews.json";
@@ -128,6 +129,7 @@ export default {
     mailCompose,
     mailServer,
     dnsBlocker,
+    tvCompat,
     vpn,
     router,
     mailSettings,

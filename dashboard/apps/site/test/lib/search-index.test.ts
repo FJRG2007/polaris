@@ -146,3 +146,34 @@ describe("recent searches", () => {
         ).toEqual(["ok"]);
     });
 });
+
+describe("the TV models in the docs search", () => {
+    const tv = {
+        ...data,
+        docs: {
+            en: [
+                page("polaris-tv-compatibility", "Does it work on my TV?", []),
+                page("polaris-tv-privacy", "Privacy switches", [])
+            ],
+            es: []
+        }
+    } as unknown as Pick<SiteData, "docs" | "api">;
+    const records = searchRecords(tv, "en", "API reference");
+
+    it("sends a model number to the checker with the model filled in", () => {
+        const hit = searchIndex(records, "TCL 32ES570F")[0]!.records[0]!;
+        expect(hit.page).toBe("Does it work on my TV?");
+        expect(hit.href).toMatch(/^en\/docs\/polaris-tv-compatibility\/\?q=TCL%2032ES570F/);
+    });
+
+    it("sends a brand's privacy switches to its section", () => {
+        const hit = searchIndex(records, "Viewing Information Services")[0]!.records[0]!;
+        expect(hit.href).toBe("en/docs/polaris-tv-privacy/#samsung");
+    });
+
+    it("adds no TV records to a locale without the checker page", () => {
+        expect(searchRecords(tv, "es", "Referencia").every((r) => !r.href.includes("?q="))).toBe(
+            true
+        );
+    });
+});
