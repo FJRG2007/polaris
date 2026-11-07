@@ -2886,8 +2886,6 @@
         },
         "areas": {
             "drive": "Drive",
-            "sharing": "Sharing",
-            "snippets": "Snippets",
             "vault": "Vault",
             "notes": "Notes",
             "office": "Office",

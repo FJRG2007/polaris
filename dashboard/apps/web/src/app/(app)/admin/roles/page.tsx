@@ -5,16 +5,22 @@
  */
 
 import { PageHeader } from "@polaris/ui";
+import { listedPermissions } from "@polaris/core";
 import { RolesAdmin } from "./roles-admin";
 import { requireAdmin } from "@/lib/session";
 import { listRoles } from "@/lib/role-service";
 import { getTranslations } from "@/lib/i18n/request";
+import { installedPermissionApps } from "@/lib/permission-presence";
 
 export const dynamic = "force-dynamic";
 
 export default async function RolesAdminPage() {
     await requireAdmin();
-    const [roles, t] = await Promise.all([listRoles(), getTranslations("admin")]);
+    const [roles, t, installed] = await Promise.all([
+        listRoles(),
+        getTranslations("admin"),
+        installedPermissionApps()
+    ]);
 
     return (
         <>
@@ -22,7 +28,7 @@ export default async function RolesAdminPage() {
                 title={t("roles.page.title")}
                 description={t("roles.page.description")}
             />
-            <RolesAdmin roles={roles} />
+            <RolesAdmin roles={roles} listed={listedPermissions(installed)} />
         </>
     );
 }

@@ -17,7 +17,7 @@
  */
 
 import * as core from "@polaris/core";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IdCard, Plus, Trash2 } from "lucide-react";
@@ -50,6 +50,10 @@ import {
 
 /** Everything a role can be given, minus the one every role already has. */
 const GRANTABLE = core.ORG_PERMISSIONS.filter((permission) => permission !== "org.read");
+
+/** The organization permissions this Polaris lists: those of installed apps and of every
+ *  Polaris. Resolved on the server; a grant outside it is kept, only not drawn. */
+const Listed = createContext<ReadonlySet<string>>(new Set(GRANTABLE));
 
 /** The grantable permissions of each area, in the order the areas were declared.
  *  An area whose only entry was `org.read` disappears rather than being drawn
@@ -101,42 +105,47 @@ function sameSet(held: Set<string>, saved: readonly string[]): boolean {
 export function RolesView({
     orgId,
     orgSlug,
-    roles
+    roles,
+    listed
 }: {
     orgId: string;
     orgSlug: string;
     roles: OrgRoleView[];
+    listed: readonly string[];
 }) {
     const t = useTranslations("accountOrgs");
     const [creating, setCreating] = useState(false);
+    const shown = useMemo(() => new Set(listed), [listed]);
 
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-muted-foreground text-sm">
-                    {t.rich("roles.intro", {
-                        people: (chunks) => (
-                            <a
-                                key="people"
-                                href={`/account/organizations/${orgSlug}/people`}
-                                className="hover:text-foreground underline"
-                            >
-                                {chunks}
-                            </a>
-                        )
-                    })}
-                </p>
-                <Button size="sm" onClick={() => setCreating(true)}>
-                    <Plus className="size-4 shrink-0" /> {t("roles.new")}
-                </Button>
+        <Listed.Provider value={shown}>
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-muted-foreground text-sm">
+                        {t.rich("roles.intro", {
+                            people: (chunks) => (
+                                <a
+                                    key="people"
+                                    href={`/account/organizations/${orgSlug}/people`}
+                                    className="hover:text-foreground underline"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        })}
+                    </p>
+                    <Button size="sm" onClick={() => setCreating(true)}>
+                        <Plus className="size-4 shrink-0" /> {t("roles.new")}
+                    </Button>
+                </div>
+
+                {roles.map((role) => (
+                    <RoleCard key={role.id} orgId={orgId} role={role} />
+                ))}
+
+                <NewRoleDialog orgId={orgId} open={creating} onOpenChange={setCreating} />
             </div>
-
-            {roles.map((role) => (
-                <RoleCard key={role.id} orgId={orgId} role={role} />
-            ))}
-
-            <NewRoleDialog orgId={orgId} open={creating} onOpenChange={setCreating} />
-        </div>
+        </Listed.Provider>
     );
 }
 
@@ -279,6 +288,7 @@ function PermissionGrid({
     onChange: (next: Set<string>) => void;
 }) {
     const t = useTranslations("accountOrgs");
+    const listed = useContext(Listed);
     const sections = useMemo(
         () =>
             AREAS.map(({ area, permissions }) => {
@@ -286,13 +296,15 @@ function PermissionGrid({
                 return {
                     id: area,
                     label: key ? t(key) : area,
-                    items: permissions.map((permission) => ({
-                        id: permission,
-                        label: t(PERMISSION_LABELS[permission])
-                    }))
+                    items: permissions
+                        .filter((permission) => listed.has(permission))
+                        .map((permission) => ({
+                            id: permission,
+                            label: t(PERMISSION_LABELS[permission])
+                        }))
                 };
-            }),
-        [t]
+            }).filter((section) => section.items.length > 0),
+        [t, listed]
     );
 
     return (

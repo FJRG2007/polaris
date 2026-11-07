@@ -15,7 +15,15 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
-import { PERMISSIONS, PERMISSION_META, isAllowed, parseResource, type Permission } from "@polaris/core";
+import {
+    PERMISSIONS,
+    PERMISSION_META,
+    isAllowed,
+    listedPermissions,
+    parseResource,
+    type Permission
+} from "@polaris/core";
+import { installedPermissionApps } from "@/lib/permission-presence";
 import { explainUserAccess, type AccessExplanation } from "@/lib/access-explain-service";
 import {
     addGroupMember,
@@ -115,13 +123,14 @@ export async function userCapabilitiesAction(
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success) return { error: t("usersDetail.errors.unknownAccount") };
 
-    const [account, sourced, overrides] = await Promise.all([
+    const [account, sourced, overrides, installed] = await Promise.all([
         prisma.user.findUnique({ where: { id: parsed.data }, select: { isAdmin: true } }),
         resolveGlobalStatementsBySource(parsed.data),
         prisma.userPermission.findMany({
             where: { userId: parsed.data },
             select: { permission: true, effect: true }
-        })
+        }),
+        installedPermissionApps()
     ]);
     if (!account) return { error: t("usersDetail.errors.unknownAccount") };
 
@@ -134,7 +143,9 @@ export async function userCapabilitiesAction(
 
     return {
         isAdmin: account.isAdmin,
-        capabilities: PERMISSIONS.map((permission) => ({
+        // Only the installed apps' permissions are listed; an override on an
+        // uninstalled one stays stored and shows again when the app is back.
+        capabilities: listedPermissions(installed).map((permission) => ({
             permission,
             area: PERMISSION_META[permission].area,
             label: PERMISSION_META[permission].label,

@@ -6,9 +6,11 @@
  * editor that anybody can open is not an access model.
  */
 
+import { listedOrgPermissions } from "@polaris/core";
 import { RolesView } from "./roles-view";
 import { listOrgRoles } from "@/lib/orgs/role-service";
 import { requireOrgPage } from "@/lib/orgs/page-access";
+import { installedPermissionApps } from "@/lib/permission-presence";
 
 export const dynamic = "force-dynamic";
 
@@ -16,5 +18,14 @@ export default async function OrganizationRolesPage({ params }: { params: Promis
     const { slug } = await params;
     const { org } = await requireOrgPage(slug, "roles.manage");
 
-    return <RolesView orgId={org.id} orgSlug={org.slug} roles={await listOrgRoles(org.id)} />;
+    const [roles, installed] = await Promise.all([listOrgRoles(org.id), installedPermissionApps()]);
+
+    return (
+        <RolesView
+            orgId={org.id}
+            orgSlug={org.slug}
+            roles={roles}
+            listed={listedOrgPermissions(installed)}
+        />
+    );
 }

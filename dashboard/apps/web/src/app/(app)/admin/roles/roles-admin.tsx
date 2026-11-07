@@ -16,7 +16,7 @@
  * you want is to see it.
  */
 
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Plus, Trash2 } from "lucide-react";
 import type { RoleView } from "@/lib/role-service";
@@ -55,6 +55,10 @@ const AREAS: { area: string; permissions: Permission[] }[] = groupByArea(
     (permission) => PERMISSION_META[permission].area
 ).map(([area, permissions]) => ({ area, permissions }));
 
+/** The permissions this Polaris lists: those of installed apps and of every
+ *  Polaris. Resolved on the server; a grant outside it is kept, only not drawn. */
+const Listed = createContext<ReadonlySet<Permission>>(new Set(PERMISSIONS));
+
 /** Everything that cannot be held without `permission`. */
 function dependents(permission: Permission): Permission[] {
     return PERMISSIONS.filter((candidate) => impliedBy(candidate).includes(permission));
@@ -77,23 +81,33 @@ function sameSet(a: Set<Permission>, b: readonly Permission[]): boolean {
     return a.size === b.length && b.every((permission) => a.has(permission));
 }
 
-export function RolesAdmin({ roles }: { roles: RoleView[] }) {
+export function RolesAdmin({
+    roles,
+    listed
+}: {
+    roles: RoleView[];
+    listed: readonly Permission[];
+}) {
     const t = useTranslations("admin");
     const [creating, setCreating] = useState(false);
 
+    const shown = useMemo(() => new Set(listed), [listed]);
+
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex justify-end">
-                <Button size="sm" onClick={() => setCreating(true)}>
-                    <Plus className="size-4" />
-                    {t("roles.newRole")}
-                </Button>
+        <Listed.Provider value={shown}>
+            <div className="flex flex-col gap-4">
+                <div className="flex justify-end">
+                    <Button size="sm" onClick={() => setCreating(true)}>
+                        <Plus className="size-4" />
+                        {t("roles.newRole")}
+                    </Button>
+                </div>
+                {roles.map((role) => (
+                    <RoleCard key={role.id} role={role} />
+                ))}
+                {creating ? <NewRoleDialog onOpenChange={setCreating} /> : null}
             </div>
-            {roles.map((role) => (
-                <RoleCard key={role.id} role={role} />
-            ))}
-            {creating ? <NewRoleDialog onOpenChange={setCreating} /> : null}
-        </div>
+        </Listed.Provider>
     );
 }
 
@@ -228,17 +242,20 @@ function PermissionGrid({
     onChange: (next: Set<Permission>) => void;
 }) {
     const t = useTranslations("admin");
+    const listed = useContext(Listed);
     const sections = useMemo(
         () =>
             AREAS.map(({ area, permissions }) => ({
                 id: area,
                 label: areaLabel(t, area),
-                items: permissions.map((permission) => ({
-                    id: permission,
-                    label: permissionLabel(t, permission)
-                }))
-            })),
-        [t]
+                items: permissions
+                    .filter((permission) => listed.has(permission))
+                    .map((permission) => ({
+                        id: permission,
+                        label: permissionLabel(t, permission)
+                    }))
+            })).filter((section) => section.items.length > 0),
+        [t, listed]
     );
 
     return (
