@@ -221,7 +221,7 @@
         "on": "Sí",
         "off": "No",
         "volume": "Volumen",
-        "lookSensitivity": "Sensibilidad de la vista",
+        "lookSensitivity": "Sensibilidad",
         "soundOn": "Con sonido",
         "noAudio": "{surface, select, app {El sonido no está disponible en esta app.} other {El sonido no está disponible en este navegador.}}",
         "callMute": "Silenciar micrófono",
