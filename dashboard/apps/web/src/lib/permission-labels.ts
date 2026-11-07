@@ -23,3 +23,37 @@ export function permissionLabel(t: Translate, permission: Permission): string {
     const key = `roles.permissions.${permission}`;
     return t.has(key) ? t(key) : PERMISSION_META[permission].label;
 }
+
+/**
+ * The app each area belongs to, by the id the app switcher draws it under, so a
+ * permission list shows the logo people already know the app by. `null` is an
+ * area with no logo of its own (Inbox is part of Management, not an app), and an
+ * area missing here - one an organization or a later version adds - draws none.
+ */
+export const AREA_APPS: Readonly<Record<string, string | null>> = {
+    Drive: "drive",
+    Vault: "vault",
+    Notes: "notes",
+    Office: "office",
+    VPN: "vpn",
+    Mail: "mail",
+    Calendar: "calendar",
+    CRM: "crm",
+    Translate: "translate",
+    Automations: "automations",
+    "Status pages": "status-pages",
+    Chat: "chat",
+    Games: "arcade",
+    Apps: "apps",
+    "Game servers": "games",
+    Home: "home",
+    Tools: "tools",
+    Tasks: "tasks",
+    Inbox: null,
+    Management: "admin"
+};
+
+/** The app id whose logo stands beside an area, or null for none. */
+export function areaApp(area: string): string | null {
+    return Object.hasOwn(AREA_APPS, area) ? AREA_APPS[area]! : null;
+}

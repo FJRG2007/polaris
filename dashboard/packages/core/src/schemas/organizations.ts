@@ -144,46 +144,62 @@ export type GrantedOrgPermission = OrgPermission | typeof ALL_ORG_PERMISSIONS;
 
 /** What each permission is called and where it belongs, so the role editor is
  *  grouped the way the organization's own screens are rather than listing keys. */
-export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string; label: string }>> =
-    {
-        "org.read": { area: "General", label: "See the organization, its people and its teams" },
-        "settings.manage": {
-            area: "General",
-            label: "Change the name, handle, description and photo"
-        },
-        "activity.read": { area: "General", label: "Read what has been done here" },
-        "people.manage": { area: "People", label: "Add and remove people, and set their role" },
-        "teams.manage": { area: "People", label: "Create teams and run their rosters" },
-        "roles.manage": { area: "People", label: "Define what the organization's roles may do" },
-        "spaces.manage": { area: "Work", label: "Create and administer the organization's spaces" },
-        "deploy.manage": {
-            area: "Work",
-            label: "Deploy and configure the organization's services"
-        },
-        "domains.manage": { area: "Work", label: "Add and verify the organization's domains" },
-        // Who is in the shared vault and what is in it. NOT the ability to read what
-        // is in it: that needs the organization's key, which only a member somebody
-        // has already vouched for holds, and no permission can hand it over.
-        "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" },
-        // Reading is not here because reading is not a permission: every member
-        // opens the organization's files. This is being able to change them.
-        "drive.manage": { area: "Work", label: "Add to and change the organization's files" },
-        // Giving somebody the company address or the support mailbox, and taking
-        // it back when they leave. Never reading what is in one.
-        "mail.manage": { area: "Work", label: "Hand out the organization's mailboxes" },
-        "crm.companies.edit": { area: "CRM", label: "Add and change companies" },
-        "crm.companies.delete": { area: "CRM", label: "Delete companies" },
-        "crm.people.edit": { area: "CRM", label: "Add and change people" },
-        "crm.people.delete": { area: "CRM", label: "Delete people" },
-        "crm.opportunities.edit": { area: "CRM", label: "Add and change opportunities" },
-        "crm.opportunities.delete": { area: "CRM", label: "Delete opportunities" }
-    };
+export const ORG_PERMISSION_META: Readonly<
+    Record<OrgPermission, { area: string; label: string; app?: string }>
+> = {
+    "org.read": { area: "General", label: "See the organization, its people and its teams" },
+    "settings.manage": {
+        area: "General",
+        label: "Change the name, handle, description and photo"
+    },
+    "activity.read": { area: "General", label: "Read what has been done here" },
+    "people.manage": { area: "People", label: "Add and remove people, and set their role" },
+    "teams.manage": { area: "People", label: "Create teams and run their rosters" },
+    "roles.manage": { area: "People", label: "Define what the organization's roles may do" },
+    "spaces.manage": { area: "Work", label: "Create and administer the organization's spaces" },
+    "deploy.manage": {
+        area: "Work",
+        label: "Deploy and configure the organization's services"
+    },
+    "domains.manage": { area: "Work", label: "Add and verify the organization's domains" },
+    // Who is in the shared vault and what is in it. NOT the ability to read what
+    // is in it: that needs the organization's key, which only a member somebody
+    // has already vouched for holds, and no permission can hand it over.
+    "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" },
+    // Reading is not here because reading is not a permission: every member
+    // opens the organization's files. This is being able to change them.
+    "drive.manage": { area: "Work", label: "Add to and change the organization's files" },
+    // Giving somebody the company address or the support mailbox, and taking
+    // it back when they leave. Never reading what is in one.
+    "mail.manage": { area: "Work", label: "Hand out the organization's mailboxes" },
+    "crm.companies.edit": { area: "CRM", app: "crm", label: "Add and change companies" },
+    "crm.companies.delete": { area: "CRM", app: "crm", label: "Delete companies" },
+    "crm.people.edit": { area: "CRM", app: "crm", label: "Add and change people" },
+    "crm.people.delete": { area: "CRM", app: "crm", label: "Delete people" },
+    "crm.opportunities.edit": { area: "CRM", app: "crm", label: "Add and change opportunities" },
+    "crm.opportunities.delete": { area: "CRM", app: "crm", label: "Delete opportunities" }
+};
 
 /** The areas in the order the editor draws them. Read off the meta rather than
  *  written twice, so a permission added above cannot go missing from the screen. */
 export const ORG_PERMISSION_AREAS: readonly string[] = [
     ...new Set(ORG_PERMISSIONS.map((permission) => ORG_PERMISSION_META[permission].area))
 ];
+
+/** Every app some organization permission arrives with, each once. */
+export const ORG_PERMISSION_APPS: readonly string[] = [
+    ...new Set(Object.values(ORG_PERMISSION_META).flatMap((meta) => (meta.app ? [meta.app] : [])))
+];
+
+/** The organization permissions a role editor lists, given the installed apps.
+ *  A grant of an uninstalled app's permission is kept, only not listed. */
+export function listedOrgPermissions(installed: Iterable<string>): OrgPermission[] {
+    const present = new Set(installed);
+    return ORG_PERMISSIONS.filter((permission) => {
+        const app = ORG_PERMISSION_META[permission].app;
+        return !app || present.has(app);
+    });
+}
 
 /**
  * The roles every organization starts with.

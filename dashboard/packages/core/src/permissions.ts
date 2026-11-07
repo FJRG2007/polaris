@@ -213,23 +213,32 @@ export const UNEDITABLE_ROLE = "admin";
  *  entries, so they stay short and predictable. */
 export const MAX_ROLE_NAME_LENGTH = 32;
 
+/** What a permission is called, the area it is filed under, and - for one that
+ *  arrives with a marketplace app - that app's catalog id. */
+export interface PermissionMeta {
+    readonly area: string;
+    readonly label: string;
+    /** The app whose install brings this permission. Absent: every Polaris has it. */
+    readonly app?: string;
+}
+
 /** What each permission is called, and the area it belongs to, so a role editor
  *  can group them the way the dashboard is grouped rather than listing keys. */
-export const PERMISSION_META: Readonly<Record<Permission, { area: string; label: string }>> = {
+export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     "drive.read": { area: "Drive", label: "See files and download them" },
     "drive.write": { area: "Drive", label: "Upload, rename and move files" },
     "drive.delete": { area: "Drive", label: "Delete files" },
     "connections.manage": { area: "Drive", label: "Add and configure storage connections" },
-    "shares.create": { area: "Sharing", label: "Create share links" },
-    "shares.manage": { area: "Sharing", label: "Manage everyone's share links" },
-    "requests.create": { area: "Sharing", label: "Create drop points" },
-    "requests.manage": { area: "Sharing", label: "Manage everyone's drop points" },
-    "snippets.read": { area: "Snippets", label: "See snippets and open shared ones" },
-    "snippets.write": { area: "Snippets", label: "Write snippets and share them by link" },
+    "shares.create": { area: "Drive", label: "Create share links" },
+    "shares.manage": { area: "Drive", label: "Manage everyone's share links" },
+    "requests.create": { area: "Drive", label: "Create drop points" },
+    "requests.manage": { area: "Drive", label: "Manage everyone's drop points" },
+    "snippets.read": { area: "Drive", label: "See snippets and open shared ones" },
+    "snippets.write": { area: "Drive", label: "Write snippets and share them by link" },
     "vault.use": { area: "Vault", label: "Keep a password vault and connect a client to it" },
     "notes.use": { area: "Notes", label: "Keep private notes" },
     "office.use": { area: "Office", label: "Write documents, spreadsheets, slides and diagrams" },
-    "vpn.use": { area: "VPN", label: "Connect a device to the VPN through an API key" },
+    "vpn.use": { area: "VPN", app: "vpn", label: "Connect a device to the VPN through an API key" },
     "mail.use": { area: "Mail", label: "Link mailboxes and read mail here" },
     // Not granted to members by default, and not implied by deploying: a mail
     // server opens port 25 to the internet and sends as whole domains, and one
@@ -237,25 +246,31 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // is a decision about the instance, the way registering a server is.
     "mailserver.manage": {
         area: "Mail",
+        app: "mail-server",
         label: "Run a mail server, and manage its domains and mailboxes"
     },
     "calendar.use": {
         area: "Calendar",
+        app: "calendar",
         label: "Keep calendars, link outside ones and take bookings"
     },
     // Opening the CRM at all. A personal CRM is reached by this alone; an
     // organization's records are governed by that organization's roles.
-    "crm.use": { area: "CRM", label: "Keep companies, people and deals" },
+    "crm.use": { area: "CRM", app: "crm", label: "Keep companies, people and deals" },
     // Opening Translate and its API. Paid engines spend the owner's keys, so a
     // role can be kept off it.
-    "translate.use": { area: "Translate", label: "Translate text" },
+    "translate.use": { area: "Translate", app: "translate", label: "Translate text" },
     // An automation acts as whoever published it and is re-checked on every run,
     // so this grants nothing the account could not already do by hand.
     "automations.use": { area: "Automations", label: "Make automations that act for you" },
     "automations.secrets": { area: "Automations", label: "Store secrets automations send" },
     // Status pages make Polaris dial addresses somebody typed, from inside the
     // network, and publish what it finds. Admin only, like adding a camera.
-    "status.manage": { area: "Status pages", label: "Run status pages and their checks" },
+    "status.manage": {
+        area: "Status pages",
+        app: "status-pages",
+        label: "Run status pages and their checks"
+    },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split
     // out because "has the chat" and "may start a server in it" are different
@@ -279,30 +294,58 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // The Games app (not Game servers). Two decisions, like a chat platform's:
     // whether somebody may open games at all, and whether they may start or join
     // one inside a call. Both granted with the chat by default.
-    "arcade.open": { area: "Games", label: "Open Games" },
-    "arcade.calls": { area: "Games", label: "Play games in calls" },
+    "arcade.open": { area: "Games", app: "arcade", label: "Open Games" },
+    "arcade.calls": { area: "Games", app: "arcade", label: "Play games in calls" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
-    "games.read": { area: "Game servers", label: "See game servers and who is playing" },
-    "games.moderate": { area: "Game servers", label: "Op, kick, ban and whitelist players" },
+    "games.read": {
+        area: "Game servers",
+        app: "game-servers",
+        label: "See game servers and who is playing"
+    },
+    "games.moderate": {
+        area: "Game servers",
+        app: "game-servers",
+        label: "Op, kick, ban and whitelist players"
+    },
     // Its own thing rather than part of managing, because the console is how every
     // other verb on this list can be done without going through the screen that
     // offers it. Somebody who should be able to run commands and not rebuild the
     // server had nowhere to sit before this.
-    "games.console": { area: "Game servers", label: "Run commands on the server console" },
-    "games.manage": { area: "Game servers", label: "Create servers, change settings and rebuild" },
+    "games.console": {
+        area: "Game servers",
+        app: "game-servers",
+        label: "Run commands on the server console"
+    },
+    "games.manage": {
+        area: "Game servers",
+        app: "game-servers",
+        label: "Create servers, change settings and rebuild"
+    },
     "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
     "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
-    "home.read": { area: "Home", label: "Watch the cameras and read what they saw" },
+    "home.read": { area: "Home", app: "home", label: "Watch the cameras and read what they saw" },
     // Pointing a camera somewhere is not the same decision as being allowed to
     // look at where it already points, and neither is silencing an alert.
-    "home.control": { area: "Home", label: "Move cameras and act on alerts" },
-    "home.manage": { area: "Home", label: "Add cameras, and set how they detect and record" },
-    "tools.use": { area: "Tools", label: "Use the tools: convert, resize, translate" },
+    "home.control": { area: "Home", app: "home", label: "Move cameras and act on alerts" },
+    "home.manage": {
+        area: "Home",
+        app: "home",
+        label: "Add cameras, and set how they detect and record"
+    },
+    "tools.use": {
+        area: "Tools",
+        app: "tools",
+        label: "Use the tools: convert, resize, translate"
+    },
     // A short link is a public address this Polaris answers, and it outlives the
     // person who made it. Using a converter is nobody's business but theirs;
     // publishing a link is.
-    "tools.manage": { area: "Tools", label: "Create short links and see who followed them" },
+    "tools.manage": {
+        area: "Tools",
+        app: "tools",
+        label: "Create short links and see who followed them"
+    },
     "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
     "tasks.manage": { area: "Tasks", label: "Create and change tasks" },
     "inbox.read": { area: "Inbox", label: "Read conversations" },
@@ -311,6 +354,25 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "settings.manage": { area: "Management", label: "Change instance settings" },
     "system.manage": { area: "Management", label: "Updates, backups and maintenance" }
 };
+
+/** Every app some permission arrives with, each once. */
+export const PERMISSION_APPS: readonly string[] = [
+    ...new Set(Object.values(PERMISSION_META).flatMap((meta) => (meta.app ? [meta.app] : [])))
+];
+
+/**
+ * The permissions a list of them shows, given the apps this Polaris has installed:
+ * every one with no app, and those whose app is here. Only the listing narrows -
+ * a grant of an uninstalled app's permission is kept as it is and shows again
+ * when the app is reinstalled.
+ */
+export function listedPermissions(installed: Iterable<string>): Permission[] {
+    const present = new Set(installed);
+    return PERMISSIONS.filter((permission) => {
+        const app = PERMISSION_META[permission].app;
+        return !app || present.has(app);
+    });
+}
 
 /**
  * Permissions that another one cannot sensibly be held without. Writing a file

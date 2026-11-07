@@ -10,6 +10,7 @@
 import { withMessages } from "../../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { PERMISSIONS } from "@polaris/core";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined })
@@ -92,6 +93,7 @@ describe("the roles editor in Spanish", () => {
                         memberCount: 1
                     }
                 ]}
+                listed={PERMISSIONS}
             />,
             "es-ES"
         )
