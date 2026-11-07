@@ -25,7 +25,9 @@ import {
 } from './helicopter.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
-import { HELI_CRUISE_SPEED, arrivalFor, heliTopSpeed, stepTurbo } from './player-rules.js';
+import {
+  HELI_CRUISE_SPEED, arrivalFor, createTurnSignal, heliTopSpeed, stepTurbo, stepTurnSignal, turnLamps
+} from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
 import { FAR_RING_MAX, overlapsBodies, overlapsFootprints, placeArrival } from './arrival-placement.js';
@@ -347,7 +349,10 @@ class ThirdPersonControllerManager {
       active._posedX = NaN;
     }
     const car = this.entities.car;
-    if (mode !== 'car' && car?.carState) car.carState.value.x = car.carState.value.w = 0;
+    if (mode !== 'car' && car?.carState) {
+      car.carState.value.set(0, 0, 0, 0); // brake, indicators & reverse off
+      car.turnSignal = null;
+    }
   }
 
   getActiveEntity() {
@@ -395,7 +400,8 @@ class ThirdPersonControllerManager {
       ent.chassisPivot.position.y = 0;
       ent.lastCollisionSpark = null;
       for (const wheel of ent.wheels) if (wheel.isFront) wheel.steerPivot.rotation.y = 0;
-      if (ent.carState) ent.carState.value.x = ent.carState.value.w = 0;
+      if (ent.carState) ent.carState.value.set(0, 0, 0, 0);
+      ent.turnSignal = null;
     } else if (this.activeMode === 'cyclist') {
       ent.leanAngle = ent.leanPivot.rotation.z = 0;
       ent._riderHidden = false;
@@ -1256,6 +1262,11 @@ class ThirdPersonControllerManager {
       const holding = Math.abs(c.speed) < BRAKE_LAMP.standingBelow && !throttle;
       c.carState.value.x = braking ? BRAKE_LAMP.slowing : holding ? BRAKE_LAMP.holding : 0;
       c.carState.value.w = c.speed < -0.2 ? 1 : 0;
+      // Indicators from the steering held (stepTurnSignal in player-rules.js)
+      c.turnSignal ??= createTurnSignal();
+      const lamps = turnLamps(stepTurnSignal(c.turnSignal, steerInput, c.speed, dt));
+      c.carState.value.y = lamps.left;
+      c.carState.value.z = lamps.right;
     }
 
     const forwardDist = (c.position.x - prevX) * Math.sin(c.heading) + (c.position.z - prevZ) * Math.cos(c.heading);

@@ -43,4 +43,41 @@ function brakeLamp(acceleration, speed) {
   return Math.abs(speed) < BRAKE_LAMP.standingBelow ? BRAKE_LAMP.holding : 0;
 }
 
-export { BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, arrivalFor, brakeLamp, heliTopSpeed, stepTurbo };
+// The player car signals from the steering held: a turn held at town speed starts the indicator on that side, and it
+// cancels once the wheel has been straight a moment (or the car is up to speed), like a stalk returning after the corner.
+// Same 0.8 s cycle as traffic. Side 1 is left (+x), -1 right.
+const TURN_SIGNAL = { steerAbove: 0.5, holdFor: 0.25, cancelAfter: 0.6, minSpeed: 0.5, maxSpeed: 14, period: 0.8 };
+
+function createTurnSignal() {
+  return { side: 0, pending: 0, held: 0, straight: 0, clock: 0 };
+}
+
+/** Advances a turn signal by dt seconds of steering input (-1..1, positive left) at a speed in m/s. */
+function stepTurnSignal(signal, steer, speed, dt) {
+  const s = Math.abs(speed);
+  const side = steer > TURN_SIGNAL.steerAbove ? 1 : steer < -TURN_SIGNAL.steerAbove ? -1 : 0;
+  if (side !== 0 && s >= TURN_SIGNAL.minSpeed && s <= TURN_SIGNAL.maxSpeed) {
+    signal.held = signal.pending === side ? signal.held + dt : dt;
+    signal.pending = side;
+    signal.straight = 0;
+    if (signal.held >= TURN_SIGNAL.holdFor) signal.side = side;
+  } else {
+    signal.pending = 0;
+    signal.held = 0;
+    if (side === 0) signal.straight += dt;
+    if (signal.straight >= TURN_SIGNAL.cancelAfter || s > TURN_SIGNAL.maxSpeed) signal.side = 0;
+  }
+  signal.clock = signal.side ? signal.clock + dt : 0;
+  return signal;
+}
+
+/** The lamp levels { left, right } a turn signal shows this instant: lit for the first half of each cycle. */
+function turnLamps(signal) {
+  const on = signal.side !== 0 && signal.clock % TURN_SIGNAL.period < TURN_SIGNAL.period / 2;
+  return { left: on && signal.side > 0 ? 1 : 0, right: on && signal.side < 0 ? 1 : 0 };
+}
+
+export {
+  BRAKE_LAMP, HELI_CRUISE_SPEED, HELI_TURBO, TURN_SIGNAL, arrivalFor, brakeLamp, createTurnSignal, heliTopSpeed,
+  stepTurbo, stepTurnSignal, turnLamps
+};

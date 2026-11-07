@@ -235,3 +235,45 @@ describe("brake lamps", () => {
         expect(rules.BRAKE_LAMP.slowing).toBeGreaterThan(rules.BRAKE_LAMP.holding);
     });
 });
+
+describe("player turn signals", () => {
+    const run = (
+        signal: ReturnType<typeof rules.createTurnSignal>,
+        steer: number,
+        speed: number,
+        seconds: number
+    ) => {
+        for (let t = 0; t < seconds; t += 0.05) rules.stepTurnSignal(signal, steer, speed, 0.05);
+        return signal;
+    };
+
+    it("start on the side held past the threshold at town speed, and blink on the 0.8 s cycle", () => {
+        const signal = run(rules.createTurnSignal(), 1, 6, 0.3);
+        expect(signal.side).toBe(1);
+        signal.clock = 0.1;
+        expect(rules.turnLamps(signal)).toEqual({ left: 1, right: 0 });
+        signal.clock = 0.5;
+        expect(rules.turnLamps(signal)).toEqual({ left: 0, right: 0 });
+        expect(run(rules.createTurnSignal(), -1, 6, 0.3).side).toBe(-1);
+    });
+
+    it("ignore a tap, a light touch, highway speed and a standstill", () => {
+        expect(run(rules.createTurnSignal(), 1, 6, 0.1).side).toBe(0);
+        expect(run(rules.createTurnSignal(), 0.3, 6, 2).side).toBe(0);
+        expect(run(rules.createTurnSignal(), 1, 30, 2).side).toBe(0);
+        expect(run(rules.createTurnSignal(), 1, 0, 2).side).toBe(0);
+        expect(rules.turnLamps(rules.createTurnSignal())).toEqual({ left: 0, right: 0 });
+    });
+
+    it("cancel once the wheel has been straight a moment or the car speeds up", () => {
+        const signal = run(rules.createTurnSignal(), 1, 6, 0.3);
+        run(signal, 0, 6, 0.3);
+        expect(signal.side).toBe(1);
+        run(signal, 0, 6, 0.4);
+        expect(signal.side).toBe(0);
+        expect(signal.clock).toBe(0);
+        const fast = run(rules.createTurnSignal(), -1, 6, 0.3);
+        run(fast, -1, 20, 0.05);
+        expect(fast.side).toBe(0);
+    });
+});
