@@ -471,23 +471,28 @@ export function Home({
         <main>
             <h2>{t("shell.apps")}</h2>
             <ul>
-                <li className="section-row">
-                    <button className="section" onClick={() => onOpen("vault")}>
-                        <span className="section-mark" aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                                <rect x="3" y="11" width="18" height="11" rx="2" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                {/* Only for an account that may use a vault, as Polar's rows are
+                    only for one that may use Polar: a row that opens on "not
+                    for you" is a row nobody needed. */}
+                {status.canVault === false ? null : (
+                    <li className="section-row">
+                        <button className="section" onClick={() => onOpen("vault")}>
+                            <span className="section-mark" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                            </span>
+                            <span className="section-text">
+                                <span className="strong">{t("shell.vault")}</span>
+                                <span className="muted small">{vaultState(status, t)}</span>
+                            </span>
+                            <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m9 18 6-6-6-6" />
                             </svg>
-                        </span>
-                        <span className="section-text">
-                            <span className="strong">{t("shell.vault")}</span>
-                            <span className="muted small">{vaultState(status, t)}</span>
-                        </span>
-                        <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="m9 18 6-6-6-6" />
-                        </svg>
-                    </button>
-                </li>
+                        </button>
+                    </li>
+                )}
                 {status.canPolar === false ? null : <PolarRow status={status} />}
                 {status.canPolar === false ? null : <PolarBrowserRow />}
                 <VpnRow onOpen={() => onOpen("vpn")} />

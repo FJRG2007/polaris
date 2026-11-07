@@ -71,18 +71,26 @@ export function visibleEntries(target: MenuTarget): Record<MenuEntry["id"], bool
 /** Where the browser's menu shows Polaris at all: every context an entry has. */
 export const ROOT_CONTEXTS = ["editable", "selection", "link", "image", "page"] as const;
 
-/** What the menu is made of for an account: Polar's entries, and the contexts
- *  they need, only when it may use Polar. */
+/** What the menu is made of for an account: the vault's entries only when it
+ *  may use a vault, Polar's entries only when it may use Polar, and the contexts
+ *  the entries it gets need. An account that may use neither gets no menu at
+ *  all rather than a "Polaris" entry with nothing behind it. */
 export function menuPlan(
     withPolar: boolean,
-    t: Words = ENGLISH
+    t: Words = ENGLISH,
+    withVault = true
 ): {
-    contexts: readonly [(typeof ROOT_CONTEXTS)[number], ...(typeof ROOT_CONTEXTS)[number][]];
+    contexts: readonly (typeof ROOT_CONTEXTS)[number][];
+    vault: readonly MenuEntry[];
     polar: readonly PolarMenuEntry[];
 } {
-    return withPolar
-        ? { contexts: ROOT_CONTEXTS, polar: polarMenuEntries(t) }
-        : { contexts: ["editable"], polar: [] };
+    return {
+        contexts: ROOT_CONTEXTS.filter((context) =>
+            context === "editable" ? withVault : withPolar
+        ),
+        vault: withVault ? menuEntries(t) : [],
+        polar: withPolar ? polarMenuEntries(t) : []
+    };
 }
 
 /** The ids Polar's entries are created and answered under. */
