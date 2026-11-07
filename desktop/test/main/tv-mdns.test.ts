@@ -37,7 +37,8 @@ describe("parseMdns", () => {
         expect(records).toContainEqual({
             name: "adb-FIXTURE0001-AbCdEf._adb-tls-pairing._tcp.local",
             type: 33,
-            data: "Android.local"
+            data: "Android.local",
+            port: 37215
         });
         expect(records).toContainEqual({ name: "Android.local", type: 1, data: "192.168.1.40" });
         const txt = records.find((record) => record.type === 16);
@@ -61,7 +62,8 @@ describe("collectTvs", () => {
         expect(tv).toEqual({
             services: ["adb-tls-pairing", "googlecast"],
             castModel: "Chromecast HD",
-            name: "Living Room TV"
+            name: "Living Room TV",
+            ports: { "adb-tls-pairing": 37215, googlecast: 8009 }
         });
         const path = choosePath(tv);
         expect(path.route).toBe("pairing");
@@ -86,7 +88,7 @@ describe("collectTvs", () => {
             { data: adb, from: "10.0.0.7" }
         ]);
         expect(found.size).toBe(1);
-        expect(found.get("10.0.0.7")).toEqual({ services: ["adb", "googlecast"], castModel: "BRAVIA 4K VH2", name: "BRAVIA 4K VH2" });
+        expect(found.get("10.0.0.7")).toEqual({ services: ["adb", "googlecast"], castModel: "BRAVIA 4K VH2", name: "BRAVIA 4K VH2", ports: {} });
     });
 
     it("ignores other services and public addresses", () => {

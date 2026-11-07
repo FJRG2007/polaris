@@ -6,10 +6,12 @@
  * Protocol as AOSP documents it (packages/modules/adb, protocol.txt and
  * SYNC.TXT). Over TCP, or over any other link that carries the same packets - a
  * USB cable's bulk endpoints (`usb-link.ts`). Android 11's Wireless debugging
- * pairing is another protocol, which this does not speak.
+ * port asks for TLS first (A_STLS); the pairing that makes it trust this key is
+ * `adb-pairing.ts`.
  */
 
 import { connect as tcp, type Socket } from "node:net";
+import { connect as tlsConnect } from "node:tls";
 import { createPublicKey, generateKeyPairSync, privateEncrypt, constants, type KeyObject } from "node:crypto";
 
 const A_CNXN = 0x4e584e43;
@@ -18,6 +20,8 @@ const A_OPEN = 0x4e45504f;
 const A_OKAY = 0x59414b4f;
 const A_CLSE = 0x45534c43;
 const A_WRTE = 0x45545257;
+const A_STLS = 0x534c5453;
+const STLS_VERSION = 0x01000000;
 const VERSION = 0x01000000;
 const MAX_PAYLOAD = 4096;
 const AUTH_TOKEN = 1;
@@ -124,6 +128,8 @@ export interface AdbLink {
     /** One packet: USB sends its header and payload as two transfers, TCP as one write. */
     send(header: Buffer, data: Buffer): void;
     close(): void;
+    /** Carries on over TLS with this certificate and key (A_STLS). Only the network link can. */
+    startTls?(certificate: string, key: string, timeoutMs: number): Promise<void>;
 }
 
 export interface AdbLinkEvents {
@@ -146,12 +152,38 @@ export function tcpLink(host: string, port: number, connectMs: number): AdbLinkO
             socket.once("connect", () => {
                 clearTimeout(timer);
                 socket.removeAllListeners("error");
-                socket.on("error", (error) => events.lost(error));
-                socket.on("close", () => events.lost(new Error("The TV closed the connection.")));
-                socket.on("data", (chunk) => events.data(chunk));
+                let current: Socket = socket;
+                const listen = (stream: Socket) => {
+                    stream.on("error", (error) => events.lost(error));
+                    stream.on("close", () => events.lost(new Error("The TV closed the connection.")));
+                    stream.on("data", (chunk) => events.data(chunk));
+                };
+                listen(socket);
                 resolve({
-                    send: (header, data) => socket.write(Buffer.concat([header, data])),
-                    close: () => socket.destroy()
+                    send: (header, data) => current.write(Buffer.concat([header, data])),
+                    close: () => current.destroy(),
+                    startTls: (certificate, key, timeoutMs) =>
+                        new Promise((done, fail) => {
+                            for (const name of ["error", "close", "data"]) socket.removeAllListeners(name);
+                            // adbd's certificate is self-signed; what it checks is that our key is one it paired with.
+                            const secure = tlsConnect({ socket, cert: certificate, key, rejectUnauthorized: false, minVersion: "TLSv1.3" });
+                            const timer = setTimeout(() => {
+                                secure.destroy();
+                                fail(new Error("timeout"));
+                            }, timeoutMs);
+                            secure.once("secureConnect", () => {
+                                clearTimeout(timer);
+                                secure.removeAllListeners("error");
+                                current = secure;
+                                listen(secure);
+                                done();
+                            });
+                            secure.once("error", (error) => {
+                                clearTimeout(timer);
+                                secure.destroy();
+                                fail(Object.assign(new Error("The TV did not accept this computer over TLS."), { code: "TLS_REFUSED", cause: error }));
+                            });
+                        })
                 });
             });
             socket.once("error", (error) => {
@@ -168,6 +200,8 @@ export interface AdbOptions {
     readonly port?: number;
     /** PEM. Its public half is what the TV is asked to allow. */
     readonly key: string;
+    /** The self-signed certificate over `key`, for a TV that asks for TLS (its Wireless debugging port). */
+    readonly certificate?: string;
     readonly connectMs: number;
     /** How long somebody has to answer the prompt on the TV. */
     readonly approveMs: number;
@@ -247,8 +281,17 @@ export class AdbConnection {
             lost: (error) => this.fail(error)
         });
         this.send(A_CNXN, VERSION, MAX_PAYLOAD, Buffer.from("host::\0"));
-        const isHandshake = (packet: Packet) => packet.command === A_CNXN || packet.command === A_AUTH;
+        const isHandshake = (packet: Packet) =>
+            packet.command === A_CNXN || packet.command === A_AUTH || packet.command === A_STLS;
         let answer = await this.next(isHandshake, connectMs);
+        if (answer.command === A_STLS) {
+            const { link } = this;
+            if (!link?.startTls || !this.options.certificate) throw new Error("The TV asks for TLS on this link.");
+            this.send(A_STLS, STLS_VERSION, 0);
+            await link.startTls(this.options.certificate, this.options.key, connectMs);
+            // Over TLS the key was already checked in the handshake: the TV answers with its CNXN.
+            answer = await this.next((packet) => packet.command === A_CNXN, connectMs);
+        }
         if (answer.command === A_AUTH && answer.arg0 === AUTH_TOKEN) {
             this.send(A_AUTH, AUTH_SIGNATURE, 0, signToken(this.options.key, answer.data));
             answer = await this.next(isHandshake, connectMs);

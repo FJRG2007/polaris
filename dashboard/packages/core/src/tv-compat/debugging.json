@@ -8,7 +8,15 @@
             "presses": 7,
             "developer": "Settings > Device Preferences > Developer options",
             "switches": ["USB debugging", "Network debugging"],
-            "source": "https://github.com/simbasjungles/free-my-tv#install"
+            "source": "https://github.com/simbasjungles/free-my-tv#install",
+            "localized": {
+                "es-ES": {
+                    "about": "Ajustes > Preferencias del dispositivo > Información",
+                    "press": "Compilación",
+                    "developer": "Ajustes > Preferencias del dispositivo > Opciones de desarrollador",
+                    "switches": ["Depuración por USB", "Depuración de red"]
+                }
+            }
         },
         {
             "id": "google-tv",
@@ -18,7 +26,15 @@
             "presses": 7,
             "developer": "Settings > System > Developer options",
             "switches": ["USB debugging", "Wireless debugging"],
-            "source": "https://github.com/simbasjungles/free-my-tv#install"
+            "source": "https://github.com/simbasjungles/free-my-tv#install",
+            "localized": {
+                "es-ES": {
+                    "about": "Ajustes > Sistema > Información",
+                    "press": "Compilación del SO de Android TV",
+                    "developer": "Ajustes > Sistema > Opciones para desarrolladores",
+                    "switches": ["Depuración por USB", "Depuración inalámbrica"]
+                }
+            }
         },
         {
             "id": "fire-os",
@@ -28,7 +44,15 @@
             "presses": 7,
             "developer": "Settings > My Fire TV > Developer options",
             "switches": ["ADB debugging"],
-            "source": "https://github.com/FJRG2007/polaris/blob/main/tv/README.md"
+            "source": "https://github.com/FJRG2007/polaris/blob/main/tv/README.md",
+            "localized": {
+                "es-ES": {
+                    "about": "Configuración > Mi Fire TV > Acerca de",
+                    "press": "el nombre del dispositivo",
+                    "developer": "Configuración > Mi Fire TV > Opciones para desarrolladores",
+                    "switches": ["Depuración ADB"]
+                }
+            }
         }
     ]
 }

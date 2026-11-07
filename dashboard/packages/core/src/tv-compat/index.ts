@@ -48,6 +48,9 @@ export function quirkSource(id: TvQuirkId): string | undefined {
 }
 
 /** How a platform's debugging is turned on, or undefined where no install runs. */
-export function debuggingFor(platform: TvPlatform): TvDebuggingSteps | undefined {
-    return TV_DEBUGGING.platforms.find((entry) => entry.platforms.includes(platform));
+export function debuggingFor(platform: TvPlatform, locale?: string): TvDebuggingSteps | undefined {
+    const steps = TV_DEBUGGING.platforms.find((entry) => entry.platforms.includes(platform));
+    // Spanish of any region reads the es-ES menus; anything else, or a menu not translated, stays English.
+    const labels = steps && locale?.toLowerCase().startsWith("es") ? steps.localized?.["es-ES"] : undefined;
+    return steps && labels ? { ...steps, ...labels } : steps;
 }

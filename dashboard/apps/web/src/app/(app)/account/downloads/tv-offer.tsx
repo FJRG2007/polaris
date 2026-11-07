@@ -37,7 +37,7 @@ import {
 import { TvChecker } from "@polaris/ui/tv-checker";
 import { debuggingFor, type TvPlatform } from "@polaris/core/tv-compat";
 import { DownloadCard } from "@polaris/ui/download-card";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { desktopBridge, type DesktopTv, type DesktopTvState } from "@/lib/desktop-bridge";
 import { TvWaitingNote } from "./tv-waiting";
 
@@ -85,7 +85,8 @@ const OUTCOMES = new Set([
     "install-interrupted",
     "usb-busy",
     "usb-gone",
-    "needs-pairing"
+    "needs-pairing",
+    "pairing-refused"
 ]);
 
 function validAddress(value: string): boolean {
@@ -123,6 +124,7 @@ function InstallSteps({
     onClose: () => void;
 }) {
     const t = useTranslations("account");
+    const locale = useLocale();
     const [state, setState] = useState<DesktopTvState | null>(null);
     const [address, setAddress] = useState("");
     const [home, setHome] = useState(true);
@@ -168,7 +170,7 @@ function InstallSteps({
     const usbListed = state.usb ?? [];
     // The app names the TV it found; before that, the platform the checker answered.
     const waiting = state.waiting ?? null;
-    const menus = platform ? debuggingFor(platform) : undefined;
+    const menus = platform ? debuggingFor(platform, locale) : undefined;
     const showBefore = !waiting && idle && menus && (!outcome || outcome === "adb-off");
     const usbPicked = usbListed.some((one) => one.id === usbId)
         ? usbId

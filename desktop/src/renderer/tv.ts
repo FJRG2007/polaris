@@ -47,7 +47,9 @@ const OUTCOMES: Record<TvOutcome, string> = {
         "The TV is plugged in, but another program is using its USB debugging. Close adb, Android Studio or scrcpy and try again. On Windows, the TV may also need the Google USB Driver.",
     "usb-gone": "The TV is no longer connected by USB. Check the cable and try again.",
     "needs-pairing":
-        "This TV turns on debugging only with a Wireless debugging pairing code, which this app cannot use yet. Nothing changed on the TV. Use the USB cable tab if the TV has a data port, or block ads with the Network filter."
+        "This TV turns on debugging with a pairing code. On the TV, open Wireless debugging, then Pair device with pairing code, and type the six digits below while they are on screen.",
+    "pairing-refused":
+        "The TV did not accept that code. Open Pair device with pairing code again on the TV and type the new code it shows."
 };
 
 const HOME_RULES = {
@@ -60,7 +62,7 @@ function waitingText(waiting: TvWaiting | null | undefined): string | null {
     if (!waiting || waiting.step !== "debugging") return null;
     const switches = waiting.switches.join(" and ");
     const pairing = waiting.switches.includes("Wireless debugging")
-        ? " If the TV offers only Wireless debugging with a pairing code, use the USB cable tab instead."
+        ? " If the TV offers only Wireless debugging, turn it on and press Install: this then asks for its pairing code."
         : "";
     return `On the TV, open ${waiting.about} and press OK on ${waiting.press} ${waiting.presses} times. Then in ${waiting.developer}, turn on ${switches}. This carries on by itself once it is on.${pairing}`;
 }
@@ -70,6 +72,8 @@ const NOT_STARTED = "The install could not start. Check the address and try agai
 
 const heading = byId<HTMLHeadingElement>("title");
 const address = byId<HTMLInputElement>("address");
+const codeField = byId<HTMLLabelElement>("code-field");
+const code = byId<HTMLInputElement>("code");
 const addressError = byId<HTMLParagraphElement>("address-error");
 const found = byId<HTMLDivElement>("found");
 const home = byId<HTMLInputElement>("home");
@@ -95,6 +99,8 @@ const bridge = window.polarisLocal.tv;
 
 let notStarted = false;
 let overUsb = false;
+/** The address whose TV asked for a Wireless debugging pairing code. */
+let codeFor: string | null = null;
 /** The USB TV picked from the list, by id. */
 let chosen: string | null = null;
 
@@ -115,8 +121,18 @@ function addressProblem(): string | null {
     return notStarted ? NOT_STARTED : null;
 }
 
+/** Whether the code field is showing: the TV at this address asked for one. */
+function asksCode(): boolean {
+    return !overUsb && codeFor !== null && codeFor === readTvAddress(address.value);
+}
+
 function render(state: TvInstallState): void {
     const idle = IDLE.has(state.phase) && !state.usbListing;
+    if (state.outcome === "needs-pairing" || state.outcome === "pairing-refused") codeFor = readTvAddress(address.value);
+    if (state.outcome === "pairing-refused") code.value = "";
+    const pairing = asksCode();
+    codeField.hidden = !pairing;
+    code.disabled = !idle;
     address.disabled = !idle;
     home.disabled = !idle;
     blockAds.disabled = !idle;
@@ -126,8 +142,9 @@ function render(state: TvInstallState): void {
     find.textContent = searching ? "Stop search" : "Find TVs";
     // A wait for the TV can be stopped from the button that started it.
     const waiting = Boolean(state.waiting);
-    available(start, waiting || (idle && (overUsb ? usbTarget(state) !== null : validAddress())));
-    start.textContent = waiting ? "Stop" : "Install";
+    const codeReady = !pairing || /^\d{6}$/.test(code.value);
+    available(start, waiting || (idle && codeReady && (overUsb ? usbTarget(state) !== null : validAddress())));
+    start.textContent = waiting ? "Stop" : pairing ? "Pair and install" : "Install";
     say(addressError, overUsb ? null : addressProblem());
     tabNetwork.setAttribute("aria-selected", String(!overUsb));
     tabUsb.setAttribute("aria-selected", String(overUsb));
@@ -184,6 +201,11 @@ bridge.onState((next) => {
     latest = next;
     render(next);
 });
+code.addEventListener("input", () => {
+    // Digits only, as the TV shows them; anything else typed or pasted is dropped.
+    code.value = code.value.replace(/\D/g, "").slice(0, 6);
+    if (latest) render(latest);
+});
 address.addEventListener("input", () => {
     notStarted = false;
     if (latest) render(latest);
@@ -212,7 +234,7 @@ start.addEventListener("click", () => {
     }
     const usb = latest && overUsb ? usbTarget(latest) : null;
     const choices = { home: home.checked, blockAds: blockAds.checked };
-    const input = usb ? { usb, ...choices } : { host: address.value.trim(), ...choices };
+    const input = usb ? { usb, ...choices } : { host: address.value.trim(), ...choices, ...(asksCode() ? { code: code.value } : {}) };
     void bridge.start(input).then((started) => {
         notStarted = !started;
         if (latest) render(latest);

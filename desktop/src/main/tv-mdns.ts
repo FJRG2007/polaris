@@ -42,11 +42,15 @@ export interface MdnsRecord {
     readonly type: number;
     /** PTR: the instance name. SRV: the target host. A: the address. TXT: each `key=value`. */
     readonly data: string | readonly string[];
+    /** SRV: the service's port. */
+    readonly port?: number;
 }
 
 /** A TV found by its announcements, with the name it gave itself when it gave one. */
 export interface TvAnnouncement extends TvSighting {
     readonly name: string | null;
+    /** The port each service announced: Wireless debugging's TLS and pairing ports move on every switch-on. */
+    readonly ports: Partial<Record<TvService, number>>;
 }
 
 /** A packet as it arrived, with the address it came from. */
@@ -129,7 +133,9 @@ export function parseMdns(packet: Buffer): MdnsRecord[] {
             if (start + length > packet.length) break;
             const rdata = packet.subarray(start, start + length);
             if (type === TYPE_PTR) records.push({ name, type, data: readName(packet, start).name });
-            else if (type === TYPE_SRV) records.push({ name, type, data: readName(packet, start + 6).name });
+            else if (type === TYPE_SRV && length >= 6) {
+                records.push({ name, type, data: readName(packet, start + 6).name, port: rdata.readUInt16BE(4) });
+            }
             else if (type === TYPE_A && length === 4) records.push({ name, type, data: [...rdata].join(".") });
             else if (type === TYPE_TXT) records.push({ name, type, data: readTxt(rdata) });
             at = start + length;
@@ -153,6 +159,7 @@ function txtValue(entries: readonly string[], key: string): string | null {
 export function collectTvs(packets: readonly MdnsPacket[]): Map<string, TvAnnouncement> {
     const instances = new Map<string, { service: TvService; from: string; }>();
     const targets = new Map<string, string>();
+    const ports = new Map<string, number>();
     const addresses = new Map<string, string>();
     const texts = new Map<string, readonly string[]>();
     const byType = new Map(Object.entries(TV_SERVICE_TYPES).map(([service, type]) => [type, service as TvService]));
@@ -162,19 +169,27 @@ export function collectTvs(packets: readonly MdnsPacket[]): Map<string, TvAnnoun
             if (record.type === TYPE_PTR && typeof record.data === "string") {
                 const service = byType.get(name);
                 if (service) instances.set(record.data.toLowerCase(), { service, from: packet.from });
-            } else if (record.type === TYPE_SRV && typeof record.data === "string") targets.set(name, record.data.toLowerCase());
+            } else if (record.type === TYPE_SRV && typeof record.data === "string") {
+                targets.set(name, record.data.toLowerCase());
+                if (record.port) ports.set(name, record.port);
+            }
             else if (record.type === TYPE_A && typeof record.data === "string") addresses.set(name, record.data);
             else if (record.type === TYPE_TXT && Array.isArray(record.data)) texts.set(name, record.data);
         }
     }
-    const found = new Map<string, { services: Set<TvService>; castModel: string | null; name: string | null; }>();
+    const found = new Map<
+        string,
+        { services: Set<TvService>; castModel: string | null; name: string | null; ports: Partial<Record<TvService, number>>; }
+    >();
     for (const [instance, { service, from }] of instances) {
         const target = targets.get(instance);
         // The host's own address record when it sent one, else the address the answer came from.
         const address = readTvAddress((target && addresses.get(target)) ?? from);
         if (!address) continue;
-        const entry = found.get(address) ?? { services: new Set<TvService>(), castModel: null, name: null };
+        const entry = found.get(address) ?? { services: new Set<TvService>(), castModel: null, name: null, ports: {} };
         entry.services.add(service);
+        const port = ports.get(instance);
+        if (port) entry.ports[service] = port;
         const txt = texts.get(instance) ?? [];
         if (service === "googlecast") {
             entry.castModel = txtValue(txt, "md") ?? entry.castModel;
@@ -185,7 +200,7 @@ export function collectTvs(packets: readonly MdnsPacket[]): Map<string, TvAnnoun
     return new Map(
         [...found].map(([address, entry]) => [
             address,
-            { services: [...entry.services].sort(), castModel: entry.castModel, name: entry.name ?? entry.castModel }
+            { services: [...entry.services].sort(), castModel: entry.castModel, name: entry.name ?? entry.castModel, ports: entry.ports }
         ])
     );
 }

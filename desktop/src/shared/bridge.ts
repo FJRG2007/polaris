@@ -307,7 +307,7 @@ export interface TvInstallBridge {
      *  the launcher's "Block ads and trackers" needs; left out, it is not granted. */
     start(
         input:
-            | { readonly host: string; readonly home: boolean; readonly blockAds?: boolean }
+            | { readonly host: string; readonly home: boolean; readonly blockAds?: boolean; readonly code?: string }
             | { readonly usb: string; readonly home: boolean; readonly blockAds?: boolean }
     ): Promise<boolean>;
     onState(listener: (state: TvInstallState) => void): () => void;
@@ -349,7 +349,8 @@ export type TvOutcome =
     | "install-interrupted"
     | "usb-busy"
     | "usb-gone"
-    | "needs-pairing";
+    | "needs-pairing"
+    | "pairing-refused";
 
 /** A TV plugged in by USB that offers ADB. */
 export interface TvUsbDevice {

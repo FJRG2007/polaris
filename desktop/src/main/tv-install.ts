@@ -25,7 +25,8 @@ import { openLocalWindow } from "./windows";
 import { repository } from "../../package.json";
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
 import { usbDevices, usbLink } from "./usb-link";
-import { AdbConnection, newAdbKey } from "./adb-client";
+import { AdbConnection, androidPublicKey, newAdbKey } from "./adb-client";
+import { adbCertificate, PairingError, pairTv, readPairingCode } from "./adb-pairing";
 import { waitForTv, type TvWaitResult, type TvWaitStep } from "./tv-wait";
 import { choosePath, type TvPath } from "./tv-path";
 import { browseTvs, mergeFound, namesOf, sightingOf, type TvAnnouncement } from "./tv-mdns";
@@ -112,6 +113,8 @@ let waitRun = 0;
 let announced = new Map<string, TvAnnouncement>();
 /** The connection waiting on the TV's prompt, closed by a cancel so the wait ends now rather than at the prompt's timeout. */
 let pending: AdbConnection | null = null;
+/** Ends a Wireless debugging pairing in progress. */
+let pairing: AbortController | null = null;
 
 /** The one instruction for this TV while the install waits on it. */
 export function waitingFor(step: TvWaitStep, path: TvPath): TvWaiting {
@@ -282,7 +285,70 @@ export function lateFailure(stage: TvStage): TvOutcome {
     return stage === "home" ? "installed-home-unknown" : "connection-lost";
 }
 
-async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): Promise<void> {
+/** What a failed pairing means on screen. */
+export function pairingFailure(caught: unknown): TvOutcome | "cancelled" {
+    if (!(caught instanceof PairingError)) return "unreachable";
+    if (caught.reason === "cancelled") return "cancelled";
+    return caught.reason === "wrong-code" ? "pairing-refused" : "unreachable";
+}
+
+/**
+ * A TV whose debugging opens only through Wireless debugging: its TLS port lets
+ * in a computer it paired with before; otherwise the six-digit code the TV shows
+ * pairs this one first. The pairing port is announced only while the TV shows
+ * that code, so it is looked for again once the code is typed.
+ */
+async function overWirelessDebugging(
+    host: string,
+    key: string,
+    heard: ReadonlyMap<string, TvAnnouncement>,
+    code: string | null
+): Promise<AdbConnection | TvOutcome | "cancelled"> {
+    const certificate = adbCertificate(key);
+    // A Stop pressed while a connect is under way closes it; that failure is the cancel, not the TV's answer.
+    waitRun += 1;
+    const run = waitRun;
+    const stopped = () => run !== waitRun;
+    const connectOn = async (port: number): Promise<AdbConnection> => {
+        const adb = new AdbConnection({ host, port, key, certificate, connectMs: 8_000, approveMs: 60_000, commandMs: 60_000 });
+        pending = adb;
+        try {
+            await adb.open();
+            return adb;
+        } catch (caught) {
+            adb.close();
+            throw caught;
+        } finally {
+            pending = null;
+        }
+    };
+    const portsNow = async () => ({ ...heard.get(host)?.ports, ...(await browseTvs(INSTALL_BROWSE_MS).catch(() => new Map<string, TvAnnouncement>())).get(host)?.ports });
+    let ports = heard.get(host)?.ports ?? {};
+    if (!code) {
+        if (!ports["adb-tls-connect"]) return "needs-pairing";
+        return connectOn(ports["adb-tls-connect"]).catch(() => (stopped() ? ("cancelled" as const) : ("needs-pairing" as const)));
+    }
+    ports = await portsNow();
+    if (stopped()) return "cancelled";
+    const pairingPort = ports["adb-tls-pairing"];
+    if (!pairingPort) return "needs-pairing";
+    const controller = new AbortController();
+    pairing = controller;
+    try {
+        await pairTv({ host, port: pairingPort, code, key, publicKey: androidPublicKey(key), timeoutMs: 30_000, signal: controller.signal });
+    } catch (caught) {
+        console.error("[tv] pairing", caught);
+        return pairingFailure(caught);
+    } finally {
+        if (pairing === controller) pairing = null;
+    }
+    if (!ports["adb-tls-connect"]) ports = await portsNow();
+    const tlsPort = ports["adb-tls-connect"];
+    if (!tlsPort) return "unreachable";
+    return connectOn(tlsPort).catch((caught: NodeJS.ErrnoException) => (stopped() ? ("cancelled" as const) : connectFailure(caught)));
+}
+
+async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, code: string | null = null): Promise<void> {
     publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null });
     const release = await latestApk().catch((caught: unknown) => {
         console.error("[tv]", caught);
@@ -314,52 +380,62 @@ async function install(target: TvTarget, makeHome: boolean, blockAds: boolean): 
             : [false, new Map<string, TvAnnouncement>()];
     const sighting = sightingOf(target.kind === "network" ? heard.get(target.host) : undefined, adbOpen);
     const before = choosePath(sighting);
+    let adb: AdbConnection;
     if (target.kind === "network" && before.route === "pairing") {
-        publish({ phase: "failed", outcome: "needs-pairing" });
-        return;
+        const reached = await overWirelessDebugging(target.host, key, heard, code);
+        if (reached === "cancelled") {
+            publish({ phase: "ready", waiting: null });
+            return;
+        }
+        if (typeof reached === "string") {
+            publish({ phase: "failed", outcome: reached, waiting: null });
+            return;
+        }
+        adb = reached;
+    } else {
+        waitRun += 1;
+        const run = waitRun;
+        const waited = await waitForTv<AdbConnection>({
+            probe: () => (target.kind === "usb" ? Promise.resolve("open") : answersOn(target.host, ADB_PORT, SCAN_MS)),
+            connect: async () => {
+                const adb = new AdbConnection({
+                    ...(target.kind === "usb" ? { link: usbLink(target.id) } : { host: target.host, port: ADB_PORT }),
+                    key,
+                    connectMs: 8_000,
+                    approveMs: 60_000,
+                    commandMs: 60_000,
+                    onPrompt: () => publish({ phase: "allow", waiting: waitingFor("prompt", before) })
+                });
+                pending = adb;
+                try {
+                    await adb.open();
+                    return adb;
+                } catch (caught) {
+                    adb.close();
+                    throw caught;
+                } finally {
+                    pending = null;
+                }
+            },
+            classify: (caught) => connectFailure(caught as NodeJS.ErrnoException),
+            onStep: (step) => publish({ phase: step === "prompt" ? "allow" : "connecting", waiting: waitingFor(step, before) }),
+            cancelled: () => run !== waitRun,
+            sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+            now: () => Date.now(),
+            intervalMs: WAIT_EVERY_MS,
+            timeoutMs: WAIT_FOR_MS
+        });
+        waitRun += 1;
+        if (waited.kind === "cancelled") {
+            publish({ phase: "ready", waiting: null });
+            return;
+        }
+        if (waited.kind !== "connected") {
+            publish({ phase: "failed", outcome: waitOutcome(waited), waiting: null });
+            return;
+        }
+        adb = waited.connection;
     }
-    waitRun += 1;
-    const run = waitRun;
-    const waited = await waitForTv<AdbConnection>({
-        probe: () => (target.kind === "usb" ? Promise.resolve("open") : answersOn(target.host, ADB_PORT, SCAN_MS)),
-        connect: async () => {
-            const adb = new AdbConnection({
-                ...(target.kind === "usb" ? { link: usbLink(target.id) } : { host: target.host, port: ADB_PORT }),
-                key,
-                connectMs: 8_000,
-                approveMs: 60_000,
-                commandMs: 60_000,
-                onPrompt: () => publish({ phase: "allow", waiting: waitingFor("prompt", before) })
-            });
-            pending = adb;
-            try {
-                await adb.open();
-                return adb;
-            } catch (caught) {
-                adb.close();
-                throw caught;
-            } finally {
-                pending = null;
-            }
-        },
-        classify: (caught) => connectFailure(caught as NodeJS.ErrnoException),
-        onStep: (step) => publish({ phase: step === "prompt" ? "allow" : "connecting", waiting: waitingFor(step, before) }),
-        cancelled: () => run !== waitRun,
-        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        now: () => Date.now(),
-        intervalMs: WAIT_EVERY_MS,
-        timeoutMs: WAIT_FOR_MS
-    });
-    waitRun += 1;
-    if (waited.kind === "cancelled") {
-        publish({ phase: "ready", waiting: null });
-        return;
-    }
-    if (waited.kind !== "connected") {
-        publish({ phase: "failed", outcome: waitOutcome(waited), waiting: null });
-        return;
-    }
-    const adb = waited.connection;
     publish({ waiting: null });
 
     let stage: TvStage = "check";
@@ -420,7 +496,8 @@ async function finish(adb: AdbConnection, target: TvTarget, outcome: TvOutcome):
 
 /** Stops a search, or a wait for the TV, under way; an install is never stopped once the TV let this in. */
 function stopSearch(by?: WebContents): void {
-    if (state.waiting) {
+    pairing?.abort();
+    if (state.waiting || state.phase === "connecting") {
         waitRun += 1;
         // A prompt nobody answered would otherwise hold the cancel until it times out.
         pending?.close();
@@ -449,7 +526,13 @@ export function openTvInstall(): void {
 }
 
 const startSchema = z.union([
-    z.object({ host: z.unknown().transform(readTvAddress).pipe(z.string()), home: z.boolean(), blockAds: z.boolean().optional() }),
+    z.object({
+        host: z.unknown().transform(readTvAddress).pipe(z.string()),
+        home: z.boolean(),
+        blockAds: z.boolean().optional(),
+        /** The Wireless debugging pairing code the TV shows; absent until it asked for one. */
+        code: z.string().max(32).optional()
+    }),
     z.object({ usb: z.string().trim().min(1).max(200), home: z.boolean(), blockAds: z.boolean().optional() })
 ]);
 
@@ -509,9 +592,11 @@ export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean
         const input = startSchema.safeParse(raw);
         if (!fromTv(event) || !input.success || busy) return false;
         const target = startTarget(input.data, state.usb);
-        if (!target) return false;
+        const typed = "code" in input.data ? input.data.code : undefined;
+        const code = typed === undefined ? null : readPairingCode(typed);
+        if (!target || (typed !== undefined && !code)) return false;
         busy = true;
-        void install(target, input.data.home, input.data.blockAds === true).finally(() => {
+        void install(target, input.data.home, input.data.blockAds === true, code).finally(() => {
             busy = false;
         });
         return true;

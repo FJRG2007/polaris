@@ -136,7 +136,22 @@ export const tvDebuggingSchema = z
                     developer: z.string().min(1),
                     /** The switches to turn on there, by the name the TV shows. */
                     switches: z.array(z.string().min(1)).min(1),
-                    source: z.string().url()
+                    source: z.string().url(),
+                    /** The same menus as the TV shows them in another language, by locale; English is the default above. */
+                    localized: z
+                        .object({
+                            "es-ES": z
+                                .object({
+                                    about: z.string().min(1),
+                                    press: z.string().min(1),
+                                    developer: z.string().min(1),
+                                    switches: z.array(z.string().min(1)).min(1)
+                                })
+                                .strict()
+                        })
+                        .partial()
+                        .strict()
+                        .optional()
                 })
                 .strict()
         )
