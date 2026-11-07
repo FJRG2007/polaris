@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, float, color, positionWorld, uniform, mod, fract, step, smoothstep, mix } from 'three/tsl';
+import { Fn, float, color, positionWorld, uniform, mod, fract, step, smoothstep, mix, attribute, uv, texture, vec2, floor } from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   AVENUES,
@@ -20,30 +20,81 @@ import { REAL_TREES } from './tree-geodata.js';
 import { placeStreetTrees } from './tree-placements.js';
 import { createSubwayEntranceParts, createFoodCartParts } from './street-props.js';
 import { createSubwayEntrances } from './subway-entrances.js';
-import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites } from './city-grid.js';
+import { pavedPlazaRects, centralParkClearings, parkTreeSites, parkLampSites, drawnGroundAt } from './city-grid.js';
 import { bryantParkLawn } from './landmarks.js';
 import { lightBudget } from './quality.js';
 
 // Instanced street furniture, traffic signals, trees and nearby light pools.
 
-function createStreetSignBladeTexture(label) {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 64;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#0d6b3f';
-  ctx.fillRect(0, 0, 256, 64);
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(4, 4, 248, 56);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '800 30px Inter, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, 128, 34);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+const BLADE_CELL_W = 256;
+const BLADE_CELL_H = 64;
+const BLADE_COLS = 4;
+
+/**
+ * NYC DOT green street-name blades, one per signal pole, each naming the intersection it stands at. Every avenue and
+ * street name is painted once into an atlas cell (half a blade: avenue cells carry the left border and end in a middle
+ * dot, street cells carry the right border); a blade's `bladeNames` instance attribute picks the avenue cell for its
+ * left half and the street cell for its right half.
+ */
+function createStreetNameBlades() {
+  const cells = [];
+  const index = new Map();
+  const cellOf = (side, name) => {
+    const key = `${side}:${name}`;
+    if (!index.has(key)) {
+      index.set(key, cells.length);
+      cells.push({ side, name });
+    }
+    return index.get(key);
+  };
+
+  function material() {
+    const rows = Math.max(1, Math.ceil(cells.length / BLADE_COLS));
+    const c = document.createElement('canvas');
+    c.width = BLADE_COLS * BLADE_CELL_W;
+    c.height = rows * BLADE_CELL_H;
+    const ctx = c.getContext('2d');
+    cells.forEach(({ side, name }, i) => {
+      const x = (i % BLADE_COLS) * BLADE_CELL_W;
+      const y = Math.floor(i / BLADE_COLS) * BLADE_CELL_H;
+      ctx.fillStyle = '#0d6b3f';
+      ctx.fillRect(x, y, BLADE_CELL_W, BLADE_CELL_H);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x, y + 1.5, BLADE_CELL_W, 5);
+      ctx.fillRect(x, y + BLADE_CELL_H - 6.5, BLADE_CELL_W, 5);
+      ctx.fillRect(side === 'avenue' ? x + 1.5 : x + BLADE_CELL_W - 6.5, y + 1.5, 5, BLADE_CELL_H - 3);
+      const text = side === 'avenue' ? `${name} ·` : name;
+      const room = BLADE_CELL_W - 24;
+      ctx.font = '800 30px Inter, Arial, sans-serif';
+      const size = Math.min(30, Math.floor((30 * room) / Math.max(1, ctx.measureText(text).width)));
+      ctx.font = `800 ${size}px Inter, Arial, sans-serif`;
+      ctx.textAlign = side === 'avenue' ? 'right' : 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, side === 'avenue' ? x + BLADE_CELL_W - 8 : x + 8, y + 34);
+    });
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshStandardNodeMaterial({ roughness: 0.32 });
+    const names = attribute('bladeNames', 'vec2');
+    const right = step(0.5, uv().x);
+    // The index reaches the fragment as an interpolated float (83.99998 for 84): rounded, or mod/floor pick the cell
+    // beside it on part of the blade and the name breaks up into speckle
+    const cell = floor(mix(names.x, names.y, right).add(0.5));
+    const col = mod(cell, BLADE_COLS);
+    const row = floor(cell.div(BLADE_COLS));
+    const u = uv().x.mul(2).sub(right);
+    const footprint = vec2(uv().x.mul(2 / BLADE_COLS), uv().y.div(rows));
+    mat.colorNode = texture(tex, vec2(col.add(u).div(BLADE_COLS), float(1).sub(row.add(1).div(rows)).add(uv().y.div(rows))))
+      .grad(footprint.dFdx(), footprint.dFdy());
+    return mat;
+  }
+
+  return {
+    /** The atlas cell pair for the corner of `avenue` and `street`. */
+    names: (avenue, street) => [cellOf('avenue', avenue.short.toUpperCase()), cellOf('street', street.short.toUpperCase())],
+    cells,
+    material
+  };
 }
 
 /**
@@ -137,10 +188,7 @@ function buildStreetDetails(scene, colliders = []) {
   lampBulbGlow.colorNode = mix(color(0x8f918c), color(0xfff1d6).mul(2.1), smoothstep(0.4, 1.1, cityUniforms.uInteriorGlow));
   const pedGlobeGlow = new THREE.MeshBasicNodeMaterial();
   pedGlobeGlow.colorNode = mix(color(0xd4d2c8), color(0xffe4b0).mul(1.95), smoothstep(0.4, 1.1, cityUniforms.uInteriorGlow));
-  const streetBladeMat = new THREE.MeshStandardNodeMaterial({
-    map: createStreetSignBladeTexture('5TH AVE · 42 ST'),
-    roughness: 0.32
-  });
+  const streetBlades = createStreetNameBlades();
 
   // 12-inch three-section signal head (origin at its centre, y = 5.42): yellow housing, a tunnel visor over each lens
   // and a hanger to the mast arm, lenses on both faces (+-z) so it reads from both approaches; the lens material
@@ -183,6 +231,7 @@ function buildStreetDetails(scene, colliders = []) {
   const aveLensMatrices = [];
   const streetLensMatrices = [];
   const streetBladeMatrices = [];
+  const streetBladeNames = [];
   const walkBoxMatrices = [];
   const audioSignals = [];
   const signalIntersections = [];
@@ -289,6 +338,7 @@ function buildStreetDetails(scene, colliders = []) {
         dummy.scale.set(1.38, 0.34, 0.08);
         dummy.updateMatrix();
         streetBladeMatrices.push(dummy.matrix.clone());
+        streetBladeNames.push(...streetBlades.names(ave, st));
 
         // Pedestrian "WALK / DON'T WALK" signal on the pole at crosswalk level (y = 3.15m), facing across the street
         dummy.position.set(px + c.armDir * 0.24, 3.15, pz);
@@ -508,7 +558,13 @@ function buildStreetDetails(scene, colliders = []) {
   addMatrixArrayInstanced(signalHousingGeo, signalHousingMat, yellowBoxMatrices);
   addMatrixArrayInstanced(signalLensGeo, aveSignalLensMat, aveLensMatrices, false);
   addMatrixArrayInstanced(signalLensGeo, streetSignalLensMat, streetLensMatrices, false);
-  addMatrixArrayInstanced(unitBox, streetBladeMat, streetBladeMatrices);
+  const streetBladeGeo = unitBox.clone();
+  streetBladeGeo.setAttribute('bladeNames', new THREE.InstancedBufferAttribute(new Float32Array(streetBladeNames), 2));
+  const streetBladeMesh = addMatrixArrayInstanced(streetBladeGeo, streetBlades.material(), streetBladeMatrices);
+  if (streetBladeMesh) {
+    streetBladeMesh.name = 'StreetNameBlades';
+    streetBladeMesh.userData.cells = streetBlades.cells; // what each atlas cell reads, for the sign sweep
+  }
   addMatrixArrayInstanced(walkHousingGeo, signalHousingMat, walkBoxMatrices);
   addMatrixArrayInstanced(walkPanelGeo, walkSignalGlow, walkBoxMatrices, false);
   addMatrixArrayInstanced(lampHousingGeo, poleMetalMat, lampHeadMatrices);
@@ -826,7 +882,7 @@ function buildStreetDetails(scene, colliders = []) {
   //    and its west end, framing the lawn the library's terrace looks out over (the lawn as fitted by landmarks.js)
   const bpl = bryantParkLawn;
   if (bpl) {
-    const ty = bpl.top - 0.2;
+    const ty = bpl.terrace;
     for (let tx = bpl.minX - 6; tx <= bpl.maxX + 6; tx += 6.5) {
       for (const tz of [bpl.minZ - 5, bpl.minZ - 11.5, bpl.maxZ + 5, bpl.maxZ + 11.5]) {
         treePositions.push({ x: tx, y: ty, z: tz, scale: 0.8, species: 0 });
@@ -840,6 +896,7 @@ function buildStreetDetails(scene, colliders = []) {
 
   // B. Central Park (59th to 110th St, 5th Ave to Central Park West; city-config.js CENTRAL_PARK_BOUNDS), on the lawn
   const cp = CPB;
+  const firstParkTree = treePositions.length;
   // B1. Central Park South (59th St) dense woodland border
   for (let tx = cp.minX + 8; tx <= cp.maxX - 8; tx += 9.5) {
     treePositions.push({ x: tx, y: CP_LAWN_Y, z: cp.maxZ - 5, scale: 0.95, species: 0 });
@@ -926,6 +983,21 @@ function buildStreetDetails(scene, colliders = []) {
         treePositions.push({ x: tx, y: CP_LAWN_Y, z: tz, scale, species: mixSpecies(hashPos(tx, 4.4, tz), 0.4, 0.15) });
       }
     }
+  }
+
+  // The rows above are laid out on the park's rectangle (CPB), which runs past the real park line at its corners -
+  // Grand Army Plaza, Columbus Circle, the 110th St ends: each tree stands on the park ground drawn under it (wall, lawn,
+  // meadow) and one with no park under it, over the sidewalk or the street, is not planted
+  {
+    let kept = firstParkTree;
+    for (let i = firstParkTree; i < treePositions.length; i++) {
+      const t = treePositions[i];
+      const ground = drawnGroundAt(t.x, t.z);
+      if (ground === null) continue;
+      t.y = ground;
+      treePositions[kept++] = t;
+    }
+    treePositions.length = kept;
   }
 
   // B5. The squares, the other parks & the plazas (sites laid out by city-grid.js)

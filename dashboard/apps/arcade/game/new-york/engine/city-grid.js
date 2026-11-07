@@ -67,6 +67,7 @@ let pavedPlazaRects;
 let sidewalkBlocks;
 let fdrViaduct;
 let streetGroundSurfaces = [];
+let seawallOutline = []; // the granite coping's outline: the esplanade walk ends at it, the river starts
 
 function addStreetGround(poly, height) {
   streetGroundSurfaces.push({
@@ -74,6 +75,16 @@ function addStreetGround(poly, height) {
     minX: Math.min(...poly.map((p) => p.x)), maxX: Math.max(...poly.map((p) => p.x)),
     minZ: Math.min(...poly.map((p) => p.z)), maxZ: Math.max(...poly.map((p) => p.z))
   });
+}
+
+// The highest surface drawn under (x, z) that something can stand on, or null where none was registered
+function drawnGroundAt(x, z) {
+  let height = null;
+  for (const s of streetGroundSurfaces) {
+    if ((height === null || s.height > height) && x >= s.minX && x <= s.maxX && z >= s.minZ && z <= s.maxZ
+      && pointInPolygonXZ(s.poly, x, z)) height = s.height;
+  }
+  return height;
 }
 
 function getStreetGroundHeight(x, z) {
@@ -253,6 +264,23 @@ function createExtrudedPolygonMesh(pts, bottomY, height, material, receiveShadow
   mesh.receiveShadow = receiveShadow;
   mesh.castShadow = castShadow;
   return mesh;
+}
+
+/**
+ * Whether (x, z) is covered by `pts` as createExtrudedPolygonMesh fills it. An inset of a thin or ragged outline can
+ * cross itself, and the triangulation then covers a different area than an even-odd test calls inside: a tree placed
+ * by the test alone can stand over the walk beside the bed. Returns a predicate, triangulating once per outline.
+ */
+function drawnPolygonTest(pts) {
+  let contour = createWorldXZShape(pts).extractPoints(1).shape;
+  if (!THREE.ShapeUtils.isClockWise(contour)) contour = contour.reverse();
+  const faces = THREE.ShapeUtils.triangulateShape(contour, []);
+  const side = (a, b, x, y) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+  return (x, z) => faces.some(([i, j, k]) => {
+    const a = contour[i], b = contour[j], c = contour[k];
+    const d1 = side(a, b, x, -z), d2 = side(b, c, x, -z), d3 = side(c, a, x, -z);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  });
 }
 
 function createFlatPolygonMesh(pts, y, material, receiveShadow = true) {
@@ -1527,6 +1555,7 @@ function buildCityGrid(scene) {
   }));
   const seawallMesh = createExtrudedPolygonMesh(seawallPolygon, -2.35, 2.31, seawallMat, true, false);
   group.add(seawallMesh);
+  seawallOutline = seawallPolygon;
 
   // Unified Manhattan Roadway Asphalt Deck (Y = 0.0) following true Manhattan coastline
   const roadMat = createRoadSurfaceMaterial();
@@ -2044,7 +2073,7 @@ function buildCityGrid(scene) {
   };
 
   // Scatters trees on a jittered grid inside polygon `pts` (kept `margin` m from its edges)
-  function scatterParkTrees(pts, spacing, y, margin, speciesMix) {
+  function scatterParkTrees(pts, spacing, y, margin, speciesMix, onLawn = () => true) {
     const inner = offsetConvexPolygon(pts, -margin);
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const p of inner) {
@@ -2054,7 +2083,7 @@ function buildCityGrid(scene) {
       for (let gz = z0; gz <= z1; gz += spacing) {
         const tx = gx + (prand(gx, gz) - 0.5) * spacing * 0.7;
         const tz = gz + (prand(gz, gx, 1) - 0.5) * spacing * 0.7;
-        if (!inPolygon(tx, tz, inner)) continue;
+        if (!inPolygon(tx, tz, inner) || !onLawn(tx, tz)) continue;
         const r = prand(tx, tz, 2);
         const species = r < speciesMix[0] ? 0 : (r < speciesMix[0] + speciesMix[1] ? 1 : 2);
         treeSites.push({ x: tx, y, z: tz, scale: 0.95 + prand(tx, tz, 3) * 0.35, species });
@@ -2118,7 +2147,7 @@ function buildCityGrid(scene) {
         return [p.x, p.z, q.x, q.z];
       }), BED_Y - 0.01, 0.5));
       lineBedEdges(bed);
-      scatterParkTrees(bed, cell.treeSpacing ?? 9.0, BED_Y, 2.0, speciesMix);
+      scatterParkTrees(bed, cell.treeSpacing ?? 9.0, BED_Y, 2.0, speciesMix, drawnPolygonTest(lawn));
     }
     // Paved hub plaza (bluestone) with an optional granite-rimmed fountain basin
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(hubR + 0.6, hubR + 0.6, 0.03, 40), pavingMat);
@@ -2319,15 +2348,16 @@ function buildCityGrid(scene) {
       parkLawnGeos.push(createExtrudedPolygonMesh(lawnTop, 0.3, BED_Y - 0.3, cpLawnMat).geometry);
       addStreetGround(lawnTop, BED_Y);
     }
-    // trees on a jittered grid inside the bed
+    // trees on a jittered grid inside the bed, on the lawn as drawn
     const SP = 11;
+    const onLawn = drawnPolygonTest(lawnTop || bed);
     for (let gx = b.minX + SP * 0.5; gx < b.maxX; gx += SP) {
       for (let gz = b.minZ + SP * 0.5; gz < b.maxZ; gz += SP) {
         const tx = gx + (prand(gx, gz) - 0.5) * SP * 0.7;
         const tz = gz + (prand(gz, gx, 1) - 0.5) * SP * 0.7;
         if (prand(tx, tz, 9) < 0.3) continue; // glades
         const inner = lawnTop || bed;
-        if (!inPolygon(tx, tz, inner)) continue;
+        if (!inPolygon(tx, tz, inner) || !onLawn(tx, tz)) continue;
         const r = prand(tx, tz, 2);
         treeSites.push({ x: tx, y: BED_Y, z: tz, scale: 0.9 + prand(tx, tz, 3) * 0.4, species: r < 0.55 ? 0 : (r < 0.75 ? 1 : 2) });
       }
@@ -2397,7 +2427,7 @@ function buildCityGrid(scene) {
         const pz = a.z + ((b.z - a.z) * t) / len;
         if (inTerminal(px, pz)) continue;
         if (k % 3 === 1) addLamp(px - o.x * 3.3, COPING_TOP, pz - o.z * 3.3);
-        else if (!nearCastle(px, pz, 4)) treeSites.push({ x: px - o.x * 4.0, y: COPING_TOP, z: pz - o.z * 4.0, scale: 0.85 + prand(px, pz, 7) * 0.25, species: prand(pz, px, 8) < 0.6 ? 0 : 1, tier: 1 });
+        else if (!nearCastle(px, pz, 4) && pointInPolygonXZ(seawallOutline, px - o.x * 4.0, pz - o.z * 4.0)) treeSites.push({ x: px - o.x * 4.0, y: COPING_TOP, z: pz - o.z * 4.0, scale: 0.85 + prand(px, pz, 7) * 0.25, species: prand(pz, px, 8) < 0.6 ? 0 : 1, tier: 1 });
       }
     }
     // Iron railing 0.6 m in from the bulkhead on the coping, gapped at the ferry terminal
@@ -2796,6 +2826,8 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
   const MIX_PARK = [0.5, 0.3]; // London plane, honey locust, else elm / oak
   const MIX_RIVERSIDE = [0.35, 0.2];
   const pickSpecies = (h, mix) => (h < mix[0] ? 0 : (h < mix[0] + mix[1] ? 1 : 2));
+  const lawnDrawn = (r, key, d) => !!(r && r[key] && !(key === 'river' && blocked(r, r[key][0]))
+    && d > r[key][0] + 0.5 && d < r[key][1] - 0.5);
   function plantBelt(rows, key, spacing, rowGap, mix, tier, s0, s1) {
     const z0 = rows[0].z;
     for (let zt = z0; zt <= rows[rows.length - 1].z; zt += spacing) {
@@ -2807,7 +2839,14 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
         const d = a + 1.9 + k * rowGap + (hash(k, zt) - 0.5) * 1.0;
         if (d > b - 1.6) break;
         if (blocked(r, d) || (key === 'river' && blocked(r, a)) || hash(z, d) < 0.1) continue;
-        treeSites.push({ x: X(r, d), y: LAWN_Y, z, scale: s0 + hash(d, z) * (s1 - s0), species: pickSpecies(hash(z * 0.37, d), mix), tier });
+        // belt() lays the lawn between two rows that both carry it: past the last one there is no lawn to stand on
+        const i0 = Math.floor((z - z0) / STEP);
+        const ra = rows[i0];
+        const rb = rows[i0 + 1];
+        if (!lawnDrawn(ra, key, d) || !lawnDrawn(rb, key, d)) continue;
+        // and the quad runs straight from one row's shore offset to the next: the tree follows it, not the nearer row
+        const t = (z - ra.z) / (rb.z - ra.z);
+        treeSites.push({ x: X(ra, d) + (X(rb, d) - X(ra, d)) * t, y: LAWN_Y, z, scale: s0 + hash(d, z) * (s1 - s0), species: pickSpecies(hash(z * 0.37, d), mix), tier });
       }
     }
   }
@@ -2818,7 +2857,7 @@ function buildManhattanWaterfrontEdge(group, { blockSidewalks, treeSites, lawnMa
     for (let zt = z0 + 4; zt <= z1; zt += 16) {
       const z = zt + (hash(zt, 3.1) - 0.5) * 3;
       const r = rows[Math.round((z - z0) / STEP)];
-      if (!r || r.river || blocked(r, -4.4)) continue;
+      if (!r || r.river || blocked(r, -4.4) || !pointInPolygonXZ(seawallOutline, X(r, -4.4), z)) continue;
       treeSites.push({ x: X(r, -4.4), y: COPING_Y, z, scale: 0.8 + hash(z, 7.7) * 0.25, species: hash(z, 1.9) < 0.6 ? 0 : 1, tier: 1 });
     }
     for (let z = z0 + 12; z <= z1; z += 26) {
@@ -3533,6 +3572,7 @@ function buildUnderpassPortal(frames, acc, quad, lights, colliders) {
 
 export {
   buildCityGrid,
+  drawnGroundAt,
   getStreetGroundHeight,
   batchStaticGroupMeshes,
   centralParkClearings,

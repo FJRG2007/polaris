@@ -3,7 +3,8 @@
 //   low     no shadows, no reflections, no bloom: the cheapest shaders, for the WebGL2 fallback and weak GPUs
 //   medium  sun shadows and bloom, no screen-space reflections
 //   high    everything (shadows, half-res SSR, bloom)
-// castLights is the share of each cast-light pool (car beams, street lamps, shop spots) lit at once. Every pool keeps
+// castLights is the share of each fixed cast-light pool (street lamps, shop spots) lit at once; vehicle headlights are
+// always lit in full, as in the reference game. Every pool keeps
 // its size whatever the level - adding or removing a light recompiles every lit material - so a lower level only
 // leaves more of its lights at intensity 0, which the clustered lighting skips.
 // Auto starts from what the device says about itself and steps down for the next visit when the game ran slowly.

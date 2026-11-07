@@ -426,11 +426,20 @@ describe("arrival placement", () => {
 });
 
 describe("brake lamps", () => {
-    it("burn full while slowing down, dimmer held at a standstill, and not at all cruising", () => {
-        expect(rules.brakeLamp(-3, 8)).toBe(rules.BRAKE_LAMP.slowing);
-        expect(rules.brakeLamp(0, 0)).toBe(rules.BRAKE_LAMP.holding);
+    it("light traffic fully while slowing down or standing, and not at all cruising, as the reference does", () => {
+        expect(rules.brakeLamp(-3, 8)).toBe(1);
+        expect(rules.brakeLamp(0, 0)).toBe(1);
+        expect(rules.brakeLamp(0, -0.2)).toBe(1);
         expect(rules.brakeLamp(0.5, 10)).toBe(0);
-        expect(rules.BRAKE_LAMP.slowing).toBeGreaterThan(rules.BRAKE_LAMP.holding);
+    });
+
+    it("light the player's car only while braking against its motion, never at rest", () => {
+        expect(rules.playerBrakeLamp(8, -1)).toBe(1);
+        expect(rules.playerBrakeLamp(-2, 1)).toBe(1);
+        expect(rules.playerBrakeLamp(0, 0)).toBe(0);
+        expect(rules.playerBrakeLamp(0, -1)).toBe(0);
+        expect(rules.playerBrakeLamp(8, 1)).toBe(0);
+        expect(rules.playerBrakeLamp(-2, -0.6)).toBe(0);
     });
 });
 

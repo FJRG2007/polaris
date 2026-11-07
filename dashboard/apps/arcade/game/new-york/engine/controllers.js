@@ -24,10 +24,10 @@ import {
   createLoftedHelicopterMaterial
 } from './helicopter.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
-import { BRAKE_LAMP, HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
+import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import {
   HELI_CRUISE_SPEED, KEY_BINDINGS, PERSON_MOVE, approachVelocity, arrivalFor, cameraRelativeMove, createJumpState, createTurnSignal,
-  heliTopSpeed, settleBody, slideVelocity, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
+  heliTopSpeed, playerBrakeLamp, settleBody, slideVelocity, stepJump, stepTurbo, stepTurnSignal, turnLamps, turnToward, wrapAngle
 } from './player-rules.js';
 import { bryantParkLawn } from './landmarks.js';
 import { polygonContact } from './building-collision.js';
@@ -1289,10 +1289,8 @@ class ThirdPersonControllerManager {
     c.chassisPivot.position.y = c.heaveY;
 
     if (c.carState) {
-      // Full while braking, dimmer when held at a standstill with no throttle (an automatic's foot on the brake), like
-      // traffic (brakeLamp in vehicle-lights.js)
-      const holding = Math.abs(c.speed) < BRAKE_LAMP.standingBelow && !throttle;
-      c.carState.value.x = braking ? BRAKE_LAMP.slowing : holding ? BRAKE_LAMP.holding : 0;
+      // Lit only while braking, as in the reference game (playerBrakeLamp in player-rules.js)
+      c.carState.value.x = playerBrakeLamp(c.speed, throttle);
       c.carState.value.w = c.speed < -0.2 ? 1 : 0;
       // Indicators from the steering held (stepTurnSignal in player-rules.js)
       c.turnSignal ??= createTurnSignal();
