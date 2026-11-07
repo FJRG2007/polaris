@@ -21,19 +21,42 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { connect as tcp } from "node:net";
 import { networkInterfaces } from "node:os";
+import { serverAddress } from "./settings";
 import { openLocalWindow } from "./windows";
 import { repository } from "../../package.json";
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  type IpcMainInvokeEvent,
+  type WebContents,
+} from "electron";
 import { usbDevices, usbLink } from "./usb-link";
 import { AdbConnection, androidPublicKey, newAdbKey } from "./adb-client";
-import { adbCertificate, PairingError, pairTv, readPairingCode } from "./adb-pairing";
+import {
+  adbCertificate,
+  PairingError,
+  pairTv,
+  readPairingCode,
+} from "./adb-pairing";
 import { waitForTv, type TvWaitResult, type TvWaitStep } from "./tv-wait";
 import { choosePath, type TvPath } from "./tv-path";
-import { browseTvs, mergeFound, namesOf, sightingOf, type TvAnnouncement } from "./tv-mdns";
+import {
+  browseTvs,
+  mergeFound,
+  namesOf,
+  sightingOf,
+  type TvAnnouncement,
+} from "./tv-mdns";
 import { CHECKSUMS, parseChecksums, releaseSource } from "./releases";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { readTvAddress } from "@/shared/tv-address";
-import { CHANNELS, type TvInstallState, type TvOutcome, type TvWaiting } from "@/shared/bridge";
+import {
+  CHANNELS,
+  type TvInstallState,
+  type TvOutcome,
+  type TvWaiting,
+} from "@/shared/bridge";
 
 const PACKAGE = "app.polaris.tv";
 const HOME_ACTIVITY = `${PACKAGE}/.MainActivity`;
@@ -58,51 +81,72 @@ const BROWSE_MS = 3_000;
 const INSTALL_BROWSE_MS = 1_500;
 
 /** What a failed connection means, in terms the person can act on. */
-export function connectFailure(error: { code?: string; message?: string; }): TvOutcome {
-    if (error.code === "USB_BUSY") return "usb-busy";
-    if (error.code === "USB_GONE") return "usb-gone";
-    if (error.code === "ECONNREFUSED") return "adb-off";
-    if (error.message === "The TV stopped answering.") return "not-allowed";
-    if (error.code === "EHOSTUNREACH" || error.code === "ENETUNREACH") return "unreachable";
+export function connectFailure(error: {
+  code?: string;
+  message?: string;
+}): TvOutcome {
+  if (error.code === "USB_BUSY") return "usb-busy";
+  if (error.code === "USB_GONE") return "usb-gone";
+  if (error.code === "ECONNREFUSED") return "adb-off";
+  if (error.message === "The TV stopped answering.") return "not-allowed";
+  if (error.code === "EHOSTUNREACH" || error.code === "ENETUNREACH")
     return "unreachable";
+  return "unreachable";
 }
 
 /** Whether the shell's answer is an Android TV this launcher can run on. */
 export function tvRefusal(sdk: string, leanback: string): TvOutcome | null {
-    if (!/feature:android\.software\.leanback/.test(leanback)) return "not-android-tv";
-    const level = Number.parseInt(sdk.trim(), 10);
-    return Number.isNaN(level) || level < MIN_SDK ? "too-old" : null;
+  if (!/feature:android\.software\.leanback/.test(leanback))
+    return "not-android-tv";
+  const level = Number.parseInt(sdk.trim(), 10);
+  return Number.isNaN(level) || level < MIN_SDK ? "too-old" : null;
 }
 
 export function homeIsOurs(resolved: string): boolean {
-    return resolved.split(/\s+/).some((line) => line === HOME_ACTIVITY || line === `${PACKAGE}/${PACKAGE}.MainActivity`);
+  return resolved
+    .split(/\s+/)
+    .some(
+      (line) =>
+        line === HOME_ACTIVITY || line === `${PACKAGE}/${PACKAGE}.MainActivity`,
+    );
 }
 
 /** The addresses to try on the networks this computer is on. */
 function neighbours(): string[] {
-    const found = new Set<string>();
-    for (const list of Object.values(networkInterfaces())) {
-        for (const entry of list ?? []) {
-            if (entry.family !== "IPv4" || entry.internal || !readTvAddress(entry.address)) continue;
-            const base = entry.address.split(".").slice(0, 3).join(".");
-            for (let last = 1; last < 255; last += 1) found.add(`${base}.${last}`);
-            found.delete(entry.address);
-        }
+  const found = new Set<string>();
+  for (const list of Object.values(networkInterfaces())) {
+    for (const entry of list ?? []) {
+      if (
+        entry.family !== "IPv4" ||
+        entry.internal ||
+        !readTvAddress(entry.address)
+      )
+        continue;
+      const base = entry.address.split(".").slice(0, 3).join(".");
+      for (let last = 1; last < 255; last += 1) found.add(`${base}.${last}`);
+      found.delete(entry.address);
     }
-    return [...found];
+  }
+  return [...found];
 }
 
-function answersOn(host: string, port: number, timeoutMs: number): Promise<"open" | "refused" | "silent"> {
-    return new Promise((resolve) => {
-        const socket = tcp({ host, port });
-        const done = (verdict: "open" | "refused" | "silent") => {
-            socket.destroy();
-            resolve(verdict);
-        };
-        socket.setTimeout(timeoutMs, () => done("silent"));
-        socket.once("connect", () => done("open"));
-        socket.once("error", (error: NodeJS.ErrnoException) => done(error.code === "ECONNREFUSED" ? "refused" : "silent"));
-    });
+function answersOn(
+  host: string,
+  port: number,
+  timeoutMs: number,
+): Promise<"open" | "refused" | "silent"> {
+  return new Promise((resolve) => {
+    const socket = tcp({ host, port });
+    const done = (verdict: "open" | "refused" | "silent") => {
+      socket.destroy();
+      resolve(verdict);
+    };
+    socket.setTimeout(timeoutMs, () => done("silent"));
+    socket.once("connect", () => done("open"));
+    socket.once("error", (error: NodeJS.ErrnoException) =>
+      done(error.code === "ECONNREFUSED" ? "refused" : "silent"),
+    );
+  });
 }
 
 /** Bumped by a cancel, so a search started before it stops taking addresses. */
@@ -118,46 +162,58 @@ let pairing: AbortController | null = null;
 
 /** The one instruction for this TV while the install waits on it. */
 export function waitingFor(step: TvWaitStep, path: TvPath): TvWaiting {
-    const { id, about, press, presses, developer, switches } = path.instruction;
-    return { step, steps: id, about, press, presses, developer, switches };
+  const { id, about, press, presses, developer, switches } = path.instruction;
+  return { step, steps: id, about, press, presses, developer, switches };
 }
 
 /** What a wait that ended without a connection tells the person. */
-export function waitOutcome(waited: Exclude<TvWaitResult<unknown>, { kind: "connected" | "cancelled" }>): TvOutcome {
-    if (waited.kind === "failed") return waited.outcome as TvOutcome;
-    return waited.step === "prompt" ? "not-allowed" : "adb-off";
+export function waitOutcome(
+  waited: Exclude<TvWaitResult<unknown>, { kind: "connected" | "cancelled" }>,
+): TvOutcome {
+  if (waited.kind === "failed") return waited.outcome as TvOutcome;
+  return waited.step === "prompt" ? "not-allowed" : "adb-off";
 }
 
-async function findTvs(run: number): Promise<{ found: string[]; heard: Map<string, TvAnnouncement>; }> {
-    const queue = neighbours();
-    const open: string[] = [];
-    const sweep = Promise.all(
-        Array.from({ length: SCAN_WIDTH }, async () => {
-            for (let host = queue.pop(); host && run === search; host = queue.pop()) {
-                if ((await answersOn(host, ADB_PORT, SCAN_MS)) === "open") open.push(host);
-            }
-        })
-    );
-    const [heard] = await Promise.all([browseTvs(BROWSE_MS, () => run !== search).catch(() => new Map<string, TvAnnouncement>()), sweep]);
-    return { found: mergeFound(open, heard), heard };
+async function findTvs(
+  run: number,
+): Promise<{ found: string[]; heard: Map<string, TvAnnouncement> }> {
+  const queue = neighbours();
+  const open: string[] = [];
+  const sweep = Promise.all(
+    Array.from({ length: SCAN_WIDTH }, async () => {
+      for (let host = queue.pop(); host && run === search; host = queue.pop()) {
+        if ((await answersOn(host, ADB_PORT, SCAN_MS)) === "open")
+          open.push(host);
+      }
+    }),
+  );
+  const [heard] = await Promise.all([
+    browseTvs(BROWSE_MS, () => run !== search).catch(
+      () => new Map<string, TvAnnouncement>(),
+    ),
+    sweep,
+  ]);
+  return { found: mergeFound(open, heard), heard };
 }
 
 async function adbKey(): Promise<string> {
-    const path = join(app.getPath("userData"), "tv-adb-key.pem");
-    const held = await readFile(path, "utf8").catch(() => null);
-    if (held) return held;
-    const key = newAdbKey();
-    await writeFile(path, key, { mode: 0o600 });
-    return key;
+  const path = join(app.getPath("userData"), "tv-adb-key.pem");
+  const held = await readFile(path, "utf8").catch(() => null);
+  if (held) return held;
+  const key = newAdbKey();
+  await writeFile(path, key, { mode: 0o600 });
+  return key;
 }
 
 const releasesSchema = z.array(
-    z.object({
-        tag_name: z.string(),
-        draft: z.boolean(),
-        prerelease: z.boolean(),
-        assets: z.array(z.object({ name: z.string(), browser_download_url: z.string() })).default([])
-    })
+  z.object({
+    tag_name: z.string(),
+    draft: z.boolean(),
+    prerelease: z.boolean(),
+    assets: z
+      .array(z.object({ name: z.string(), browser_download_url: z.string() }))
+      .default([]),
+  }),
 );
 
 type PublishedRelease = z.infer<typeof releasesSchema>[number];
@@ -165,49 +221,108 @@ type PublishedRelease = z.infer<typeof releasesSchema>[number];
 /** The newest TV release. One list holds every kind of release, so it can be
  *  pages back from the first. */
 async function newestRelease(api: string): Promise<PublishedRelease | null> {
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
-        const response = await fetch(`${api}&page=${page}`, {
-            headers: { accept: "application/vnd.github+json" },
-            signal: AbortSignal.timeout(LOOKUP_MS)
-        });
-        if (!response.ok) throw new Error("download");
-        const releases = releasesSchema.parse(await response.json());
-        const release = releases.find((one) => one.tag_name.startsWith(TAG_PREFIX) && !one.draft && !one.prerelease);
-        if (release) return release;
-        if (releases.length < PAGE_SIZE) return null;
-    }
-    return null;
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const response = await fetch(`${api}&page=${page}`, {
+      headers: { accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(LOOKUP_MS),
+    });
+    if (!response.ok) throw new Error("download");
+    const releases = releasesSchema.parse(await response.json());
+    const release = releases.find(
+      (one) =>
+        one.tag_name.startsWith(TAG_PREFIX) && !one.draft && !one.prerelease,
+    );
+    if (release) return release;
+    if (releases.length < PAGE_SIZE) return null;
+  }
+  return null;
 }
 
 /** The newest published APK, verified, or null when none has been released. */
-export async function latestApk(): Promise<{ apk: Buffer; version: string; } | null> {
-    const source = releaseSource(repository);
-    if (!source) return null;
-    const release = await newestRelease(source.api);
-    if (!release) return null;
-    const apkAsset = release.assets.find((one) => one.name === APK_NAME);
-    const sums = release.assets.find((one) => one.name === CHECKSUMS);
-    if (!apkAsset || !sums) return null;
-    const listed = await fetch(sums.browser_download_url, { signal: AbortSignal.timeout(LOOKUP_MS) });
-    const expected = parseChecksums(await listed.text()).get(APK_NAME);
-    const download = await fetch(apkAsset.browser_download_url, { signal: AbortSignal.timeout(DOWNLOAD_MS) });
-    if (!listed.ok || !download.ok || !expected) throw new Error("download");
-    const apk = Buffer.from(await download.arrayBuffer());
-    if (createHash("sha256").update(apk).digest("hex") !== expected) throw new Error("download");
-    return { apk, version: release.tag_name.slice(TAG_PREFIX.length) };
+export async function latestApk(): Promise<{
+  apk: Buffer;
+  version: string;
+} | null> {
+  const source = releaseSource(repository);
+  if (!source) return null;
+  const release = await newestRelease(source.api);
+  if (!release) return null;
+  const apkAsset = release.assets.find((one) => one.name === APK_NAME);
+  const sums = release.assets.find((one) => one.name === CHECKSUMS);
+  if (!apkAsset || !sums) return null;
+  const listed = await fetch(sums.browser_download_url, {
+    signal: AbortSignal.timeout(LOOKUP_MS),
+  });
+  const expected = parseChecksums(await listed.text()).get(APK_NAME);
+  const download = await fetch(apkAsset.browser_download_url, {
+    signal: AbortSignal.timeout(DOWNLOAD_MS),
+  });
+  if (!listed.ok || !download.ok || !expected) throw new Error("download");
+  const apk = Buffer.from(await download.arrayBuffer());
+  if (createHash("sha256").update(apk).digest("hex") !== expected)
+    throw new Error("download");
+  return { apk, version: release.tag_name.slice(TAG_PREFIX.length) };
 }
 
 /** A TV on the network by its address, or one plugged in by USB by its id. */
-export type TvTarget = { readonly kind: "network"; readonly host: string; } | { readonly kind: "usb"; readonly id: string; };
+export type TvTarget =
+  | { readonly kind: "network"; readonly host: string }
+  | { readonly kind: "usb"; readonly id: string };
 
 /** The backup folder's name for a TV: its address, or its USB id with only safe characters. */
 export function targetLabel(target: TvTarget): string {
-    return target.kind === "network" ? target.host : `usb-${target.id.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 64)}`;
+  return target.kind === "network"
+    ? target.host
+    : `usb-${target.id.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 64)}`;
 }
 
 /** The TV's Private DNS before anything changed, named, so a missing key reads as "null" rather than a blank line. */
 export const PRIVATE_DNS_READ =
-    "echo private_dns_mode=$(settings get global private_dns_mode); echo private_dns_specifier=$(settings get global private_dns_specifier)";
+  "echo private_dns_mode=$(settings get global private_dns_mode); echo private_dns_specifier=$(settings get global private_dns_specifier)";
+
+/**
+ * Opens the TV's link screen with this app's Polaris filled in, one press on the remote from the code to scan.
+ * Null when there is no Polaris yet, when its address is this computer's own loopback (the TV would ask itself),
+ * or when it is not a plain http(s) origin: the value goes into a shell command line, so nothing else is let through.
+ */
+export function linkCommand(server: string | null): string | null {
+  if (!server) return null;
+  let origin: string;
+  try {
+    origin = new URL(server).origin;
+  } catch {
+    return null;
+  }
+  if (!/^https?:\/\/[A-Za-z0-9.:[\]-]+$/.test(origin)) return null;
+  if (loopback(new URL(origin).hostname)) return null;
+  return `am start -n ${PACKAGE}/.LinkFromInstall --es origin ${origin}`;
+}
+
+function loopback(host: string): boolean {
+  const name = host.toLowerCase().replace(/\.$/, "");
+  return (
+    name === "localhost" ||
+    name.endsWith(".localhost") ||
+    /^127\./.test(name) ||
+    name === "0.0.0.0" ||
+    name === "[::1]" ||
+    name === "[::]" ||
+    name.startsWith("[::ffff:7f")
+  );
+}
+
+/** Asks the installed launcher whether this TV is already linked; stopped packages included, as a fresh install is. */
+export const LINK_STATE_READ = `am broadcast -f 32 -n ${PACKAGE}/.LinkState`;
+
+/** Whether the launcher answered that it is linked; anything else, an error included, reads as not linked. */
+export function alreadyLinked(output: string): boolean {
+  return /data="linked=true"/.test(output);
+}
+
+/** Whether `am start` reported the activity started rather than an error. */
+export function opened(output: string): boolean {
+  return output.trim().length > 0 && !/Error|Exception/i.test(output);
+}
 
 /**
  * The runtime grants after the install. Location names the Wi-Fi in the launcher's network row;
@@ -216,26 +331,34 @@ export const PRIVATE_DNS_READ =
  * have granted the second for another switch.
  */
 export function grantCommands(blockAds: boolean): readonly string[] {
-    const grants = [`pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`];
-    if (blockAds) grants.push(`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`);
-    return grants;
+  const grants = [
+    `pm grant ${PACKAGE} android.permission.ACCESS_FINE_LOCATION`,
+  ];
+  if (blockAds)
+    grants.push(`pm grant ${PACKAGE} android.permission.WRITE_SECURE_SETTINGS`);
+  return grants;
 }
 
 async function backUp(adb: AdbConnection, target: TvTarget): Promise<string> {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const folder = join(app.getPath("userData"), "tv-backups", `${targetLabel(target)}-${stamp}`);
-    await mkdir(folder, { recursive: true });
-    const reads: readonly (readonly [string, string])[] = [
-        ["packages.txt", "pm list packages"],
-        ["disabled.txt", "pm list packages -d"],
-        ["getprop.txt", "getprop"],
-        ["settings-global.txt", "settings list global"],
-        ["settings-secure.txt", "settings list secure"],
-        ["settings-system.txt", "settings list system"],
-        ["private-dns.txt", PRIVATE_DNS_READ]
-    ];
-    for (const [name, command] of reads) await writeFile(join(folder, name), await adb.shell(command));
-    return folder;
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const folder = join(
+    app.getPath("userData"),
+    "tv-backups",
+    `${targetLabel(target)}-${stamp}`,
+  );
+  await mkdir(folder, { recursive: true });
+  const reads: readonly (readonly [string, string])[] = [
+    ["packages.txt", "pm list packages"],
+    ["disabled.txt", "pm list packages -d"],
+    ["getprop.txt", "getprop"],
+    ["settings-global.txt", "settings list global"],
+    ["settings-secure.txt", "settings list secure"],
+    ["settings-system.txt", "settings list system"],
+    ["private-dns.txt", PRIVATE_DNS_READ],
+  ];
+  for (const [name, command] of reads)
+    await writeFile(join(folder, name), await adb.shell(command));
+  return folder;
 }
 
 let window: BrowserWindow | null = null;
@@ -244,35 +367,45 @@ const pages = new Set<WebContents>();
 let busy = false;
 let searcher: WebContents | null = null;
 let state: TvInstallState = {
-    phase: "ready",
-    found: [],
-    usb: null,
-    usbListing: false,
-    outcome: null,
-    backup: null,
-    closed: null,
-    waiting: null,
-    home: null,
-    named: {}
+  phase: "ready",
+  found: [],
+  usb: null,
+  usbListing: false,
+  outcome: null,
+  backup: null,
+  closed: null,
+  waiting: null,
+  home: null,
+  linking: null,
+  named: {},
 };
 
 function publish(next: Partial<TvInstallState>): void {
-    state = { ...state, ...next };
-    for (const page of pages) if (!page.isDestroyed()) page.send(CHANNELS.tvEvent, state);
+  state = { ...state, ...next };
+  for (const page of pages)
+    if (!page.isDestroyed()) page.send(CHANNELS.tvEvent, state);
 }
 
-async function closeAdb(adb: AdbConnection, target: TvTarget): Promise<boolean> {
-    await adb.shell("settings put global adb_wifi_enabled 0; settings put global adb_enabled 0").catch(() => "");
-    adb.close();
-    for (let attempt = 0; attempt < CLOSE_ATTEMPTS; attempt += 1) {
-        if (target.kind === "usb") {
-            // Debugging off takes the ADB interface off the cable.
-            const still = await usbDevices().catch(() => null);
-            if (still && !still.some((one) => one.id === target.id)) return true;
-        } else if ((await answersOn(target.host, ADB_PORT, SCAN_MS)) === "refused") return true;
-        await new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS));
-    }
-    return false;
+async function closeAdb(
+  adb: AdbConnection,
+  target: TvTarget,
+): Promise<boolean> {
+  await adb
+    .shell(
+      "settings put global adb_wifi_enabled 0; settings put global adb_enabled 0",
+    )
+    .catch(() => "");
+  adb.close();
+  for (let attempt = 0; attempt < CLOSE_ATTEMPTS; attempt += 1) {
+    if (target.kind === "usb") {
+      // Debugging off takes the ADB interface off the cable.
+      const still = await usbDevices().catch(() => null);
+      if (still && !still.some((one) => one.id === target.id)) return true;
+    } else if ((await answersOn(target.host, ADB_PORT, SCAN_MS)) === "refused")
+      return true;
+    await new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS));
+  }
+  return false;
 }
 
 /** How far an install got, which decides what a failure can truthfully say. */
@@ -280,16 +413,16 @@ export type TvStage = "check" | "backup" | "send" | "install" | "home";
 
 /** What an error part way through means for the set. */
 export function lateFailure(stage: TvStage): TvOutcome {
-    if (stage === "backup") return "backup-failed";
-    if (stage === "install") return "install-interrupted";
-    return stage === "home" ? "installed-home-unknown" : "connection-lost";
+  if (stage === "backup") return "backup-failed";
+  if (stage === "install") return "install-interrupted";
+  return stage === "home" ? "installed-home-unknown" : "connection-lost";
 }
 
 /** What a failed pairing means on screen. */
 export function pairingFailure(caught: unknown): TvOutcome | "cancelled" {
-    if (!(caught instanceof PairingError)) return "unreachable";
-    if (caught.reason === "cancelled") return "cancelled";
-    return caught.reason === "wrong-code" ? "pairing-refused" : "unreachable";
+  if (!(caught instanceof PairingError)) return "unreachable";
+  if (caught.reason === "cancelled") return "cancelled";
+  return caught.reason === "wrong-code" ? "pairing-refused" : "unreachable";
 }
 
 /**
@@ -299,314 +432,424 @@ export function pairingFailure(caught: unknown): TvOutcome | "cancelled" {
  * that code, so it is looked for again once the code is typed.
  */
 async function overWirelessDebugging(
-    host: string,
-    key: string,
-    heard: ReadonlyMap<string, TvAnnouncement>,
-    code: string | null
+  host: string,
+  key: string,
+  heard: ReadonlyMap<string, TvAnnouncement>,
+  code: string | null,
 ): Promise<AdbConnection | TvOutcome | "cancelled"> {
-    const certificate = adbCertificate(key);
-    // A Stop pressed while a connect is under way closes it; that failure is the cancel, not the TV's answer.
+  const certificate = adbCertificate(key);
+  // A Stop pressed while a connect is under way closes it; that failure is the cancel, not the TV's answer.
+  waitRun += 1;
+  const run = waitRun;
+  const stopped = () => run !== waitRun;
+  const connectOn = async (port: number): Promise<AdbConnection> => {
+    const adb = new AdbConnection({
+      host,
+      port,
+      key,
+      certificate,
+      connectMs: 8_000,
+      approveMs: 60_000,
+      commandMs: 60_000,
+    });
+    pending = adb;
+    try {
+      await adb.open();
+      return adb;
+    } catch (caught) {
+      adb.close();
+      throw caught;
+    } finally {
+      pending = null;
+    }
+  };
+  const portsNow = async () => ({
+    ...heard.get(host)?.ports,
+    ...(
+      await browseTvs(INSTALL_BROWSE_MS).catch(
+        () => new Map<string, TvAnnouncement>(),
+      )
+    ).get(host)?.ports,
+  });
+  let ports = heard.get(host)?.ports ?? {};
+  if (!code) {
+    const remembered = ports["adb-tls-connect"];
+    if (remembered) {
+      const adb = await connectOn(remembered).catch(() => null);
+      if (adb) return adb;
+      if (stopped()) return "cancelled";
+    }
+    const fresh = (await portsNow())["adb-tls-connect"];
+    if (stopped()) return "cancelled";
+    if (!fresh || fresh === remembered) return "needs-pairing";
+    return connectOn(fresh).catch(() =>
+      stopped() ? ("cancelled" as const) : ("needs-pairing" as const),
+    );
+  }
+  ports = await portsNow();
+  if (stopped()) return "cancelled";
+  const pairingPort = ports["adb-tls-pairing"];
+  if (!pairingPort) return "needs-pairing";
+  const controller = new AbortController();
+  pairing = controller;
+  try {
+    await pairTv({
+      host,
+      port: pairingPort,
+      code,
+      key,
+      publicKey: androidPublicKey(key),
+      timeoutMs: 30_000,
+      signal: controller.signal,
+    });
+  } catch (caught) {
+    console.error("[tv] pairing", caught);
+    return pairingFailure(caught);
+  } finally {
+    if (pairing === controller) pairing = null;
+  }
+  if (!ports["adb-tls-connect"]) ports = await portsNow();
+  const tlsPort = ports["adb-tls-connect"];
+  if (!tlsPort) return "unreachable";
+  return connectOn(tlsPort).catch((caught: NodeJS.ErrnoException) =>
+    stopped() ? ("cancelled" as const) : connectFailure(caught),
+  );
+}
+
+async function install(
+  target: TvTarget,
+  makeHome: boolean,
+  blockAds: boolean,
+  code: string | null = null,
+): Promise<void> {
+  publish({
+    phase: "download",
+    outcome: null,
+    backup: null,
+    closed: null,
+    waiting: null,
+    home: null,
+    linking: null,
+  });
+  const release = await latestApk().catch((caught: unknown) => {
+    console.error("[tv]", caught);
+    return undefined;
+  });
+  if (!release) {
+    publish({
+      phase: "failed",
+      outcome: release === null ? "not-released" : "download-failed",
+    });
+    return;
+  }
+  const key = await adbKey().catch((caught: unknown) => {
+    console.error("[tv]", caught);
+    return null;
+  });
+  if (!key) {
+    publish({ phase: "failed", outcome: "key-failed" });
+    return;
+  }
+
+  publish({ phase: "connecting" });
+  // A typed address nobody searched for is asked about here, so a pairing-only TV is known at once.
+  const [adbOpen, heard] =
+    target.kind === "network"
+      ? await Promise.all([
+          answersOn(target.host, ADB_PORT, SCAN_MS).then(
+            (verdict) => verdict === "open",
+          ),
+          announced.has(target.host)
+            ? Promise.resolve(announced)
+            : browseTvs(INSTALL_BROWSE_MS).catch(
+                () => new Map<string, TvAnnouncement>(),
+              ),
+        ])
+      : [false, new Map<string, TvAnnouncement>()];
+  const sighting = sightingOf(
+    target.kind === "network" ? heard.get(target.host) : undefined,
+    adbOpen,
+  );
+  const before = choosePath(sighting);
+  let adb: AdbConnection;
+  if (target.kind === "network" && before.route === "pairing") {
+    const reached = await overWirelessDebugging(target.host, key, heard, code);
+    if (reached === "cancelled") {
+      publish({ phase: "ready", waiting: null });
+      return;
+    }
+    if (typeof reached === "string") {
+      publish({ phase: "failed", outcome: reached, waiting: null });
+      return;
+    }
+    adb = reached;
+  } else {
     waitRun += 1;
     const run = waitRun;
-    const stopped = () => run !== waitRun;
-    const connectOn = async (port: number): Promise<AdbConnection> => {
-        const adb = new AdbConnection({ host, port, key, certificate, connectMs: 8_000, approveMs: 60_000, commandMs: 60_000 });
+    const waited = await waitForTv<AdbConnection>({
+      probe: () =>
+        target.kind === "usb"
+          ? Promise.resolve("open")
+          : answersOn(target.host, ADB_PORT, SCAN_MS),
+      connect: async () => {
+        const adb = new AdbConnection({
+          ...(target.kind === "usb"
+            ? { link: usbLink(target.id) }
+            : { host: target.host, port: ADB_PORT }),
+          key,
+          connectMs: 8_000,
+          approveMs: 60_000,
+          commandMs: 60_000,
+          onPrompt: () =>
+            publish({ phase: "allow", waiting: waitingFor("prompt", before) }),
+        });
         pending = adb;
         try {
-            await adb.open();
-            return adb;
+          await adb.open();
+          return adb;
         } catch (caught) {
-            adb.close();
-            throw caught;
+          adb.close();
+          throw caught;
         } finally {
-            pending = null;
+          pending = null;
         }
-    };
-    const portsNow = async () => ({ ...heard.get(host)?.ports, ...(await browseTvs(INSTALL_BROWSE_MS).catch(() => new Map<string, TvAnnouncement>())).get(host)?.ports });
-    let ports = heard.get(host)?.ports ?? {};
-    if (!code) {
-        const remembered = ports["adb-tls-connect"];
-        if (remembered) {
-            const adb = await connectOn(remembered).catch(() => null);
-            if (adb) return adb;
-            if (stopped()) return "cancelled";
-        }
-        const fresh = (await portsNow())["adb-tls-connect"];
-        if (stopped()) return "cancelled";
-        if (!fresh || fresh === remembered) return "needs-pairing";
-        return connectOn(fresh).catch(() => (stopped() ? ("cancelled" as const) : ("needs-pairing" as const)));
+      },
+      classify: (caught) => connectFailure(caught as NodeJS.ErrnoException),
+      onStep: (step) =>
+        publish({
+          phase: step === "prompt" ? "allow" : "connecting",
+          waiting: waitingFor(step, before),
+        }),
+      cancelled: () => run !== waitRun,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      now: () => Date.now(),
+      intervalMs: WAIT_EVERY_MS,
+      timeoutMs: WAIT_FOR_MS,
+    });
+    waitRun += 1;
+    if (waited.kind === "cancelled") {
+      publish({ phase: "ready", waiting: null });
+      return;
     }
-    ports = await portsNow();
-    if (stopped()) return "cancelled";
-    const pairingPort = ports["adb-tls-pairing"];
-    if (!pairingPort) return "needs-pairing";
-    const controller = new AbortController();
-    pairing = controller;
-    try {
-        await pairTv({ host, port: pairingPort, code, key, publicKey: androidPublicKey(key), timeoutMs: 30_000, signal: controller.signal });
-    } catch (caught) {
-        console.error("[tv] pairing", caught);
-        return pairingFailure(caught);
-    } finally {
-        if (pairing === controller) pairing = null;
+    if (waited.kind !== "connected") {
+      publish({ phase: "failed", outcome: waitOutcome(waited), waiting: null });
+      return;
     }
-    if (!ports["adb-tls-connect"]) ports = await portsNow();
-    const tlsPort = ports["adb-tls-connect"];
-    if (!tlsPort) return "unreachable";
-    return connectOn(tlsPort).catch((caught: NodeJS.ErrnoException) => (stopped() ? ("cancelled" as const) : connectFailure(caught)));
+    adb = waited.connection;
+  }
+  publish({ waiting: null });
+
+  let stage: TvStage = "check";
+  try {
+    publish({ phase: "checking" });
+    const sdk = await adb.shell("getprop ro.build.version.sdk");
+    const refusal = tvRefusal(sdk, await adb.shell("pm list features"));
+    if (refusal) {
+      await finish(adb, target, refusal);
+      return;
+    }
+    const path = choosePath(sighting, {
+      manufacturer: await adb.shell("getprop ro.product.manufacturer"),
+      model: await adb.shell("getprop ro.product.model"),
+      sdk: Number.parseInt(sdk.trim(), 10) || null,
+    });
+    publish({ home: path.home });
+    stage = "backup";
+    publish({ phase: "backup" });
+    publish({ backup: await backUp(adb, target) });
+
+    stage = "send";
+    publish({ phase: "install" });
+    await adb.push(REMOTE_APK, release.apk);
+    stage = "install";
+    const installed = await adb.shell(`pm install -r ${REMOTE_APK}`, 180_000);
+    await adb.shell(`rm -f ${REMOTE_APK}`).catch(() => "");
+    if (!installed.includes("Success")) {
+      await finish(
+        adb,
+        target,
+        /VERIFICATION_FAILURE/.test(installed)
+          ? "sideload-refused"
+          : "install-failed",
+      );
+      return;
+    }
+    stage = "home";
+    for (const grant of grantCommands(blockAds))
+      await adb.shell(grant).catch(() => "");
+    // TCL's app-ops: a TV without that firmware answers an error, which changes nothing.
+    for (const line of path.afterInstall)
+      await adb.shell(`${line} 2>/dev/null; true`).catch(() => "");
+
+    let outcome: TvOutcome = "installed";
+    if (makeHome && path.home === "offered") {
+      publish({ phase: "home" });
+      await adb.shell(
+        `cmd package set-home-activity --user 0 ${HOME_ACTIVITY}`,
+      );
+      const resolved = await adb.shell(
+        "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      );
+      outcome = homeIsOurs(resolved)
+        ? "installed-home"
+        : "installed-home-refused";
+    }
+    const link = linkCommand(serverAddress());
+    if (
+      link &&
+      !alreadyLinked(await adb.shell(LINK_STATE_READ).catch(() => ""))
+    ) {
+      publish({ linking: opened(await adb.shell(link).catch(() => "Error")) });
+    }
+    await finish(adb, target, outcome);
+  } catch (caught) {
+    console.error("[tv]", caught);
+    await finish(adb, target, lateFailure(stage));
+  }
 }
 
-async function install(target: TvTarget, makeHome: boolean, blockAds: boolean, code: string | null = null): Promise<void> {
-    publish({ phase: "download", outcome: null, backup: null, closed: null, waiting: null, home: null });
-    const release = await latestApk().catch((caught: unknown) => {
-        console.error("[tv]", caught);
-        return undefined;
-    });
-    if (!release) {
-        publish({ phase: "failed", outcome: release === null ? "not-released" : "download-failed" });
-        return;
-    }
-    const key = await adbKey().catch((caught: unknown) => {
-        console.error("[tv]", caught);
-        return null;
-    });
-    if (!key) {
-        publish({ phase: "failed", outcome: "key-failed" });
-        return;
-    }
-
-    publish({ phase: "connecting" });
-    // A typed address nobody searched for is asked about here, so a pairing-only TV is known at once.
-    const [adbOpen, heard] =
-        target.kind === "network"
-            ? await Promise.all([
-                  answersOn(target.host, ADB_PORT, SCAN_MS).then((verdict) => verdict === "open"),
-                  announced.has(target.host)
-                      ? Promise.resolve(announced)
-                      : browseTvs(INSTALL_BROWSE_MS).catch(() => new Map<string, TvAnnouncement>())
-              ])
-            : [false, new Map<string, TvAnnouncement>()];
-    const sighting = sightingOf(target.kind === "network" ? heard.get(target.host) : undefined, adbOpen);
-    const before = choosePath(sighting);
-    let adb: AdbConnection;
-    if (target.kind === "network" && before.route === "pairing") {
-        const reached = await overWirelessDebugging(target.host, key, heard, code);
-        if (reached === "cancelled") {
-            publish({ phase: "ready", waiting: null });
-            return;
-        }
-        if (typeof reached === "string") {
-            publish({ phase: "failed", outcome: reached, waiting: null });
-            return;
-        }
-        adb = reached;
-    } else {
-        waitRun += 1;
-        const run = waitRun;
-        const waited = await waitForTv<AdbConnection>({
-            probe: () => (target.kind === "usb" ? Promise.resolve("open") : answersOn(target.host, ADB_PORT, SCAN_MS)),
-            connect: async () => {
-                const adb = new AdbConnection({
-                    ...(target.kind === "usb" ? { link: usbLink(target.id) } : { host: target.host, port: ADB_PORT }),
-                    key,
-                    connectMs: 8_000,
-                    approveMs: 60_000,
-                    commandMs: 60_000,
-                    onPrompt: () => publish({ phase: "allow", waiting: waitingFor("prompt", before) })
-                });
-                pending = adb;
-                try {
-                    await adb.open();
-                    return adb;
-                } catch (caught) {
-                    adb.close();
-                    throw caught;
-                } finally {
-                    pending = null;
-                }
-            },
-            classify: (caught) => connectFailure(caught as NodeJS.ErrnoException),
-            onStep: (step) => publish({ phase: step === "prompt" ? "allow" : "connecting", waiting: waitingFor(step, before) }),
-            cancelled: () => run !== waitRun,
-            sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-            now: () => Date.now(),
-            intervalMs: WAIT_EVERY_MS,
-            timeoutMs: WAIT_FOR_MS
-        });
-        waitRun += 1;
-        if (waited.kind === "cancelled") {
-            publish({ phase: "ready", waiting: null });
-            return;
-        }
-        if (waited.kind !== "connected") {
-            publish({ phase: "failed", outcome: waitOutcome(waited), waiting: null });
-            return;
-        }
-        adb = waited.connection;
-    }
-    publish({ waiting: null });
-
-    let stage: TvStage = "check";
-    try {
-        publish({ phase: "checking" });
-        const sdk = await adb.shell("getprop ro.build.version.sdk");
-        const refusal = tvRefusal(sdk, await adb.shell("pm list features"));
-        if (refusal) {
-            await finish(adb, target, refusal);
-            return;
-        }
-        const path = choosePath(sighting, {
-            manufacturer: await adb.shell("getprop ro.product.manufacturer"),
-            model: await adb.shell("getprop ro.product.model"),
-            sdk: Number.parseInt(sdk.trim(), 10) || null
-        });
-        publish({ home: path.home });
-        stage = "backup";
-        publish({ phase: "backup" });
-        publish({ backup: await backUp(adb, target) });
-
-        stage = "send";
-        publish({ phase: "install" });
-        await adb.push(REMOTE_APK, release.apk);
-        stage = "install";
-        const installed = await adb.shell(`pm install -r ${REMOTE_APK}`, 180_000);
-        await adb.shell(`rm -f ${REMOTE_APK}`).catch(() => "");
-        if (!installed.includes("Success")) {
-            await finish(adb, target, /VERIFICATION_FAILURE/.test(installed) ? "sideload-refused" : "install-failed");
-            return;
-        }
-        stage = "home";
-        for (const grant of grantCommands(blockAds)) await adb.shell(grant).catch(() => "");
-        // TCL's app-ops: a TV without that firmware answers an error, which changes nothing.
-        for (const line of path.afterInstall) await adb.shell(`${line} 2>/dev/null; true`).catch(() => "");
-
-        let outcome: TvOutcome = "installed";
-        if (makeHome && path.home === "offered") {
-            publish({ phase: "home" });
-            await adb.shell(`cmd package set-home-activity --user 0 ${HOME_ACTIVITY}`);
-            const resolved = await adb.shell(
-                "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
-            );
-            outcome = homeIsOurs(resolved) ? "installed-home" : "installed-home-refused";
-        }
-        await finish(adb, target, outcome);
-    } catch (caught) {
-        console.error("[tv]", caught);
-        await finish(adb, target, lateFailure(stage));
-    }
-}
-
-async function finish(adb: AdbConnection, target: TvTarget, outcome: TvOutcome): Promise<void> {
-    publish({ phase: "closing" });
-    const closed = await closeAdb(adb, target);
-    publish({ phase: outcome.startsWith("installed") ? "done" : "failed", outcome, closed });
+async function finish(
+  adb: AdbConnection,
+  target: TvTarget,
+  outcome: TvOutcome,
+): Promise<void> {
+  publish({ phase: "closing" });
+  const closed = await closeAdb(adb, target);
+  publish({
+    phase: outcome.startsWith("installed") ? "done" : "failed",
+    outcome,
+    closed,
+  });
 }
 
 /** Stops a search, or a wait for the TV, under way; an install is never stopped once the TV let this in. */
 function stopSearch(by?: WebContents): void {
-    pairing?.abort();
-    if (state.waiting || state.phase === "connecting") {
-        waitRun += 1;
-        // A prompt nobody answered would otherwise hold the cancel until it times out.
-        pending?.close();
-    }
-    if (state.phase !== "searching" || (by && searcher !== by)) return;
-    searcher = null;
-    search += 1;
-    busy = false;
-    publish({ phase: "ready" });
+  pairing?.abort();
+  if (state.waiting || state.phase === "connecting") {
+    waitRun += 1;
+    // A prompt nobody answered would otherwise hold the cancel until it times out.
+    pending?.close();
+  }
+  if (state.phase !== "searching" || (by && searcher !== by)) return;
+  searcher = null;
+  search += 1;
+  busy = false;
+  publish({ phase: "ready" });
 }
 
 /** The window. One at a time: a second click brings it forward. */
 export function openTvInstall(): void {
-    if (window && !window.isDestroyed()) {
-        window.show();
-        window.focus();
-        return;
-    }
-    window = openLocalWindow("tv", { title: "Install on a TV - Polaris", width: 560, height: 620 });
-    const contents = window.webContents;
-    window.on("closed", () => {
-        window = null;
-        // Closing stops a search it started, as closing the dashboard dialog does.
-        stopSearch(contents);
-    });
+  if (window && !window.isDestroyed()) {
+    window.show();
+    window.focus();
+    return;
+  }
+  window = openLocalWindow("tv", {
+    title: "Install on a TV - Polaris",
+    width: 560,
+    height: 620,
+  });
+  const contents = window.webContents;
+  window.on("closed", () => {
+    window = null;
+    // Closing stops a search it started, as closing the dashboard dialog does.
+    stopSearch(contents);
+  });
 }
 
 const startSchema = z.union([
-    z.object({
-        host: z.unknown().transform(readTvAddress).pipe(z.string()),
-        home: z.boolean(),
-        blockAds: z.boolean().optional(),
-        /** The Wireless debugging pairing code the TV shows; absent until it asked for one. */
-        code: z.string().max(32).optional()
-    }),
-    z.object({ usb: z.string().trim().min(1).max(200), home: z.boolean(), blockAds: z.boolean().optional() })
+  z.object({
+    host: z.unknown().transform(readTvAddress).pipe(z.string()),
+    home: z.boolean(),
+    blockAds: z.boolean().optional(),
+    /** The Wireless debugging pairing code the TV shows; absent until it asked for one. */
+    code: z.string().max(32).optional(),
+  }),
+  z.object({
+    usb: z.string().trim().min(1).max(200),
+    home: z.boolean(),
+    blockAds: z.boolean().optional(),
+  }),
 ]);
 
 /** Where a start asked to install; a USB id only counts if it was listed. */
-export function startTarget(input: z.infer<typeof startSchema>, listed: readonly { readonly id: string; }[] | null): TvTarget | null {
-    if ("host" in input) return { kind: "network", host: input.host };
-    return listed?.some((one) => one.id === input.usb) ? { kind: "usb", id: input.usb } : null;
+export function startTarget(
+  input: z.infer<typeof startSchema>,
+  listed: readonly { readonly id: string }[] | null,
+): TvTarget | null {
+  if ("host" in input) return { kind: "network", host: input.host };
+  return listed?.some((one) => one.id === input.usb)
+    ? { kind: "usb", id: input.usb }
+    : null;
 }
 
 /** `fromTv` accepts the TV window and a Polaris window on its own Polaris. */
-export function registerTvInstall(fromTv: (event: IpcMainInvokeEvent) => boolean): void {
-    ipcMain.handle(CHANNELS.tvState, (event) => {
-        if (!fromTv(event)) return null;
-        const page = event.sender;
-        if (!pages.has(page)) {
-            pages.add(page);
-            page.once("destroyed", () => pages.delete(page));
-        }
-        return state;
+export function registerTvInstall(
+  fromTv: (event: IpcMainInvokeEvent) => boolean,
+): void {
+  ipcMain.handle(CHANNELS.tvState, (event) => {
+    if (!fromTv(event)) return null;
+    const page = event.sender;
+    if (!pages.has(page)) {
+      pages.add(page);
+      page.once("destroyed", () => pages.delete(page));
+    }
+    return state;
+  });
+  ipcMain.handle(CHANNELS.tvCancel, (event) => {
+    if (!fromTv(event)) return null;
+    stopSearch();
+    return state;
+  });
+  ipcMain.handle(CHANNELS.tvFind, async (event) => {
+    if (!fromTv(event)) return null;
+    if (busy) return state;
+    busy = true;
+    search += 1;
+    searcher = event.sender;
+    const run = search;
+    publish({ phase: "searching", found: [] });
+    const { found, heard } = await findTvs(run).catch(() => ({
+      found: [],
+      heard: new Map<string, TvAnnouncement>(),
+    }));
+    // A cancelled search has already handed the controls back.
+    if (run !== search) return state;
+    busy = false;
+    searcher = null;
+    announced = heard;
+    publish({ phase: "ready", found, named: namesOf(heard) });
+    return state;
+  });
+  ipcMain.handle(CHANNELS.tvFindUsb, async (event) => {
+    if (!fromTv(event)) return null;
+    if (busy) return state;
+    busy = true;
+    publish({ usbListing: true });
+    const usb = await usbDevices().catch((caught: unknown) => {
+      console.error("[tv]", caught);
+      return [];
     });
-    ipcMain.handle(CHANNELS.tvCancel, (event) => {
-        if (!fromTv(event)) return null;
-        stopSearch();
-        return state;
+    busy = false;
+    publish({ usb, usbListing: false, outcome: null });
+    return state;
+  });
+  ipcMain.handle(CHANNELS.tvStart, async (event, raw: unknown) => {
+    const input = startSchema.safeParse(raw);
+    if (!fromTv(event) || !input.success || busy) return false;
+    const target = startTarget(input.data, state.usb);
+    const typed = "code" in input.data ? input.data.code : undefined;
+    const code = typed === undefined ? null : readPairingCode(typed);
+    if (!target || (typed !== undefined && !code)) return false;
+    busy = true;
+    void install(
+      target,
+      input.data.home,
+      input.data.blockAds === true,
+      code,
+    ).finally(() => {
+      busy = false;
     });
-    ipcMain.handle(CHANNELS.tvFind, async (event) => {
-        if (!fromTv(event)) return null;
-        if (busy) return state;
-        busy = true;
-        search += 1;
-        searcher = event.sender;
-        const run = search;
-        publish({ phase: "searching", found: [] });
-        const { found, heard } = await findTvs(run).catch(() => ({ found: [], heard: new Map<string, TvAnnouncement>() }));
-        // A cancelled search has already handed the controls back.
-        if (run !== search) return state;
-        busy = false;
-        searcher = null;
-        announced = heard;
-        publish({ phase: "ready", found, named: namesOf(heard) });
-        return state;
-    });
-    ipcMain.handle(CHANNELS.tvFindUsb, async (event) => {
-        if (!fromTv(event)) return null;
-        if (busy) return state;
-        busy = true;
-        publish({ usbListing: true });
-        const usb = await usbDevices().catch((caught: unknown) => {
-            console.error("[tv]", caught);
-            return [];
-        });
-        busy = false;
-        publish({ usb, usbListing: false, outcome: null });
-        return state;
-    });
-    ipcMain.handle(CHANNELS.tvStart, async (event, raw: unknown) => {
-        const input = startSchema.safeParse(raw);
-        if (!fromTv(event) || !input.success || busy) return false;
-        const target = startTarget(input.data, state.usb);
-        const typed = "code" in input.data ? input.data.code : undefined;
-        const code = typed === undefined ? null : readPairingCode(typed);
-        if (!target || (typed !== undefined && !code)) return false;
-        busy = true;
-        void install(target, input.data.home, input.data.blockAds === true, code).finally(() => {
-            busy = false;
-        });
-        return true;
-    });
+    return true;
+  });
 }

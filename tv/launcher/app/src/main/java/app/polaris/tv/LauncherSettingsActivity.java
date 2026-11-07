@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /** Remote-friendly settings owned by the launcher; system settings stay one row away. */
 public final class LauncherSettingsActivity extends Activity {
@@ -44,6 +45,7 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView openOnStartChoice;
     private TextView dnsChoice;
     private TextView updatesChoice;
+    private TextView languageChoice;
     private int columns;
     private int rowsBelowDock;
     private int dockOpacity;
@@ -65,6 +67,10 @@ public final class LauncherSettingsActivity extends Activity {
         });
         findViewById(R.id.polarisChoice).setOnClickListener(
                 v -> startActivity(new Intent(this, PolarisActivity.class)));
+        languageChoice = findViewById(R.id.languageChoice);
+        languageChoice.setOnClickListener(v -> openLanguages());
+        findViewById(R.id.tvSettingsChoice).setOnClickListener(v ->
+                open(SystemSettings.intent(this, Settings.ACTION_SETTINGS)));
         dnsChoice = findViewById(R.id.dnsChoice);
         dnsChoice.setOnClickListener(v -> openDns());
         updatesChoice = findViewById(R.id.updatesChoice);
@@ -181,8 +187,6 @@ public final class LauncherSettingsActivity extends Activity {
         });
         findViewById(R.id.defaultHomeChoice).setOnClickListener(v ->
                 open(new Intent(this, HomeSettingsActivity.class)));
-        findViewById(R.id.tvSettingsChoice).setOnClickListener(v ->
-                open(SystemSettings.intent(this, Settings.ACTION_SETTINGS)));
         refresh();
         if (config.launcherSettingsButton) reorderChoice.requestFocus();
         else columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
@@ -412,6 +416,7 @@ public final class LauncherSettingsActivity extends Activity {
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
         followThemeChoice.setSelected(!hasOnTvChoices());
+        languageChoice.setText(getString(R.string.language_row, languageLabel(Config.load(this).locale)));
         String dnsHost = PrivateDnsSwitch.of(this).ours();
         dnsChoice.setText(getString(R.string.dns_row,
                 dnsHost == null ? getString(R.string.off) : getString(R.string.dns_state_on, dnsHost)));
@@ -478,6 +483,42 @@ public final class LauncherSettingsActivity extends Activity {
             case INSTALLING: return getString(R.string.update_installing);
             default: return getString(R.string.polaris_unreachable);
         }
+    }
+
+    /** The languages the launcher is translated into, as tags; "" first for the TV's own. */
+    static final String[] LANGUAGES = {"", "en", "es", "es-419", "ca", "ast", "pt", "pt-PT", "fr", "it", "de",
+            "nl", "da", "sv", "nb", "fi", "pl", "cs", "uk", "ru", "sr-Latn", "tr", "ar", "he", "bn", "th", "vi",
+            "id", "uz", "ko", "zh-CN", "zh-TW"};
+
+    /** A language as its own speakers write it ("Español"), or "Same as the TV" for "". */
+    private String languageLabel(String tag) {
+        Locale locale = LauncherLocale.parse(tag);
+        if (locale == null) return getString(R.string.language_tv);
+        String name = locale.getDisplayName(locale);
+        return name.isEmpty() ? tag : name.substring(0, 1).toUpperCase(locale) + name.substring(1);
+    }
+
+    private void openLanguages() {
+        String current = Config.load(this).locale;
+        String[] names = new String[LANGUAGES.length];
+        int checked = 0;
+        for (int i = 0; i < LANGUAGES.length; i++) {
+            names[i] = languageLabel(LANGUAGES[i]);
+            if (LANGUAGES[i].equalsIgnoreCase(current == null ? "" : current.trim())) checked = i;
+        }
+        final int was = checked;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.language_title)
+                .setSingleChoiceItems(names, checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    if (which == was) return;
+                    choices.edit().putString(Config.LANGUAGE_KEY, LANGUAGES[which]).commit();
+                    changed();
+                    // Every screen wraps its context in the language when it starts, this one included.
+                    recreate();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private boolean hasOnTvChoices() {

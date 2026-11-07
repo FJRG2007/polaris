@@ -76,4 +76,9 @@
         <item quantity="one">%d alerta</item>
         <item quantity="other">%d alertas</item>
     </plurals>
+    <string name="polaris_from_install">Pulsa Conectar para vincular esta TV a %1$s.</string>
+    <string name="polaris_link_pill">Vincular a Polaris</string>
+    <string name="language_row">Idioma: %1$s</string>
+    <string name="language_title">Idioma</string>
+    <string name="language_tv">El mismo que la TV</string>
 </resources>

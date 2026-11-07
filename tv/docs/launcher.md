@@ -34,10 +34,10 @@ Themes set the same keys plus a background colour and a wallpaper.
 
 ## Launcher settings and the default home
 
-Click **Settings** for the TV's own settings. Hold OK on it for its menu:
+Click **Settings** for Launcher settings (`launcher_settings_button`, on by default since 3.6; a theme
+that sets it to `false` gets the TV's own settings there instead). Hold OK on it for its menu:
 
-- **Launcher settings**. With `launcher_settings_button` a click opens those instead, and the menu
-  leaves the row out.
+- **Launcher settings**, when a click opens the TV's settings instead.
 - **Native settings**, where the TV ships a settings app of its own beside Android's - Xiaomi China,
   TCL/FFALCON and Fire OS are in `settings_fallback_components` - because that app holds pages
   Android's has no row for, such as Xiaomi's Account & Security with the ADB switch.
@@ -51,6 +51,11 @@ Click **Settings** for the TV's own settings. Hold OK on it for its menu:
 The launcher's own page has these rows, top to bottom:
 
 - **Reorder apps**, only with `launcher_settings_button`, the same as the menu's.
+- **Polaris account**: link this TV to your Polaris, or see the one it is linked to. Until it is linked,
+  Home also shows a **Link to Polaris** pill that opens the same page.
+- **Language**: the launcher's own language, or **Same as the TV**. It outlives a theme change; a theme's
+  `locale` applies only while nothing was picked here.
+- **TV settings**, the TV's own settings app.
 - **Apps per row** 4, 5, 6 or 7; **Rows below dock** 0 to 3, how many rows of tiles stay visible under the
   dock band; **Dock band opacity** 100%, 70%, 50% or 30%. The last two only do anything while the dock is
   its own row (`dock_row`, on by default).

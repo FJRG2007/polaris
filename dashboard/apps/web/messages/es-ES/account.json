@@ -1463,6 +1463,7 @@
                     "list": "{items} y {last}",
                     "stop": "Parar"
                 },
+                "linking": "La TV muestra ahora este Polaris en su pantalla de vínculo. Pulsa OK en el mando para ver el código y escanéalo con el móvil.",
                 "outcomes": {
                     "installed": "Polaris TV está instalada. Búscala entre las apps de la TV.",
                     "installed-home": "Polaris TV está instalada y ya es la pantalla de inicio.",
