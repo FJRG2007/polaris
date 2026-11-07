@@ -84,6 +84,21 @@ label {
     color: var(--muted);
 }
 
+fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+legend {
+    padding: 0;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+}
+
 .field {
     position: relative;
     display: flex;
@@ -163,6 +178,20 @@ input[aria-invalid="true"] {
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+}
+
+/* A checkbox or radio beside its text: label alone stacks them in a column. */
+label.row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+}
+
+label.row > input {
+    flex-shrink: 0;
+    width: auto;
+    padding: 0;
+    margin-top: 2px;
 }
 
 .row.end {

@@ -5,7 +5,7 @@
 
 import { available, byId, say } from "./dom";
 import { readTvAddress } from "@/shared/tv-address";
-import type { TvInstallState, TvOutcome, TvPhase, TvWaiting } from "@/shared/bridge";
+import type { TvControl, TvControlRung, TvInstallState, TvOutcome, TvPhase, TvWaiting } from "@/shared/bridge";
 
 const STEPS: Partial<Record<TvPhase, string>> = {
     searching: "Looking for TVs on this network...",
@@ -16,6 +16,7 @@ const STEPS: Partial<Record<TvPhase, string>> = {
     download: "Downloading Polaris TV...",
     install: "Installing...",
     home: "Making it the Home screen...",
+    control: "Asking the TV for each permission...",
     closing: "Turning off debugging on the TV..."
 };
 
@@ -61,6 +62,29 @@ const OUTCOMES: Record<TvOutcome, string> = {
         "The TV did not accept that code. Open Pair device with pairing code again on the TV and type the new code it shows."
 };
 
+const RUNGS: Record<TvControlRung, string> = {
+    home: "Home screen",
+    "secure-settings": "Change system settings, for ad blocking and keeping its helpers on",
+    "notification-listener": "Restart itself when the TV closes it",
+    "install-packages": "Update itself",
+    battery: "Keep running when the TV saves power"
+};
+
+const CONTROL_STATES: Record<TvControl["state"], string> = {
+    got: "allowed",
+    refused: "refused by this TV",
+    skipped: "not tried on this TV"
+};
+
+const APP_ONLY = "Installed only as an app. Nothing else on the TV was changed.";
+
+/** One line per level the system mode tried; the one line an app-only install changed nothing past. */
+function controlLines(control: readonly TvControl[] | null | undefined): string[] {
+    if (!control) return [];
+    if (control.length === 0) return [APP_ONLY];
+    return control.map((one) => `${RUNGS[one.rung]}: ${CONTROL_STATES[one.state]}`);
+}
+
 const HOME_RULES = {
     "app-only": "This TV keeps its own Home screen, so Polaris TV opens as an app from the TV's apps.",
     "refused-by-maker": "The Home switch stays off: on this maker's TVs it has left a set unable to start."
@@ -85,7 +109,9 @@ const codeField = byId<HTMLLabelElement>("code-field");
 const code = byId<HTMLInputElement>("code");
 const addressError = byId<HTMLParagraphElement>("address-error");
 const found = byId<HTMLDivElement>("found");
-const home = byId<HTMLInputElement>("home");
+const modeSystem = byId<HTMLInputElement>("mode-system");
+const modeApp = byId<HTMLInputElement>("mode-app");
+const control = byId<HTMLUListElement>("control");
 const blockAds = byId<HTMLInputElement>("block-ads");
 const find = byId<HTMLButtonElement>("find");
 const start = byId<HTMLButtonElement>("start");
@@ -141,7 +167,8 @@ function render(state: TvInstallState): void {
     codeField.hidden = !pairing;
     code.disabled = !idle;
     address.disabled = !idle;
-    home.disabled = !idle;
+    modeSystem.disabled = !idle;
+    modeApp.disabled = !idle;
     blockAds.disabled = !idle;
     // A search can be stopped from the same button that started it.
     const searching = state.phase === "searching";
@@ -179,6 +206,15 @@ function render(state: TvInstallState): void {
     say(homeRule, state.home && state.home !== "offered" ? HOME_RULES[state.home] : null);
     const linking = state.phase === "done" && state.linking ? ` ${LINKING}` : "";
     say(result, state.outcome ? OUTCOMES[state.outcome] + linking : null);
+    const lines = state.phase === "done" ? controlLines(state.control) : [];
+    control.hidden = lines.length === 0;
+    control.replaceChildren(
+        ...lines.map((line) => {
+            const item = document.createElement("li");
+            item.textContent = line;
+            return item;
+        })
+    );
     heading.textContent = state.phase === "done" ? "Installed" : "Install on a TV";
     say(backup, state.backup ? `Backup kept on this computer: ${state.backup}` : null);
     say(
@@ -250,7 +286,8 @@ start.addEventListener("click", () => {
         return;
     }
     const usb = latest && overUsb ? usbTarget(latest) : null;
-    const choices = { home: home.checked, blockAds: blockAds.checked };
+    const mode = modeApp.checked ? "app" : "system";
+    const choices = { mode, home: mode === "system", blockAds: blockAds.checked } as const;
     const input = usb ? { usb, ...choices } : { host: address.value.trim(), ...choices, ...(asksCode() ? { code: code.value } : {}) };
     void bridge.start(input).then((started) => {
         notStarted = !started;

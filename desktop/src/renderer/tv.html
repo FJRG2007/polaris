@@ -56,10 +56,18 @@
                 </p>
             </div>
 
-            <label class="row">
-                <input id="home" type="checkbox" checked />
-                Make it the Home screen. The TV's own stays installed and enabled.
-            </label>
+            <fieldset class="stack">
+                <legend>How to install it</legend>
+                <label class="row">
+                    <input id="mode-system" type="radio" name="mode" value="system" checked />
+                    As the TV's system: it becomes the Home screen and gets every permission this TV allows. The
+                    TV's own Home stays installed and enabled.
+                </label>
+                <label class="row">
+                    <input id="mode-app" type="radio" name="mode" value="app" />
+                    Only as an app: nothing else on the TV changes.
+                </label>
+            </fieldset>
 
             <label class="row">
                 <input id="block-ads" type="checkbox" />
@@ -76,6 +84,7 @@
             <p id="waiting" role="status" hidden></p>
             <p id="home-rule" class="hint" hidden></p>
             <p id="result" role="status" hidden></p>
+            <ul id="control" class="hint" hidden></ul>
             <p id="closed" class="hint" hidden></p>
             <p id="backup" class="hint path" hidden></p>
 
